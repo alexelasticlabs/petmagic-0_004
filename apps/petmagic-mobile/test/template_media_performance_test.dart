@@ -175,6 +175,9 @@ void main() {
     final source = await File(
       'lib/features/templates/presentation/widgets/template_card.dart',
     ).readAsString();
+    final playbackManagerSource = await File(
+      'lib/features/templates/presentation/template_feed_playback_manager.dart',
+    ).readAsString();
 
     expect(
       source,
@@ -185,7 +188,7 @@ void main() {
     expect(
       source,
       contains(
-        "import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';",
+        "import 'package:petmagic_mobile/features/templates/presentation/template_feed_playback_manager.dart';",
       ),
     );
     expect(
@@ -201,8 +204,13 @@ void main() {
     expect(source, contains('_ensureVideoController()'));
     expect(source, contains('widget.template.previewAsset'));
     expect(source, contains('VisibilityDetector('));
-    expect(source, contains('_prewarmVisibilityFraction'));
-    expect(source, contains('_playVisibilityFraction'));
+    expect(
+      playbackManagerSource,
+      contains('videoEligibilityVisibilityFraction'),
+    );
+    expect(source, contains('widget.playbackManager?.updateCardVisibility('));
+    expect(source, contains('TemplateFeedDisplayLevel.videoPreview'));
+    expect(source, contains('snapshot?.mediaVersion'));
     expect(
       source,
       contains(
@@ -217,12 +225,15 @@ void main() {
     );
     expect(source, contains('AppLifecycleState.resumed'));
     expect(source, contains('_disposeVideoController()'));
-    expect(source, contains('bool _hasPreviewSlot = false;'));
+    expect(source, isNot(contains('bool _hasPreviewSlot = false;')));
     expect(
-      source,
-      contains('MediaLifecyclePolicy.tryAcquireVideoPreviewSlot()'),
+      playbackManagerSource,
+      contains('MediaLifecyclePolicy.tryAcquireVideoPreviewSlot('),
     );
-    expect(source, contains('MediaLifecyclePolicy.releaseVideoPreviewSlot()'));
+    expect(
+      playbackManagerSource,
+      contains('MediaLifecyclePolicy.releaseVideoPreviewSlot()'),
+    );
     expect(source, contains('createCachedTemplatePreviewVideoController('));
     expect(source, contains('await controller.setVolume(0);'));
     expect(source, contains('await controller.setLooping(true);'));

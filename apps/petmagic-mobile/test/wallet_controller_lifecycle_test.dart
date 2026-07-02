@@ -7,6 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
@@ -86,13 +88,15 @@ void main() {
 
     expect(source, contains('_walletController.setWalletPageVisible(true);'));
     expect(source, contains('_walletController.setWalletPageVisible(false);'));
+    expect(
+      source,
+      contains("!ref.read(appLaunchControllerProvider).isAuthenticated"),
+    );
   });
 
   test('wallet load completes safely after provider disposal', () async {
     final repository = _DelayedWalletRepository();
-    final container = ProviderContainer(
-      overrides: [walletRepositoryProvider.overrideWithValue(repository)],
-    );
+    final container = _walletTestContainer(repository);
 
     final controller = container.read(walletControllerProvider.notifier);
     final loadFuture = controller.load();
@@ -109,9 +113,7 @@ void main() {
     'stripe verification completes safely after provider disposal',
     () async {
       final repository = _DelayedWalletRepository();
-      final container = ProviderContainer(
-        overrides: [walletRepositoryProvider.overrideWithValue(repository)],
-      );
+      final container = _walletTestContainer(repository);
 
       final controller = container.read(walletControllerProvider.notifier);
       final checkout = await controller.buyPack(_pack, _stripeMethod);
@@ -127,15 +129,65 @@ void main() {
     },
   );
 
+  test('concurrent stripe verification shares one in-flight request', () async {
+    final repository = _DelayedWalletRepository();
+    final container = _walletTestContainer(repository);
+    addTearDown(container.dispose);
+
+    final controller = container.read(walletControllerProvider.notifier);
+    final checkout = await controller.buyPack(_pack, _stripeMethod);
+    expect(checkout?.orderId, 'order-1');
+
+    final firstVerification = controller.verifyStripeCheckout('cs_test_123');
+    await repository.verifyStripeStarted.future;
+
+    final secondVerification = controller.verifyStripeCheckout('cs_test_123');
+    await Future<void>.delayed(Duration.zero);
+
+    repository.completeVerifyStripe();
+    repository.completeFetchWallet();
+    await Future.wait([firstVerification, secondVerification]);
+
+    expect(repository.verifyStripeCalls, 1);
+  });
+
+  test(
+    'concurrent checkout status verification shares one in-flight polling loop',
+    () async {
+      final repository = _DelayedPurchaseStatusWalletRepository();
+      final container = _walletTestContainer(repository);
+      addTearDown(container.dispose);
+
+      final controller = container.read(walletControllerProvider.notifier);
+      final checkout = await controller.buyPack(_pack, _stripeMethod);
+      expect(checkout?.orderId, 'order-1');
+
+      final firstVerification = controller.verifyCheckoutStatus();
+      await repository.fetchPurchaseStarted.future;
+
+      final secondVerification = controller.verifyCheckoutStatus();
+      await Future<void>.delayed(Duration.zero);
+
+      repository.completeFetchPurchase();
+      repository.completeFetchWallet();
+      await Future.wait([firstVerification, secondVerification]);
+
+      expect(repository.fetchPurchaseCalls, 1);
+      final state = container.read(walletControllerProvider);
+      expect(
+        state.checkoutVerificationState,
+        WalletCheckoutVerificationState.succeeded,
+      );
+    },
+  );
+
   test(
     'wallet checkout rejects unsafe external checkout url before state update',
     () async {
       final repository = _DelayedWalletRepository(
         checkoutUrl: 'https://checkout.stripe.com@evil.example/session',
       );
-      final container = ProviderContainer(
-        overrides: [walletRepositoryProvider.overrideWithValue(repository)],
-      );
+      final container = _walletTestContainer(repository);
       addTearDown(container.dispose);
 
       final checkout = await container
@@ -157,9 +209,7 @@ void main() {
         '  RuntimeError: WALLET.NETWORK_UNAVAILABLE  ',
       ),
     );
-    final container = ProviderContainer(
-      overrides: [walletRepositoryProvider.overrideWithValue(repository)],
-    );
+    final container = _walletTestContainer(repository);
     addTearDown(container.dispose);
 
     final controller = container.read(walletControllerProvider.notifier);
@@ -176,9 +226,7 @@ void main() {
         ' AppException: wallet.payment_unavailable ',
       ),
     );
-    final container = ProviderContainer(
-      overrides: [walletRepositoryProvider.overrideWithValue(repository)],
-    );
+    final container = _walletTestContainer(repository);
     addTearDown(container.dispose);
 
     final controller = container.read(walletControllerProvider.notifier);
@@ -194,9 +242,7 @@ void main() {
     'buyPack double-submit guard ignores second call while first is in flight',
     () async {
       final repository = _DelayedWalletRepository();
-      final container = ProviderContainer(
-        overrides: [walletRepositoryProvider.overrideWithValue(repository)],
-      );
+      final container = _walletTestContainer(repository);
       addTearDown(container.dispose);
 
       final controller = container.read(walletControllerProvider.notifier);
@@ -213,9 +259,7 @@ void main() {
 
   test('wallet resume sync refreshes ledger pagination snapshot', () async {
     final repository = _LifecycleSyncWalletRepository();
-    final container = ProviderContainer(
-      overrides: [walletRepositoryProvider.overrideWithValue(repository)],
-    );
+    final container = _walletTestContainer(repository);
     addTearDown(container.dispose);
 
     final controller = container.read(walletControllerProvider.notifier);
@@ -236,13 +280,48 @@ void main() {
     expect(state.ledgerHasMore, isTrue);
   });
 
+  test('wallet resume sync skips background refresh while offline', () async {
+    final repository = _LifecycleSyncWalletRepository();
+    final container = _walletTestContainer(
+      repository,
+      networkStatusController: _TestWalletLifecycleNetworkStatusController(
+        initialHasInternet: false,
+      ),
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(walletControllerProvider.notifier);
+    await controller.load();
+
+    controller.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await Future<void>.delayed(Duration.zero);
+
+    final state = container.read(walletControllerProvider);
+    expect(repository.walletFetchCount, 1);
+    expect(state.wallet?.balance, 10);
+  });
+
+  test('wallet resume sync skips background refresh for guests', () async {
+    final repository = _LifecycleSyncWalletRepository();
+    final container = _walletTestContainer(repository, authenticated: false);
+    addTearDown(container.dispose);
+
+    final controller = container.read(walletControllerProvider.notifier);
+    await controller.load();
+
+    controller.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await Future<void>.delayed(Duration.zero);
+
+    final state = container.read(walletControllerProvider);
+    expect(repository.walletFetchCount, 1);
+    expect(state.wallet?.balance, 10);
+  });
+
   test(
     'wallet load marks full snapshot as hydrated after ancillary requests',
     () async {
       final repository = _LifecycleSyncWalletRepository();
-      final container = ProviderContainer(
-        overrides: [walletRepositoryProvider.overrideWithValue(repository)],
-      );
+      final container = _walletTestContainer(repository);
       addTearDown(container.dispose);
 
       final controller = container.read(walletControllerProvider.notifier);
@@ -257,9 +336,7 @@ void main() {
     'wallet load keeps snapshot unhydrated when ancillary request fails',
     () async {
       final repository = _PartialWalletRepository();
-      final container = ProviderContainer(
-        overrides: [walletRepositoryProvider.overrideWithValue(repository)],
-      );
+      final container = _walletTestContainer(repository);
       addTearDown(container.dispose);
 
       final controller = container.read(walletControllerProvider.notifier);
@@ -276,9 +353,7 @@ void main() {
     'wallet resume sync skips duplicate snapshot refresh while wallet page is visible',
     () async {
       final repository = _LifecycleSyncWalletRepository();
-      final container = ProviderContainer(
-        overrides: [walletRepositoryProvider.overrideWithValue(repository)],
-      );
+      final container = _walletTestContainer(repository);
       addTearDown(container.dispose);
 
       final controller = container.read(walletControllerProvider.notifier);
@@ -299,9 +374,7 @@ void main() {
     'wallet resume sync preserves already loaded older ledger pages without duplicates',
     () async {
       final repository = _LedgerPreservingSyncWalletRepository();
-      final container = ProviderContainer(
-        overrides: [walletRepositoryProvider.overrideWithValue(repository)],
-      );
+      final container = _walletTestContainer(repository);
       addTearDown(container.dispose);
 
       final controller = container.read(walletControllerProvider.notifier);
@@ -339,9 +412,7 @@ void main() {
 
   test('wallet refresh cancels in-flight ledger load more request', () async {
     final repository = _CancelableLedgerLoadMoreWalletRepository();
-    final container = ProviderContainer(
-      overrides: [walletRepositoryProvider.overrideWithValue(repository)],
-    );
+    final container = _walletTestContainer(repository);
     addTearDown(container.dispose);
 
     final controller = container.read(walletControllerProvider.notifier);
@@ -373,9 +444,7 @@ void main() {
     'wallet load more skips duplicate ledger entries from overlapping pages',
     () async {
       final repository = _OverlappingLedgerLoadMoreWalletRepository();
-      final container = ProviderContainer(
-        overrides: [walletRepositoryProvider.overrideWithValue(repository)],
-      );
+      final container = _walletTestContainer(repository);
       addTearDown(container.dispose);
 
       final controller = container.read(walletControllerProvider.notifier);
@@ -395,11 +464,30 @@ void main() {
     },
   );
 
+  test('wallet load more stays idle after sign-out', () async {
+    final repository = _OverlappingLedgerLoadMoreWalletRepository();
+    final launchController = _MutableWalletLifecycleAppLaunchController(false);
+    final container = ProviderContainer(
+      overrides: [
+        walletRepositoryProvider.overrideWithValue(repository),
+        appLaunchControllerProvider.overrideWith(() => launchController),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(walletControllerProvider.notifier);
+    await controller.loadMoreLedger();
+
+    expect(repository.ledgerFetchCalls, 0);
+    expect(
+      container.read(walletControllerProvider).isLoadingMoreLedger,
+      isFalse,
+    );
+  });
+
   test('claim ad reward refreshes ledger pagination snapshot', () async {
     final repository = _MutationLedgerWalletRepository();
-    final container = ProviderContainer(
-      overrides: [walletRepositoryProvider.overrideWithValue(repository)],
-    );
+    final container = _walletTestContainer(repository);
     addTearDown(container.dispose);
 
     final controller = container.read(walletControllerProvider.notifier);
@@ -415,9 +503,7 @@ void main() {
 
   test('redeem code refreshes ledger pagination snapshot', () async {
     final repository = _MutationLedgerWalletRepository();
-    final container = ProviderContainer(
-      overrides: [walletRepositoryProvider.overrideWithValue(repository)],
-    );
+    final container = _walletTestContainer(repository);
     addTearDown(container.dispose);
 
     final controller = container.read(walletControllerProvider.notifier);
@@ -435,7 +521,10 @@ void main() {
     'stripe verification logging does not include raw payment reference',
     () {
       final source = readWalletControllerLibrarySource();
-      final verifyBody = _methodBody(source, 'verifyStripeCheckout');
+      final verifyBody = _methodBody(
+        source,
+        '_performStripeCheckoutVerification',
+      );
 
       expect(verifyBody, contains("'reference_type'"));
       expect(verifyBody, contains('_stripeReferenceType(normalizedReference)'));
@@ -484,6 +573,39 @@ String _methodBody(String source, String methodName) {
   fail('Method $methodName body did not close.');
 }
 
+ProviderContainer _walletTestContainer(
+  WalletRepository repository, {
+  bool authenticated = true,
+  NetworkStatusController? networkStatusController,
+}) {
+  return ProviderContainer(
+    overrides: [
+      walletRepositoryProvider.overrideWithValue(repository),
+      appLaunchControllerProvider.overrideWith(
+        () => _MutableWalletLifecycleAppLaunchController(authenticated),
+      ),
+      if (networkStatusController != null)
+        networkStatusControllerProvider.overrideWith(
+          () => networkStatusController,
+        ),
+    ],
+  );
+}
+
+class _TestWalletLifecycleNetworkStatusController
+    extends NetworkStatusController {
+  _TestWalletLifecycleNetworkStatusController({
+    required this.initialHasInternet,
+  });
+
+  final bool initialHasInternet;
+
+  @override
+  NetworkStatusState build() {
+    return NetworkStatusState(hasInternet: initialHasInternet);
+  }
+}
+
 class _DelayedWalletRepository extends WalletRepository {
   _DelayedWalletRepository({
     this.checkoutUrl = 'https://checkout.stripe.com/session',
@@ -495,6 +617,7 @@ class _DelayedWalletRepository extends WalletRepository {
   final Completer<void> verifyStripeStarted = Completer<void>();
   final Completer<void> _verifyStripeCompleter = Completer<void>();
   CancelToken? fetchWalletCancelToken;
+  int verifyStripeCalls = 0;
 
   @override
   Stream<List<PurchaseDetails>> get purchaseUpdates => const Stream.empty();
@@ -583,6 +706,7 @@ class _DelayedWalletRepository extends WalletRepository {
     required String orderId,
     String? stripeReferenceId,
   }) async {
+    verifyStripeCalls++;
     if (!verifyStripeStarted.isCompleted) {
       verifyStripeStarted.complete();
     }
@@ -604,6 +728,42 @@ class _DelayedWalletRepository extends WalletRepository {
   void completeVerifyStripe() {
     if (!_verifyStripeCompleter.isCompleted) {
       _verifyStripeCompleter.complete();
+    }
+  }
+}
+
+class _DelayedPurchaseStatusWalletRepository extends _DelayedWalletRepository {
+  final Completer<void> fetchPurchaseStarted = Completer<void>();
+  final Completer<void> _fetchPurchaseCompleter = Completer<void>();
+  int fetchPurchaseCalls = 0;
+
+  @override
+  Future<PurchaseHistoryItem> fetchPurchase(
+    String orderId, {
+    CancelToken? cancelToken,
+  }) async {
+    fetchPurchaseCalls++;
+    if (!fetchPurchaseStarted.isCompleted) {
+      fetchPurchaseStarted.complete();
+    }
+
+    await _fetchPurchaseCompleter.future;
+    return PurchaseHistoryItem(
+      orderId: orderId,
+      packDisplayName: 'Starter Sparks',
+      paymentProvider: 'stripe',
+      status: 'succeeded',
+      priceAmount: 4.99,
+      currencyCode: 'USD',
+      sparkToGrant: 100,
+      createdAtUtc: DateTime.utc(2026, 1, 1),
+      confirmedAtUtc: DateTime.utc(2026, 1, 1, 0, 1),
+    );
+  }
+
+  void completeFetchPurchase() {
+    if (!_fetchPurchaseCompleter.isCompleted) {
+      _fetchPurchaseCompleter.complete();
     }
   }
 }
@@ -1042,6 +1202,8 @@ class _OverlappingLedgerLoadMoreWalletRepository extends WalletRepository {
   _OverlappingLedgerLoadMoreWalletRepository()
     : super(dio: Dio(), sessionStorage: AuthSessionStorage());
 
+  int ledgerFetchCalls = 0;
+
   @override
   Stream<List<PurchaseDetails>> get purchaseUpdates => const Stream.empty();
 
@@ -1056,6 +1218,7 @@ class _OverlappingLedgerLoadMoreWalletRepository extends WalletRepository {
     int take = 20,
     CancelToken? cancelToken,
   }) async {
+    ledgerFetchCalls++;
     final items = switch (skip) {
       0 => [
         WalletLedgerItem(
@@ -1158,6 +1321,23 @@ class _OverlappingLedgerLoadMoreWalletRepository extends WalletRepository {
     CancelToken? cancelToken,
   }) async {
     return const OffsetPagedModel(items: [], skip: 0, take: 20, hasMore: false);
+  }
+}
+
+class _MutableWalletLifecycleAppLaunchController extends AppLaunchController {
+  _MutableWalletLifecycleAppLaunchController(this._isAuthenticated);
+
+  final bool _isAuthenticated;
+
+  @override
+  AppLaunchState build() {
+    return AppLaunchState(
+      isLoading: false,
+      isAuthenticated: _isAuthenticated,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: true,
+    );
   }
 }
 

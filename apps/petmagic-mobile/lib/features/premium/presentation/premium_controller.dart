@@ -439,6 +439,7 @@ abstract class _PremiumControllerBase extends Notifier<PremiumState> {
   late PremiumRepository _repository;
   late PremiumRefreshProfile _refreshProfile;
   Future<void>? _loadInFlight;
+  Future<void>? _checkoutVerificationInFlight;
   CancelToken? _activeLoadCancelToken;
   CancelToken? _activeStatusRefreshCancelToken;
   bool _premiumLifecycleStarted = false;

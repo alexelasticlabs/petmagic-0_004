@@ -289,6 +289,24 @@ mixin _WalletControllerCheckout
 
   @override
   Future<void> verifyCheckoutStatus() async {
+    final inFlight = _checkoutVerificationInFlight;
+    if (inFlight != null) {
+      await inFlight;
+      return;
+    }
+
+    final operation = _performCheckoutStatusVerification();
+    _checkoutVerificationInFlight = operation;
+    try {
+      await operation;
+    } finally {
+      if (identical(_checkoutVerificationInFlight, operation)) {
+        _checkoutVerificationInFlight = null;
+      }
+    }
+  }
+
+  Future<void> _performCheckoutStatusVerification() async {
     final pendingOrderId = state.pendingCheckoutOrderId;
     if (pendingOrderId == null || pendingOrderId.isEmpty) {
       return;
@@ -357,6 +375,26 @@ mixin _WalletControllerCheckout
 
   @override
   Future<void> verifyStripeCheckout(String? stripeReferenceId) async {
+    final inFlight = _checkoutVerificationInFlight;
+    if (inFlight != null) {
+      await inFlight;
+      return;
+    }
+
+    final operation = _performStripeCheckoutVerification(stripeReferenceId);
+    _checkoutVerificationInFlight = operation;
+    try {
+      await operation;
+    } finally {
+      if (identical(_checkoutVerificationInFlight, operation)) {
+        _checkoutVerificationInFlight = null;
+      }
+    }
+  }
+
+  Future<void> _performStripeCheckoutVerification(
+    String? stripeReferenceId,
+  ) async {
     final pendingOrderId = state.pendingCheckoutOrderId;
     if (pendingOrderId == null || pendingOrderId.isEmpty) {
       return;
@@ -454,7 +492,7 @@ mixin _WalletControllerCheckout
       }
     }
 
-    await verifyCheckoutStatus();
+    await _performCheckoutStatusVerification();
   }
 
   @override

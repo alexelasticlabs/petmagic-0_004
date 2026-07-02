@@ -16,25 +16,45 @@ void main() {
     final cardSource = await File(
       'lib/features/templates/presentation/widgets/template_card.dart',
     ).readAsString();
+    final playbackManagerSource = await File(
+      'lib/features/templates/presentation/template_feed_playback_manager.dart',
+    ).readAsString();
     final contentSource = await File(
       'lib/features/templates/presentation/widgets/template_flow_media_preview.part.dart',
     ).readAsString().then((source) => source.replaceAll('\r\n', '\n'));
 
     expect(cardSource, contains('VisibilityDetector('));
-    expect(cardSource, contains('_prewarmVisibilityFraction'));
-    expect(cardSource, contains('_playVisibilityFraction'));
     expect(
-      cardSource,
-      contains('MediaLifecyclePolicy.tryAcquireVideoPreviewSlot()'),
+      playbackManagerSource,
+      contains('videoEligibilityVisibilityFraction'),
     );
     expect(
       cardSource,
-      contains('createTemplatePreviewVideoController(previewUrl)'),
+      contains(
+        "import 'package:petmagic_mobile/features/templates/presentation/template_feed_playback_manager.dart';",
+      ),
     );
+    expect(cardSource, contains('TemplateFeedDisplayLevel.videoPreview'));
     expect(
       cardSource,
-      contains('createCachedTemplatePreviewVideoController(previewUrl)'),
+      contains('widget.playbackManager?.updateCardVisibility('),
     );
+    expect(
+      playbackManagerSource,
+      contains(
+        "import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';",
+      ),
+    );
+    expect(
+      playbackManagerSource,
+      contains('MediaLifecyclePolicy.tryAcquireVideoPreviewSlot('),
+    );
+    expect(
+      playbackManagerSource,
+      contains('MediaLifecyclePolicy.releaseVideoPreviewSlot()'),
+    );
+    expect(cardSource, contains('createTemplatePreviewVideoController('));
+    expect(cardSource, contains('createCachedTemplatePreviewVideoController('));
     expect(cardSource, isNot(contains('VideoPlayerController.networkUrl(')));
 
     expect(

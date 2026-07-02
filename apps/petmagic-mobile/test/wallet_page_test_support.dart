@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
@@ -114,6 +115,7 @@ Future<void> pumpWalletPage(
   WidgetTester tester, {
   required WalletRepository repository,
   bool authenticated = true,
+  NetworkStatusController? networkStatusController,
 }) async {
   addTearDown(() => PetMagicNotificationCenter.instance.clearQueue());
 
@@ -126,6 +128,10 @@ Future<void> pumpWalletPage(
               : UnauthenticatedWalletAppLaunchController.new,
         ),
         walletRepositoryProvider.overrideWithValue(repository),
+        if (networkStatusController != null)
+          networkStatusControllerProvider.overrideWith(
+            () => networkStatusController,
+          ),
       ],
       child: MaterialApp.router(
         theme: AppTheme.dark(),
@@ -157,10 +163,26 @@ Future<void> pumpWalletPage(
   await tester.pump(const Duration(milliseconds: 300));
 }
 
+class TestWalletNetworkStatusController extends NetworkStatusController {
+  TestWalletNetworkStatusController({required this.initialHasInternet});
+
+  final bool initialHasInternet;
+
+  @override
+  NetworkStatusState build() {
+    return NetworkStatusState(hasInternet: initialHasInternet);
+  }
+
+  void setHasInternet(bool value) {
+    state = state.copyWith(hasInternet: value);
+  }
+}
+
 Future<void> pumpRewardsPage(
   WidgetTester tester, {
   required WalletRepository repository,
   bool authenticated = true,
+  NetworkStatusController? networkStatusController,
 }) async {
   addTearDown(() => PetMagicNotificationCenter.instance.clearQueue());
 
@@ -173,6 +195,10 @@ Future<void> pumpRewardsPage(
               : UnauthenticatedWalletAppLaunchController.new,
         ),
         walletRepositoryProvider.overrideWithValue(repository),
+        if (networkStatusController != null)
+          networkStatusControllerProvider.overrideWith(
+            () => networkStatusController,
+          ),
       ],
       child: MaterialApp.router(
         theme: AppTheme.dark(),

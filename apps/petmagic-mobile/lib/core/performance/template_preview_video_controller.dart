@@ -5,12 +5,19 @@ import 'package:video_player/video_player.dart';
 
 Future<VideoPlayerController> createCachedTemplatePreviewVideoController(
   String previewUrl, {
+  int? mediaVersion,
   Uri? fallbackUri,
 }) async {
   File? cachedFile;
   try {
-    cachedFile = await TemplateMediaCache.getCachedPreviewFile(previewUrl);
-    cachedFile ??= await TemplateMediaCache.fetchPreviewFile(previewUrl);
+    cachedFile = await TemplateMediaCache.getCachedPreviewFile(
+      previewUrl,
+      mediaVersion: mediaVersion,
+    );
+    cachedFile ??= await TemplateMediaCache.fetchPreviewFile(
+      previewUrl,
+      mediaVersion: mediaVersion,
+    );
   } catch (error) {
     if (_isPreviewCacheInvalidation(error)) {
       rethrow;

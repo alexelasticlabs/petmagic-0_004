@@ -21,33 +21,38 @@ void main() {
             jsonEncode({
               'items': [
                 {
-                  'templateId': 'template-video-1',
-                  'templateType': 'Video',
+                  'id': 'template-video-1',
+                  'type': 'Video',
                   'title': 'Magic portrait',
                   'shortDescription': 'Animated pet portrait',
-                  'category': 'Portrait',
-                  'effectivePromoBadge': 'Trending',
+                  'category': {
+                    'id': null,
+                    'slug': 'portrait',
+                    'title': 'Portrait',
+                  },
                   'tags': ['portrait', 'video'],
                   'isPremium': true,
-                  'tokenCost': 25,
-                  'previewAsset': {
-                    'url': 'https://cdn.petmagic.test/preview.mp4',
-                    'fileName': 'preview.mp4',
-                    'contentType': 'video/mp4',
-                    'fileSizeBytes': 123456,
-                    'durationSeconds': 4.8,
+                  'access': 'premium',
+                  'thumbnailUrl': 'https://cdn.petmagic.test/thumb.jpg',
+                  'media': {
+                    'thumbnailUrl': 'https://cdn.petmagic.test/thumb.jpg',
+                    'animatedPreviewUrl':
+                        'https://cdn.petmagic.test/animated.webp',
+                    'feedLoopLowUrl': 'https://cdn.petmagic.test/low.mp4',
+                    'feedLoopMediumUrl': 'https://cdn.petmagic.test/medium.mp4',
+                    'mediaKind': 'video',
+                    'aspectRatio': null,
+                    'durationMs': 4800,
+                    'sizeBytes': 123456,
+                    'dominantColor': '#123456',
+                    'blurHash': 'LEHV6nWB2yk8pyo0adR*.7kCMdnj',
+                    'mediaVersion': 43,
                   },
-                  'musicDescription': 'Soft cinematic loop',
-                  'referenceVideoDurationSeconds': 4.8,
-                  'thumbnailUrl': null,
-                  'petPhotoRequirements': ['Clear pet face', 'Good lighting'],
-                  'supportsGenerationResultInput': true,
-                  'requiredInputMediaType': 'Image',
-                  'recommendedAfterImageGeneration': true,
-                  'supportsGenerateSimilar': false,
-                  'defaultVariationStrength': 'high',
+                  'mediaKind': 'video',
+                  'durationMs': 4800,
+                  'sizeBytes': 123456,
                   'version': 42,
-                  'updatedAtUtc': '2026-06-15T12:00:00Z',
+                  'mediaVersion': 43,
                 },
               ],
               'nextCursor': 'next-cursor',
@@ -78,19 +83,36 @@ void main() {
       final item = response.items.single;
       expect(item.templateId, 'template-video-1');
       expect(item.templateType, 'Video');
+      expect(item.category, 'Portrait');
+      expect(item.thumbnailUrl, 'https://cdn.petmagic.test/thumb.jpg');
+      expect(
+        item.animatedPreviewUrl,
+        'https://cdn.petmagic.test/animated.webp',
+      );
+      expect(item.feedLoopLowUrl, 'https://cdn.petmagic.test/low.mp4');
+      expect(item.feedLoopMediumUrl, 'https://cdn.petmagic.test/medium.mp4');
+      expect(item.mediaKind, 'video');
+      expect(item.durationMs, 4800);
+      expect(item.sizeBytes, 123456);
+      expect(item.mediaVersion, 43);
+      expect(item.previewAsset?.url, 'https://cdn.petmagic.test/medium.mp4');
       expect(item.previewAsset?.contentType, 'video/mp4');
       expect(item.previewAsset?.durationSeconds, 4.8);
-      expect(item.petPhotoRequirements, ['Clear pet face', 'Good lighting']);
-      expect(item.effectivePromoBadge, 'Trending');
+      expect(item.petPhotoRequirements, isEmpty);
       expect(item.version, 42);
-      expect(item.updatedAtUtc, DateTime.utc(2026, 6, 15, 12));
+      expect(item.updatedAtUtc, isNull);
       final domainItem = item.toDomain();
       expect(domainItem.templateType, TemplateType.video);
-      expect(domainItem.supportsGenerationResultInput, isTrue);
-      expect(domainItem.requiredInputMediaType, TemplateType.image);
-      expect(domainItem.recommendedAfterImageGeneration, isTrue);
-      expect(domainItem.supportsGenerateSimilar, isFalse);
-      expect(domainItem.defaultVariationStrength, 'high');
+      expect(domainItem.feedLoopLowUrl, 'https://cdn.petmagic.test/low.mp4');
+      expect(
+        domainItem.feedLoopMediumUrl,
+        'https://cdn.petmagic.test/medium.mp4',
+      );
+      expect(domainItem.supportsGenerationResultInput, isFalse);
+      expect(domainItem.requiredInputMediaType, isNull);
+      expect(domainItem.recommendedAfterImageGeneration, isFalse);
+      expect(domainItem.supportsGenerateSimilar, isTrue);
+      expect(domainItem.defaultVariationStrength, 'medium');
       expect(capturedOptions?.path, '/api/templates/feed');
       expect(capturedOptions?.queryParameters, {
         'type': 'Video',

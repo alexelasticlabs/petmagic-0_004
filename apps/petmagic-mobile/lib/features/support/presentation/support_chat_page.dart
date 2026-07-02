@@ -573,7 +573,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
       }
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!_scrollController.hasClients) {
+        if (!mounted || !_scrollController.hasClients) {
           return;
         }
 

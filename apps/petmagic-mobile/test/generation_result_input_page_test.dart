@@ -163,6 +163,7 @@ class _ResultInputRepository extends TemplateGenerationRepository {
           isPremium: false,
           isRecommended: true,
           tokenCost: 3,
+          version: 7,
         ),
       ],
     );
@@ -184,6 +185,7 @@ class _ResultInputRepository extends TemplateGenerationRepository {
   Future<TemplateGenerationResult> startGenerationFromResult({
     required String parentGenerationResultId,
     required String templateId,
+    int? expectedTemplateVersion,
     String? correlationId,
     CancelToken? cancelToken,
   }) async {

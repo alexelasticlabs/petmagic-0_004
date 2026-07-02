@@ -165,6 +165,62 @@ void main() {
   );
 
   test(
+    'template media cache keys include mediaVersion without changing request url',
+    () async {
+      await TemplateMediaCache.clearAll();
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      var requestCount = 0;
+      final requestedQueries = <String>[];
+      final subscription = server.listen((request) async {
+        if (request.uri.path == '/versioned-preview.mp4') {
+          requestCount += 1;
+          requestedQueries.add(request.uri.query);
+          request.response.headers
+            ..contentType = ContentType('video', 'mp4')
+            ..set(HttpHeaders.cacheControlHeader, 'max-age=3600');
+          const bytes = [0, 0, 0, 24, 102, 116, 121, 112, 109, 112, 52, 50];
+          request.response.contentLength = bytes.length;
+          request.response.add(bytes);
+          await request.response.close();
+          return;
+        }
+
+        request.response.statusCode = HttpStatus.notFound;
+        await request.response.close();
+      });
+      addTearDown(() async {
+        await subscription.cancel();
+        await server.close(force: true);
+        await TemplateMediaCache.clearAll();
+      });
+
+      final previewUrl =
+          'http://${server.address.host}:${server.port}/versioned-preview.mp4';
+      final v1 = await TemplateMediaCache.fetchPreviewFile(
+        previewUrl,
+        mediaVersion: 1,
+      );
+      final v1Again = await TemplateMediaCache.fetchPreviewFile(
+        previewUrl,
+        mediaVersion: 1,
+      );
+      final v2 = await TemplateMediaCache.fetchPreviewFile(
+        previewUrl,
+        mediaVersion: 2,
+      );
+
+      expect(v1.path, v1Again.path);
+      expect(v2.path, isNot(v1.path));
+      expect(requestCount, 2);
+      expect(requestedQueries, ['', '']);
+      expect(
+        TemplateMediaCache.cacheKeyForMedia(previewUrl, mediaVersion: 1),
+        isNot(TemplateMediaCache.cacheKeyForMedia(previewUrl, mediaVersion: 2)),
+      );
+    },
+  );
+
+  test(
     'template media cache rejects in-flight downloads after explicit removal',
     () async {
       await TemplateMediaCache.clearAll();

@@ -9,6 +9,7 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';
 import 'package:petmagic_mobile/core/performance/template_media_cache.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
+import 'package:petmagic_mobile/features/templates/presentation/template_feed_playback_manager.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_card.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_player_platform_interface/video_player_platform_interface.dart';
@@ -136,15 +137,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 120));
 
       expect(fakePlatform.createCalls, equals(1));
-      await pumpUntil(
-        tester,
-        () =>
-            fakePlatform.loopingValues.contains(true) &&
-            fakePlatform.volumeValues.contains(0),
-        timeout: const Duration(seconds: 1),
-      );
-      expect(fakePlatform.loopingValues, [true]);
-      expect(fakePlatform.volumeValues, [0]);
+      expect(MediaLifecyclePolicy.activeVideoPreviews, equals(0));
 
       detector.onVisibilityChanged?.call(
         VisibilityInfo(
@@ -155,7 +148,16 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 120));
 
-      expect(fakePlatform.createCalls, equals(1));
+      expect(fakePlatform.createCalls, equals(2));
+      await pumpUntil(
+        tester,
+        () =>
+            fakePlatform.loopingValues.contains(true) &&
+            fakePlatform.volumeValues.contains(0),
+        timeout: const Duration(seconds: 1),
+      );
+      expect(fakePlatform.loopingValues, everyElement(true));
+      expect(fakePlatform.volumeValues, everyElement(0));
       expect(fakePlatform.playCalls, greaterThan(0));
       final firstPlayIndex = fakePlatform.operations.indexOf('play');
       expect(firstPlayIndex, greaterThan(-1));
@@ -466,7 +468,7 @@ void main() {
     },
   );
 
-  testWidgets('TemplateCard keeps video preview alive while tab is offstage', (
+  testWidgets('TemplateCard releases video preview when card leaves viewport', (
     tester,
   ) async {
     final template = videoTemplate(
@@ -509,15 +511,14 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 1000));
 
-    expect(fakePlatform.disposeCalls, equals(0));
-    expect(MediaLifecyclePolicy.activeVideoPreviews, equals(1));
+    expect(MediaLifecyclePolicy.activeVideoPreviews, equals(0));
 
     hostState.setEnabled(true);
     await tester.pump();
     showTemplateCard(tester);
     await tester.pump(const Duration(milliseconds: 120));
 
-    expect(fakePlatform.createCalls, equals(1));
+    expect(fakePlatform.createCalls, equals(2));
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 80));
@@ -614,16 +615,16 @@ void main() {
     }
     await pumpUntil(
       tester,
-      () => fakePlatform.createCalls >= 4,
+      () => fakePlatform.createCalls >= 2,
       timeout: const Duration(seconds: 1),
     );
 
-    expect(MediaLifecyclePolicy.activeVideoPreviews, equals(4));
-    expect(fakePlatform.createCalls, equals(4));
+    expect(MediaLifecyclePolicy.activeVideoPreviews, equals(2));
+    expect(fakePlatform.createCalls, equals(2));
     expect(
       fakePlatform.createdUris,
       templates
-          .take(4)
+          .take(2)
           .map((template) => template.previewAsset!.url)
           .toList(growable: false),
     );
@@ -636,6 +637,53 @@ void main() {
     );
 
     expect(MediaLifecyclePolicy.activeVideoPreviews, equals(0));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('TemplateCard uses adaptive feed loop url selected by manager', (
+    tester,
+  ) async {
+    final template = videoTemplate(
+      id: 'video-template-adaptive-quality',
+      previewUrl: 'https://cdn.example.com/templates/detail-preview.mp4',
+      feedLoopLowUrl: 'https://cdn.example.com/templates/feed-low.mp4',
+      feedLoopMediumUrl: 'https://cdn.example.com/templates/feed-medium.mp4',
+      mediaVersion: 12,
+    );
+    final manager = TemplateFeedPlaybackManager()
+      ..configure(
+        environment: const TemplateFeedPlaybackEnvironment(
+          networkClass: TemplateFeedNetworkClass.cellular,
+        ),
+      );
+    final requestedUrls = <String>[];
+
+    await tester.pumpWidget(
+      buildTemplateCardHost(
+        template,
+        playbackManager: manager,
+        previewControllerFactory: (previewUrl) async {
+          requestedUrls.add(previewUrl);
+          return VideoPlayerController.networkUrl(Uri.parse(previewUrl));
+        },
+      ),
+    );
+    await tester.pump();
+    showTemplateCard(tester);
+    await tester.pump(const Duration(milliseconds: 120));
+
+    expect(requestedUrls, ['https://cdn.example.com/templates/feed-low.mp4']);
+    expect(fakePlatform.createdUris, [
+      'https://cdn.example.com/templates/feed-low.mp4',
+    ]);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await pumpUntil(
+      tester,
+      () => MediaLifecyclePolicy.activeVideoPreviews == 0,
+      timeout: const Duration(seconds: 1),
+    );
+
     expect(tester.takeException(), isNull);
   });
 

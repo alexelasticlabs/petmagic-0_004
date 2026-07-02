@@ -42,11 +42,6 @@ String etaLabel(AppLocalizations text, TemplateGenerationResult generation) {
     }
   }
 
-  final estimated = generation.estimatedDurationLabel;
-  if (estimated != null && estimated.isNotEmpty) {
-    return text.generationStatusEtaEstimated(estimated);
-  }
-
   if (generation.stage == 'queued') {
     return text.generationStatusEtaQueued;
   }

@@ -238,7 +238,7 @@ mixin _WalletControllerLoading
 
   @override
   Future<void> loadMoreLedger({bool force = false}) async {
-    if (!ref.mounted) {
+    if (!ref.mounted || !_hasAuthenticatedWalletSession()) {
       return;
     }
 

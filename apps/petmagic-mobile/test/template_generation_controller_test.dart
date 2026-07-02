@@ -125,6 +125,89 @@ void main() {
     },
   );
 
+  test('premium wallet can pass premium template generation gate', () async {
+    final container = ProviderContainer(
+      overrides: [
+        templateGenerationRepositoryProvider.overrideWithValue(
+          _FakeTemplateGenerationRepository(),
+        ),
+        walletControllerProvider.overrideWith(
+          () => _FakeWalletController(_wallet(balance: 100, isPremium: true)),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(
+      templateGenerationControllerProvider.notifier,
+    );
+
+    final gate = await controller.checkGate(
+      _template(tokenCost: 50, isPremium: true),
+    );
+
+    expect(gate.kind, TemplateGenerationGateKind.allowed);
+    expect(gate.isPremium, isTrue);
+  });
+
+  test('free wallet keeps premium template generation gated', () async {
+    final repository = _FakeTemplateGenerationRepository();
+    final container = ProviderContainer(
+      overrides: [
+        templateGenerationRepositoryProvider.overrideWithValue(repository),
+        walletControllerProvider.overrideWith(
+          () => _FakeWalletController(_wallet(balance: 100)),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(
+      templateGenerationControllerProvider.notifier,
+    );
+
+    final gate = await controller.checkGate(
+      _template(tokenCost: 50, isPremium: true),
+    );
+
+    expect(gate.kind, TemplateGenerationGateKind.premiumRequired);
+    expect(gate.isPremium, isFalse);
+    expect(repository.startCalls, 0);
+  });
+
+  test(
+    'premium generation flow starts after premium gate is allowed',
+    () async {
+      final repository = _FakeTemplateGenerationRepository();
+      final container = ProviderContainer(
+        overrides: [
+          templateGenerationRepositoryProvider.overrideWithValue(repository),
+          walletControllerProvider.overrideWith(
+            () => _FakeWalletController(_wallet(balance: 100, isPremium: true)),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(
+        templateGenerationControllerProvider.notifier,
+      );
+      controller.selectPhoto(XFile('pet.jpg', name: 'pet.jpg'));
+
+      final gate = await controller.checkGate(
+        _template(tokenCost: 50, isPremium: true),
+      );
+      expect(gate.kind, TemplateGenerationGateKind.allowed);
+
+      final generation = await controller.startGeneration(
+        _template(tokenCost: 50, isPremium: true),
+      );
+
+      expect(generation, isNotNull);
+      expect(repository.startCalls, 1);
+    },
+  );
+
   test('stops polling when generation refresh fails', () async {
     final repository = _FakeTemplateGenerationRepository(
       startResult: _generation(status: TemplateGenerationStatus.queued),
@@ -668,6 +751,7 @@ class _FakeTemplateGenerationRepository
   Future<TemplateGenerationResult> startGeneration({
     required String templateId,
     required XFile sourceImage,
+    int? expectedTemplateVersion,
     String? correlationId,
     CancelToken? cancelToken,
   }) async {
@@ -919,6 +1003,7 @@ class _FakeTemplateGenerationRepository
   Future<TemplateGenerationResult> startGenerationFromResult({
     required String parentGenerationResultId,
     required String templateId,
+    int? expectedTemplateVersion,
     String? correlationId,
     CancelToken? cancelToken,
   }) async {
@@ -930,6 +1015,7 @@ class _FakeTemplateGenerationRepository
     required String petId,
     String? petPhotoId,
     required String templateId,
+    int? expectedTemplateVersion,
     String? correlationId,
     CancelToken? cancelToken,
   }) async {
@@ -1125,7 +1211,7 @@ class _FakeWalletController extends WalletController {
   }
 }
 
-TemplateItem _template({required int tokenCost}) {
+TemplateItem _template({required int tokenCost, bool isPremium = false}) {
   return TemplateItem(
     templateId: 'template-1',
     templateType: TemplateType.image,
@@ -1134,7 +1220,7 @@ TemplateItem _template({required int tokenCost}) {
     petPhotoRequirements: const ['Clear face'],
     category: 'Portrait',
     tags: const ['portrait'],
-    isPremium: false,
+    isPremium: isPremium,
     tokenCost: tokenCost,
   );
 }
@@ -1160,12 +1246,12 @@ TemplateGenerationResult _generation({
   );
 }
 
-WalletStateModel _wallet({required int balance}) {
+WalletStateModel _wallet({required int balance, bool isPremium = false}) {
   return WalletStateModel(
     userId: 'user-1',
     balance: balance,
     adRewardsRemainingToday: 0,
-    isPremium: false,
+    isPremium: isPremium,
     updatedAtUtc: DateTime.utc(2026, 5, 25),
   );
 }

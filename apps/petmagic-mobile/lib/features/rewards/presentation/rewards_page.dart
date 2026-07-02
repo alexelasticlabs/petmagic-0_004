@@ -125,6 +125,10 @@ class _RewardsPageState extends ConsumerState<RewardsPage>
 
     final walletState = ref.read(walletControllerProvider);
     final hasInternet = ref.read(networkStatusControllerProvider).hasInternet;
+    if (!hasInternet) {
+      return;
+    }
+
     final unavailableKind =
         walletState.wallet == null && !walletState.isInitialLoading
         ? classifyAppUnavailable(

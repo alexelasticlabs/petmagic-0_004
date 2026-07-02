@@ -485,6 +485,44 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'My Pets does not refetch unavailable state on offline resume and retries on reconnect',
+    (tester) async {
+      final networkController = TestMyPetsNetworkStatusController(
+        initialHasInternet: false,
+      );
+      final repository = FakePetRepository(
+        pets: const [],
+        fetchPetsError: const FormatException(
+          'raw socket trace /private/token should never reach the UI',
+        ),
+      );
+
+      await pumpMyPets(
+        tester,
+        repository: repository,
+        brightness: Brightness.light,
+        networkStatusController: networkController,
+      );
+
+      expect(repository.petsFetchCount, 1);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+
+      expect(repository.petsFetchCount, 1);
+
+      networkController.setHasInternet(true);
+      await tester.pump();
+      await tester.pump();
+
+      expect(repository.petsFetchCount, 2);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('My Pets create action preserves reserved pet ID for templates', (
     tester,
   ) async {

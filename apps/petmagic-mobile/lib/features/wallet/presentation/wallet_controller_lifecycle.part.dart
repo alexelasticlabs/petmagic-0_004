@@ -106,8 +106,15 @@ mixin _WalletControllerLifecycle on _WalletControllerBase {
   }
 
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && !_isWalletPageVisible) {
-      unawaited(_syncWalletSnapshot(forceRefresh: true));
+    if (state != AppLifecycleState.resumed || _isWalletPageVisible) {
+      return;
     }
+
+    if (!ref.read(appLaunchControllerProvider).isAuthenticated ||
+        !ref.read(networkStatusControllerProvider).hasInternet) {
+      return;
+    }
+
+    unawaited(_syncWalletSnapshot(forceRefresh: true));
   }
 }

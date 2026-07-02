@@ -17,7 +17,17 @@ enum TemplateGenerationStatus {
 }
 
 TemplateGenerationStatus templateGenerationStatusFromApi(String value) {
-  return switch (value.toLowerCase()) {
+  return switch (value.trim().toLowerCase()) {
+    '1' => TemplateGenerationStatus.queued,
+    '2' => TemplateGenerationStatus.processing,
+    '3' => TemplateGenerationStatus.completed,
+    '4' => TemplateGenerationStatus.failed,
+    '5' => TemplateGenerationStatus.cancelled,
+    '6' => TemplateGenerationStatus.processing,
+    '7' => TemplateGenerationStatus.submittingToProvider,
+    '8' => TemplateGenerationStatus.providerQueued,
+    '9' => TemplateGenerationStatus.providerProcessing,
+    '10' => TemplateGenerationStatus.importingMedia,
     'uploading' => TemplateGenerationStatus.uploading,
     'processing' => TemplateGenerationStatus.processing,
     'preprocessing' => TemplateGenerationStatus.preprocessing,
@@ -368,6 +378,7 @@ class CompatibleGenerationTemplate {
     required this.isPremium,
     required this.isRecommended,
     required this.tokenCost,
+    required this.version,
     this.thumbnailUrl,
   });
 
@@ -378,6 +389,7 @@ class CompatibleGenerationTemplate {
   final bool isPremium;
   final bool isRecommended;
   final int tokenCost;
+  final int version;
 
   bool get isVideo => templateType == TemplateType.video;
 }

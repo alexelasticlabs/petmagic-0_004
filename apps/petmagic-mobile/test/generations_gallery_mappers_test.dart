@@ -51,7 +51,7 @@ void main() {
       );
       expect(
         estimatedTimeLabel(text, processing),
-        text.generationStatusEtaEstimated('1 min'),
+        text.generationStatusEtaNotifyHint,
       );
 
       final finalizing = _generation(stage: 'processing', progressPercent: 95);

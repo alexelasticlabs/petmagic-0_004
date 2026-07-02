@@ -4,8 +4,9 @@ class MediaLifecyclePolicy {
   static const int _maxConcurrentVideoPreviews = 4;
   static int _activeVideoPreviews = 0;
 
-  static bool tryAcquireVideoPreviewSlot() {
-    if (_activeVideoPreviews >= _maxConcurrentVideoPreviews) {
+  static bool tryAcquireVideoPreviewSlot({int? maxConcurrent}) {
+    final budget = maxConcurrent ?? _maxConcurrentVideoPreviews;
+    if (_activeVideoPreviews >= budget) {
       return false;
     }
     _activeVideoPreviews += 1;

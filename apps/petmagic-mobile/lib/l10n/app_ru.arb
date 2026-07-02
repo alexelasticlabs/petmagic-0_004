@@ -1038,6 +1038,8 @@
   "templateFlowUploadPetPhotoLockedAction": "Загрузка фото доступна в Premium",
   "templateFlowPremiumRequiredError": "Этот шаблон доступен только с Premium.",
   "templateFlowInsufficientBalanceError": "Недостаточно PawSpark для запуска генерации.",
+  "templateFlowTemplateUnavailableError": "Этот шаблон больше недоступен. Выберите другой шаблон в ленте.",
+  "templateFlowTemplateChangedError": "Шаблон был обновлен. Откройте его из ленты заново и попробуйте еще раз.",
   "templateFlowNetworkError": "Нет соединения. Проверьте интернет и попробуйте снова.",
   "templateFlowServerError": "Сервис временно недоступен. Попробуйте чуть позже.",
   "templateFlowStartFailedError": "Не удалось запустить генерацию. Попробуйте еще раз.",
@@ -1108,7 +1110,7 @@
   "generationStatusCancelQueuedHint": "Отменить можно, пока генерация ещё ждёт в очереди.",
   "generationStatusCancelQueuedAction": "Отменить генерацию",
   "generationStatusCancelQueuedTitle": "Отменить генерацию?",
-  "generationStatusCancelQueuedMessage": "Это сработает только пока генерация в очереди. Если PawSpark были зарезервированы, backend вернёт их автоматически.",
+  "generationStatusCancelQueuedMessage": "Это сработает только пока генерация в очереди. Если PawSpark были зарезервированы, они автоматически вернутся на ваш баланс.",
   "generationStatusCancelQueuedKeepAction": "Продолжить ждать",
   "generationStatusCancelQueuedConfirmAction": "Подтвердить отмену",
   "generationStatusCancelQueuedSuccess": "Генерация отменена.",
@@ -1508,5 +1510,5 @@
       }
     }
   },
-  "templateFlowGenerationWaitTooLongPremiumHint": "Premium получает приоритетную очередь и обычно ждёт меньше."
+  "templateFlowGenerationWaitTooLongPremiumHint": "Premium-запросы получают приоритет при высокой нагрузке и могут ждать меньше."
 }

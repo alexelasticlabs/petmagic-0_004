@@ -85,7 +85,10 @@ void main() {
         overrides: [
           templatesRepositoryProvider.overrideWithValue(repository),
           realtimeClientProvider.overrideWithValue(const NoopRealtimeClient()),
-          templateThumbnailWarmupProvider.overrideWithValue((url) async {
+          templateThumbnailWarmupProvider.overrideWithValue((
+            url, {
+            mediaVersion,
+          }) async {
             warmedUrls.add(url);
             throw StateError('warmup failed');
           }),
@@ -129,7 +132,10 @@ void main() {
         overrides: [
           templatesRepositoryProvider.overrideWithValue(repository),
           realtimeClientProvider.overrideWithValue(const NoopRealtimeClient()),
-          templateThumbnailWarmupProvider.overrideWithValue((url) async {
+          templateThumbnailWarmupProvider.overrideWithValue((
+            url, {
+            mediaVersion,
+          }) async {
             warmedUrls.add(url);
           }),
         ],

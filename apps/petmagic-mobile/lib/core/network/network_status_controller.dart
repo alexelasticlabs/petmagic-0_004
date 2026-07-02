@@ -36,6 +36,7 @@ final networkStatusControllerProvider =
 class NetworkStatusController extends Notifier<NetworkStatusState> {
   static const Duration _recoveredBannerDuration = Duration(seconds: 3);
   static const Duration _offlineProbeInterval = Duration(seconds: 5);
+  static const Duration _offlineProbeMaxInterval = Duration(seconds: 30);
   static const Duration _internetProbeTimeout = Duration(seconds: 2);
   static const Duration _probeDebounceWindow = Duration(seconds: 5);
 
@@ -47,6 +48,7 @@ class NetworkStatusController extends Notifier<NetworkStatusState> {
   bool _started = false;
   bool? _lastProbeResult;
   DateTime? _lastProbeTime;
+  Duration _currentOfflineProbeInterval = _offlineProbeInterval;
 
   @override
   NetworkStatusState build() {
@@ -58,8 +60,7 @@ class NetworkStatusController extends Notifier<NetworkStatusState> {
       _started = false;
       _subscription?.cancel();
       _subscription = null;
-      _offlineProbeTimer?.cancel();
-      _offlineProbeTimer = null;
+      _stopOfflineProbe();
       _restoreBannerTimer?.cancel();
       _restoreBannerTimer = null;
     });
@@ -181,6 +182,7 @@ class NetworkStatusController extends Notifier<NetworkStatusState> {
     if (!hasInternet) {
       _restoreBannerTimer?.cancel();
       _restoreBannerTimer = null;
+      _currentOfflineProbeInterval = _offlineProbeInterval;
       _startOfflineProbe();
       state = state.copyWith(
         hasInternet: false,
@@ -215,19 +217,35 @@ class NetworkStatusController extends Notifier<NetworkStatusState> {
   }
 
   void _startOfflineProbe() {
+    _scheduleNextOfflineProbe(_currentOfflineProbeInterval);
+  }
+
+  void _scheduleNextOfflineProbe(Duration delay) {
     _offlineProbeTimer?.cancel();
-    _offlineProbeTimer = Timer.periodic(_offlineProbeInterval, (_) {
+    _offlineProbeTimer = Timer(delay, () async {
       if (!ref.mounted) {
         return;
       }
 
-      unawaited(_refreshFromCurrentConnectivity(source: 'offline_probe'));
+      await _refreshFromCurrentConnectivity(source: 'offline_probe');
+      if (!ref.mounted || state.hasInternet) {
+        return;
+      }
+
+      final nextSeconds =
+          (_currentOfflineProbeInterval.inSeconds * 2).clamp(
+            _offlineProbeInterval.inSeconds,
+            _offlineProbeMaxInterval.inSeconds,
+          );
+      _currentOfflineProbeInterval = Duration(seconds: nextSeconds);
+      _scheduleNextOfflineProbe(_currentOfflineProbeInterval);
     });
   }
 
   void _stopOfflineProbe() {
     _offlineProbeTimer?.cancel();
     _offlineProbeTimer = null;
+    _currentOfflineProbeInterval = _offlineProbeInterval;
   }
 
   void _scheduleRestoreBannerHide() {

@@ -55,6 +55,14 @@ class TemplateItemDto {
     required this.isPremium,
     required this.tokenCost,
     required this.thumbnailUrl,
+    required this.animatedPreviewUrl,
+    required this.feedLoopLowUrl,
+    required this.feedLoopMediumUrl,
+    required this.detailPreviewUrl,
+    required this.mediaKind,
+    required this.durationMs,
+    required this.sizeBytes,
+    required this.mediaVersion,
     required this.previewAsset,
     required this.musicDescription,
     required this.referenceVideoDurationSeconds,
@@ -78,6 +86,14 @@ class TemplateItemDto {
   final bool isPremium;
   final int tokenCost;
   final String? thumbnailUrl;
+  final String? animatedPreviewUrl;
+  final String? feedLoopLowUrl;
+  final String? feedLoopMediumUrl;
+  final String? detailPreviewUrl;
+  final String? mediaKind;
+  final int? durationMs;
+  final int? sizeBytes;
+  final int? mediaVersion;
   final TemplateAssetDto? previewAsset;
   final String? musicDescription;
   final double? referenceVideoDurationSeconds;
@@ -92,6 +108,35 @@ class TemplateItemDto {
   factory TemplateItemDto.fromJson(Map<String, Object?> json) {
     final rawAsset = json['previewAsset'];
     final previewUrl = json['previewUrl'] as String?;
+    final rawMedia = json['media'];
+    final media = rawMedia is Map
+        ? Map<String, Object?>.from(rawMedia)
+        : const <String, Object?>{};
+    final thumbnailUrl =
+        _normalizeOptionalString(json['thumbnailUrl']) ??
+        _normalizeOptionalString(media['thumbnailUrl']);
+    final animatedPreviewUrl = _normalizeOptionalString(
+      media['animatedPreviewUrl'],
+    );
+    final feedLoopLowUrl = _normalizeOptionalString(media['feedLoopLowUrl']);
+    final feedLoopMediumUrl = _normalizeOptionalString(
+      media['feedLoopMediumUrl'],
+    );
+    final detailPreviewUrl = _normalizeOptionalString(
+      media['detailPreviewUrl'],
+    );
+    final mediaKind =
+        _normalizeOptionalString(json['mediaKind']) ??
+        _normalizeOptionalString(media['mediaKind']);
+    final durationMs =
+        (json['durationMs'] as num?)?.toInt() ??
+        (media['durationMs'] as num?)?.toInt();
+    final sizeBytes =
+        (json['sizeBytes'] as num?)?.toInt() ??
+        (media['sizeBytes'] as num?)?.toInt();
+    final mediaVersion =
+        (json['mediaVersion'] as num?)?.toInt() ??
+        (media['mediaVersion'] as num?)?.toInt();
 
     TemplateAssetDto? parsedAsset;
     if (rawAsset is Map) {
@@ -110,6 +155,22 @@ class TemplateItemDto {
         fileSizeBytes: null,
         durationSeconds: null,
       );
+    } else {
+      final mediaPreviewUrl =
+          detailPreviewUrl ??
+          feedLoopMediumUrl ??
+          feedLoopLowUrl ??
+          animatedPreviewUrl ??
+          thumbnailUrl;
+      if (mediaPreviewUrl != null && mediaPreviewUrl.isNotEmpty) {
+        parsedAsset = TemplateAssetDto(
+          url: mediaPreviewUrl,
+          fileName: mediaPreviewUrl.split('/').last,
+          contentType: _contentTypeFromMediaKind(mediaKind, mediaPreviewUrl),
+          fileSizeBytes: sizeBytes,
+          durationSeconds: durationMs == null ? null : durationMs / 1000,
+        );
+      }
     }
 
     final templateId =
@@ -129,7 +190,7 @@ class TemplateItemDto {
               .map((item) => item.trim())
               .where((item) => item.isNotEmpty)
               .toList(growable: false),
-      category: json['category'] as String? ?? '',
+      category: _readCategory(json['category']),
       effectivePromoBadge: json['effectivePromoBadge'] as String?,
       tags: (json['tags'] as List<dynamic>? ?? const [])
           .whereType<String>()
@@ -139,7 +200,15 @@ class TemplateItemDto {
           (json['tokenCost'] as num?)?.toInt() ??
           (json['priceTokens'] as num?)?.toInt() ??
           0,
-      thumbnailUrl: json['thumbnailUrl'] as String?,
+      thumbnailUrl: thumbnailUrl,
+      animatedPreviewUrl: animatedPreviewUrl,
+      feedLoopLowUrl: feedLoopLowUrl,
+      feedLoopMediumUrl: feedLoopMediumUrl,
+      detailPreviewUrl: detailPreviewUrl,
+      mediaKind: mediaKind,
+      durationMs: durationMs,
+      sizeBytes: sizeBytes,
+      mediaVersion: mediaVersion,
       previewAsset: parsedAsset,
       musicDescription: json['musicDescription'] as String?,
       referenceVideoDurationSeconds:
@@ -154,7 +223,7 @@ class TemplateItemDto {
       defaultVariationStrength: _normalizeVariationStrength(
         json['defaultVariationStrength'] as String?,
       ),
-      version: (json['version'] as num?)?.toInt() ?? 0,
+      version: (json['version'] as num?)?.toInt() ?? mediaVersion ?? 0,
       updatedAtUtc: _parseDateTime(
         json['updatedAtUtc'] as String? ?? json['updatedAt'] as String?,
       ),
@@ -167,6 +236,43 @@ class TemplateItemDto {
     }
 
     return DateTime.tryParse(raw)?.toUtc();
+  }
+
+  static String? _normalizeOptionalString(Object? value) {
+    if (value is! String) {
+      return null;
+    }
+
+    final normalized = value.trim();
+    return normalized.isEmpty ? null : normalized;
+  }
+
+  static String _readCategory(Object? rawCategory) {
+    if (rawCategory is String) {
+      return rawCategory;
+    }
+
+    if (rawCategory is Map) {
+      final category = Map<String, Object?>.from(rawCategory);
+      return _normalizeOptionalString(category['title']) ??
+          _normalizeOptionalString(category['slug']) ??
+          '';
+    }
+
+    return '';
+  }
+
+  static String _contentTypeFromMediaKind(String? mediaKind, String url) {
+    final normalized = mediaKind?.trim().toLowerCase();
+    if (normalized == 'video') {
+      return 'video/mp4';
+    }
+
+    if (normalized == 'image') {
+      return 'image/jpeg';
+    }
+
+    return _inferContentTypeFromUrl(url);
   }
 
   static bool _readPremiumFlag(Map<String, Object?> json) {
@@ -247,6 +353,14 @@ class TemplateItemDto {
     'isPremium': isPremium,
     'tokenCost': tokenCost,
     'thumbnailUrl': thumbnailUrl,
+    'animatedPreviewUrl': animatedPreviewUrl,
+    'feedLoopLowUrl': feedLoopLowUrl,
+    'feedLoopMediumUrl': feedLoopMediumUrl,
+    'detailPreviewUrl': detailPreviewUrl,
+    'mediaKind': mediaKind,
+    'durationMs': durationMs,
+    'sizeBytes': sizeBytes,
+    'mediaVersion': mediaVersion,
     'previewAsset': previewAsset?.toJson(),
     'musicDescription': musicDescription,
     'referenceVideoDurationSeconds': referenceVideoDurationSeconds,
@@ -271,6 +385,14 @@ class TemplateItemDto {
     isPremium: isPremium,
     tokenCost: tokenCost,
     thumbnailUrl: thumbnailUrl,
+    animatedPreviewUrl: animatedPreviewUrl,
+    feedLoopLowUrl: feedLoopLowUrl,
+    feedLoopMediumUrl: feedLoopMediumUrl,
+    detailPreviewUrl: detailPreviewUrl,
+    mediaKind: mediaKind,
+    durationMs: durationMs,
+    sizeBytes: sizeBytes,
+    mediaVersion: mediaVersion,
     previewAsset: previewAsset?.toDomain(),
     musicDescription: musicDescription,
     referenceVideoDurationSeconds: referenceVideoDurationSeconds,

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_query.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
@@ -11,6 +12,54 @@ import 'package:petmagic_mobile/features/templates/presentation/templates_contro
 import 'templates_controller_test_support.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('does not connect realtime while internet is unavailable', () async {
+    final repository = FakeTemplatesControllerRepository();
+    final realtimeClient = FakeTemplatesControllerRealtimeClient();
+    final networkController = _TestNetworkStatusController(false);
+    final container = ProviderContainer(
+      overrides: [
+        templatesRepositoryProvider.overrideWithValue(repository),
+        realtimeClientProvider.overrideWithValue(realtimeClient),
+        networkStatusControllerProvider.overrideWith(() => networkController),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    container.read(templatesControllerProvider);
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+
+    expect(realtimeClient.connectCalls, 0);
+    expect(realtimeClient.disconnectCalls, 0);
+  });
+
+  test(
+    'pauses realtime offline and reconnects after internet restore',
+    () async {
+      final repository = FakeTemplatesControllerRepository();
+      final realtimeClient = FakeTemplatesControllerRealtimeClient();
+      final networkController = _TestNetworkStatusController(true);
+      final container = ProviderContainer(
+        overrides: [
+          templatesRepositoryProvider.overrideWithValue(repository),
+          realtimeClientProvider.overrideWithValue(realtimeClient),
+          networkStatusControllerProvider.overrideWith(() => networkController),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      container.read(templatesControllerProvider);
+      await _waitUntil(() => realtimeClient.connectCalls == 1);
+
+      networkController.setHasInternet(false);
+      await _waitUntil(() => realtimeClient.disconnectCalls == 1);
+
+      networkController.setHasInternet(true);
+      await _waitUntil(() => realtimeClient.connectCalls == 2);
+    },
+  );
+
   test(
     'coalesces burst realtime invalidations into a single refresh',
     () async {
@@ -38,6 +87,222 @@ void main() {
   );
 
   test(
+    'scoped text invalidation patches loaded card without feed reload or media churn',
+    () async {
+      final original = templateFixture(
+        'template-1',
+        TemplateType.image,
+        title: 'Old title',
+        mediaVersion: 7,
+      );
+      final updated = templateFixture(
+        'template-1',
+        TemplateType.image,
+        title: 'New title',
+        shortDescription: 'New description',
+        mediaVersion: 8,
+      );
+      final repository = FakeTemplatesControllerRepository(
+        pagesByKey: {
+          const TemplatesQuery().cacheKey: TemplatesFeedPage(
+            items: [original],
+            hasMore: false,
+          ),
+        },
+        templatesById: {'template-1': updated},
+      );
+      final realtimeClient = FakeTemplatesControllerRealtimeClient();
+      final container = ProviderContainer(
+        overrides: [
+          templatesRepositoryProvider.overrideWithValue(repository),
+          realtimeClientProvider.overrideWithValue(realtimeClient),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(templatesControllerProvider.notifier);
+      await controller.loadInitial(forceRefresh: true);
+
+      realtimeClient.emitTemplatesFeedInvalidated(
+        payload: const {
+          'scope': 'template',
+          'templateId': 'template-1',
+          'isPubliclyVisible': true,
+          'reason': 'updated',
+        },
+      );
+      await _waitUntil(() => repository.fetchTemplateCalls == 1);
+
+      final state = container.read(templatesControllerProvider);
+      expect(repository.fetchFeedCalls, 1);
+      expect(state.items.single.title, 'New title');
+      expect(state.items.single.shortDescription, 'New description');
+      expect(state.items.single.mediaVersion, 7);
+    },
+  );
+
+  test(
+    'scoped media invalidation patches one card without full feed reload',
+    () async {
+      final original = templateFixture(
+        'template-1',
+        TemplateType.image,
+        mediaVersion: 1,
+      );
+      final unchangedNeighbor = templateFixture(
+        'template-2',
+        TemplateType.image,
+        mediaVersion: 1,
+      );
+      final updated = templateFixture(
+        'template-1',
+        TemplateType.image,
+        mediaVersion: 2,
+      );
+      final repository = FakeTemplatesControllerRepository(
+        pagesByKey: {
+          const TemplatesQuery().cacheKey: TemplatesFeedPage(
+            items: [original, unchangedNeighbor],
+            hasMore: false,
+          ),
+        },
+        templatesById: {'template-1': updated},
+      );
+      final realtimeClient = FakeTemplatesControllerRealtimeClient();
+      final container = ProviderContainer(
+        overrides: [
+          templatesRepositoryProvider.overrideWithValue(repository),
+          realtimeClientProvider.overrideWithValue(realtimeClient),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(templatesControllerProvider.notifier);
+      await controller.loadInitial(forceRefresh: true);
+
+      realtimeClient.emitTemplatesFeedInvalidated(
+        payload: const {
+          'scope': 'template',
+          'templateId': 'template-1',
+          'mediaVersion': 2,
+          'isPubliclyVisible': true,
+          'reason': 'media_updated',
+        },
+      );
+      await _waitUntil(() => repository.fetchTemplateCalls == 1);
+
+      final state = container.read(templatesControllerProvider);
+      expect(repository.fetchFeedCalls, 1);
+      expect(state.items.map((item) => item.templateId), [
+        'template-1',
+        'template-2',
+      ]);
+      expect(state.items.first.mediaVersion, 2);
+      expect(state.items.last.mediaVersion, unchangedNeighbor.mediaVersion);
+    },
+  );
+
+  test(
+    'critical scoped template invalidation hides card during pagination',
+    () async {
+      final loadMoreCompleter = Completer<void>();
+      final repository = FakeTemplatesControllerRepository(
+        pagesByKey: {
+          const TemplatesQuery().cacheKey: TemplatesFeedPage(
+            items: [
+              templateFixture('template-1', TemplateType.image),
+              templateFixture('template-2', TemplateType.image),
+            ],
+            nextCursor: 'cursor-2',
+            hasMore: true,
+          ),
+        },
+        pagesByCursor: {
+          'cursor-2': TemplatesFeedPage(
+            items: [templateFixture('template-3', TemplateType.image)],
+            hasMore: false,
+            page: 2,
+          ),
+        },
+        fetchCompletersByCursor: {'cursor-2': loadMoreCompleter},
+      );
+      final realtimeClient = FakeTemplatesControllerRealtimeClient();
+      final container = ProviderContainer(
+        overrides: [
+          templatesRepositoryProvider.overrideWithValue(repository),
+          realtimeClientProvider.overrideWithValue(realtimeClient),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(templatesControllerProvider.notifier);
+      await controller.loadInitial(forceRefresh: true);
+      final loadMoreFuture = controller.loadMore();
+      await Future<void>.delayed(Duration.zero);
+
+      realtimeClient.emitTemplatesFeedInvalidated(
+        payload: const {
+          'scope': 'template',
+          'templateId': 'template-1',
+          'isPubliclyVisible': false,
+          'isCritical': true,
+          'reason': 'status_changed',
+        },
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        container
+            .read(templatesControllerProvider)
+            .items
+            .map((item) => item.templateId),
+        ['template-2'],
+      );
+      expect(repository.fetchFeedCalls, 2);
+
+      loadMoreCompleter.complete();
+      await loadMoreFuture;
+      final state = container.read(templatesControllerProvider);
+      expect(state.items.map((item) => item.templateId), [
+        'template-2',
+        'template-3',
+      ]);
+      expect(repository.fetchFeedCalls, 2);
+    },
+  );
+
+  test(
+    'scoped category invalidation refreshes filters without feed reload',
+    () async {
+      final repository = FakeTemplatesControllerRepository();
+      final realtimeClient = FakeTemplatesControllerRealtimeClient();
+      final container = ProviderContainer(
+        overrides: [
+          templatesRepositoryProvider.overrideWithValue(repository),
+          realtimeClientProvider.overrideWithValue(realtimeClient),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      container.read(templatesControllerProvider);
+
+      realtimeClient.emitTemplatesFeedInvalidated(
+        payload: const {
+          'scope': 'category',
+          'category': 'Portrait',
+          'reason': 'renamed',
+        },
+      );
+      await _waitUntil(() => repository.fetchCategoriesCalls == 1);
+
+      expect(repository.fetchFeedCalls, 0);
+      expect(container.read(templatesControllerProvider).categories, [
+        'Portrait',
+      ]);
+    },
+  );
+
+  test(
     'replays one deferred refresh after an in-flight realtime refresh',
     () async {
       final repository = FakeTemplatesControllerRepository(
@@ -55,7 +320,7 @@ void main() {
       container.read(templatesControllerProvider);
 
       realtimeClient.emitTemplatesFeedInvalidated();
-      await Future<void>.delayed(const Duration(milliseconds: 450));
+      await _waitUntil(() => repository.fetchFeedCalls == 1);
       expect(repository.fetchFeedCalls, 1);
 
       realtimeClient.emitTemplatesFeedInvalidated();
@@ -64,7 +329,7 @@ void main() {
       expect(repository.fetchFeedCalls, 1);
 
       repository.completeFirstFetch();
-      await Future<void>.delayed(const Duration(milliseconds: 500));
+      await _waitUntil(() => repository.fetchFeedCalls == 2);
 
       expect(repository.fetchFeedCalls, 2);
       expect(repository.fetchCategoriesCalls, 2);
@@ -687,6 +952,7 @@ void main() {
       expect(state.query.search, 'dog');
       expect(state.items.map((item) => item.templateId), ['dog-template']);
       expect(state.isLoadingMore, isFalse);
+      expect(controller.staleResponsesDiscarded, 1);
     },
   );
 
@@ -747,6 +1013,7 @@ void main() {
     expect(state.items.map((item) => item.templateId), ['video-template-1']);
     expect(state.isLoadingMore, isFalse);
     expect(state.itemsQueryKey, videoQuery.cacheKey);
+    expect(controller.staleResponsesDiscarded, 1);
   });
 
   test('stops stale thumbnail warmup after filter changes', () async {
@@ -793,7 +1060,10 @@ void main() {
       overrides: [
         templatesRepositoryProvider.overrideWithValue(repository),
         realtimeClientProvider.overrideWithValue(const NoopRealtimeClient()),
-        templateThumbnailWarmupProvider.overrideWithValue((url) async {
+        templateThumbnailWarmupProvider.overrideWithValue((
+          url, {
+          mediaVersion,
+        }) async {
           warmedUrls.add(url);
           if (url == firstStaleThumbnailUrl) {
             staleWarmupStarted.complete();
@@ -815,7 +1085,140 @@ void main() {
     expect(state.query.type, TemplateType.video);
     expect(state.items.map((item) => item.templateId), ['video-template-1']);
     expect(warmedUrls, [firstStaleThumbnailUrl, currentThumbnailUrl]);
+    expect(controller.preloadCancellations, greaterThanOrEqualTo(1));
   });
+
+  test(
+    'realtime invalidation during pagination refreshes after page completes',
+    () async {
+      final loadMoreCompleter = Completer<void>();
+      final repository = FakeTemplatesControllerRepository(
+        pagesByKey: {
+          const TemplatesQuery().cacheKey: TemplatesFeedPage(
+            items: [templateFixture('template-1', TemplateType.image)],
+            nextCursor: 'cursor-2',
+            hasMore: true,
+          ),
+        },
+        pagesByCursor: {
+          'cursor-2': TemplatesFeedPage(
+            items: [templateFixture('template-2', TemplateType.image)],
+            hasMore: false,
+            page: 2,
+          ),
+        },
+        fetchCompletersByCursor: {'cursor-2': loadMoreCompleter},
+      );
+      final realtimeClient = FakeTemplatesControllerRealtimeClient();
+      final container = ProviderContainer(
+        overrides: [
+          templatesRepositoryProvider.overrideWithValue(repository),
+          realtimeClientProvider.overrideWithValue(realtimeClient),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(templatesControllerProvider.notifier);
+      await controller.loadInitial(forceRefresh: true);
+
+      final loadMoreFuture = controller.loadMore();
+      await Future<void>.delayed(Duration.zero);
+      expect(container.read(templatesControllerProvider).isLoadingMore, isTrue);
+
+      realtimeClient.emitTemplatesFeedInvalidated();
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(repository.fetchFeedCalls, 2);
+
+      loadMoreCompleter.complete();
+      await loadMoreFuture;
+      await _waitUntil(() => repository.fetchFeedCalls == 3);
+
+      expect(repository.fetchedQueries.map((query) => query.cursor), [
+        null,
+        'cursor-2',
+        null,
+      ]);
+      expect(
+        container.read(templatesControllerProvider).isLoadingMore,
+        isFalse,
+      );
+    },
+  );
+
+  test(
+    'realtime invalidation during active search does not start duplicate refresh',
+    () async {
+      final searchCompleter = Completer<void>();
+      final searchQuery = const TemplatesQuery(search: 'magic');
+      final repository = FakeTemplatesControllerRepository(
+        cachedPagesByKey: const {},
+        pagesByKey: {
+          searchQuery.cacheKey: TemplatesFeedPage(
+            items: [templateFixture('magic-template', TemplateType.image)],
+            hasMore: false,
+          ),
+        },
+        fetchCompletersByKey: {searchQuery.cacheKey: searchCompleter},
+      );
+      final realtimeClient = FakeTemplatesControllerRealtimeClient();
+      final container = ProviderContainer(
+        overrides: [
+          templatesRepositoryProvider.overrideWithValue(repository),
+          realtimeClientProvider.overrideWithValue(realtimeClient),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(templatesControllerProvider.notifier);
+      controller.setSearch('magic');
+      await Future<void>.delayed(Duration.zero);
+      expect(repository.fetchFeedCalls, 1);
+
+      realtimeClient.emitTemplatesFeedInvalidated();
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      searchCompleter.complete();
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+
+      final state = container.read(templatesControllerProvider);
+      expect(repository.fetchFeedCalls, 1);
+      expect(state.query.search, 'magic');
+      expect(state.items.map((item) => item.templateId), ['magic-template']);
+    },
+  );
+
+  test(
+    'disposing provider during pending request cancels work and ignores result',
+    () async {
+      final fetchCompleter = Completer<void>();
+      final repository = FakeTemplatesControllerRepository(
+        firstFetchCompleter: fetchCompleter,
+        pagesByKey: {
+          const TemplatesQuery().cacheKey: TemplatesFeedPage(
+            items: [templateFixture('late-template', TemplateType.image)],
+            hasMore: false,
+          ),
+        },
+      );
+      final container = ProviderContainer(
+        overrides: [
+          templatesRepositoryProvider.overrideWithValue(repository),
+          realtimeClientProvider.overrideWithValue(const NoopRealtimeClient()),
+        ],
+      );
+
+      final controller = container.read(templatesControllerProvider.notifier);
+      final loadFuture = controller.loadInitial(forceRefresh: true);
+      await Future<void>.delayed(Duration.zero);
+
+      container.dispose();
+      fetchCompleter.complete();
+      await loadFuture;
+      await Future<void>.delayed(Duration.zero);
+
+      expect(repository.cancelPendingFeedRequestCalls, 1);
+      expect(repository.cancelPendingMetadataRequestsCalls, 1);
+    },
+  );
 
   test('bounds thumbnail warmup to first preview candidates only', () async {
     final items = List<TemplateItem>.generate(
@@ -841,7 +1244,10 @@ void main() {
       overrides: [
         templatesRepositoryProvider.overrideWithValue(repository),
         realtimeClientProvider.overrideWithValue(const NoopRealtimeClient()),
-        templateThumbnailWarmupProvider.overrideWithValue((url) async {
+        templateThumbnailWarmupProvider.overrideWithValue((
+          url, {
+          mediaVersion,
+        }) async {
           warmedUrls.add(url);
         }),
       ],
@@ -865,4 +1271,41 @@ void main() {
     );
     expect(warmedUrls, hasLength(lessThan(items.length)));
   });
+}
+
+Future<void> _waitUntil(
+  bool Function() condition, {
+  Duration timeout = const Duration(seconds: 2),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (!condition()) {
+    if (DateTime.now().isAfter(deadline)) {
+      fail('Condition was not met within $timeout.');
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+  }
+}
+
+class _TestNetworkStatusController extends NetworkStatusController {
+  _TestNetworkStatusController(bool hasInternet)
+    : _initialState = NetworkStatusState(
+        hasInternet: hasInternet,
+        bannerPhase: hasInternet
+            ? NetworkBannerPhase.hidden
+            : NetworkBannerPhase.offline,
+      );
+
+  final NetworkStatusState _initialState;
+
+  @override
+  NetworkStatusState build() => _initialState;
+
+  void setHasInternet(bool value) {
+    state = NetworkStatusState(
+      hasInternet: value,
+      bannerPhase: value
+          ? NetworkBannerPhase.restored
+          : NetworkBannerPhase.offline,
+    );
+  }
 }

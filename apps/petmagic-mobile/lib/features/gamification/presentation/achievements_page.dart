@@ -65,6 +65,10 @@ class _AchievementsPageState extends ConsumerState<AchievementsPage>
 
     final achievements = ref.read(achievementsProvider);
     final hasInternet = ref.read(networkStatusControllerProvider).hasInternet;
+    if (!hasInternet) {
+      return;
+    }
+
     if (classifyAchievementsUnavailable(
           error: achievements.asError?.error,
           hasInternet: hasInternet,

@@ -1,5 +1,7 @@
 const _templateErrorKeyAliases = <String, String>{
   'economy.insufficient_balance': 'templates.insufficient_balance',
+  'template_unavailable': 'templates.template_unavailable',
+  'template_changed': 'templates.template_changed',
 };
 
 const _safeTemplateErrorKeys = <String>[
@@ -16,6 +18,10 @@ const _safeTemplateErrorKeys = <String>[
   'templates.generation_failed',
   'templates.generation_already_started',
   'templates.generation_cancel_not_allowed',
+  'templates.template_unavailable',
+  'templates.template_changed',
+  'template_unavailable',
+  'template_changed',
 ];
 
 String? normalizeTemplateErrorKey(String? raw) {

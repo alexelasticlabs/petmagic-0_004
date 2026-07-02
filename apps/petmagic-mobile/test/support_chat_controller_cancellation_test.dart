@@ -12,6 +12,8 @@ import 'package:petmagic_mobile/features/support/data/support_chat_repository.da
 import 'package:petmagic_mobile/features/support/presentation/support_chat_controller.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('stop cancels active support attachment upload', () async {
     final repository = _CancellableSupportChatRepository();
     final container = ProviderContainer(

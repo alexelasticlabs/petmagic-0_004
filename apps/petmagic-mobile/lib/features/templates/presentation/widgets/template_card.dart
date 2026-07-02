@@ -7,10 +7,10 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/lifecycle/app_lifecycle_signal.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
-import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';
 import 'package:petmagic_mobile/core/performance/template_media_cache.dart';
 import 'package:petmagic_mobile/core/performance/template_preview_video_controller.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
+import 'package:petmagic_mobile/features/templates/presentation/template_feed_playback_manager.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:petmagic_mobile/shared/widgets/motion.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
@@ -70,6 +70,7 @@ class TemplateCard extends StatefulWidget {
     this.showGuestPreview = false,
     this.highlightBadgeLabel,
     this.featuredData,
+    this.playbackManager,
     this.previewControllerFactory,
     super.key,
   });
@@ -81,6 +82,7 @@ class TemplateCard extends StatefulWidget {
   final bool showGuestPreview;
   final String? highlightBadgeLabel;
   final TemplateCardFeaturedData? featuredData;
+  final TemplateFeedPlaybackManager? playbackManager;
   final Future<VideoPlayerController> Function(String previewUrl)?
   previewControllerFactory;
 
@@ -90,26 +92,27 @@ class TemplateCard extends StatefulWidget {
 
 class _TemplateCardState extends State<TemplateCard> {
   static const Duration _disposeDelay = Duration(milliseconds: 900);
-  static const double _prewarmVisibilityFraction = 0.28;
-  static const double _playVisibilityFraction = 0.58;
 
   VideoPlayerController? _videoController;
   Timer? _disposeTimer;
   Timer? _featuredCountdownTimer;
   bool _isPreviewActive = false;
-  bool _hasPreviewSlot = false;
   bool _isPressed = false;
   bool _videoLoadFailed = false;
   bool _videoControllerInitInFlight = false;
   double _lastVisibleFraction = 0;
   int _previewRetryToken = 0;
   int _videoControllerRequestVersion = 0;
+  late final String _playbackCardId = 'template-card-${identityHashCode(this)}';
   late final VoidCallback _appLifecycleListener = _handleAppLifecycleChanged;
+  late final VoidCallback _playbackManagerListener =
+      _handlePlaybackManagerChanged;
 
   @override
   void initState() {
     super.initState();
     AppLifecycleSignal.instance.addListener(_appLifecycleListener);
+    widget.playbackManager?.addListener(_playbackManagerListener);
     _syncFeaturedCountdownTicker();
   }
 
@@ -121,6 +124,7 @@ class _TemplateCardState extends State<TemplateCard> {
         oldWidget.template.templateId != widget.template.templateId ||
         oldWidget.template.mediaIdentity != widget.template.mediaIdentity;
     if (mediaChanged) {
+      oldWidget.playbackManager?.unregisterCard(_playbackCardId);
       _isPreviewActive = false;
       _videoLoadFailed = false;
       _previewRetryToken = 0;
@@ -132,6 +136,12 @@ class _TemplateCardState extends State<TemplateCard> {
         widget.featuredData?.countdownTarget) {
       _syncFeaturedCountdownTicker();
     }
+
+    if (!identical(oldWidget.playbackManager, widget.playbackManager)) {
+      oldWidget.playbackManager?.removeListener(_playbackManagerListener);
+      oldWidget.playbackManager?.unregisterCard(_playbackCardId);
+      widget.playbackManager?.addListener(_playbackManagerListener);
+    }
   }
 
   @override
@@ -139,15 +149,13 @@ class _TemplateCardState extends State<TemplateCard> {
     _disposeTimer?.cancel();
     _featuredCountdownTimer?.cancel();
     AppLifecycleSignal.instance.removeListener(_appLifecycleListener);
+    widget.playbackManager?.removeListener(_playbackManagerListener);
+    widget.playbackManager?.unregisterCard(_playbackCardId);
     _videoControllerRequestVersion++;
     _videoControllerInitInFlight = false;
     final controller = _videoController;
     _videoController = null;
     unawaited(controller?.dispose());
-    if (_hasPreviewSlot) {
-      MediaLifecyclePolicy.releaseVideoPreviewSlot();
-      _hasPreviewSlot = false;
-    }
     super.dispose();
   }
 
@@ -376,9 +384,9 @@ class _TemplateCardState extends State<TemplateCard> {
       return;
     }
 
-    final isVideoTemplate =
-        widget.template.isVideo && isVideoPreview(widget.template.previewAsset);
+    final isVideoTemplate = _hasTemplateVideoPreview(widget.template);
     if (!isVideoTemplate) {
+      widget.playbackManager?.unregisterCard(_playbackCardId);
       _isPreviewActive = false;
       _disposeTimer?.cancel();
       unawaited(_disposeVideoController());
@@ -388,41 +396,34 @@ class _TemplateCardState extends State<TemplateCard> {
     final visibleFraction = info.visibleFraction;
     _lastVisibleFraction = visibleFraction;
     if (visibleFraction <= 0) {
+      widget.playbackManager?.unregisterCard(_playbackCardId);
       _isPreviewActive = false;
       _disposeTimer?.cancel();
-      if (!TickerMode.valuesOf(context).enabled) {
-        unawaited(_syncPlaybackState());
-        return;
-      }
       unawaited(_syncPlaybackState());
       unawaited(_disposeVideoController());
       return;
     }
 
-    final shouldPrewarm = visibleFraction > _prewarmVisibilityFraction;
-    final shouldPlay = visibleFraction > _playVisibilityFraction;
-
-    if (shouldPrewarm) {
-      _disposeTimer?.cancel();
-      unawaited(_ensureVideoController());
-    } else {
-      unawaited(_syncPlaybackState());
-      _scheduleVideoDispose();
-    }
-
-    if (_isPreviewActive == shouldPlay) {
-      return;
-    }
-
-    _isPreviewActive = shouldPlay;
-    if (shouldPlay) {
-      unawaited(_ensureVideoController());
-    } else {
-      unawaited(_syncPlaybackState());
-    }
+    widget.playbackManager?.updateCardVisibility(
+      cardId: _playbackCardId,
+      templateId: widget.template.templateId,
+      isVideoTemplate: isVideoTemplate,
+      hasAnimatedPreview:
+          _normalizeTemplateMediaUrl(widget.template.animatedPreviewUrl) !=
+          null,
+      visibleFraction: visibleFraction,
+      thumbnailUrl: widget.template.thumbnailUrl,
+      animatedPreviewUrl: widget.template.animatedPreviewUrl,
+      feedLoopLowUrl: widget.template.feedLoopLowUrl,
+      feedLoopMediumUrl: widget.template.feedLoopMediumUrl,
+      fallbackPreviewUrl: widget.template.previewAsset?.url,
+      mediaVersion: widget.template.mediaVersion,
+    );
+    _syncWithPlaybackManager();
   }
 
   void _suspendPreviewForAppBackground() {
+    widget.playbackManager?.unregisterCard(_playbackCardId);
     _isPreviewActive = false;
     _disposeTimer?.cancel();
     unawaited(_disposeVideoController());
@@ -430,13 +431,58 @@ class _TemplateCardState extends State<TemplateCard> {
 
   void _resumeVisiblePreviewAfterAppResume() {
     if (!TickerMode.valuesOf(context).enabled ||
-        _lastVisibleFraction <= _prewarmVisibilityFraction) {
+        _lastVisibleFraction <=
+            TemplateFeedPlaybackManager.videoEligibilityVisibilityFraction) {
       return;
     }
 
     _disposeTimer?.cancel();
-    _isPreviewActive = _lastVisibleFraction > _playVisibilityFraction;
-    unawaited(_ensureVideoController());
+    widget.playbackManager?.updateCardVisibility(
+      cardId: _playbackCardId,
+      templateId: widget.template.templateId,
+      isVideoTemplate: _hasTemplateVideoPreview(widget.template),
+      hasAnimatedPreview:
+          _normalizeTemplateMediaUrl(widget.template.animatedPreviewUrl) !=
+          null,
+      visibleFraction: _lastVisibleFraction,
+      thumbnailUrl: widget.template.thumbnailUrl,
+      animatedPreviewUrl: widget.template.animatedPreviewUrl,
+      feedLoopLowUrl: widget.template.feedLoopLowUrl,
+      feedLoopMediumUrl: widget.template.feedLoopMediumUrl,
+      fallbackPreviewUrl: widget.template.previewAsset?.url,
+      mediaVersion: widget.template.mediaVersion,
+    );
+    _syncWithPlaybackManager();
+  }
+
+  void _handlePlaybackManagerChanged() {
+    if (!mounted) {
+      return;
+    }
+
+    _syncWithPlaybackManager();
+  }
+
+  void _syncWithPlaybackManager() {
+    final manager = widget.playbackManager;
+    final snapshot = manager?.snapshotFor(_playbackCardId);
+    final shouldPlay =
+        snapshot?.displayLevel == TemplateFeedDisplayLevel.videoPreview;
+    if (shouldPlay) {
+      _disposeTimer?.cancel();
+      _isPreviewActive = true;
+      unawaited(_ensureVideoController());
+      return;
+    }
+
+    _isPreviewActive = false;
+    unawaited(_syncPlaybackState());
+    if (_lastVisibleFraction <= 0 ||
+        (manager != null && snapshot?.hasVideoControllerSlot != true)) {
+      unawaited(_disposeVideoController());
+    } else {
+      _scheduleVideoDispose();
+    }
   }
 
   Future<void> _syncPlaybackState() async {
@@ -476,17 +522,9 @@ class _TemplateCardState extends State<TemplateCard> {
     _videoControllerInitInFlight = false;
     final controller = _videoController;
     if (controller == null) {
-      if (_hasPreviewSlot) {
-        MediaLifecyclePolicy.releaseVideoPreviewSlot();
-        _hasPreviewSlot = false;
-      }
       return;
     }
 
-    if (_hasPreviewSlot) {
-      MediaLifecyclePolicy.releaseVideoPreviewSlot();
-      _hasPreviewSlot = false;
-    }
     _videoController = null;
     try {
       await controller.dispose();
@@ -497,7 +535,13 @@ class _TemplateCardState extends State<TemplateCard> {
         message: 'Template card preview controller disposal failed.',
         error: error,
         stackTrace: stackTrace,
-        context: {'hadPreviewSlot': _hasPreviewSlot},
+        context: {
+          'hasPlaybackGrant':
+              widget.playbackManager
+                  ?.snapshotFor(_playbackCardId)
+                  .hasVideoControllerSlot ??
+              false,
+        },
       );
     }
     if (mounted) {
@@ -506,7 +550,13 @@ class _TemplateCardState extends State<TemplateCard> {
   }
 
   Future<void> _ensureVideoController() async {
-    if (_videoController != null || widget.template.previewAsset == null) {
+    final snapshot = widget.playbackManager?.snapshotFor(_playbackCardId);
+    if (snapshot?.displayLevel != TemplateFeedDisplayLevel.videoPreview) {
+      await _syncPlaybackState();
+      return;
+    }
+
+    if (_videoController != null) {
       await _syncPlaybackState();
       return;
     }
@@ -517,7 +567,7 @@ class _TemplateCardState extends State<TemplateCard> {
 
     final templateId = widget.template.templateId;
     final previewUrl = _normalizeTemplateMediaUrl(
-      widget.template.previewAsset!.url,
+      snapshot?.videoPreviewUrl ?? widget.template.previewAsset?.url,
     );
     if (previewUrl == null) {
       if (mounted) {
@@ -528,12 +578,6 @@ class _TemplateCardState extends State<TemplateCard> {
       return;
     }
 
-    if (!_hasPreviewSlot &&
-        !MediaLifecyclePolicy.tryAcquireVideoPreviewSlot()) {
-      return;
-    }
-    _hasPreviewSlot = true;
-
     final requestVersion = ++_videoControllerRequestVersion;
     _videoControllerInitInFlight = true;
     VideoPlayerController? controller;
@@ -541,7 +585,10 @@ class _TemplateCardState extends State<TemplateCard> {
     try {
       controller = widget.previewControllerFactory != null
           ? await widget.previewControllerFactory!(previewUrl)
-          : await _createVideoController(previewUrl);
+          : await _createVideoController(
+              previewUrl,
+              mediaVersion: snapshot?.mediaVersion,
+            );
       if (!_isCurrentVideoControllerRequest(
         requestVersion: requestVersion,
         templateId: templateId,
@@ -596,10 +643,17 @@ class _TemplateCardState extends State<TemplateCard> {
       )) {
         _videoController = null;
         _isPreviewActive = false;
-        if (_hasPreviewSlot) {
-          MediaLifecyclePolicy.releaseVideoPreviewSlot();
-          _hasPreviewSlot = false;
-        }
+        AppLogger.info(
+          feature: 'Templates.TemplateCard',
+          operation: 'video_playback_fallback_to_thumbnail',
+          message: 'Template card fell back to thumbnail after video failure.',
+          context: {
+            'templateId': widget.template.templateId,
+            'hasThumbnail':
+                _normalizeTemplateMediaUrl(widget.template.thumbnailUrl) !=
+                null,
+          },
+        );
         setState(() {
           _videoLoadFailed = true;
         });
@@ -624,9 +678,13 @@ class _TemplateCardState extends State<TemplateCard> {
   }
 
   Future<VideoPlayerController> _createVideoController(
-    String previewUrl,
-  ) async {
-    return createTemplatePreviewVideoController(previewUrl);
+    String previewUrl, {
+    int? mediaVersion,
+  }) async {
+    return createTemplatePreviewVideoController(
+      previewUrl,
+      mediaVersion: mediaVersion,
+    );
   }
 
   bool _isCurrentVideoControllerRequest({
@@ -636,22 +694,38 @@ class _TemplateCardState extends State<TemplateCard> {
   }) {
     if (!mounted ||
         requestVersion != _videoControllerRequestVersion ||
-        widget.template.templateId != templateId) {
+        widget.template.templateId != templateId ||
+        widget.playbackManager?.snapshotFor(_playbackCardId).displayLevel !=
+            TemplateFeedDisplayLevel.videoPreview) {
       return false;
     }
 
+    final currentSnapshot = widget.playbackManager?.snapshotFor(
+      _playbackCardId,
+    );
     final currentPreviewUrl = _normalizeTemplateMediaUrl(
-      widget.template.previewAsset?.url,
+      currentSnapshot?.videoPreviewUrl ?? widget.template.previewAsset?.url,
     );
     return currentPreviewUrl == previewUrl;
   }
 }
 
+bool _hasTemplateVideoPreview(TemplateItem template) {
+  return template.isVideo &&
+      (_normalizeTemplateMediaUrl(template.feedLoopLowUrl) != null ||
+          _normalizeTemplateMediaUrl(template.feedLoopMediumUrl) != null ||
+          isVideoPreview(template.previewAsset));
+}
+
 @visibleForTesting
 Future<VideoPlayerController> createTemplatePreviewVideoController(
-  String previewUrl,
-) async {
-  return createCachedTemplatePreviewVideoController(previewUrl);
+  String previewUrl, {
+  int? mediaVersion,
+}) async {
+  return createCachedTemplatePreviewVideoController(
+    previewUrl,
+    mediaVersion: mediaVersion,
+  );
 }
 
 class _TemplateMedia extends StatelessWidget {
@@ -704,6 +778,7 @@ class _TemplateMedia extends StatelessWidget {
               '-$previewRetryToken',
             ),
             imageUrl: imageUrl,
+            mediaVersion: template.mediaVersion,
             cacheWidth: imageCacheWidth,
             onRetry: onRetry,
             isVideoTemplate: assetIsVideo,
@@ -746,12 +821,14 @@ class _TemplateImageWithFallback extends StatefulWidget {
   const _TemplateImageWithFallback({
     super.key,
     required this.imageUrl,
+    required this.mediaVersion,
     required this.cacheWidth,
     required this.onRetry,
     required this.isVideoTemplate,
   });
 
   final String imageUrl;
+  final int? mediaVersion;
   final int cacheWidth;
   final VoidCallback onRetry;
   final bool isVideoTemplate;
@@ -768,14 +845,21 @@ class _TemplateImageWithFallbackState
   @override
   void initState() {
     super.initState();
-    _imageFileFuture = TemplateMediaCache.fetchThumbnailFile(widget.imageUrl);
+    _imageFileFuture = TemplateMediaCache.fetchThumbnailFile(
+      widget.imageUrl,
+      mediaVersion: widget.mediaVersion,
+    );
   }
 
   @override
   void didUpdateWidget(covariant _TemplateImageWithFallback oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.imageUrl != widget.imageUrl) {
-      _imageFileFuture = TemplateMediaCache.fetchThumbnailFile(widget.imageUrl);
+    if (oldWidget.imageUrl != widget.imageUrl ||
+        oldWidget.mediaVersion != widget.mediaVersion) {
+      _imageFileFuture = TemplateMediaCache.fetchThumbnailFile(
+        widget.imageUrl,
+        mediaVersion: widget.mediaVersion,
+      );
     }
   }
 
@@ -829,7 +913,12 @@ class _TemplateImageWithFallbackState
   }
 
   void _retryImageLoad() {
-    unawaited(TemplateMediaCache.removeThumbnailFile(widget.imageUrl));
+    unawaited(
+      TemplateMediaCache.removeThumbnailFile(
+        widget.imageUrl,
+        mediaVersion: widget.mediaVersion,
+      ),
+    );
     widget.onRetry();
   }
 }

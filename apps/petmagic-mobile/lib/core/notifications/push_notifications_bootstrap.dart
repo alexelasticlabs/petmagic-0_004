@@ -42,6 +42,8 @@ class _PushNotificationsBootstrapState
   StreamSubscription<Uri>? _deepLinkSubscription;
   Timer? _initialLinkTimeoutTimer;
   String? _pendingRoute;
+  String? _pendingCheckoutSessionId;
+  bool _pendingCheckoutVerificationRequested = false;
   bool _wasAuthenticated = false;
 
   @override
@@ -84,6 +86,7 @@ class _PushNotificationsBootstrapState
 
   void _handleLaunchState(AppLaunchState launchState) {
     _flushPendingRouteIfReady(launchState);
+    _flushPendingCheckoutVerificationIfReady(launchState);
 
     if (launchState.isAuthenticated && !_wasAuthenticated) {
       _wasAuthenticated = true;
@@ -104,6 +107,7 @@ class _PushNotificationsBootstrapState
 
     if (!launchState.isAuthenticated && _wasAuthenticated) {
       _wasAuthenticated = false;
+      _clearPendingCheckoutVerification();
       Future.microtask(() {
         if (!mounted) {
           return;
@@ -120,6 +124,10 @@ class _PushNotificationsBootstrapState
   }
 
   Future<void> _handleInitialLinkOnce() async {
+    if (!mounted) {
+      return;
+    }
+
     if (_deepLinkSubscription == null) {
       return;
     }
@@ -260,29 +268,9 @@ class _PushNotificationsBootstrapState
       if (path == 'success') {
         final sessionId = uri.queryParameters['session_id'];
         if (sessionId != null && sessionId.isNotEmpty) {
-          Future.microtask(() {
-            if (!mounted) {
-              return;
-            }
-
-            unawaited(
-              ref
-                  .read(walletControllerProvider.notifier)
-                  .verifyStripeCheckout(sessionId),
-            );
-          });
+          _queueCheckoutVerification(sessionId: sessionId);
         } else {
-          Future.microtask(() {
-            if (!mounted) {
-              return;
-            }
-
-            unawaited(
-              ref
-                  .read(walletControllerProvider.notifier)
-                  .verifyCheckoutStatus(),
-            );
-          });
+          _queueCheckoutVerification();
         }
       }
       return;
@@ -297,6 +285,43 @@ class _PushNotificationsBootstrapState
     if (generationId != null && generationId.isNotEmpty) {
       _openRoute(GenerationStatusPage.routeFor(generationId));
     }
+  }
+
+  void _queueCheckoutVerification({String? sessionId}) {
+    final normalizedSessionId = sessionId?.trim();
+    _pendingCheckoutSessionId = normalizedSessionId?.isNotEmpty == true
+        ? normalizedSessionId
+        : null;
+    _pendingCheckoutVerificationRequested = true;
+    _flushPendingCheckoutVerificationIfReady(
+      ref.read(appLaunchControllerProvider),
+    );
+  }
+
+  void _clearPendingCheckoutVerification() {
+    _pendingCheckoutSessionId = null;
+    _pendingCheckoutVerificationRequested = false;
+  }
+
+  void _flushPendingCheckoutVerificationIfReady(AppLaunchState launchState) {
+    if (!_pendingCheckoutVerificationRequested ||
+        launchState.isLoading ||
+        !launchState.isAuthenticated ||
+        launchState.requiresLegalAcceptance) {
+      return;
+    }
+
+    final sessionId = _pendingCheckoutSessionId;
+    _pendingCheckoutSessionId = null;
+    _pendingCheckoutVerificationRequested = false;
+
+    final controller = ref.read(walletControllerProvider.notifier);
+    if (sessionId != null) {
+      unawaited(controller.verifyStripeCheckout(sessionId));
+      return;
+    }
+
+    unawaited(controller.verifyCheckoutStatus());
   }
 
   bool _isGenerationRoute(String route) {

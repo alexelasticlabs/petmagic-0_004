@@ -104,6 +104,21 @@ void main() {
       expect(resolver.successfulBaseUrls, isEmpty);
     },
   );
+
+  test('server-sent events realtime client configures transport timeout', () {
+    final httpClient = _FakeHttpClient(
+      onGetUrl: (_) async =>
+          _FakeHttpClientRequest(response: _FakeHttpClientResponse(HttpStatus.ok)),
+    );
+
+    ServerSentEventsRealtimeClient(
+      apiBaseUrlResolver: _TrackingApiBaseUrlResolver(const ['https://api.example']),
+      httpClient: httpClient,
+      connectionTimeout: const Duration(seconds: 8),
+    );
+
+    expect(httpClient.connectionTimeout, const Duration(seconds: 8));
+  });
 }
 
 class _TrackingApiBaseUrlResolver extends ApiBaseUrlResolver {
@@ -132,6 +147,8 @@ class _FakeHttpClient implements HttpClient {
 
   final Future<_FakeHttpClientRequest> Function(Uri uri) onGetUrl;
   bool closed = false;
+  @override
+  Duration? connectionTimeout;
 
   @override
   Future<HttpClientRequest> getUrl(Uri url) => onGetUrl(url);

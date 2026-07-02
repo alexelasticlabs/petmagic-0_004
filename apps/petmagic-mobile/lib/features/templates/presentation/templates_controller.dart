@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/performance/template_media_cache.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_query.dart';
@@ -16,15 +17,97 @@ final templatesControllerProvider =
       TemplatesController.new,
     );
 
-final templateThumbnailWarmupProvider = Provider<Future<void> Function(String)>(
-  (ref) {
-    return (url) async {
-      await TemplateMediaCache.fetchThumbnailFile(url);
-    };
-  },
-);
+final templateThumbnailWarmupProvider =
+    Provider<Future<void> Function(String, {int? mediaVersion})>((ref) {
+      return (url, {mediaVersion}) async {
+        await TemplateMediaCache.fetchThumbnailFile(
+          url,
+          mediaVersion: mediaVersion,
+        );
+      };
+    });
 
 const Object _templateOfTheDayUnchanged = Object();
+
+class _TemplateFeedInvalidation {
+  const _TemplateFeedInvalidation({
+    required this.scope,
+    this.templateId,
+    this.category,
+    this.mediaVersion,
+    this.templateType,
+    this.isPubliclyVisible,
+    this.isCritical = false,
+    this.reason,
+  });
+
+  final String scope;
+  final String? templateId;
+  final String? category;
+  final int? mediaVersion;
+  final String? templateType;
+  final bool? isPubliclyVisible;
+  final bool isCritical;
+  final String? reason;
+
+  bool get isFull => scope == 'full';
+  bool get isTemplate => scope == 'template';
+  bool get isCategory => scope == 'category';
+  bool get isTemplateOfTheDay => scope == 'templateOfTheDay';
+  bool get isUnavailable => isPubliclyVisible == false || isCritical;
+  bool get hasMediaChange => mediaVersion != null;
+
+  static _TemplateFeedInvalidation? fromPayload(Map<String, Object?> payload) {
+    if (payload.isEmpty) {
+      return null;
+    }
+
+    final scope = _readString(payload['scope']);
+    if (scope == null) {
+      return null;
+    }
+
+    return _TemplateFeedInvalidation(
+      scope: scope,
+      templateId: _readString(payload['templateId']),
+      category: _readString(payload['category']),
+      mediaVersion: _readInt(payload['mediaVersion']),
+      templateType: _readString(payload['templateType']),
+      isPubliclyVisible: _readBool(payload['isPubliclyVisible']),
+      isCritical: _readBool(payload['isCritical']) ?? false,
+      reason: _readString(payload['reason']),
+    );
+  }
+
+  static String? _readString(Object? value) {
+    final text = value?.toString().trim();
+    return text == null || text.isEmpty ? null : text;
+  }
+
+  static int? _readInt(Object? value) {
+    if (value is int) {
+      return value;
+    }
+    if (value is num) {
+      return value.toInt();
+    }
+    return int.tryParse(value?.toString() ?? '');
+  }
+
+  static bool? _readBool(Object? value) {
+    if (value is bool) {
+      return value;
+    }
+    final normalized = value?.toString().trim().toLowerCase();
+    if (normalized == 'true') {
+      return true;
+    }
+    if (normalized == 'false') {
+      return false;
+    }
+    return null;
+  }
+}
 
 class TemplatesState {
   const TemplatesState({
@@ -127,18 +210,29 @@ class TemplatesController extends Notifier<TemplatesState> {
   static const _warmupPreviewLimit = 6;
   static const _maxInMemoryFeedCaches = 6;
 
-  TemplatesRepository get _repository => ref.read(templatesRepositoryProvider);
+  TemplatesRepository get _repository =>
+      _activeRepository ?? ref.read(templatesRepositoryProvider);
+  TemplatesRepository? _activeRepository;
   RealtimeClient? _activeRealtimeClient;
   StreamSubscription<RealtimeEvent>? _realtimeSubscription;
   Timer? _realtimeRefreshTimer;
   bool _hasPendingRealtimeRefresh = false;
+  bool _isRealtimeRefreshInFlight = false;
   int _requestVersion = 0;
+  int _preloadVersion = 0;
+  int _activePreviewWarmupTasks = 0;
+  int _staleResponsesDiscarded = 0;
+  int _preloadCancellations = 0;
   Future<void>? _inFlightInitialLoad;
   String? _inFlightInitialQueryKey;
   bool? _inFlightInitialForceRefresh;
   int? _inFlightInitialKnownCatalogVersion;
+  bool _hasInternet = true;
   bool _isScreenVisible = true;
   bool _isRealtimeConnected = false;
+
+  int get staleResponsesDiscarded => _staleResponsesDiscarded;
+  int get preloadCancellations => _preloadCancellations;
 
   static String? _normalizeCategory(String? value) {
     final normalized = value?.trim();
@@ -170,12 +264,42 @@ class TemplatesController extends Notifier<TemplatesState> {
 
   @override
   TemplatesState build() {
+    _activeRepository = ref.read(templatesRepositoryProvider);
     _activeRealtimeClient = ref.watch(realtimeClientProvider);
+    _hasInternet = ref.read(networkStatusControllerProvider).hasInternet;
+    ref.listen<bool>(
+      networkStatusControllerProvider.select((state) => state.hasInternet),
+      (_, hasInternet) => _handleNetworkStatusChanged(hasInternet),
+    );
     unawaited(_resumeRealtimeIfNeeded());
     ref.onDispose(() {
+      _invalidateActiveFeedWork(
+        clearLoadingState: false,
+        reason: 'dispose',
+        repository: _activeRepository,
+      );
       _pauseRealtime();
     });
     return const TemplatesState();
+  }
+
+  void _handleNetworkStatusChanged(bool hasInternet) {
+    if (_hasInternet == hasInternet) {
+      return;
+    }
+
+    _hasInternet = hasInternet;
+    if (!hasInternet) {
+      _pauseRealtime();
+      return;
+    }
+
+    if (!_isScreenVisible) {
+      return;
+    }
+
+    unawaited(_resumeRealtimeIfNeeded());
+    _resumePendingRealtimeRefreshIfNeeded();
   }
 
   void setScreenVisible(bool visible) {
@@ -195,13 +319,36 @@ class TemplatesController extends Notifier<TemplatesState> {
   }
 
   void _cancelActiveFeedWork() {
+    _invalidateActiveFeedWork(clearLoadingState: true, reason: 'screen_hidden');
+  }
+
+  void _invalidateActiveFeedWork({
+    required bool clearLoadingState,
+    required String reason,
+    TemplatesRepository? repository,
+  }) {
     _requestVersion++;
     _inFlightInitialLoad = null;
     _inFlightInitialQueryKey = null;
     _inFlightInitialForceRefresh = null;
     _inFlightInitialKnownCatalogVersion = null;
-    _repository.cancelPendingFeedRequest();
-    _repository.cancelPendingMetadataRequests();
+    _isRealtimeRefreshInFlight = false;
+    _realtimeRefreshTimer?.cancel();
+    _realtimeRefreshTimer = null;
+    _hasPendingRealtimeRefresh = false;
+    final resolvedRepository = repository ?? _repository;
+    final cancelledPreviewPreloads = _invalidatePreviewPreloads(
+      reason,
+      repository: resolvedRepository,
+    );
+    resolvedRepository.cancelPendingFeedRequest();
+    if (!cancelledPreviewPreloads) {
+      resolvedRepository.cancelPendingMetadataRequests();
+    }
+    if (!clearLoadingState || !ref.mounted) {
+      return;
+    }
+
     if (state.isLoading ||
         state.isRefreshing ||
         state.isLoadingMore ||
@@ -224,8 +371,276 @@ class TemplatesController extends Notifier<TemplatesState> {
       return;
     }
 
+    final invalidation = _TemplateFeedInvalidation.fromPayload(event.payload);
+    if (invalidation == null || invalidation.isFull) {
+      _handleFullRealtimeInvalidation();
+      return;
+    }
+
+    if (invalidation.isCategory) {
+      _recordScopedRealtimeInvalidation(invalidation);
+      unawaited(_refreshCategoriesFromRealtime());
+      return;
+    }
+
+    if (invalidation.isTemplateOfTheDay) {
+      _recordScopedRealtimeInvalidation(invalidation);
+      unawaited(_loadTemplateOfTheDay(_requestVersion));
+      return;
+    }
+
+    if (invalidation.isTemplate) {
+      _recordScopedRealtimeInvalidation(invalidation);
+      unawaited(_applyTemplateRealtimeInvalidation(invalidation));
+      return;
+    }
+
+    _handleFullRealtimeInvalidation();
+  }
+
+  void _handleFullRealtimeInvalidation() {
+    if (state.isLoadingMore) {
+      _recordRealtimeBusyIntersection('pagination');
+      _hasPendingRealtimeRefresh = true;
+      return;
+    }
+
+    if (state.isLoading || state.isRefreshing) {
+      _recordRealtimeBusyIntersection(
+        _isRealtimeRefreshInFlight ? 'realtime_refresh' : 'initial_refresh',
+      );
+      _hasPendingRealtimeRefresh = _isRealtimeRefreshInFlight;
+      if (_hasPendingRealtimeRefresh) {
+        _scheduleRealtimeRefresh();
+      }
+      return;
+    }
+
     _hasPendingRealtimeRefresh = true;
     _scheduleRealtimeRefresh();
+  }
+
+  Future<void> _applyTemplateRealtimeInvalidation(
+    _TemplateFeedInvalidation invalidation,
+  ) async {
+    final templateId = invalidation.templateId;
+    if (templateId == null || templateId.isEmpty || !ref.mounted) {
+      return;
+    }
+
+    final existingIndex = state.items.indexWhere(
+      (item) => item.templateId == templateId,
+    );
+    final existing = existingIndex == -1 ? null : state.items[existingIndex];
+
+    if (invalidation.isUnavailable) {
+      _removeTemplateFromState(templateId);
+      return;
+    }
+
+    if (existing == null) {
+      return;
+    }
+
+    if (invalidation.hasMediaChange &&
+        invalidation.mediaVersion != existing.mediaVersion) {
+      await _invalidateTemplateMediaCache(existing);
+    }
+
+    try {
+      final updated = await _repository.fetchTemplate(
+        templateId,
+        forceRefresh: true,
+      );
+      if (!ref.mounted || !_isScreenVisible) {
+        return;
+      }
+
+      final currentIndex = state.items.indexWhere(
+        (item) => item.templateId == templateId,
+      );
+      if (currentIndex == -1) {
+        return;
+      }
+
+      final current = state.items[currentIndex];
+      final resolved = invalidation.hasMediaChange
+          ? updated
+          : _mergeTemplateMetadataKeepingMedia(current, updated);
+      _replaceTemplateInState(resolved);
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Templates.Controller',
+        operation: 'scoped_template_invalidation',
+        message: 'Scoped template invalidation failed.',
+        error: error,
+        stackTrace: stackTrace,
+        context: {
+          'templateId': templateId,
+          'scope': invalidation.scope,
+          'reason': invalidation.reason,
+        },
+      );
+    }
+  }
+
+  Future<void> _refreshCategoriesFromRealtime() async {
+    try {
+      final categories = _normalizeCategories(
+        await _repository.fetchCategories(),
+      );
+      if (!ref.mounted || !_isScreenVisible) {
+        return;
+      }
+
+      state = state.copyWith(categories: categories);
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Templates.Controller',
+        operation: 'realtime_category_invalidation',
+        message: 'Template categories scoped invalidation failed.',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  void _replaceTemplateInState(TemplateItem template) {
+    final replacedItems = state.items
+        .map((item) => item.templateId == template.templateId ? template : item)
+        .toList(growable: false);
+    final replacedCache = _mapCachedPages((page) {
+      final pageItems = page.items
+          .map(
+            (item) => item.templateId == template.templateId ? template : item,
+          )
+          .toList(growable: false);
+      return TemplatesFeedPage(
+        items: pageItems,
+        hasMore: page.hasMore,
+        nextCursor: page.nextCursor,
+        page: page.page,
+      );
+    });
+
+    state = state.copyWith(
+      items: replacedItems,
+      cachedPagesByQueryKey: replacedCache,
+    );
+  }
+
+  void _removeTemplateFromState(String templateId) {
+    if (!ref.mounted) {
+      return;
+    }
+
+    final filteredItems = state.items
+        .where((item) => item.templateId != templateId)
+        .toList(growable: false);
+    if (filteredItems.length == state.items.length) {
+      return;
+    }
+
+    final filteredCache = _mapCachedPages((page) {
+      final pageItems = page.items
+          .where((item) => item.templateId != templateId)
+          .toList(growable: false);
+      return TemplatesFeedPage(
+        items: pageItems,
+        hasMore: page.hasMore,
+        nextCursor: page.nextCursor,
+        page: page.page,
+      );
+    });
+
+    state = state.copyWith(
+      items: filteredItems,
+      cachedPagesByQueryKey: filteredCache,
+    );
+  }
+
+  Map<String, TemplatesFeedPage> _mapCachedPages(
+    TemplatesFeedPage Function(TemplatesFeedPage page) mapPage,
+  ) {
+    if (state.cachedPagesByQueryKey.isEmpty) {
+      return state.cachedPagesByQueryKey;
+    }
+
+    return state.cachedPagesByQueryKey.map(
+      (key, page) => MapEntry(key, mapPage(page)),
+    );
+  }
+
+  Future<void> _invalidateTemplateMediaCache(TemplateItem template) async {
+    final mediaUrls = <String>{
+      ...[
+        _normalizeMediaUrl(template.thumbnailUrl),
+        _normalizeMediaUrl(template.animatedPreviewUrl),
+        _normalizeMediaUrl(template.feedLoopLowUrl),
+        _normalizeMediaUrl(template.feedLoopMediumUrl),
+        _normalizeMediaUrl(template.detailPreviewUrl),
+        _normalizeMediaUrl(template.previewAsset?.url),
+      ].whereType<String>(),
+    };
+
+    for (final url in mediaUrls) {
+      await TemplateMediaCache.removeThumbnailFile(
+        url,
+        mediaVersion: template.mediaVersion,
+      );
+      await TemplateMediaCache.removePreviewFile(
+        url,
+        mediaVersion: template.mediaVersion,
+      );
+    }
+
+    AppLogger.info(
+      feature: 'Templates.Controller',
+      operation: 'mobile_media_redownload_after_sse',
+      message: 'Invalidated scoped template media cache after SSE.',
+      context: {
+        'templateId': template.templateId,
+        'mediaVersion': template.mediaVersion,
+        'mediaUrls': mediaUrls.length,
+      },
+    );
+  }
+
+  TemplateItem _mergeTemplateMetadataKeepingMedia(
+    TemplateItem current,
+    TemplateItem updated,
+  ) {
+    return TemplateItem(
+      templateId: updated.templateId,
+      templateType: updated.templateType,
+      title: updated.title,
+      shortDescription: updated.shortDescription,
+      petPhotoRequirements: updated.petPhotoRequirements,
+      category: updated.category,
+      tags: updated.tags,
+      isPremium: updated.isPremium,
+      tokenCost: updated.tokenCost,
+      effectivePromoBadge: updated.effectivePromoBadge,
+      thumbnailUrl: current.thumbnailUrl,
+      animatedPreviewUrl: current.animatedPreviewUrl,
+      feedLoopLowUrl: current.feedLoopLowUrl,
+      feedLoopMediumUrl: current.feedLoopMediumUrl,
+      detailPreviewUrl: current.detailPreviewUrl,
+      mediaKind: current.mediaKind,
+      durationMs: current.durationMs,
+      sizeBytes: current.sizeBytes,
+      mediaVersion: current.mediaVersion,
+      previewAsset: current.previewAsset,
+      musicDescription: updated.musicDescription,
+      referenceVideoDurationSeconds: updated.referenceVideoDurationSeconds,
+      supportsGenerationResultInput: updated.supportsGenerationResultInput,
+      requiredInputMediaType: updated.requiredInputMediaType,
+      recommendedAfterImageGeneration: updated.recommendedAfterImageGeneration,
+      supportsGenerateSimilar: updated.supportsGenerateSimilar,
+      defaultVariationStrength: updated.defaultVariationStrength,
+      version: updated.version,
+      updatedAtUtc: updated.updatedAtUtc,
+    );
   }
 
   bool get _isFeedBusy =>
@@ -254,6 +669,7 @@ class TemplatesController extends Notifier<TemplatesState> {
   }
 
   Future<void> _refreshFromRealtimeInvalidation() async {
+    _isRealtimeRefreshInFlight = true;
     try {
       final latestVersion = await _repository.fetchCatalogVersion();
       if (!_isScreenVisible) {
@@ -267,7 +683,41 @@ class TemplatesController extends Notifier<TemplatesState> {
       await loadInitial(forceRefresh: true, knownCatalogVersion: latestVersion);
     } on Object {
       await loadInitial(forceRefresh: true);
+    } finally {
+      _isRealtimeRefreshInFlight = false;
     }
+  }
+
+  void _recordRealtimeBusyIntersection(String activeRequest) {
+    AppLogger.info(
+      feature: 'Templates.Controller',
+      operation: 'realtime_invalidation_during_active_request',
+      message: 'Templates feed invalidation arrived during an active request.',
+      context: {
+        'activeRequest': activeRequest,
+        'requestVersion': _requestVersion,
+      },
+    );
+  }
+
+  void _recordScopedRealtimeInvalidation(
+    _TemplateFeedInvalidation invalidation,
+  ) {
+    AppLogger.info(
+      feature: 'Templates.Controller',
+      operation: 'scoped_realtime_invalidation',
+      message: 'Applying scoped templates feed invalidation.',
+      context: {
+        'scope': invalidation.scope,
+        'templateId': invalidation.templateId,
+        'category': invalidation.category,
+        'mediaVersion': invalidation.mediaVersion,
+        'templateType': invalidation.templateType,
+        'isCritical': invalidation.isCritical,
+        'isPubliclyVisible': invalidation.isPubliclyVisible,
+        'reason': invalidation.reason,
+      },
+    );
   }
 
   void _resumePendingRealtimeRefreshIfNeeded() {
@@ -277,7 +727,7 @@ class TemplatesController extends Notifier<TemplatesState> {
   }
 
   Future<void> _resumeRealtimeIfNeeded() async {
-    if (!_isScreenVisible) {
+    if (!_isScreenVisible || !_hasInternet) {
       return;
     }
 
@@ -365,6 +815,7 @@ class TemplatesController extends Notifier<TemplatesState> {
     int? knownCatalogVersion,
   }) async {
     final requestVersion = ++_requestVersion;
+    _invalidatePreviewPreloads('initial_request_started');
     if (_shouldLoadTemplateOfTheDay(forceRefresh: forceRefresh)) {
       unawaited(_loadTemplateOfTheDay(requestVersion));
     }
@@ -413,7 +864,15 @@ class TemplatesController extends Notifier<TemplatesState> {
       }
 
       final cached = await _repository.readCachedFirstPage(query);
-      if (cached != null && requestVersion == _requestVersion) {
+      if (!_isCurrentFeedRequest(requestVersion)) {
+        _recordStaleResponseDiscarded(
+          requestVersion: requestVersion,
+          operation: 'read_cached_first_page',
+        );
+        return;
+      }
+
+      if (cached != null) {
         final updatedCache = _rememberFeedPage(
           state.cachedPagesByQueryKey,
           queryKey,
@@ -463,7 +922,13 @@ class TemplatesController extends Notifier<TemplatesState> {
 
     try {
       final page = await _repository.fetchFeed(query);
-      if (requestVersion != _requestVersion) return;
+      if (!_isCurrentFeedRequest(requestVersion)) {
+        _recordStaleResponseDiscarded(
+          requestVersion: requestVersion,
+          operation: 'fetch_feed_initial',
+        );
+        return;
+      }
 
       final updatedCache = _rememberFeedPage(
         state.cachedPagesByQueryKey,
@@ -489,6 +954,7 @@ class TemplatesController extends Notifier<TemplatesState> {
         _warmupTemplatePreviews(
           page.items,
           requestVersion: requestVersion,
+          preloadVersion: _preloadVersion,
           queryKey: queryKey,
         ),
       );
@@ -496,14 +962,26 @@ class TemplatesController extends Notifier<TemplatesState> {
         unawaited(_refreshCategories(requestVersion));
       }
     } on RequestCancelledException {
-      if (requestVersion != _requestVersion) return;
+      if (!_isCurrentFeedRequest(requestVersion)) {
+        _recordStaleResponseDiscarded(
+          requestVersion: requestVersion,
+          operation: 'fetch_feed_initial_cancelled',
+        );
+        return;
+      }
       state = state.copyWith(
         isLoading: false,
         isRefreshing: false,
         isLoadingMore: false,
       );
     } on AppException catch (error) {
-      if (requestVersion != _requestVersion) return;
+      if (!_isCurrentFeedRequest(requestVersion)) {
+        _recordStaleResponseDiscarded(
+          requestVersion: requestVersion,
+          operation: 'fetch_feed_initial_app_error',
+        );
+        return;
+      }
       state = state.copyWith(
         isLoading: false,
         isRefreshing: false,
@@ -511,7 +989,13 @@ class TemplatesController extends Notifier<TemplatesState> {
         errorMessage: error.message,
       );
     } catch (error) {
-      if (requestVersion != _requestVersion) return;
+      if (!_isCurrentFeedRequest(requestVersion)) {
+        _recordStaleResponseDiscarded(
+          requestVersion: requestVersion,
+          operation: 'fetch_feed_initial_error',
+        );
+        return;
+      }
       state = state.copyWith(
         isLoading: false,
         isRefreshing: false,
@@ -647,7 +1131,11 @@ class TemplatesController extends Notifier<TemplatesState> {
           state.query.copyWith(resetPage: true).cacheKey == queryKey &&
           state.itemsQueryKey == queryKey &&
           state.nextCursor == currentNextCursor;
-      if (requestVersion != _requestVersion || !isCurrentQuery) {
+      if (!_isCurrentFeedRequest(requestVersion) || !isCurrentQuery) {
+        _recordStaleResponseDiscarded(
+          requestVersion: requestVersion,
+          operation: 'fetch_feed_pagination',
+        );
         return;
       }
 
@@ -683,19 +1171,31 @@ class TemplatesController extends Notifier<TemplatesState> {
         clearError: true,
       );
     } on RequestCancelledException {
-      if (requestVersion != _requestVersion) {
+      if (!_isCurrentFeedRequest(requestVersion)) {
+        _recordStaleResponseDiscarded(
+          requestVersion: requestVersion,
+          operation: 'fetch_feed_pagination_cancelled',
+        );
         return;
       }
 
       state = state.copyWith(isLoadingMore: false);
     } on AppException catch (error) {
-      if (requestVersion != _requestVersion) {
+      if (!_isCurrentFeedRequest(requestVersion)) {
+        _recordStaleResponseDiscarded(
+          requestVersion: requestVersion,
+          operation: 'fetch_feed_pagination_app_error',
+        );
         return;
       }
 
       state = state.copyWith(isLoadingMore: false, errorMessage: error.message);
     } catch (error) {
-      if (requestVersion != _requestVersion) {
+      if (!_isCurrentFeedRequest(requestVersion)) {
+        _recordStaleResponseDiscarded(
+          requestVersion: requestVersion,
+          operation: 'fetch_feed_pagination_error',
+        );
         return;
       }
 
@@ -809,9 +1309,11 @@ class TemplatesController extends Notifier<TemplatesState> {
   Future<void> _warmupTemplatePreviews(
     List<TemplateItem> items, {
     required int requestVersion,
+    required int preloadVersion,
     required String queryKey,
   }) async {
-    final uniqueUrls = <String>{};
+    final uniqueItems = <({String url, int? mediaVersion})>[];
+    final uniqueKeys = <String>{};
     for (final item in items.take(_warmupPreviewLimit)) {
       final thumbnailUrl = _normalizeMediaUrl(item.thumbnailUrl);
       final previewUrl = _normalizeMediaUrl(item.previewAsset?.url);
@@ -819,23 +1321,49 @@ class TemplatesController extends Notifier<TemplatesState> {
       final preferred = thumbnailUrl != null && !isVideoUrl(thumbnailUrl)
           ? thumbnailUrl
           : (!isPreviewVideo ? previewUrl : null);
-      if (preferred != null) {
-        uniqueUrls.add(preferred);
+      if (preferred != null &&
+          uniqueKeys.add(
+            TemplateMediaCache.cacheKeyForMedia(
+              preferred,
+              mediaVersion: item.mediaVersion,
+            ),
+          )) {
+        uniqueItems.add((url: preferred, mediaVersion: item.mediaVersion));
       }
     }
 
-    final urlList = uniqueUrls.toList(growable: false);
-    for (final url in urlList) {
-      if (!_shouldContinuePreviewWarmup(requestVersion, queryKey)) {
-        return;
+    _activePreviewWarmupTasks++;
+    try {
+      for (final item in uniqueItems) {
+        if (!_shouldContinuePreviewWarmup(
+          requestVersion,
+          preloadVersion,
+          queryKey,
+        )) {
+          _recordPreloadCancellation('before_url');
+          return;
+        }
+        await _warmupSingleUrl(item.url, mediaVersion: item.mediaVersion);
+        if (!_shouldContinuePreviewWarmup(
+          requestVersion,
+          preloadVersion,
+          queryKey,
+        )) {
+          _recordPreloadCancellation('after_url');
+          return;
+        }
       }
-      await _warmupSingleUrl(url);
+    } finally {
+      _activePreviewWarmupTasks -= 1;
     }
   }
 
-  Future<void> _warmupSingleUrl(String url) async {
+  Future<void> _warmupSingleUrl(String url, {int? mediaVersion}) async {
     try {
-      await ref.read(templateThumbnailWarmupProvider)(url);
+      await ref.read(templateThumbnailWarmupProvider)(
+        url,
+        mediaVersion: mediaVersion,
+      );
     } catch (error, stackTrace) {
       AppLogger.warn(
         feature: 'Templates.Controller',
@@ -848,15 +1376,71 @@ class TemplatesController extends Notifier<TemplatesState> {
     }
   }
 
-  bool _shouldContinuePreviewWarmup(int requestVersion, String queryKey) {
+  bool _shouldContinuePreviewWarmup(
+    int requestVersion,
+    int preloadVersion,
+    String queryKey,
+  ) {
     if (!ref.mounted ||
         !_isScreenVisible ||
         requestVersion != _requestVersion ||
+        preloadVersion != _preloadVersion ||
         state.itemsQueryKey != queryKey) {
       return false;
     }
 
     return state.query.copyWith(resetPage: true).cacheKey == queryKey;
+  }
+
+  bool _invalidatePreviewPreloads(
+    String reason, {
+    TemplatesRepository? repository,
+  }) {
+    _preloadVersion++;
+    if (_activePreviewWarmupTasks <= 0) {
+      return false;
+    }
+
+    (repository ?? _repository).cancelPendingMetadataRequests();
+    _recordPreloadCancellation(reason);
+    return true;
+  }
+
+  bool _isCurrentFeedRequest(int requestVersion) {
+    return ref.mounted && _isScreenVisible && requestVersion == _requestVersion;
+  }
+
+  void _recordStaleResponseDiscarded({
+    required int requestVersion,
+    required String operation,
+  }) {
+    _staleResponsesDiscarded++;
+    AppLogger.info(
+      feature: 'Templates.Controller',
+      operation: 'stale_responses_discarded',
+      message: 'Discarded stale templates feed response.',
+      context: {
+        'sourceOperation': operation,
+        'discardedRequestVersion': requestVersion,
+        'currentRequestVersion': _requestVersion,
+        'count': _staleResponsesDiscarded,
+      },
+    );
+  }
+
+  void _recordPreloadCancellation(String reason) {
+    _preloadCancellations++;
+    AppLogger.info(
+      feature: 'Templates.Controller',
+      operation: 'preload_cancellations',
+      message: 'Cancelled stale template preview preload work.',
+      context: {
+        'reason': reason,
+        'requestVersion': _requestVersion,
+        'preloadVersion': _preloadVersion,
+        'count': _preloadCancellations,
+      },
+    );
   }
 
   String? _normalizeMediaUrl(String? rawUrl) {

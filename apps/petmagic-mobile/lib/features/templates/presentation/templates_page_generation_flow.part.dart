@@ -59,8 +59,7 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
       }
 
       if (!gate.isAllowed) {
-        final hasPremiumAccess =
-            ref.read(walletControllerProvider).wallet?.isPremium ?? false;
+        final hasPremiumAccess = ref.read(templatePremiumAccessProvider);
         final blockerAction = await showTemplateBlockedSheet(
           context: context,
           template: template,
@@ -195,8 +194,7 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
     }
 
     if (!gate.isAllowed) {
-      final hasPremiumAccess =
-          ref.read(walletControllerProvider).wallet?.isPremium ?? false;
+      final hasPremiumAccess = ref.read(templatePremiumAccessProvider);
       final blockerAction = await showTemplateBlockedSheet(
         context: context,
         template: template,
@@ -237,6 +235,7 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
               petId: petId,
               petPhotoId: selectedPhoto.id,
               templateId: template.templateId,
+              expectedTemplateVersion: template.version,
             );
       },
     );

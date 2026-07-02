@@ -194,6 +194,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
 
     final profileState = ref.read(profileControllerProvider);
     final hasInternet = ref.read(networkStatusControllerProvider).hasInternet;
+    if (!hasInternet) {
+      return;
+    }
+
     final unavailableKind =
         !profileState.isLoading && profileState.profile == null
         ? classifyAppUnavailable(

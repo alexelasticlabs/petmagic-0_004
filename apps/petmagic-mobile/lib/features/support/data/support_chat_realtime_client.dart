@@ -40,13 +40,16 @@ class SignalRSupportChatRealtimeClient implements SupportChatRealtimeClient {
   SignalRSupportChatRealtimeClient({
     required AuthSessionStorage sessionStorage,
     required ApiBaseUrlResolver apiBaseUrlResolver,
+    Duration requestTimeout = const Duration(seconds: 8),
   }) : _sessionStorage = sessionStorage,
-       _apiBaseUrlResolver = apiBaseUrlResolver;
+       _apiBaseUrlResolver = apiBaseUrlResolver,
+       _requestTimeout = requestTimeout;
 
   static const _conversationUpdatedEvent = 'conversation-updated';
 
   final AuthSessionStorage _sessionStorage;
   final ApiBaseUrlResolver _apiBaseUrlResolver;
+  final Duration _requestTimeout;
   final StreamController<SupportChatRealtimeUpdate> _eventsController =
       StreamController<SupportChatRealtimeUpdate>.broadcast();
 
@@ -70,6 +73,11 @@ class SignalRSupportChatRealtimeClient implements SupportChatRealtimeClient {
 
     _isConnecting = true;
     try {
+      final accessToken = await _readAccessToken();
+      if (accessToken.isEmpty) {
+        return;
+      }
+
       final candidates = [...await _apiBaseUrlResolver.prioritizedCandidates()];
       final active = _apiBaseUrlResolver.activeBaseUrl;
       if (active != null && !candidates.contains(active)) {
@@ -189,6 +197,7 @@ class SignalRSupportChatRealtimeClient implements SupportChatRealtimeClient {
           options: HttpConnectionOptions(
             accessTokenFactory: _readAccessToken,
             headers: _buildConnectionHeaders(),
+            requestTimeout: _requestTimeout.inMilliseconds,
           ),
         )
         .withAutomaticReconnect()

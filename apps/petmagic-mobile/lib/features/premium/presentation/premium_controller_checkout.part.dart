@@ -50,6 +50,10 @@ mixin _PremiumControllerCheckout
 
   @override
   Future<PremiumCheckoutModel?> startCheckout() async {
+    if (!_hasAuthenticatedPremiumSession()) {
+      return null;
+    }
+
     final plan = state.selectedPlan;
     if (plan == null) {
       return null;
@@ -130,6 +134,10 @@ mixin _PremiumControllerCheckout
 
   @override
   Future<void> manageBilling() async {
+    if (!_hasAuthenticatedPremiumSession()) {
+      return;
+    }
+
     _updateStateIfMounted(
       (state) => state.copyWith(
         isManaging: true,
@@ -183,6 +191,10 @@ mixin _PremiumControllerCheckout
 
   @override
   Future<void> restorePurchases() async {
+    if (!_hasAuthenticatedPremiumSession()) {
+      return;
+    }
+
     if (state.selectedProvider != PremiumPaymentProvider.stripe) {
       _updateStateIfMounted(
         (state) => state.copyWith(
@@ -280,6 +292,30 @@ mixin _PremiumControllerCheckout
 
   @override
   Future<void> verifyCheckoutStatus({
+    String? stripePlanCode,
+    String? stripeExternalSubscriptionId,
+  }) async {
+    final inFlight = _checkoutVerificationInFlight;
+    if (inFlight != null) {
+      await inFlight;
+      return;
+    }
+
+    final operation = _performCheckoutStatusVerification(
+      stripePlanCode: stripePlanCode,
+      stripeExternalSubscriptionId: stripeExternalSubscriptionId,
+    );
+    _checkoutVerificationInFlight = operation;
+    try {
+      await operation;
+    } finally {
+      if (identical(_checkoutVerificationInFlight, operation)) {
+        _checkoutVerificationInFlight = null;
+      }
+    }
+  }
+
+  Future<void> _performCheckoutStatusVerification({
     String? stripePlanCode,
     String? stripeExternalSubscriptionId,
   }) async {

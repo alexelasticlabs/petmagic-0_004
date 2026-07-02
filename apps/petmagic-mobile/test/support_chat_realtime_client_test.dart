@@ -1,8 +1,11 @@
 import 'dart:io';
+import 'dart:convert';
 
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/core/network/api_base_url_resolver.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
+import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_realtime_client.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
@@ -62,6 +65,29 @@ void main() {
   });
 
   test(
+    'support chat realtime skips hub connect when auth session is missing',
+    () async {
+      final resolver = _TrackingApiBaseUrlResolver(const [
+        'http://127.0.0.1:5000',
+      ]);
+      final client = SignalRSupportChatRealtimeClient(
+        sessionStorage: AuthSessionStorage(
+          secureStorage: _FakeSecureStorage(<String, String>{}),
+        ),
+        apiBaseUrlResolver: resolver,
+      );
+      addTearDown(client.dispose);
+
+      await client.connect();
+
+      expect(resolver.prioritizedCandidatesCalls, 0);
+      expect(resolver.invalidatedBaseUrls, isEmpty);
+      expect(resolver.successfulBaseUrls, isEmpty);
+      expect(resolver.resolveBaseUrlCalls, 0);
+    },
+  );
+
+  test(
     'support chat realtime keeps active base URL on non-transport hub failures',
     () async {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -75,7 +101,7 @@ void main() {
         'http://${server.address.address}:${server.port}',
       ]);
       final client = SignalRSupportChatRealtimeClient(
-        sessionStorage: AuthSessionStorage(),
+        sessionStorage: _sessionStorageWithTokens(),
         apiBaseUrlResolver: resolver,
       );
       addTearDown(client.dispose);
@@ -111,7 +137,7 @@ void main() {
         'http://${server.address.address}:${server.port}',
       ]);
       final client = SignalRSupportChatRealtimeClient(
-        sessionStorage: AuthSessionStorage(),
+        sessionStorage: _sessionStorageWithTokens(),
         apiBaseUrlResolver: resolver,
       );
       addTearDown(client.dispose);
@@ -128,6 +154,24 @@ void main() {
       expect(resolver.successfulBaseUrls, isEmpty);
     },
   );
+
+  test(
+    'support chat realtime configures non-default negotiate timeout',
+    () async {
+      final source = await File(
+        'lib/features/support/data/support_chat_realtime_client.dart',
+      ).readAsString();
+
+      expect(
+        source,
+        contains('Duration requestTimeout = const Duration(seconds: 8)'),
+      );
+      expect(
+        source,
+        contains('requestTimeout: _requestTimeout.inMilliseconds'),
+      );
+    },
+  );
 }
 
 class _TrackingApiBaseUrlResolver extends ApiBaseUrlResolver {
@@ -136,10 +180,14 @@ class _TrackingApiBaseUrlResolver extends ApiBaseUrlResolver {
   final List<String> _candidates;
   final List<String> invalidatedBaseUrls = <String>[];
   final List<String> successfulBaseUrls = <String>[];
+  int prioritizedCandidatesCalls = 0;
   int resolveBaseUrlCalls = 0;
 
   @override
-  Future<List<String>> prioritizedCandidates() async => _candidates;
+  Future<List<String>> prioritizedCandidates() async {
+    prioritizedCandidatesCalls++;
+    return _candidates;
+  }
 
   @override
   Future<String> resolveBaseUrl({bool forceRefresh = false}) async {
@@ -155,5 +203,61 @@ class _TrackingApiBaseUrlResolver extends ApiBaseUrlResolver {
   @override
   Future<void> markSuccessful(String baseUrl) async {
     successfulBaseUrls.add(baseUrl);
+  }
+}
+
+AuthSessionStorage _sessionStorageWithTokens() {
+  return AuthSessionStorage(
+    secureStorage: _FakeSecureStorage({
+      AuthSessionStorage.sessionKey: jsonEncode(_session.toJson()),
+    }),
+  );
+}
+
+final _session = AuthSession(
+  accessToken: 'access-token',
+  refreshToken: 'refresh-token',
+  expiresAtUtc: DateTime.utc(2035),
+  user: const MobileUserProfile(
+    userId: 'user-1',
+    email: 'pet@example.com',
+    displayName: 'Pet Parent',
+    isPremium: false,
+    emailConfirmed: true,
+    termsOfUseAccepted: true,
+    privacyPolicyAccepted: true,
+    marketingEmailsEnabled: false,
+    legalAcceptance: MobileLegalAcceptanceStatus(
+      termsOfUseAccepted: true,
+      termsOfUseAcceptedVersion: '1',
+      termsOfUseAcceptedAtUtc: null,
+      privacyPolicyAccepted: true,
+      privacyPolicyAcceptedVersion: '1',
+      privacyPolicyAcceptedAtUtc: null,
+      currentTermsOfUseVersion: '1',
+      currentPrivacyPolicyVersion: '1',
+      requiresAcceptance: false,
+    ),
+    roles: ['User'],
+    avatar: null,
+  ),
+);
+
+class _FakeSecureStorage extends FlutterSecureStorage {
+  _FakeSecureStorage(this.values);
+
+  final Map<String, String> values;
+
+  @override
+  Future<String?> read({
+    required String key,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    return values[key];
   }
 }

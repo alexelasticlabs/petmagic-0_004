@@ -16,8 +16,7 @@ extension _TemplatesPageTemplateActions on _TemplatesPageState {
     final isAuthenticated = ref
         .read(appLaunchControllerProvider)
         .isAuthenticated;
-    final hasPremiumAccess =
-        ref.read(walletControllerProvider).wallet?.isPremium ?? false;
+    final hasPremiumAccess = ref.read(templatePremiumAccessProvider);
     final action = await context.push<TemplateDetailAction>(
       TemplatePreviewPage.routePath,
       extra: TemplatePreviewRouteArgs(
@@ -42,7 +41,7 @@ extension _TemplatesPageTemplateActions on _TemplatesPageState {
     try {
       return await ref
           .read(templatesRepositoryProvider)
-          .fetchTemplate(template.templateId);
+          .fetchTemplate(template.templateId, forceRefresh: true);
     } catch (error, stackTrace) {
       AppLogger.warn(
         feature: 'templates',
@@ -74,7 +73,7 @@ extension _TemplatesPageTemplateActions on _TemplatesPageState {
     try {
       final template = await ref
           .read(templatesRepositoryProvider)
-          .fetchTemplate(featured.templateId);
+          .fetchTemplate(featured.templateId, forceRefresh: true);
       if (!mounted) {
         return;
       }
@@ -153,8 +152,7 @@ extension _TemplatesPageTemplateActions on _TemplatesPageState {
       _isRandomTemplateLoading = true;
     });
 
-    final hasPremiumAccess =
-        ref.read(walletControllerProvider).wallet?.isPremium ?? false;
+    final hasPremiumAccess = ref.read(templatePremiumAccessProvider);
     final randomRepository = ref.read(templatesRepositoryProvider);
     _activeRandomTemplateRepository = randomRepository;
 

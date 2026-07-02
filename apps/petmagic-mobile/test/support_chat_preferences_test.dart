@@ -17,6 +17,7 @@ import 'support_chat_test_support.dart';
 import 'widget_test_support.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   configureWidgetTestHarness();
 
   setUp(() {

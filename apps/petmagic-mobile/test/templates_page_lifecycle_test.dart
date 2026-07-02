@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,8 +7,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
+import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_query.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_controller.dart';
@@ -265,7 +269,63 @@ void main() {
   });
 
   testWidgets(
-    'templates page skips wallet preload when wallet snapshot is fully hydrated',
+    'templates page defers access preload while offline and retries on reconnect',
+    (tester) async {
+      final controller = FakeTemplatesController();
+      final walletController = TrackingWalletController();
+      final profileController = TrackingProfileBootstrapController();
+      final networkController = TestTemplatesNetworkStatusController(
+        initialHasInternet: false,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(
+              AuthenticatedAppLaunchController.new,
+            ),
+            networkStatusControllerProvider.overrideWith(
+              () => networkController,
+            ),
+            profileControllerProvider.overrideWith(() => profileController),
+            walletControllerProvider.overrideWith(() => walletController),
+            templatesControllerProvider.overrideWith(() => controller),
+            realtimeClientProvider.overrideWith(
+              (ref) => const NoopRealtimeClient(),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            locale: const Locale('en'),
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const Scaffold(body: TemplatesPage()),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(walletController.loadCalls, 0);
+      expect(walletController.syncSnapshotCalls, 0);
+      expect(profileController.initializeCalls, 0);
+
+      networkController.setHasInternet(true);
+      await tester.pump();
+      await tester.pump();
+
+      expect(walletController.loadCalls, 1);
+      expect(profileController.initializeCalls, 1);
+    },
+  );
+
+  testWidgets(
+    'templates page syncs premium snapshot when wallet is fully hydrated',
     (tester) async {
       final controller = FakeTemplatesController();
       final walletController = TrackingWalletController(
@@ -303,8 +363,306 @@ void main() {
       await tester.pump();
 
       expect(walletController.loadCalls, 0);
+      expect(walletController.syncSnapshotCalls, 1);
     },
   );
+
+  testWidgets(
+    'templates page syncs premium snapshot while hydrated wallet refreshes',
+    (tester) async {
+      final controller = FakeTemplatesController(
+        items: [templateFixture('1', 'Premium access check')],
+      );
+      final walletController = TrackingWalletController(
+        hasWallet: true,
+        hasCompletedFullLoad: true,
+        isRefreshing: true,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(
+              AuthenticatedAppLaunchController.new,
+            ),
+            walletControllerProvider.overrideWith(() => walletController),
+            templatesControllerProvider.overrideWith(() => controller),
+            realtimeClientProvider.overrideWith(
+              (ref) => const NoopRealtimeClient(),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            locale: const Locale('en'),
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const Scaffold(body: TemplatesPage()),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(walletController.loadCalls, 0);
+      expect(walletController.syncSnapshotCalls, 1);
+    },
+  );
+
+  testWidgets('wallet.isPremium=false keeps premium template locked', (
+    tester,
+  ) async {
+    final controller = FakeTemplatesController(
+      items: [
+        templateFixture(
+          'premium-template',
+          'Premium portrait',
+          isPremium: true,
+        ),
+      ],
+    );
+    final walletController = TrackingWalletController(
+      hasWallet: true,
+      hasCompletedFullLoad: true,
+      initialIsPremium: false,
+      syncedIsPremium: false,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appLaunchControllerProvider.overrideWith(
+            AuthenticatedAppLaunchController.new,
+          ),
+          walletControllerProvider.overrideWith(() => walletController),
+          templatesControllerProvider.overrideWith(() => controller),
+          realtimeClientProvider.overrideWith(
+            (ref) => const NoopRealtimeClient(),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          locale: const Locale('en'),
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(body: TemplatesPage()),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    final context = tester.element(find.byType(TemplatesPage));
+    final text = AppLocalizations.of(context);
+
+    expect(
+      tester.widget<TemplateCard>(find.byType(TemplateCard)).hasPremiumAccess,
+      isFalse,
+    );
+    expect(find.text(text.templateUnlockPremiumAction), findsOneWidget);
+  });
+
+  testWidgets('wallet.isPremium=true unlocks premium template cards', (
+    tester,
+  ) async {
+    final controller = FakeTemplatesController(
+      items: [
+        templateFixture(
+          'premium-template',
+          'Premium portrait',
+          isPremium: true,
+        ),
+      ],
+    );
+    final walletController = TrackingWalletController(
+      hasWallet: true,
+      hasCompletedFullLoad: true,
+      initialIsPremium: true,
+      syncedIsPremium: true,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appLaunchControllerProvider.overrideWith(
+            AuthenticatedAppLaunchController.new,
+          ),
+          walletControllerProvider.overrideWith(() => walletController),
+          templatesControllerProvider.overrideWith(() => controller),
+          realtimeClientProvider.overrideWith(
+            (ref) => const NoopRealtimeClient(),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          locale: const Locale('en'),
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(body: TemplatesPage()),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    final context = tester.element(find.byType(TemplatesPage));
+    final text = AppLocalizations.of(context);
+
+    expect(
+      tester.widget<TemplateCard>(find.byType(TemplateCard)).hasPremiumAccess,
+      isTrue,
+    );
+    expect(find.text(text.templateUnlockPremiumAction), findsNothing);
+    expect(find.text(text.templateTryAction), findsOneWidget);
+  });
+
+  testWidgets('profile.isPremium=true unlocks stale wallet premium cards', (
+    tester,
+  ) async {
+    final controller = FakeTemplatesController(
+      items: [
+        templateFixture(
+          'premium-template',
+          'Premium portrait',
+          isPremium: true,
+        ),
+      ],
+    );
+    final walletController = TrackingWalletController(
+      hasWallet: true,
+      hasCompletedFullLoad: true,
+      initialIsPremium: false,
+      syncedIsPremium: false,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appLaunchControllerProvider.overrideWith(
+            AuthenticatedAppLaunchController.new,
+          ),
+          profileControllerProvider.overrideWith(
+            () => FakeProfileController(isPremium: true),
+          ),
+          walletControllerProvider.overrideWith(() => walletController),
+          templatesControllerProvider.overrideWith(() => controller),
+          realtimeClientProvider.overrideWith(
+            (ref) => const NoopRealtimeClient(),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          locale: const Locale('en'),
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(body: TemplatesPage()),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    final context = tester.element(find.byType(TemplatesPage));
+    final text = AppLocalizations.of(context);
+
+    expect(
+      tester.widget<TemplateCard>(find.byType(TemplateCard)).hasPremiumAccess,
+      isTrue,
+    );
+    expect(find.text(text.templateUnlockPremiumAction), findsNothing);
+    expect(find.text(text.templateTryAction), findsOneWidget);
+  });
+
+  testWidgets('templates page updates premium cards after wallet sync', (
+    tester,
+  ) async {
+    final syncCompleter = Completer<void>();
+    final controller = FakeTemplatesController(
+      items: [
+        templateFixture(
+          'premium-template',
+          'Premium portrait',
+          isPremium: true,
+        ),
+      ],
+    );
+    final walletController = TrackingWalletController(
+      hasWallet: true,
+      hasCompletedFullLoad: true,
+      initialIsPremium: false,
+      syncedIsPremium: true,
+      syncCompleter: syncCompleter,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appLaunchControllerProvider.overrideWith(
+            AuthenticatedAppLaunchController.new,
+          ),
+          walletControllerProvider.overrideWith(() => walletController),
+          templatesControllerProvider.overrideWith(() => controller),
+          realtimeClientProvider.overrideWith(
+            (ref) => const NoopRealtimeClient(),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          locale: const Locale('en'),
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(body: TemplatesPage()),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    final context = tester.element(find.byType(TemplatesPage));
+    final text = AppLocalizations.of(context);
+
+    expect(walletController.syncSnapshotCalls, 1);
+    expect(
+      tester.widget<TemplateCard>(find.byType(TemplateCard)).hasPremiumAccess,
+      isFalse,
+    );
+    expect(find.text(text.templateUnlockPremiumAction), findsOneWidget);
+
+    syncCompleter.complete();
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+      tester.widget<TemplateCard>(find.byType(TemplateCard)).hasPremiumAccess,
+      isTrue,
+    );
+    expect(find.text(text.templateUnlockPremiumAction), findsNothing);
+    expect(find.text(text.templateTryAction), findsOneWidget);
+  });
 
   testWidgets('templates page preloads wallet for partial wallet snapshot', (
     tester,

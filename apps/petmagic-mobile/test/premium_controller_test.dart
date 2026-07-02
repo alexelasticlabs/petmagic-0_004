@@ -269,6 +269,61 @@ void main() {
   });
 
   test(
+    'guest premium monetization actions do not call checkout or billing APIs',
+    () async {
+      final repository = _FakePremiumRepository(
+        config: _paywallConfig(
+          methods: const [
+            PremiumPaymentMethodModel(
+              provider: PremiumPaymentProvider.stripe,
+              purchaseChannel: 'external_checkout',
+              platform: 'android',
+              region: '*',
+              isEnabled: true,
+              isSelectedByDefault: true,
+              requiresExternalWarning: false,
+              requiresStoreDisclosure: false,
+              isRecommended: true,
+              bonusTokensPercent: 0,
+            ),
+          ],
+        ),
+        status: _status(provider: 'stripe', canManageSubscription: false),
+      );
+
+      final container = ProviderContainer(
+        overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _GuestAppLaunchController.new,
+          ),
+          premiumRepositoryProvider.overrideWithValue(repository),
+          premiumRefreshProfileProvider.overrideWithValue(() async {}),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(premiumControllerProvider.notifier);
+      await controller.load();
+
+      final checkout = await controller.startCheckout();
+      await controller.manageBilling();
+      await controller.restorePurchases();
+
+      final state = container.read(premiumControllerProvider);
+      expect(checkout, isNull);
+      expect(repository.createStripeCheckoutCalls, 0);
+      expect(repository.createBillingPortalCalls, 0);
+      expect(repository.restoreStorePurchasesCalls, 0);
+      expect(repository.startStoreCheckoutCalls, 0);
+      expect(state.isBuying, isFalse);
+      expect(state.isManaging, isFalse);
+      expect(state.isRestoring, isFalse);
+      expect(state.externalUrl, isNull);
+      expect(state.errorMessage, isNull);
+    },
+  );
+
+  test(
     'canStartCheckout is false while a checkout is already in flight',
     () async {
       final repository = _FakePremiumRepository(
@@ -681,6 +736,85 @@ void main() {
   );
 
   test(
+    'concurrent checkout verification shares one in-flight polling loop',
+    () async {
+      var refreshCalls = 0;
+      final refreshStarted = Completer<void>();
+      final releaseRefresh = Completer<void>();
+      final repository = _FakePremiumRepository(
+        config: _paywallConfig(
+          methods: const [
+            PremiumPaymentMethodModel(
+              provider: PremiumPaymentProvider.stripe,
+              purchaseChannel: 'external_checkout',
+              platform: 'android',
+              region: '*',
+              isEnabled: true,
+              isSelectedByDefault: true,
+              requiresExternalWarning: false,
+              requiresStoreDisclosure: false,
+              isRecommended: true,
+              bonusTokensPercent: 0,
+            ),
+          ],
+        ),
+        status: _status(
+          provider: 'stripe',
+          canManageSubscription: false,
+          isPremium: false,
+        ),
+        statusSequence: [
+          _status(
+            provider: 'stripe',
+            canManageSubscription: true,
+            isPremium: true,
+          ),
+        ],
+      );
+
+      final container = ProviderContainer(
+        overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedAppLaunchController.new,
+          ),
+          premiumRepositoryProvider.overrideWithValue(repository),
+          premiumRefreshProfileProvider.overrideWithValue(() async {
+            refreshCalls++;
+            if (!refreshStarted.isCompleted) {
+              refreshStarted.complete();
+            }
+            await releaseRefresh.future;
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(premiumControllerProvider.notifier);
+      await controller.load();
+      controller.markCheckoutOpened(wasPremiumBeforeCheckout: false);
+
+      final firstVerification = controller.verifyCheckoutStatus();
+      await refreshStarted.future;
+
+      final secondVerification = controller.verifyCheckoutStatus();
+      await Future<void>.delayed(Duration.zero);
+
+      releaseRefresh.complete();
+      await Future.wait([firstVerification, secondVerification]);
+
+      final state = container.read(premiumControllerProvider);
+      expect(refreshCalls, 1);
+      expect(repository.fetchPaywallConfigCalls, 1);
+      expect(repository.fetchStatusCalls, 2);
+      expect(
+        state.checkoutVerificationState,
+        PremiumCheckoutVerificationState.activated,
+      );
+      expect(state.isPremium, isTrue);
+    },
+  );
+
+  test(
     'stripe restore clears restoring state when profile refresh fails',
     () async {
       final repository = _FakePremiumRepository(
@@ -881,6 +1015,10 @@ class _FakePremiumRepository extends PremiumRepository {
   int fetchPaywallConfigCalls = 0;
   int fetchStatusCalls = 0;
   int fetchStoreAvailabilityCalls = 0;
+  int createStripeCheckoutCalls = 0;
+  int createBillingPortalCalls = 0;
+  int startStoreCheckoutCalls = 0;
+  int restoreStorePurchasesCalls = 0;
 
   @override
   Stream<List<PurchaseDetails>> get purchaseUpdates => _streamController.stream;
@@ -917,6 +1055,7 @@ class _FakePremiumRepository extends PremiumRepository {
     PremiumPlanModel plan,
     Locale locale,
   ) async {
+    createStripeCheckoutCalls++;
     if (checkoutError != null) {
       throw checkoutError!;
     }
@@ -924,11 +1063,13 @@ class _FakePremiumRepository extends PremiumRepository {
   }
 
   @override
-  Future<PremiumBillingPortalModel> createBillingPortal() async =>
-      const PremiumBillingPortalModel(
-        paymentProvider: 'stripe',
-        portalUrl: 'https://billing.stripe.com/session/test',
-      );
+  Future<PremiumBillingPortalModel> createBillingPortal() async {
+    createBillingPortalCalls++;
+    return const PremiumBillingPortalModel(
+      paymentProvider: 'stripe',
+      portalUrl: 'https://billing.stripe.com/session/test',
+    );
+  }
 
   @override
   Future<
@@ -955,10 +1096,14 @@ class _FakePremiumRepository extends PremiumRepository {
   Future<void> startStoreCheckout(
     PremiumPlanModel plan,
     PremiumPaymentProvider provider,
-  ) async {}
+  ) async {
+    startStoreCheckoutCalls++;
+  }
 
   @override
-  Future<void> restoreStorePurchases() async {}
+  Future<void> restoreStorePurchases() async {
+    restoreStorePurchasesCalls++;
+  }
 
   @override
   Future<PremiumStoreVerificationModel> verifyStorePurchase({

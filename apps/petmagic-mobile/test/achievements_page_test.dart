@@ -124,6 +124,35 @@ void main() {
   );
 
   testWidgets(
+    'achievements page does not refetch unavailable state on offline resume',
+    (tester) async {
+      final repository = _ControlledAchievementsRepository(failUntilCall: 20);
+      final networkController = _TestNetworkStatusController(false);
+
+      await _pumpPage(tester, repository, networkOverride: networkController);
+      await tester.pumpAndSettle();
+
+      final initialFetchCalls = repository.fetchCalls;
+      expect(initialFetchCalls, greaterThan(0));
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+
+      expect(repository.fetchCalls, initialFetchCalls);
+
+      repository.failUntilCall = initialFetchCalls;
+      networkController.setHasInternet(true);
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(repository.fetchCalls, greaterThan(initialFetchCalls));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'achievements page treats online connection failures as server unavailable',
     (tester) async {
       final repository = _ControlledAchievementsRepository(

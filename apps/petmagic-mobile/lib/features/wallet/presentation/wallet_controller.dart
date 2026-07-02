@@ -4,9 +4,11 @@ import 'package:dio/dio.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/lifecycle/app_lifecycle_signal.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/mappers/wallet_error_key_mapper.dart';
@@ -199,6 +201,7 @@ abstract class _WalletControllerBase extends Notifier<WalletState> {
   late final WalletRepository _repository;
   bool _repositoryInitialized = false;
   Future<void>? _loadInFlight;
+  Future<void>? _checkoutVerificationInFlight;
   CancelToken? _activeLoadCancelToken;
   CancelToken? _activeWalletSyncCancelToken;
   CancelToken? _activeLedgerLoadMoreCancelToken;
@@ -206,6 +209,10 @@ abstract class _WalletControllerBase extends Notifier<WalletState> {
   bool _walletLifecycleStarted = false;
   bool _isWalletPageVisible = false;
   VoidCallback? _appLifecycleListener;
+
+  bool _hasAuthenticatedWalletSession() {
+    return ref.read(appLaunchControllerProvider).isAuthenticated;
+  }
 
   Future<void> load({bool refresh = false});
 

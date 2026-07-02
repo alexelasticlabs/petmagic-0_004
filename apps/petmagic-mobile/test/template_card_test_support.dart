@@ -7,6 +7,7 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
+import 'package:petmagic_mobile/features/templates/presentation/template_feed_playback_manager.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_card.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_player_platform_interface/video_player_platform_interface.dart';
@@ -55,7 +56,9 @@ Widget buildTemplateCardHost(
   ThemeData? theme,
   bool hasPremiumAccess = true,
   Size size = const Size(320, 240),
+  TemplateFeedPlaybackManager? playbackManager,
 }) {
+  final manager = playbackManager ?? TemplateFeedPlaybackManager();
   return MaterialApp(
     theme: theme ?? AppTheme.light(),
     localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -69,6 +72,7 @@ Widget buildTemplateCardHost(
             template: template,
             hasPremiumAccess: hasPremiumAccess,
             imageCacheWidth: imageCacheWidth,
+            playbackManager: manager,
             previewControllerFactory: previewControllerFactory,
           ),
         ),
@@ -78,6 +82,7 @@ Widget buildTemplateCardHost(
 }
 
 Widget buildTemplateCardGridHost(List<TemplateItem> templates) {
+  final playbackManager = TemplateFeedPlaybackManager();
   return MaterialApp(
     theme: AppTheme.light(),
     localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -96,6 +101,7 @@ Widget buildTemplateCardGridHost(List<TemplateItem> templates) {
                   template: template,
                   hasPremiumAccess: true,
                   imageCacheWidth: 720,
+                  playbackManager: playbackManager,
                   previewControllerFactory: (previewUrl) async =>
                       VideoPlayerController.networkUrl(Uri.parse(previewUrl)),
                 ),
@@ -110,6 +116,11 @@ Widget buildTemplateCardGridHost(List<TemplateItem> templates) {
 TemplateItem videoTemplate({
   String id = 'video-template-test',
   String previewUrl = 'https://cdn.example.com/templates/test-preview.mp4',
+  String? thumbnailUrl,
+  String? animatedPreviewUrl,
+  String? feedLoopLowUrl,
+  String? feedLoopMediumUrl,
+  int? mediaVersion,
 }) {
   return TemplateItem(
     templateId: id,
@@ -121,6 +132,11 @@ TemplateItem videoTemplate({
     tags: const <String>['viewport', 'video'],
     isPremium: false,
     tokenCost: 5,
+    thumbnailUrl: thumbnailUrl,
+    animatedPreviewUrl: animatedPreviewUrl,
+    feedLoopLowUrl: feedLoopLowUrl,
+    feedLoopMediumUrl: feedLoopMediumUrl,
+    mediaVersion: mediaVersion,
     previewAsset: TemplateAsset(
       url: previewUrl,
       fileName: 'test-preview.mp4',

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -304,6 +306,36 @@ void main() {
       expect(find.text(text.profileLegalAcceptAction), findsOneWidget);
     },
   );
+
+  test('rewards page lifecycle skips offline resume retries', () {
+    final source = File(
+      'lib/features/rewards/presentation/rewards_page.dart',
+    ).readAsStringSync();
+
+    expect(
+      source,
+      contains(
+        '    final hasInternet = ref.read(networkStatusControllerProvider).hasInternet;\n'
+        '    if (!hasInternet) {\n'
+        '      return;\n'
+        '    }\n'
+        '\n'
+        '    final unavailableKind =',
+      ),
+    );
+    expect(
+      source,
+      contains(
+        '      if (previous?.hasInternet != false || !next.hasInternet) {\n'
+        '        return;\n'
+        '      }',
+      ),
+    );
+    expect(
+      source,
+      contains('      unawaited(controller.load(refresh: true));'),
+    );
+  });
 
   testWidgets('wallet navigation hides while keyboard is open', (tester) async {
     await tester.pumpWidget(

@@ -109,7 +109,8 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
   }
 
   void _handleScroll() {
-    if (!_scrollController.hasClients) {
+    if (!_scrollController.hasClients ||
+        !ref.read(appLaunchControllerProvider).isAuthenticated) {
       return;
     }
 
@@ -133,7 +134,9 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
     _autoLoadMoreScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _autoLoadMoreScheduled = false;
-      if (!mounted || !_scrollController.hasClients) {
+      if (!mounted ||
+          !_scrollController.hasClients ||
+          !ref.read(appLaunchControllerProvider).isAuthenticated) {
         return;
       }
 

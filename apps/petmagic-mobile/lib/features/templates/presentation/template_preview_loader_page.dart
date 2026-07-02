@@ -28,7 +28,10 @@ class _TemplatePreviewLoaderPageState
   Future<void> _loadTemplate() async {
     try {
       final repository = ref.read(templatesRepositoryProvider);
-      final template = await repository.fetchTemplate(widget.templateId);
+      final template = await repository.fetchTemplate(
+        widget.templateId,
+        forceRefresh: true,
+      );
       if (!mounted) return;
 
       context.pushReplacement(

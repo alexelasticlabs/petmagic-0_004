@@ -15,11 +15,12 @@ void main() {
     final connectivityBody = _methodBody(source, '_onConnectivityChanged');
     final applyBody = _methodBody(source, '_applyConnectionState');
     final offlineProbeBody = _methodBody(source, '_startOfflineProbe');
+    final scheduleProbeBody = _methodBody(source, '_scheduleNextOfflineProbe');
     final restoreBannerBody = _methodBody(source, '_scheduleRestoreBannerHide');
 
     expect(onDisposeBody, contains('_started = false;'));
     expect(onDisposeBody, contains('_subscription?.cancel();'));
-    expect(onDisposeBody, contains('_offlineProbeTimer?.cancel();'));
+    expect(onDisposeBody, contains('_stopOfflineProbe();'));
     expect(onDisposeBody, contains('_restoreBannerTimer?.cancel();'));
 
     expect(bootstrapBody, contains('if (!ref.mounted)'));
@@ -27,9 +28,13 @@ void main() {
     expect(refreshBody, contains('if (!ref.mounted)'));
     expect(connectivityBody, contains('if (!ref.mounted)'));
     expect(applyBody, contains('if (!ref.mounted)'));
+    expect(applyBody, contains('_currentOfflineProbeInterval = _offlineProbeInterval;'));
 
-    expect(offlineProbeBody, contains('Timer.periodic'));
-    expect(offlineProbeBody, contains('if (!ref.mounted)'));
+    expect(offlineProbeBody, contains('_scheduleNextOfflineProbe(_currentOfflineProbeInterval);'));
+    expect(scheduleProbeBody, contains('Timer(delay, () async {'));
+    expect(scheduleProbeBody, contains('if (!ref.mounted || state.hasInternet)'));
+    expect(scheduleProbeBody, contains('_currentOfflineProbeInterval.inSeconds * 2'));
+    expect(scheduleProbeBody, contains('_offlineProbeMaxInterval.inSeconds'));
     expect(restoreBannerBody, contains('Timer('));
     expect(restoreBannerBody, contains('if (!ref.mounted)'));
   });

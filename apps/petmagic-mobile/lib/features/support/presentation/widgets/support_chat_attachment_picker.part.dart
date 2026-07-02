@@ -128,7 +128,7 @@ class _SupportAttachmentPickerSheetState
       _isInitialLoading = false;
       _assets = const [];
       _nextPage = 0;
-      _hasMore = paths.isNotEmpty;
+      _hasMore = false;
       _assetLoadFailed = false;
     });
 
@@ -218,7 +218,7 @@ class _SupportAttachmentPickerSheetState
         }
       }
       _nextPage = currentPage + 1;
-      _hasMore = nextAssets.length == _supportAttachmentRecentAssetCount;
+      _hasMore = fetched.length == _supportAttachmentRecentAssetCount;
       _isLoadingMore = false;
       _assetLoadFailed = false;
     });

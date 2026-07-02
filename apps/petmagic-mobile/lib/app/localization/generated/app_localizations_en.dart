@@ -1591,7 +1591,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get externalCheckoutPendingVerificationMessage =>
-      'Payment is not confirmed yet. We will update Premium or your wallet as soon as Stripe webhook arrives.';
+      'Payment is not confirmed yet. We will update Premium or your wallet as soon as Stripe confirms the payment.';
 
   @override
   String premiumContinueWithPlan(Object period, Object plan, Object price) {
@@ -3368,6 +3368,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Not enough PawSpark to start generation.';
 
   @override
+  String get templateFlowTemplateUnavailableError =>
+      'This template is no longer available. Choose another template from the feed.';
+
+  @override
+  String get templateFlowTemplateChangedError =>
+      'This template was updated. Reopen it from the feed and try again.';
+
+  @override
   String get templateFlowNetworkError =>
       'No connection. Check your network and try again.';
 
@@ -3600,7 +3608,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get generationStatusCancelQueuedMessage =>
-      'This only works while generation is still queued. If PawSpark were reserved, backend will return them automatically.';
+      'This only works while generation is still queued. If PawSpark were reserved, they will return to your balance automatically.';
 
   @override
   String get generationStatusCancelQueuedKeepAction => 'Keep waiting';
@@ -4670,5 +4678,5 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get templateFlowGenerationWaitTooLongPremiumHint =>
-      'Premium gets priority queue access and usually waits less.';
+      'Premium requests get priority when the service is busy and may wait less.';
 }

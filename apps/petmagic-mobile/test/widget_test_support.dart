@@ -353,7 +353,10 @@ class FakeTemplatesRepository implements TemplatesRepository {
   void cancelPendingMetadataRequests() {}
 
   @override
-  Future<TemplateItem> fetchTemplate(String templateId) async {
+  Future<TemplateItem> fetchTemplate(
+    String templateId, {
+    bool forceRefresh = false,
+  }) async {
     return items.firstWhere((item) => item.templateId == templateId);
   }
 

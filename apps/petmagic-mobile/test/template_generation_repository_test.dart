@@ -271,6 +271,10 @@ void main() {
         'ProviderQueued': TemplateGenerationStatus.providerQueued,
         'ProviderProcessing': TemplateGenerationStatus.providerProcessing,
         'ImportingMedia': TemplateGenerationStatus.importingMedia,
+        '7': TemplateGenerationStatus.submittingToProvider,
+        '8': TemplateGenerationStatus.providerQueued,
+        '9': TemplateGenerationStatus.providerProcessing,
+        '10': TemplateGenerationStatus.importingMedia,
       };
 
       for (final entry in cases.entries) {

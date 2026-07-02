@@ -28,7 +28,10 @@ abstract interface class TemplatesRepository {
 
   void cancelPendingMetadataRequests();
 
-  Future<TemplateItem> fetchTemplate(String templateId);
+  Future<TemplateItem> fetchTemplate(
+    String templateId, {
+    bool forceRefresh = false,
+  });
 
   Future<TemplateItem?> fetchRandomTemplate({
     required TemplateRandomMode mode,
@@ -79,6 +82,8 @@ class DefaultTemplatesRepository implements TemplatesRepository {
   int _templateDetailCacheGeneration = 0;
 
   static const int _fullResyncPageSize = 100;
+  static const int _fullResyncMaxPages = 100;
+  static const String _catalogSyncFailedCode = 'templates.catalog_sync_failed';
   static const int _templateDetailCacheLimit = 64;
   static const Duration _templateDetailCacheTtl = Duration(minutes: 10);
 
@@ -116,12 +121,15 @@ class DefaultTemplatesRepository implements TemplatesRepository {
   }
 
   @override
-  Future<TemplateItem> fetchTemplate(String templateId) async {
+  Future<TemplateItem> fetchTemplate(
+    String templateId, {
+    bool forceRefresh = false,
+  }) async {
     final normalizedId = templateId.trim();
     final cacheKey = normalizedId.isEmpty ? templateId : normalizedId;
     final now = DateTime.now().toUtc();
     final cached = _templateDetailsById[cacheKey];
-    if (cached != null && cached.expiresAtUtc.isAfter(now)) {
+    if (!forceRefresh && cached != null && cached.expiresAtUtc.isAfter(now)) {
       _rememberTemplateDetail(cacheKey, cached.template, now);
       return cached.template;
     }
@@ -131,7 +139,7 @@ class DefaultTemplatesRepository implements TemplatesRepository {
     }
 
     final inFlight = _templateDetailFetchesById[cacheKey];
-    if (inFlight != null) {
+    if (!forceRefresh && inFlight != null) {
       return inFlight;
     }
 
@@ -282,18 +290,37 @@ class DefaultTemplatesRepository implements TemplatesRepository {
     final previousItems = await _cacheDataSource.readCatalogItems();
     final allItems = <TemplateItemDto>[];
     var page = 1;
+    var pagesFetched = 0;
 
     while (true) {
+      if (pagesFetched >= _fullResyncMaxPages) {
+        throw _buildCatalogSyncFailure(
+          reason: 'page_limit_exceeded',
+          requestedPage: page,
+          targetVersion: targetVersion,
+        );
+      }
+
       final response = await _remoteDataSource.fetchCatalogPage(
         page: page,
         pageSize: _fullResyncPageSize,
       );
+      pagesFetched++;
+      if (response.page != page) {
+        throw _buildCatalogSyncFailure(
+          reason: 'page_mismatch',
+          requestedPage: page,
+          receivedPage: response.page,
+          targetVersion: targetVersion,
+        );
+      }
+
       allItems.addAll(response.items);
       if (!response.hasMore || response.items.isEmpty) {
         break;
       }
 
-      page = response.page + 1;
+      page++;
     }
 
     final incomingMediaUrls = allItems.expand(_templateMediaUrls).toSet();
@@ -307,6 +334,31 @@ class DefaultTemplatesRepository implements TemplatesRepository {
     _clearTemplateDetails(forceGeneration: true);
     await _cleanupDeletedMediaUrls(staleMediaUrls);
     return targetVersion;
+  }
+
+  AppException _buildCatalogSyncFailure({
+    required String reason,
+    required int requestedPage,
+    required int targetVersion,
+    int? receivedPage,
+  }) {
+    final error = AppException(_catalogSyncFailedCode);
+    AppLogger.warn(
+      feature: 'Templates.Repository',
+      operation: 'full_catalog_resync',
+      message:
+          'Template catalog full resync aborted due to invalid paging contract.',
+      error: error,
+      context: {
+        'reason': reason,
+        'requestedPage': requestedPage,
+        'receivedPage': receivedPage,
+        'targetVersion': targetVersion,
+        'pageSize': _fullResyncPageSize,
+        'maxPages': _fullResyncMaxPages,
+      },
+    );
+    return error;
   }
 
   void _rememberTemplateDetail(

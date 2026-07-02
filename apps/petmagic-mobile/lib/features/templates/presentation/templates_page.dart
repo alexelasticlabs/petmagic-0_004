@@ -13,6 +13,7 @@ import 'package:petmagic_mobile/core/permissions/media_permission_feedback.dart'
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/pets/presentation/pet_profile_providers.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
+import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
 import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart';
@@ -21,6 +22,8 @@ import 'package:petmagic_mobile/features/templates/data/templates_repository.dar
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
+import 'package:petmagic_mobile/features/templates/presentation/template_entitlement_provider.dart';
+import 'package:petmagic_mobile/features/templates/presentation/template_feed_playback_manager.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_preview_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_card.dart';
@@ -89,6 +92,11 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
   bool _isAppResumed = true;
   bool _isPetPhotoPickerActive = false;
   bool? _isTabActive;
+  bool _shouldRefreshAccessOnReconnect = false;
+  Future<void>? _walletAccessRefreshInFlight;
+  Future<void>? _profileAccessRefreshInFlight;
+  DateTime? _lastScrollSampleAt;
+  double? _lastScrollSampleOffset;
   final Set<String> _trackedTemplateOfTheDayViews = <String>{};
 
   void _setPageState(VoidCallback update) {
@@ -111,7 +119,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
       if (!mounted) {
         return;
       }
-      _maybeLoadWalletForAuthenticatedUser();
+      _refreshAccessForAuthenticatedUser();
     });
   }
 
@@ -161,13 +169,16 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
       }
       _cancelPendingSearchDebounce();
       _cancelPendingRandomTemplateRequest();
+      ref
+          .read(templateFeedPlaybackManagerProvider)
+          .disposeAll(reason: 'templates_app_background');
       _templatesController.setScreenVisible(false);
     });
   }
 
   void _handleScreenBecameVisible({required bool fromAppResume}) {
     _templatesController.setScreenVisible(true);
-    _maybeLoadWalletForAuthenticatedUser();
+    _refreshAccessForAuthenticatedUser(forceRefresh: fromAppResume);
 
     final state = ref.read(templatesControllerProvider);
     final shouldRefresh =
@@ -200,6 +211,9 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
       if (!isTabActive) {
         _cancelPendingSearchDebounce();
         _cancelPendingRandomTemplateRequest();
+        ref
+            .read(templateFeedPlaybackManagerProvider)
+            .disposeAll(reason: 'templates_tab_hidden');
         _templatesController.setScreenVisible(false);
         return;
       }
@@ -217,17 +231,87 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
     return now.difference(lastRefreshAt) >= _refreshCooldown;
   }
 
-  void _maybeLoadWalletForAuthenticatedUser() {
-    final launchState = ref.read(appLaunchControllerProvider);
-    final walletState = ref.read(walletControllerProvider);
-    if (!launchState.isAuthenticated ||
-        walletState.isLoading ||
-        walletState.isRefreshing ||
-        walletState.hasCompletedFullLoad) {
+  void _refreshAccessForAuthenticatedUser({bool forceRefresh = false}) {
+    if (!ref.read(networkStatusControllerProvider).hasInternet) {
+      _shouldRefreshAccessOnReconnect = true;
       return;
     }
 
-    unawaited(_walletController.load());
+    _shouldRefreshAccessOnReconnect = false;
+    _refreshWalletAccessForAuthenticatedUser(forceRefresh: forceRefresh);
+    _refreshProfileAccessForAuthenticatedUser();
+  }
+
+  void _refreshWalletAccessForAuthenticatedUser({bool forceRefresh = false}) {
+    final launchState = ref.read(appLaunchControllerProvider);
+    final walletState = ref.read(walletControllerProvider);
+    final hasHydratedWallet =
+        walletState.wallet != null && walletState.hasCompletedFullLoad;
+    if (!launchState.isAuthenticated ||
+        (!hasHydratedWallet &&
+            (walletState.isLoading || walletState.isRefreshing)) ||
+        _walletAccessRefreshInFlight != null) {
+      return;
+    }
+
+    final Future<void> refresh;
+    if (hasHydratedWallet) {
+      refresh = _walletController.syncSnapshot(forceRefresh: forceRefresh);
+    } else {
+      refresh = _walletController.load();
+    }
+
+    _walletAccessRefreshInFlight = refresh;
+    unawaited(
+      refresh.whenComplete(() {
+        if (identical(_walletAccessRefreshInFlight, refresh)) {
+          _walletAccessRefreshInFlight = null;
+        }
+      }),
+    );
+  }
+
+  void _refreshProfileAccessForAuthenticatedUser() {
+    final launchState = ref.read(appLaunchControllerProvider);
+    final profileState = ref.read(profileControllerProvider);
+    if (!launchState.isAuthenticated ||
+        profileState.profile != null ||
+        _profileAccessRefreshInFlight != null) {
+      return;
+    }
+
+    final Future<void> refresh;
+    try {
+      refresh = ref.read(profileControllerProvider.notifier).initialize();
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Templates',
+        operation: 'profile_access_preload',
+        message: 'Profile access preload could not start.',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return;
+    }
+
+    _profileAccessRefreshInFlight = refresh;
+    unawaited(
+      refresh
+          .catchError((Object error, StackTrace stackTrace) {
+            AppLogger.warn(
+              feature: 'Templates',
+              operation: 'profile_access_preload',
+              message: 'Profile access preload failed.',
+              error: error,
+              stackTrace: stackTrace,
+            );
+          })
+          .whenComplete(() {
+            if (identical(_profileAccessRefreshInFlight, refresh)) {
+              _profileAccessRefreshInFlight = null;
+            }
+          }),
+    );
   }
 
   void _runAfterBuild(VoidCallback action) {
@@ -247,6 +331,10 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
     ) {
       if (previous?.hasInternet != false || !next.hasInternet || !mounted) {
         return;
+      }
+
+      if (_shouldRefreshAccessOnReconnect) {
+        _refreshAccessForAuthenticatedUser(forceRefresh: true);
       }
 
       final state = ref.read(templatesControllerProvider);

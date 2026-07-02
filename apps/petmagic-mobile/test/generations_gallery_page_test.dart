@@ -348,10 +348,7 @@ void main() {
     expect(find.text('65%'), findsOneWidget);
     expect(find.text(text.generationStatusActiveInfoHint), findsOneWidget);
     expect(find.text('Cancel generation'), findsNothing);
-    expect(
-      find.text(text.generationStatusEtaEstimated('1-2 мин')),
-      findsOneWidget,
-    );
+    expect(find.text(text.generationStatusEtaNotifyHint), findsOneWidget);
   });
 
   testWidgets('failed filter renders reason and recovery actions', (

@@ -181,7 +181,9 @@ class AppLogger {
     if (error is AppException) {
       return {
         'type': error.runtimeType.toString(),
-        'message': _maskSensitiveValue('message', error.message),
+        'message': _normalizeLogText(
+          _maskSensitiveValue('message', error.message),
+        ),
         if (error.statusCode != null) 'status_code': error.statusCode!,
       };
     }
@@ -247,7 +249,7 @@ class AppLogger {
       }
 
       final text = value.toString();
-      final masked = _maskSensitiveValue(key, text);
+      final masked = _normalizeLogText(_maskSensitiveValue(key, text));
       sanitized[key] = masked.length > 256
           ? '${masked.substring(0, 256)}...'
           : masked;
@@ -257,13 +259,17 @@ class AppLogger {
   }
 
   static String _sanitizeMessage(String value) {
-    final masked = _maskSensitiveText(value);
+    final masked = _normalizeLogText(_maskSensitiveText(value));
     return masked.length > 512 ? '${masked.substring(0, 512)}...' : masked;
   }
 
   static String _maskSensitiveValue(String key, String value) {
     if (_isEmailKey(key)) {
       return _maskEmailValue(value);
+    }
+
+    if (_isRemoteMediaUrlKey(key)) {
+      return _maskRemoteMediaUrl(value);
     }
 
     if (_isSensitiveKey(key)) {
@@ -382,6 +388,24 @@ class AppLogger {
         normalizedKey == 'route';
   }
 
+  static bool _isRemoteMediaUrlKey(String key) {
+    final normalizedKey = key.toLowerCase().replaceAll(
+      RegExp(r'[^a-z0-9]'),
+      '',
+    );
+    return normalizedKey == 'attachmenturl' ||
+        normalizedKey == 'fileurl' ||
+        normalizedKey == 'mediaurl' ||
+        normalizedKey == 'imageurl' ||
+        normalizedKey == 'videourl' ||
+        normalizedKey == 'avatarurl' ||
+        normalizedKey == 'thumbnailurl' ||
+        normalizedKey == 'previewurl' ||
+        normalizedKey == 'outputurl' ||
+        normalizedKey == 'downloadurl' ||
+        normalizedKey == 'uploadurl';
+  }
+
   static bool _isLocalFilePathKey(String key) {
     final normalizedKey = key.toLowerCase().replaceAll(
       RegExp(r'[^a-z0-9]'),
@@ -496,6 +520,21 @@ class AppLogger {
 
     masked = masked.replaceAllMapped(
       RegExp(
+        r'''(["']?)(attachment[_-]?url|file[_-]?url|media[_-]?url|image[_-]?url|video[_-]?url|avatar[_-]?url|thumbnail[_-]?url|preview[_-]?url|output[_-]?url|download[_-]?url|upload[_-]?url)\1(\s*[:=]\s*)(["']?)(https?://[^,}\]\s"']+)\4''',
+        caseSensitive: false,
+      ),
+      (match) {
+        final quote = match.group(1) ?? '';
+        final key = match.group(2) ?? '';
+        final separator = match.group(3) ?? ': ';
+        final valueQuote = match.group(4) ?? '';
+        final value = match.group(5) ?? '';
+        return '$quote$key$quote$separator$valueQuote${_maskRemoteMediaUrl(value)}$valueQuote';
+      },
+    );
+
+    masked = masked.replaceAllMapped(
+      RegExp(
         r'''(["']?)(user[_-]?name|display[_-]?name|full[_-]?name|first[_-]?name|last[_-]?name|sender[_-]?name|sender[_-]?display[_-]?name|recipient[_-]?name|recipient[_-]?display[_-]?name|contact[_-]?name|contact[_-]?display[_-]?name|address|full[_-]?address|street[_-]?address|address[_-]?line1?|address[_-]?line2|city|country|region|province|postal[_-]?code|zip[_-]?code)\1(\s*[:=]\s*)(["']?)[^,}\]\n"']+\4''',
         caseSensitive: false,
       ),
@@ -584,6 +623,36 @@ class AppLogger {
     );
 
     return masked;
+  }
+
+  static String _maskRemoteMediaUrl(String value) {
+    final trimmed = value.trim();
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null ||
+        !uri.hasScheme ||
+        !(uri.scheme == 'http' || uri.scheme == 'https')) {
+      return '***';
+    }
+
+    final hasPath = uri.pathSegments.any((segment) => segment.isNotEmpty);
+    final sanitized = Uri(
+      scheme: uri.scheme,
+      host: uri.host,
+      port: uri.hasPort ? uri.port : null,
+      path: hasPath ? '/***' : '',
+    );
+    final normalized = sanitized.toString();
+    return normalized.endsWith('/')
+        ? normalized.substring(0, normalized.length - 1)
+        : normalized;
+  }
+
+  static String _normalizeLogText(String value) {
+    final normalizedControls = value.replaceAll(
+      RegExp(r'[\u0000-\u001F\u007F]+'),
+      ' ',
+    );
+    return normalizedControls.replaceAll(RegExp(r' {2,}'), ' ').trim();
   }
 
   @visibleForTesting

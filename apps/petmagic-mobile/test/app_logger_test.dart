@@ -345,6 +345,28 @@ void main() {
     expect(sanitized.toString(), isNot(contains('pi_secret_123')));
   });
 
+  test('redacts remote media urls in context without exposing object paths', () {
+    final sanitized = AppLogger.sanitizeContextForTesting({
+      'attachmentUrl':
+          'https://cdn.petmagic.ai/private/user-42/support/alice@example.com-photo.png',
+      'fileUrl': 'https://cdn.petmagic.ai/files/raw-attachment.pdf?sig=secret',
+      'avatarUrl': 'https://cdn.petmagic.ai/avatars/user-42/original.jpg',
+      'endpoint': 'https://api.petmagic.app/api/support?token=secret',
+    });
+
+    expect(sanitized['attachmentUrl'], 'https://cdn.petmagic.ai/***');
+    expect(sanitized['fileUrl'], 'https://cdn.petmagic.ai/***');
+    expect(sanitized['avatarUrl'], 'https://cdn.petmagic.ai/***');
+    expect(sanitized['endpoint'], 'https://api.petmagic.app/api/support');
+    expect(
+      sanitized.toString(),
+      isNot(contains('alice@example.com-photo.png')),
+    );
+    expect(sanitized.toString(), isNot(contains('raw-attachment.pdf')));
+    expect(sanitized.toString(), isNot(contains('/avatars/user-42')));
+    expect(sanitized.toString(), isNot(contains('token=secret')));
+  });
+
   test('redacts local file path context without redacting API endpoints', () {
     final sanitized = AppLogger.sanitizeContextForTesting({
       'filePath': '/var/mobile/Containers/Data/Application/app/source.jpg',
@@ -377,6 +399,55 @@ void main() {
     expect(message, isNot(contains('/tmp/petmagic')));
     expect(message, isNot(contains('/storage/emulated')));
     expect(message, isNot(contains('file:///private')));
+  });
+
+  test('redacts keyed remote media urls embedded in log text', () {
+    final message = AppLogger.sanitizeMessageForTesting(
+      'attachmentUrl=https://cdn.petmagic.ai/private/user-42/support/alice@example.com-photo.png '
+      'fileUrl="https://cdn.petmagic.ai/files/raw-attachment.pdf?sig=secret" '
+      'previewUrl: https://cdn.petmagic.ai/templates/video-preview.mp4',
+    );
+
+    expect(message, contains('attachmentUrl=https://cdn.petmagic.ai/***'));
+    expect(message, contains('fileUrl="https://cdn.petmagic.ai/***"'));
+    expect(message, contains('previewUrl: https://cdn.petmagic.ai/***'));
+    expect(message, isNot(contains('alice@example.com-photo.png')));
+    expect(message, isNot(contains('raw-attachment.pdf')));
+    expect(message, isNot(contains('video-preview.mp4')));
+    expect(message, isNot(contains('sig=secret')));
+  });
+
+  test('normalizes control characters in sanitized log messages', () {
+    final message = AppLogger.sanitizeMessageForTesting(
+      'External auth failed\r\nAuthorization: Bearer raw.jwt.token\t'
+      'email pet.parent@example.com\nCookie: session=raw',
+    );
+
+    expect(message, contains('Bearer ***'));
+    expect(message, contains('p***@example.com'));
+    expect(message, contains('Cookie: ***'));
+    expect(message, isNot(contains('\r')));
+    expect(message, isNot(contains('\n')));
+    expect(message, isNot(contains('\t')));
+    expect(message, isNot(contains('raw.jwt.token')));
+    expect(message, isNot(contains('session=raw')));
+  });
+
+  test('normalizes control characters in sanitized context strings', () {
+    final sanitized = AppLogger.sanitizeContextForTesting({
+      'metadata':
+          'first line\r\naccessToken=plain-access-token\tsecond line\n'
+          'filePath=/tmp/private/source.jpg',
+    });
+
+    final metadata = sanitized['metadata'] as String;
+    expect(metadata, contains('accessToken=***'));
+    expect(metadata, contains('filePath=***'));
+    expect(metadata, isNot(contains('\r')));
+    expect(metadata, isNot(contains('\n')));
+    expect(metadata, isNot(contains('\t')));
+    expect(metadata, isNot(contains('plain-access-token')));
+    expect(metadata, isNot(contains('/tmp/private/source.jpg')));
   });
 
   test('sanitizes DioException without leaking headers body or query', () {

@@ -97,8 +97,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
 
   @override
   void dispose() {
-    _autoRefreshTimer?.cancel();
-    _autoRefreshTimer = null;
+    _stopAutoRefresh();
     _walletController.setWalletPageVisible(false);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -106,8 +105,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
 
   @override
   void deactivate() {
-    _autoRefreshTimer?.cancel();
-    _autoRefreshTimer = null;
+    _stopAutoRefresh();
     _walletController.setWalletPageVisible(false);
     super.deactivate();
   }
@@ -123,8 +121,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
     super.activate();
     _walletController.setWalletPageVisible(true);
     if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
-      _autoRefreshTimer?.cancel();
-      _autoRefreshTimer = null;
+      _stopAutoRefresh();
       return;
     }
 
@@ -136,6 +133,9 @@ class _WalletPageState extends ConsumerState<WalletPage>
       if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
         return;
       }
+      if (!ref.read(networkStatusControllerProvider).hasInternet) {
+        return;
+      }
 
       unawaited(_refreshVisibleWalletData(forceRefresh: true));
     });
@@ -144,31 +144,24 @@ class _WalletPageState extends ConsumerState<WalletPage>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
-      _autoRefreshTimer?.cancel();
-      _autoRefreshTimer = null;
+      _stopAutoRefresh();
       return;
     }
 
     if (state != AppLifecycleState.resumed) {
-      _autoRefreshTimer?.cancel();
-      _autoRefreshTimer = null;
+      _stopAutoRefresh();
+      return;
+    }
+
+    if (!ref.read(networkStatusControllerProvider).hasInternet) {
       return;
     }
 
     if (state == AppLifecycleState.resumed && _shouldReloadOnResume) {
-      _shouldReloadOnResume = false;
       unawaited(
-        () async {
-          final controller = ref.read(walletControllerProvider.notifier);
-          await controller.verifyCheckoutStatus();
-
-          final verificationState = ref
-              .read(walletControllerProvider)
-              .checkoutVerificationState;
-          if (verificationState != WalletCheckoutVerificationState.succeeded) {
-            await controller.verifyStripeCheckout(null);
-          }
-        }().whenComplete(_scheduleNextAutoRefresh),
+        _resumePendingCheckoutVerification().whenComplete(
+          _scheduleNextAutoRefresh,
+        ),
       );
       return;
     }
@@ -184,14 +177,42 @@ class _WalletPageState extends ConsumerState<WalletPage>
     _scheduleNextAutoRefresh();
   }
 
-  void _scheduleNextAutoRefresh() {
-    if (!mounted) {
+  void _stopAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = null;
+  }
+
+  Future<void> _resumePendingCheckoutVerification() async {
+    if (!_shouldReloadOnResume) {
       return;
     }
 
-    _autoRefreshTimer?.cancel();
+    _shouldReloadOnResume = false;
+    final controller = ref.read(walletControllerProvider.notifier);
+    await controller.verifyCheckoutStatus();
+
+    final verificationState = ref
+        .read(walletControllerProvider)
+        .checkoutVerificationState;
+    if (verificationState != WalletCheckoutVerificationState.succeeded) {
+      await controller.verifyStripeCheckout(null);
+    }
+  }
+
+  void _scheduleNextAutoRefresh() {
+    if (!mounted || !ref.read(networkStatusControllerProvider).hasInternet) {
+      _stopAutoRefresh();
+      return;
+    }
+
+    _stopAutoRefresh();
     _autoRefreshTimer = Timer(_currentAutoRefreshInterval(), () {
       if (!mounted) {
+        return;
+      }
+
+      if (!ref.read(networkStatusControllerProvider).hasInternet) {
+        _stopAutoRefresh();
         return;
       }
 
@@ -352,6 +373,10 @@ class _WalletPageState extends ConsumerState<WalletPage>
         return;
       }
 
+      if (!isAuthenticated) {
+        return;
+      }
+
       final currentState = ref.read(walletControllerProvider);
       final currentUnavailableKind =
           currentState.wallet == null && !currentState.isInitialLoading
@@ -360,11 +385,27 @@ class _WalletPageState extends ConsumerState<WalletPage>
               hasInternet: next.hasInternet,
             )
           : null;
-      if (currentUnavailableKind == null) {
+      if (_shouldReloadOnResume) {
+        unawaited(
+          _resumePendingCheckoutVerification().whenComplete(
+            _scheduleNextAutoRefresh,
+          ),
+        );
         return;
       }
 
-      unawaited(controller.load(refresh: true));
+      if (currentUnavailableKind != null) {
+        unawaited(
+          controller.load(refresh: true).whenComplete(_scheduleNextAutoRefresh),
+        );
+        return;
+      }
+
+      unawaited(
+        _refreshVisibleWalletData(
+          forceRefresh: true,
+        ).whenComplete(_scheduleNextAutoRefresh),
+      );
     });
 
     ref.listen(walletControllerProvider, (previous, next) {

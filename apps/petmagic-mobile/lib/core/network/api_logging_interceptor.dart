@@ -202,12 +202,23 @@ class ApiLoggingInterceptor extends Interceptor {
 
   static bool _isSensitiveFieldName(String name) {
     final lower = name.toLowerCase();
+    final normalized = lower.replaceAll(RegExp(r'[^a-z0-9]'), '');
     return lower.contains('password') ||
         lower.contains('token') ||
         lower.contains('secret') ||
         lower.contains('authorization') ||
+        lower.contains('email') ||
+        lower.contains('phone') ||
+        lower.contains('receipt') ||
+        lower.contains('cookie') ||
+        lower.contains('signature') ||
         lower.contains('api_key') ||
-        lower.contains('apikey');
+        lower.contains('apikey') ||
+        normalized.contains('session') ||
+        normalized.contains('ticket') ||
+        normalized.contains('otp') ||
+        normalized == 'code' ||
+        normalized.endsWith('code');
   }
 
   String? _validationKeys(Object? data) {

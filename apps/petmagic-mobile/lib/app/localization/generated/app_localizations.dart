@@ -2943,7 +2943,7 @@ abstract class AppLocalizations {
   /// No description provided for @externalCheckoutPendingVerificationMessage.
   ///
   /// In en, this message translates to:
-  /// **'Payment is not confirmed yet. We will update Premium or your wallet as soon as Stripe webhook arrives.'**
+  /// **'Payment is not confirmed yet. We will update Premium or your wallet as soon as Stripe confirms the payment.'**
   String get externalCheckoutPendingVerificationMessage;
 
   /// No description provided for @premiumContinueWithPlan.
@@ -6081,6 +6081,18 @@ abstract class AppLocalizations {
   /// **'Not enough PawSpark to start generation.'**
   String get templateFlowInsufficientBalanceError;
 
+  /// No description provided for @templateFlowTemplateUnavailableError.
+  ///
+  /// In en, this message translates to:
+  /// **'This template is no longer available. Choose another template from the feed.'**
+  String get templateFlowTemplateUnavailableError;
+
+  /// No description provided for @templateFlowTemplateChangedError.
+  ///
+  /// In en, this message translates to:
+  /// **'This template was updated. Reopen it from the feed and try again.'**
+  String get templateFlowTemplateChangedError;
+
   /// No description provided for @templateFlowNetworkError.
   ///
   /// In en, this message translates to:
@@ -6498,7 +6510,7 @@ abstract class AppLocalizations {
   /// No description provided for @generationStatusCancelQueuedMessage.
   ///
   /// In en, this message translates to:
-  /// **'This only works while generation is still queued. If PawSpark were reserved, backend will return them automatically.'**
+  /// **'This only works while generation is still queued. If PawSpark were reserved, they will return to your balance automatically.'**
   String get generationStatusCancelQueuedMessage;
 
   /// No description provided for @generationStatusCancelQueuedKeepAction.
@@ -8342,7 +8354,7 @@ abstract class AppLocalizations {
   /// No description provided for @templateFlowGenerationWaitTooLongPremiumHint.
   ///
   /// In en, this message translates to:
-  /// **'Premium gets priority queue access and usually waits less.'**
+  /// **'Premium requests get priority when the service is busy and may wait less.'**
   String get templateFlowGenerationWaitTooLongPremiumHint;
 }
 

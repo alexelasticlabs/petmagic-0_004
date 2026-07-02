@@ -101,12 +101,17 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
     required ApiBaseUrlResolver apiBaseUrlResolver,
     HttpClient? httpClient,
     this.reconnectDelay = const Duration(seconds: 3),
+    Duration connectionTimeout = const Duration(seconds: 8),
   }) : _apiBaseUrlResolver = apiBaseUrlResolver,
-       _httpClient = httpClient;
+       _httpClient = httpClient,
+       _connectionTimeout = connectionTimeout {
+    _httpClient?.connectionTimeout = connectionTimeout;
+  }
 
   final ApiBaseUrlResolver _apiBaseUrlResolver;
   HttpClient? _httpClient;
   final Duration reconnectDelay;
+  final Duration _connectionTimeout;
 
   StreamController<RealtimeEvent>? _controller;
   Future<void>? _connectionLoop;
@@ -187,7 +192,8 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
     final requestId = RequestIdentity.createRequestId();
     final correlationId = RequestIdentity.createCorrelationId();
     try {
-      final httpClient = _httpClient ??= HttpClient();
+      final httpClient = _httpClient ??=
+          (HttpClient()..connectionTimeout = _connectionTimeout);
       final request = await httpClient.getUrl(
         Uri.parse('$baseUrl/api/templates/events'),
       );

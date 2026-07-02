@@ -593,7 +593,7 @@
   "generationStatusCancelQueuedHint": "Puedes cancelar mientras esta generación siga esperando en cola.",
   "generationStatusCancelQueuedAction": "Cancelar generación",
   "generationStatusCancelQueuedTitle": "¿Cancelar generación?",
-  "generationStatusCancelQueuedMessage": "Esto solo funciona mientras la generación sigue en cola. Si se reservaron PawSpark, el backend los devolverá automáticamente.",
+  "generationStatusCancelQueuedMessage": "Esto solo funciona mientras la generación sigue en cola. Si se reservaron PawSpark, volverán automáticamente a tu saldo.",
   "generationStatusCancelQueuedKeepAction": "Seguir esperando",
   "generationStatusCancelQueuedConfirmAction": "Confirmar cancelación",
   "generationStatusCancelQueuedSuccess": "Generación cancelada.",
@@ -1141,6 +1141,8 @@
   "templateFlowUploadPetPhotoAction": "Sube una foto de mascota",
   "templateFlowPremiumRequiredError": "Esta plantilla está disponible sólo con Premium.",
   "templateFlowInsufficientBalanceError": "No hay suficiente PawSpark para iniciar la generación.",
+  "templateFlowTemplateUnavailableError": "Esta plantilla ya no está disponible. Elige otra plantilla del feed.",
+  "templateFlowTemplateChangedError": "Esta plantilla se actualizó. Ábrela de nuevo desde el feed e inténtalo otra vez.",
   "templateFlowNetworkError": "Sin conexión. Verifique su red e inténtelo nuevamente.",
   "templateFlowServerError": "El servicio no está disponible temporalmente. Inténtelo de nuevo más tarde.",
   "templateFlowStartFailedError": "No se pudo iniciar la generación. Por favor inténtalo de nuevo.",
@@ -1513,5 +1515,5 @@
       }
     }
   },
-  "templateFlowGenerationWaitTooLongPremiumHint": "Premium accede a una cola prioritaria y normalmente espera menos."
+  "templateFlowGenerationWaitTooLongPremiumHint": "Las solicitudes Premium tienen prioridad cuando el servicio esta ocupado y pueden esperar menos."
 }

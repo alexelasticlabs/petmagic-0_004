@@ -4,6 +4,23 @@ extension _TemplatesPageLifecycle on _TemplatesPageState {
   void _handleScroll() {
     if (!_scrollController.hasClients) return;
     final position = _scrollController.position;
+    final now = DateTime.now();
+    final previousAt = _lastScrollSampleAt;
+    final previousOffset = _lastScrollSampleOffset;
+    if (previousAt != null && previousOffset != null) {
+      final elapsedSeconds =
+          now.difference(previousAt).inMicroseconds /
+          Duration.microsecondsPerSecond;
+      if (elapsedSeconds > 0) {
+        final velocity = (position.pixels - previousOffset) / elapsedSeconds;
+        ref
+            .read(templateFeedPlaybackManagerProvider)
+            .updateScrollVelocity(velocity);
+      }
+    }
+    _lastScrollSampleAt = now;
+    _lastScrollSampleOffset = position.pixels;
+
     if (position.pixels > position.maxScrollExtent - 720) {
       _templatesController.loadMore();
     }

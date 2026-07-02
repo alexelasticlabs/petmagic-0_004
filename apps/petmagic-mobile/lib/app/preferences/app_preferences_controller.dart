@@ -50,8 +50,19 @@ class AppPreferencesController extends Notifier<AppPreferencesState> {
   }
 
   Future<void> _load() async {
+    if (!ref.mounted) {
+      return;
+    }
+
     final savedThemeMode = await _storage.readThemeMode();
+    if (!ref.mounted) {
+      return;
+    }
+
     final savedLocale = await _storage.readLocale();
+    if (!ref.mounted) {
+      return;
+    }
 
     state = state.copyWith(
       themeMode: savedThemeMode ?? state.themeMode,

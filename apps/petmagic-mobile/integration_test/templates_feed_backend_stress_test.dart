@@ -10,12 +10,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_query.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_remote_data_source.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
+import 'package:petmagic_mobile/features/templates/presentation/template_feed_playback_manager.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_card.dart';
@@ -142,6 +144,22 @@ void main() {
       expect(
         longSessionData['max_visible_card_count'],
         isA<int>().having((value) => value, 'value', lessThan(60)),
+      );
+
+      final longScrollMemoryData = await _runBackendLongScrollMemoryProfile(
+        tester,
+        backend,
+      );
+      _recordBackendLongScrollMemoryData(binding, longScrollMemoryData);
+
+      final mixedData = longScrollMemoryData['mixed']! as Map<String, Object?>;
+      final videoOnlyData =
+          longScrollMemoryData['video_only']! as Map<String, Object?>;
+      expect(mixedData['target_reached'], isTrue);
+      expect(videoOnlyData['target_reached'], isTrue);
+      expect(
+        videoOnlyData['active_video_preview_average'],
+        greaterThan(mixedData['active_video_preview_average'] as double),
       );
 
       expect(tester.takeException(), isNull);
@@ -286,6 +304,8 @@ Future<Map<String, Object?>> _runBackendLongSessionWorkflow(
   var maxVisibleCardCount = 0;
   var maxCacheQueryKeyCount = 0;
   var maxDuplicateItemCount = 0;
+  final mixedActiveVideoPreviewSamples = <int>[];
+  final videoOnlyActiveVideoPreviewSamples = <int>[];
 
   for (var cycle = 0; cycle < 12; cycle++) {
     final type = switch (cycle % 3) {
@@ -322,6 +342,8 @@ Future<Map<String, Object?>> _runBackendLongSessionWorkflow(
       debugState: () => _backendDebug(tester, backend),
       maxPumps: 250,
     );
+    await _settlePlaybackBudget(tester);
+    await _activateVisibleTemplateCards(tester);
     _recordLongSessionExtremes(
       tester,
       onLoaded: (value) => maxLoadedItemCount = value > maxLoadedItemCount
@@ -335,6 +357,11 @@ Future<Map<String, Object?>> _runBackendLongSessionWorkflow(
           : maxCacheQueryKeyCount,
       onDuplicates: (value) => maxDuplicateItemCount =
           value > maxDuplicateItemCount ? value : maxDuplicateItemCount,
+    );
+    _recordActiveVideoPreviewSample(
+      type,
+      mixedActiveVideoPreviewSamples,
+      videoOnlyActiveVideoPreviewSamples,
     );
 
     scrollController!.jumpTo(scrollController.position.maxScrollExtent);
@@ -353,6 +380,8 @@ Future<Map<String, Object?>> _runBackendLongSessionWorkflow(
       debugState: () => _backendDebug(tester, backend),
       maxPumps: 250,
     );
+    await _settlePlaybackBudget(tester);
+    await _activateVisibleTemplateCards(tester);
     _recordLongSessionExtremes(
       tester,
       onLoaded: (value) => maxLoadedItemCount = value > maxLoadedItemCount
@@ -366,6 +395,11 @@ Future<Map<String, Object?>> _runBackendLongSessionWorkflow(
           : maxCacheQueryKeyCount,
       onDuplicates: (value) => maxDuplicateItemCount =
           value > maxDuplicateItemCount ? value : maxDuplicateItemCount,
+    );
+    _recordActiveVideoPreviewSample(
+      type,
+      mixedActiveVideoPreviewSamples,
+      videoOnlyActiveVideoPreviewSamples,
     );
 
     scrollController.jumpTo(0);
@@ -396,12 +430,203 @@ Future<Map<String, Object?>> _runBackendLongSessionWorkflow(
     'final_cache_query_key_count': state.cachedPagesByQueryKey.length,
     'final_loaded_item_count': state.items.length,
     'final_visible_card_count': _visibleCardCount(),
+    'mixed_active_video_preview_average': _average(
+      mixedActiveVideoPreviewSamples,
+    ),
+    'mixed_active_video_preview_max': mixedActiveVideoPreviewSamples.isEmpty
+        ? 0
+        : mixedActiveVideoPreviewSamples.reduce((a, b) => a > b ? a : b),
+    'mixed_active_video_preview_samples': mixedActiveVideoPreviewSamples,
+    'video_only_active_video_preview_average': _average(
+      videoOnlyActiveVideoPreviewSamples,
+    ),
+    'video_only_active_video_preview_max':
+        videoOnlyActiveVideoPreviewSamples.isEmpty
+        ? 0
+        : videoOnlyActiveVideoPreviewSamples.reduce((a, b) => a > b ? a : b),
+    'video_only_active_video_preview_samples':
+        videoOnlyActiveVideoPreviewSamples,
     'final_query': {
       'type': state.query.type?.apiValue,
       'category': state.query.category,
       'search': state.query.search,
     },
   };
+}
+
+Future<Map<String, Object?>> _runBackendLongScrollMemoryProfile(
+  WidgetTester tester,
+  _BackendStressAdapter backend,
+) async {
+  final mixed = await _runLongScrollMode(tester, backend, type: null);
+  final videoOnly = await _runLongScrollMode(
+    tester,
+    backend,
+    type: TemplateType.video,
+  );
+
+  return {
+    'stage': 'completed',
+    'target_item_count': 520,
+    'mixed': mixed,
+    'video_only': videoOnly,
+  };
+}
+
+Future<Map<String, Object?>> _runLongScrollMode(
+  WidgetTester tester,
+  _BackendStressAdapter backend, {
+  required TemplateType? type,
+}) async {
+  const targetItemCount = 520;
+  final label = type == TemplateType.video ? 'video_only' : 'mixed';
+  final requestStartIndex = backend.feedQueries.length;
+  final controller = _templatesController(tester);
+  controller.setSearch('');
+  await tester.pump();
+  controller.setCategory(null);
+  await tester.pump();
+  controller.setType(type);
+  await tester.pump();
+
+  final expectedPrefix = _expectedLongScrollPrefix(type: type);
+  await _pumpUntil(
+    tester,
+    () => _stateMatchesLongScrollQuery(
+      tester,
+      type: type,
+      expectedPrefix: expectedPrefix,
+      minimumItemCount: 20,
+    ),
+    description: '$label long-scroll first page loads',
+    debugState: () => _backendDebug(tester, backend),
+    maxPumps: 300,
+  );
+
+  final loadedItemSamples = <int>[];
+  final activeVideoPreviewSamples = <int>[];
+  var maxVisibleCardCount = 0;
+  var maxDuplicateItemCount = 0;
+
+  await _sampleLongScrollState(
+    tester,
+    activeVideoPreviewSamples,
+    loadedItemSamples,
+    onVisible: (value) => maxVisibleCardCount = value > maxVisibleCardCount
+        ? value
+        : maxVisibleCardCount,
+    onDuplicates: (value) => maxDuplicateItemCount =
+        value > maxDuplicateItemCount ? value : maxDuplicateItemCount,
+  );
+
+  while (_state(tester).items.length < targetItemCount &&
+      _state(tester).hasMore) {
+    final beforeCount = _state(tester).items.length;
+    await controller.loadMore();
+    await _pumpUntil(
+      tester,
+      () =>
+          _state(tester).items.length > beforeCount || !_state(tester).hasMore,
+      description: '$label long-scroll cursor advances past $beforeCount',
+      debugState: () => _backendDebug(tester, backend),
+      maxPumps: 300,
+    );
+
+    final loadedCount = _state(tester).items.length;
+    if (loadedCount % 100 == 0 || loadedCount >= targetItemCount) {
+      await tester.pump(const Duration(seconds: 2));
+    }
+    await _sampleLongScrollState(
+      tester,
+      activeVideoPreviewSamples,
+      loadedItemSamples,
+      onVisible: (value) => maxVisibleCardCount = value > maxVisibleCardCount
+          ? value
+          : maxVisibleCardCount,
+      onDuplicates: (value) => maxDuplicateItemCount =
+          value > maxDuplicateItemCount ? value : maxDuplicateItemCount,
+    );
+  }
+
+  await tester.pump(const Duration(seconds: 12));
+  await _sampleLongScrollState(
+    tester,
+    activeVideoPreviewSamples,
+    loadedItemSamples,
+    onVisible: (value) => maxVisibleCardCount = value > maxVisibleCardCount
+        ? value
+        : maxVisibleCardCount,
+    onDuplicates: (value) => maxDuplicateItemCount =
+        value > maxDuplicateItemCount ? value : maxDuplicateItemCount,
+  );
+
+  final newQueries = backend.feedQueries.skip(requestStartIndex).toList();
+  final state = _state(tester);
+  return {
+    'label': label,
+    'type': type?.apiValue,
+    'loaded_item_count': state.items.length,
+    'target_reached': state.items.length >= targetItemCount,
+    'has_more': state.hasMore,
+    'request_count_delta': newQueries.length,
+    'cursor_query_count': newQueries
+        .where((query) => query['cursor'] != null)
+        .length,
+    'duplicate_adjacent_query_count': _duplicateAdjacentQueryCount(newQueries),
+    'max_visible_card_count': maxVisibleCardCount,
+    'max_duplicate_item_count': maxDuplicateItemCount,
+    'active_video_preview_average': _average(activeVideoPreviewSamples),
+    'active_video_preview_max': activeVideoPreviewSamples.isEmpty
+        ? 0
+        : activeVideoPreviewSamples.reduce((a, b) => a > b ? a : b),
+    'active_video_preview_samples': activeVideoPreviewSamples,
+    'loaded_item_samples': loadedItemSamples,
+  };
+}
+
+Future<void> _sampleLongScrollState(
+  WidgetTester tester,
+  List<int> activeVideoPreviewSamples,
+  List<int> loadedItemSamples, {
+  required ValueChanged<int> onVisible,
+  required ValueChanged<int> onDuplicates,
+}) async {
+  await _settlePlaybackBudget(tester);
+  await _activateVisibleTemplateCards(tester);
+  activeVideoPreviewSamples.add(MediaLifecyclePolicy.activeVideoPreviews);
+  final state = _state(tester);
+  loadedItemSamples.add(state.items.length);
+  onVisible(_visibleCardCount());
+  onDuplicates(_duplicateTemplateIdCount(state));
+}
+
+Future<void> _settlePlaybackBudget(WidgetTester tester) async {
+  final manager = ProviderScope.containerOf(
+    tester.element(find.byType(TemplatesPage)),
+  ).read(templateFeedPlaybackManagerProvider);
+  manager.updateScrollVelocity(0);
+  await tester.pump(const Duration(milliseconds: 120));
+}
+
+void _recordActiveVideoPreviewSample(
+  TemplateType? type,
+  List<int> mixedActiveVideoPreviewSamples,
+  List<int> videoOnlyActiveVideoPreviewSamples,
+) {
+  final active = MediaLifecyclePolicy.activeVideoPreviews;
+  if (type == null) {
+    mixedActiveVideoPreviewSamples.add(active);
+  } else if (type == TemplateType.video) {
+    videoOnlyActiveVideoPreviewSamples.add(active);
+  }
+}
+
+double _average(List<int> values) {
+  if (values.isEmpty) {
+    return 0;
+  }
+
+  return values.reduce((a, b) => a + b) / values.length;
 }
 
 TemplatesState _state(WidgetTester tester) {
@@ -474,6 +699,15 @@ void _recordBackendLongSessionData(
   binding.reportData!['templates_feed_backend_long_session'] = data;
 }
 
+void _recordBackendLongScrollMemoryData(
+  IntegrationTestWidgetsFlutterBinding binding,
+  Map<String, Object?> data,
+) {
+  binding.reportData ??= <String, dynamic>{};
+  binding.reportData!['templates_feed_backend_long_scroll_memory_profile'] =
+      data;
+}
+
 Future<void> _pumpUntil(
   WidgetTester tester,
   bool Function() condition, {
@@ -491,6 +725,33 @@ Future<void> _pumpUntil(
 
   final details = debugState == null ? '' : '\n${debugState()}';
   fail('Timed out waiting for condition: $description$details');
+}
+
+Future<void> _activateVisibleTemplateCards(WidgetTester tester) async {
+  final templateDetectors = tester
+      .widgetList<VisibilityDetector>(find.byType(VisibilityDetector))
+      .where((detector) => detector.key.toString().contains('template-card-'))
+      .toList(growable: false);
+
+  expect(templateDetectors, isNotEmpty);
+  var invokedCallbacks = 0;
+  for (final detector in templateDetectors) {
+    final callback = detector.onVisibilityChanged;
+    if (callback == null) {
+      continue;
+    }
+
+    invokedCallbacks += 1;
+    callback(
+      VisibilityInfo(
+        key: detector.key!,
+        size: const Size(180, 250),
+        visibleBounds: const Rect.fromLTWH(0, 0, 180, 250),
+      ),
+    );
+  }
+  expect(invokedCallbacks, greaterThan(0));
+  await tester.pump();
 }
 
 String _backendDebug(WidgetTester tester, _BackendStressAdapter backend) {
@@ -550,6 +811,25 @@ bool _stateMatchesLongSessionQuery(
       state.errorMessage == null;
 }
 
+bool _stateMatchesLongScrollQuery(
+  WidgetTester tester, {
+  required TemplateType? type,
+  required String expectedPrefix,
+  required int minimumItemCount,
+}) {
+  final state = _state(tester);
+  return state.query.type == type &&
+      state.query.category == null &&
+      state.query.search == null &&
+      state.items.length >= minimumItemCount &&
+      state.items.every((item) => item.templateId.startsWith(expectedPrefix)) &&
+      _duplicateTemplateIdCount(state) == 0 &&
+      !state.isLoading &&
+      !state.isRefreshing &&
+      !state.isLoadingMore &&
+      state.errorMessage == null;
+}
+
 int _visibleCardCount() => find.byType(TemplateCard).evaluate().length;
 
 int _duplicateTemplateIdCount(TemplatesState state) {
@@ -574,6 +854,15 @@ String _expectedLongSessionPrefix({
       ? 'image-template'
       : 'template';
   return '${search.toLowerCase()}-$basePrefix-';
+}
+
+String _expectedLongScrollPrefix({required TemplateType? type}) {
+  final basePrefix = type == TemplateType.video
+      ? 'video-template'
+      : type == TemplateType.image
+      ? 'image-template'
+      : 'template';
+  return '$basePrefix-';
 }
 
 int _duplicateAdjacentQueryCount(List<Map<String, Object?>> queries) {
@@ -647,7 +936,10 @@ class _RemoteBackedTemplatesRepository implements TemplatesRepository {
   }
 
   @override
-  Future<TemplateItem> fetchTemplate(String templateId) async {
+  Future<TemplateItem> fetchTemplate(
+    String templateId, {
+    bool forceRefresh = false,
+  }) async {
     return (await _dataSource.fetchTemplate(templateId)).toDomain();
   }
 
@@ -770,7 +1062,6 @@ class _BackendStressAdapter implements HttpClientAdapter {
     final category = query['category'] as String?;
     final isVideo = type == 'Video';
     final isImage = type == 'Image';
-    final templateType = isVideo ? 'Video' : 'Image';
     final basePrefix = category == 'Search'
         ? isVideo
               ? 'search-video-template'
@@ -794,14 +1085,21 @@ class _BackendStressAdapter implements HttpClientAdapter {
     final nextCursor = end < totalTemplates ? 'cursor-$end' : null;
 
     return _jsonResponse({
-      'items': List<Map<String, Object?>>.generate(
-        end - start,
-        (index) => _templateJson(
-          '$idPrefix-${(start + index).toString().padLeft(4, '0')}',
-          templateType: templateType,
+      'items': List<Map<String, Object?>>.generate(end - start, (index) {
+        final itemIndex = start + index;
+        final itemTemplateType = isVideo
+            ? 'Video'
+            : isImage
+            ? 'Image'
+            : itemIndex.isEven
+            ? 'Video'
+            : 'Image';
+        return _templateJson(
+          '$idPrefix-${itemIndex.toString().padLeft(4, '0')}',
+          templateType: itemTemplateType,
           category: category ?? 'Portrait',
-        ),
-      ),
+        );
+      }),
       'nextCursor': nextCursor,
       'hasMore': nextCursor != null,
       'page': (start ~/ take) + 1,
@@ -827,6 +1125,10 @@ Map<String, Object?> _templateJson(
   String templateType = 'Image',
   String category = 'Portrait',
 }) {
+  final isVideo = templateType == 'Video';
+  final mediaUrl = isVideo
+      ? 'https://cdn.petmagic.ai/media/template-video-preview.mp4'
+      : 'https://cdn.petmagic.ai/media/template-preview.png';
   return {
     'templateId': templateId,
     'templateType': templateType,
@@ -836,5 +1138,31 @@ Map<String, Object?> _templateJson(
     'tags': ['pet', 'portrait'],
     'isPremium': false,
     'tokenCost': 1,
+    'thumbnailUrl': 'https://cdn.petmagic.ai/media/template-thumb.png',
+    'mediaKind': isVideo ? 'video' : 'image',
+    'durationMs': isVideo ? 4500 : null,
+    'sizeBytes': isVideo ? 384000 : 48000,
+    'mediaVersion': 1,
+    'media': {
+      'thumbnailUrl': 'https://cdn.petmagic.ai/media/template-thumb.png',
+      'animatedPreviewUrl': isVideo
+          ? 'https://cdn.petmagic.ai/media/template-preview.gif'
+          : null,
+      'feedLoopLowUrl': isVideo ? mediaUrl : null,
+      'feedLoopMediumUrl': isVideo ? mediaUrl : null,
+      'mediaKind': isVideo ? 'video' : 'image',
+      'durationMs': isVideo ? 4500 : null,
+      'sizeBytes': isVideo ? 384000 : 48000,
+      'mediaVersion': 1,
+    },
+    'previewAsset': {
+      'url': mediaUrl,
+      'fileName': isVideo
+          ? 'template-video-preview.mp4'
+          : 'template-preview.png',
+      'contentType': isVideo ? 'video/mp4' : 'image/png',
+      'fileSizeBytes': isVideo ? 384000 : 48000,
+      'durationSeconds': isVideo ? 4.5 : null,
+    },
   };
 }

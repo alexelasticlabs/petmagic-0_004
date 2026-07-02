@@ -211,6 +211,15 @@ void main() {
     final deepLinkBody = _methodBody(source, '_openDeepLink');
     final initialLinkBody = _methodBody(source, '_handleInitialLinkOnce');
     final flushPendingBody = _methodBody(source, '_flushPendingRouteIfReady');
+    final queueCheckoutBody = _methodBody(source, '_queueCheckoutVerification');
+    final clearCheckoutBody = _methodBody(
+      source,
+      '_clearPendingCheckoutVerification',
+    );
+    final flushCheckoutBody = _methodBody(
+      source,
+      '_flushPendingCheckoutVerificationIfReady',
+    );
     final resolvedRouteBody = _methodBody(source, '_resolvedRouteDestination');
     final buildBody = _methodBody(source, 'build');
 
@@ -221,6 +230,11 @@ void main() {
     expect(disposeBody, contains('_coordinator = null;'));
     expect(launchStateBody, contains('if (!mounted)'));
     expect(launchStateBody, contains('_flushPendingRouteIfReady(launchState)'));
+    expect(
+      launchStateBody,
+      contains('_flushPendingCheckoutVerificationIfReady(launchState)'),
+    );
+    expect(launchStateBody, contains('_clearPendingCheckoutVerification();'));
     expect(routeBody, contains('if (!mounted)'));
     expect(routeBody, contains('if (!_isSupportedRoute(route))'));
     expect(
@@ -229,13 +243,37 @@ void main() {
     );
     expect(routeBody, contains('_pendingRoute = route'));
     expect(deepLinkBody, contains('if (!mounted)'));
+    expect(initialLinkBody, contains('if (!mounted)'));
     expect(deepLinkBody, contains('_openRoute('));
+    expect(
+      deepLinkBody,
+      contains('_queueCheckoutVerification(sessionId: sessionId);'),
+    );
+    expect(deepLinkBody, contains('_queueCheckoutVerification();'));
     expect(initialLinkBody, isNot(contains('Firebase.apps')));
     expect(
       flushPendingBody,
       contains('final destination = _resolvedRouteDestination'),
     );
     expect(flushPendingBody, contains('widget.router.go(destination)'));
+    expect(
+      queueCheckoutBody,
+      contains('_pendingCheckoutVerificationRequested = true;'),
+    );
+    expect(
+      queueCheckoutBody,
+      contains('_flushPendingCheckoutVerificationIfReady('),
+    );
+    expect(clearCheckoutBody, contains('_pendingCheckoutSessionId = null;'));
+    expect(
+      clearCheckoutBody,
+      contains('_pendingCheckoutVerificationRequested = false;'),
+    );
+    expect(flushCheckoutBody, contains('launchState.isLoading'));
+    expect(flushCheckoutBody, contains('!launchState.isAuthenticated'));
+    expect(flushCheckoutBody, contains('launchState.requiresLegalAcceptance'));
+    expect(flushCheckoutBody, contains('verifyStripeCheckout(sessionId)'));
+    expect(flushCheckoutBody, contains('verifyCheckoutStatus()'));
     expect(resolvedRouteBody, contains('launchState.isLoading'));
     expect(resolvedRouteBody, contains('launchState.isAuthenticated'));
     expect(resolvedRouteBody, contains('launchState.guestSessionReady'));

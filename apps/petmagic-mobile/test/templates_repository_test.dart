@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_cache_data_source.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_dto.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_query.dart';
@@ -370,6 +371,98 @@ void main() {
     },
   );
 
+  test(
+    'full catalog resync aborts on invalid paging metadata and keeps local cache',
+    () async {
+      final cacheDataSource = TemplatesCacheDataSource(
+        SharedPreferencesAsync(),
+      );
+      await cacheDataSource.replaceCatalog([
+        _catalogDto(
+          id: 'local-existing',
+          title: 'Local existing',
+          thumbnailUrl: 'https://cdn.petmagic.test/local-existing-thumb.jpg',
+          previewUrl: 'https://cdn.petmagic.test/local-existing-preview.jpg',
+        ),
+      ], version: 1);
+      final backend = _InvalidFullResyncPagingBackend();
+      final repository = DefaultTemplatesRepository(
+        remoteDataSource: TemplatesRemoteDataSource(
+          Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+            ..httpClientAdapter = backend,
+        ),
+        cacheDataSource: cacheDataSource,
+      );
+
+      await expectLater(
+        repository.syncCatalog(),
+        throwsA(
+          isA<AppException>().having(
+            (error) => error.message,
+            'message',
+            'templates.catalog_sync_failed',
+          ),
+        ),
+      );
+
+      expect(await cacheDataSource.readCatalogVersion(), 1);
+      expect(
+        (await cacheDataSource.readCatalogItems()).map(
+          (item) => item.templateId,
+        ),
+        ['local-existing'],
+      );
+      expect(backend.catalogPagesRequested, [1, 2]);
+    },
+  );
+
+  test(
+    'full catalog resync stops after bounded page budget and keeps local cache',
+    () async {
+      final cacheDataSource = TemplatesCacheDataSource(
+        SharedPreferencesAsync(),
+      );
+      await cacheDataSource.replaceCatalog([
+        _catalogDto(
+          id: 'local-existing',
+          title: 'Local existing',
+          thumbnailUrl: 'https://cdn.petmagic.test/local-existing-thumb.jpg',
+          previewUrl: 'https://cdn.petmagic.test/local-existing-preview.jpg',
+        ),
+      ], version: 1);
+      final backend = _ExcessiveFullResyncPagingBackend();
+      final repository = DefaultTemplatesRepository(
+        remoteDataSource: TemplatesRemoteDataSource(
+          Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+            ..httpClientAdapter = backend,
+        ),
+        cacheDataSource: cacheDataSource,
+      );
+
+      await expectLater(
+        repository.syncCatalog(),
+        throwsA(
+          isA<AppException>().having(
+            (error) => error.message,
+            'message',
+            'templates.catalog_sync_failed',
+          ),
+        ),
+      );
+
+      expect(await cacheDataSource.readCatalogVersion(), 1);
+      expect(
+        (await cacheDataSource.readCatalogItems()).map(
+          (item) => item.templateId,
+        ),
+        ['local-existing'],
+      );
+      expect(backend.catalogPagesRequested.length, 100);
+      expect(backend.catalogPagesRequested.first, 1);
+      expect(backend.catalogPagesRequested.last, 100);
+    },
+  );
+
   test('template detail cache is bounded', () async {
     final backend = _TemplateDetailBackend();
     final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
@@ -700,6 +793,102 @@ class _CatalogMediaCleanupBackend implements HttpClientAdapter {
           'pageSize': 100,
           'hasMore': false,
           'totalCount': 2,
+          'generatedAtUtc': '2026-06-15T13:00:01Z',
+        });
+      default:
+        fail('Unexpected request path: ${options.path}');
+    }
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
+class _InvalidFullResyncPagingBackend implements HttpClientAdapter {
+  final List<int> catalogPagesRequested = [];
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<dynamic>? cancelFuture,
+  ) async {
+    switch (options.path) {
+      case '/api/templates/catalog-version':
+        return _jsonResponse({'version': 2});
+      case '/api/templates/changes':
+        return _jsonResponse({
+          'fromVersion': 1,
+          'toVersion': 2,
+          'upserts': const <Map<String, Object?>>[],
+          'deletedIds': const <String>[],
+          'needsFullResync': true,
+        });
+      case '/api/templates':
+        final requestedPage =
+            (options.queryParameters['page'] as num?)?.toInt() ?? 1;
+        catalogPagesRequested.add(requestedPage);
+        return _jsonResponse({
+          'items': [
+            _catalogItem(
+              id: 'remote-page-$requestedPage',
+              title: 'Remote page $requestedPage',
+              version: 2,
+              updatedAtUtc: '2026-06-15T13:00:00Z',
+            ),
+          ],
+          'page': 1,
+          'pageSize': 100,
+          'hasMore': true,
+          'totalCount': 2,
+          'generatedAtUtc': '2026-06-15T13:00:01Z',
+        });
+      default:
+        fail('Unexpected request path: ${options.path}');
+    }
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
+class _ExcessiveFullResyncPagingBackend implements HttpClientAdapter {
+  final List<int> catalogPagesRequested = [];
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<dynamic>? cancelFuture,
+  ) async {
+    switch (options.path) {
+      case '/api/templates/catalog-version':
+        return _jsonResponse({'version': 2});
+      case '/api/templates/changes':
+        return _jsonResponse({
+          'fromVersion': 1,
+          'toVersion': 2,
+          'upserts': const <Map<String, Object?>>[],
+          'deletedIds': const <String>[],
+          'needsFullResync': true,
+        });
+      case '/api/templates':
+        final requestedPage =
+            (options.queryParameters['page'] as num?)?.toInt() ?? 1;
+        catalogPagesRequested.add(requestedPage);
+        return _jsonResponse({
+          'items': [
+            _catalogItem(
+              id: 'remote-page-$requestedPage',
+              title: 'Remote page $requestedPage',
+              version: 2,
+              updatedAtUtc: '2026-06-15T13:00:00Z',
+            ),
+          ],
+          'page': requestedPage,
+          'pageSize': 100,
+          'hasMore': true,
+          'totalCount': 1000,
           'generatedAtUtc': '2026-06-15T13:00:01Z',
         });
       default:

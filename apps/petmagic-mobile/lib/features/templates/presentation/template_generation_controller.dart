@@ -221,6 +221,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
       final generation = await _repository.startGeneration(
         templateId: template.templateId,
         sourceImage: optimizedPhoto.file,
+        expectedTemplateVersion: template.version,
         correlationId: _activeCorrelationId,
         cancelToken: requestCancelToken,
       );

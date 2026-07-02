@@ -3377,6 +3377,14 @@ class AppLocalizationsRu extends AppLocalizations {
       'Недостаточно PawSpark для запуска генерации.';
 
   @override
+  String get templateFlowTemplateUnavailableError =>
+      'Этот шаблон больше недоступен. Выберите другой шаблон в ленте.';
+
+  @override
+  String get templateFlowTemplateChangedError =>
+      'Шаблон был обновлен. Откройте его из ленты заново и попробуйте еще раз.';
+
+  @override
   String get templateFlowNetworkError =>
       'Нет соединения. Проверьте интернет и попробуйте снова.';
 
@@ -3610,7 +3618,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get generationStatusCancelQueuedMessage =>
-      'Это сработает только пока генерация в очереди. Если PawSpark были зарезервированы, backend вернёт их автоматически.';
+      'Это сработает только пока генерация в очереди. Если PawSpark были зарезервированы, они автоматически вернутся на ваш баланс.';
 
   @override
   String get generationStatusCancelQueuedKeepAction => 'Продолжить ждать';
@@ -4689,5 +4697,5 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get templateFlowGenerationWaitTooLongPremiumHint =>
-      'Premium получает приоритетную очередь и обычно ждёт меньше.';
+      'Premium-запросы получают приоритет при высокой нагрузке и могут ждать меньше.';
 }

@@ -12,6 +12,7 @@ import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/pets/presentation/my_pets_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
+import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
@@ -112,6 +113,7 @@ void main() {
             AuthenticatedAppLaunchController.new,
           ),
           walletControllerProvider.overrideWith(IdleWalletController.new),
+          profileControllerProvider.overrideWith(FakeProfileController.new),
           templatesControllerProvider.overrideWith(
             () => FakeTemplatesController(
               items: [templateFixture('feed-template', 'Feed payload')],
@@ -193,6 +195,7 @@ void main() {
             AuthenticatedAppLaunchController.new,
           ),
           walletControllerProvider.overrideWith(IdleWalletController.new),
+          profileControllerProvider.overrideWith(FakeProfileController.new),
           templatesControllerProvider.overrideWith(
             () => FakeTemplatesController(
               items: [templateFixture('feed-template', 'Feed payload')],
@@ -304,6 +307,7 @@ void main() {
             AuthenticatedAppLaunchController.new,
           ),
           walletControllerProvider.overrideWith(FundedWalletController.new),
+          profileControllerProvider.overrideWith(FakeProfileController.new),
           templatesControllerProvider.overrideWith(
             () => FakeTemplatesController(
               items: [templateFixture('template-pet', 'Pet portrait')],
@@ -418,6 +422,7 @@ void main() {
             UnauthenticatedAppLaunchController.new,
           ),
           walletControllerProvider.overrideWith(IdleWalletController.new),
+          profileControllerProvider.overrideWith(FakeProfileController.new),
           templatesControllerProvider.overrideWith(
             () => FakeTemplatesController(
               items: [templateFixture('template-pet', 'Pet portrait')],
@@ -496,6 +501,7 @@ void main() {
             UnauthenticatedAppLaunchController.new,
           ),
           walletControllerProvider.overrideWith(IdleWalletController.new),
+          profileControllerProvider.overrideWith(FakeProfileController.new),
           templatesControllerProvider.overrideWith(FakeTemplatesController.new),
           realtimeClientProvider.overrideWith(
             (ref) => const NoopRealtimeClient(),
@@ -589,6 +595,7 @@ void main() {
             UnauthenticatedAppLaunchController.new,
           ),
           walletControllerProvider.overrideWith(IdleWalletController.new),
+          profileControllerProvider.overrideWith(FakeProfileController.new),
           templatesControllerProvider.overrideWith(
             () => FakeTemplatesController(
               items: [templateFixture('template-pet', 'Pet portrait')],
@@ -684,6 +691,7 @@ void main() {
             AuthenticatedAppLaunchController.new,
           ),
           walletControllerProvider.overrideWith(FundedWalletController.new),
+          profileControllerProvider.overrideWith(FakeProfileController.new),
           templatesControllerProvider.overrideWith(
             () => FakeTemplatesController(
               items: [templateFixture('template-pet', 'Pet portrait')],
@@ -810,6 +818,7 @@ void main() {
             AuthenticatedAppLaunchController.new,
           ),
           walletControllerProvider.overrideWith(FundedWalletController.new),
+          profileControllerProvider.overrideWith(FakeProfileController.new),
           templatesControllerProvider.overrideWith(
             () => FakeTemplatesController(
               items: [templateFixture('template-pet', 'Pet portrait')],

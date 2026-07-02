@@ -63,11 +63,6 @@ String estimatedTimeLabel(
   if (generation.stage == 'queued' || generation.isWaitingInQueue) {
     return text.generationStatusEtaStartsSoon;
   }
-  if ((generation.estimatedDurationLabel ?? '').isNotEmpty) {
-    return text.generationStatusEtaEstimated(
-      generation.estimatedDurationLabel!,
-    );
-  }
   return text.generationStatusEtaNotifyHint;
 }
 

@@ -512,7 +512,7 @@
   "externalCheckoutContinueAction": "Continue",
   "externalCheckoutCheckingTitle": "Checking payment",
   "externalCheckoutCheckingMessage": "We are waiting for Stripe confirmation. This usually takes a few seconds.",
-  "externalCheckoutPendingVerificationMessage": "Payment is not confirmed yet. We will update Premium or your wallet as soon as Stripe webhook arrives.",
+  "externalCheckoutPendingVerificationMessage": "Payment is not confirmed yet. We will update Premium or your wallet as soon as Stripe confirms the payment.",
   "premiumContinueWithPlan": "Continue with {plan} — {price} {period}",
   "@premiumContinueWithPlan": {},
   "premiumManageAction": "Manage subscription",
@@ -1042,6 +1042,8 @@
   "templateFlowUploadPetPhotoLockedAction": "Photo upload is available in Premium",
   "templateFlowPremiumRequiredError": "This template is available only with Premium.",
   "templateFlowInsufficientBalanceError": "Not enough PawSpark to start generation.",
+  "templateFlowTemplateUnavailableError": "This template is no longer available. Choose another template from the feed.",
+  "templateFlowTemplateChangedError": "This template was updated. Reopen it from the feed and try again.",
   "templateFlowNetworkError": "No connection. Check your network and try again.",
   "templateFlowServerError": "Service is temporarily unavailable. Please try again later.",
   "templateFlowStartFailedError": "Could not start generation. Please try again.",
@@ -1112,7 +1114,7 @@
   "generationStatusCancelQueuedHint": "You can cancel while this generation is still waiting in queue.",
   "generationStatusCancelQueuedAction": "Cancel generation",
   "generationStatusCancelQueuedTitle": "Cancel generation?",
-  "generationStatusCancelQueuedMessage": "This only works while generation is still queued. If PawSpark were reserved, backend will return them automatically.",
+  "generationStatusCancelQueuedMessage": "This only works while generation is still queued. If PawSpark were reserved, they will return to your balance automatically.",
   "generationStatusCancelQueuedKeepAction": "Keep waiting",
   "generationStatusCancelQueuedConfirmAction": "Confirm cancellation",
   "generationStatusCancelQueuedSuccess": "Generation cancelled.",
@@ -1526,5 +1528,5 @@
       }
     }
   },
-  "templateFlowGenerationWaitTooLongPremiumHint": "Premium gets priority queue access and usually waits less."
+  "templateFlowGenerationWaitTooLongPremiumHint": "Premium requests get priority when the service is busy and may wait less."
 }

@@ -107,4 +107,21 @@ void main() {
     expect(downloadBody, contains('downloadFileBytes('));
     expect(downloadBody, contains('cancelToken: cancelToken'));
   });
+
+  test('support chat deferred auto-scroll stops after page disposal', () {
+    final pageSource = File(
+      'lib/features/support/presentation/support_chat_page.dart',
+    ).readAsStringSync();
+    final buildBody = _methodBody(
+      pageSource,
+      'Widget build(BuildContext context)',
+    );
+
+    expect(buildBody, contains('WidgetsBinding.instance.addPostFrameCallback'));
+    expect(
+      buildBody,
+      contains('if (!mounted || !_scrollController.hasClients) {'),
+    );
+    expect(buildBody, contains('_scrollController.animateTo('));
+  });
 }

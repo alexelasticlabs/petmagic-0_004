@@ -291,6 +291,50 @@ void main() {
   );
 
   testWidgets(
+    'wallet auto refresh pauses offline and resumes after internet restore',
+    (tester) async {
+      final repository = FakeWalletRepository(
+        wallet: walletStateFixture,
+        ledger: ledgerItemsFixture,
+        packs: packsFixture,
+        purchases: purchasesFixture,
+      );
+      final networkStatusController = TestWalletNetworkStatusController(
+        initialHasInternet: false,
+      );
+
+      await pumpWalletPage(
+        tester,
+        repository: repository,
+        networkStatusController: networkStatusController,
+      );
+
+      expect(repository.walletFetchCount, 1);
+
+      await tester.pump(const Duration(seconds: 13));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      expect(
+        repository.walletFetchCount,
+        1,
+        reason:
+            'offline wallet page should not keep background refresh traffic alive',
+      );
+
+      networkStatusController.setHasInternet(true);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      expect(
+        repository.walletFetchCount,
+        2,
+        reason: 'wallet page should resync once connectivity returns',
+      );
+    },
+  );
+
+  testWidgets(
     'wallet page shows legal acceptance action for legal gate errors',
     (tester) async {
       await pumpWalletPage(

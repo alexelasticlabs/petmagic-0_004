@@ -166,6 +166,14 @@ String _generationStartErrorText(AppLocalizations text, String raw) {
     return text.templateFlowInsufficientBalanceError;
   }
 
+  if (raw.contains('templates.template_unavailable')) {
+    return text.templateFlowTemplateUnavailableError;
+  }
+
+  if (raw.contains('templates.template_changed')) {
+    return text.templateFlowTemplateChangedError;
+  }
+
   if (raw.contains('templates.network_unavailable')) {
     return text.templateFlowNetworkError;
   }
@@ -204,7 +212,7 @@ class _TemplatesLifecycleObserver with WidgetsBindingObserver {
   }
 }
 
-class _TemplateFeedSlivers extends ConsumerWidget {
+class _TemplateFeedSlivers extends ConsumerStatefulWidget {
   const _TemplateFeedSlivers({
     required this.bottomInset,
     required this.templateOfTheDay,
@@ -224,7 +232,67 @@ class _TemplateFeedSlivers extends ConsumerWidget {
   final ValueChanged<TemplateOfTheDayItem> onTemplateOfTheDaySelected;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_TemplateFeedSlivers> createState() =>
+      _TemplateFeedSliversState();
+}
+
+class _TemplateFeedSliversState extends ConsumerState<_TemplateFeedSlivers> {
+  TemplateFeedKind? _configuredFeedKind;
+  TemplateFeedPlaybackEnvironment? _configuredEnvironment;
+  String? _configuredFeedScopeKey;
+  TemplateFeedKind? _pendingFeedKind;
+  TemplateFeedPlaybackEnvironment? _pendingEnvironment;
+  String? _pendingFeedScopeKey;
+  bool _configurationScheduled = false;
+
+  void _schedulePlaybackConfiguration({
+    required TemplateFeedPlaybackManager manager,
+    required TemplateFeedKind feedKind,
+    required TemplateFeedPlaybackEnvironment environment,
+    required String feedScopeKey,
+  }) {
+    if (_configuredFeedKind == feedKind &&
+        _configuredEnvironment == environment &&
+        _configuredFeedScopeKey == feedScopeKey) {
+      return;
+    }
+
+    _pendingFeedKind = feedKind;
+    _pendingEnvironment = environment;
+    _pendingFeedScopeKey = feedScopeKey;
+    if (_configurationScheduled) {
+      return;
+    }
+
+    _configurationScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _configurationScheduled = false;
+      if (!mounted) {
+        return;
+      }
+
+      final nextFeedKind = _pendingFeedKind;
+      final nextEnvironment = _pendingEnvironment;
+      final nextFeedScopeKey = _pendingFeedScopeKey;
+      if (nextFeedKind == null ||
+          nextEnvironment == null ||
+          nextFeedScopeKey == null) {
+        return;
+      }
+
+      _configuredFeedKind = nextFeedKind;
+      _configuredEnvironment = nextEnvironment;
+      _configuredFeedScopeKey = nextFeedScopeKey;
+      manager.configure(
+        feedKind: nextFeedKind,
+        environment: nextEnvironment,
+        feedScopeKey: nextFeedScopeKey,
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(
       templatesControllerProvider.select(
         (state) => (
@@ -236,12 +304,26 @@ class _TemplateFeedSlivers extends ConsumerWidget {
         ),
       ),
     );
-    final hasPremiumAccess = ref.watch(
-      walletControllerProvider.select(
-        (walletState) => walletState.wallet?.isPremium ?? false,
-      ),
-    );
+    final hasPremiumAccess = ref.watch(templatePremiumAccessProvider);
     final controller = ref.read(templatesControllerProvider.notifier);
+    final playbackManager = ref.watch(templateFeedPlaybackManagerProvider);
+    final playbackEnvironment = ref.watch(
+      templateFeedPlaybackEnvironmentProvider,
+    );
+    final feedKind = widget.selectedType == TemplateType.video
+        ? TemplateFeedKind.videoOnly
+        : TemplateFeedKind.mixed;
+    final feedScopeKey = Object.hash(
+      widget.selectedType,
+      widget.selectedCategory,
+      widget.searchQuery,
+    ).toString();
+    _schedulePlaybackConfiguration(
+      manager: playbackManager,
+      feedKind: feedKind,
+      environment: playbackEnvironment,
+      feedScopeKey: feedScopeKey,
+    );
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final hasInternet = ref.watch(
@@ -263,7 +345,7 @@ class _TemplateFeedSlivers extends ConsumerWidget {
           child: PetMagicUnavailableView(
             kind: unavailableKind,
             onRetry: () => controller.loadInitial(forceRefresh: true),
-            padding: EdgeInsets.fromLTRB(28, 36, 28, bottomInset),
+            padding: EdgeInsets.fromLTRB(28, 36, 28, widget.bottomInset),
           ),
         );
       }
@@ -294,16 +376,16 @@ class _TemplateFeedSlivers extends ConsumerWidget {
     }
 
     final featuredEntry = _buildFeaturedTemplateGridEntry(
-      templateOfTheDay: templateOfTheDay,
+      templateOfTheDay: widget.templateOfTheDay,
       visibleTemplates: state.items,
-      selectedType: selectedType,
-      selectedCategory: selectedCategory,
-      searchQuery: searchQuery,
+      selectedType: widget.selectedType,
+      selectedCategory: widget.selectedCategory,
+      searchQuery: widget.searchQuery,
     );
     final visibleEntries = <_TemplateGridEntry>[
       ?featuredEntry,
       for (final template in state.items)
-        if (template.templateId != templateOfTheDay?.templateId)
+        if (template.templateId != widget.templateOfTheDay?.templateId)
           _TemplateGridEntry(template: template),
     ];
 
@@ -341,6 +423,7 @@ class _TemplateFeedSlivers extends ConsumerWidget {
                     template: template,
                     hasPremiumAccess: hasPremiumAccess,
                     imageCacheWidth: imageCacheWidth,
+                    playbackManager: playbackManager,
                     highlightBadgeLabel: featured != null
                         ? text.templateOfTheDayFeedBadge
                         : null,
@@ -356,8 +439,8 @@ class _TemplateFeedSlivers extends ConsumerWidget {
                             isNew: featured.isNew,
                           ),
                     onPressed: () => featured != null
-                        ? onTemplateOfTheDaySelected(featured)
-                        : onTemplateSelected(template),
+                        ? widget.onTemplateOfTheDaySelected(featured)
+                        : widget.onTemplateSelected(template),
                   );
                   if (index >= 6) {
                     return card;
@@ -387,7 +470,7 @@ class _TemplateFeedSlivers extends ConsumerWidget {
         ),
         SliverToBoxAdapter(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(10, 8, 10, bottomInset),
+            padding: EdgeInsets.fromLTRB(10, 8, 10, widget.bottomInset),
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 180),
               child: state.isLoadingMore

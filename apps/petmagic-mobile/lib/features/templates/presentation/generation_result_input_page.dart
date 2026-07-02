@@ -262,6 +262,7 @@ class _GenerationResultInputPageState
       final generation = await repository.startGenerationFromResult(
         parentGenerationResultId: widget.generationId,
         templateId: template.id,
+        expectedTemplateVersion: template.version,
         cancelToken: startCancelToken,
       );
       if (!mounted || startCancelToken.isCancelled) {

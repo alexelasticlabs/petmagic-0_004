@@ -115,6 +115,14 @@ class TemplateItem {
     required this.tokenCost,
     this.effectivePromoBadge,
     this.thumbnailUrl,
+    this.animatedPreviewUrl,
+    this.feedLoopLowUrl,
+    this.feedLoopMediumUrl,
+    this.detailPreviewUrl,
+    this.mediaKind,
+    this.durationMs,
+    this.sizeBytes,
+    this.mediaVersion,
     this.previewAsset,
     this.musicDescription,
     this.referenceVideoDurationSeconds,
@@ -138,6 +146,14 @@ class TemplateItem {
   final int tokenCost;
   final String? effectivePromoBadge;
   final String? thumbnailUrl;
+  final String? animatedPreviewUrl;
+  final String? feedLoopLowUrl;
+  final String? feedLoopMediumUrl;
+  final String? detailPreviewUrl;
+  final String? mediaKind;
+  final int? durationMs;
+  final int? sizeBytes;
+  final int? mediaVersion;
   final TemplateAsset? previewAsset;
   final String? musicDescription;
   final double? referenceVideoDurationSeconds;
@@ -153,9 +169,13 @@ class TemplateItem {
 
   String get mediaIdentity {
     final thumbnail = thumbnailUrl?.trim() ?? '';
+    final animated = animatedPreviewUrl?.trim() ?? '';
+    final feedLow = feedLoopLowUrl?.trim() ?? '';
+    final feedMedium = feedLoopMediumUrl?.trim() ?? '';
+    final detail = detailPreviewUrl?.trim() ?? '';
     final previewUrl = previewAsset?.url.trim() ?? '';
     final previewContentType = previewAsset?.contentType.trim() ?? '';
-    return '$thumbnail|$previewUrl|$previewContentType';
+    return '$thumbnail|$animated|$feedLow|$feedMedium|$detail|$previewUrl|$previewContentType|${mediaVersion ?? 0}';
   }
 
   List<String> get effectivePetPhotoRequirements {

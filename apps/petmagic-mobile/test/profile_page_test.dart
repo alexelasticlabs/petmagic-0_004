@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/gamification/data/gamification_models.dart';
 import 'package:petmagic_mobile/features/gamification/presentation/gamification_providers.dart';
@@ -556,6 +557,95 @@ void main() {
 
       expect(find.text('Pet User'), findsOneWidget);
       expect(walletController.loadCalls, 1);
+    },
+  );
+
+  testWidgets(
+    'profile page does not refetch unavailable state on offline resume and retries on reconnect',
+    (tester) async {
+      final profileController = _UnavailableThenLoadedProfileController();
+      final walletController = _CountingWalletController(
+        initialState: const WalletState(isLoading: false),
+      );
+      final networkController = _TestProfileNetworkStatusController(
+        initialHasInternet: false,
+      );
+
+      final router = GoRouter(
+        initialLocation: ProfilePage.routePath,
+        routes: [
+          GoRoute(
+            path: ProfilePage.routePath,
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: ProfilePage()),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedProfileAppLaunchController.new,
+            ),
+            networkStatusControllerProvider.overrideWith(
+              () => networkController,
+            ),
+            profileControllerProvider.overrideWith(() => profileController),
+            walletControllerProvider.overrideWith(() => walletController),
+            premiumSubscriptionSummaryProvider.overrideWith(
+              (ref) async => const PremiumSubscriptionSummaryView(
+                isPremium: false,
+                canManageSubscription: false,
+                status: 'inactive',
+                manageSubscriptionAction: '',
+                provider: PremiumSubscriptionProviderView.unknown,
+              ),
+            ),
+          ],
+          child: MaterialApp.router(
+            routerConfig: router,
+            theme: AppTheme.dark(),
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: const [
+              Locale('ru'),
+              Locale('en'),
+              Locale('de'),
+              Locale('es'),
+              Locale('fr'),
+              Locale('it'),
+              Locale('pl'),
+            ],
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+
+      final initialInitializeCalls = profileController.initializeCalls;
+      expect(initialInitializeCalls, greaterThan(0));
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+
+      expect(profileController.initializeCalls, initialInitializeCalls);
+
+      networkController.setHasInternet(true);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+
+      expect(
+        profileController.initializeCalls,
+        greaterThan(initialInitializeCalls),
+      );
+      expect(find.text('Pet User'), findsOneWidget);
+      expect(walletController.loadCalls, 1);
+      expect(tester.takeException(), isNull);
     },
   );
 
@@ -1249,6 +1339,8 @@ class _GuestProfileController extends ProfileController {
 class _UnavailableThenLoadedProfileController extends ProfileController {
   int _initializeCalls = 0;
 
+  int get initializeCalls => _initializeCalls;
+
   @override
   ProfileState build() {
     return const ProfileState(
@@ -1282,6 +1374,21 @@ class _UnavailableThenLoadedProfileController extends ProfileController {
 
   @override
   Future<void> logout() async {}
+}
+
+class _TestProfileNetworkStatusController extends NetworkStatusController {
+  _TestProfileNetworkStatusController({required this.initialHasInternet});
+
+  final bool initialHasInternet;
+
+  @override
+  NetworkStatusState build() {
+    return NetworkStatusState(hasInternet: initialHasInternet);
+  }
+
+  void setHasInternet(bool value) {
+    state = state.copyWith(hasInternet: value);
+  }
 }
 
 class _MutableProfileAppLaunchController extends AppLaunchController {

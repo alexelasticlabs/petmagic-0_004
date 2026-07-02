@@ -12,6 +12,7 @@ import 'package:image_picker_platform_interface/image_picker_platform_interface.
     as image_picker_platform;
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/permissions/app_permission_coordinator.dart';
 import 'package:petmagic_mobile/core/permissions/media_permission_feedback.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
@@ -53,6 +54,7 @@ Future<void> pumpMyPets(
   bool authenticated = true,
   Widget Function(BuildContext, GoRouterState)? templatesBuilder,
   AppPermissionCoordinator? permissionCoordinator,
+  NetworkStatusController? networkStatusController,
 }) async {
   tester.view.physicalSize = const Size(390, 844);
   tester.view.devicePixelRatio = 1;
@@ -94,6 +96,10 @@ Future<void> pumpMyPets(
         appPermissionCoordinatorProvider.overrideWithValue(
           permissionCoordinator ?? FakeAppPermissionCoordinator(),
         ),
+        if (networkStatusController != null)
+          networkStatusControllerProvider.overrideWith(
+            () => networkStatusController,
+          ),
       ],
       child: MaterialApp.router(
         theme: AppTheme.light(),
@@ -264,6 +270,21 @@ class UnauthenticatedAppLaunchController extends AppLaunchController {
       hasSeenOnboarding: true,
       guestSessionReady: true,
     );
+  }
+}
+
+class TestMyPetsNetworkStatusController extends NetworkStatusController {
+  TestMyPetsNetworkStatusController({required this.initialHasInternet});
+
+  final bool initialHasInternet;
+
+  @override
+  NetworkStatusState build() {
+    return NetworkStatusState(hasInternet: initialHasInternet);
+  }
+
+  void setHasInternet(bool value) {
+    state = state.copyWith(hasInternet: value);
   }
 }
 

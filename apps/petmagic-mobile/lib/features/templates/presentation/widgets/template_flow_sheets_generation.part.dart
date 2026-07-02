@@ -21,14 +21,11 @@ class _TemplateGenerationProgressContentState
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
     final state = ref.watch(templateGenerationControllerProvider);
-    final wallet = ref.watch(
-      walletControllerProvider.select((walletState) => walletState.wallet),
-    );
+    final hasPremiumAccess = ref.watch(templatePremiumAccessProvider);
     final generation = state.generation;
     final isCompleted = generation?.isCompleted == true;
     final isFailed = generation?.isFailed == true || state.errorMessage != null;
-    final shouldShowPremiumGate =
-        widget.template.isVideo && !(wallet?.isPremium ?? false);
+    final shouldShowPremiumGate = widget.template.isVideo && !hasPremiumAccess;
     final completedGenerationId = generation?.generationId;
 
     if (isCompleted &&

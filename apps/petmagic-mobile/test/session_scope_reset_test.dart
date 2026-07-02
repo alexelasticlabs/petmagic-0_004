@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,6 +15,7 @@ import 'package:petmagic_mobile/features/pets/presentation/pet_profile_providers
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_realtime_client.dart';
+import 'package:petmagic_mobile/features/templates/data/generation_gallery_store.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/shared/payments/store_product_availability_cache.dart';
@@ -328,6 +332,52 @@ void main() {
       expect(loadCalls, 2);
     },
   );
+
+  test(
+    'deferred session invalidation stops quietly after container disposal',
+    () async {
+      final sessionStorage = _SignedOutAuthSessionStorage();
+      final repository = TemplateGenerationRepository(
+        dio: Dio(),
+        sessionStorage: sessionStorage,
+        preferences: SharedPreferencesAsync(),
+        authSessionCoordinator: AuthSessionCoordinator(
+          dio: Dio(),
+          sessionStorage: sessionStorage,
+        ),
+      );
+      final galleryStore = _NoopGenerationGalleryStore();
+      final launchController = _MutableSessionScopeLaunchController(true);
+      final asyncErrors = <Object>[];
+
+      await runZonedGuarded(
+        () async {
+          final container = ProviderContainer(
+            overrides: [
+              appLaunchControllerProvider.overrideWith(() => launchController),
+              authSessionStorageProvider.overrideWithValue(sessionStorage),
+              templateGenerationRepositoryProvider.overrideWithValue(
+                repository,
+              ),
+              generationGalleryStoreProvider.overrideWithValue(galleryStore),
+              sessionMediaCacheCleanerProvider.overrideWithValue(() async {}),
+            ],
+          );
+
+          container.read(sessionScopeResetProvider);
+          launchController.setAuthenticated(false);
+          container.dispose();
+
+          await _flushMicrotasks();
+        },
+        (error, stackTrace) {
+          asyncErrors.add(error);
+        },
+      );
+
+      expect(asyncErrors, isEmpty);
+    },
+  );
 }
 
 Future<void> _waitForLaunchState(
@@ -361,6 +411,50 @@ class _SignedOutAuthSessionStorage extends AuthSessionStorage {
 
   @override
   Future<void> clear() async {}
+}
+
+class _MutableSessionScopeLaunchController extends AppLaunchController {
+  _MutableSessionScopeLaunchController(this._isAuthenticated);
+
+  bool _isAuthenticated;
+
+  @override
+  AppLaunchState build() {
+    return AppLaunchState(
+      isLoading: false,
+      isAuthenticated: _isAuthenticated,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: _isAuthenticated,
+    );
+  }
+
+  void setAuthenticated(bool value) {
+    _isAuthenticated = value;
+    state = state.copyWith(
+      isLoading: false,
+      isAuthenticated: value,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: value,
+    );
+  }
+}
+
+class _NoopGenerationGalleryStore extends GenerationGalleryStore {
+  _NoopGenerationGalleryStore()
+    : super(
+        dio: Dio(),
+        preferences: SharedPreferencesAsync(),
+        sessionStorage: AuthSessionStorage(),
+        rootDirectoryResolver: () async => Directory.systemTemp,
+      );
+
+  @override
+  Future<void> cancelActiveDownloads() async {}
+
+  @override
+  Future<void> purgeAllScopes() async {}
 }
 
 class FakeGamificationRepository extends GamificationRepository {

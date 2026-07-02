@@ -158,6 +158,37 @@ void main() {
         text.templateFlowStepFinalTouches,
       );
     });
+
+    testWidgets('ETA ignores backend English duration fallback', (
+      tester,
+    ) async {
+      late AppLocalizations text;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          locale: const Locale('ru'),
+          home: Builder(
+            builder: (context) {
+              text = AppLocalizations.of(context);
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+
+      expect(
+        etaLabel(
+          text,
+          _generation(
+            status: TemplateGenerationStatus.providerQueued,
+            estimatedDurationLabel: 'Usually under 1 minute',
+          ),
+        ),
+        text.generationStatusEtaStartsSoon,
+      );
+    });
   });
 }
 
@@ -169,6 +200,7 @@ TemplateGenerationResult _generation({
   String? stage,
   int? queuePosition,
   int? estimatedWaitSeconds,
+  String? estimatedDurationLabel,
 }) {
   final now = DateTime.utc(2026, 6, 15, 12);
   return TemplateGenerationResult(
@@ -185,6 +217,7 @@ TemplateGenerationResult _generation({
     stage: stage,
     queuePosition: queuePosition,
     estimatedWaitSeconds: estimatedWaitSeconds,
+    estimatedDurationLabel: estimatedDurationLabel,
     outputUrl: outputUrl,
     outputVideoDurationSeconds: outputVideoDurationSeconds,
   );

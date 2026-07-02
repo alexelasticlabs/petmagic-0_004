@@ -13,6 +13,7 @@ mixin _SupportChatControllerConversationMixin
   bool _hasPendingRealtimeRefresh = false;
   bool _hasLoadedConversationSnapshot = false;
   bool _started = false;
+  bool _hasInternet = true;
   bool _isScreenVisible = true;
   bool _isRealtimeConnected = false;
 
@@ -135,6 +136,27 @@ mixin _SupportChatControllerConversationMixin
     _realtimeRefreshTimer?.cancel();
     _realtimeRefreshTimer = null;
     _pauseRealtime();
+  }
+
+  void _handleNetworkStatusChanged(bool hasInternet) {
+    if (_hasInternet == hasInternet) {
+      return;
+    }
+
+    _hasInternet = hasInternet;
+    if (!hasInternet) {
+      _realtimeRefreshTimer?.cancel();
+      _realtimeRefreshTimer = null;
+      _pauseRealtime();
+      return;
+    }
+
+    if (!_started || !_isScreenVisible) {
+      return;
+    }
+
+    unawaited(_resumeRealtimeIfNeeded());
+    _resumePendingRealtimeRefreshIfNeeded();
   }
 
   Future<void> start() async {
@@ -410,7 +432,7 @@ mixin _SupportChatControllerConversationMixin
   }
 
   void _scheduleRealtimeRefresh() {
-    if (!_isScreenVisible || _isConversationBusy) {
+    if (!_isScreenVisible || !_hasInternet || _isConversationBusy) {
       return;
     }
 
@@ -423,7 +445,10 @@ mixin _SupportChatControllerConversationMixin
 
   void _flushPendingRealtimeRefresh() {
     _realtimeRefreshTimer = null;
-    if (!_hasPendingRealtimeRefresh || _isConversationBusy) {
+    if (!_hasPendingRealtimeRefresh ||
+        !_isScreenVisible ||
+        !_hasInternet ||
+        _isConversationBusy) {
       return;
     }
 
@@ -436,13 +461,13 @@ mixin _SupportChatControllerConversationMixin
       return;
     }
 
-    if (_isScreenVisible && _hasPendingRealtimeRefresh) {
+    if (_isScreenVisible && _hasInternet && _hasPendingRealtimeRefresh) {
       _scheduleRealtimeRefresh();
     }
   }
 
   Future<void> _resumeRealtimeIfNeeded() async {
-    if (!_started || !ref.mounted || !_isScreenVisible) {
+    if (!_started || !ref.mounted || !_isScreenVisible || !_hasInternet) {
       return;
     }
 

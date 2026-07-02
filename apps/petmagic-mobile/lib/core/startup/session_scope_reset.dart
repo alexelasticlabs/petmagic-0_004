@@ -40,6 +40,10 @@ final sessionScopeResetProvider = Provider<void>((ref) {
     }
 
     Future.microtask(() {
+      if (!ref.mounted) {
+        return;
+      }
+
       ref.invalidate(templateGenerationRepositoryProvider);
       ref.invalidate(walletControllerProvider);
       ref.invalidate(templatesControllerProvider);

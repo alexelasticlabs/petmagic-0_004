@@ -38,6 +38,9 @@ String _generationErrorText(AppLocalizations text, String raw) {
   return switch (normalizeTemplateErrorKey(raw)) {
     'templates.insufficient_balance' =>
       text.templateFlowInsufficientBalanceError,
+    'templates.template_unavailable' =>
+      text.templateFlowTemplateUnavailableError,
+    'templates.template_changed' => text.templateFlowTemplateChangedError,
     'templates.network_unavailable' ||
     'templates.connection_timeout' => text.templateFlowNetworkError,
     'templates.server_unavailable' ||

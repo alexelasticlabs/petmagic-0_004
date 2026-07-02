@@ -88,6 +88,7 @@ class TemplateGenerationRepository {
   Future<TemplateGenerationResult> startGeneration({
     required String templateId,
     required XFile sourceImage,
+    int? expectedTemplateVersion,
     String? correlationId,
     CancelToken? cancelToken,
   }) async {
@@ -131,6 +132,8 @@ class TemplateGenerationRepository {
             filename: fileName,
             contentType: MediaType.parse(contentType),
           ),
+          if (expectedTemplateVersion != null && expectedTemplateVersion > 0)
+            'expectedTemplateVersion': expectedTemplateVersion,
         }),
         options: authenticatedMultipartRequestOptions(
           session.accessToken,
@@ -214,6 +217,7 @@ class TemplateGenerationRepository {
   Future<TemplateGenerationResult> startGenerationFromResult({
     required String parentGenerationResultId,
     required String templateId,
+    int? expectedTemplateVersion,
     String? correlationId,
     CancelToken? cancelToken,
   }) async {
@@ -223,6 +227,8 @@ class TemplateGenerationRepository {
         data: {
           'parentGenerationResultId': parentGenerationResultId,
           'templateId': templateId,
+          if (expectedTemplateVersion != null && expectedTemplateVersion > 0)
+            'expectedTemplateVersion': expectedTemplateVersion,
         },
         options: authenticatedRequestOptions(
           session.accessToken,
@@ -275,6 +281,7 @@ class TemplateGenerationRepository {
     required String petId,
     String? petPhotoId,
     required String templateId,
+    int? expectedTemplateVersion,
     String? correlationId,
     CancelToken? cancelToken,
   }) async {
@@ -288,6 +295,8 @@ class TemplateGenerationRepository {
           if (petPhotoId != null && petPhotoId.isNotEmpty)
             'petPhotoId': petPhotoId,
           'templateId': templateId,
+          if (expectedTemplateVersion != null && expectedTemplateVersion > 0)
+            'expectedTemplateVersion': expectedTemplateVersion,
         },
         options: authenticatedRequestOptions(
           session.accessToken,

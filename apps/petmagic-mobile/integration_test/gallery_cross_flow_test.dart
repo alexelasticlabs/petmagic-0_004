@@ -388,7 +388,10 @@ class _SingleTemplateRepository implements TemplatesRepository {
   }
 
   @override
-  Future<TemplateItem> fetchTemplate(String templateId) async {
+  Future<TemplateItem> fetchTemplate(
+    String templateId, {
+    bool forceRefresh = false,
+  }) async {
     return template;
   }
 
@@ -497,6 +500,7 @@ class _CrossGalleryPetFlowRepository extends TemplateGenerationRepository {
     required String petId,
     String? petPhotoId,
     required String templateId,
+    int? expectedTemplateVersion,
     String? correlationId,
     CancelToken? cancelToken,
   }) async {

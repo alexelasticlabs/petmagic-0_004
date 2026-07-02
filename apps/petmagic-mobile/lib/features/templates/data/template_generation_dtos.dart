@@ -10,6 +10,7 @@ class CompatibleGenerationTemplateDto {
     required this.isPremium,
     required this.isRecommended,
     required this.tokenCost,
+    required this.version,
     this.thumbnailUrl,
   });
 
@@ -20,6 +21,7 @@ class CompatibleGenerationTemplateDto {
   final bool isPremium;
   final bool isRecommended;
   final int tokenCost;
+  final int version;
 
   factory CompatibleGenerationTemplateDto.fromJson(Map<String, Object?> json) {
     return CompatibleGenerationTemplateDto(
@@ -30,6 +32,7 @@ class CompatibleGenerationTemplateDto {
       isPremium: json['isPremium'] as bool? ?? false,
       isRecommended: json['isRecommended'] as bool? ?? false,
       tokenCost: (json['tokenCost'] as num?)?.toInt() ?? 0,
+      version: (json['version'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -41,6 +44,7 @@ class CompatibleGenerationTemplateDto {
     isPremium: isPremium,
     isRecommended: isRecommended,
     tokenCost: tokenCost,
+    version: version,
   );
 }
 

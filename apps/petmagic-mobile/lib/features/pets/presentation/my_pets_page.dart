@@ -72,6 +72,10 @@ class _MyPetsPageState extends ConsumerState<MyPetsPage>
 
     final pets = ref.read(petsProvider);
     final hasInternet = ref.read(networkStatusControllerProvider).hasInternet;
+    if (!hasInternet) {
+      return;
+    }
+
     if (_petsUnavailableKind(pets, hasInternet) == null) {
       return;
     }

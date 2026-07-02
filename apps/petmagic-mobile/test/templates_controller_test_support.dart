@@ -14,6 +14,7 @@ class FakeTemplatesControllerRepository implements TemplatesRepository {
     this.pagesByKey = const {},
     this.cachedPagesByKey,
     this.pagesByCursor = const {},
+    this.templatesById = const {},
     this.fetchCompletersByKey = const {},
     this.fetchCompletersByCursor = const {},
     this.errorsByKey = const {},
@@ -29,6 +30,7 @@ class FakeTemplatesControllerRepository implements TemplatesRepository {
   final Map<String, TemplatesFeedPage> pagesByKey;
   final Map<String, TemplatesFeedPage>? cachedPagesByKey;
   final Map<String, TemplatesFeedPage> pagesByCursor;
+  final Map<String, TemplateItem> templatesById;
   final Map<String, Completer<void>> fetchCompletersByKey;
   final Map<String, Completer<void>> fetchCompletersByCursor;
   final Map<String, Object> errorsByKey;
@@ -38,6 +40,7 @@ class FakeTemplatesControllerRepository implements TemplatesRepository {
   int _catalogVersion = 0;
   int fetchFeedCalls = 0;
   int fetchCategoriesCalls = 0;
+  int fetchTemplateCalls = 0;
   int readCachedFirstPageCalls = 0;
   int fetchTemplateOfTheDayCalls = 0;
   int cancelPendingFeedRequestCalls = 0;
@@ -96,7 +99,16 @@ class FakeTemplatesControllerRepository implements TemplatesRepository {
   }
 
   @override
-  Future<TemplateItem> fetchTemplate(String templateId) async {
+  Future<TemplateItem> fetchTemplate(
+    String templateId, {
+    bool forceRefresh = false,
+  }) async {
+    fetchTemplateCalls++;
+    final template = templatesById[templateId];
+    if (template != null) {
+      return template;
+    }
+
     return pagesByKey.values
         .expand((page) => page.items)
         .firstWhere((item) => item.templateId == templateId);
@@ -200,19 +212,31 @@ class FakeTemplatesControllerRepository implements TemplatesRepository {
 TemplateItem templateFixture(
   String id,
   TemplateType type, {
+  String? title,
+  String? shortDescription,
   String? thumbnailUrl,
+  String? animatedPreviewUrl,
+  String? feedLoopLowUrl,
+  String? feedLoopMediumUrl,
+  String? detailPreviewUrl,
+  int? mediaVersion,
 }) {
   return TemplateItem(
     templateId: id,
     templateType: type,
-    title: id,
-    shortDescription: id,
+    title: title ?? id,
+    shortDescription: shortDescription ?? id,
     petPhotoRequirements: const ['Clear photo'],
     category: 'Portrait',
     tags: const ['pet'],
     isPremium: false,
     tokenCost: 1,
     thumbnailUrl: thumbnailUrl,
+    animatedPreviewUrl: animatedPreviewUrl,
+    feedLoopLowUrl: feedLoopLowUrl,
+    feedLoopMediumUrl: feedLoopMediumUrl,
+    detailPreviewUrl: detailPreviewUrl,
+    mediaVersion: mediaVersion,
   );
 }
 
@@ -222,6 +246,7 @@ class FakeTemplatesControllerRealtimeClient implements RealtimeClient {
   final Completer<void>? connectCompleter;
   final StreamController<RealtimeEvent> _controller =
       StreamController<RealtimeEvent>.broadcast();
+  int connectCalls = 0;
   int disconnectCalls = 0;
 
   @override
@@ -229,6 +254,7 @@ class FakeTemplatesControllerRealtimeClient implements RealtimeClient {
 
   @override
   Future<void> connect() async {
+    connectCalls++;
     await connectCompleter?.future;
   }
 
@@ -240,9 +266,12 @@ class FakeTemplatesControllerRealtimeClient implements RealtimeClient {
     }
   }
 
-  void emitTemplatesFeedInvalidated() {
+  void emitTemplatesFeedInvalidated({Map<String, Object?> payload = const {}}) {
     _controller.add(
-      const RealtimeEvent(topic: RealtimeTopics.templatesFeedInvalidated),
+      RealtimeEvent(
+        topic: RealtimeTopics.templatesFeedInvalidated,
+        payload: payload,
+      ),
     );
   }
 }

@@ -38,6 +38,16 @@ void main() {
     expect(source, contains("'token'"));
     expect(source, contains("'secret'"));
     expect(source, contains("'authorization'"));
+    expect(source, contains("'email'"));
+    expect(source, contains("'phone'"));
+    expect(source, contains("'receipt'"));
+    expect(source, contains("'cookie'"));
+    expect(source, contains("'signature'"));
+    expect(source, contains("normalized == 'code'"));
+    expect(source, contains("normalized.endsWith('code')"));
+    expect(source, contains("normalized.contains('session')"));
+    expect(source, contains("normalized.contains('ticket')"));
+    expect(source, contains("normalized.contains('otp')"));
     expect(source, contains('.where((key) => !_isSensitiveFieldName(key))'));
   });
 

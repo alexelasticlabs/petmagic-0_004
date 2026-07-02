@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_realtime_client.dart';
@@ -10,6 +12,8 @@ import 'package:petmagic_mobile/features/support/presentation/support_chat_contr
 import 'support_chat_test_support.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test(
     'refresh clears loading after unexpected failure and allows retry',
     () async {
@@ -119,6 +123,84 @@ void main() {
       expect(realtimeClient.disconnectCalls, 1);
     },
   );
+
+  test(
+    'does not connect support realtime while internet is unavailable',
+    () async {
+      final repository = FakeSupportChatRepository();
+      final realtimeClient = TrackingSupportChatRealtimeClient();
+      final networkController = _TestNetworkStatusController(
+        initialHasInternet: false,
+      );
+      final container = ProviderContainer(
+        overrides: [
+          supportChatRepositoryProvider.overrideWithValue(repository),
+          supportChatRealtimeClientProvider.overrideWithValue(realtimeClient),
+          networkStatusControllerProvider.overrideWith(() => networkController),
+        ],
+      );
+      addTearDown(() {
+        realtimeClient.closeStream();
+        container.dispose();
+      });
+
+      final controller = container.read(supportChatControllerProvider.notifier);
+
+      await controller.start();
+
+      expect(repository.getConversationCalls, 1);
+      expect(realtimeClient.connectCalls, 0);
+
+      controller.setScreenVisible(false);
+      await Future<void>.delayed(Duration.zero);
+      controller.setScreenVisible(true);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(realtimeClient.connectCalls, 0);
+      expect(realtimeClient.disconnectCalls, 0);
+    },
+  );
+
+  test(
+    'pauses support realtime offline and reconnects after internet restore',
+    () async {
+      final repository = FakeSupportChatRepository();
+      final realtimeClient = TrackingSupportChatRealtimeClient();
+      final networkController = _TestNetworkStatusController(
+        initialHasInternet: true,
+      );
+      final container = ProviderContainer(
+        overrides: [
+          supportChatRepositoryProvider.overrideWithValue(repository),
+          supportChatRealtimeClientProvider.overrideWithValue(realtimeClient),
+          networkStatusControllerProvider.overrideWith(() => networkController),
+        ],
+      );
+      addTearDown(() {
+        realtimeClient.closeStream();
+        container.dispose();
+      });
+
+      final controller = container.read(supportChatControllerProvider.notifier);
+
+      await controller.start();
+
+      expect(realtimeClient.connectCalls, 1);
+
+      networkController.setHasInternet(false);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(realtimeClient.disconnectCalls, 1);
+      expect(realtimeClient.connectCalls, 1);
+
+      networkController.setHasInternet(true);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(realtimeClient.connectCalls, 2);
+      expect(realtimeClient.disconnectCalls, 1);
+      expect(repository.getConversationCalls, 1);
+    },
+  );
 }
 
 class _FlakyRefreshSupportChatRepository extends SupportChatRepository {
@@ -177,4 +259,19 @@ SupportChatConversation _conversation() {
     lastMessageAtUtc: null,
     messages: const [],
   );
+}
+
+class _TestNetworkStatusController extends NetworkStatusController {
+  _TestNetworkStatusController({required this.initialHasInternet});
+
+  final bool initialHasInternet;
+
+  @override
+  NetworkStatusState build() {
+    return NetworkStatusState(hasInternet: initialHasInternet);
+  }
+
+  void setHasInternet(bool value) {
+    state = state.copyWith(hasInternet: value);
+  }
 }

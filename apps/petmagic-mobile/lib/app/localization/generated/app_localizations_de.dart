@@ -3422,6 +3422,14 @@ class AppLocalizationsDe extends AppLocalizations {
       'Nicht genug PawSpark zum Starten der Generierung.';
 
   @override
+  String get templateFlowTemplateUnavailableError =>
+      'Diese Vorlage ist nicht mehr verfügbar. Wählen Sie eine andere Vorlage aus dem Feed.';
+
+  @override
+  String get templateFlowTemplateChangedError =>
+      'Diese Vorlage wurde aktualisiert. Öffnen Sie sie erneut aus dem Feed und versuchen Sie es noch einmal.';
+
+  @override
   String get templateFlowNetworkError =>
       'Keine Verbindung. Überprüfen Sie Ihr Netzwerk und versuchen Sie es erneut.';
 
@@ -3659,7 +3667,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get generationStatusCancelQueuedMessage =>
-      'Das funktioniert nur, solange die Generierung noch in der Warteschlange ist. Falls PawSpark reserviert wurden, gibt der Backend sie automatisch zurueck.';
+      'Das funktioniert nur, solange die Generierung noch in der Warteschlange ist. Falls PawSpark reserviert wurden, kehren sie automatisch zu deinem Guthaben zurueck.';
 
   @override
   String get generationStatusCancelQueuedKeepAction => 'Weiter warten';
@@ -4745,5 +4753,5 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get templateFlowGenerationWaitTooLongPremiumHint =>
-      'Premium erhaelt Zugang zur priorisierten Warteschlange und wartet normalerweise weniger.';
+      'Premium-Anfragen erhalten Prioritaet, wenn der Dienst stark ausgelastet ist, und koennen kuerzer warten.';
 }

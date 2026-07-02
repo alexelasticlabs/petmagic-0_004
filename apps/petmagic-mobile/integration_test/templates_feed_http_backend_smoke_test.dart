@@ -739,7 +739,10 @@ class _RemoteBackedTemplatesRepository implements TemplatesRepository {
   }
 
   @override
-  Future<TemplateItem> fetchTemplate(String templateId) async {
+  Future<TemplateItem> fetchTemplate(
+    String templateId, {
+    bool forceRefresh = false,
+  }) async {
     return (await _dataSource.fetchTemplate(templateId)).toDomain();
   }
 

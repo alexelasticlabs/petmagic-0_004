@@ -67,11 +67,23 @@ void main() {
     expect(initializeBody, contains('PhotoManager.getAssetPathList('));
     expect(initializeBody, contains('on Object'));
     expect(initializeBody, contains('_markAssetLoadFailed(clearAssets: true)'));
+    expect(initializeBody, contains('_hasMore = false;'));
+    expect(initializeBody, isNot(contains('_hasMore = paths.isNotEmpty;')));
 
     expect(loadNextPageBody, contains('getAssetListPaged('));
     expect(loadNextPageBody, contains('on Object'));
     expect(loadNextPageBody, contains('_isLoadingMore = false;'));
     expect(loadNextPageBody, contains('_hasMore = false;'));
+    expect(
+      loadNextPageBody,
+      contains('fetched.length == _supportAttachmentRecentAssetCount'),
+    );
+    expect(
+      loadNextPageBody,
+      isNot(
+        contains('nextAssets.length == _supportAttachmentRecentAssetCount'),
+      ),
+    );
     expect(loadNextPageBody, contains('_assetLoadFailed = _assets.isEmpty;'));
 
     expect(markFailedBody, contains('_isInitialLoading = false;'));

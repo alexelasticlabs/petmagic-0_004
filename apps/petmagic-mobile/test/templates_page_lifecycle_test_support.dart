@@ -7,8 +7,11 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
+import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
+import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_query.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
@@ -157,11 +160,20 @@ class TrackingWalletController extends WalletController {
   TrackingWalletController({
     this.hasWallet = false,
     this.hasCompletedFullLoad = false,
+    this.initialIsPremium = false,
+    this.isRefreshing = false,
+    this.syncedIsPremium,
+    this.syncCompleter,
   });
 
   final bool hasWallet;
   final bool hasCompletedFullLoad;
+  final bool initialIsPremium;
+  final bool isRefreshing;
+  final bool? syncedIsPremium;
+  final Completer<void>? syncCompleter;
   int loadCalls = 0;
+  int syncSnapshotCalls = 0;
 
   @override
   WalletState build() {
@@ -171,11 +183,12 @@ class TrackingWalletController extends WalletController {
               userId: 'user-1',
               balance: 50,
               adRewardsRemainingToday: 0,
-              isPremium: false,
+              isPremium: initialIsPremium,
               updatedAtUtc: DateTime.utc(2035),
             )
           : null,
       hasCompletedFullLoad: hasCompletedFullLoad,
+      isRefreshing: isRefreshing,
     );
   }
 
@@ -183,6 +196,104 @@ class TrackingWalletController extends WalletController {
   Future<void> load({bool refresh = false}) async {
     loadCalls++;
     state = state.copyWith(isLoading: true);
+  }
+
+  @override
+  Future<void> syncSnapshot({bool forceRefresh = false}) async {
+    syncSnapshotCalls++;
+    await syncCompleter?.future;
+    final wallet = state.wallet;
+    final nextIsPremium = syncedIsPremium;
+    if (wallet == null || nextIsPremium == null) {
+      return;
+    }
+    state = state.copyWith(
+      wallet: WalletStateModel(
+        userId: wallet.userId,
+        balance: wallet.balance,
+        adRewardsRemainingToday: wallet.adRewardsRemainingToday,
+        isPremium: nextIsPremium,
+        nextWeeklyGrantAtUtc: wallet.nextWeeklyGrantAtUtc,
+        updatedAtUtc: DateTime.utc(2035, 1, 2),
+      ),
+    );
+  }
+}
+
+class TrackingProfileBootstrapController extends ProfileController {
+  int initializeCalls = 0;
+
+  @override
+  ProfileState build() {
+    return const ProfileState(
+      isLoading: false,
+      isSaving: false,
+      displayName: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+    );
+  }
+
+  @override
+  Future<void> initialize({String initialEmail = ''}) async {
+    initializeCalls++;
+  }
+}
+
+class FakeProfileController extends ProfileController {
+  FakeProfileController({this.isPremium = false});
+
+  final bool isPremium;
+
+  @override
+  ProfileState build() {
+    return ProfileState(
+      isLoading: false,
+      isSaving: false,
+      displayName: 'Pet User',
+      email: 'user@example.com',
+      password: '',
+      confirmPassword: '',
+      profile: MobileUserProfile(
+        userId: 'user-1',
+        email: 'user@example.com',
+        displayName: 'Pet User',
+        isPremium: isPremium,
+        emailConfirmed: true,
+        termsOfUseAccepted: true,
+        privacyPolicyAccepted: true,
+        marketingEmailsEnabled: true,
+        legalAcceptance: const MobileLegalAcceptanceStatus(
+          termsOfUseAccepted: true,
+          termsOfUseAcceptedVersion: '1.0',
+          termsOfUseAcceptedAtUtc: null,
+          privacyPolicyAccepted: true,
+          privacyPolicyAcceptedVersion: '1.0',
+          privacyPolicyAcceptedAtUtc: null,
+          currentTermsOfUseVersion: '1.0',
+          currentPrivacyPolicyVersion: '1.0',
+          requiresAcceptance: false,
+        ),
+        roles: const ['user'],
+        avatar: null,
+      ),
+    );
+  }
+}
+
+class TestTemplatesNetworkStatusController extends NetworkStatusController {
+  TestTemplatesNetworkStatusController({required this.initialHasInternet});
+
+  final bool initialHasInternet;
+
+  @override
+  NetworkStatusState build() {
+    return NetworkStatusState(hasInternet: initialHasInternet);
+  }
+
+  void setHasInternet(bool value) {
+    state = state.copyWith(hasInternet: value);
   }
 }
 
@@ -296,6 +407,7 @@ TemplateItem templateFixture(
   String title, {
   TemplateType type = TemplateType.image,
   String? thumbnailUrl,
+  bool isPremium = false,
 }) {
   return TemplateItem(
     templateId: id,
@@ -305,7 +417,7 @@ TemplateItem templateFixture(
     petPhotoRequirements: const ['Clear photo'],
     category: 'Portrait',
     tags: const ['pet'],
-    isPremium: false,
+    isPremium: isPremium,
     tokenCost: 1,
     thumbnailUrl: thumbnailUrl,
   );
@@ -366,7 +478,10 @@ class RandomTemplatesRepository implements TemplatesRepository {
   void cancelPendingMetadataRequests() {}
 
   @override
-  Future<TemplateItem> fetchTemplate(String templateId) async {
+  Future<TemplateItem> fetchTemplate(
+    String templateId, {
+    bool forceRefresh = false,
+  }) async {
     fetchTemplateCalls++;
     final detail = templateDetailsById[templateId];
     if (detail != null) {
@@ -485,6 +600,7 @@ class PetFlowGenerationRepository extends TemplateGenerationRepository {
     required String petId,
     String? petPhotoId,
     required String templateId,
+    int? expectedTemplateVersion,
     String? correlationId,
     CancelToken? cancelToken,
   }) async {
@@ -574,6 +690,7 @@ class CrossGalleryPetFlowRepository extends PetFlowGenerationRepository {
     required String petId,
     String? petPhotoId,
     required String templateId,
+    int? expectedTemplateVersion,
     String? correlationId,
     CancelToken? cancelToken,
   }) async {
@@ -581,6 +698,7 @@ class CrossGalleryPetFlowRepository extends PetFlowGenerationRepository {
       petId: petId,
       petPhotoId: petPhotoId,
       templateId: templateId,
+      expectedTemplateVersion: expectedTemplateVersion,
       correlationId: correlationId,
       cancelToken: cancelToken,
     );

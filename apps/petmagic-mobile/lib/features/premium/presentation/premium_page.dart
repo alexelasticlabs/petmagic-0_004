@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations_en.dart';
 import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
@@ -105,6 +106,13 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
   void _handlePremiumPageLifecycleChange(AppLifecycleState appState) {
     if (appState == AppLifecycleState.resumed && _shouldReloadOnResume) {
       _shouldReloadOnResume = false;
+      if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
+        return;
+      }
+      if (!ref.read(networkStatusControllerProvider).hasInternet) {
+        return;
+      }
+
       final controller = ref.read(premiumControllerProvider.notifier);
       if (ref.read(premiumControllerProvider).isAwaitingCheckoutVerification) {
         unawaited(controller.verifyCheckoutStatus());
