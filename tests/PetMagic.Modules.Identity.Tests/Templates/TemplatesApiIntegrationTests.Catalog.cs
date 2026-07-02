@@ -4,13 +4,17 @@ using System.Text;
 using System.Text.Json;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.DependencyInjection;
 
 using PetMagic.Modules.Templates.Api.Endpoints;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
+using PetMagic.Modules.Templates.Infrastructure;
 using PetMagic.Modules.Templates.Infrastructure.Data;
+using PetMagic.Modules.Templates.Infrastructure.Entities;
+using PetMagic.Modules.Templates.Infrastructure.Options;
 
 namespace PetMagic.Modules.Identity.Tests.Templates;
 
@@ -130,7 +134,7 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.Equal(templateId, listedPublicItem.Id);
         Assert.Equal("Viral Dance Deluxe", listedPublicItem.Title);
 
-        var publicDetail = await GetFromJsonAsync<PublicTemplateResponse>(
+        var publicDetail = await GetFromJsonAsync<TemplateDetailDto>(
             application.Client,
             $"/api/templates/{templateId}");
 
@@ -179,7 +183,59 @@ public sealed partial class TemplatesApiIntegrationTests
 
         var receivedEvent = await eventTask.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Equal(TemplateFeedRealtimeTopics.TemplatesFeedInvalidated, receivedEvent.Topic);
-        Assert.Equal("{}", receivedEvent.Data);
+        using var payload = JsonDocument.Parse(receivedEvent.Data);
+        Assert.Equal(TemplateFeedInvalidationScopes.Category, payload.RootElement.GetProperty("scope").GetString());
+        Assert.Equal("Seasonal", payload.RootElement.GetProperty("category").GetString());
+        Assert.Equal("created", payload.RootElement.GetProperty("reason").GetString());
+    }
+
+    [Fact]
+    public async Task EventsStream_ShouldIgnoreGenerationStatusChangedEvents()
+    {
+        await using var application = await TestApplication.CreateAsync(startGenerationWorker: false);
+
+        var created = await CreateActiveImageTemplateAsync(
+            application.Client,
+            "Public Realtime Guard",
+            "Security",
+            ["realtime", "guard"]);
+        var generation = await UploadGenerationSourceAsync(
+            application.Client,
+            created.TemplateId,
+            "pet.jpg",
+            "image/jpeg",
+            JpegBytes());
+
+        application.Client.DefaultRequestHeaders.Authorization = null;
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/templates/events");
+        using var response = await application.Client.SendAsync(
+            request,
+            HttpCompletionOption.ResponseHeadersRead);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("text/event-stream", response.Content.Headers.ContentType?.MediaType);
+
+        await using var stream = await response.Content.ReadAsStreamAsync();
+        using var reader = new StreamReader(stream, Encoding.UTF8);
+        var realtime = application.Services.GetRequiredService<ITemplateFeedRealtimeService>();
+
+        await realtime.PublishGenerationStatusChangedAsync(generation);
+
+        var blockedEventTask = ReadNextServerSentEventAsync(reader);
+        await Assert.ThrowsAsync<TimeoutException>(() => blockedEventTask.WaitAsync(TimeSpan.FromMilliseconds(400)));
+
+        await realtime.PublishTemplatesFeedInvalidatedAsync(
+            new TemplateFeedInvalidationPayload(
+                TemplateFeedInvalidationScopes.Full,
+                Reason: "security-regression"),
+            CancellationToken.None);
+
+        var receivedEvent = await blockedEventTask.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(TemplateFeedRealtimeTopics.TemplatesFeedInvalidated, receivedEvent.Topic);
+        using var payload = JsonDocument.Parse(receivedEvent.Data);
+        Assert.Equal(TemplateFeedInvalidationScopes.Full, payload.RootElement.GetProperty("scope").GetString());
+        Assert.Equal("security-regression", payload.RootElement.GetProperty("reason").GetString());
     }
 
     [Fact]
@@ -286,7 +342,7 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.Equal(templateId, listedPublicItem.Id);
         Assert.Equal("Cozy Portrait Plus", listedPublicItem.Title);
 
-        var publicDetail = await GetFromJsonAsync<PublicTemplateResponse>(
+        var publicDetail = await GetFromJsonAsync<TemplateDetailDto>(
             application.Client,
             $"/api/templates/{templateId}");
 
@@ -383,6 +439,94 @@ public sealed partial class TemplatesApiIntegrationTests
         var secondPageItem = Assert.Single(secondPage.Items);
         Assert.Contains(secondPageItem.TemplateId, new[] { first.TemplateId, second.TemplateId });
         Assert.NotEqual(firstPageItem.TemplateId, secondPageItem.TemplateId);
+    }
+
+    [Fact]
+    public async Task PublicTemplatesFeed_ShouldExcludeQaOnlyTemplatesByDefaultAndAllowAdminQaMode()
+    {
+        await using var application = await TestApplication.CreateAsync();
+
+        var production = await CreateActiveImageTemplateAsync(
+            application.Client,
+            "Production Visible Portrait",
+            "Visibility",
+            ["visibility"]);
+        var qaOnly = await PostAsJsonAsync<AdminTemplateResponse>(
+            application.Client,
+            "/api/admin/templates/image",
+            new CreateImageTemplateCommand(
+                "Local Smoke Failing Image",
+                "QA-only failing provider fixture.",
+                "Visibility",
+                ["visibility", "qa"],
+                false,
+                20,
+                TemplatePromoBadgeMode.New.ToString(),
+                new TemplateAssetCommand("http://localhost:5000/templates-media/qa.jpg", "qa.jpg", "image/jpeg", 64, null),
+                "openai/gpt-image-2/edit",
+                "__petmagic_fake_fail__",
+                TemplateStatus.Active.ToString(),
+                IsQaOnly: true));
+
+        application.Client.DefaultRequestHeaders.Authorization = null;
+        var publicFeed = await GetFromJsonAsync<PublicTemplatesFeedResponse>(
+            application.Client,
+            "/api/templates/feed?category=Visibility&take=10");
+        Assert.Contains(publicFeed.Items, item => item.TemplateId == production.TemplateId);
+        Assert.DoesNotContain(publicFeed.Items, item => item.TemplateId == qaOnly.TemplateId);
+
+        application.Client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(TestAuthHandler.SchemeName);
+        var qaFeed = await GetFromJsonAsync<PublicTemplatesFeedResponse>(
+            application.Client,
+            "/api/templates/feed?category=Visibility&take=10&includeQa=true");
+        Assert.Contains(qaFeed.Items, item => item.TemplateId == qaOnly.TemplateId);
+    }
+
+    [Fact]
+    public async Task TemplateContentHealthCheck_ShouldMarkMissingPreviewUnhealthyWithoutBreakingFeed()
+    {
+        await using var application = await TestApplication.CreateAsync();
+        var templateId = Guid.NewGuid();
+        await using (var scope = application.Services.CreateAsyncScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+            dbContext.TemplateItems.Add(new TemplateItem
+            {
+                Id = templateId,
+                Version = 1,
+                TemplateType = TemplateType.Image,
+                Title = "Broken Preview Drift",
+                ShortDescription = "Legacy active template without preview.",
+                Category = "Health",
+                Tags = "health",
+                IsPremium = false,
+                TokenCost = 20,
+                Status = TemplateStatus.Active,
+                PromoBadgeMode = TemplatePromoBadgeMode.New,
+                ImageModel = "openai/gpt-image-2/edit",
+                ImagePrompt = "Keep the same pet.",
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        application.Client.DefaultRequestHeaders.Authorization = null;
+        var feed = await GetFromJsonAsync<PublicTemplatesFeedResponse>(
+            application.Client,
+            "/api/templates/feed?category=Health&take=10");
+        Assert.Contains(feed.Items, item => item.TemplateId == templateId && item.PreviewAsset is null);
+
+        await using var healthScope = application.Services.CreateAsyncScope();
+        var healthCheck = new TemplateContentHealthCheck(
+            healthScope.ServiceProvider.GetRequiredService<TemplatesDbContext>(),
+            healthScope.ServiceProvider.GetRequiredService<TemplatesOptions>(),
+            new StaticHttpClientFactory());
+        var result = await healthCheck.CheckHealthAsync(new HealthCheckContext());
+
+        Assert.Equal(HealthStatus.Unhealthy, result.Status);
+        Assert.Equal(1, Assert.IsType<int>(result.Data["problemCount"]));
+        Assert.Contains("missing_preview", Assert.IsType<string[]>(result.Data["problems"])[0]);
     }
 
     [Fact]
@@ -564,27 +708,22 @@ public sealed partial class TemplatesApiIntegrationTests
         var item = Assert.Single(items.EnumerateArray());
         var allowedItemProperties = new HashSet<string>(StringComparer.Ordinal)
         {
-            "templateId",
-            "templateType",
+            "id",
+            "type",
             "title",
             "shortDescription",
             "category",
-            "effectivePromoBadge",
             "tags",
             "isPremium",
-            "tokenCost",
-            "previewAsset",
-            "musicDescription",
-            "referenceVideoDurationSeconds",
+            "access",
             "thumbnailUrl",
-            "petPhotoRequirements",
-            "supportsGenerationResultInput",
-            "requiredInputMediaType",
-            "recommendedAfterImageGeneration",
-            "supportsGenerateSimilar",
-            "defaultVariationStrength",
+            "media",
+            "mediaKind",
+            "aspectRatio",
+            "durationMs",
+            "sizeBytes",
             "version",
-            "updatedAtUtc"
+            "mediaVersion"
         };
         var itemProperties = item.EnumerateObject()
             .Select(property => property.Name)
@@ -602,53 +741,59 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.DoesNotContain("referenceMotionAsset", itemProperties);
         Assert.DoesNotContain("estimatedProviderCostUsd", itemProperties);
         Assert.DoesNotContain("createdAtUtc", itemProperties);
-        Assert.Equal(created.TemplateId, item.GetProperty("templateId").GetGuid());
-        Assert.Equal("Image", item.GetProperty("templateType").GetString());
+        Assert.DoesNotContain("templateId", itemProperties);
+        Assert.DoesNotContain("templateType", itemProperties);
+        Assert.DoesNotContain("previewAsset", itemProperties);
+        Assert.DoesNotContain("tokenCost", itemProperties);
+        Assert.DoesNotContain("petPhotoRequirements", itemProperties);
+        Assert.DoesNotContain("supportsGenerationResultInput", itemProperties);
+        Assert.DoesNotContain("requiredInputMediaType", itemProperties);
+        Assert.DoesNotContain("recommendedAfterImageGeneration", itemProperties);
+        Assert.DoesNotContain("supportsGenerateSimilar", itemProperties);
+        Assert.DoesNotContain("defaultVariationStrength", itemProperties);
+        Assert.DoesNotContain("updatedAtUtc", itemProperties);
+        Assert.DoesNotContain("detailPreviewUrl", itemProperties);
+        Assert.Equal(created.TemplateId, item.GetProperty("id").GetGuid());
+        Assert.Equal("Image", item.GetProperty("type").GetString());
         Assert.Equal("Contract Feed Portrait", item.GetProperty("title").GetString());
         Assert.Equal("Contract feed description", item.GetProperty("shortDescription").GetString());
-        Assert.Equal("Contract", item.GetProperty("category").GetString());
+        var category = item.GetProperty("category");
+        Assert.Equal("Contract", category.GetProperty("title").GetString());
+        Assert.Equal("contract", category.GetProperty("slug").GetString());
         Assert.False(item.GetProperty("isPremium").GetBoolean());
-        Assert.Equal(20, item.GetProperty("tokenCost").GetInt32());
-        Assert.Equal(
-            ["Clear pet face", "Good lighting"],
-            [.. item.GetProperty("petPhotoRequirements").EnumerateArray().Select(requirement => requirement.GetString()!)]);
-        Assert.False(item.GetProperty("supportsGenerationResultInput").GetBoolean());
-        Assert.Equal(JsonValueKind.Null, item.GetProperty("requiredInputMediaType").ValueKind);
-        Assert.False(item.GetProperty("recommendedAfterImageGeneration").GetBoolean());
-        Assert.True(item.GetProperty("supportsGenerateSimilar").GetBoolean());
-        Assert.Equal("medium", item.GetProperty("defaultVariationStrength").GetString());
         Assert.True(item.GetProperty("version").GetInt64() > 0);
-        Assert.Equal(JsonValueKind.String, item.GetProperty("updatedAtUtc").ValueKind);
+        Assert.Equal(previewAsset.Url, item.GetProperty("thumbnailUrl").GetString());
 
-        var preview = item.GetProperty("previewAsset");
-        var allowedPreviewProperties = new HashSet<string>(StringComparer.Ordinal)
+        var media = item.GetProperty("media");
+        var allowedMediaProperties = new HashSet<string>(StringComparer.Ordinal)
         {
-            "url",
-            "fileName",
-            "contentType",
-            "fileSizeBytes",
-            "durationSeconds"
+            "thumbnailUrl",
+            "animatedPreviewUrl",
+            "feedLoopLowUrl",
+            "feedLoopMediumUrl",
+            "mediaKind",
+            "aspectRatio",
+            "durationMs",
+            "sizeBytes",
+            "dominantColor",
+            "blurHash",
+            "mediaVersion"
         };
-        var previewProperties = preview.EnumerateObject()
+        var mediaProperties = media.EnumerateObject()
             .Select(property => property.Name)
             .ToHashSet(StringComparer.Ordinal);
 
-        Assert.Equal(allowedPreviewProperties.Count, previewProperties.Count);
-        Assert.Subset(allowedPreviewProperties, previewProperties);
-        Assert.Equal(previewAsset.Url, preview.GetProperty("url").GetString());
-        Assert.Equal("contract-feed.jpg", preview.GetProperty("fileName").GetString());
-        Assert.Equal("image/jpeg", preview.GetProperty("contentType").GetString());
-        Assert.Equal(previewAsset.Url, item.GetProperty("thumbnailUrl").GetString());
+        Assert.Equal(allowedMediaProperties.Count, mediaProperties.Count);
+        Assert.Subset(allowedMediaProperties, mediaProperties);
+        Assert.Equal(previewAsset.Url, media.GetProperty("thumbnailUrl").GetString());
+        Assert.Equal("image", media.GetProperty("mediaKind").GetString());
 
         var typedResponse = JsonSerializer.Deserialize<PublicTemplatesFeedResponse>(body, JsonOptions);
         Assert.NotNull(typedResponse);
         var typedItem = Assert.Single(typedResponse.Items);
         Assert.Equal(created.TemplateId, typedItem.TemplateId);
-        Assert.Equal(previewAsset.Url, typedItem.PreviewAsset?.Url);
         Assert.Equal(previewAsset.Url, typedItem.ThumbnailUrl);
-        Assert.True(typedItem.SupportsGenerateSimilar);
         Assert.True(typedItem.Version > 0);
-        Assert.NotNull(typedItem.UpdatedAtUtc);
     }
 
     [Fact]
@@ -710,26 +855,32 @@ public sealed partial class TemplatesApiIntegrationTests
 
         using var document = JsonDocument.Parse(body);
         var item = Assert.Single(document.RootElement.GetProperty("items").EnumerateArray());
-        Assert.Equal(created.TemplateId, item.GetProperty("templateId").GetGuid());
-        Assert.Equal("Video", item.GetProperty("templateType").GetString());
-        Assert.Equal(JsonValueKind.Null, item.GetProperty("thumbnailUrl").ValueKind);
+        var itemProperties = item.EnumerateObject()
+            .Select(property => property.Name)
+            .ToHashSet(StringComparer.Ordinal);
+        Assert.DoesNotContain("templateId", itemProperties);
+        Assert.DoesNotContain("templateType", itemProperties);
+        Assert.DoesNotContain("previewAsset", itemProperties);
+        Assert.DoesNotContain("referenceVideoDurationSeconds", itemProperties);
+        Assert.DoesNotContain("detailPreviewUrl", itemProperties);
+        Assert.Equal(created.TemplateId, item.GetProperty("id").GetGuid());
+        Assert.Equal("Video", item.GetProperty("type").GetString());
+        Assert.Equal(previewAsset.Url, item.GetProperty("thumbnailUrl").GetString());
 
-        var preview = item.GetProperty("previewAsset");
-        Assert.Equal(previewAsset.Url, preview.GetProperty("url").GetString());
-        Assert.Equal("video/mp4", preview.GetProperty("contentType").GetString());
-        Assert.Equal(4.5, preview.GetProperty("durationSeconds").GetDouble());
-        Assert.Equal(8.75, item.GetProperty("referenceVideoDurationSeconds").GetDouble());
+        var media = item.GetProperty("media");
+        Assert.Equal(previewAsset.Url, media.GetProperty("thumbnailUrl").GetString());
+        Assert.Equal(previewAsset.Url, media.GetProperty("feedLoopLowUrl").GetString());
+        Assert.Equal("video", media.GetProperty("mediaKind").GetString());
+        Assert.Equal(4500, media.GetProperty("durationMs").GetInt32());
 
         var typedResponse = JsonSerializer.Deserialize<PublicTemplatesFeedResponse>(body, JsonOptions);
         Assert.NotNull(typedResponse);
         var typedItem = Assert.Single(typedResponse.Items);
         Assert.Equal(created.TemplateId, typedItem.TemplateId);
         Assert.Equal(TemplateType.Video.ToString(), typedItem.TemplateType);
-        Assert.Null(typedItem.ThumbnailUrl);
-        Assert.Equal(previewAsset.Url, typedItem.PreviewAsset?.Url);
-        Assert.Equal("video/mp4", typedItem.PreviewAsset?.ContentType);
-        Assert.Equal(4.5, typedItem.PreviewAsset?.DurationSeconds);
-        Assert.Equal(8.75, typedItem.ReferenceVideoDurationSeconds);
+        Assert.Equal(previewAsset.Url, typedItem.ThumbnailUrl);
+        Assert.Equal(previewAsset.Url, typedItem.Media.FeedLoopLowUrl);
+        Assert.Equal(4500, typedItem.Media.DurationMs);
     }
 
     [Theory]
@@ -1337,5 +1488,23 @@ public sealed partial class TemplatesApiIntegrationTests
         }
     }
 
+    private sealed class StaticHttpClientFactory : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name)
+        {
+            return new HttpClient(new StaticHttpMessageHandler())
+            {
+                BaseAddress = new Uri("http://localhost")
+            };
+        }
+    }
+
+    private sealed class StaticHttpMessageHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+        }
+    }
 
 }

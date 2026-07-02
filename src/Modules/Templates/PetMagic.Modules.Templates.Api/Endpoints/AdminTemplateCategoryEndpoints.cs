@@ -21,6 +21,8 @@ public static class AdminTemplateCategoryEndpoints
             .RequireRateLimiting("admin");
 
         group.MapGet("/", ListAsync);
+        group.MapGet("/diagnostics", DiagnosticsAsync)
+            .RequireAuthorization("AdminOnly");
         group.MapPost("/", CreateAsync)
             .RequireAuthorization("AdminOnly");
         group.MapPut("/{categoryId:guid}", UpdateAsync)
@@ -31,6 +33,19 @@ public static class AdminTemplateCategoryEndpoints
             .RequireAuthorization("AdminOnly");
 
         return endpoints;
+    }
+
+    private static async Task<Results<Ok<AdminTemplateCategoryDiagnosticsResponse>, ProblemHttpResult>> DiagnosticsAsync(
+        [FromServices] ITemplatesService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.GetAdminCategoryDiagnosticsAsync(cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToCategoryProblem(result.Error.Code);
+        }
+
+        return TypedResults.Ok(result.Value);
     }
 
     private static async Task<Results<Ok<IReadOnlyList<AdminTemplateCategoryListItemResponse>>, ProblemHttpResult>> ListAsync(

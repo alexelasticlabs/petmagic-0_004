@@ -134,6 +134,8 @@ public static partial class TemplateGenerationEndpoints
         {
             "templates.invalid_subject" => StatusCodes.Status401Unauthorized,
             "templates.not_found" => StatusCodes.Status404NotFound,
+            "TEMPLATE_UNAVAILABLE" => StatusCodes.Status409Conflict,
+            "TEMPLATE_CHANGED" => StatusCodes.Status409Conflict,
             "GENERATION_JOB_NOT_FOUND" => StatusCodes.Status404NotFound,
             "templates.invalid_status" => StatusCodes.Status409Conflict,
             "templates.type_mismatch" => StatusCodes.Status400BadRequest,
@@ -178,6 +180,8 @@ public static partial class TemplateGenerationEndpoints
         {
             "templates.invalid_subject" => "Authentication failed.",
             "templates.not_found" or "GENERATION_JOB_NOT_FOUND" => "Generation was not found.",
+            "TEMPLATE_UNAVAILABLE" => "Template is no longer available. Please choose another template.",
+            "TEMPLATE_CHANGED" => "Template was updated. Please reopen it and try again.",
             "templates.invalid_status" => "Generation is not available for this action.",
             "templates.type_mismatch" => "Template type does not support this action.",
             "templates.generation_result_input_unavailable" => "Source generation result is no longer available.",

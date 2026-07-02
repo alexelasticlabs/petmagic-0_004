@@ -44,7 +44,20 @@ internal sealed partial class TemplateGenerationService
         }
 
         var template = source.Template;
-        var readiness = ValidateTemplate(template, requireActiveStatus: true);
+        var visibility = await _visibilityPolicy.EvaluatePublicAsync(
+            template,
+            new TemplateVisibilityContext(
+                RequireGenerationAccess: true,
+                HasPremiumAccess: command.HasPremiumAccess),
+            cancellationToken);
+        if (!visibility.IsVisible)
+        {
+            var error = visibility.Error ?? TemplatesErrors.TemplateUnavailable;
+            RecordRejectedGeneration(command.UserId, template.Id, error);
+            return Result.Failure<TemplateGenerationResponse>(error);
+        }
+
+        var readiness = ValidateTemplateReadiness(template);
         if (readiness is not null)
         {
             return Result.Failure<TemplateGenerationResponse>(readiness);
@@ -213,6 +226,7 @@ internal sealed partial class TemplateGenerationService
         job.ChargedAtUtc = DateTime.UtcNow;
         job.UpdatedAtUtc = job.ChargedAtUtc.Value;
         await dbContext.SaveChangesAsync(cancellationToken);
+        TemplateGenerationMetrics.RecordJobAccepted(job);
 
         return Result.Success(await MapResponseWithQueueMetricsAsync(job, cancellationToken));
     }

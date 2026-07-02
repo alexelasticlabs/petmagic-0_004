@@ -216,6 +216,43 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task GetPublicTemplateOfTheDayAsync_ShouldKeepManualAssignmentWhenCategoryBecomesArchived()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var date = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(6);
+        var manualTemplateId = await CreateActiveImageTemplateAsync(service, "Archived Category Daily Pick", "Seasonal", ["daily"]);
+        await CreateActiveImageTemplateAsync(service, "Active Category Daily Pick", "Evergreen", ["daily"]);
+
+        var manual = await service.CreateTemplateOfTheDayAsync(
+            new CreateTemplateOfTheDayCommand(
+                manualTemplateId,
+                date,
+                date,
+                true,
+                true,
+                10,
+                null,
+                null,
+                null,
+                Guid.NewGuid()),
+            CancellationToken.None);
+
+        Assert.True(manual.IsSuccess);
+
+        var archivedCategory = await dbContext.TemplateCategories.SingleAsync(category => category.Name == "Seasonal");
+        archivedCategory.IsArchived = true;
+        await dbContext.SaveChangesAsync();
+
+        var result = await service.GetPublicTemplateOfTheDayAsync(date, "en", CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var template = Assert.IsType<PublicTemplateOfTheDayItemResponse>(result.Value.Template);
+        Assert.Equal(manualTemplateId, template.TemplateId);
+        Assert.Equal("manual", template.Source);
+    }
+
+    [Fact]
     public async Task CurrentTemplateOfTheDayAsync_ShouldUseConfiguredBusinessTimeZoneWhenDateIsOmitted()
     {
         await using var dbContext = CreateDbContext();

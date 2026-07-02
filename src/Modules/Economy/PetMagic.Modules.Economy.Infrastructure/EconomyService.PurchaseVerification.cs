@@ -76,25 +76,6 @@ public sealed partial class EconomyService
         return Result.Success(ToPaged(items, normalizedSkip, normalizedTake));
     }
 
-    public async Task<Result<PurchaseOrderResponse>> ConfirmPackPurchaseAsync(ConfirmPackPurchaseCommand command, CancellationToken cancellationToken)
-    {
-        var order = await dbContext.PurchaseOrders
-            .FirstOrDefaultAsync(x => x.Id == command.OrderId && x.UserId == command.UserId, cancellationToken);
-
-        if (order is null)
-        {
-            return Result.Failure<PurchaseOrderResponse>(EconomyErrors.PurchaseNotFound);
-        }
-
-        var confirmResult = await ConfirmPurchaseInternalAsync(order, cancellationToken);
-        if (confirmResult.IsFailure)
-        {
-            return Result.Failure<PurchaseOrderResponse>(confirmResult.Error);
-        }
-
-        return Result.Success(ToPurchaseOrderResponse(confirmResult.Value));
-    }
-
     public async Task<Result<PurchaseOrderResponse>> VerifyStripeCheckoutSessionAsync(VerifyStripeCheckoutSessionCommand command, CancellationToken cancellationToken)
     {
         var order = await dbContext.PurchaseOrders

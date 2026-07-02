@@ -34,6 +34,8 @@ public sealed class TemplatesOptions
 
     public bool SeedSampleTemplates { get; init; }
 
+    public bool QaFixturesEnabled { get; init; }
+
     public bool GenerationWorkerEnabled { get; init; } = true;
 
     public int GenerationWorkerPollIntervalMilliseconds { get; init; } = 1_000;

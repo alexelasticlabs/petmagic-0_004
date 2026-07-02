@@ -97,13 +97,16 @@ internal sealed class HttpGeneratedMediaImporter(
         Func<string, Uri, string> resolveExtension,
         CancellationToken cancellationToken)
     {
+        var mediaType = ResolveMetricsMediaType(expectedContentTypePrefix);
         if (!Uri.TryCreate(generatedMediaUrl, UriKind.Absolute, out var uri))
         {
+            TemplateGenerationMetrics.RecordMediaImportFailure(mediaType, "invalid_url");
             return Result.Failure<StoredMediaResponse>(TemplatesErrors.GeneratedMediaImportFailed);
         }
 
         if (!IsAllowedGeneratedMediaUri(uri))
         {
+            TemplateGenerationMetrics.RecordMediaImportFailure(mediaType, "url_not_allowed");
             return Result.Failure<StoredMediaResponse>(TemplatesErrors.GeneratedMediaImportFailed);
         }
 
@@ -113,18 +116,21 @@ internal sealed class HttpGeneratedMediaImporter(
             using var response = await client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
+                TemplateGenerationMetrics.RecordMediaImportFailure(mediaType, $"http_{(int)response.StatusCode}");
                 return Result.Failure<StoredMediaResponse>(TemplatesErrors.GeneratedMediaImportFailed);
             }
 
             var length = response.Content.Headers.ContentLength;
             if (length is > 0 && length > maxFileSizeBytes)
             {
+                TemplateGenerationMetrics.RecordMediaImportFailure(mediaType, "too_large");
                 return Result.Failure<StoredMediaResponse>(TemplatesErrors.GeneratedMediaTooLarge);
             }
 
             var contentType = response.Content.Headers.ContentType?.MediaType ?? defaultContentType;
             if (!contentType.StartsWith(expectedContentTypePrefix, StringComparison.OrdinalIgnoreCase))
             {
+                TemplateGenerationMetrics.RecordMediaImportFailure(mediaType, "unexpected_content_type");
                 return Result.Failure<StoredMediaResponse>(TemplatesErrors.GeneratedMediaImportFailed);
             }
 
@@ -135,7 +141,13 @@ internal sealed class HttpGeneratedMediaImporter(
 
             var extension = resolveExtension(contentType, uri);
             var upload = new MediaUploadCommand($"generated-{generationId:N}{extension}", contentType, memoryStream, memoryStream.Length);
-            return await mediaStorage.StoreAsync(upload, cancellationToken);
+            var storeResult = await mediaStorage.StoreAsync(upload, cancellationToken);
+            if (storeResult.IsFailure)
+            {
+                TemplateGenerationMetrics.RecordMediaImportFailure(mediaType, storeResult.Error.Code);
+            }
+
+            return storeResult;
         }
         catch (OperationCanceledException)
         {
@@ -143,10 +155,12 @@ internal sealed class HttpGeneratedMediaImporter(
         }
         catch (InvalidOperationException)
         {
+            TemplateGenerationMetrics.RecordMediaImportFailure(mediaType, "too_large");
             return Result.Failure<StoredMediaResponse>(TemplatesErrors.GeneratedMediaTooLarge);
         }
         catch (Exception exception)
         {
+            TemplateGenerationMetrics.RecordMediaImportFailure(mediaType, "exception");
             logger.LogWarning(
                 exception,
                 "Generated template media import failed. GenerationId={GenerationId}",
@@ -161,5 +175,12 @@ internal sealed class HttpGeneratedMediaImporter(
             && string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
             && !uri.IsLoopback
             && string.IsNullOrWhiteSpace(uri.UserInfo);
+    }
+
+    private static string ResolveMetricsMediaType(string expectedContentTypePrefix)
+    {
+        return expectedContentTypePrefix.StartsWith("video/", StringComparison.OrdinalIgnoreCase)
+            ? TemplateGenerationQueue.MediaTypeVideo
+            : TemplateGenerationQueue.MediaTypeImage;
     }
 }

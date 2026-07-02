@@ -123,35 +123,6 @@ public static partial class EconomyEndpoints
         return TypedResults.Ok(result.Value);
     }
 
-    private static async Task<Results<Ok<PurchaseOrderResponse>, ValidationProblem, ProblemHttpResult>> ConfirmPurchaseAsync(
-        HttpContext context,
-        Guid orderId,
-        IValidator<ConfirmPackPurchaseCommand> validator,
-        IEconomyService service,
-        CancellationToken cancellationToken)
-    {
-        var (userId, _, subjectError) = TryGetSubject(context);
-        if (subjectError is not null)
-        {
-            return ToClientEconomyProblem(subjectError);
-        }
-
-        var command = new ConfirmPackPurchaseCommand(userId!.Value, orderId);
-        var validation = await validator.ValidateAsync(command, cancellationToken);
-        if (!validation.IsValid)
-        {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
-        }
-
-        var result = await service.ConfirmPackPurchaseAsync(command, cancellationToken);
-        if (result.IsFailure)
-        {
-            return ToClientEconomyProblem(result.Error);
-        }
-
-        return TypedResults.Ok(result.Value);
-    }
-
     private static async Task<Results<Ok<PurchaseOrderResponse>, ProblemHttpResult>> VerifyStripeCheckoutAsync(
         HttpContext context,
         Guid orderId,

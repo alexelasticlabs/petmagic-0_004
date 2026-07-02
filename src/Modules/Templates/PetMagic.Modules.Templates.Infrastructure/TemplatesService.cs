@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
 
 using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Templates.Application.Abstractions;
@@ -16,8 +17,13 @@ internal sealed partial class TemplatesService(
     ITemplateMediaLifecycleService mediaLifecycleService,
     ITemplateFeedRealtimeService templateFeedRealtimeService,
     IAdminAuditLog? adminAuditLog = null,
-    TemplateWatermarkSettingsStore? watermarkSettings = null) : ITemplatesService
+    TemplateWatermarkSettingsStore? watermarkSettings = null,
+    ITemplateVisibilityPolicy? visibilityPolicy = null,
+    ILogger<TemplatesService>? logger = null) : ITemplatesService
 {
+    private readonly ITemplateVisibilityPolicy _visibilityPolicy =
+        visibilityPolicy ?? new TemplateVisibilityPolicy();
+
     private readonly TemplateCategoryAdminService _templateCategoryAdminService =
         new(dbContext, templateFeedRealtimeService);
 
@@ -36,5 +42,5 @@ internal sealed partial class TemplatesService(
     private const int PublicTagFilterMaxCount = 12;
     private const string PublicImpossibleTagFilter = "__petmagic_invalid_public_tag_filter__";
 
-    private sealed record PublicFeedCursor(DateTime UpdatedAtUtc, long? Version, Guid TemplateId);
+    private sealed record PublicFeedCursor(DateTime PublishedAtUtc, Guid TemplateId);
 }

@@ -136,9 +136,6 @@ public static partial class EconomyEndpoints
         group.MapPost("/purchases/create", CreatePurchaseAsync)
             .RequireAuthorization();
 
-        group.MapPost("/purchases/{orderId:guid}/confirm", ConfirmPurchaseAsync)
-            .RequireAuthorization();
-
         group.MapPost("/purchases/{orderId:guid}/verify-stripe", VerifyStripeCheckoutAsync)
             .RequireAuthorization();
 

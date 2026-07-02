@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
+using PetMagic.Modules.Templates.Infrastructure;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
 
 namespace PetMagic.Modules.Identity.Tests.Templates;
@@ -119,7 +121,7 @@ public sealed partial class TemplatesServiceTests
         Assert.Equal(expectedRequirements, created.Value.PetPhotoRequirements);
 
         var adminDetail = await service.GetAdminAsync(created.Value.TemplateId, CancellationToken.None);
-        var publicDetail = await service.GetPublicAsync(created.Value.TemplateId, null, CancellationToken.None);
+        var publicDetail = await service.GetPublicAsync(created.Value.TemplateId, null, includeQaOnly: false, CancellationToken.None);
         var publicFeed = await service.ListPublicFeedAsync(
             new PublicTemplatesFeedQuery(null, null, [], null, "good lighting", 10, null, null),
             CancellationToken.None);
@@ -166,7 +168,7 @@ public sealed partial class TemplatesServiceTests
         await dbContext.SaveChangesAsync();
 
         var adminDetail = await service.GetAdminAsync(created.Value.TemplateId, CancellationToken.None);
-        var publicDetail = await service.GetPublicAsync(created.Value.TemplateId, null, CancellationToken.None);
+        var publicDetail = await service.GetPublicAsync(created.Value.TemplateId, null, includeQaOnly: false, CancellationToken.None);
 
         Assert.True(adminDetail.IsSuccess);
         Assert.True(publicDetail.IsSuccess);
@@ -208,7 +210,7 @@ public sealed partial class TemplatesServiceTests
 
         Assert.True(created.IsSuccess);
 
-        var detail = await service.GetPublicAsync(created.Value.TemplateId, null, CancellationToken.None);
+        var detail = await service.GetPublicAsync(created.Value.TemplateId, null, includeQaOnly: false, CancellationToken.None);
         var catalog = await service.ListPublicCatalogAsync(
             new PublicTemplatesCatalogQuery(1, 10, null, "Capability", null, ["capability"]),
             CancellationToken.None);
@@ -230,7 +232,7 @@ public sealed partial class TemplatesServiceTests
         Assert.NotNull(random.Value.Template);
         AssertListCapabilities(random.Value.Template!);
 
-        static void AssertDetailCapabilities(PublicTemplateResponse item)
+        static void AssertDetailCapabilities(TemplateDetailDto item)
         {
             Assert.True(item.SupportsGenerationResultInput);
             Assert.Equal(TemplateType.Video.ToString(), item.RequiredInputMediaType);
@@ -260,9 +262,9 @@ public sealed partial class TemplatesServiceTests
         var middleId = await CreateActiveImageTemplateAsync(service, "Middle Portrait", "Portrait", ["cozy"]);
         var newestId = await CreateActiveImageTemplateAsync(service, "New Portrait", "Portrait", ["cozy"]);
 
-        await SetUpdatedAtUtcAsync(dbContext, oldestId, utcNow.AddMinutes(-30));
-        await SetUpdatedAtUtcAsync(dbContext, middleId, utcNow.AddMinutes(-20));
-        await SetUpdatedAtUtcAsync(dbContext, newestId, utcNow.AddMinutes(-10));
+        await SetPublishedAtUtcAsync(dbContext, oldestId, utcNow.AddMinutes(-30));
+        await SetPublishedAtUtcAsync(dbContext, middleId, utcNow.AddMinutes(-20));
+        await SetPublishedAtUtcAsync(dbContext, newestId, utcNow.AddMinutes(-10));
 
         var firstPage = await service.ListPublicFeedAsync(
             new PublicTemplatesFeedQuery(null, "Portrait", ["cozy"], null, "portrait", 2, null, null),
@@ -285,6 +287,179 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task ListPublicFeedAsync_ShouldNotMoveTemplateWhenAdminUpdatesContent()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var utcNow = DateTime.UtcNow;
+
+        var oldestId = await CreateActiveImageTemplateAsync(service, "Stable Old", "Portrait", ["stable-order"]);
+        var middleId = await CreateActiveImageTemplateAsync(service, "Stable Middle", "Portrait", ["stable-order"]);
+        var newestId = await CreateActiveImageTemplateAsync(service, "Stable New", "Portrait", ["stable-order"]);
+
+        await SetPublishedAtUtcAsync(dbContext, oldestId, utcNow.AddMinutes(-30));
+        await SetPublishedAtUtcAsync(dbContext, middleId, utcNow.AddMinutes(-20));
+        await SetPublishedAtUtcAsync(dbContext, newestId, utcNow.AddMinutes(-10));
+
+        var before = await service.ListPublicFeedAsync(
+            new PublicTemplatesFeedQuery(null, "Portrait", ["stable-order"], null, "stable", 10, null, null),
+            CancellationToken.None);
+
+        var updated = await service.UpdateImageAsync(
+            new UpdateImageTemplateCommand(
+                oldestId,
+                "Stable Old Renamed",
+                "Updated copy and media should not republish.",
+                "Portrait",
+                ["stable-order"],
+                false,
+                20,
+                TemplatePromoBadgeMode.New.ToString(),
+                CreatePreviewAsset("https://cdn.example.com/stable-old-renamed.jpg", "stable-old-renamed.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                TemplateStatus.Active.ToString()),
+            CancellationToken.None);
+
+        var after = await service.ListPublicFeedAsync(
+            new PublicTemplatesFeedQuery(null, "Portrait", ["stable-order"], null, "stable", 10, null, null),
+            CancellationToken.None);
+
+        Assert.True(before.IsSuccess);
+        Assert.True(updated.IsSuccess);
+        Assert.True(after.IsSuccess);
+        Assert.Equal([newestId, middleId, oldestId], [.. before.Value.Items.Select(item => item.TemplateId)]);
+        Assert.Equal([newestId, middleId, oldestId], [.. after.Value.Items.Select(item => item.TemplateId)]);
+
+        var reloaded = await dbContext.TemplateItems.SingleAsync(template => template.Id == oldestId);
+        Assert.Equal(utcNow.AddMinutes(-30), reloaded.PublishedAtUtc);
+        Assert.True(reloaded.UpdatedAtUtc > reloaded.PublishedAtUtc);
+    }
+
+    [Fact]
+    public async Task AdminActivation_ShouldSetPublishedAtUtcOnce()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var created = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Publish Once",
+                "Draft before first publication.",
+                "Portrait",
+                ["publish-once"],
+                false,
+                20,
+                TemplatePromoBadgeMode.New.ToString(),
+                CreatePreviewAsset("https://cdn.example.com/publish-once.jpg", "publish-once.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet."),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+        Assert.Null(created.Value.PublishedAtUtc);
+
+        var activated = await service.ChangeStatusAsync(
+            new ChangeTemplateStatusCommand(created.Value.TemplateId, TemplateStatus.Active.ToString()),
+            CancellationToken.None);
+        Assert.True(activated.IsSuccess);
+        Assert.NotNull(activated.Value.PublishedAtUtc);
+
+        var updated = await service.UpdateImageAsync(
+            new UpdateImageTemplateCommand(
+                created.Value.TemplateId,
+                "Publish Once Updated",
+                "Active metadata update must not republish.",
+                "Portrait",
+                ["publish-once"],
+                false,
+                20,
+                TemplatePromoBadgeMode.New.ToString(),
+                CreatePreviewAsset("https://cdn.example.com/publish-once-updated.jpg", "publish-once-updated.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                TemplateStatus.Active.ToString()),
+            CancellationToken.None);
+
+        Assert.True(updated.IsSuccess);
+        Assert.Equal(activated.Value.PublishedAtUtc, updated.Value.PublishedAtUtc);
+        Assert.True(updated.Value.UpdatedAtUtc >= activated.Value.UpdatedAtUtc);
+    }
+
+    [Fact]
+    public async Task ListPublicFeedAsync_ShouldReturnSamePageForSameCursorRetry()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var utcNow = DateTime.UtcNow;
+
+        var oldestId = await CreateActiveImageTemplateAsync(service, "Retry Old", "Portrait", ["retry-cursor"]);
+        var middleId = await CreateActiveImageTemplateAsync(service, "Retry Middle", "Portrait", ["retry-cursor"]);
+        var newestId = await CreateActiveImageTemplateAsync(service, "Retry New", "Portrait", ["retry-cursor"]);
+
+        await SetPublishedAtUtcAsync(dbContext, oldestId, utcNow.AddMinutes(-30));
+        await SetPublishedAtUtcAsync(dbContext, middleId, utcNow.AddMinutes(-20));
+        await SetPublishedAtUtcAsync(dbContext, newestId, utcNow.AddMinutes(-10));
+
+        var firstPage = await service.ListPublicFeedAsync(
+            new PublicTemplatesFeedQuery(null, "Portrait", ["retry-cursor"], null, "retry", 1, null, null),
+            CancellationToken.None);
+        Assert.True(firstPage.IsSuccess);
+        Assert.NotNull(firstPage.Value.NextCursor);
+
+        var retryOne = await service.ListPublicFeedAsync(
+            new PublicTemplatesFeedQuery(null, "Portrait", ["retry-cursor"], null, "retry", 2, firstPage.Value.NextCursor, null),
+            CancellationToken.None);
+        var retryTwo = await service.ListPublicFeedAsync(
+            new PublicTemplatesFeedQuery(null, "Portrait", ["retry-cursor"], null, "retry", 2, firstPage.Value.NextCursor, null),
+            CancellationToken.None);
+
+        Assert.True(retryOne.IsSuccess);
+        Assert.True(retryTwo.IsSuccess);
+        Assert.Equal([middleId, oldestId], [.. retryOne.Value.Items.Select(item => item.TemplateId)]);
+        Assert.Equal(
+            [.. retryOne.Value.Items.Select(item => item.TemplateId)],
+            [.. retryTwo.Value.Items.Select(item => item.TemplateId)]);
+        Assert.Equal(retryOne.Value.NextCursor, retryTwo.Value.NextCursor);
+        Assert.Equal(retryOne.Value.HasMore, retryTwo.Value.HasMore);
+    }
+
+    [Fact]
+    public async Task ListPublicFeedAsync_ShouldContinueAfterCursorWhenTemplateIsDeletedBetweenPages()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var utcNow = DateTime.UtcNow;
+
+        var oldestId = await CreateActiveImageTemplateAsync(service, "Delete Old", "Portrait", ["delete-cursor"]);
+        var middleId = await CreateActiveImageTemplateAsync(service, "Delete Middle", "Portrait", ["delete-cursor"]);
+        var newestId = await CreateActiveImageTemplateAsync(service, "Delete New", "Portrait", ["delete-cursor"]);
+
+        await SetPublishedAtUtcAsync(dbContext, oldestId, utcNow.AddMinutes(-30));
+        await SetPublishedAtUtcAsync(dbContext, middleId, utcNow.AddMinutes(-20));
+        await SetPublishedAtUtcAsync(dbContext, newestId, utcNow.AddMinutes(-10));
+
+        var firstPage = await service.ListPublicFeedAsync(
+            new PublicTemplatesFeedQuery(null, "Portrait", ["delete-cursor"], null, "delete", 1, null, null),
+            CancellationToken.None);
+        Assert.True(firstPage.IsSuccess);
+        Assert.NotNull(firstPage.Value.NextCursor);
+
+        var deleted = await service.DeleteAsync(middleId, CancellationToken.None);
+        Assert.True(deleted.IsSuccess);
+
+        var secondPage = await service.ListPublicFeedAsync(
+            new PublicTemplatesFeedQuery(null, "Portrait", ["delete-cursor"], null, "delete", 2, firstPage.Value.NextCursor, null),
+            CancellationToken.None);
+
+        Assert.True(secondPage.IsSuccess);
+        var item = Assert.Single(secondPage.Value.Items);
+        Assert.Equal(oldestId, item.TemplateId);
+        Assert.DoesNotContain(secondPage.Value.Items, item => item.TemplateId == newestId);
+        Assert.DoesNotContain(secondPage.Value.Items, item => item.TemplateId == middleId);
+    }
+
+    [Fact]
     public async Task ListPublicFeedAsync_ShouldApplySearchCategoryAndCursorWithoutTags()
     {
         await using var dbContext = CreateDbContext();
@@ -296,9 +471,9 @@ public sealed partial class TemplatesServiceTests
         await CreateActiveImageTemplateAsync(service, "Dance Burst", "Dance", ["loud"]);
         var newestId = await CreateActiveImageTemplateAsync(service, "PORTRAIT Neon", "Portrait", ["bright"]);
 
-        await SetUpdatedAtUtcAsync(dbContext, oldestId, utcNow.AddMinutes(-30));
-        await SetUpdatedAtUtcAsync(dbContext, middleId, utcNow.AddMinutes(-20));
-        await SetUpdatedAtUtcAsync(dbContext, newestId, utcNow.AddMinutes(-10));
+        await SetPublishedAtUtcAsync(dbContext, oldestId, utcNow.AddMinutes(-30));
+        await SetPublishedAtUtcAsync(dbContext, middleId, utcNow.AddMinutes(-20));
+        await SetPublishedAtUtcAsync(dbContext, newestId, utcNow.AddMinutes(-10));
 
         var firstPage = await service.ListPublicFeedAsync(
             new PublicTemplatesFeedQuery(null, "portrait", [], null, "portrait", 2, null, null),
@@ -399,7 +574,7 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
-    public async Task ListPublicFeedAsync_ShouldPageTemplatesWithSameTimestampUsingVersionCursor()
+    public async Task ListPublicFeedAsync_ShouldPageTemplatesWithSamePublishedTimestampUsingIdCursor()
     {
         await using var dbContext = CreateDbContext();
         var service = CreateService(dbContext);
@@ -409,9 +584,9 @@ public sealed partial class TemplatesServiceTests
         var middleVersionId = await CreateActiveImageTemplateAsync(service, "Same Time Two", "Portrait", ["stable"]);
         var newestVersionId = await CreateActiveImageTemplateAsync(service, "Same Time Three", "Portrait", ["stable"]);
 
-        await SetUpdatedAtUtcAsync(dbContext, oldestVersionId, updatedAtUtc);
-        await SetUpdatedAtUtcAsync(dbContext, middleVersionId, updatedAtUtc);
-        await SetUpdatedAtUtcAsync(dbContext, newestVersionId, updatedAtUtc);
+        await SetPublishedAtUtcAsync(dbContext, oldestVersionId, updatedAtUtc);
+        await SetPublishedAtUtcAsync(dbContext, middleVersionId, updatedAtUtc);
+        await SetPublishedAtUtcAsync(dbContext, newestVersionId, updatedAtUtc);
 
         var firstPage = await service.ListPublicFeedAsync(
             new PublicTemplatesFeedQuery(null, "Portrait", ["stable"], null, "same time", 2, null, null),
@@ -420,8 +595,11 @@ public sealed partial class TemplatesServiceTests
         Assert.True(firstPage.IsSuccess);
         Assert.True(firstPage.Value.HasMore);
         Assert.NotNull(firstPage.Value.NextCursor);
-        Assert.Equal(3, firstPage.Value.NextCursor.Split(':').Length);
-        Assert.Equal([newestVersionId, middleVersionId], [.. firstPage.Value.Items.Select(item => item.TemplateId)]);
+        Assert.Equal(2, firstPage.Value.NextCursor.Split(':').Length);
+        var expectedOrder = new[] { oldestVersionId, middleVersionId, newestVersionId }
+            .OrderDescending()
+            .ToArray();
+        Assert.Equal(expectedOrder.Take(2), firstPage.Value.Items.Select(item => item.TemplateId));
 
         var secondPage = await service.ListPublicFeedAsync(
             new PublicTemplatesFeedQuery(null, "Portrait", ["stable"], null, "same time", 2, firstPage.Value.NextCursor, null),
@@ -431,11 +609,11 @@ public sealed partial class TemplatesServiceTests
         Assert.False(secondPage.Value.HasMore);
         Assert.Null(secondPage.Value.NextCursor);
         var item = Assert.Single(secondPage.Value.Items);
-        Assert.Equal(oldestVersionId, item.TemplateId);
+        Assert.Equal(expectedOrder[2], item.TemplateId);
     }
 
     [Fact]
-    public async Task ListPublicFeedAsync_ShouldPageTemplatesWithSameTimestampAndVersionUsingIdCursor()
+    public async Task ListPublicFeedAsync_ShouldPageTemplatesWithSamePublishedTimestampUsingExplicitIdCursor()
     {
         await using var dbContext = CreateDbContext();
         var updatedAtUtc = DateTime.UtcNow.AddMinutes(-5);
@@ -549,6 +727,7 @@ public sealed partial class TemplatesServiceTests
                 ImageModel = "openai/gpt-image-2/edit",
                 ImagePrompt = "Keep the same pet.",
                 CreatedAtUtc = updatedAtUtc.AddMinutes(-1),
+                PublishedAtUtc = updatedAtUtc,
                 UpdatedAtUtc = updatedAtUtc,
                 Assets =
                 [
@@ -587,16 +766,9 @@ public sealed partial class TemplatesServiceTests
             [.. firstPage.Value.Items.Select(item => item.TemplateId).Distinct()]);
         Assert.All(firstPage.Value.Items, item =>
         {
-            Assert.Equal("Scale", item.Category);
+            Assert.Equal("Scale", item.Category.Title);
             Assert.Contains("Scale Portrait", item.Title);
-            if (item.TemplateType == TemplateType.Video.ToString())
-            {
-                Assert.Null(item.ThumbnailUrl);
-            }
-            else
-            {
-                Assert.Equal(item.PreviewAsset?.Url, item.ThumbnailUrl);
-            }
+            Assert.Equal(item.Media.ThumbnailUrl, item.ThumbnailUrl);
         });
 
         var secondPage = await service.ListPublicFeedAsync(
@@ -610,7 +782,7 @@ public sealed partial class TemplatesServiceTests
             item => firstPage.Value.Items.Any(first => first.TemplateId == item.TemplateId));
         Assert.True(
             firstPage.Value.Items.Last().Title.CompareTo(secondPage.Value.Items.First().Title) < 0,
-            "Second cursor page should continue after the first page in updatedAt desc order.");
+            "Second cursor page should continue after the first page in publishedAt desc order.");
     }
 
     [Fact]
@@ -722,6 +894,142 @@ public sealed partial class TemplatesServiceTests
         Assert.NotNull(random.Value.Template);
         Assert.Equal(templateId, random.Value.Template!.TemplateId);
         Assert.Equal(boundedCategory, random.Value.Template.Category);
+    }
+
+    [Fact]
+    public async Task PublicTemplateVisibility_ShouldKeepArchivedCategoryTemplatesInGeneralReadEndpoints()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var archivedTemplateId = await CreateActiveImageTemplateAsync(
+            service,
+            "Archived Category Portrait",
+            "Seasonal",
+            ["visibility"]);
+        var visibleTemplateId = await CreateActiveImageTemplateAsync(
+            service,
+            "Visible Category Portrait",
+            "Evergreen",
+            ["visibility"]);
+
+        var archivedCategory = await dbContext.TemplateCategories.SingleAsync(category => category.Name == "Seasonal");
+        archivedCategory.IsArchived = true;
+        await dbContext.SaveChangesAsync();
+
+        var catalog = await service.ListPublicCatalogAsync(
+            new PublicTemplatesCatalogQuery(1, 10, null, null, null, ["visibility"]),
+            CancellationToken.None);
+        var feed = await service.ListPublicFeedAsync(
+            new PublicTemplatesFeedQuery(null, null, ["visibility"], null, null, 10, null, null),
+            CancellationToken.None);
+        var archivedCategoryFeed = await service.ListPublicFeedAsync(
+            new PublicTemplatesFeedQuery(null, "Seasonal", ["visibility"], null, null, 10, null, null),
+            CancellationToken.None);
+        var detail = await service.GetPublicAsync(
+            archivedTemplateId,
+            null,
+            includeQaOnly: false,
+            CancellationToken.None);
+        var random = await service.GetPublicRandomTemplateAsync(
+            new PublicRandomTemplateQuery(TemplateType.Image, "Seasonal", true, null),
+            CancellationToken.None);
+
+        Assert.True(catalog.IsSuccess);
+        Assert.True(feed.IsSuccess);
+        Assert.True(archivedCategoryFeed.IsSuccess);
+        Assert.True(detail.IsSuccess);
+        Assert.True(random.IsSuccess);
+        Assert.Contains(catalog.Value.Items, item => item.Id == visibleTemplateId);
+        Assert.Contains(catalog.Value.Items, item => item.Id == archivedTemplateId);
+        Assert.Contains(feed.Value.Items, item => item.TemplateId == visibleTemplateId);
+        Assert.Contains(feed.Value.Items, item => item.TemplateId == archivedTemplateId);
+        Assert.Empty(archivedCategoryFeed.Value.Items);
+        Assert.Null(random.Value.Template);
+    }
+
+    [Fact]
+    public async Task ListPublicFeedAsync_ShouldLogLegacyCategoryFallbackMatches()
+    {
+        await using var dbContext = CreateDbContext();
+        var logger = new CapturingLogger<TemplatesService>();
+        var service = CreateService(dbContext, logger: logger);
+
+        var templateId = await CreateActiveImageTemplateAsync(
+            service,
+            "Legacy Category Match",
+            "Legacy Category",
+            ["fallback"]);
+        var canonical = await dbContext.TemplateCategories.SingleAsync(category => category.Name == "Legacy Category");
+        dbContext.TemplateCategories.Remove(canonical);
+        var template = await dbContext.TemplateItems.SingleAsync(item => item.Id == templateId);
+        template.Category = " Legacy   Category ";
+        await dbContext.SaveChangesAsync();
+
+        var feed = await service.ListPublicFeedAsync(
+            new PublicTemplatesFeedQuery(null, "legacy category", ["fallback"], null, null, 10, null, null),
+            CancellationToken.None);
+
+        Assert.True(feed.IsSuccess);
+        var item = Assert.Single(feed.Value.Items);
+        Assert.Equal(templateId, item.TemplateId);
+
+        var log = Assert.Single(logger.Entries, entry => entry.Message.Contains("category_fallback_used", StringComparison.Ordinal));
+        Assert.Equal(LogLevel.Warning, log.Level);
+        Assert.Equal(templateId, log.Properties["TemplateId"]);
+        Assert.Equal(" Legacy   Category ", log.Properties["Category"]);
+    }
+
+    [Fact]
+    public async Task GetAdminCategoryDiagnosticsAsync_ShouldReturnNoncanonicalActiveTemplates()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        await CreateActiveImageTemplateAsync(service, "Canonical Template", "Canonical", ["diag"]);
+        var orphanId = await CreateActiveImageTemplateAsync(service, "Orphan Template", "Orphan", ["diag"]);
+        var archivedCategoryId = await CreateActiveImageTemplateAsync(service, "Archived Category Template", "ArchivedDiag", ["diag"]);
+        await CreateActiveImageTemplateAsync(service, "Draft Ignored Template", "DraftDiag", ["diag"]);
+
+        var orphanCategory = await dbContext.TemplateCategories.SingleAsync(category => category.Name == "Orphan");
+        dbContext.TemplateCategories.Remove(orphanCategory);
+        var archivedCategory = await dbContext.TemplateCategories.SingleAsync(category => category.Name == "ArchivedDiag");
+        archivedCategory.IsArchived = true;
+        var draft = await dbContext.TemplateItems.SingleAsync(template => template.Title == "Draft Ignored Template");
+        draft.Status = TemplateStatus.Draft;
+        await dbContext.SaveChangesAsync();
+
+        var diagnostics = await service.GetAdminCategoryDiagnosticsAsync(CancellationToken.None);
+
+        Assert.True(diagnostics.IsSuccess);
+        Assert.Equal(3, diagnostics.Value.TotalActiveTemplates);
+        Assert.Equal(2, diagnostics.Value.NoncanonicalTemplates);
+        Assert.Equal(66.67, diagnostics.Value.NoncanonicalPercent);
+        Assert.Contains(diagnostics.Value.Items, item => item.TemplateId == orphanId && item.NormalizedCategory == "ORPHAN");
+        Assert.Contains(diagnostics.Value.Items, item => item.TemplateId == archivedCategoryId && item.NormalizedCategory == "ARCHIVEDDIAG");
+        Assert.DoesNotContain(diagnostics.Value.Items, item => item.Title == "Canonical Template");
+        Assert.DoesNotContain(diagnostics.Value.Items, item => item.Title == "Draft Ignored Template");
+    }
+
+    [Fact]
+    public async Task CreateImageAsync_ShouldReuseCategoryWhenInputDiffersOnlyByWhitespaceOrCasing()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var firstId = await CreateActiveImageTemplateAsync(service, "Normalized One", "Pet   Portrait", ["normalize"]);
+        var secondId = await CreateActiveImageTemplateAsync(service, "Normalized Two", " pet portrait ", ["normalize"]);
+
+        var categories = await dbContext.TemplateCategories
+            .Where(category => category.NormalizedName == "PET PORTRAIT")
+            .ToArrayAsync();
+        var first = await dbContext.TemplateItems.SingleAsync(template => template.Id == firstId);
+        var second = await dbContext.TemplateItems.SingleAsync(template => template.Id == secondId);
+
+        var category = Assert.Single(categories);
+        Assert.Equal("Pet Portrait", category.Name);
+        Assert.Equal("Pet Portrait", first.Category);
+        Assert.Equal("Pet Portrait", second.Category);
     }
 
     [Fact]

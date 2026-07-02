@@ -76,8 +76,6 @@ public sealed record ValidateAppleAppStoreBillingCommand(
     Guid UserId,
     string SignedTransactionInfo);
 
-public sealed record ConfirmPackPurchaseCommand(Guid UserId, Guid OrderId);
-
 public sealed record CreatePaymentMethodSetupCommand(Guid UserId, string PaymentProvider);
 
 public sealed record RemovePaymentMethodCommand(Guid UserId, Guid PaymentMethodId);

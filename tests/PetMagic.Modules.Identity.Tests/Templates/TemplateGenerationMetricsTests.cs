@@ -1,4 +1,5 @@
 using PetMagic.Modules.Templates.Domain.Enums;
+using PetMagic.Modules.Templates.Api;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Infrastructure;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
@@ -16,6 +17,7 @@ public sealed class TemplateGenerationMetricsTests
             "generation_jobs_queued",
             "generation_jobs_processing",
             "generation_jobs_failed_total",
+            "generation_jobs_accepted_total",
             "generation_jobs_exhausted_total",
             "generation_lifecycle_events_total",
             "generation_duration_seconds",
@@ -23,16 +25,23 @@ public sealed class TemplateGenerationMetricsTests
             "generation_jobs_queued_without_charge_total",
             "generation_jobs_refunded_total",
             "generation_duplicate_refund_attempts_total",
+            "generation_refund_failures_total",
+            "generation_cancel_refunds_total",
             "generation_fal_timeouts_total",
             "generation_sse_delivery_failures_total",
             "generation_queue_depth",
             "generation_oldest_queued_job_age_seconds",
             "generation_oldest_processing_job_age_seconds",
+            "generation_stuck_stage_age_seconds",
             "generation_active_jobs",
             "generation_queue_wait_seconds",
             "generation_eta_accuracy_error_seconds",
             "generation_jobs_rejected_total",
             "generation_jobs_cancelled_total",
+            "generation_retry_attempts_total",
+            "generation_media_import_failures_total",
+            "generation_preview_404_total",
+            "generation_r2_upload_failures_total",
             "generation_scheduler_claim_attempts_total",
             "generation_scheduler_no_slot_skips_total",
             "generation_scheduler_borrowed_video_starts_total",
@@ -88,6 +97,7 @@ public sealed class TemplateGenerationMetricsTests
         };
 
         TemplateGenerationMetrics.RecordJobQueued(job);
+        TemplateGenerationMetrics.RecordJobAccepted(job);
         TemplateGenerationMetrics.RecordJobClaimed(job);
         TemplateGenerationMetrics.RecordJobCompleted(job);
         TemplateGenerationMetrics.RecordJobStage(job, "finalizing");
@@ -103,15 +113,22 @@ public sealed class TemplateGenerationMetricsTests
         TemplateGenerationMetrics.RecordQueuedWithoutCharge(job);
         TemplateGenerationMetrics.RecordJobRefunded(job);
         TemplateGenerationMetrics.RecordDuplicateRefundAttempt(job);
+        TemplateGenerationMetrics.RecordRefundFailure(job, TemplatesErrors.MediaStorageFailed.Code);
+        TemplateGenerationMetrics.RecordCancelRefund(job);
         TemplateGenerationMetrics.RecordFalTimeout("video", "video_generation", "fal-ai/kling-video/v3/pro/motion-control");
         TemplateGenerationMetrics.RecordSseDeliveryFailure(TemplateFeedRealtimeTopics.GenerationStatusChanged);
         TemplateGenerationMetrics.RecordQueueSnapshot(3, 120, 45);
         TemplateGenerationMetrics.RecordLaneQueueSnapshot("image", "premium", 2, 1, 30, 15);
+        TemplateGenerationMetrics.RecordStuckStageAge("ProviderQueued", "image", "premium", 900);
         TemplateGenerationMetrics.RecordJobRejected(
             TemplatesErrors.GenerationWaitTooLong.Code,
             TemplateGenerationQueue.MediaTypeImage,
             TemplateGenerationQueue.TierPremium);
         TemplateGenerationMetrics.RecordJobCancelled(job);
+        TemplateGenerationMetrics.RecordRetryAttempt(job, "claim_retry");
+        TemplateGenerationMetrics.RecordMediaImportFailure("video", "http_404");
+        TemplateGenerationMetrics.RecordPreviewNotFound("preview");
+        TemplateGenerationMetrics.RecordR2UploadFailure("store");
         TemplateGenerationMetrics.RecordSchedulerClaimAttempt("image", "claimed");
         TemplateGenerationMetrics.RecordSchedulerNoSlotSkip("video");
         TemplateGenerationMetrics.RecordSchedulerCapacitySnapshot(activeImage: 2, activeVideo: 5, videoReserved: 3, imageProtected: 4);
@@ -174,6 +191,7 @@ public sealed class TemplateGenerationMetricsTests
                 && x.Value == 1
                 && Equals(x.Tags["event_type"], "stage")
                 && Equals(x.Tags["stage"], "finalizing"));
+        Assert.Contains(recorder.Measurements, x => x.InstrumentName == "generation_jobs_accepted_total" && x.Value == 1);
         Assert.Contains(
             recorder.Measurements,
             x => x.InstrumentName == "generation_lifecycle_events_total"
@@ -183,6 +201,12 @@ public sealed class TemplateGenerationMetricsTests
         Assert.Contains(recorder.Measurements, x => x.InstrumentName == "generation_jobs_queued_without_charge_total" && x.Value == 1);
         Assert.Contains(recorder.Measurements, x => x.InstrumentName == "generation_jobs_refunded_total" && x.Value == 1);
         Assert.Contains(recorder.Measurements, x => x.InstrumentName == "generation_duplicate_refund_attempts_total" && x.Value == 1);
+        Assert.Contains(
+            recorder.Measurements,
+            x => x.InstrumentName == "generation_refund_failures_total"
+                && x.Value == 1
+                && Equals(x.Tags["error_code"], TemplatesErrors.MediaStorageFailed.Code));
+        Assert.Contains(recorder.Measurements, x => x.InstrumentName == "generation_cancel_refunds_total" && x.Value == 1);
         Assert.Contains(
             recorder.Measurements,
             x => x.InstrumentName == "generation_fal_timeouts_total"
@@ -197,6 +221,11 @@ public sealed class TemplateGenerationMetricsTests
         Assert.Contains(recorder.Measurements, x => x.InstrumentName == "generation_queue_depth" && x.Value == 3);
         Assert.Contains(recorder.Measurements, x => x.InstrumentName == "generation_oldest_queued_job_age_seconds" && x.Value == 120);
         Assert.Contains(recorder.Measurements, x => x.InstrumentName == "generation_oldest_processing_job_age_seconds" && x.Value == 45);
+        Assert.Contains(
+            recorder.Measurements,
+            x => x.InstrumentName == "generation_stuck_stage_age_seconds"
+                && x.Value == 900
+                && Equals(x.Tags["stage"], "ProviderQueued"));
         Assert.Contains(
             recorder.Measurements,
             x => x.InstrumentName == "generation_jobs_queued"
@@ -216,6 +245,27 @@ public sealed class TemplateGenerationMetricsTests
                 && x.Value >= 15
                 && Equals(x.Tags["media_type"], "image")
                 && Equals(x.Tags["tier"], "premium"));
+        Assert.Contains(
+            recorder.Measurements,
+            x => x.InstrumentName == "generation_retry_attempts_total"
+                && x.Value == 1
+                && Equals(x.Tags["reason"], "claim_retry"));
+        Assert.Contains(
+            recorder.Measurements,
+            x => x.InstrumentName == "generation_media_import_failures_total"
+                && x.Value == 1
+                && Equals(x.Tags["media_type"], "video")
+                && Equals(x.Tags["reason"], "http_404"));
+        Assert.Contains(
+            recorder.Measurements,
+            x => x.InstrumentName == "generation_preview_404_total"
+                && x.Value == 1
+                && Equals(x.Tags["role"], "preview"));
+        Assert.Contains(
+            recorder.Measurements,
+            x => x.InstrumentName == "generation_r2_upload_failures_total"
+                && x.Value == 1
+                && Equals(x.Tags["operation"], "store"));
         Assert.Contains(
             recorder.Measurements,
             x => x.InstrumentName == "generation_active_jobs"
@@ -290,5 +340,67 @@ public sealed class TemplateGenerationMetricsTests
             x => x.InstrumentName == "fal_provider_queue_wait_seconds"
                 && x.Value >= 40
                 && Equals(x.Tags["stage"], "image_generation"));
+    }
+
+    [Fact]
+    public void TemplateGenerationMetrics_ShouldCountOnlyFullFeedInvalidations_AsFullInvalidations()
+    {
+        using var recorder = new MeterMeasurementRecorder(
+            TemplateGenerationMetrics.MeterName,
+            "sse_events_published_count",
+            "sse_full_invalidation_count");
+
+        TemplateGenerationMetrics.RecordSseEventPublished(TemplateFeedInvalidationScopes.Template);
+        TemplateGenerationMetrics.RecordSseEventPublished(TemplateFeedInvalidationScopes.Category);
+        TemplateGenerationMetrics.RecordSseEventPublished(TemplateFeedInvalidationScopes.TemplateOfTheDay);
+        TemplateGenerationMetrics.RecordSseEventPublished(TemplateFeedInvalidationScopes.Full);
+        TemplateGenerationMetrics.RecordSseFullInvalidation();
+
+        Assert.Contains(
+            recorder.Measurements,
+            x => x.InstrumentName == "sse_events_published_count"
+                && x.Value == 1
+                && Equals(x.Tags["scope"], TemplateFeedInvalidationScopes.Template));
+        Assert.Contains(
+            recorder.Measurements,
+            x => x.InstrumentName == "sse_events_published_count"
+                && x.Value == 1
+                && Equals(x.Tags["scope"], TemplateFeedInvalidationScopes.Category));
+        Assert.Contains(
+            recorder.Measurements,
+            x => x.InstrumentName == "sse_events_published_count"
+                && x.Value == 1
+                && Equals(x.Tags["scope"], TemplateFeedInvalidationScopes.TemplateOfTheDay));
+        Assert.Contains(
+            recorder.Measurements,
+            x => x.InstrumentName == "sse_events_published_count"
+                && x.Value == 1
+                && Equals(x.Tags["scope"], TemplateFeedInvalidationScopes.Full));
+        Assert.Single(
+            recorder.Measurements,
+            x => x.InstrumentName == "sse_full_invalidation_count" && x.Value == 1);
+    }
+
+    [Fact]
+    public void TemplateGenerationApiMetrics_ShouldEmitWebhookInstruments()
+    {
+        using var recorder = new MeterMeasurementRecorder(
+            TemplateGenerationApiMetrics.MeterName,
+            "generation_webhook_signature_failures_total",
+            "generation_webhook_delivery_failures_total");
+
+        TemplateGenerationApiMetrics.RecordWebhookSignatureFailure("signature_mismatch");
+        TemplateGenerationApiMetrics.RecordWebhookDeliveryFailure("invalid_payload");
+
+        Assert.Contains(
+            recorder.Measurements,
+            x => x.InstrumentName == "generation_webhook_signature_failures_total"
+                && x.Value == 1
+                && Equals(x.Tags["reason"], "signature_mismatch"));
+        Assert.Contains(
+            recorder.Measurements,
+            x => x.InstrumentName == "generation_webhook_delivery_failures_total"
+                && x.Value == 1
+                && Equals(x.Tags["reason"], "invalid_payload"));
     }
 }

@@ -33,6 +33,7 @@ public static partial class TemplateGenerationEndpoints
         }
         catch (JsonException)
         {
+            TemplateGenerationApiMetrics.RecordWebhookDeliveryFailure("invalid_json");
             return TypedResults.BadRequest(new FalWebhookErrorResponse("invalid_json"));
         }
 
@@ -40,12 +41,14 @@ public static partial class TemplateGenerationEndpoints
             || string.IsNullOrWhiteSpace(request.RequestId)
             || string.IsNullOrWhiteSpace(request.Status))
         {
+            TemplateGenerationApiMetrics.RecordWebhookDeliveryFailure("invalid_payload");
             return TypedResults.BadRequest(new FalWebhookErrorResponse("invalid_payload"));
         }
 
         var headerRequestId = context.Request.Headers["X-Fal-Webhook-Request-Id"].FirstOrDefault();
         if (!string.Equals(headerRequestId, request.RequestId, StringComparison.Ordinal))
         {
+            TemplateGenerationApiMetrics.RecordWebhookDeliveryFailure("request_id_mismatch");
             return TypedResults.BadRequest(new FalWebhookErrorResponse("request_id_mismatch"));
         }
 
@@ -65,6 +68,7 @@ public static partial class TemplateGenerationEndpoints
             cancellationToken);
         if (result.IsFailure)
         {
+            TemplateGenerationApiMetrics.RecordWebhookDeliveryFailure(result.Error.Code);
             return ToClientGenerationProblem(result.Error);
         }
 

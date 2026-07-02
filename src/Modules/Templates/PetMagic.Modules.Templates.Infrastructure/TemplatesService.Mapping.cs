@@ -137,7 +137,8 @@ internal sealed partial class TemplatesService
             template.RequiredInputMediaType?.ToString(),
             template.RecommendedAfterImageGeneration,
             template.SupportsGenerateSimilar,
-            template.DefaultVariationStrength ?? "medium");
+            template.DefaultVariationStrength ?? "medium",
+            template.IsQaOnly);
     }
 
     private static AdminTemplateResponse MapAdminResponse(TemplateItem template)
@@ -157,6 +158,11 @@ internal sealed partial class TemplatesService
             template.TokenCost,
             DeserializeTags(template.Tags),
             GetAsset(template, TemplateAssetKind.Preview),
+            GetAsset(template, TemplateAssetKind.Thumbnail),
+            GetAsset(template, TemplateAssetKind.AnimatedPreview),
+            GetAsset(template, TemplateAssetKind.FeedLoopLow),
+            GetAsset(template, TemplateAssetKind.FeedLoopMedium),
+            GetAsset(template, TemplateAssetKind.DetailPreview),
             template.MusicDescription,
             GetAsset(template, TemplateAssetKind.ReferenceMotion),
             template.ReferenceVideoDurationSeconds,
@@ -175,13 +181,15 @@ internal sealed partial class TemplatesService
                     template.KlingModel,
                     template.ReferenceVideoDurationSeconds),
             template.CreatedAtUtc,
+            template.PublishedAtUtc,
             template.UpdatedAtUtc,
             DeserializeRequirements(template.PetPhotoRequirements),
             template.SupportsGenerationResultInput,
             template.RequiredInputMediaType?.ToString(),
             template.RecommendedAfterImageGeneration,
             template.SupportsGenerateSimilar,
-            template.DefaultVariationStrength ?? "medium");
+            template.DefaultVariationStrength ?? "medium",
+            template.IsQaOnly);
     }
 
     private static PublicTemplateListItemResponse MapPublicListItem(TemplateItem template, string? locale)
@@ -219,7 +227,6 @@ internal sealed partial class TemplatesService
         string title,
         string shortDescription,
         string? localizedTextsJson,
-        string? petPhotoRequirements,
         string category,
         string tags,
         bool isPremium,
@@ -228,11 +235,13 @@ internal sealed partial class TemplatesService
         TemplateStatus status,
         string? musicDescription,
         double? referenceVideoDurationSeconds,
+        string? petPhotoRequirements,
         bool supportsGenerationResultInput,
         TemplateType? requiredInputMediaType,
         bool recommendedAfterImageGeneration,
         bool supportsGenerateSimilar,
         string? defaultVariationStrength,
+        long version,
         DateTime createdAtUtc,
         DateTime updatedAtUtc,
         string? previewUrl,
@@ -288,7 +297,129 @@ internal sealed partial class TemplatesService
             ThumbnailUrl: ResolvePublicThumbnailUrl(previewUrl, previewContentType));
     }
 
-    private static PublicTemplateFeedItemResponse MapPublicFeedItem(
+    private static FeedTemplateCardDto MapPublicFeedItem(
+        Guid templateId,
+        TemplateType templateType,
+        string title,
+        string shortDescription,
+        string? localizedTextsJson,
+        string category,
+        string tags,
+        bool isPremium,
+        long version,
+        string? thumbnailUrl,
+        string? thumbnailContentType,
+        long? thumbnailFileSizeBytes,
+        double? thumbnailDurationSeconds,
+        string? animatedPreviewUrl,
+        string? animatedPreviewContentType,
+        long? animatedPreviewFileSizeBytes,
+        double? animatedPreviewDurationSeconds,
+        string? feedLoopLowUrl,
+        string? feedLoopLowContentType,
+        long? feedLoopLowFileSizeBytes,
+        double? feedLoopLowDurationSeconds,
+        string? feedLoopMediumUrl,
+        string? feedLoopMediumContentType,
+        long? feedLoopMediumFileSizeBytes,
+        double? feedLoopMediumDurationSeconds,
+        string? previewUrl,
+        string? previewContentType,
+        long? previewFileSizeBytes,
+        double? previewDurationSeconds,
+        string? locale)
+    {
+        var localizedTexts = TemplateLocalizationTranslator.Resolve(title, shortDescription, localizedTextsJson, locale);
+        var resolvedThumbnailUrl = thumbnailUrl ?? ResolvePublicThumbnailUrl(previewUrl, previewContentType);
+        var resolvedFeedLoopLowUrl = feedLoopLowUrl;
+        if (string.IsNullOrWhiteSpace(resolvedFeedLoopLowUrl) && ResolveTemplateMediaKind(previewContentType) == "video")
+        {
+            resolvedFeedLoopLowUrl = previewUrl;
+        }
+
+        var primaryContentType = feedLoopLowContentType
+            ?? animatedPreviewContentType
+            ?? feedLoopMediumContentType
+            ?? thumbnailContentType
+            ?? previewContentType;
+        var primaryDurationSeconds = feedLoopLowDurationSeconds
+            ?? animatedPreviewDurationSeconds
+            ?? feedLoopMediumDurationSeconds
+            ?? thumbnailDurationSeconds
+            ?? previewDurationSeconds;
+        var primarySizeBytes = feedLoopLowFileSizeBytes
+            ?? animatedPreviewFileSizeBytes
+            ?? feedLoopMediumFileSizeBytes
+            ?? thumbnailFileSizeBytes
+            ?? previewFileSizeBytes;
+        var mediaKind = ResolveTemplateMediaKind(primaryContentType);
+
+        return new FeedTemplateCardDto(
+            templateId,
+            localizedTexts.Title,
+            localizedTexts.ShortDescription,
+            templateType.ToString(),
+            new TemplateCategorySummaryDto(null, ResolveCategorySlug(category), category),
+            DeserializeTags(tags),
+            isPremium,
+            isPremium ? "premium" : "free",
+            resolvedThumbnailUrl,
+            new FeedTemplateMediaDto(
+                resolvedThumbnailUrl,
+                animatedPreviewUrl,
+                resolvedFeedLoopLowUrl,
+                feedLoopMediumUrl,
+                mediaKind,
+                DurationMs: ToDurationMs(primaryDurationSeconds),
+                SizeBytes: primarySizeBytes,
+                MediaVersion: version),
+            mediaKind,
+            null,
+            ToDurationMs(primaryDurationSeconds),
+            primarySizeBytes,
+            version,
+            version);
+    }
+
+    private static TemplateDetailDto MapTemplateDetail(TemplateItem template, string? locale)
+    {
+        var localizedTexts = TemplateLocalizationTranslator.Resolve(template.Title, template.ShortDescription, template.LocalizedTextsJson, locale);
+        var previewAsset = GetAsset(template, TemplateAssetKind.Preview);
+        var thumbnailAsset = GetAsset(template, TemplateAssetKind.Thumbnail);
+        var detailPreviewAsset = GetAsset(template, TemplateAssetKind.DetailPreview) ?? previewAsset;
+        var mediaKind = ResolveTemplateMediaKind(detailPreviewAsset?.ContentType ?? thumbnailAsset?.ContentType ?? previewAsset?.ContentType);
+
+        return new TemplateDetailDto(
+            template.Id,
+            template.TemplateType.ToString(),
+            localizedTexts.Title,
+            localizedTexts.ShortDescription,
+            new TemplateCategorySummaryDto(null, ResolveCategorySlug(template.Category), template.Category),
+            ResolveEffectivePromoBadge(template, DateTime.UtcNow),
+            DeserializeTags(template.Tags),
+            template.IsPremium,
+            template.TokenCost,
+            new TemplateDetailMediaDto(
+                thumbnailAsset?.Url ?? ResolvePublicThumbnailUrl(previewAsset?.Url, previewAsset?.ContentType),
+                detailPreviewAsset?.Url,
+                mediaKind,
+                DurationMs: ToDurationMs(detailPreviewAsset?.DurationSeconds ?? previewAsset?.DurationSeconds),
+                SizeBytes: detailPreviewAsset?.FileSizeBytes ?? previewAsset?.FileSizeBytes,
+                MediaVersion: template.Version),
+            template.MusicDescription,
+            template.ReferenceVideoDurationSeconds,
+            localizedTexts.PetPhotoRequirements ?? DeserializeRequirements(template.PetPhotoRequirements),
+            template.SupportsGenerationResultInput,
+            template.RequiredInputMediaType?.ToString(),
+            template.RecommendedAfterImageGeneration,
+            template.SupportsGenerateSimilar,
+            template.DefaultVariationStrength,
+            thumbnailAsset?.Url ?? ResolvePublicThumbnailUrl(previewAsset?.Url, previewAsset?.ContentType),
+            template.Version,
+            template.UpdatedAtUtc);
+    }
+
+    private static TemplateDetailDto MapTemplateDetail(
         Guid templateId,
         TemplateType templateType,
         string title,
@@ -316,6 +447,12 @@ internal sealed partial class TemplatesService
         string? previewContentType,
         long? previewFileSizeBytes,
         double? previewDurationSeconds,
+        string? thumbnailUrl,
+        string? thumbnailContentType,
+        string? detailPreviewUrl,
+        string? detailPreviewContentType,
+        long? detailPreviewFileSizeBytes,
+        double? detailPreviewDurationSeconds,
         string? locale)
     {
         var localizedTexts = TemplateLocalizationTranslator.Resolve(title, shortDescription, localizedTextsJson, locale);
@@ -327,13 +464,16 @@ internal sealed partial class TemplatesService
                 previewContentType ?? string.Empty,
                 previewFileSizeBytes,
                 previewDurationSeconds);
+        var resolvedDetailPreviewUrl = string.IsNullOrWhiteSpace(detailPreviewUrl) ? previewUrl : detailPreviewUrl;
+        var resolvedDetailContentType = string.IsNullOrWhiteSpace(detailPreviewContentType) ? previewContentType : detailPreviewContentType;
+        var mediaKind = ResolveTemplateMediaKind(resolvedDetailContentType ?? thumbnailContentType ?? previewContentType);
 
-        return new PublicTemplateFeedItemResponse(
+        return new TemplateDetailDto(
             templateId,
             templateType.ToString(),
             localizedTexts.Title,
             localizedTexts.ShortDescription,
-            category,
+            new TemplateCategorySummaryDto(null, ResolveCategorySlug(category), category),
             ResolveEffectivePromoBadge(
                 promoBadgeMode,
                 createdAtUtc,
@@ -352,129 +492,58 @@ internal sealed partial class TemplatesService
             DeserializeTags(tags),
             isPremium,
             tokenCost,
-            previewAsset,
+            new TemplateDetailMediaDto(
+                thumbnailUrl ?? ResolvePublicThumbnailUrl(previewAsset?.Url, previewAsset?.ContentType),
+                resolvedDetailPreviewUrl,
+                mediaKind,
+                DurationMs: ToDurationMs(detailPreviewDurationSeconds ?? previewDurationSeconds),
+                SizeBytes: detailPreviewFileSizeBytes ?? previewFileSizeBytes,
+                MediaVersion: version),
             musicDescription,
             referenceVideoDurationSeconds,
-            ResolvePublicThumbnailUrl(previewUrl, previewContentType),
             localizedTexts.PetPhotoRequirements ?? DeserializeRequirements(petPhotoRequirements),
             supportsGenerationResultInput,
             requiredInputMediaType?.ToString(),
             recommendedAfterImageGeneration,
             supportsGenerateSimilar,
             NormalizePublicVariationStrength(defaultVariationStrength),
+            thumbnailUrl ?? ResolvePublicThumbnailUrl(previewAsset?.Url, previewAsset?.ContentType),
             version,
             updatedAtUtc);
-    }
-
-    private static PublicTemplateResponse MapPublicResponse(TemplateItem template, string? locale)
-    {
-        var localizedTexts = TemplateLocalizationTranslator.Resolve(template.Title, template.ShortDescription, template.LocalizedTextsJson, locale);
-        var previewAsset = GetAsset(template, TemplateAssetKind.Preview);
-
-        return new PublicTemplateResponse(
-            template.Id,
-            template.TemplateType.ToString(),
-            localizedTexts.Title,
-            localizedTexts.ShortDescription,
-            template.Category,
-            ResolveEffectivePromoBadge(template, DateTime.UtcNow),
-            DeserializeTags(template.Tags),
-            template.IsPremium,
-            template.TokenCost,
-            previewAsset,
-            template.MusicDescription,
-            template.ReferenceVideoDurationSeconds,
-            localizedTexts.PetPhotoRequirements ?? DeserializeRequirements(template.PetPhotoRequirements),
-            template.SupportsGenerationResultInput,
-            template.RequiredInputMediaType?.ToString(),
-            template.RecommendedAfterImageGeneration,
-            template.SupportsGenerateSimilar,
-            template.DefaultVariationStrength,
-            ResolvePublicThumbnailUrl(
-                previewAsset?.Url,
-                previewAsset?.ContentType));
-    }
-
-    private static PublicTemplateResponse MapPublicResponse(
-        Guid templateId,
-        TemplateType templateType,
-        string title,
-        string shortDescription,
-        string? localizedTextsJson,
-        string? petPhotoRequirements,
-        string category,
-        string tags,
-        bool isPremium,
-        int tokenCost,
-        TemplatePromoBadgeMode promoBadgeMode,
-        TemplateStatus status,
-        string? musicDescription,
-        double? referenceVideoDurationSeconds,
-        bool supportsGenerationResultInput,
-        TemplateType? requiredInputMediaType,
-        bool recommendedAfterImageGeneration,
-        bool supportsGenerateSimilar,
-        string? defaultVariationStrength,
-        DateTime createdAtUtc,
-        DateTime updatedAtUtc,
-        string? previewUrl,
-        string? previewFileName,
-        string? previewContentType,
-        long? previewFileSizeBytes,
-        double? previewDurationSeconds,
-        string? locale)
-    {
-        var localizedTexts = TemplateLocalizationTranslator.Resolve(title, shortDescription, localizedTextsJson, locale);
-        var previewAsset = string.IsNullOrWhiteSpace(previewUrl)
-            ? null
-            : new TemplateAssetResponse(
-                previewUrl,
-                previewFileName ?? string.Empty,
-                previewContentType ?? string.Empty,
-                previewFileSizeBytes,
-                previewDurationSeconds);
-
-        return new PublicTemplateResponse(
-            templateId,
-            templateType.ToString(),
-            localizedTexts.Title,
-            localizedTexts.ShortDescription,
-            category,
-            ResolveEffectivePromoBadge(
-                promoBadgeMode,
-                createdAtUtc,
-                updatedAtUtc,
-                status,
-                isPremium,
-                tokenCost,
-                [
-                    title,
-                    shortDescription,
-                    category,
-                    tags,
-                    musicDescription
-                ],
-                DateTime.UtcNow),
-            DeserializeTags(tags),
-            isPremium,
-            tokenCost,
-            previewAsset,
-            musicDescription,
-            referenceVideoDurationSeconds,
-            localizedTexts.PetPhotoRequirements ?? DeserializeRequirements(petPhotoRequirements),
-            supportsGenerationResultInput,
-            requiredInputMediaType?.ToString(),
-            recommendedAfterImageGeneration,
-            supportsGenerateSimilar,
-            NormalizePublicVariationStrength(defaultVariationStrength),
-            ResolvePublicThumbnailUrl(
-                previewAsset?.Url,
-                previewAsset?.ContentType));
     }
 
     private static string NormalizePublicVariationStrength(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? "medium" : value;
+    }
+
+    private static int? ToDurationMs(double? durationSeconds)
+    {
+        return durationSeconds is null
+            ? null
+            : (int)Math.Round(durationSeconds.Value * 1000d, MidpointRounding.AwayFromZero);
+    }
+
+    private static string ResolveTemplateMediaKind(string? contentType)
+    {
+        return contentType?.StartsWith("video/", StringComparison.OrdinalIgnoreCase) == true
+            ? "video"
+            : "image";
+    }
+
+    private static string ResolveCategorySlug(string? category)
+    {
+        var normalized = (category ?? string.Empty).Trim().ToLowerInvariant();
+        if (normalized.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        return string.Join(
+            "-",
+            normalized
+                .Split([' ', '_', '/', '\\'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(part => part.Length > 0));
     }
 
     private static TemplatePromoBadgeMode ParsePromoBadgeMode(string raw)

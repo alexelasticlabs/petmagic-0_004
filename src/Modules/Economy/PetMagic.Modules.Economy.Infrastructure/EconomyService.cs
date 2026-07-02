@@ -276,7 +276,7 @@ public sealed partial class EconomyService(
             return Result.Failure<RedeemCodeAppliedResponse>(EconomyErrors.RedeemCodeNotFound);
         }
 
-        var transaction = dbContext.Database.IsRelational()
+        await using var transaction = dbContext.Database.IsRelational()
             ? await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
             : null;
 
@@ -426,7 +426,7 @@ public sealed partial class EconomyService(
             return Result.Failure<ReferralCodeAppliedResponse>(EconomyErrors.ReferralCodeNotFound);
         }
 
-        var transaction = dbContext.Database.IsRelational()
+        await using var transaction = dbContext.Database.IsRelational()
             ? await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
             : null;
 

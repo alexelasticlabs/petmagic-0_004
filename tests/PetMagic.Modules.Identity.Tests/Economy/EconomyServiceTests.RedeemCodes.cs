@@ -242,17 +242,13 @@ public sealed partial class EconomyServiceTests
         Assert.Equal(EconomyErrors.RedeemCodePurchaseRequirementNotMet.Code, firstAttempt.Error.Code);
 
         var packId = AddStarterPack(dbContext);
-        var purchase = await service.CreatePackPurchaseAsync(
-            new CreatePackPurchaseCommand(userId, packId, "USD", "stripe", "web", "1.0.0", "*", "en"),
-            CancellationToken.None);
+        var verifiedPurchase = await CreateAndVerifyStorePurchaseAsync(
+            dbContext,
+            service,
+            userId,
+            packId);
 
-        Assert.True(purchase.IsSuccess);
-
-        var confirm = await service.ConfirmPackPurchaseAsync(
-            new ConfirmPackPurchaseCommand(userId, purchase.Value.OrderId),
-            CancellationToken.None);
-
-        Assert.True(confirm.IsSuccess);
+        Assert.Equal(PurchaseOrderStatus.Succeeded, verifiedPurchase.Status);
 
         var secondAttempt = await service.ApplyRedeemCodeAsync(
             new ApplyRedeemCodeCommand(userId, "LOYAL-50"),

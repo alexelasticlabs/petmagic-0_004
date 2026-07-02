@@ -44,6 +44,8 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
 
     public DbSet<TemplateRealtimeEventRecord> TemplateRealtimeEvents => Set<TemplateRealtimeEventRecord>();
 
+    public DbSet<TemplateRuntimeConfigFingerprint> TemplateRuntimeConfigFingerprints => Set<TemplateRuntimeConfigFingerprint>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         builder.Entity<TemplateCategory>(entity =>
@@ -67,6 +69,7 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.Property(x => x.PetPhotoRequirements).HasMaxLength(1000);
             entity.Property(x => x.Category).HasMaxLength(64).IsRequired();
             entity.Property(x => x.Tags).HasMaxLength(1000).IsRequired();
+            entity.Property(x => x.IsQaOnly).HasDefaultValue(false);
             entity.Property(x => x.PromoBadgeMode).HasConversion<int>();
             entity.Property(x => x.RequiredInputMediaType).HasConversion<int>();
             entity.Property(x => x.DefaultVariationStrength).HasMaxLength(16).HasDefaultValue("medium");
@@ -88,10 +91,13 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.HasIndex(x => new { x.Status, x.UpdatedAtUtc, x.Id })
                 .HasDatabaseName("IX_templates_items_Status_UpdatedAtUtc_Id")
                 .HasFilter(""" "DeletedAtUtc" IS NULL """);
-            entity.HasIndex(x => new { x.Status, x.TemplateType, x.IsPremium, x.UpdatedAtUtc, x.Version, x.Id })
+            entity.HasIndex(x => new { x.Status, x.PublishedAtUtc, x.Id })
+                .HasDatabaseName("IX_templates_items_Status_PublishedAtUtc_Id")
+                .HasFilter(""" "DeletedAtUtc" IS NULL """);
+            entity.HasIndex(x => new { x.Status, x.IsQaOnly, x.TemplateType, x.IsPremium, x.PublishedAtUtc, x.Id })
                 .HasDatabaseName("IX_templates_items_PublicFeedFilters")
                 .HasFilter(""" "DeletedAtUtc" IS NULL """);
-            entity.HasIndex(x => new { x.Status, x.Category, x.UpdatedAtUtc, x.Version, x.Id })
+            entity.HasIndex(x => new { x.Status, x.IsQaOnly, x.Category, x.PublishedAtUtc, x.Id })
                 .HasDatabaseName("IX_templates_items_PublicFeedCategoryOrder")
                 .HasFilter(""" "DeletedAtUtc" IS NULL """);
         });
@@ -350,6 +356,21 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.Property(x => x.Data).HasColumnType("text");
             entity.HasIndex(x => new { x.CreatedAtUtc, x.Id })
                 .HasDatabaseName("IX_templates_realtime_events_CreatedAtUtc_Id");
+        });
+
+        builder.Entity<TemplateRuntimeConfigFingerprint>(entity =>
+        {
+            entity.ToTable("templates_runtime_config_fingerprints");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Component).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.ProfileName).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.Checksum).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.ConfigJson).HasColumnType("text").IsRequired();
+            entity.Property(x => x.MismatchDetails).HasMaxLength(1000);
+            entity.HasIndex(x => new { x.Component, x.ProfileName, x.StartedAtUtc })
+                .HasDatabaseName("IX_trcf_Component_ProfileName_StartedAtUtc");
+            entity.HasIndex(x => new { x.ProfileName, x.Checksum, x.StartedAtUtc })
+                .HasDatabaseName("IX_trcf_ProfileName_Checksum_StartedAtUtc");
         });
 
         builder.Entity<TemplateGenerationFeedback>(entity =>

@@ -21,7 +21,11 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
 {
     private static readonly TimeSpan ExternalHttpClientTimeout = TimeSpan.FromSeconds(30);
 
-    public static IServiceCollection AddTemplatesInfrastructure(this IServiceCollection services, IConfiguration configuration, IHostEnvironment? environment = null)
+    public static IServiceCollection AddTemplatesInfrastructure(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        IHostEnvironment? environment = null,
+        string? schedulerComponent = null)
     {
         services.AddMemoryCache();
 
@@ -78,6 +82,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             PreviewMaxFileSizeBytes = ParseLong(section["PreviewMaxFileSizeBytes"], 25 * 1024 * 1024),
             ReferenceMotionMaxFileSizeBytes = ParseLong(section["ReferenceMotionMaxFileSizeBytes"], 100 * 1024 * 1024),
             SeedSampleTemplates = ParseBool(section["SeedSampleTemplates"], false),
+            QaFixturesEnabled = ParseBool(ReadValue(section, "QaFixturesEnabled", "PETMAGIC_QA_FIXTURES_ENABLED"), false),
             GenerationWorkerEnabled = ParseBool(section["GenerationWorkerEnabled"], true),
             GenerationWorkerPollIntervalMilliseconds = ParseInt(section["GenerationWorkerPollIntervalMilliseconds"], 1_000),
             RealtimePollingIntervalMilliseconds = ParsePositiveInt(section["RealtimePollingIntervalMilliseconds"], 1_000),
@@ -198,6 +203,10 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         ValidateProductionProviderConfiguration(options, services, environment, configuredStorageProvider, configuredAiProvider);
 
         services.AddSingleton(options);
+        services.AddSingleton(new TemplateSchedulerConfigComponent(
+            ResolveSchedulerComponent(schedulerComponent, options)));
+        services.AddSingleton<TemplateSchedulerConfigRuntimeState>();
+        services.AddHostedService<TemplateSchedulerConfigStartupService>();
         services.AddSingleton<TemplateWatermarkSettingsStore>();
         services.AddDbContextPool<TemplatesDbContext>(dbOptions =>
         {
@@ -209,6 +218,11 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         AddMediaStorage(services, options);
         AddGenerationBilling(services, environment);
         services.AddSingleton<ITemplateFeedRealtimeService, TemplateFeedRealtimeService>();
+        services.AddHttpClient(TemplateContentHealthCheck.HttpClientName, client =>
+        {
+            ConfigureExternalHttpClient(client);
+            client.Timeout = TimeSpan.FromSeconds(5);
+        });
         services.AddHttpClient(FalProviderHealthService.HttpClientName, ConfigureExternalHttpClient);
         services.AddScoped<ITemplateAiProviderHealthService, FalProviderHealthService>();
         services.AddScoped<ITemplatePushTokenService, TemplatePushTokenService>();
@@ -223,11 +237,13 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
                 : serviceProvider.GetRequiredService<NoopTemplateGenerationPushNotificationSender>();
         });
         services.AddScoped<ITemplateMediaLifecycleService, TemplateMediaLifecycleService>();
+        services.AddScoped<ITemplateVisibilityPolicy, TemplateVisibilityPolicy>();
         services.AddScoped<ITemplatesService, TemplatesService>();
         services.AddScoped<IPetsService, PetsService>();
         services.AddScoped<IFeedbackService, FeedbackService>();
         services.AddScoped<IAdminUserTemplateAnalyticsReader, AdminUserTemplateAnalyticsReader>();
         services.AddScoped<ITemplateGenerationService, TemplateGenerationService>();
+        services.AddScoped<ITemplateGenerationQaFixtureService, TemplateGenerationQaFixtureService>();
         services.AddScoped<IImagePreviewGenerator, ImagePreviewGenerator>();
         services.AddScoped<TemplateMediaCleanupProcessor>();
         AddGenerationProviderPipelineServices(services, options);
@@ -248,6 +264,26 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         }
 
         return services;
+    }
+
+    private static string ResolveSchedulerComponent(string? schedulerComponent, TemplatesOptions options)
+    {
+        if (!string.IsNullOrWhiteSpace(schedulerComponent))
+        {
+            var normalized = schedulerComponent.Trim().ToLowerInvariant();
+            if (normalized is TemplateSchedulerConfigFingerprint.ApiComponent
+                or TemplateSchedulerConfigFingerprint.GenerationWorkerComponent)
+            {
+                return normalized;
+            }
+
+            throw new InvalidOperationException(
+                $"Unsupported template scheduler config component '{schedulerComponent}'.");
+        }
+
+        return options.GenerationWorkerEnabled
+            ? TemplateSchedulerConfigFingerprint.GenerationWorkerComponent
+            : TemplateSchedulerConfigFingerprint.ApiComponent;
     }
 
     private static void AddGenerationProviderPipelineServices(IServiceCollection services, TemplatesOptions options)
@@ -510,6 +546,11 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         if (options.SeedSampleTemplates)
         {
             throw new InvalidOperationException("Sample template seed data cannot be enabled in Production.");
+        }
+
+        if (options.QaFixturesEnabled)
+        {
+            throw new InvalidOperationException("Template QA fixtures cannot be enabled in Production.");
         }
 
         ValidateProductionPublicBaseUrl(options.PublicBaseUrl, "Templates:PublicBaseUrl");

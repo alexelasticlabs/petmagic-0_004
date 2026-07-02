@@ -44,6 +44,9 @@ internal sealed class TemplateFeedRealtimeService(
 
     public ValueTask PublishTemplatesFeedInvalidatedAsync(CancellationToken cancellationToken = default)
     {
+        TemplateGenerationMetrics.RecordSseEventPublished(TemplateFeedInvalidationScopes.Full);
+        TemplateGenerationMetrics.RecordSseFullInvalidation();
+
         var nowTicks = DateTime.UtcNow.Ticks;
 
         while (true)
@@ -61,6 +64,23 @@ internal sealed class TemplateFeedRealtimeService(
         }
 
         return PublishAsync(new TemplateFeedRealtimeEvent(TemplateFeedRealtimeTopics.TemplatesFeedInvalidated), cancellationToken);
+    }
+
+    public ValueTask PublishTemplatesFeedInvalidatedAsync(
+        TemplateFeedInvalidationPayload payload,
+        CancellationToken cancellationToken = default)
+    {
+        var scope = string.IsNullOrWhiteSpace(payload.Scope)
+            ? TemplateFeedInvalidationScopes.Full
+            : payload.Scope.Trim();
+        TemplateGenerationMetrics.RecordSseEventPublished(scope);
+        if (string.Equals(scope, TemplateFeedInvalidationScopes.Full, StringComparison.OrdinalIgnoreCase))
+        {
+            TemplateGenerationMetrics.RecordSseFullInvalidation();
+        }
+
+        var data = JsonSerializer.Serialize(payload with { Scope = scope }, RealtimeJsonOptions);
+        return PublishAsync(new TemplateFeedRealtimeEvent(TemplateFeedRealtimeTopics.TemplatesFeedInvalidated, data), cancellationToken);
     }
 
     public ValueTask PublishGenerationStatusChangedAsync(TemplateGenerationResponse generation, CancellationToken cancellationToken = default)

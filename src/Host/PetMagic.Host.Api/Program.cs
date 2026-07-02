@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Reflection;
 using System.Threading.RateLimiting;
 
 using Microsoft.AspNetCore.DataProtection;
@@ -42,6 +43,7 @@ Log.Logger = new LoggerConfiguration()
 try
 {
     var builder = WebApplication.CreateBuilder(args);
+    var buildInfo = ResolveBuildInfo(builder.Environment.EnvironmentName);
 
     TemplateGenerationHostModeValidator.RequireGenerationWorkerMode(
         builder.Configuration,
@@ -300,14 +302,19 @@ try
         .AddIdentityApiModule()
         .AddSupportChatInfrastructure(builder.Configuration, builder.Environment.IsProduction())
         .AddSupportChatApiModule()
-        .AddTemplatesInfrastructure(builder.Configuration, builder.Environment)
+        .AddTemplatesInfrastructure(
+            builder.Configuration,
+            builder.Environment,
+            TemplateSchedulerConfigFingerprint.ApiComponent)
         .AddTemplatesApiModule()
         .AddGamificationInfrastructure(builder.Configuration)
         .AddGamificationApiModule();
 
     builder.Services.AddHealthChecks()
         .AddCheck("self", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy())
-        .AddCheck<PremiumSubscriptionPlansHealthCheck>("economy_subscription_plans");
+        .AddCheck<PremiumSubscriptionPlansHealthCheck>("economy_subscription_plans")
+        .AddCheck<TemplateContentHealthCheck>("templates_content")
+        .AddCheck<TemplateSchedulerConfigHealthCheck>("templates_scheduler_config");
 
     builder.Services
         .AddOpenTelemetry()
@@ -470,17 +477,7 @@ try
         ResponseWriter = async (context, report) =>
         {
             context.Response.ContentType = "application/json";
-            var result = new
-            {
-                status = report.Status.ToString(),
-                checks = report.Entries.Select(e => new
-                {
-                    name = e.Key,
-                    status = e.Value.Status.ToString(),
-                    duration = e.Value.Duration
-                }),
-                totalDuration = report.TotalDuration
-            };
+            var result = HealthResponseBuilder.Build(context, report, buildInfo);
             await context.Response.WriteAsJsonAsync(result);
         }
     }).AllowAnonymous();
@@ -507,6 +504,39 @@ catch (Exception exception)
 finally
 {
     Log.CloseAndFlush();
+}
+
+static HostBuildInfo ResolveBuildInfo(string environmentName)
+{
+    var assembly = Assembly.GetExecutingAssembly();
+    var assemblyName = assembly.GetName();
+    var informationalVersion = assembly
+        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+        ?.InformationalVersion;
+    var sourceRevision = assembly
+        .GetCustomAttributes<AssemblyMetadataAttribute>()
+        .FirstOrDefault(attribute => string.Equals(attribute.Key, "SourceRevisionId", StringComparison.Ordinal))
+        ?.Value;
+
+    if (string.IsNullOrWhiteSpace(sourceRevision)
+        && informationalVersion?.IndexOf('+', StringComparison.Ordinal) is int revisionSeparator
+        && revisionSeparator >= 0
+        && revisionSeparator < informationalVersion.Length - 1)
+    {
+        sourceRevision = informationalVersion[(revisionSeparator + 1)..];
+    }
+
+    return new HostBuildInfo(
+        Application: "PetMagic.Host.Api",
+        Environment: environmentName,
+        Version: assemblyName.Version?.ToString() ?? "unknown",
+        InformationalVersion: string.IsNullOrWhiteSpace(informationalVersion)
+            ? "unknown"
+            : informationalVersion,
+        SourceRevision: string.IsNullOrWhiteSpace(sourceRevision)
+            ? "unknown"
+            : sourceRevision,
+        ProcessStartedAtUtc: DateTimeOffset.UtcNow);
 }
 
 static void LoadDotEnvFileIfPresent()
@@ -578,3 +608,11 @@ static string ResolveBootstrapEnvironment()
         ?? Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT")
         ?? Environments.Production;
 }
+
+internal sealed record HostBuildInfo(
+    string Application,
+    string Environment,
+    string Version,
+    string InformationalVersion,
+    string SourceRevision,
+    DateTimeOffset ProcessStartedAtUtc);

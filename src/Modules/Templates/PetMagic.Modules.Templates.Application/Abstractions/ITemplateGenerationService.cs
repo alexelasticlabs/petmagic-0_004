@@ -44,6 +44,18 @@ public interface ITemplateGenerationService
     Task<Result<RemoveGenerationWatermarkResponse>> GrantAdminCleanDownloadAsync(Guid adminUserId, Guid generationId, CancellationToken cancellationToken);
 }
 
+public interface ITemplateGenerationQaFixtureService
+{
+    Task<Result<QaGenerationFixturesResponse>> CreateAsync(
+        Guid userId,
+        CreateQaGenerationFixturesCommand command,
+        CancellationToken cancellationToken);
+
+    Task<Result<QaGenerationFixtureCleanupResponse>> CleanupAsync(
+        Guid userId,
+        CancellationToken cancellationToken);
+}
+
 public interface ITemplateGenerationProviderCallbackService
 {
     Task<Result<FalProviderWebhookResponse>> ProcessFalWebhookAsync(

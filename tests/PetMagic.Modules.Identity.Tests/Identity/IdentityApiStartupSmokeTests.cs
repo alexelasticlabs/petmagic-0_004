@@ -40,6 +40,7 @@ public sealed class IdentityApiStartupSmokeTests
     [InlineData("POST", "/api/auth/verify-password-reset-code", "auth-password-reset")]
     [InlineData("POST", "/api/auth/me/password-change/request", "auth-password-reset")]
     [InlineData("GET", "/api/auth/external/{provider}", "auth-external")]
+    [InlineData("GET", "/api/auth/external/google/mobile-config", "auth-external")]
     [InlineData("GET", "/api/auth/external/callback", "auth-external")]
     [InlineData("POST", "/api/auth/external/exchange", "auth-external")]
     [InlineData("POST", "/api/auth/external/google/native", "auth-external")]

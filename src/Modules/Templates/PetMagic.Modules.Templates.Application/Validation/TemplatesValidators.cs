@@ -44,6 +44,11 @@ public sealed class CreateImageTemplateCommandValidator : AbstractValidator<Crea
         RuleForEach(x => x.PetPhotoRequirements).NotEmpty().MaximumLength(TemplateValidationRules.RequirementMaxLength).When(x => x.PetPhotoRequirements is not null);
         RuleForEach(x => x.Tags).NotEmpty().MaximumLength(TemplateValidationRules.TagMaxLength);
         RuleFor(x => x.PreviewAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.PreviewAsset is not null);
+        RuleFor(x => x.ThumbnailAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.ThumbnailAsset is not null);
+        RuleFor(x => x.AnimatedPreviewAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.AnimatedPreviewAsset is not null);
+        RuleFor(x => x.FeedLoopLowAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.FeedLoopLowAsset is not null);
+        RuleFor(x => x.FeedLoopMediumAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.FeedLoopMediumAsset is not null);
+        RuleFor(x => x.DetailPreviewAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.DetailPreviewAsset is not null);
     }
 }
 
@@ -67,6 +72,11 @@ public sealed class UpdateImageTemplateCommandValidator : AbstractValidator<Upda
         RuleForEach(x => x.PetPhotoRequirements).NotEmpty().MaximumLength(TemplateValidationRules.RequirementMaxLength).When(x => x.PetPhotoRequirements is not null);
         RuleForEach(x => x.Tags).NotEmpty().MaximumLength(TemplateValidationRules.TagMaxLength);
         RuleFor(x => x.PreviewAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.PreviewAsset is not null);
+        RuleFor(x => x.ThumbnailAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.ThumbnailAsset is not null);
+        RuleFor(x => x.AnimatedPreviewAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.AnimatedPreviewAsset is not null);
+        RuleFor(x => x.FeedLoopLowAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.FeedLoopLowAsset is not null);
+        RuleFor(x => x.FeedLoopMediumAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.FeedLoopMediumAsset is not null);
+        RuleFor(x => x.DetailPreviewAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.DetailPreviewAsset is not null);
     }
 }
 
@@ -93,6 +103,11 @@ public sealed class CreateVideoTemplateCommandValidator : AbstractValidator<Crea
         RuleForEach(x => x.Tags).NotEmpty().MaximumLength(TemplateValidationRules.TagMaxLength);
         RuleFor(x => x.PreviewAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.PreviewAsset is not null);
         RuleFor(x => x.ReferenceMotionAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.ReferenceMotionAsset is not null);
+        RuleFor(x => x.ThumbnailAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.ThumbnailAsset is not null);
+        RuleFor(x => x.AnimatedPreviewAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.AnimatedPreviewAsset is not null);
+        RuleFor(x => x.FeedLoopLowAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.FeedLoopLowAsset is not null);
+        RuleFor(x => x.FeedLoopMediumAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.FeedLoopMediumAsset is not null);
+        RuleFor(x => x.DetailPreviewAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.DetailPreviewAsset is not null);
     }
 }
 
@@ -120,6 +135,11 @@ public sealed class UpdateVideoTemplateCommandValidator : AbstractValidator<Upda
         RuleForEach(x => x.Tags).NotEmpty().MaximumLength(TemplateValidationRules.TagMaxLength);
         RuleFor(x => x.PreviewAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.PreviewAsset is not null);
         RuleFor(x => x.ReferenceMotionAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.ReferenceMotionAsset is not null);
+        RuleFor(x => x.ThumbnailAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.ThumbnailAsset is not null);
+        RuleFor(x => x.AnimatedPreviewAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.AnimatedPreviewAsset is not null);
+        RuleFor(x => x.FeedLoopLowAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.FeedLoopLowAsset is not null);
+        RuleFor(x => x.FeedLoopMediumAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.FeedLoopMediumAsset is not null);
+        RuleFor(x => x.DetailPreviewAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.DetailPreviewAsset is not null);
     }
 }
 

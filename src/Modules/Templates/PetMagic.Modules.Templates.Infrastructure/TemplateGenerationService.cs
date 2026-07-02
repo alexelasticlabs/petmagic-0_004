@@ -25,17 +25,16 @@ internal sealed partial class TemplateGenerationService(
     IGamificationService? gamificationService = null,
     ILogger<TemplateGenerationService>? logger = null,
     ITemplateFeedRealtimeService? realtimeService = null,
-    ITemplateAiProviderHealthService? aiProviderHealthService = null) : ITemplateGenerationService
+    ITemplateAiProviderHealthService? aiProviderHealthService = null,
+    ITemplateVisibilityPolicy? visibilityPolicy = null) : ITemplateGenerationService
 {
+    private readonly ITemplateVisibilityPolicy _visibilityPolicy =
+        visibilityPolicy ?? new TemplateVisibilityPolicy();
+
     internal static readonly Guid AdminTestUserId = Guid.Empty;
 
-    internal static Error? ValidateTemplate(TemplateItem template, bool requireActiveStatus)
+    internal static Error? ValidateTemplateReadiness(TemplateItem template)
     {
-        if (requireActiveStatus && template.Status != TemplateStatus.Active)
-        {
-            return TemplatesErrors.InvalidStatus;
-        }
-
         if (template.TemplateType == TemplateType.Image)
         {
             return string.IsNullOrWhiteSpace(template.ImageModel)

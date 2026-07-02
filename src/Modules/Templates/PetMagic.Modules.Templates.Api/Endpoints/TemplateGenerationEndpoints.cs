@@ -92,6 +92,14 @@ public static partial class TemplateGenerationEndpoints
             .RequireAuthorization()
             .RequireRateLimiting("templates");
 
+        group.MapPost("/qa/generation-fixtures", CreateQaGenerationFixturesAsync)
+            .RequireAuthorization("AdminOnly")
+            .RequireRateLimiting("templates");
+
+        group.MapDelete("/qa/generation-fixtures", CleanupQaGenerationFixturesAsync)
+            .RequireAuthorization("AdminOnly")
+            .RequireRateLimiting("templates");
+
         group.MapPut("/notifications/push-token", RegisterPushTokenAsync)
             .RequireAuthorization()
             .RequireRateLimiting("templates");

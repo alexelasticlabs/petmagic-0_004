@@ -350,7 +350,7 @@ public static class IdentityInfrastructureServiceCollectionExtensions
         return new AvatarReadUrlSigningOptions
         {
             SigningKey = configuration["Jwt:SigningKey"] ?? string.Empty,
-            ReadUrlTtlMinutes = ParsePositiveInt(section["ReadUrlTtlMinutes"], 720)
+            ReadUrlTtlMinutes = ParsePositiveInt(section["ReadUrlTtlMinutes"], 60)
         };
     }
 

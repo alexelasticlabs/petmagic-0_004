@@ -79,8 +79,9 @@ public sealed class DatabaseIndexModelTests
         AssertHasUniqueIndex<TemplateAiProviderRequestPermit>(dbContext, ["Provider", "BucketUtc", "PermitNumber"]);
         AssertHasUniqueIndex<TemplateCatalogChange>(dbContext, ["Version"]);
         AssertHasIndex<TemplateItem>(dbContext, ["Status", "UpdatedAtUtc", "Id"]);
-        AssertHasIndex<TemplateItem>(dbContext, ["Status", "TemplateType", "IsPremium", "UpdatedAtUtc", "Version", "Id"]);
-        AssertHasIndex<TemplateItem>(dbContext, ["Status", "Category", "UpdatedAtUtc", "Version", "Id"]);
+        AssertHasIndex<TemplateItem>(dbContext, ["Status", "PublishedAtUtc", "Id"]);
+        AssertHasIndex<TemplateItem>(dbContext, ["Status", "IsQaOnly", "TemplateType", "IsPremium", "PublishedAtUtc", "Id"]);
+        AssertHasIndex<TemplateItem>(dbContext, ["Status", "IsQaOnly", "Category", "PublishedAtUtc", "Id"]);
         AssertHasIndex<TemplateGenerationFeedback>(dbContext, ["TemplateId", "CreatedAtUtc"]);
         AssertHasIndex<TemplateGenerationFeedback>(dbContext, ["GenerationId", "UserId"]);
         AssertHasIndex<TemplateGenerationFeedback>(dbContext, ["TemplateId", "Rating", "CreatedAtUtc"]);

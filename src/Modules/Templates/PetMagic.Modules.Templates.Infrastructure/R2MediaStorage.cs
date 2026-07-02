@@ -87,6 +87,7 @@ internal sealed class R2MediaStorage(
         }
         catch (Exception exception)
         {
+            TemplateGenerationMetrics.RecordR2UploadFailure("store");
             logger?.LogWarning(
                 exception,
                 "R2 media store failed. Operation={Operation} StorageKey={StorageKey} ContentLength={ContentLength} HasPreferredStorageKey={HasPreferredStorageKey}",

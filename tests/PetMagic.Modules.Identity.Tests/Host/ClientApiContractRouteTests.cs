@@ -170,6 +170,7 @@ public sealed class ClientApiContractRouteTests
         { "GET", "/api/admin/templates", "admin templates list" },
         { "GET", "/api/admin/templates/analytics", "admin templates analytics" },
         { "GET", "/api/admin/templates/categories", "admin template categories" },
+        { "GET", "/api/admin/templates/categories/diagnostics", "admin template category diagnostics" },
         { "POST", "/api/admin/templates/categories", "admin template category create" },
         { "PUT", "/api/admin/templates/categories/{categoryId:guid}", "admin template category update" },
         { "PUT", "/api/admin/templates/categories/{categoryId:guid}/archive", "admin template category archive" },
@@ -248,6 +249,14 @@ public sealed class ClientApiContractRouteTests
             .ToArray();
 
         Assert.Empty(missingRoutes);
+    }
+
+    [Fact]
+    public async Task MobileClientRoutes_ShouldNotExposeLegacyPurchaseConfirmEndpoint()
+    {
+        await using var app = await ClientApiContractTestApplication.CreateAsync();
+
+        Assert.False(app.HasRoute("POST", "/api/economy/purchases/{orderId:guid}/confirm"));
     }
 
     [Fact]

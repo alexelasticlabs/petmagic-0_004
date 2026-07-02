@@ -215,16 +215,141 @@ public sealed class AdminTemplateEndpointHardeningTests
         var method = ExtractMethodBody(source, "GetPublicAsync");
 
         Assert.Contains(".AsNoTracking()", method, StringComparison.Ordinal);
+        Assert.Contains("_visibilityPolicy.ApplyPublic(", method, StringComparison.Ordinal);
         Assert.Contains(".Select(x => new", method, StringComparison.Ordinal);
         Assert.Contains("asset.AssetKind == TemplateAssetKind.Preview", method, StringComparison.Ordinal);
-        Assert.Contains("x.DeletedAtUtc == null", method, StringComparison.Ordinal);
-        Assert.Contains("x.Status == TemplateStatus.Active", method, StringComparison.Ordinal);
         Assert.DoesNotContain(".Include(x => x.Assets)", method, StringComparison.Ordinal);
         Assert.DoesNotContain("FindTemplateAsync(templateId", method, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void PublicTemplateFeed_ShouldUseProviderSafeVersionCursor()
+    public void PublicTemplateVisibility_ShouldUseCentralPolicyWithoutCategoryArchiveRules()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Infrastructure",
+            "TemplateVisibilityPolicy.cs"));
+
+        Assert.Contains("template.DeletedAtUtc == null", source, StringComparison.Ordinal);
+        Assert.Contains("template.Status == TemplateStatus.Active", source, StringComparison.Ordinal);
+        Assert.Contains("context.IncludeQaOnly || !template.IsQaOnly", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("IsArchived", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("TemplateCategories", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TemplateVisibilityPolicyDirectCheckAllowlist_ShouldStayDocumented()
+    {
+        var root = FindRepositoryRoot();
+        var docs = File.ReadAllText(Path.Combine(root, "docs", "API_CONTRACTS.md"));
+        var allowlistedFiles = new[]
+        {
+            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "TemplateCategoryAdminService.cs"),
+            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "TemplateGenerationQaFixtureService.cs"),
+            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "TemplateContentHealthCheck.cs")
+        };
+
+        Assert.Contains("Template Visibility Policy Bypass Allowlist", docs, StringComparison.Ordinal);
+        foreach (var relativePath in allowlistedFiles)
+        {
+            var source = File.ReadAllText(Path.Combine(root, relativePath));
+            Assert.Contains("TemplateVisibilityPolicy direct-check allowlist", source, StringComparison.Ordinal);
+            Assert.Contains(relativePath.Replace('\\', '/'), docs, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void TemplateVisibilityPolicyDirectChecks_ShouldStayWithinAllowlist()
+    {
+        var root = FindRepositoryRoot();
+        var templatesRoot = Path.Combine(root, "src", "Modules", "Templates");
+        var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            NormalizeRepoPath(Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "TemplateCategoryAdminService.cs")),
+            NormalizeRepoPath(Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "TemplateGenerationQaFixtureService.cs")),
+            NormalizeRepoPath(Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "TemplateContentHealthCheck.cs")),
+            NormalizeRepoPath(Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "TemplateVisibilityPolicy.cs"))
+        };
+
+        var violations = new List<string>();
+        foreach (var file in Directory.EnumerateFiles(templatesRoot, "*.cs", SearchOption.AllDirectories))
+        {
+            if (file.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var relativePath = NormalizeRepoPath(Path.GetRelativePath(root, file));
+            var lines = File.ReadAllLines(file);
+            for (var index = 0; index < lines.Length; index++)
+            {
+                if (!ContainsActiveStatusCheck(lines[index]))
+                {
+                    continue;
+                }
+
+                var windowStart = Math.Max(0, index - 4);
+                var windowEnd = Math.Min(lines.Length - 1, index + 4);
+                var hasDeletedCheckNearby = Enumerable
+                    .Range(windowStart, windowEnd - windowStart + 1)
+                    .Any(lineIndex => ContainsNotDeletedCheck(lines[lineIndex]));
+                if (!hasDeletedCheckNearby)
+                {
+                    continue;
+                }
+
+                if (!allowed.Contains(relativePath))
+                {
+                    violations.Add($"{relativePath}:{index + 1}");
+                    continue;
+                }
+
+                var source = string.Join('\n', lines);
+                if (!relativePath.EndsWith("TemplateVisibilityPolicy.cs", StringComparison.OrdinalIgnoreCase)
+                    && !source.Contains("TemplateVisibilityPolicy direct-check allowlist", StringComparison.Ordinal))
+                {
+                    violations.Add($"{relativePath}:{index + 1} missing allowlist marker");
+                }
+            }
+        }
+
+        Assert.Empty(violations);
+    }
+
+    [Fact]
+    public void AdminTemplateBulkOperations_ShouldStayAbsentUntilSseBatchingExists()
+    {
+        var root = FindRepositoryRoot();
+        var endpointSource = ReadAllEndpointPartialFiles("AdminTemplateEndpoints");
+        var categoryEndpointSource = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Api",
+            "Endpoints",
+            "AdminTemplateCategoryEndpoints.cs"));
+        var adminWebClientSource = File.ReadAllText(Path.Combine(
+            root,
+            "apps",
+            "admin-web",
+            "src",
+            "lib",
+            "api-client.templates.ts"));
+        var docs = File.ReadAllText(Path.Combine(root, "docs", "API_CONTRACTS.md"));
+
+        Assert.DoesNotContain("/bulk", endpointSource, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("/bulk", categoryEndpointSource, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("/bulk", adminWebClientSource, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Admin Template Bulk Operations", docs, StringComparison.Ordinal);
+        Assert.Contains("There is no bulk template status/update endpoint", docs, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PublicTemplateFeed_ShouldUseStablePublishedAtCursor()
     {
         var source = File.ReadAllText(Path.Combine(
             FindRepositoryRoot(),
@@ -235,10 +360,11 @@ public sealed class AdminTemplateEndpointHardeningTests
             "TemplatesService.Public.cs"));
         var method = ExtractMethodBody(source, "ListPublicFeedAsync");
 
-        Assert.Contains(".ThenByDescending(template => template.Version)", method, StringComparison.Ordinal);
-        Assert.Contains("template.Version < cursor.Version.Value", method, StringComparison.Ordinal);
+        Assert.Contains(".OrderByDescending(template => template.PublishedAtUtc ?? template.CreatedAtUtc)", method, StringComparison.Ordinal);
+        Assert.DoesNotContain(".ThenByDescending(template => template.Version)", method, StringComparison.Ordinal);
+        Assert.DoesNotContain("template.Version < cursor.Version.Value", method, StringComparison.Ordinal);
         Assert.Contains("template.Id.CompareTo(cursor.TemplateId) < 0", method, StringComparison.Ordinal);
-        Assert.Contains("FormatPublicFeedCursor(pageItems[^1].UpdatedAtUtc, pageItems[^1].Version, pageItems[^1].Id)", method, StringComparison.Ordinal);
+        Assert.Contains("ResolvePublicFeedSortAtUtc(pageItems[^1].PublishedAtUtc, pageItems[^1].CreatedAtUtc)", method, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -294,8 +420,9 @@ public sealed class AdminTemplateEndpointHardeningTests
 
         Assert.Contains("private static ProblemHttpResult ToCategoryProblem(string errorCode)", source, StringComparison.Ordinal);
         Assert.Contains("detail: GetCategoryProblemDetail(errorCode)", source, StringComparison.Ordinal);
+        Assert.Contains("Task<Results<Ok<AdminTemplateCategoryDiagnosticsResponse>, ProblemHttpResult>> DiagnosticsAsync(", source, StringComparison.Ordinal);
         Assert.Contains("Task<Results<Ok<IReadOnlyList<AdminTemplateCategoryListItemResponse>>, ProblemHttpResult>> ListAsync(", source, StringComparison.Ordinal);
-        Assert.Equal(5, CountOccurrences(source, "if (result.IsFailure)"));
+        Assert.Equal(6, CountOccurrences(source, "if (result.IsFailure)"));
         Assert.DoesNotContain("detail: result.Error.Message", source, StringComparison.Ordinal);
     }
 
@@ -556,6 +683,25 @@ public sealed class AdminTemplateEndpointHardeningTests
         Assert.Contains("httpContext.RequestAborted.IsCancellationRequested", method, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void PublicTemplateEvents_ShouldFilterToCatalogInvalidationTopic()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Api",
+            "Endpoints",
+            "PublicTemplateEndpoints.cs"));
+        var method = ExtractMethodBody(source, "private static async Task StreamEventsAsync");
+
+        Assert.Contains("AllowedPublicRealtimeTopics", source, StringComparison.Ordinal);
+        Assert.Contains("TemplateFeedRealtimeTopics.TemplatesFeedInvalidated", source, StringComparison.Ordinal);
+        Assert.Contains("if (!IsPublicRealtimeTopic(realtimeEvent.Topic))", method, StringComparison.Ordinal);
+        Assert.DoesNotContain("GenerationStatusChanged", method, StringComparison.Ordinal);
+    }
+
     private static string FindRepositoryRoot()
     {
         var current = new DirectoryInfo(AppContext.BaseDirectory);
@@ -586,6 +732,23 @@ public sealed class AdminTemplateEndpointHardeningTests
         return ReadAllPartialFiles(
             baseFileName,
             Path.Combine("PetMagic.Modules.Templates.Api", "Endpoints"));
+    }
+
+    private static string NormalizeRepoPath(string path)
+    {
+        return path.Replace('\\', '/');
+    }
+
+    private static bool ContainsActiveStatusCheck(string line)
+    {
+        return line.Contains("Status == TemplateStatus.Active", StringComparison.Ordinal)
+            || line.Contains("TemplateStatus.Active == ", StringComparison.Ordinal);
+    }
+
+    private static bool ContainsNotDeletedCheck(string line)
+    {
+        return line.Contains("DeletedAtUtc == null", StringComparison.Ordinal)
+            || line.Contains("DeletedAtUtc is null", StringComparison.Ordinal);
     }
 
     private static int CountOccurrences(string source, string value)

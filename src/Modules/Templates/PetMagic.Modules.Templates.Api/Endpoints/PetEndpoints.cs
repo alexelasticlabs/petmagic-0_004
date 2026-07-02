@@ -297,13 +297,14 @@ public static class PetEndpoints
             return ToPetProblem(subjectError);
         }
 
-        var templateLookup = await templatesService.GetAdminAsync(request.TemplateId, cancellationToken);
+        var templateLookup = await templatesService.GetPublicAsync(request.TemplateId, null, includeQaOnly: false, cancellationToken);
         if (templateLookup.IsFailure)
         {
             return ToPetProblem(templateLookup.Error);
         }
 
-        if (templateLookup.Value.IsPremium && !await HasPremiumTemplateAccessAsync(context, userId!.Value, cancellationToken))
+        var hasPremiumAccess = await HasPremiumTemplateAccessAsync(context, userId!.Value, cancellationToken);
+        if (templateLookup.Value.IsPremium && !hasPremiumAccess)
         {
             return ToPetProblem(new Error(
                 "templates.premium_required",
@@ -319,7 +320,9 @@ public static class PetEndpoints
                 request.TemplateId,
                 idempotencyKey,
                 activeGenerationLimit,
-                await ResolveQueueTierAsync(context, userId.Value, cancellationToken)),
+                await ResolveQueueTierAsync(context, userId.Value, cancellationToken),
+                request.ExpectedTemplateVersion,
+                hasPremiumAccess),
             cancellationToken);
 
         return result.IsFailure
@@ -481,6 +484,8 @@ public static class PetEndpoints
             "templates.invalid_subject" => StatusCodes.Status401Unauthorized,
             "templates.not_found" or "pets.not_found" or "pets.photo_not_found" => StatusCodes.Status404NotFound,
             "templates.premium_required" => StatusCodes.Status403Forbidden,
+            "TEMPLATE_UNAVAILABLE" => StatusCodes.Status409Conflict,
+            "TEMPLATE_CHANGED" => StatusCodes.Status409Conflict,
             "pets.photo_required" => StatusCodes.Status409Conflict,
             "economy.insufficient_balance" => StatusCodes.Status402PaymentRequired,
             "ACTIVE_GENERATION_LIMIT_REACHED" => StatusCodes.Status429TooManyRequests,
@@ -505,6 +510,8 @@ public static class PetEndpoints
             "templates.invalid_subject" => "Authentication failed.",
             "templates.not_found" => "Template was not found.",
             "templates.premium_required" => "Premium subscription is required for this template.",
+            "TEMPLATE_UNAVAILABLE" => "Template is no longer available. Please choose another template.",
+            "TEMPLATE_CHANGED" => "Template was updated. Please reopen it and try again.",
             "pets.not_found" => "Pet was not found.",
             "pets.photo_not_found" => "Pet photo was not found.",
             "pets.photo_required" => "A pet photo is required to complete this action.",
@@ -591,7 +598,11 @@ public static class PetEndpoints
 
     private sealed record FavoritePhotoRequest(bool IsFavorite);
 
-    private sealed record StartFromPetRequest(Guid PetId, Guid? PetPhotoId, Guid TemplateId);
+    private sealed record StartFromPetRequest(
+        Guid PetId,
+        Guid? PetPhotoId,
+        Guid TemplateId,
+        long? ExpectedTemplateVersion = null);
 
     private sealed record AdminStatusRequest(string? Status);
 }

@@ -8,6 +8,8 @@ public interface ITemplateAdminService
 {
     Task<Result<IReadOnlyList<AdminTemplateCategoryListItemResponse>>> ListAdminCategoriesAsync(bool includeArchived, CancellationToken cancellationToken);
 
+    Task<Result<AdminTemplateCategoryDiagnosticsResponse>> GetAdminCategoryDiagnosticsAsync(CancellationToken cancellationToken);
+
     Task<Result<AdminTemplateCategoryListItemResponse>> CreateCategoryAsync(CreateTemplateCategoryCommand command, CancellationToken cancellationToken);
 
     Task<Result<AdminTemplateCategoryListItemResponse>> UpdateCategoryAsync(UpdateTemplateCategoryCommand command, CancellationToken cancellationToken);

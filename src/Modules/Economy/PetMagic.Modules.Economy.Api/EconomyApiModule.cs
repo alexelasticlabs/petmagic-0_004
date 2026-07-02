@@ -29,7 +29,6 @@ public static class EconomyApiModule
         services.AddScoped<IValidator<UnregisterEconomyPushTokenCommand>, UnregisterEconomyPushTokenCommandValidator>();
         services.AddScoped<IValidator<CreatePaymentMethodSetupCommand>, CreatePaymentMethodSetupCommandValidator>();
         services.AddScoped<IValidator<RemovePaymentMethodCommand>, RemovePaymentMethodCommandValidator>();
-        services.AddScoped<IValidator<ConfirmPackPurchaseCommand>, ConfirmPackPurchaseCommandValidator>();
         services.AddScoped<IValidator<StripeWebhookCommand>, StripeWebhookCommandValidator>();
         services.AddScoped<IValidator<AppStoreServerNotificationCommand>, AppStoreServerNotificationCommandValidator>();
         services.AddScoped<IValidator<GooglePlayDeveloperNotificationCommand>, GooglePlayDeveloperNotificationCommandValidator>();

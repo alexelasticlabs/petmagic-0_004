@@ -63,6 +63,7 @@ internal sealed partial class TemplateGenerationService
             if (refund.IsFailure)
             {
                 job.RefundLastErrorCode = refund.Error.Code;
+                TemplateGenerationMetrics.RecordRefundFailure(job, refund.Error.Code);
                 await dbContext.SaveChangesAsync(cancellationToken);
             }
             else
@@ -71,6 +72,7 @@ internal sealed partial class TemplateGenerationService
                 job.RefundLastErrorCode = null;
                 refunded = true;
                 TemplateGenerationMetrics.RecordJobRefunded(job);
+                TemplateGenerationMetrics.RecordCancelRefund(job);
                 await dbContext.SaveChangesAsync(cancellationToken);
             }
         }

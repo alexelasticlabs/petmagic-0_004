@@ -86,15 +86,6 @@ public sealed class EconomyValidatorsTests
     }
 
     [Fact]
-    public void ConfirmPackPurchaseValidator_ShouldPass_WhenPayloadValid()
-    {
-        var validator = new ConfirmPackPurchaseCommandValidator();
-        var result = validator.Validate(new ConfirmPackPurchaseCommand(Guid.NewGuid(), Guid.NewGuid()));
-
-        Assert.True(result.IsValid);
-    }
-
-    [Fact]
     public void VerifyPremiumStorePurchaseValidator_ShouldFail_WhenVerificationDataMissing()
     {
         var validator = new VerifyPremiumStorePurchaseCommandValidator();

@@ -1,8 +1,10 @@
 using System.Globalization;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 using PetMagic.BuildingBlocks.Results;
+using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
@@ -46,6 +48,18 @@ internal sealed partial class TemplatesService
             return Result.Failure(TemplatesErrors.MissingPreview);
         }
 
+        if (GetAsset(template, TemplateAssetKind.Thumbnail) is null)
+        {
+            return Result.Failure(TemplatesErrors.MissingPreview);
+        }
+
+        if (GetAsset(template, TemplateAssetKind.AnimatedPreview) is null
+            && GetAsset(template, TemplateAssetKind.FeedLoopLow) is null
+            && GetAsset(template, TemplateAssetKind.FeedLoopMedium) is null)
+        {
+            return Result.Failure(TemplatesErrors.MissingPreview);
+        }
+
         if (template.TemplateType == TemplateType.Video)
         {
             if (GetAsset(template, TemplateAssetKind.ReferenceMotion) is null)
@@ -79,6 +93,40 @@ internal sealed partial class TemplatesService
         return Result.Success();
     }
 
+    private void LogIncompletePublicMediaSet(TemplateItem template)
+    {
+        if (logger is null)
+        {
+            return;
+        }
+
+        var missing = new List<string>();
+        if (GetAsset(template, TemplateAssetKind.AnimatedPreview) is null)
+        {
+            missing.Add("animatedPreview");
+        }
+
+        if (GetAsset(template, TemplateAssetKind.FeedLoopMedium) is null)
+        {
+            missing.Add("feedLoopMedium");
+        }
+
+        if (GetAsset(template, TemplateAssetKind.DetailPreview) is null)
+        {
+            missing.Add("detailPreview");
+        }
+
+        if (missing.Count == 0)
+        {
+            return;
+        }
+
+        logger.LogWarning(
+            "Template activated with incomplete public media variants. TemplateId={TemplateId} MissingMediaVariants={MissingMediaVariants}",
+            template.Id,
+            string.Join(",", missing));
+    }
+
     private static Result<TemplateStatus> ResolveRequestedStatus(string? rawStatus, TemplateStatus fallback)
     {
         if (string.IsNullOrWhiteSpace(rawStatus))
@@ -89,6 +137,47 @@ internal sealed partial class TemplatesService
         return Enum.TryParse<TemplateStatus>(rawStatus, true, out var status)
             ? Result.Success(status)
             : Result.Failure<TemplateStatus>(TemplatesErrors.InvalidStatus);
+    }
+
+    private static void SetPublicMediaAssets(
+        TemplateItem template,
+        TemplateAssetCommand? previewAsset,
+        TemplateAssetCommand? thumbnailAsset,
+        TemplateAssetCommand? animatedPreviewAsset,
+        TemplateAssetCommand? feedLoopLowAsset,
+        TemplateAssetCommand? feedLoopMediumAsset,
+        TemplateAssetCommand? detailPreviewAsset)
+    {
+        SetAsset(template, TemplateAssetKind.Thumbnail, thumbnailAsset ?? previewAsset);
+        SetAsset(template, TemplateAssetKind.AnimatedPreview, animatedPreviewAsset);
+        SetAsset(template, TemplateAssetKind.FeedLoopLow, feedLoopLowAsset ?? previewAsset);
+        SetAsset(template, TemplateAssetKind.FeedLoopMedium, feedLoopMediumAsset);
+        SetAsset(template, TemplateAssetKind.DetailPreview, detailPreviewAsset ?? previewAsset);
+    }
+
+    private static (TemplateAssetCommand? Asset, TemplateMediaRole Role)[] PreviewAssetsForLifecycle(
+        TemplateAssetCommand? previewAsset,
+        TemplateAssetCommand? thumbnailAsset,
+        TemplateAssetCommand? animatedPreviewAsset,
+        TemplateAssetCommand? feedLoopLowAsset,
+        TemplateAssetCommand? feedLoopMediumAsset,
+        TemplateAssetCommand? detailPreviewAsset)
+    {
+        var assets = new[]
+        {
+            previewAsset,
+            thumbnailAsset ?? previewAsset,
+            animatedPreviewAsset,
+            feedLoopLowAsset ?? previewAsset,
+            feedLoopMediumAsset,
+            detailPreviewAsset ?? previewAsset
+        };
+
+        return assets
+            .Where(asset => asset is not null)
+            .DistinctBy(asset => asset!.Url.Trim())
+            .Select(asset => (asset, TemplateMediaRole.PreviewAsset))
+            .ToArray();
     }
 
     private async Task<(double? duration, CharacterOrientation? orientation)> ResolveReferenceMetadataAsync(TemplateAssetCommand? asset, CancellationToken cancellationToken)
@@ -278,6 +367,19 @@ internal sealed partial class TemplatesService
         });
     }
 
+    private static void StampFirstPublicationIfNeeded(TemplateItem template, DateTime publishedAtUtc)
+    {
+        if (template.Status == TemplateStatus.Active && template.PublishedAtUtc is null)
+        {
+            template.PublishedAtUtc = publishedAtUtc;
+        }
+    }
+
+    private static DateTime ResolvePublicFeedSortAtUtc(DateTime? publishedAtUtc, DateTime createdAtUtc)
+    {
+        return publishedAtUtc ?? createdAtUtc;
+    }
+
     private async Task StampCatalogDeleteAsync(TemplateItem template, DateTime updatedAtUtc, CancellationToken cancellationToken)
     {
         var nextVersion = await GetNextCatalogVersionAsync(cancellationToken);
@@ -311,7 +413,6 @@ internal sealed partial class TemplatesService
             return null;
         }
 
-        long? version = null;
         if (parts.Length == 3)
         {
             if (!long.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedVersion)
@@ -319,21 +420,19 @@ internal sealed partial class TemplatesService
             {
                 return null;
             }
-
-            version = parsedVersion;
         }
 
-        return new PublicFeedCursor(new DateTime(ticks, DateTimeKind.Utc), version, templateId);
+        return new PublicFeedCursor(new DateTime(ticks, DateTimeKind.Utc), templateId);
     }
 
     private static string FormatPublicFeedCursor(TemplateItem template)
     {
-        return FormatPublicFeedCursor(template.UpdatedAtUtc, template.Version, template.Id);
+        return FormatPublicFeedCursor(ResolvePublicFeedSortAtUtc(template.PublishedAtUtc, template.CreatedAtUtc), template.Id);
     }
 
-    private static string FormatPublicFeedCursor(DateTime updatedAtUtc, long version, Guid templateId)
+    private static string FormatPublicFeedCursor(DateTime publishedAtUtc, Guid templateId)
     {
-        return string.Create(CultureInfo.InvariantCulture, $"{updatedAtUtc.Ticks}:{version}:{templateId:N}");
+        return string.Create(CultureInfo.InvariantCulture, $"{publishedAtUtc.Ticks}:{templateId:N}");
     }
 
     private static string[] NormalizeTags(IEnumerable<string> tags)
@@ -386,12 +485,19 @@ internal sealed partial class TemplatesService
 
     private static string NormalizeCategoryName(string rawCategoryName)
     {
-        return rawCategoryName.Trim();
+        return CollapseWhitespace(rawCategoryName);
     }
 
     private static string NormalizeCategoryKey(string categoryName)
     {
-        return categoryName.Trim().ToUpperInvariant();
+        return CollapseWhitespace(categoryName).ToUpperInvariant();
+    }
+
+    private static string CollapseWhitespace(string value)
+    {
+        return string.Join(' ', value
+            .Trim()
+            .Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries));
     }
 
     private static string ResolvePrompt(string prompt, string fallback)
@@ -465,6 +571,42 @@ internal sealed partial class TemplatesService
     private ValueTask PublishFeedInvalidatedAsync(CancellationToken cancellationToken)
     {
         return templateFeedRealtimeService.PublishTemplatesFeedInvalidatedAsync(cancellationToken);
+    }
+
+    private async ValueTask PublishTemplateInvalidatedAsync(
+        TemplateItem template,
+        string reason,
+        bool isCritical,
+        bool mediaChanged,
+        CancellationToken cancellationToken)
+    {
+        var decision = await _visibilityPolicy.EvaluatePublicAsync(
+            template,
+            new TemplateVisibilityContext(),
+            cancellationToken);
+
+        await templateFeedRealtimeService.PublishTemplatesFeedInvalidatedAsync(
+            new TemplateFeedInvalidationPayload(
+                TemplateFeedInvalidationScopes.Template,
+                TemplateId: template.Id,
+                Category: template.Category,
+                MediaVersion: mediaChanged ? template.Version : null,
+                TemplateType: template.TemplateType.ToString(),
+                IsPubliclyVisible: decision.IsVisible,
+                IsCritical: isCritical || !decision.IsVisible,
+                Reason: reason),
+            cancellationToken);
+    }
+
+    private ValueTask PublishTemplateOfTheDayInvalidatedAsync(
+        string reason,
+        CancellationToken cancellationToken)
+    {
+        return templateFeedRealtimeService.PublishTemplatesFeedInvalidatedAsync(
+            new TemplateFeedInvalidationPayload(
+                TemplateFeedInvalidationScopes.TemplateOfTheDay,
+                Reason: reason),
+            cancellationToken);
     }
 
     private static string? SetAsset(TemplateItem template, TemplateAssetKind assetKind, TemplateAssetCommand? asset)

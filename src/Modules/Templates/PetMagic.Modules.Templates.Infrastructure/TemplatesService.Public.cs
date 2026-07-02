@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
 
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Contracts;
@@ -19,10 +20,9 @@ internal sealed partial class TemplatesService
         var normalizedCategory = NormalizePublicCategoryFilter(query.Category);
         var normalizedTags = NormalizePublicTagFilters(query.Tags);
 
-        var baseQuery = dbContext.TemplateItems
-            .AsNoTracking()
-            .Where(x => x.DeletedAtUtc == null)
-            .Where(x => x.Status == TemplateStatus.Active)
+        var baseQuery = _visibilityPolicy.ApplyPublic(
+            dbContext.TemplateItems.AsNoTracking(),
+            new TemplateVisibilityContext(IncludeQaOnly: query.IncludeQaOnly, Locale: query.Locale))
             .Where(x => !query.Type.HasValue || x.TemplateType == query.Type.Value)
             .Where(x => !query.PremiumOnly.HasValue || !query.PremiumOnly.Value || x.IsPremium);
 
@@ -163,11 +163,10 @@ internal sealed partial class TemplatesService
         }
 
         var changedTemplateIds = changes.Select(change => change.TemplateId).Distinct().ToArray();
-        var changedTemplates = await dbContext.TemplateItems
-            .AsNoTracking()
+        var changedTemplates = await _visibilityPolicy.ApplyPublic(
+                dbContext.TemplateItems.AsNoTracking(),
+                new TemplateVisibilityContext(Locale: locale))
             .Where(template => changedTemplateIds.Contains(template.Id))
-            .Where(template => template.DeletedAtUtc == null)
-            .Where(template => template.Status == TemplateStatus.Active)
             .Select(template => new
             {
                 template.Id,
@@ -263,10 +262,9 @@ internal sealed partial class TemplatesService
         var normalizedSearch = NormalizePublicSearchFilter(query.Search);
         var normalizedTags = NormalizePublicTagFilters(query.Tags);
 
-        var filteredQuery = dbContext.TemplateItems
-            .AsNoTracking()
-            .Where(x => x.DeletedAtUtc == null)
-            .Where(x => x.Status == TemplateStatus.Active)
+        var filteredQuery = _visibilityPolicy.ApplyPublic(
+            dbContext.TemplateItems.AsNoTracking(),
+            new TemplateVisibilityContext(IncludeQaOnly: query.IncludeQaOnly, Locale: query.Locale))
             .Where(x => !query.Type.HasValue || x.TemplateType == query.Type.Value)
             .Where(x => !query.PremiumOnly.HasValue || !query.PremiumOnly.Value || x.IsPremium);
 
@@ -285,19 +283,14 @@ internal sealed partial class TemplatesService
 
         if (cursor is not null)
         {
-            filteredQuery = cursor.Version.HasValue
-                ? filteredQuery.Where(template =>
-                    template.UpdatedAtUtc < cursor.UpdatedAtUtc
-                    || (template.UpdatedAtUtc == cursor.UpdatedAtUtc && template.Version < cursor.Version.Value)
-                    || (template.UpdatedAtUtc == cursor.UpdatedAtUtc
-                        && template.Version == cursor.Version.Value
-                        && template.Id.CompareTo(cursor.TemplateId) < 0))
-                : filteredQuery.Where(template => template.UpdatedAtUtc < cursor.UpdatedAtUtc);
+            filteredQuery = filteredQuery.Where(template =>
+                (template.PublishedAtUtc ?? template.CreatedAtUtc) < cursor.PublishedAtUtc
+                || ((template.PublishedAtUtc ?? template.CreatedAtUtc) == cursor.PublishedAtUtc
+                    && template.Id.CompareTo(cursor.TemplateId) < 0));
         }
 
         var orderedQuery = filteredQuery
-            .OrderByDescending(template => template.UpdatedAtUtc)
-            .ThenByDescending(template => template.Version)
+            .OrderByDescending(template => template.PublishedAtUtc ?? template.CreatedAtUtc)
             .ThenByDescending(template => template.Id);
 
         var filtered = await ApplyTemplateTagFilter(orderedQuery, normalizedTags)
@@ -309,22 +302,23 @@ internal sealed partial class TemplatesService
                 template.Title,
                 template.ShortDescription,
                 template.LocalizedTextsJson,
-                template.PetPhotoRequirements,
                 template.Category,
                 template.Tags,
                 template.IsPremium,
                 template.TokenCost,
-                template.Version,
                 template.PromoBadgeMode,
                 template.Status,
                 template.MusicDescription,
                 template.ReferenceVideoDurationSeconds,
+                template.PetPhotoRequirements,
                 template.SupportsGenerationResultInput,
                 template.RequiredInputMediaType,
                 template.RecommendedAfterImageGeneration,
                 template.SupportsGenerateSimilar,
                 template.DefaultVariationStrength,
+                template.Version,
                 template.CreatedAtUtc,
+                template.PublishedAtUtc,
                 template.UpdatedAtUtc,
                 Preview = template.Assets
                     .Where(asset => asset.AssetKind == TemplateAssetKind.Preview)
@@ -336,6 +330,46 @@ internal sealed partial class TemplatesService
                         asset.FileSizeBytes,
                         asset.DurationSeconds
                     })
+                    .FirstOrDefault(),
+                Thumbnail = template.Assets
+                    .Where(asset => asset.AssetKind == TemplateAssetKind.Thumbnail)
+                    .Select(asset => new
+                    {
+                        asset.Url,
+                        asset.ContentType,
+                        asset.FileSizeBytes,
+                        asset.DurationSeconds
+                    })
+                    .FirstOrDefault(),
+                AnimatedPreview = template.Assets
+                    .Where(asset => asset.AssetKind == TemplateAssetKind.AnimatedPreview)
+                    .Select(asset => new
+                    {
+                        asset.Url,
+                        asset.ContentType,
+                        asset.FileSizeBytes,
+                        asset.DurationSeconds
+                    })
+                    .FirstOrDefault(),
+                FeedLoopLow = template.Assets
+                    .Where(asset => asset.AssetKind == TemplateAssetKind.FeedLoopLow)
+                    .Select(asset => new
+                    {
+                        asset.Url,
+                        asset.ContentType,
+                        asset.FileSizeBytes,
+                        asset.DurationSeconds
+                    })
+                    .FirstOrDefault(),
+                FeedLoopMedium = template.Assets
+                    .Where(asset => asset.AssetKind == TemplateAssetKind.FeedLoopMedium)
+                    .Select(asset => new
+                    {
+                        asset.Url,
+                        asset.ContentType,
+                        asset.FileSizeBytes,
+                        asset.DurationSeconds
+                    })
                     .FirstOrDefault()
             })
             .ToArrayAsync(cancellationToken);
@@ -343,7 +377,9 @@ internal sealed partial class TemplatesService
         var pageItems = filtered.Take(take).ToArray();
         var hasMore = filtered.Length > take;
         var nextCursor = hasMore && pageItems.Length > 0
-            ? FormatPublicFeedCursor(pageItems[^1].UpdatedAtUtc, pageItems[^1].Version, pageItems[^1].Id)
+            ? FormatPublicFeedCursor(
+                ResolvePublicFeedSortAtUtc(pageItems[^1].PublishedAtUtc, pageItems[^1].CreatedAtUtc),
+                pageItems[^1].Id)
             : null;
 
         return Result.Success(new PublicTemplatesFeedResponse(
@@ -353,25 +389,27 @@ internal sealed partial class TemplatesService
                 template.Title,
                 template.ShortDescription,
                 template.LocalizedTextsJson,
-                template.PetPhotoRequirements,
                 template.Category,
                 template.Tags,
                 template.IsPremium,
-                template.TokenCost,
-                template.PromoBadgeMode,
-                template.Status,
-                template.MusicDescription,
-                template.ReferenceVideoDurationSeconds,
-                template.SupportsGenerationResultInput,
-                template.RequiredInputMediaType,
-                template.RecommendedAfterImageGeneration,
-                template.SupportsGenerateSimilar,
-                template.DefaultVariationStrength,
                 template.Version,
-                template.CreatedAtUtc,
-                template.UpdatedAtUtc,
+                template.Thumbnail?.Url,
+                template.Thumbnail?.ContentType,
+                template.Thumbnail?.FileSizeBytes,
+                template.Thumbnail?.DurationSeconds,
+                template.AnimatedPreview?.Url,
+                template.AnimatedPreview?.ContentType,
+                template.AnimatedPreview?.FileSizeBytes,
+                template.AnimatedPreview?.DurationSeconds,
+                template.FeedLoopLow?.Url,
+                template.FeedLoopLow?.ContentType,
+                template.FeedLoopLow?.FileSizeBytes,
+                template.FeedLoopLow?.DurationSeconds,
+                template.FeedLoopMedium?.Url,
+                template.FeedLoopMedium?.ContentType,
+                template.FeedLoopMedium?.FileSizeBytes,
+                template.FeedLoopMedium?.DurationSeconds,
                 template.Preview?.Url,
-                template.Preview?.FileName,
                 template.Preview?.ContentType,
                 template.Preview?.FileSizeBytes,
                 template.Preview?.DurationSeconds,
@@ -388,10 +426,9 @@ internal sealed partial class TemplatesService
         var normalizedCategory = NormalizePublicCategoryFilter(query.Category);
         var normalizedAccess = NormalizePublicRandomAccess(query.Access);
 
-        var filteredQuery = dbContext.TemplateItems
-            .AsNoTracking()
-            .Where(template => template.DeletedAtUtc == null)
-            .Where(template => template.Status == TemplateStatus.Active)
+        var filteredQuery = _visibilityPolicy.ApplyPublic(
+                dbContext.TemplateItems.AsNoTracking(),
+                new TemplateVisibilityContext(IncludeQaOnly: query.IncludeQaOnly, Locale: query.Locale))
             .Where(template => !query.Type.HasValue || template.TemplateType == query.Type.Value)
             .Where(template => !query.ExcludeTemplateId.HasValue || template.Id != query.ExcludeTemplateId.Value)
             .Where(template => template.Assets.Any(asset =>
@@ -441,6 +478,7 @@ internal sealed partial class TemplatesService
                 template.RecommendedAfterImageGeneration,
                 template.SupportsGenerateSimilar,
                 template.DefaultVariationStrength,
+                template.Version,
                 template.CreatedAtUtc,
                 template.UpdatedAtUtc,
                 Preview = template.Assets
@@ -469,7 +507,6 @@ internal sealed partial class TemplatesService
                 item.Title,
                 item.ShortDescription,
                 item.LocalizedTextsJson,
-                item.PetPhotoRequirements,
                 item.Category,
                 item.Tags,
                 item.IsPremium,
@@ -478,11 +515,13 @@ internal sealed partial class TemplatesService
                 item.Status,
                 item.MusicDescription,
                 item.ReferenceVideoDurationSeconds,
+                item.PetPhotoRequirements,
                 item.SupportsGenerationResultInput,
                 item.RequiredInputMediaType,
                 item.RecommendedAfterImageGeneration,
                 item.SupportsGenerateSimilar,
                 item.DefaultVariationStrength,
+                item.Version,
                 item.CreatedAtUtc,
                 item.UpdatedAtUtc,
                 item.Preview?.Url,
@@ -518,24 +557,64 @@ internal sealed partial class TemplatesService
         var canonicalCategory = await dbContext.TemplateCategories
             .AsNoTracking()
             .Where(category => category.NormalizedName == categoryKey)
-            .Select(category => category.Name)
+            .Select(category => new
+            {
+                category.Name,
+                category.IsArchived
+            })
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (!string.IsNullOrWhiteSpace(canonicalCategory))
+        if (canonicalCategory is not null)
         {
-            return query.Where(template => template.Category == canonicalCategory);
+            TemplateCategoryMetrics.RecordCategoryFilterLookup(usedFallback: false);
+            if (canonicalCategory.IsArchived)
+            {
+                // Archived categories are hidden from public filters while their templates remain visible in unfiltered feeds.
+                return query.Where(template => false);
+            }
+
+            return query.Where(template => template.Category == canonicalCategory.Name);
         }
 
-        return query.Where(template => (template.Category ?? string.Empty).ToUpper() == categoryKey);
+        TemplateCategoryMetrics.RecordCategoryFilterLookup(usedFallback: true);
+        var fallbackMatches = (await query
+            .Select(template => new
+            {
+                template.Id,
+                template.Category
+            })
+            .ToArrayAsync(cancellationToken))
+            .Where(template => NormalizeCategoryKey(template.Category ?? string.Empty) == categoryKey)
+            .ToArray();
+
+        foreach (var match in fallbackMatches)
+        {
+            logger?.LogWarning(
+                "category_fallback_used TemplateId={TemplateId} Category={Category} RequestedCategory={RequestedCategory} NormalizedCategory={NormalizedCategory}",
+                match.Id,
+                match.Category,
+                normalizedCategory,
+                categoryKey);
+        }
+
+        var fallbackTemplateIds = fallbackMatches
+            .Select(template => template.Id)
+            .ToArray();
+        return fallbackTemplateIds.Length == 0
+            ? query.Where(template => false)
+            : query.Where(template => fallbackTemplateIds.Contains(template.Id));
     }
 
-    public async Task<Result<PublicTemplateResponse>> GetPublicAsync(Guid templateId, string? locale, CancellationToken cancellationToken)
+    public async Task<Result<TemplateDetailDto>> GetPublicAsync(
+        Guid templateId,
+        string? locale,
+        bool includeQaOnly,
+        CancellationToken cancellationToken)
     {
-        var template = await dbContext.TemplateItems
-            .AsNoTracking()
+        var template = await _visibilityPolicy.ApplyPublic(
+                dbContext.TemplateItems.AsNoTracking(),
+                new TemplateVisibilityContext(IncludeQaOnly: includeQaOnly, Locale: locale))
             .Where(x => x.Id == templateId)
-            .Where(x => x.DeletedAtUtc == null)
-            .Where(x => x.Status == TemplateStatus.Active)
             .Select(x => new
             {
                 x.Id,
@@ -557,6 +636,7 @@ internal sealed partial class TemplatesService
                 x.RecommendedAfterImageGeneration,
                 x.SupportsGenerateSimilar,
                 x.DefaultVariationStrength,
+                x.Version,
                 x.CreatedAtUtc,
                 x.UpdatedAtUtc,
                 Preview = x.Assets
@@ -569,15 +649,33 @@ internal sealed partial class TemplatesService
                         asset.FileSizeBytes,
                         asset.DurationSeconds
                     })
+                    .FirstOrDefault(),
+                Thumbnail = x.Assets
+                    .Where(asset => asset.AssetKind == TemplateAssetKind.Thumbnail)
+                    .Select(asset => new
+                    {
+                        asset.Url,
+                        asset.ContentType
+                    })
+                    .FirstOrDefault(),
+                DetailPreview = x.Assets
+                    .Where(asset => asset.AssetKind == TemplateAssetKind.DetailPreview)
+                    .Select(asset => new
+                    {
+                        asset.Url,
+                        asset.ContentType,
+                        asset.FileSizeBytes,
+                        asset.DurationSeconds
+                    })
                     .FirstOrDefault()
             })
             .FirstOrDefaultAsync(cancellationToken);
         if (template is null)
         {
-            return Result.Failure<PublicTemplateResponse>(TemplatesErrors.NotFound);
+            return Result.Failure<TemplateDetailDto>(TemplatesErrors.NotFound);
         }
 
-        return Result.Success(MapPublicResponse(
+        return Result.Success(MapTemplateDetail(
             template.Id,
             template.TemplateType,
             template.Title,
@@ -597,6 +695,7 @@ internal sealed partial class TemplatesService
             template.RecommendedAfterImageGeneration,
             template.SupportsGenerateSimilar,
             template.DefaultVariationStrength,
+            template.Version,
             template.CreatedAtUtc,
             template.UpdatedAtUtc,
             template.Preview?.Url,
@@ -604,6 +703,12 @@ internal sealed partial class TemplatesService
             template.Preview?.ContentType,
             template.Preview?.FileSizeBytes,
             template.Preview?.DurationSeconds,
+            template.Thumbnail?.Url,
+            template.Thumbnail?.ContentType,
+            template.DetailPreview?.Url,
+            template.DetailPreview?.ContentType,
+            template.DetailPreview?.FileSizeBytes,
+            template.DetailPreview?.DurationSeconds,
             locale));
     }
 

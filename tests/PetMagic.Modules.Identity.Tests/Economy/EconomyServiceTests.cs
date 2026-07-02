@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
+using PetMagic.Modules.Economy.Application.Contracts;
 using PetMagic.Modules.Economy.Domain.Enums;
 using PetMagic.Modules.Economy.Infrastructure;
 using PetMagic.Modules.Economy.Infrastructure.Data;
@@ -146,6 +147,89 @@ public sealed partial class EconomyServiceTests
         });
         dbContext.SaveChanges();
         return packId;
+    }
+
+    private static void EnableStoreProvider(
+        EconomyDbContext dbContext,
+        string provider,
+        string platform,
+        string region = "*")
+    {
+        if (dbContext.PaymentProviderConfigurations.Any(x =>
+                x.Provider == provider
+                && x.Platform == platform
+                && x.Region == region))
+        {
+            return;
+        }
+
+        dbContext.PaymentProviderConfigurations.Add(new PaymentProviderConfiguration
+        {
+            Id = Guid.NewGuid(),
+            Provider = provider,
+            Platform = platform,
+            Region = region,
+            IsEnabled = true,
+            IsRecommended = true,
+            IsSelectedByDefault = true,
+            RequiresExternalWarning = false,
+            RequiresStoreDisclosure = false,
+            AllowedFromAppVersion = "0.0.0",
+            ExternalCheckoutAllowed = false,
+            BonusTokensPercent = 0,
+            Mode = "test",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        dbContext.SaveChanges();
+    }
+
+    private static string BuildStoreProductId(string provider, string packCode)
+    {
+        var storeSegment = provider switch
+        {
+            "google_play" => "google",
+            "app_store" => "apple",
+            _ => "store"
+        };
+
+        return $"com.petmagic.app.tokens.{storeSegment}.{packCode.ToLowerInvariant()}";
+    }
+
+    private static async Task<PurchaseOrderResponse> CreateAndVerifyStorePurchaseAsync(
+        EconomyDbContext dbContext,
+        EconomyService service,
+        Guid userId,
+        Guid packId,
+        string provider = "app_store")
+    {
+        var platform = provider == "google_play" ? "android" : "ios";
+        EnableStoreProvider(dbContext, provider, platform);
+
+        var createResult = await service.CreatePackPurchaseAsync(
+            new CreatePackPurchaseCommand(userId, packId, "USD", provider, platform, "1.0.0", "US", "en"),
+            CancellationToken.None);
+        Assert.True(createResult.IsSuccess);
+
+        var packCode = await dbContext.CurrencyPacks
+            .Where(x => x.Id == packId)
+            .Select(x => x.Code)
+            .SingleAsync();
+
+        var verifyResult = await service.VerifyPackStorePurchaseAsync(
+            new VerifyPackStorePurchaseCommand(
+                userId,
+                createResult.Value.OrderId,
+                provider,
+                BuildStoreProductId(provider, packCode),
+                $"store-token-{Guid.NewGuid():N}",
+                null,
+                $"purchase-{Guid.NewGuid():N}",
+                DateTime.UtcNow.ToString("O")),
+            CancellationToken.None);
+        Assert.True(verifyResult.IsSuccess);
+
+        return verifyResult.Value;
     }
 
     private static PurchaseOrder CreatePendingStripeOrder(decimal priceAmount, string currencyCode)

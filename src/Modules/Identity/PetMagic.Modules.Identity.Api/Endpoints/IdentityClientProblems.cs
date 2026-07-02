@@ -19,7 +19,7 @@ internal static class IdentityClientProblems
     {
         return TypedResults.Problem(
             title: "auth.external_invalid",
-            detail: "Unsupported provider.",
+            detail: "External authentication request is invalid.",
             statusCode: StatusCodes.Status400BadRequest);
     }
 
@@ -61,7 +61,7 @@ internal static class IdentityClientProblems
             "auth.user_exists" => "Account already exists.",
             "auth.email_not_confirmed" => "Email address is not confirmed.",
             "auth.invalid_subject" => "Authentication failed.",
-            "auth.external_invalid" => "Unsupported provider.",
+            "auth.external_invalid" => "External authentication request is invalid.",
             "auth.email_code_invalid" => "Email verification code is invalid.",
             "auth.password_reset_code_invalid" => "Password reset code is invalid.",
             "auth.invalid_refresh" => "Session is invalid or expired.",

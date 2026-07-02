@@ -24,6 +24,7 @@ public sealed class AuthCredentialAndProfileEndpointSecurityTests
         Assert.Contains("IdentityClientProblems.ToProblem(result.Error", legalSource);
         Assert.Contains("IdentityClientProblems.ExternalProviderInvalid();", profileSource);
         Assert.DoesNotContain("detail: \"Unsupported provider.\"", profileSource);
+        Assert.DoesNotContain("detail: \"External authentication request is invalid.\"", profileSource);
         Assert.DoesNotContain("detail: \"Current legal documents are temporarily unavailable.\"", legalSource);
         Assert.Contains("problem = IdentityClientProblems.InvalidSubject();", helpersSource);
         Assert.Contains("if (!AuthEndpoints.TryGetUserId(context, out var userId, out var invalidSubjectProblem))", legalSource);
@@ -42,7 +43,7 @@ public sealed class AuthCredentialAndProfileEndpointSecurityTests
         Assert.Contains("\"users.not_found\" => StatusCodes.Status404NotFound", source);
         Assert.Contains("\"legal.catalog_unavailable\" => StatusCodes.Status503ServiceUnavailable", source);
         Assert.Contains("\"auth.invalid_subject\" => \"Authentication failed.\"", source);
-        Assert.Contains("\"auth.external_invalid\" => \"Unsupported provider.\"", source);
+        Assert.Contains("\"auth.external_invalid\" => \"External authentication request is invalid.\"", source);
         Assert.Contains("\"Current legal documents are temporarily unavailable.\"", source);
         Assert.Contains("\"Email delivery is temporarily unavailable.\"", source);
         Assert.Contains("\"Avatar upload is temporarily unavailable.\"", source);

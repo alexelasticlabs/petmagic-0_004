@@ -28,7 +28,8 @@ public sealed record AdminTemplateListItemResponse(
     string? RequiredInputMediaType = null,
     bool RecommendedAfterImageGeneration = false,
     bool SupportsGenerateSimilar = true,
-    string DefaultVariationStrength = "medium");
+    string DefaultVariationStrength = "medium",
+    bool IsQaOnly = false);
 
 public sealed record AdminTemplateCatalogQuery(
     string? Type,
@@ -98,6 +99,22 @@ public sealed record AdminTemplateCategoryListItemResponse(
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc);
 
+public sealed record AdminTemplateCategoryDiagnosticsResponse(
+    int TotalActiveTemplates,
+    int NoncanonicalTemplates,
+    double NoncanonicalPercent,
+    IReadOnlyList<AdminTemplateCategoryDiagnosticItemResponse> Items,
+    DateTime GeneratedAtUtc);
+
+public sealed record AdminTemplateCategoryDiagnosticItemResponse(
+    Guid TemplateId,
+    string Title,
+    string Category,
+    string NormalizedCategory,
+    string TemplateType,
+    string Status,
+    DateTime UpdatedAtUtc);
+
 public sealed record AdminTemplateResponse(
     Guid TemplateId,
     string TemplateType,
@@ -111,6 +128,11 @@ public sealed record AdminTemplateResponse(
     int TokenCost,
     string[] Tags,
     TemplateAssetResponse? PreviewAsset,
+    TemplateAssetResponse? ThumbnailAsset,
+    TemplateAssetResponse? AnimatedPreviewAsset,
+    TemplateAssetResponse? FeedLoopLowAsset,
+    TemplateAssetResponse? FeedLoopMediumAsset,
+    TemplateAssetResponse? DetailPreviewAsset,
     string? MusicDescription,
     TemplateAssetResponse? ReferenceMotionAsset,
     double? ReferenceVideoDurationSeconds,
@@ -124,13 +146,15 @@ public sealed record AdminTemplateResponse(
     bool? KeepOriginalSound,
     decimal? EstimatedProviderCostUsd,
     DateTime CreatedAtUtc,
+    DateTime? PublishedAtUtc,
     DateTime UpdatedAtUtc,
     IReadOnlyList<string>? PetPhotoRequirements = null,
     bool SupportsGenerationResultInput = false,
     string? RequiredInputMediaType = null,
     bool RecommendedAfterImageGeneration = false,
     bool SupportsGenerateSimilar = true,
-    string DefaultVariationStrength = "medium");
+    string DefaultVariationStrength = "medium",
+    bool IsQaOnly = false);
 
 public sealed record AdminTemplateStatisticsResponse(
     Guid TemplateId,

@@ -64,7 +64,12 @@ public static partial class AdminTemplateEndpoints
             request.RequiredInputMediaType,
             request.RecommendedAfterImageGeneration,
             request.SupportsGenerateSimilar,
-            request.DefaultVariationStrength);
+            request.DefaultVariationStrength,
+            ThumbnailAsset: request.ThumbnailAsset,
+            AnimatedPreviewAsset: request.AnimatedPreviewAsset,
+            FeedLoopLowAsset: request.FeedLoopLowAsset,
+            FeedLoopMediumAsset: request.FeedLoopMediumAsset,
+            DetailPreviewAsset: request.DetailPreviewAsset);
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
@@ -131,7 +136,12 @@ public static partial class AdminTemplateEndpoints
             request.RequiredInputMediaType,
             request.RecommendedAfterImageGeneration,
             request.SupportsGenerateSimilar,
-            request.DefaultVariationStrength);
+            request.DefaultVariationStrength,
+            ThumbnailAsset: request.ThumbnailAsset,
+            AnimatedPreviewAsset: request.AnimatedPreviewAsset,
+            FeedLoopLowAsset: request.FeedLoopLowAsset,
+            FeedLoopMediumAsset: request.FeedLoopMediumAsset,
+            DetailPreviewAsset: request.DetailPreviewAsset);
 
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
@@ -202,7 +212,12 @@ public static partial class AdminTemplateEndpoints
         string? RequiredInputMediaType = null,
         bool RecommendedAfterImageGeneration = false,
         bool SupportsGenerateSimilar = true,
-        string DefaultVariationStrength = "medium");
+        string DefaultVariationStrength = "medium",
+        TemplateAssetCommand? ThumbnailAsset = null,
+        TemplateAssetCommand? AnimatedPreviewAsset = null,
+        TemplateAssetCommand? FeedLoopLowAsset = null,
+        TemplateAssetCommand? FeedLoopMediumAsset = null,
+        TemplateAssetCommand? DetailPreviewAsset = null);
 
     public sealed record UpdateVideoTemplateRequest(
         string Title,
@@ -226,7 +241,12 @@ public static partial class AdminTemplateEndpoints
         string? RequiredInputMediaType = null,
         bool RecommendedAfterImageGeneration = false,
         bool SupportsGenerateSimilar = true,
-        string DefaultVariationStrength = "medium");
+        string DefaultVariationStrength = "medium",
+        TemplateAssetCommand? ThumbnailAsset = null,
+        TemplateAssetCommand? AnimatedPreviewAsset = null,
+        TemplateAssetCommand? FeedLoopLowAsset = null,
+        TemplateAssetCommand? FeedLoopMediumAsset = null,
+        TemplateAssetCommand? DetailPreviewAsset = null);
 
     public sealed record ChangeTemplateStatusRequest(string Status);
 

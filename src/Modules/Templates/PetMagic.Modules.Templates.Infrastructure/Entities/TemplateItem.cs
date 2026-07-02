@@ -26,6 +26,8 @@ public sealed class TemplateItem
 
     public bool IsPremium { get; set; }
 
+    public bool IsQaOnly { get; set; }
+
     public int TokenCost { get; set; }
 
     public bool SupportsGenerationResultInput { get; set; }
@@ -63,6 +65,8 @@ public sealed class TemplateItem
     public bool? KeepOriginalSound { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }
+
+    public DateTime? PublishedAtUtc { get; set; }
 
     public DateTime UpdatedAtUtc { get; set; }
 

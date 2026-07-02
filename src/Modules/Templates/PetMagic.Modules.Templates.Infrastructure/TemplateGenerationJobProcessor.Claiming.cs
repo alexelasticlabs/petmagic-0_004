@@ -17,6 +17,7 @@ internal sealed partial class TemplateGenerationJobProcessor
         var staleJob = await dbContext.TemplateGenerationJobs
             .Include(x => x.Template)
             .Where(x => TemplateGenerationJobStatusSets.Processing.Contains(x.Status)
+                && x.InputSourceType != TemplateGenerationQaFixtures.InputSourceType
                 && (x.ChargedAtUtc != null || x.UserId == TemplateGenerationService.AdminTestUserId)
                 && x.LockedAtUtc != null
                 && x.LockedAtUtc <= staleThreshold)
@@ -127,6 +128,7 @@ internal sealed partial class TemplateGenerationJobProcessor
                 SELECT "Id"
                 FROM templates_generation_jobs
                 WHERE "Status" = {0}
+                    AND "InputSourceType" <> 'qa_fixture'
                     AND ("ChargedAtUtc" IS NOT NULL OR "UserId" = {4})
                     AND "AttemptCount" < {3}
                     AND (
@@ -204,6 +206,7 @@ internal sealed partial class TemplateGenerationJobProcessor
             .Include(x => x.Template)
             .ThenInclude(x => x.Assets)
             .Where(x => x.Status == TemplateGenerationStatus.Queued
+                && x.InputSourceType != TemplateGenerationQaFixtures.InputSourceType
                 && (x.ChargedAtUtc != null || x.UserId == TemplateGenerationService.AdminTestUserId)
                 && x.AttemptCount < options.MaxGenerationAttempts
                 && ((allowImage && x.QueueMediaType == TemplateGenerationQueue.MediaTypeImage)
@@ -225,6 +228,11 @@ internal sealed partial class TemplateGenerationJobProcessor
 
         MarkProcessing(job, DateTime.UtcNow);
         await dbContext.SaveChangesAsync(cancellationToken);
+        if (job.AttemptCount > 1)
+        {
+            TemplateGenerationMetrics.RecordRetryAttempt(job, "claim_retry");
+        }
+
         return job;
     }
 
@@ -286,6 +294,7 @@ internal sealed partial class TemplateGenerationJobProcessor
         var job = await dbContext.TemplateGenerationJobs
             .Include(x => x.Template)
             .Where(x => x.Status == TemplateGenerationStatus.Queued
+                && x.InputSourceType != TemplateGenerationQaFixtures.InputSourceType
                 && x.UserId != TemplateGenerationService.AdminTestUserId
                 && x.ChargedAtUtc == null
                 && x.QueuedAtUtc <= cutoff)
@@ -325,6 +334,7 @@ internal sealed partial class TemplateGenerationJobProcessor
         var job = await dbContext.TemplateGenerationJobs
             .Include(x => x.Template)
             .Where(x => x.Status == TemplateGenerationStatus.Queued
+                && x.InputSourceType != TemplateGenerationQaFixtures.InputSourceType
                 && (x.ChargedAtUtc != null || x.UserId == TemplateGenerationService.AdminTestUserId)
                 && x.AttemptCount >= options.MaxGenerationAttempts)
             .OrderBy(x => x.QueuedAtUtc)

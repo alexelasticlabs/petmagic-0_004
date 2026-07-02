@@ -323,6 +323,7 @@ internal sealed partial class TemplateGenerationJobProcessor
                         && x.NormalizedImageUrl != null
                         && x.MotionProviderRequestId == null)
                     || x.Status == TemplateGenerationStatus.ImportingMedia)
+                && x.InputSourceType != TemplateGenerationQaFixtures.InputSourceType
                 && (x.LockedAtUtc == null || x.LockedAtUtc <= staleThreshold))
             .OrderBy(x => x.ProviderStatusCheckedAtUtc ?? x.UpdatedAtUtc)
             .ThenBy(x => x.QueuedAtUtc)

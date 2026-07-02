@@ -9,7 +9,7 @@ public sealed class SupportAttachmentReadUrlSigningOptions
 {
     public string SigningKey { get; init; } = string.Empty;
 
-    public int ReadUrlTtlMinutes { get; init; } = 720;
+    public int ReadUrlTtlMinutes { get; init; } = 60;
 }
 
 public sealed class SupportAttachmentReadUrlSigner(
@@ -22,9 +22,19 @@ public sealed class SupportAttachmentReadUrlSigner(
 
     public string CreateReadUrl(string fileUrl)
     {
-        if (!TryBuildManagedPath(fileUrl, out var managedPath) || string.IsNullOrWhiteSpace(signingOptions.SigningKey))
+        if (string.IsNullOrWhiteSpace(fileUrl))
         {
-            return fileUrl;
+            return string.Empty;
+        }
+
+        if (!TryBuildManagedPath(fileUrl, out var managedPath))
+        {
+            return ContainsManagedPathSegment(fileUrl) ? string.Empty : fileUrl;
+        }
+
+        if (string.IsNullOrWhiteSpace(signingOptions.SigningKey))
+        {
+            return string.Empty;
         }
 
         var expiresAtUnixSeconds = DateTimeOffset.UtcNow
@@ -132,5 +142,11 @@ public sealed class SupportAttachmentReadUrlSigner(
 
         managedPath = normalizedPath[segmentIndex..];
         return managedPath.Length > ManagedPathSegment.Length;
+    }
+
+    private static bool ContainsManagedPathSegment(string fileUrl)
+    {
+        return fileUrl.Contains(ManagedPathSegment, StringComparison.OrdinalIgnoreCase)
+            || fileUrl.Contains(ManagedPathSegment.TrimStart('/'), StringComparison.OrdinalIgnoreCase);
     }
 }

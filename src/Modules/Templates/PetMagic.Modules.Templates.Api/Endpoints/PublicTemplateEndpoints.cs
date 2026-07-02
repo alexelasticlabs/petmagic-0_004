@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
@@ -22,6 +24,11 @@ public static class PublicTemplateEndpoints
     private const int MaxAnalyticsMetadataEntries = 12;
     private const int MaxAnalyticsMetadataKeyLength = 64;
     private const int MaxAnalyticsMetadataValueLength = 160;
+    private static readonly JsonSerializerOptions PublicJsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly HashSet<string> AllowedPublicRealtimeTopics =
+    [
+        TemplateFeedRealtimeTopics.TemplatesFeedInvalidated
+    ];
     private static readonly HashSet<string> AllowedPublicAnalyticsEventTypes =
     [
         TemplateAnalyticsEventTypes.View,
@@ -88,7 +95,9 @@ public static class PublicTemplateEndpoints
         [FromQuery] string? category,
         [FromQuery] string[]? tags,
         [FromQuery] bool? premiumOnly,
+        [FromQuery] bool? includeQa,
         [FromQuery] string? locale,
+        [FromServices] IHostEnvironment environment,
         [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
@@ -105,7 +114,8 @@ public static class PublicTemplateEndpoints
                 category,
                 ResolveLocalePreference(httpContext, locale),
                 tags,
-                premiumOnly),
+                premiumOnly,
+                CanIncludeQaTemplates(httpContext, environment, includeQa)),
             cancellationToken);
         SetPublicCatalogCacheHeaders(httpContext);
         if (result.IsFailure)
@@ -194,6 +204,11 @@ public static class PublicTemplateEndpoints
 
                 while (subscription.TryRead(out var realtimeEvent))
                 {
+                    if (!IsPublicRealtimeTopic(realtimeEvent.Topic))
+                    {
+                        continue;
+                    }
+
                     await WriteEventAsync(httpContext, realtimeEvent, cancellationToken);
                 }
             }
@@ -230,8 +245,11 @@ public static class PublicTemplateEndpoints
         [FromQuery] string? search,
         [FromQuery] int? take,
         [FromQuery] string? cursor,
+        [FromQuery] bool? includeQa,
         [FromQuery] string? locale,
+        [FromServices] IHostEnvironment environment,
         [FromServices] ITemplatesService service,
+        [FromServices] ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
         if (!TryParseOptionalTemplateType(type, out var templateType))
@@ -253,7 +271,8 @@ public static class PublicTemplateEndpoints
                 search,
                 take,
                 cursor,
-                ResolveLocalePreference(httpContext, locale)),
+                ResolveLocalePreference(httpContext, locale),
+                CanIncludeQaTemplates(httpContext, environment, includeQa)),
             cancellationToken);
 
         SetPublicCatalogCacheHeaders(httpContext);
@@ -261,6 +280,15 @@ public static class PublicTemplateEndpoints
         {
             return ToPublicCatalogProblem(result.Error.Code);
         }
+
+        var payloadBytes = JsonSerializer.SerializeToUtf8Bytes(result.Value, PublicJsonOptions).LongLength;
+        loggerFactory
+            .CreateLogger("PetMagic.Templates.PublicFeed")
+            .LogInformation(
+                "Public template feed payload generated. Bytes={PayloadBytes} Items={ItemCount} HasMore={HasMore}",
+                payloadBytes,
+                result.Value.Items.Count,
+                result.Value.HasMore);
 
         return TypedResults.Ok(result.Value);
     }
@@ -293,7 +321,9 @@ public static class PublicTemplateEndpoints
         [FromQuery] bool? includePremium,
         [FromQuery] string? access,
         [FromQuery] Guid? excludeTemplateId,
+        [FromQuery] bool? includeQa,
         [FromQuery] string? locale,
+        [FromServices] IHostEnvironment environment,
         [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
@@ -314,7 +344,8 @@ public static class PublicTemplateEndpoints
                 includePremium ?? true,
                 ResolveLocalePreference(httpContext, locale),
                 normalizedAccess,
-                excludeTemplateId),
+                excludeTemplateId,
+                CanIncludeQaTemplates(httpContext, environment, includeQa)),
             cancellationToken);
 
         SetPublicCatalogCacheHeaders(httpContext);
@@ -346,6 +377,13 @@ public static class PublicTemplateEndpoints
         return parts.Length == 3
             && (!long.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var version)
                 || version < 0);
+    }
+
+    private static bool CanIncludeQaTemplates(HttpContext httpContext, IHostEnvironment environment, bool? includeQa)
+    {
+        return includeQa == true
+            && !environment.IsProduction()
+            && (httpContext.User.IsInRole("Admin") || httpContext.User.IsInRole("Moderator"));
     }
 
     private static void SetPublicCatalogCacheHeaders(HttpContext httpContext)
@@ -400,15 +438,21 @@ public static class PublicTemplateEndpoints
         return ToPublicValidationProblem("templates.invalid_type");
     }
 
-    private static async Task<Results<Ok<PublicTemplateResponse>, ProblemHttpResult>> GetAsync(
+    private static async Task<Results<Ok<TemplateDetailDto>, ProblemHttpResult>> GetAsync(
         Guid templateId,
         [FromQuery] string? source,
+        [FromQuery] bool? includeQa,
         [FromQuery] string? locale,
         HttpContext httpContext,
+        [FromServices] IHostEnvironment environment,
         [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
-        var result = await service.GetPublicAsync(templateId, ResolveLocalePreference(httpContext, locale), cancellationToken);
+        var result = await service.GetPublicAsync(
+            templateId,
+            ResolveLocalePreference(httpContext, locale),
+            CanIncludeQaTemplates(httpContext, environment, includeQa),
+            cancellationToken);
         if (result.IsFailure)
         {
             return ToPublicTemplateProblem(result.Error.Code, StatusCodes.Status404NotFound);
@@ -764,6 +808,11 @@ public static class PublicTemplateEndpoints
         await httpContext.Response.WriteAsync($"event: {realtimeEvent.Topic}\n", cancellationToken);
         await httpContext.Response.WriteAsync($"data: {realtimeEvent.Data}\n\n", cancellationToken);
         await httpContext.Response.Body.FlushAsync(cancellationToken);
+    }
+
+    private static bool IsPublicRealtimeTopic(string topic)
+    {
+        return AllowedPublicRealtimeTopics.Contains(topic);
     }
 
     private sealed record RecordTemplateAnalyticsEventRequest(

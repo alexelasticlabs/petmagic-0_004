@@ -1,8 +1,10 @@
 using System.Threading.Channels;
+using Microsoft.Data.Sqlite;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
 
 using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Templates.Application.Abstractions;
@@ -23,7 +25,8 @@ public sealed partial class TemplatesServiceTests
         IMediaStorage? mediaStorage = null,
         ITemplateFeedRealtimeService? realtimeService = null,
         IAdminAuditLog? adminAuditLog = null,
-        TemplatesOptions? templatesOptions = null)
+        TemplatesOptions? templatesOptions = null,
+        ILogger<TemplatesService>? logger = null)
     {
         var options = templatesOptions ?? CreateTemplatesServiceOptions();
 
@@ -37,7 +40,8 @@ public sealed partial class TemplatesServiceTests
             mediaStorage ?? new RecordingMediaStorage(),
             lifecycleService,
             realtimeService ?? new RecordingTemplateFeedRealtimeService(),
-            adminAuditLog);
+            adminAuditLog,
+            logger: logger);
     }
 
     private static TemplatesOptions CreateTemplatesServiceOptions(
@@ -117,7 +121,7 @@ public sealed partial class TemplatesServiceTests
         return created.Value.TemplateId;
     }
 
-    private static TemplateItem CreatePublicFeedTemplate(Guid templateId, string title, DateTime updatedAtUtc, long version)
+    private static TemplateItem CreatePublicFeedTemplate(Guid templateId, string title, DateTime publishedAtUtc, long version)
     {
         var slug = title.ToLowerInvariant().Replace(' ', '-');
         return new TemplateItem
@@ -135,8 +139,9 @@ public sealed partial class TemplatesServiceTests
             PromoBadgeMode = TemplatePromoBadgeMode.New,
             ImageModel = "openai/gpt-image-2/edit",
             ImagePrompt = "Keep the same pet.",
-            CreatedAtUtc = updatedAtUtc.AddMinutes(-1),
-            UpdatedAtUtc = updatedAtUtc,
+            CreatedAtUtc = publishedAtUtc.AddMinutes(-1),
+            PublishedAtUtc = publishedAtUtc,
+            UpdatedAtUtc = publishedAtUtc,
             Assets =
             [
                 new TemplateAsset
@@ -157,6 +162,13 @@ public sealed partial class TemplatesServiceTests
     {
         var template = await dbContext.TemplateItems.SingleAsync(x => x.Id == templateId);
         template.UpdatedAtUtc = updatedAtUtc;
+        await dbContext.SaveChangesAsync();
+    }
+
+    private static async Task SetPublishedAtUtcAsync(TemplatesDbContext dbContext, Guid templateId, DateTime publishedAtUtc)
+    {
+        var template = await dbContext.TemplateItems.SingleAsync(x => x.Id == templateId);
+        template.PublishedAtUtc = publishedAtUtc;
         await dbContext.SaveChangesAsync();
     }
 
@@ -246,9 +258,26 @@ public sealed partial class TemplatesServiceTests
         return new TemplatesDbContext(builder.Options);
     }
 
+    private static async Task<TemplatesDbContext> CreateSqliteDbContextAsync(
+        SqliteConnection connection,
+        params IInterceptor[] interceptors)
+    {
+        var builder = new DbContextOptionsBuilder<TemplatesDbContext>()
+            .UseSqlite(connection);
+        if (interceptors.Length > 0)
+        {
+            builder.AddInterceptors(interceptors);
+        }
+
+        var dbContext = new TemplatesDbContext(builder.Options);
+        await dbContext.Database.EnsureCreatedAsync();
+        return dbContext;
+    }
+
     private sealed class RecordingTemplateFeedRealtimeService : ITemplateFeedRealtimeService
     {
         public int InvalidatedCount { get; private set; }
+        public List<TemplateFeedInvalidationPayload?> Invalidations { get; } = [];
         public List<TemplateGenerationResponse> GenerationStatusEvents { get; } = [];
 
         public ChannelReader<TemplateFeedRealtimeEvent> Subscribe(CancellationToken cancellationToken = default)
@@ -260,6 +289,16 @@ public sealed partial class TemplatesServiceTests
         public ValueTask PublishTemplatesFeedInvalidatedAsync(CancellationToken cancellationToken = default)
         {
             InvalidatedCount++;
+            Invalidations.Add(null);
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask PublishTemplatesFeedInvalidatedAsync(
+            TemplateFeedInvalidationPayload payload,
+            CancellationToken cancellationToken = default)
+        {
+            InvalidatedCount++;
+            Invalidations.Add(payload);
             return ValueTask.CompletedTask;
         }
 
@@ -295,6 +334,39 @@ public sealed partial class TemplatesServiceTests
         }
     }
 
+    private sealed class CapturingLogger<T> : ILogger<T>
+    {
+        public List<CapturedLogEntry> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull
+        {
+            return null;
+        }
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            var properties = state as IEnumerable<KeyValuePair<string, object?>>
+                ?? [];
+            Entries.Add(new CapturedLogEntry(
+                logLevel,
+                formatter(state, exception),
+                properties.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal)));
+        }
+    }
+
+    private sealed record CapturedLogEntry(
+        LogLevel Level,
+        string Message,
+        IReadOnlyDictionary<string, object?> Properties);
+
     private sealed class OneShotConcurrencyInterceptor : SaveChangesInterceptor
     {
         public bool Enabled { get; set; }
@@ -313,6 +385,71 @@ public sealed partial class TemplatesServiceTests
 
             ThrowCount++;
             throw new DbUpdateConcurrencyException("Simulated template update concurrency conflict.");
+        }
+    }
+
+    private sealed class ThrowingTemplateFeedRealtimeService : ITemplateFeedRealtimeService
+    {
+        public int InvalidatedCount { get; private set; }
+
+        public ChannelReader<TemplateFeedRealtimeEvent> Subscribe(CancellationToken cancellationToken = default)
+        {
+            var channel = Channel.CreateUnbounded<TemplateFeedRealtimeEvent>();
+            return channel.Reader;
+        }
+
+        public ValueTask PublishTemplatesFeedInvalidatedAsync(CancellationToken cancellationToken = default)
+        {
+            InvalidatedCount++;
+            throw new InvalidOperationException("Simulated realtime publish failure.");
+        }
+
+        public ValueTask PublishTemplatesFeedInvalidatedAsync(
+            TemplateFeedInvalidationPayload payload,
+            CancellationToken cancellationToken = default)
+        {
+            InvalidatedCount++;
+            throw new InvalidOperationException("Simulated realtime publish failure.");
+        }
+
+        public ValueTask PublishGenerationStatusChangedAsync(TemplateGenerationResponse generation, CancellationToken cancellationToken = default)
+        {
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class FailOnRealtimeEventSaveInterceptor : SaveChangesInterceptor
+    {
+        public bool Enabled { get; set; } = true;
+
+        public override InterceptionResult<int> SavingChanges(
+            DbContextEventData eventData,
+            InterceptionResult<int> result)
+        {
+            ThrowIfRealtimeEventIsBeingSaved(eventData);
+            return base.SavingChanges(eventData, result);
+        }
+
+        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            ThrowIfRealtimeEventIsBeingSaved(eventData);
+            return base.SavingChangesAsync(eventData, result, cancellationToken);
+        }
+
+        private void ThrowIfRealtimeEventIsBeingSaved(DbContextEventData eventData)
+        {
+            if (!Enabled
+                || eventData.Context is null
+                || !eventData.Context.ChangeTracker.Entries<TemplateRealtimeEventRecord>()
+                    .Any(entry => entry.State == EntityState.Added))
+            {
+                return;
+            }
+
+            throw new DbUpdateException("Simulated outbox write failure.");
         }
     }
 
@@ -365,6 +502,31 @@ public sealed partial class TemplatesServiceTests
             ReadUrls.Add(assetUrl);
             ReadTtls.Add(ttl);
             return Task.FromResult(PetMagic.BuildingBlocks.Results.Result.Success(signReadUrls ? $"{assetUrl}?signed=1" : assetUrl));
+        }
+    }
+
+    private sealed class FailingReadMediaStorage : IMediaStorage
+    {
+        public Task<PetMagic.BuildingBlocks.Results.Result<StoredMediaResponse>> StoreAsync(MediaUploadCommand asset, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(PetMagic.BuildingBlocks.Results.Result.Success(
+                new StoredMediaResponse(
+                    $"http://localhost:5000/stub/{asset.FileName}",
+                    $"stub/{asset.FileName}",
+                    asset.FileName,
+                    asset.ContentType,
+                    asset.Content?.LongLength ?? asset.ContentLengthBytes ?? 0,
+                    null)));
+        }
+
+        public Task<PetMagic.BuildingBlocks.Results.Result> DeleteAsync(string assetUrl, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(PetMagic.BuildingBlocks.Results.Result.Success());
+        }
+
+        public Task<PetMagic.BuildingBlocks.Results.Result<string>> CreateReadUrlAsync(string assetUrl, TimeSpan ttl, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(PetMagic.BuildingBlocks.Results.Result.Failure<string>(TemplatesErrors.MediaStorageFailed));
         }
     }
 

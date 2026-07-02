@@ -57,8 +57,8 @@ public static partial class TemplateGenerationEndpoints
             return ToClientGenerationProblem(templateLookup.Error);
         }
 
-        if (templateLookup.Value.IsPremium
-            && !await HasPremiumTemplateAccessAsync(context, userId!.Value, cancellationToken))
+        var hasPremiumAccess = await HasPremiumTemplateAccessAsync(context, userId!.Value, cancellationToken);
+        if (templateLookup.Value.IsPremium && !hasPremiumAccess)
         {
             return ToClientGenerationProblem(new Error(
                 PremiumRequiredCode,
@@ -71,7 +71,9 @@ public static partial class TemplateGenerationEndpoints
             request.TemplateId,
             NormalizeIdempotencyKey(context.Request.Headers["Idempotency-Key"].FirstOrDefault()),
             await ResolveActiveGenerationLimitAsync(context, userId.Value, cancellationToken),
-            await ResolveQueueTierAsync(context, userId.Value, cancellationToken));
+            await ResolveQueueTierAsync(context, userId.Value, cancellationToken),
+            request.ExpectedTemplateVersion,
+            hasPremiumAccess);
 
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
@@ -108,7 +110,8 @@ public static partial class TemplateGenerationEndpoints
             string.IsNullOrWhiteSpace(request?.VariationStrength) ? "medium" : request!.VariationStrength!,
             NormalizeIdempotencyKey(context.Request.Headers["Idempotency-Key"].FirstOrDefault()),
             await ResolveActiveGenerationLimitAsync(context, userId.Value, cancellationToken),
-            await ResolveQueueTierAsync(context, userId.Value, cancellationToken));
+            await ResolveQueueTierAsync(context, userId.Value, cancellationToken),
+            await HasPremiumTemplateAccessAsync(context, userId.Value, cancellationToken));
 
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
@@ -130,6 +133,7 @@ public static partial class TemplateGenerationEndpoints
         HttpContext context,
         Guid templateId,
         [FromForm] IFormFile? sourceImage,
+        [FromForm] long? expectedTemplateVersion,
         [FromServices] IMediaStorage mediaStorage,
         [FromServices] IImagePreviewGenerator imagePreviewGenerator,
         [FromServices] ITemplateMediaUploadPolicy uploadPolicy,
@@ -150,8 +154,8 @@ public static partial class TemplateGenerationEndpoints
             return ToClientGenerationProblem(templateLookup.Error);
         }
 
-        if (templateLookup.Value.IsPremium
-            && !await HasPremiumTemplateAccessAsync(context, userId!.Value, cancellationToken))
+        var hasPremiumAccess = await HasPremiumTemplateAccessAsync(context, userId!.Value, cancellationToken);
+        if (templateLookup.Value.IsPremium && !hasPremiumAccess)
         {
             return ToClientGenerationProblem(new Error(
                 PremiumRequiredCode,
@@ -210,7 +214,9 @@ public static partial class TemplateGenerationEndpoints
                 IdempotencyKey: idempotencyKey,
                 RequestHash: requestHash,
                 ActiveGenerationLimit: activeGenerationLimit,
-                QueueTier: await ResolveQueueTierAsync(context, userId.Value, cancellationToken));
+                QueueTier: await ResolveQueueTierAsync(context, userId.Value, cancellationToken),
+                ExpectedTemplateVersion: expectedTemplateVersion,
+                HasPremiumAccess: hasPremiumAccess);
 
             var validation = await validator.ValidateAsync(command, cancellationToken);
             if (!validation.IsValid)
@@ -306,5 +312,8 @@ public static partial class TemplateGenerationEndpoints
         return Convert.ToHexString(hashBytes).ToLowerInvariant();
     }
 
-    private sealed record StartGenerationFromResultRequest(Guid ParentGenerationResultId, Guid TemplateId);
+    private sealed record StartGenerationFromResultRequest(
+        Guid ParentGenerationResultId,
+        Guid TemplateId,
+        long? ExpectedTemplateVersion = null);
 }

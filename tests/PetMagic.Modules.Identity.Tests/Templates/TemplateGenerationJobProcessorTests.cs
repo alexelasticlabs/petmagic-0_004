@@ -1537,6 +1537,13 @@ public sealed class TemplateGenerationJobProcessorTests
             return ValueTask.CompletedTask;
         }
 
+        public ValueTask PublishTemplatesFeedInvalidatedAsync(
+            TemplateFeedInvalidationPayload payload,
+            CancellationToken cancellationToken = default)
+        {
+            return ValueTask.CompletedTask;
+        }
+
         public ValueTask PublishGenerationStatusChangedAsync(TemplateGenerationResponse generation, CancellationToken cancellationToken = default)
         {
             return ValueTask.CompletedTask;

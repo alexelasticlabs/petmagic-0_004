@@ -13,7 +13,9 @@ public sealed record StartTemplateGenerationCommand(
     string? RequestHash = null,
     int? ActiveGenerationLimit = null,
     TemplateAssetCommand? SourceImagePreviewAsset = null,
-    string QueueTier = "free")
+    string QueueTier = "free",
+    long? ExpectedTemplateVersion = null,
+    bool HasPremiumAccess = false)
 {
     public StartTemplateGenerationCommand(
         Guid userId,
@@ -30,7 +32,9 @@ public sealed record StartTemplateGenerationCommand(
             requestHash,
             activeGenerationLimit,
             null,
-            "free")
+            "free",
+            null,
+            false)
     {
     }
 
@@ -42,7 +46,9 @@ public sealed record StartTemplateGenerationFromResultCommand(
     Guid TemplateId,
     string? IdempotencyKey = null,
     int? ActiveGenerationLimit = null,
-    string QueueTier = "free");
+    string QueueTier = "free",
+    long? ExpectedTemplateVersion = null,
+    bool HasPremiumAccess = false);
 
 public sealed record StartSimilarTemplateGenerationCommand(
     Guid UserId,
@@ -50,7 +56,8 @@ public sealed record StartSimilarTemplateGenerationCommand(
     string VariationStrength = "medium",
     string? IdempotencyKey = null,
     int? ActiveGenerationLimit = null,
-    string QueueTier = "free");
+    string QueueTier = "free",
+    bool HasPremiumAccess = false);
 
 public sealed record StartTemplateGenerationFromPetCommand(
     Guid UserId,
@@ -59,7 +66,9 @@ public sealed record StartTemplateGenerationFromPetCommand(
     Guid TemplateId,
     string? IdempotencyKey = null,
     int? ActiveGenerationLimit = null,
-    string QueueTier = "free");
+    string QueueTier = "free",
+    long? ExpectedTemplateVersion = null,
+    bool HasPremiumAccess = false);
 
 public sealed record TemplateGenerationHistoryQuery(
     string? Status,
@@ -159,6 +168,32 @@ public sealed record CancelQueuedGenerationResponse(
     string Status,
     bool Refunded,
     DateTime CancelledAtUtc);
+
+public sealed record CreateQaGenerationFixturesCommand(
+    Guid? ImageTemplateId,
+    Guid? VideoTemplateId,
+    string[]? Scenarios = null);
+
+public sealed record QaGenerationFixturesResponse(
+    IReadOnlyList<TemplateGenerationResponse> Generations,
+    IReadOnlyList<QaGenerationWaitTooLongFixtureResponse> WaitTooLong,
+    int DeletedBeforeCreate);
+
+public sealed record QaGenerationWaitTooLongFixtureResponse(
+    string Scenario,
+    string MediaType,
+    Guid TemplateId,
+    int BacklogJobsCreated,
+    int EstimatedWaitSeconds,
+    int MaxAllowedWaitSeconds,
+    int RetryAfterSeconds,
+    string ExpectedErrorCode);
+
+public sealed record QaGenerationFixtureCleanupResponse(
+    int DeletedGenerationJobs,
+    int DeletedMediaRecords,
+    int DeletedRealtimeEvents,
+    int RefundedGenerationJobs);
 
 public sealed record RemoveGenerationWatermarkCommand(
     Guid UserId,

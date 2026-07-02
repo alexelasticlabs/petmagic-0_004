@@ -198,7 +198,8 @@ public sealed partial class TemplatesApiIntegrationTests
         public static async Task<TestApplication> CreateAsync(
             bool failGeneratedMediaImport = false,
             int? freeImageMaxEstimatedWaitSeconds = null,
-            bool startGenerationWorker = true)
+            bool startGenerationWorker = true,
+            bool qaFixturesEnabled = false)
         {
             var databaseRoot = new InMemoryDatabaseRoot();
             var databaseName = $"templates-api-tests-{Guid.NewGuid():N}";
@@ -298,6 +299,7 @@ public sealed partial class TemplatesApiIntegrationTests
                 PreviewMaxFileSizeBytes = 5 * 1024 * 1024,
                 ReferenceMotionMaxFileSizeBytes = 5 * 1024 * 1024,
                 SeedSampleTemplates = false,
+                QaFixturesEnabled = qaFixturesEnabled,
                 GenerationWorkerPollIntervalMilliseconds = 10,
                 GeneratedVideoMaxFileSizeBytes = 5 * 1024 * 1024,
                 FreeImageMaxEstimatedWaitSeconds = freeImageMaxEstimatedWaitSeconds ?? 10_000,
@@ -329,6 +331,7 @@ public sealed partial class TemplatesApiIntegrationTests
             builder.Services.AddScoped<ITemplateMediaLifecycleService, TemplateMediaLifecycleService>();
             builder.Services.AddScoped<ITemplatesService, TemplatesService>();
             builder.Services.AddScoped<ITemplateGenerationService, TemplateGenerationService>();
+            builder.Services.AddScoped<ITemplateGenerationQaFixtureService, TemplateGenerationQaFixtureService>();
             builder.Services.AddScoped<IPetsService, PetsService>();
             builder.Services.AddScoped<IFeedbackService, FeedbackService>();
             builder.Services.AddScoped<ITemplatePushTokenService, TemplatePushTokenService>();

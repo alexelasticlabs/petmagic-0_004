@@ -102,6 +102,7 @@ internal sealed partial class TemplatesService
         settings.UpdatedByAdminId = command.UpdatedByAdminId;
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        await PublishTemplateOfTheDayInvalidatedAsync("settings_updated", cancellationToken);
         return Result.Success(MapAdminTemplateOfTheDaySettings(settings));
     }
 
@@ -148,6 +149,7 @@ internal sealed partial class TemplatesService
 
         dbContext.TemplateOfTheDay.Add(assignment);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await PublishTemplateOfTheDayInvalidatedAsync("created", cancellationToken);
         return Result.Success(MapAdminTemplateOfTheDay(assignment));
     }
 
@@ -196,6 +198,7 @@ internal sealed partial class TemplatesService
         assignment.UpdatedAtUtc = DateTime.UtcNow;
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        await PublishTemplateOfTheDayInvalidatedAsync("updated", cancellationToken);
         return Result.Success(MapAdminTemplateOfTheDay(assignment));
     }
 
@@ -211,6 +214,7 @@ internal sealed partial class TemplatesService
 
         dbContext.TemplateOfTheDay.Remove(assignment);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await PublishTemplateOfTheDayInvalidatedAsync("deleted", cancellationToken);
         return Result.Success();
     }
 
@@ -233,9 +237,13 @@ internal sealed partial class TemplatesService
             NormalizeTemplateOfTheDayExcludeRecentDays(excludeRecentDays),
             cancellationToken);
 
-        return assignment is null
-            ? Result.Failure<AdminTemplateOfTheDayResponse>(TemplatesErrors.TemplateOfTheDayTemplateUnavailable)
-            : Result.Success(MapAdminTemplateOfTheDay(assignment));
+        if (assignment is null)
+        {
+            return Result.Failure<AdminTemplateOfTheDayResponse>(TemplatesErrors.TemplateOfTheDayTemplateUnavailable);
+        }
+
+        await PublishTemplateOfTheDayInvalidatedAsync("auto_picked", cancellationToken);
+        return Result.Success(MapAdminTemplateOfTheDay(assignment));
     }
 
     private async Task<TemplateOfTheDay?> ResolveTemplateOfTheDayAsync(
@@ -284,14 +292,14 @@ internal sealed partial class TemplatesService
 
     private IQueryable<TemplateOfTheDay> QueryAvailableTemplateOfTheDayAssignments(DateOnly date)
     {
-        return dbContext.TemplateOfTheDay
-            .Include(assignment => assignment.Template)
-            .ThenInclude(template => template.Assets)
+        return _visibilityPolicy.ApplyPublicTemplateOfTheDay(
+                dbContext.TemplateOfTheDay
+                    .Include(assignment => assignment.Template)
+                    .ThenInclude(template => template.Assets),
+                new TemplateVisibilityContext())
             .Where(assignment => assignment.IsActive)
             .Where(assignment => assignment.StartDate <= date)
             .Where(assignment => assignment.EndDate == null || assignment.EndDate >= date)
-            .Where(assignment => assignment.Template.DeletedAtUtc == null)
-            .Where(assignment => assignment.Template.Status == TemplateStatus.Active)
             .Where(assignment => assignment.Template.Assets.Any(asset =>
                 asset.AssetKind == TemplateAssetKind.Preview
                 && (asset.Url ?? string.Empty).Trim() != string.Empty));
@@ -325,10 +333,9 @@ internal sealed partial class TemplatesService
             return existing;
         }
 
-        var baseCandidates = dbContext.TemplateItems
-            .Include(template => template.Assets)
-            .Where(template => template.DeletedAtUtc == null)
-            .Where(template => template.Status == TemplateStatus.Active)
+        var baseCandidates = _visibilityPolicy.ApplyPublic(
+                dbContext.TemplateItems.Include(template => template.Assets),
+                new TemplateVisibilityContext())
             .Where(template => !allowedType.HasValue || template.TemplateType == allowedType.Value)
             .Where(template => template.Assets.Any(asset =>
                 asset.AssetKind == TemplateAssetKind.Preview
@@ -390,11 +397,10 @@ internal sealed partial class TemplatesService
         Guid templateId,
         CancellationToken cancellationToken)
     {
-        return await dbContext.TemplateItems
-            .Include(template => template.Assets)
+        return await _visibilityPolicy.ApplyPublic(
+                dbContext.TemplateItems.Include(template => template.Assets),
+                new TemplateVisibilityContext())
             .Where(template => template.Id == templateId)
-            .Where(template => template.DeletedAtUtc == null)
-            .Where(template => template.Status == TemplateStatus.Active)
             .Where(template => template.Assets.Any(asset =>
                 asset.AssetKind == TemplateAssetKind.Preview
                 && (asset.Url ?? string.Empty).Trim() != string.Empty))

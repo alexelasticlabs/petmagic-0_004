@@ -134,7 +134,8 @@ public static partial class AuthEndpoints
             .RequireRateLimiting("auth-external");
 
         group.MapGet("/external/google/mobile-config", GetGoogleMobileConfigAsync)
-            .AllowAnonymous();
+            .AllowAnonymous()
+            .RequireRateLimiting("auth-external");
 
         group.MapGet("/external/callback", ExternalCallbackAsync)
             .AllowAnonymous()

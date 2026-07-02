@@ -55,7 +55,10 @@ try
 
     builder.Services
         .AddEconomyInfrastructure(builder.Configuration, builder.Environment.IsProduction())
-        .AddTemplatesInfrastructure(builder.Configuration, builder.Environment);
+        .AddTemplatesInfrastructure(
+            builder.Configuration,
+            builder.Environment,
+            TemplateSchedulerConfigFingerprint.GenerationWorkerComponent);
 
     builder.Services
         .AddOpenTelemetry()

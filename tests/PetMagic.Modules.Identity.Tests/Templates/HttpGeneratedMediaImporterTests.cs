@@ -53,6 +53,21 @@ public sealed class HttpGeneratedMediaImporterTests
         Assert.Equal(0, storage.StoreCount);
     }
 
+    [Fact]
+    public async Task ImportImageAsync_ShouldFailWithoutStoring_WhenProviderUrlReturnsNotFound()
+    {
+        var handler = new StatusHandler(HttpStatusCode.NotFound);
+        var storage = new RecordingMediaStorage();
+        var importer = CreateImporter(handler, storage);
+
+        var result = await importer.ImportImageAsync("https://cdn.example.com/expired-generated.png", Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(TemplatesErrors.GeneratedMediaImportFailed.Code, result.Error.Code);
+        Assert.Equal(1, handler.RequestCount);
+        Assert.Equal(0, storage.StoreCount);
+    }
+
     private static HttpGeneratedMediaImporter CreateImporter(HttpMessageHandler handler, RecordingMediaStorage? storage = null)
     {
         storage ??= new RecordingMediaStorage();
@@ -98,6 +113,17 @@ public sealed class HttpGeneratedMediaImporterTests
                     }
                 }
             });
+        }
+    }
+
+    private sealed class StatusHandler(HttpStatusCode statusCode) : HttpMessageHandler
+    {
+        public int RequestCount { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            RequestCount++;
+            return Task.FromResult(new HttpResponseMessage(statusCode));
         }
     }
 

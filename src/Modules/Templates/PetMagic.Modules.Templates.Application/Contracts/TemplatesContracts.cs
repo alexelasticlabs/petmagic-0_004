@@ -47,7 +47,13 @@ public sealed record CreateImageTemplateCommand(
     string? RequiredInputMediaType = null,
     bool RecommendedAfterImageGeneration = false,
     bool SupportsGenerateSimilar = true,
-    string DefaultVariationStrength = "medium");
+    string DefaultVariationStrength = "medium",
+    bool IsQaOnly = false,
+    TemplateAssetCommand? ThumbnailAsset = null,
+    TemplateAssetCommand? AnimatedPreviewAsset = null,
+    TemplateAssetCommand? FeedLoopLowAsset = null,
+    TemplateAssetCommand? FeedLoopMediumAsset = null,
+    TemplateAssetCommand? DetailPreviewAsset = null);
 
 public sealed record UpdateImageTemplateCommand(
     Guid TemplateId,
@@ -67,7 +73,13 @@ public sealed record UpdateImageTemplateCommand(
     string? RequiredInputMediaType = null,
     bool RecommendedAfterImageGeneration = false,
     bool SupportsGenerateSimilar = true,
-    string DefaultVariationStrength = "medium");
+    string DefaultVariationStrength = "medium",
+    bool IsQaOnly = false,
+    TemplateAssetCommand? ThumbnailAsset = null,
+    TemplateAssetCommand? AnimatedPreviewAsset = null,
+    TemplateAssetCommand? FeedLoopLowAsset = null,
+    TemplateAssetCommand? FeedLoopMediumAsset = null,
+    TemplateAssetCommand? DetailPreviewAsset = null);
 
 public sealed record CreateVideoTemplateCommand(
     string Title,
@@ -91,7 +103,13 @@ public sealed record CreateVideoTemplateCommand(
     string? RequiredInputMediaType = null,
     bool RecommendedAfterImageGeneration = false,
     bool SupportsGenerateSimilar = true,
-    string DefaultVariationStrength = "medium");
+    string DefaultVariationStrength = "medium",
+    bool IsQaOnly = false,
+    TemplateAssetCommand? ThumbnailAsset = null,
+    TemplateAssetCommand? AnimatedPreviewAsset = null,
+    TemplateAssetCommand? FeedLoopLowAsset = null,
+    TemplateAssetCommand? FeedLoopMediumAsset = null,
+    TemplateAssetCommand? DetailPreviewAsset = null);
 
 public sealed record UpdateVideoTemplateCommand(
     Guid TemplateId,
@@ -116,7 +134,13 @@ public sealed record UpdateVideoTemplateCommand(
     string? RequiredInputMediaType = null,
     bool RecommendedAfterImageGeneration = false,
     bool SupportsGenerateSimilar = true,
-    string DefaultVariationStrength = "medium");
+    string DefaultVariationStrength = "medium",
+    bool IsQaOnly = false,
+    TemplateAssetCommand? ThumbnailAsset = null,
+    TemplateAssetCommand? AnimatedPreviewAsset = null,
+    TemplateAssetCommand? FeedLoopLowAsset = null,
+    TemplateAssetCommand? FeedLoopMediumAsset = null,
+    TemplateAssetCommand? DetailPreviewAsset = null);
 
 public sealed record ChangeTemplateStatusCommand(Guid TemplateId, string Status);
 

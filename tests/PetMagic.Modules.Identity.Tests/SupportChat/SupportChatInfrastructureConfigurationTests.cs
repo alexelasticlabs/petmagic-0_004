@@ -66,6 +66,24 @@ public sealed class SupportChatInfrastructureConfigurationTests
         Assert.Contains("client.Timeout = PushHttpClientTimeout", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void AddSupportChatInfrastructure_ShouldUseShortLivedSupportAttachmentReadUrlsByDefault()
+    {
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["ConnectionStrings:DefaultConnection"] = "Host=db.petmagic.internal;Database=petmagic;Username=petmagic_app;Password=strong-secret",
+            ["Jwt:SigningKey"] = new string('s', 64),
+        });
+
+        var services = new ServiceCollection();
+        services.AddSupportChatInfrastructure(configuration, isProduction: false);
+
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<SupportAttachmentReadUrlSigningOptions>();
+
+        Assert.Equal(60, options.ReadUrlTtlMinutes);
+    }
+
     private static IConfiguration CreateConfiguration(IReadOnlyDictionary<string, string?> values) =>
         new ConfigurationBuilder()
             .AddInMemoryCollection(values)

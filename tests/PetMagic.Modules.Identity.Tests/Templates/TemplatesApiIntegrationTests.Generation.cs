@@ -1,10 +1,12 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
+using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
 using PetMagic.Modules.Templates.Infrastructure;
@@ -15,6 +17,136 @@ namespace PetMagic.Modules.Identity.Tests.Templates;
 
 public sealed partial class TemplatesApiIntegrationTests
 {
+    [Fact]
+    public async Task GenerationStatusContract_ShouldReturnNamedStatusesAcrossStatusHistoryAndRealtime()
+    {
+        await using var application = await TestApplication.CreateAsync(startGenerationWorker: false);
+
+        var created = await CreateActiveImageTemplateAsync(
+            application.Client,
+            "Status Contract Portrait",
+            "Portrait",
+            ["status-contract"]);
+        var now = DateTime.UtcNow;
+        var expectedStatuses = new (TemplateGenerationStatus StoredStatus, string ApiStatus)[]
+        {
+            (TemplateGenerationStatus.Queued, "Queued"),
+            (TemplateGenerationStatus.ProviderQueued, "ProviderQueued"),
+            (TemplateGenerationStatus.ProviderProcessing, "ProviderProcessing"),
+            (TemplateGenerationStatus.ImportingMedia, "ImportingMedia"),
+            (TemplateGenerationStatus.Completed, "Completed"),
+            (TemplateGenerationStatus.Failed, "Failed"),
+            (TemplateGenerationStatus.Cancelled, "Cancelled")
+        };
+        var generationIds = new Dictionary<string, Guid>(StringComparer.Ordinal);
+
+        await using (var scope = application.Services.CreateAsyncScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+            foreach (var (storedStatus, apiStatus) in expectedStatuses)
+            {
+                var generationId = Guid.NewGuid();
+                generationIds[apiStatus] = generationId;
+                dbContext.TemplateGenerationJobs.Add(new TemplateGenerationJob
+                {
+                    Id = generationId,
+                    UserId = TestUserId,
+                    TemplateId = created.TemplateId,
+                    Status = storedStatus,
+                    TokenCost = created.TokenCost,
+                    SourceImageUrl = $"https://cdn.example.com/{apiStatus.ToLowerInvariant()}-source.jpg",
+                    SourceImageFileName = $"{apiStatus.ToLowerInvariant()}-source.jpg",
+                    SourceImageContentType = "image/jpeg",
+                    SourceImageFileSizeBytes = 2048,
+                    ResultUrl = storedStatus == TemplateGenerationStatus.Completed
+                        ? $"https://cdn.example.com/{apiStatus.ToLowerInvariant()}-result.png"
+                        : null,
+                    AttemptCount = storedStatus == TemplateGenerationStatus.Failed ? 2 : 1,
+                    LastErrorCode = storedStatus == TemplateGenerationStatus.Failed
+                        ? "templates.ai_provider_failed"
+                        : null,
+                    LastErrorMessage = storedStatus == TemplateGenerationStatus.Failed
+                        ? "Provider failed."
+                        : null,
+                    CreatedAtUtc = now.AddMinutes(-generationIds.Count - 1),
+                    QueuedAtUtc = now.AddMinutes(-generationIds.Count - 1),
+                    StartedAtUtc = storedStatus == TemplateGenerationStatus.Queued
+                        ? null
+                        : now.AddMinutes(-generationIds.Count),
+                    CompletedAtUtc = storedStatus is TemplateGenerationStatus.Completed or TemplateGenerationStatus.Failed or TemplateGenerationStatus.Cancelled
+                        ? now
+                        : null,
+                    UpdatedAtUtc = now,
+                    ChargedAtUtc = now.AddMinutes(-generationIds.Count - 1),
+                    QueueMediaType = TemplateGenerationQueue.MediaTypeImage,
+                    QueueTier = TemplateGenerationQueue.TierFree
+                });
+            }
+
+            await dbContext.SaveChangesAsync();
+        }
+
+        foreach (var (_, apiStatus) in expectedStatuses)
+        {
+            using var statusResponse = await application.Client.GetAsync($"/api/templates/generations/{generationIds[apiStatus]}");
+            await EnsureSuccessStatusCodeAsync(statusResponse, $"/api/templates/generations/{generationIds[apiStatus]}");
+            using var statusJson = JsonDocument.Parse(await statusResponse.Content.ReadAsStringAsync());
+
+            Assert.Equal(JsonValueKind.String, statusJson.RootElement.GetProperty("status").ValueKind);
+            Assert.Equal(apiStatus, statusJson.RootElement.GetProperty("status").GetString());
+        }
+
+        using (var historyResponse = await application.Client.GetAsync("/api/templates/generations?take=20"))
+        {
+            await EnsureSuccessStatusCodeAsync(historyResponse, "/api/templates/generations?take=20");
+            using var historyJson = JsonDocument.Parse(await historyResponse.Content.ReadAsStringAsync());
+            var statusByGenerationId = historyJson.RootElement
+                .EnumerateArray()
+                .ToDictionary(
+                    item => item.GetProperty("generationId").GetGuid(),
+                    item => item.GetProperty("status"));
+
+            foreach (var (_, apiStatus) in expectedStatuses)
+            {
+                var statusElement = statusByGenerationId[generationIds[apiStatus]];
+                Assert.Equal(JsonValueKind.String, statusElement.ValueKind);
+                Assert.Equal(apiStatus, statusElement.GetString());
+            }
+        }
+
+        var realtime = application.Services.GetRequiredService<ITemplateFeedRealtimeService>();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var subscription = realtime.Subscribe(timeout.Token);
+        foreach (var (_, apiStatus) in expectedStatuses)
+        {
+            var generation = await GetFromJsonAsync<TemplateGenerationResponse>(
+                application.Client,
+                $"/api/templates/generations/{generationIds[apiStatus]}");
+            await realtime.PublishGenerationStatusChangedAsync(generation);
+        }
+
+        var receivedEvents = new List<TemplateFeedRealtimeEvent>(expectedStatuses.Length);
+        for (var index = 0; index < expectedStatuses.Length; index++)
+        {
+            Assert.True(await subscription.WaitToReadAsync(timeout.Token));
+            Assert.True(subscription.TryRead(out var realtimeEvent));
+            receivedEvents.Add(realtimeEvent);
+        }
+
+        var realtimeStatuses = receivedEvents.Select(realtimeEvent =>
+        {
+            Assert.Equal(TemplateFeedRealtimeTopics.GenerationStatusChanged, realtimeEvent.Topic);
+            using var eventJson = JsonDocument.Parse(realtimeEvent.Data);
+            var statusElement = eventJson.RootElement.GetProperty("status");
+            Assert.Equal(JsonValueKind.String, statusElement.ValueKind);
+            return statusElement.GetString();
+        });
+
+        Assert.Equal(
+            expectedStatuses.Select(x => x.ApiStatus).OrderBy(status => status, StringComparer.Ordinal),
+            realtimeStatuses.OrderBy(status => status, StringComparer.Ordinal));
+    }
+
 
     [Fact]
     public async Task VideoGenerationFlow_ShouldUploadSourceCreateCompletedJobAndFetchResult()

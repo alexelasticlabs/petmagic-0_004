@@ -43,6 +43,37 @@ public sealed class SupportAttachmentReadUrlSignerTests
     }
 
     [Fact]
+    public void CreateReadUrl_ShouldHideManagedUrl_WhenSigningKeyMissing()
+    {
+        var signer = new SupportAttachmentReadUrlSigner(
+            StorageOptions,
+            new SupportAttachmentReadUrlSigningOptions
+            {
+                SigningKey = string.Empty,
+                ReadUrlTtlMinutes = SigningOptions.ReadUrlTtlMinutes
+            });
+
+        var signedUrl = signer.CreateReadUrl("https://api.petmagic.app/support-media/support-attachments/2026/06/test.png");
+
+        Assert.Equal(string.Empty, signedUrl);
+    }
+
+    [Fact]
+    public void CreateReadUrl_ShouldHideManagedUrl_WhenPublicBaseUrlDoesNotMatch()
+    {
+        var signer = new SupportAttachmentReadUrlSigner(
+            new SupportAttachmentStorageOptions
+            {
+                PublicBaseUrl = "https://media.petmagic.app/support-media"
+            },
+            SigningOptions);
+
+        var signedUrl = signer.CreateReadUrl("https://api.petmagic.app/support-media/support-attachments/2026/06/test.png");
+
+        Assert.Equal(string.Empty, signedUrl);
+    }
+
+    [Fact]
     public void IsAuthorizedRequest_ShouldAcceptSignedManagedPath()
     {
         var signer = CreateSigner();

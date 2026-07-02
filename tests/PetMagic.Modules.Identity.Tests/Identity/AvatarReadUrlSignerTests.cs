@@ -48,6 +48,37 @@ public sealed class AvatarReadUrlSignerTests
     }
 
     [Fact]
+    public void CreateReadUrl_ShouldHideManagedAvatarUrl_WhenSigningKeyMissing()
+    {
+        var signer = new AvatarReadUrlSigner(
+            StorageOptions,
+            new AvatarReadUrlSigningOptions
+            {
+                SigningKey = string.Empty,
+                ReadUrlTtlMinutes = SigningOptions.ReadUrlTtlMinutes
+            });
+
+        var signedUrl = signer.CreateReadUrl("https://api.petmagic.app/media/user-avatars/2026/06/test.jpg");
+
+        Assert.Equal(string.Empty, signedUrl);
+    }
+
+    [Fact]
+    public void CreateReadUrl_ShouldHideManagedAvatarUrl_WhenPublicBaseUrlDoesNotMatch()
+    {
+        var signer = new AvatarReadUrlSigner(
+            new AvatarStorageOptions
+            {
+                PublicBaseUrl = "https://media.petmagic.app/media"
+            },
+            SigningOptions);
+
+        var signedUrl = signer.CreateReadUrl("https://api.petmagic.app/media/user-avatars/2026/06/test.jpg");
+
+        Assert.Equal(string.Empty, signedUrl);
+    }
+
+    [Fact]
     public void IsAuthorizedRequest_ShouldRejectExpiredOrTamperedAvatarUrls()
     {
         var signer = CreateSigner();

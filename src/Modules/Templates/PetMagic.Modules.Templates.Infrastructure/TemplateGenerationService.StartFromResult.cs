@@ -31,12 +31,10 @@ internal sealed partial class TemplateGenerationService
             return Result.Failure<CompatibleGenerationTemplatesResponse>(TemplatesErrors.GenerationResultInputUnavailable);
         }
 
-        var templates = await dbContext.TemplateItems
-            .AsNoTracking()
-            .Include(x => x.Assets)
-            .Where(x => x.DeletedAtUtc == null
-                && x.Status == TemplateStatus.Active
-                && x.TemplateType == TemplateType.Video
+        var templates = await _visibilityPolicy.ApplyPublic(
+                dbContext.TemplateItems.AsNoTracking().Include(x => x.Assets),
+                new TemplateVisibilityContext())
+            .Where(x => x.TemplateType == TemplateType.Video
                 && x.SupportsGenerationResultInput
                 && x.RequiredInputMediaType == inputMediaType.Value)
             .OrderBy(x => x.Title)
@@ -51,7 +49,8 @@ internal sealed partial class TemplateGenerationService
                     .FirstOrDefault(),
                 x.IsPremium,
                 false,
-                x.TokenCost))
+                x.TokenCost,
+                x.Version))
             .ToArrayAsync(cancellationToken);
 
         return Result.Success(new CompatibleGenerationTemplatesResponse(
@@ -81,16 +80,21 @@ internal sealed partial class TemplateGenerationService
             return Result.Failure<TemplateGenerationResponse>(TemplatesErrors.GenerationResultInputUnavailable);
         }
 
-        var template = await dbContext.TemplateItems
-            .Include(x => x.Assets)
-            .FirstOrDefaultAsync(x => x.Id == command.TemplateId, cancellationToken);
-
-        if (template is null)
+        var templateLookup = await FindPublicGenerationTemplateAsync(
+            command.TemplateId,
+            new TemplateVisibilityContext(
+                RequireGenerationAccess: true,
+                HasPremiumAccess: command.HasPremiumAccess,
+                ExpectedVersion: command.ExpectedTemplateVersion),
+            command.UserId,
+            cancellationToken);
+        if (templateLookup.IsFailure)
         {
-            return Result.Failure<TemplateGenerationResponse>(TemplatesErrors.NotFound);
+            return Result.Failure<TemplateGenerationResponse>(templateLookup.Error);
         }
 
-        var readiness = ValidateTemplate(template, requireActiveStatus: true);
+        var template = templateLookup.Value;
+        var readiness = ValidateTemplateReadiness(template);
         if (readiness is not null)
         {
             return Result.Failure<TemplateGenerationResponse>(readiness);
@@ -217,6 +221,7 @@ internal sealed partial class TemplateGenerationService
         job.ChargedAtUtc = DateTime.UtcNow;
         job.UpdatedAtUtc = job.ChargedAtUtc.Value;
         await dbContext.SaveChangesAsync(cancellationToken);
+        TemplateGenerationMetrics.RecordJobAccepted(job);
 
         return Result.Success(await MapResponseWithQueueMetricsAsync(job, cancellationToken));
     }

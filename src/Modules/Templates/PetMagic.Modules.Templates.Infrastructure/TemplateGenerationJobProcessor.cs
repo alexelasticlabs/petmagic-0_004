@@ -210,6 +210,38 @@ internal sealed partial class TemplateGenerationJobProcessor(
                 lane.OldestQueuedAtUtc is null ? null : (now - lane.OldestQueuedAtUtc.Value).TotalSeconds,
                 lane.OldestProcessingStartedAtUtc is null ? null : (now - lane.OldestProcessingStartedAtUtc.Value).TotalSeconds);
         }
+
+        var providerStageSnapshots = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .Where(x => x.Status == TemplateGenerationStatus.ProviderQueued
+                || x.Status == TemplateGenerationStatus.ProviderProcessing
+                || x.Status == TemplateGenerationStatus.ImportingMedia)
+            .GroupBy(x => new { x.Status, x.QueueMediaType, x.QueueTier })
+            .Select(x => new
+            {
+                x.Key.Status,
+                x.Key.QueueMediaType,
+                x.Key.QueueTier,
+                OldestStageAtUtc = x.Min(job => (DateTime?)(job.ProviderStatusCheckedAtUtc
+                    ?? job.ImportStartedAtUtc
+                    ?? job.ProviderSubmittedAtUtc
+                    ?? job.UpdatedAtUtc))
+            })
+            .ToArrayAsync(cancellationToken);
+
+        foreach (var stage in providerStageSnapshots)
+        {
+            if (stage.OldestStageAtUtc is null)
+            {
+                continue;
+            }
+
+            TemplateGenerationMetrics.RecordStuckStageAge(
+                TemplateGenerationService.ResolveApiStatus(stage.Status),
+                stage.QueueMediaType,
+                stage.QueueTier,
+                (now - stage.OldestStageAtUtc.Value).TotalSeconds);
+        }
     }
 
     public async Task<bool> RetryNextRefundAsync(CancellationToken cancellationToken)
@@ -278,9 +310,7 @@ internal sealed partial class TemplateGenerationJobProcessor(
 
         try
         {
-            var readiness = TemplateGenerationService.ValidateTemplate(
-                job.Template,
-                requireActiveStatus: job.UserId != TemplateGenerationService.AdminTestUserId);
+            var readiness = TemplateGenerationService.ValidateTemplateReadiness(job.Template);
             if (readiness is not null)
             {
                 await MarkFailedAsync(job, readiness, cancellationToken);
@@ -496,6 +526,7 @@ internal sealed partial class TemplateGenerationJobProcessor(
         }
 
         job.RefundLastErrorCode = refund.Error.Code;
+        TemplateGenerationMetrics.RecordRefundFailure(job, refund.Error.Code);
         logger.LogWarning(
             "Template generation refund failed. ErrorCode={ErrorCode} ElapsedMs={ElapsedMs}",
             refund.Error.Code,

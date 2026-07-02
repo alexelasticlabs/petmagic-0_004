@@ -1,11 +1,15 @@
 using System;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using PetMagic.Modules.Templates.Infrastructure.Data;
 
 #nullable disable
 
 namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 {
     /// <inheritdoc />
+    [DbContext(typeof(TemplatesDbContext))]
+    [Migration("20260701093000_AddAsyncGenerationProviderPipeline")]
     public partial class AddAsyncGenerationProviderPipeline : Migration
     {
         /// <inheritdoc />

@@ -6,10 +6,14 @@ using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain;
 using PetMagic.Modules.Templates.Domain.Enums;
 using PetMagic.Modules.Templates.Infrastructure.Data;
+using PetMagic.Modules.Templates.Infrastructure.Options;
 
 namespace PetMagic.Modules.Templates.Infrastructure;
 
-internal sealed class AdminUserTemplateAnalyticsReader(TemplatesDbContext dbContext) : IAdminUserTemplateAnalyticsReader
+internal sealed class AdminUserTemplateAnalyticsReader(
+    TemplatesDbContext dbContext,
+    IMediaStorage mediaStorage,
+    TemplatesOptions options) : IAdminUserTemplateAnalyticsReader
 {
     public async Task<Result<AdminUserTemplateAnalyticsResponse>> GetAdminUserTemplateAnalyticsAsync(
         Guid userId,
@@ -54,20 +58,23 @@ internal sealed class AdminUserTemplateAnalyticsReader(TemplatesDbContext dbCont
             })
             .ToListAsync(cancellationToken);
 
-        var recentGenerations = recentGenerationRows
-            .Select(x => new AdminUserTemplateGenerationResponse(
-                x.Id,
-                x.TemplateId,
-                x.TemplateTitle ?? string.Empty,
-                x.TemplateType.ToString(),
-                x.Status.ToString(),
-                x.TokenCost,
-                x.FailureCode,
-                x.FailureMessage,
-                x.OutputUrl,
-                x.CreatedAtUtc,
-                x.CompletedAtUtc))
-            .ToList();
+        var recentGenerations = new List<AdminUserTemplateGenerationResponse>(recentGenerationRows.Count);
+        foreach (var row in recentGenerationRows)
+        {
+            var signedOutputUrl = await CreateAdminReadUrlAsync(row.OutputUrl, cancellationToken);
+            recentGenerations.Add(new AdminUserTemplateGenerationResponse(
+                row.Id,
+                row.TemplateId,
+                row.TemplateTitle ?? string.Empty,
+                row.TemplateType.ToString(),
+                row.Status.ToString(),
+                row.TokenCost,
+                row.FailureCode,
+                row.FailureMessage,
+                signedOutputUrl,
+                row.CreatedAtUtc,
+                row.CompletedAtUtc));
+        }
 
         var failureBreakdown = await dbContext.TemplateGenerationJobs
             .AsNoTracking()
@@ -167,5 +174,17 @@ internal sealed class AdminUserTemplateAnalyticsReader(TemplatesDbContext dbCont
             recentTemplateEvents,
             failureBreakdownItems,
             recentActivity));
+    }
+
+    private async Task<string?> CreateAdminReadUrlAsync(string? assetUrl, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(assetUrl))
+        {
+            return null;
+        }
+
+        var ttl = TimeSpan.FromSeconds(Math.Max(1, options.UserMediaReadUrlTtlSeconds));
+        var signed = await mediaStorage.CreateReadUrlAsync(assetUrl, ttl, cancellationToken);
+        return signed.IsSuccess ? signed.Value : null;
     }
 }

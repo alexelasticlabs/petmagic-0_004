@@ -106,7 +106,8 @@ public sealed partial class TemplatesServiceTests
     public async Task ListAdminGenerationsAsync_ShouldReturnBatchedRelationshipAndPreviewFields()
     {
         await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext);
+        var mediaStorage = new RecordingMediaStorage(signReadUrls: true);
+        var service = CreateService(dbContext, mediaStorage);
         var parentTemplateId = await CreateActiveImageTemplateAsync(service, "Admin Parent Portrait", "Portrait", ["admin-jobs"]);
         var childTemplateId = await CreateActiveImageTemplateAsync(service, "Admin Child Portrait", "Portrait", ["admin-jobs"]);
         var userId = Guid.NewGuid();
@@ -236,13 +237,121 @@ public sealed partial class TemplatesServiceTests
         Assert.Equal(1, item.ChildCount);
         Assert.Equal("generation_result", item.InputSourceType);
         Assert.Equal(inputMediaId, item.InputMediaAssetId);
-        Assert.Equal("https://cdn.example.com/input-preview.jpg", item.InputPreviewUrl);
+        Assert.Equal("https://cdn.example.com/input-preview.jpg?signed=1", item.InputPreviewUrl);
         Assert.Equal(resultMediaId, item.ResultMediaAssetId);
-        Assert.Equal("https://cdn.example.com/result-watermarked-preview.jpg", item.ResultPreviewUrl);
+        Assert.Equal("https://cdn.example.com/result-watermarked-preview.jpg?signed=1", item.ResultPreviewUrl);
+        Assert.Equal("https://cdn.example.com/child-watermarked-output.jpg?signed=1", item.WatermarkedMediaPath);
+        Assert.Contains("https://cdn.example.com/input-preview.jpg", mediaStorage.ReadUrls);
+        Assert.Contains("https://cdn.example.com/result-watermarked-preview.jpg", mediaStorage.ReadUrls);
+        Assert.Contains("https://cdn.example.com/child-watermarked-output.jpg", mediaStorage.ReadUrls);
+        Assert.All(mediaStorage.ReadTtls, ttl => Assert.Equal(TimeSpan.FromSeconds(900), ttl));
         Assert.Equal("admin", item.WatermarkUnlockMethod);
         Assert.Equal(adminId, item.WatermarkUnlockedByUserId);
         Assert.Equal(1, item.WatermarkCreditsSpent);
         Assert.Equal(now.AddMinutes(-1), item.WatermarkUnlockedAtUtc);
+    }
+
+    [Fact]
+    public async Task ListAdminGenerationsAsync_ShouldNotExposePrivatePreviewUrls_WhenReadUrlSigningFails()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, new FailingReadMediaStorage());
+        var templateId = await CreateActiveImageTemplateAsync(service, "Private Preview Portrait", "Portrait", ["admin-jobs"]);
+        var userId = Guid.NewGuid();
+        var generationId = Guid.NewGuid();
+        var inputMediaId = Guid.NewGuid();
+        var resultMediaId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        dbContext.TemplateGenerationJobs.Add(new TemplateGenerationJob
+        {
+            Id = generationId,
+            UserId = userId,
+            TemplateId = templateId,
+            Status = TemplateGenerationStatus.Completed,
+            TokenCost = 20,
+            SourceImageUrl = "templates-media/private/source.jpg",
+            SourceImageFileName = "source.jpg",
+            SourceImageContentType = "image/jpeg",
+            InputMediaAssetId = inputMediaId,
+            ResultMediaAssetId = resultMediaId,
+            WatermarkedResultUrl = "templates-media/private/watermarked.png",
+            IsWatermarkRequired = true,
+            CreatedAtUtc = now.AddMinutes(-3),
+            QueuedAtUtc = now.AddMinutes(-3),
+            CompletedAtUtc = now.AddMinutes(-2),
+            UpdatedAtUtc = now.AddMinutes(-2)
+        });
+        dbContext.TemplateMediaRecords.AddRange(
+            CreateGenerationMediaRecord(inputMediaId, userId, generationId, "user_upload", "templates-media/private/source.jpg", "templates-media/private/source-preview.webp", now.AddMinutes(-3)),
+            CreateGenerationMediaRecord(resultMediaId, userId, generationId, "generation_result", "templates-media/private/result.png", "templates-media/private/result-preview.webp", now.AddMinutes(-2)));
+        await dbContext.SaveChangesAsync();
+
+        var page = await service.ListAdminGenerationsAsync(
+            new AdminTemplateGenerationsQuery("completed", null, userId.ToString(), null, 0, 10),
+            CancellationToken.None);
+
+        Assert.True(page.IsSuccess);
+        var item = Assert.Single(page.Value.Items);
+        Assert.Null(item.InputPreviewUrl);
+        Assert.Null(item.ResultPreviewUrl);
+        Assert.Null(item.WatermarkedMediaPath);
+        var serialized = JsonSerializer.Serialize(item);
+        Assert.DoesNotContain("templates-media/private", serialized, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SignUserMediaUrlsAsync_ShouldHidePrivateMedia_WhenReadUrlSigningFails()
+    {
+        var response = new TemplateGenerationResponse(
+            GenerationId: Guid.NewGuid(),
+            UserId: Guid.NewGuid(),
+            TemplateId: Guid.NewGuid(),
+            Status: "Completed",
+            TokenCost: 20,
+            SourceImageAsset: new TemplateAssetResponse(
+                "templates-media/private/source.jpg",
+                "source.jpg",
+                "image/jpeg",
+                1024,
+                null),
+            NormalizedImageUrl: "templates-media/private/normalized.jpg",
+            ReferenceMotionUrl: "https://cdn.example.com/templates/reference.mp4",
+            OutputUrl: "templates-media/private/result.png",
+            AttemptCount: 1,
+            UsedPreprocessingModel: "openai/gpt-image-2/edit",
+            UsedKlingModel: null,
+            PreprocessingProviderRequestId: null,
+            PreprocessingInferenceTimeSeconds: null,
+            MotionProviderRequestId: null,
+            MotionInferenceTimeSeconds: null,
+            OutputVideoDurationSeconds: null,
+            MotionProviderCostUsd: null,
+            FailureCode: null,
+            FailureMessage: null,
+            CreatedAtUtc: DateTime.UtcNow.AddMinutes(-2),
+            UpdatedAtUtc: DateTime.UtcNow,
+            StartedAtUtc: DateTime.UtcNow.AddMinutes(-2),
+            PreprocessingCompletedAtUtc: DateTime.UtcNow.AddMinutes(-1),
+            MotionGenerationCompletedAtUtc: null,
+            MediaImportCompletedAtUtc: DateTime.UtcNow,
+            CompletedAtUtc: DateTime.UtcNow,
+            UserMediaExpired: false,
+            InputPreviewUrl: "templates-media/private/input-preview.webp",
+            ResultPreviewUrl: "templates-media/private/result-preview.webp");
+
+        var signed = await TemplateGenerationService.SignUserMediaUrlsAsync(
+            new FailingReadMediaStorage(),
+            CreateTemplatesOptions(),
+            response,
+            CancellationToken.None);
+
+        Assert.Null(signed.SourceImageAsset);
+        Assert.Null(signed.NormalizedImageUrl);
+        Assert.Null(signed.OutputUrl);
+        Assert.Null(signed.InputPreviewUrl);
+        Assert.Null(signed.ResultPreviewUrl);
+        Assert.Equal(response.ReferenceMotionUrl, signed.ReferenceMotionUrl);
     }
 
     [Fact]
@@ -662,7 +771,7 @@ public sealed partial class TemplatesServiceTests
             SourceType = sourceType,
             GenerationId = generationId,
             Url = url,
-            FileName = Path.GetFileName(new Uri(url).AbsolutePath),
+            FileName = Path.GetFileName(url.Replace('\\', '/')),
             ContentType = "image/png",
             Role = sourceType == "generation_result"
                 ? TemplateMediaRole.GenerationOutputImage

@@ -41,6 +41,7 @@ internal sealed partial class TemplatesService
             Category = categoryResult.Value.Name,
             Tags = SerializeTags(command.Tags),
             IsPremium = command.IsPremium,
+            IsQaOnly = command.IsQaOnly,
             TokenCost = command.TokenCost,
             SupportsGenerationResultInput = command.SupportsGenerationResultInput,
             RequiredInputMediaType = ParseInputMediaType(command.RequiredInputMediaType),
@@ -52,12 +53,21 @@ internal sealed partial class TemplatesService
             ImageModel = command.ImageModel.Trim(),
             ImagePrompt = ResolvePrompt(command.ImagePrompt, options.DefaultImagePrompt),
             CreatedAtUtc = now,
+            PublishedAtUtc = statusResult.Value == TemplateStatus.Active ? now : null,
             UpdatedAtUtc = now
         };
 
         template.LocalizedTextsJson = null;
 
         SetAsset(template, TemplateAssetKind.Preview, command.PreviewAsset);
+        SetPublicMediaAssets(
+            template,
+            command.PreviewAsset,
+            command.ThumbnailAsset,
+            command.AnimatedPreviewAsset,
+            command.FeedLoopLowAsset,
+            command.FeedLoopMediumAsset,
+            command.DetailPreviewAsset);
 
         if (template.Status == TemplateStatus.Active)
         {
@@ -66,13 +76,25 @@ internal sealed partial class TemplatesService
             {
                 return Result.Failure<AdminTemplateResponse>(activationCheck.Error);
             }
+
+            StampFirstPublicationIfNeeded(template, now);
+            LogIncompletePublicMediaSet(template);
         }
 
         dbContext.TemplateItems.Add(template);
-        await mediaLifecycleService.ClaimTemplateAssetAsync(template.Id, command.PreviewAsset, TemplateMediaRole.PreviewAsset, cancellationToken);
+        await ClaimTemplateAssetsAfterUpdateAsync(
+            template.Id,
+            cancellationToken,
+            PreviewAssetsForLifecycle(
+                command.PreviewAsset,
+                command.ThumbnailAsset,
+                command.AnimatedPreviewAsset,
+                command.FeedLoopLowAsset,
+                command.FeedLoopMediumAsset,
+                command.DetailPreviewAsset));
         await StampCatalogUpsertAsync(template, now, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
-        await PublishFeedInvalidatedAsync(cancellationToken);
+        await PublishTemplateInvalidatedAsync(template, "created", isCritical: false, mediaChanged: true, cancellationToken);
 
         return Result.Success(MapAdminResponse(template));
     }
@@ -122,6 +144,7 @@ internal sealed partial class TemplatesService
         template.Category = categoryResult.Value.Name;
         template.Tags = SerializeTags(command.Tags);
         template.IsPremium = command.IsPremium;
+        template.IsQaOnly = command.IsQaOnly;
         template.TokenCost = command.TokenCost;
         template.SupportsGenerationResultInput = command.SupportsGenerationResultInput;
         template.RequiredInputMediaType = ParseInputMediaType(command.RequiredInputMediaType);
@@ -135,7 +158,12 @@ internal sealed partial class TemplatesService
         var now = DateTime.UtcNow;
 
         var obsoleteAssetUrls = CollectObsoleteAssetUrls([
-            SetAsset(template, TemplateAssetKind.Preview, command.PreviewAsset)
+            SetAsset(template, TemplateAssetKind.Preview, command.PreviewAsset),
+            SetAsset(template, TemplateAssetKind.Thumbnail, command.ThumbnailAsset ?? command.PreviewAsset),
+            SetAsset(template, TemplateAssetKind.AnimatedPreview, command.AnimatedPreviewAsset),
+            SetAsset(template, TemplateAssetKind.FeedLoopLow, command.FeedLoopLowAsset ?? command.PreviewAsset),
+            SetAsset(template, TemplateAssetKind.FeedLoopMedium, command.FeedLoopMediumAsset),
+            SetAsset(template, TemplateAssetKind.DetailPreview, command.DetailPreviewAsset ?? command.PreviewAsset)
         ]);
 
         if (template.Status == TemplateStatus.Active)
@@ -145,6 +173,9 @@ internal sealed partial class TemplatesService
             {
                 return Result.Failure<AdminTemplateResponse>(activationCheck.Error);
             }
+
+            StampFirstPublicationIfNeeded(template, now);
+            LogIncompletePublicMediaSet(template);
         }
 
         await StampCatalogUpsertAsync(template, now, cancellationToken);
@@ -170,8 +201,19 @@ internal sealed partial class TemplatesService
         await ClaimTemplateAssetsAfterUpdateAsync(
             template.Id,
             cancellationToken,
-            (command.PreviewAsset, TemplateMediaRole.PreviewAsset));
-        await PublishFeedInvalidatedAsync(cancellationToken);
+            PreviewAssetsForLifecycle(
+                command.PreviewAsset,
+                command.ThumbnailAsset,
+                command.AnimatedPreviewAsset,
+                command.FeedLoopLowAsset,
+                command.FeedLoopMediumAsset,
+                command.DetailPreviewAsset));
+        await PublishTemplateInvalidatedAsync(
+            template,
+            "updated",
+            isCritical: false,
+            mediaChanged: obsoleteAssetUrls.Length > 0,
+            cancellationToken);
         await CleanupObsoleteMediaAsync(obsoleteAssetUrls, cancellationToken);
         return Result.Success(await MapUpdatedTemplateResponseAsync(command.TemplateId, template, cancellationToken));
     }
@@ -208,6 +250,7 @@ internal sealed partial class TemplatesService
             Category = categoryResult.Value.Name,
             Tags = SerializeTags(command.Tags),
             IsPremium = command.IsPremium,
+            IsQaOnly = command.IsQaOnly,
             TokenCost = command.TokenCost,
             SupportsGenerationResultInput = command.SupportsGenerationResultInput,
             RequiredInputMediaType = ParseInputMediaType(command.RequiredInputMediaType),
@@ -225,12 +268,21 @@ internal sealed partial class TemplatesService
             KlingPrompt = ResolvePrompt(command.KlingPrompt, options.DefaultKlingPrompt),
             KeepOriginalSound = command.KeepOriginalSound,
             CreatedAtUtc = now,
+            PublishedAtUtc = statusResult.Value == TemplateStatus.Active ? now : null,
             UpdatedAtUtc = now
         };
 
         template.LocalizedTextsJson = null;
 
         SetAsset(template, TemplateAssetKind.Preview, command.PreviewAsset);
+        SetPublicMediaAssets(
+            template,
+            command.PreviewAsset,
+            command.ThumbnailAsset,
+            command.AnimatedPreviewAsset,
+            command.FeedLoopLowAsset,
+            command.FeedLoopMediumAsset,
+            command.DetailPreviewAsset);
         SetAsset(template, TemplateAssetKind.ReferenceMotion, command.ReferenceMotionAsset);
 
         if (template.Status == TemplateStatus.Active)
@@ -240,14 +292,26 @@ internal sealed partial class TemplatesService
             {
                 return Result.Failure<AdminTemplateResponse>(activationCheck.Error);
             }
+
+            StampFirstPublicationIfNeeded(template, now);
+            LogIncompletePublicMediaSet(template);
         }
 
         dbContext.TemplateItems.Add(template);
-        await mediaLifecycleService.ClaimTemplateAssetAsync(template.Id, command.PreviewAsset, TemplateMediaRole.PreviewAsset, cancellationToken);
+        await ClaimTemplateAssetsAfterUpdateAsync(
+            template.Id,
+            cancellationToken,
+            PreviewAssetsForLifecycle(
+                command.PreviewAsset,
+                command.ThumbnailAsset,
+                command.AnimatedPreviewAsset,
+                command.FeedLoopLowAsset,
+                command.FeedLoopMediumAsset,
+                command.DetailPreviewAsset));
         await mediaLifecycleService.ClaimTemplateAssetAsync(template.Id, command.ReferenceMotionAsset, TemplateMediaRole.ReferenceMotionAsset, cancellationToken);
         await StampCatalogUpsertAsync(template, now, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
-        await PublishFeedInvalidatedAsync(cancellationToken);
+        await PublishTemplateInvalidatedAsync(template, "created", isCritical: false, mediaChanged: true, cancellationToken);
 
         return Result.Success(MapAdminResponse(template));
     }
@@ -299,6 +363,7 @@ internal sealed partial class TemplatesService
         template.Category = categoryResult.Value.Name;
         template.Tags = SerializeTags(command.Tags);
         template.IsPremium = command.IsPremium;
+        template.IsQaOnly = command.IsQaOnly;
         template.TokenCost = command.TokenCost;
         template.SupportsGenerationResultInput = command.SupportsGenerationResultInput;
         template.RequiredInputMediaType = ParseInputMediaType(command.RequiredInputMediaType);
@@ -320,6 +385,11 @@ internal sealed partial class TemplatesService
 
         var obsoleteAssetUrls = CollectObsoleteAssetUrls([
             SetAsset(template, TemplateAssetKind.Preview, command.PreviewAsset),
+            SetAsset(template, TemplateAssetKind.Thumbnail, command.ThumbnailAsset ?? command.PreviewAsset),
+            SetAsset(template, TemplateAssetKind.AnimatedPreview, command.AnimatedPreviewAsset),
+            SetAsset(template, TemplateAssetKind.FeedLoopLow, command.FeedLoopLowAsset ?? command.PreviewAsset),
+            SetAsset(template, TemplateAssetKind.FeedLoopMedium, command.FeedLoopMediumAsset),
+            SetAsset(template, TemplateAssetKind.DetailPreview, command.DetailPreviewAsset ?? command.PreviewAsset),
             SetAsset(template, TemplateAssetKind.ReferenceMotion, command.ReferenceMotionAsset)
         ]);
 
@@ -330,6 +400,9 @@ internal sealed partial class TemplatesService
             {
                 return Result.Failure<AdminTemplateResponse>(activationCheck.Error);
             }
+
+            StampFirstPublicationIfNeeded(template, now);
+            LogIncompletePublicMediaSet(template);
         }
 
         await StampCatalogUpsertAsync(template, now, cancellationToken);
@@ -355,9 +428,23 @@ internal sealed partial class TemplatesService
         await ClaimTemplateAssetsAfterUpdateAsync(
             template.Id,
             cancellationToken,
-            (command.PreviewAsset, TemplateMediaRole.PreviewAsset),
+            PreviewAssetsForLifecycle(
+                command.PreviewAsset,
+                command.ThumbnailAsset,
+                command.AnimatedPreviewAsset,
+                command.FeedLoopLowAsset,
+                command.FeedLoopMediumAsset,
+                command.DetailPreviewAsset));
+        await ClaimTemplateAssetsAfterUpdateAsync(
+            template.Id,
+            cancellationToken,
             (command.ReferenceMotionAsset, TemplateMediaRole.ReferenceMotionAsset));
-        await PublishFeedInvalidatedAsync(cancellationToken);
+        await PublishTemplateInvalidatedAsync(
+            template,
+            "updated",
+            isCritical: false,
+            mediaChanged: obsoleteAssetUrls.Length > 0,
+            cancellationToken);
         await CleanupObsoleteMediaAsync(obsoleteAssetUrls, cancellationToken);
         return Result.Success(await MapUpdatedTemplateResponseAsync(command.TemplateId, template, cancellationToken));
     }
@@ -382,11 +469,15 @@ internal sealed partial class TemplatesService
             {
                 return Result.Failure<AdminTemplateResponse>(activationCheck.Error);
             }
+
+            LogIncompletePublicMediaSet(template);
         }
 
         var previousStatus = template.Status;
+        var now = DateTime.UtcNow;
         template.Status = status;
-        await StampCatalogUpsertAsync(template, DateTime.UtcNow, cancellationToken);
+        StampFirstPublicationIfNeeded(template, now);
+        await StampCatalogUpsertAsync(template, now, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
         await WriteTemplateAuditAsync(
             ResolveTemplateStatusAuditAction(status),
@@ -394,7 +485,7 @@ internal sealed partial class TemplatesService
             previousStatus.ToString(),
             status.ToString(),
             cancellationToken);
-        await PublishFeedInvalidatedAsync(cancellationToken);
+        await PublishTemplateInvalidatedAsync(template, "status_changed", isCritical: previousStatus != status, mediaChanged: false, cancellationToken);
 
         return Result.Success(MapAdminResponse(template));
     }
@@ -429,7 +520,7 @@ internal sealed partial class TemplatesService
             previousStatus.ToString(),
             TemplateStatus.Archived.ToString(),
             cancellationToken);
-        await PublishFeedInvalidatedAsync(cancellationToken);
+        await PublishTemplateInvalidatedAsync(template, "deleted", isCritical: true, mediaChanged: false, cancellationToken);
 
         return Result.Success();
     }

@@ -42,17 +42,20 @@ internal sealed class FalWebhookSignatureVerifier(
             || string.IsNullOrWhiteSpace(timestamp)
             || string.IsNullOrWhiteSpace(signatureHex))
         {
+            TemplateGenerationApiMetrics.RecordWebhookSignatureFailure("missing_header");
             return false;
         }
 
         if (!long.TryParse(timestamp, out var timestampSeconds))
         {
+            TemplateGenerationApiMetrics.RecordWebhookSignatureFailure("invalid_timestamp");
             return false;
         }
 
         var nowSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         if (Math.Abs(nowSeconds - timestampSeconds) > TimestampLeewaySeconds)
         {
+            TemplateGenerationApiMetrics.RecordWebhookSignatureFailure("timestamp_out_of_range");
             return false;
         }
 
@@ -63,6 +66,7 @@ internal sealed class FalWebhookSignatureVerifier(
         }
         catch (FormatException)
         {
+            TemplateGenerationApiMetrics.RecordWebhookSignatureFailure("invalid_signature_encoding");
             return false;
         }
 
@@ -77,6 +81,7 @@ internal sealed class FalWebhookSignatureVerifier(
             }
         }
 
+        TemplateGenerationApiMetrics.RecordWebhookSignatureFailure("signature_mismatch");
         return false;
     }
 

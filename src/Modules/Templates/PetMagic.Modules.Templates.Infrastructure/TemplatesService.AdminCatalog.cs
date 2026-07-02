@@ -13,6 +13,11 @@ internal sealed partial class TemplatesService
         return await _templateCategoryAdminService.ListAdminCategoriesAsync(includeArchived, cancellationToken);
     }
 
+    public async Task<Result<AdminTemplateCategoryDiagnosticsResponse>> GetAdminCategoryDiagnosticsAsync(CancellationToken cancellationToken)
+    {
+        return await _templateCategoryAdminService.GetAdminCategoryDiagnosticsAsync(cancellationToken);
+    }
+
     public async Task<Result<AdminTemplateCategoryListItemResponse>> CreateCategoryAsync(CreateTemplateCategoryCommand command, CancellationToken cancellationToken)
     {
         return await _templateCategoryAdminService.CreateCategoryAsync(command, cancellationToken);

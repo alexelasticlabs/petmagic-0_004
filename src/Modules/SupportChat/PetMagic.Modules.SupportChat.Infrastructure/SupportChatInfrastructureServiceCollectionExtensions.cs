@@ -128,7 +128,7 @@ public static class SupportChatInfrastructureServiceCollectionExtensions
         return new SupportAttachmentReadUrlSigningOptions
         {
             SigningKey = configuration["Jwt:SigningKey"] ?? string.Empty,
-            ReadUrlTtlMinutes = ParsePositiveInt(section["ReadUrlTtlMinutes"], 720),
+            ReadUrlTtlMinutes = ParsePositiveInt(section["ReadUrlTtlMinutes"], 60),
         };
     }
 

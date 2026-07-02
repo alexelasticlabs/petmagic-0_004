@@ -303,57 +303,6 @@ public sealed partial class EconomyServiceTests
     }
 
     [Fact]
-    public async Task ConfirmPackPurchase_ShouldCreditWalletOnce()
-    {
-        await using var dbContext = CreateDbContext();
-
-        var userId = Guid.NewGuid();
-        var packId = Guid.NewGuid();
-
-        dbContext.CurrencyPacks.Add(new CurrencyPack
-        {
-            Id = packId,
-            Code = "starter",
-            DisplayName = "Starter PawSpark",
-            CurrencyCode = "USD",
-            PriceAmount = 4.99m,
-            GrantedSpark = 100,
-            BonusSpark = 20,
-            IsActive = true,
-            SortOrder = 1
-        });
-
-        await dbContext.SaveChangesAsync();
-
-        var service = CreateService(dbContext);
-
-        var createResult = await service.CreatePackPurchaseAsync(
-            new CreatePackPurchaseCommand(userId, packId, "USD", "stripe", "web", "1.0.0", "*", "en"),
-            CancellationToken.None);
-
-        Assert.True(createResult.IsSuccess);
-
-        var confirmResult = await service.ConfirmPackPurchaseAsync(
-            new ConfirmPackPurchaseCommand(userId, createResult.Value.OrderId),
-            CancellationToken.None);
-
-        Assert.True(confirmResult.IsSuccess);
-
-        var wallet = await dbContext.Wallets.FirstAsync(x => x.UserId == userId);
-        Assert.Equal(120, wallet.Balance);
-
-        var secondConfirm = await service.ConfirmPackPurchaseAsync(
-            new ConfirmPackPurchaseCommand(userId, createResult.Value.OrderId),
-            CancellationToken.None);
-
-        Assert.True(secondConfirm.IsFailure);
-        Assert.Equal(EconomyErrors.PurchaseAlreadyProcessed.Code, secondConfirm.Error.Code);
-
-        var walletAfterSecond = await dbContext.Wallets.FirstAsync(x => x.UserId == userId);
-        Assert.Equal(120, walletAfterSecond.Balance);
-    }
-
-    [Fact]
     public async Task GetRewardsSummaryAsync_ShouldCreateStableReferralCode()
     {
         await using var dbContext = CreateDbContext();
@@ -413,15 +362,12 @@ public sealed partial class EconomyServiceTests
         var packId = AddStarterPack(dbContext);
         var service = CreateService(dbContext);
 
-        var purchase = await service.CreatePackPurchaseAsync(
-            new CreatePackPurchaseCommand(refereeId, packId, "USD", "stripe", "web", "1.0.0", "*", "en"),
-            CancellationToken.None);
-        Assert.True(purchase.IsSuccess);
-
-        var confirm = await service.ConfirmPackPurchaseAsync(
-            new ConfirmPackPurchaseCommand(refereeId, purchase.Value.OrderId),
-            CancellationToken.None);
-        Assert.True(confirm.IsSuccess);
+        var verifiedPurchase = await CreateAndVerifyStorePurchaseAsync(
+            dbContext,
+            service,
+            refereeId,
+            packId);
+        Assert.Equal(PurchaseOrderStatus.Succeeded, verifiedPurchase.Status);
 
         var referrerRewards = await service.GetRewardsSummaryAsync(referrerId, CancellationToken.None);
         var activation = await service.ApplyReferralCodeAsync(
@@ -507,7 +453,7 @@ public sealed partial class EconomyServiceTests
     }
 
     [Fact]
-    public async Task ConfirmPackPurchaseAsync_ShouldSettlePendingReferralBonusOnce()
+    public async Task VerifiedStorePurchase_ShouldSettlePendingReferralBonusOnce()
     {
         await using var dbContext = CreateDbContext();
 
@@ -526,20 +472,13 @@ public sealed partial class EconomyServiceTests
         await service.ClaimAdRewardAsync(new ClaimAdRewardCommand(refereeId), CancellationToken.None);
         Assert.False(await dbContext.WalletLedgerEntries.AnyAsync(x => x.Source == WalletLedgerSource.ReferralBonus));
 
-        var purchase = await service.CreatePackPurchaseAsync(
-            new CreatePackPurchaseCommand(refereeId, packId, "USD", "stripe", "web", "1.0.0", "*", "en"),
-            CancellationToken.None);
-        Assert.True(purchase.IsSuccess);
+        var verifiedPurchase = await CreateAndVerifyStorePurchaseAsync(
+            dbContext,
+            service,
+            refereeId,
+            packId);
 
-        var firstConfirm = await service.ConfirmPackPurchaseAsync(
-            new ConfirmPackPurchaseCommand(refereeId, purchase.Value.OrderId),
-            CancellationToken.None);
-        var secondConfirm = await service.ConfirmPackPurchaseAsync(
-            new ConfirmPackPurchaseCommand(refereeId, purchase.Value.OrderId),
-            CancellationToken.None);
-
-        Assert.True(firstConfirm.IsSuccess);
-        Assert.True(secondConfirm.IsFailure);
+        Assert.Equal(PurchaseOrderStatus.Succeeded, verifiedPurchase.Status);
 
         var referrerWallet = await dbContext.Wallets.SingleAsync(x => x.UserId == referrerId);
         var refereeWallet = await dbContext.Wallets.SingleAsync(x => x.UserId == refereeId);

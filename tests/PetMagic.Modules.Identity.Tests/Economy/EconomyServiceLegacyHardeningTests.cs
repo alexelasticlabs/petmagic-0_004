@@ -89,6 +89,23 @@ public sealed class EconomyServiceLegacyHardeningTests
         Assert.Contains("pack.CurrencyCode ?? string.Empty", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void RedeemAndReferralTransactions_ShouldDisposeOnEarlyReturn()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Economy",
+            "PetMagic.Modules.Economy.Infrastructure",
+            "EconomyService.cs"));
+
+        Assert.Contains("await using var transaction = dbContext.Database.IsRelational()", source, StringComparison.Ordinal);
+        Assert.Contains("public async Task<Result<RedeemCodeAppliedResponse>> ApplyRedeemCodeAsync", source, StringComparison.Ordinal);
+        Assert.Contains("public async Task<Result<ReferralCodeAppliedResponse>> ApplyReferralCodeAsync", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("        var transaction = dbContext.Database.IsRelational()", source, StringComparison.Ordinal);
+    }
+
     private static string FindRepositoryRoot()
     {
         var current = new DirectoryInfo(AppContext.BaseDirectory);

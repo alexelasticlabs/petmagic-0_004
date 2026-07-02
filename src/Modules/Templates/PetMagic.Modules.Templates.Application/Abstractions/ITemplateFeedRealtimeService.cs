@@ -12,11 +12,34 @@ public static class TemplateFeedRealtimeTopics
 
 public sealed record TemplateFeedRealtimeEvent(string Topic, string Data = "{}");
 
+public static class TemplateFeedInvalidationScopes
+{
+    public const string Full = "full";
+    public const string Template = "template";
+    public const string Category = "category";
+    public const string TemplateOfTheDay = "templateOfTheDay";
+}
+
+public sealed record TemplateFeedInvalidationPayload(
+    string Scope,
+    Guid? TemplateId = null,
+    string? Category = null,
+    long? MediaVersion = null,
+    string? TemplateType = null,
+    bool? IsPubliclyVisible = null,
+    bool IsCritical = false,
+    string? Reason = null,
+    string? Locale = null);
+
 public interface ITemplateFeedRealtimeService
 {
     ChannelReader<TemplateFeedRealtimeEvent> Subscribe(CancellationToken cancellationToken = default);
 
     ValueTask PublishTemplatesFeedInvalidatedAsync(CancellationToken cancellationToken = default);
+
+    ValueTask PublishTemplatesFeedInvalidatedAsync(
+        TemplateFeedInvalidationPayload payload,
+        CancellationToken cancellationToken = default);
 
     ValueTask PublishGenerationStatusChangedAsync(TemplateGenerationResponse generation, CancellationToken cancellationToken = default);
 }

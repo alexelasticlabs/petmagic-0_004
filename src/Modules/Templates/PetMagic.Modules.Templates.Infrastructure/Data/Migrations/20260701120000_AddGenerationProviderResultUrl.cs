@@ -1,10 +1,14 @@
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using PetMagic.Modules.Templates.Infrastructure.Data;
 
 #nullable disable
 
 namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 {
     /// <inheritdoc />
+    [DbContext(typeof(TemplatesDbContext))]
+    [Migration("20260701120000_AddGenerationProviderResultUrl")]
     public partial class AddGenerationProviderResultUrl : Migration
     {
         /// <inheritdoc />

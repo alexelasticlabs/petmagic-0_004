@@ -154,16 +154,17 @@ internal sealed partial class TemplatesService
         var inputPreviewsByGenerationId = await LoadAdminGenerationInputPreviewsAsync(rows, cancellationToken);
         var resultPreviewsByGenerationId = await LoadAdminGenerationResultPreviewsAsync(rows, cancellationToken);
 
-        var items = rows
-            .Select(row =>
-            {
-                latestUnlocksByGenerationId.TryGetValue(row.GenerationId, out var unlock);
-                parentInfoByGenerationId.TryGetValue(row.ParentGenerationId ?? Guid.Empty, out var parentInfo);
-                childCountsByGenerationId.TryGetValue(row.GenerationId, out var childCount);
-                inputPreviewsByGenerationId.TryGetValue(row.GenerationId, out var inputPreviewUrl);
-                resultPreviewsByGenerationId.TryGetValue(row.GenerationId, out var resultPreviewUrl);
+        var items = new List<AdminTemplateGenerationListItemResponse>(rows.Count);
+        foreach (var row in rows)
+        {
+            latestUnlocksByGenerationId.TryGetValue(row.GenerationId, out var unlock);
+            parentInfoByGenerationId.TryGetValue(row.ParentGenerationId ?? Guid.Empty, out var parentInfo);
+            childCountsByGenerationId.TryGetValue(row.GenerationId, out var childCount);
+            inputPreviewsByGenerationId.TryGetValue(row.GenerationId, out var inputPreviewUrl);
+            resultPreviewsByGenerationId.TryGetValue(row.GenerationId, out var resultPreviewUrl);
+            var watermarkedMediaUrl = await CreateAdminGenerationReadUrlAsync(row.WatermarkedMediaPath, cancellationToken);
 
-                return new AdminTemplateGenerationListItemResponse(
+            items.Add(new AdminTemplateGenerationListItemResponse(
                     row.GenerationId,
                     row.UserId,
                     row.TemplateId,
@@ -184,7 +185,7 @@ internal sealed partial class TemplatesService
                     row.RefundedAtUtc,
                     row.IsWatermarkRequired,
                     row.IsWatermarkRemoved,
-                    row.WatermarkedMediaPath,
+                    watermarkedMediaUrl,
                     unlock?.UnlockMethod,
                     unlock?.UnlockedByUserId,
                     unlock?.CreditsSpent,
@@ -207,16 +208,15 @@ internal sealed partial class TemplatesService
                     row.PromptBeforeVariation,
                     row.PromptAfterVariation,
                     row.PetId,
-                    row.PetPhotoId);
-            })
-            .ToArray();
+                    row.PetPhotoId));
+        }
 
         return Result.Success(new AdminTemplateGenerationListPageResponse(
             items,
             totalCount,
             skip,
             take,
-            skip + items.Length < totalCount,
+            skip + items.Count < totalCount,
             DateTime.UtcNow));
     }
 
@@ -363,7 +363,8 @@ internal sealed partial class TemplatesService
         {
             if (row.InputMediaAssetId.HasValue && mediaPreviews.TryGetValue(row.InputMediaAssetId.Value, out var previewUrl))
             {
-                previewsByGenerationId[row.GenerationId] = previewUrl;
+                previewsByGenerationId[row.GenerationId] =
+                    await CreateAdminGenerationReadUrlAsync(previewUrl, cancellationToken);
             }
         }
 
@@ -409,21 +410,36 @@ internal sealed partial class TemplatesService
             .GroupBy(media => media.GenerationId!.Value)
             .ToDictionary(group => group.Key, group => group.First());
 
-        return rows.ToDictionary(
-            row => row.GenerationId,
-            row =>
+        var previewsByGenerationId = new Dictionary<Guid, string?>();
+        foreach (var row in rows)
+        {
+            AdminGenerationResultMediaRow? media = null;
+            if (row.ResultMediaAssetId.HasValue)
             {
-                AdminGenerationResultMediaRow? media = null;
-                if (row.ResultMediaAssetId.HasValue)
-                {
-                    mediaById.TryGetValue(row.ResultMediaAssetId.Value, out media);
-                }
+                mediaById.TryGetValue(row.ResultMediaAssetId.Value, out media);
+            }
 
-                media ??= fallbackMediaByGenerationId.GetValueOrDefault(row.GenerationId);
-                return media is null
-                    ? null
-                    : ResolveAdminGenerationResultPreviewUrl(row, media);
-            });
+            media ??= fallbackMediaByGenerationId.GetValueOrDefault(row.GenerationId);
+            previewsByGenerationId[row.GenerationId] = media is null
+                ? null
+                : await CreateAdminGenerationReadUrlAsync(
+                    ResolveAdminGenerationResultPreviewUrl(row, media),
+                    cancellationToken);
+        }
+
+        return previewsByGenerationId;
+    }
+
+    private async Task<string?> CreateAdminGenerationReadUrlAsync(string? assetUrl, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(assetUrl))
+        {
+            return null;
+        }
+
+        var ttl = TimeSpan.FromSeconds(Math.Max(1, options.UserMediaReadUrlTtlSeconds));
+        var signed = await mediaStorage.CreateReadUrlAsync(assetUrl, ttl, cancellationToken);
+        return signed.IsSuccess ? signed.Value : null;
     }
 
     private static string? ResolveAdminGenerationResultPreviewUrl(

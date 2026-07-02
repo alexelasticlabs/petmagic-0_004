@@ -1,7 +1,14 @@
-using Microsoft.EntityFrameworkCore;
+using System.Data.Common;
+using System.Text.Json;
 
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+
+using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
+using PetMagic.Modules.Templates.Infrastructure.Data;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
 
 namespace PetMagic.Modules.Identity.Tests.Templates;
@@ -74,7 +81,8 @@ public sealed partial class TemplatesServiceTests
     public async Task UpdateCategoryAsync_ShouldRenameLinkedTemplates()
     {
         await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext);
+        var realtimeService = new RecordingTemplateFeedRealtimeService();
+        var service = CreateService(dbContext, realtimeService: realtimeService);
 
         var created = await service.CreateImageAsync(
             new CreateImageTemplateCommand(
@@ -93,6 +101,7 @@ public sealed partial class TemplatesServiceTests
         Assert.True(created.IsSuccess);
 
         var category = await dbContext.TemplateCategories.SingleAsync(x => x.Name == "Portrait");
+        var invalidationCountBeforeRename = realtimeService.InvalidatedCount;
         var updatedCategory = await service.UpdateCategoryAsync(
             new UpdateTemplateCategoryCommand(category.Id, "Studio Portrait"),
             CancellationToken.None);
@@ -103,6 +112,146 @@ public sealed partial class TemplatesServiceTests
         var updatedTemplate = await service.GetAdminAsync(created.Value.TemplateId, CancellationToken.None);
         Assert.True(updatedTemplate.IsSuccess);
         Assert.Equal("Studio Portrait", updatedTemplate.Value.Category);
+
+        Assert.Equal(invalidationCountBeforeRename, realtimeService.InvalidatedCount);
+        await AssertCategoryRenameOutboxEventAsync(dbContext, "Studio Portrait");
+    }
+
+    [Fact]
+    public async Task UpdateCategoryAsync_ShouldPersistRenameAndOutbox_WhenPublisherWouldThrowAfterCommit()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        await using var dbContext = await CreateSqliteDbContextAsync(connection);
+        var seedService = CreateService(dbContext);
+
+        var created = await seedService.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Portrait",
+                "Cozy portrait",
+                "Portrait",
+                ["cozy"],
+                false,
+                20,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset("https://cdn.example.com/portrait.jpg", "portrait.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet."),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+        var category = await dbContext.TemplateCategories.SingleAsync(x => x.Name == "Portrait");
+        var throwingRealtimeService = new ThrowingTemplateFeedRealtimeService();
+        var service = CreateService(dbContext, realtimeService: throwingRealtimeService);
+
+        var updatedCategory = await service.UpdateCategoryAsync(
+            new UpdateTemplateCategoryCommand(category.Id, "Studio Portrait"),
+            CancellationToken.None);
+
+        Assert.True(updatedCategory.IsSuccess);
+        Assert.Equal(0, throwingRealtimeService.InvalidatedCount);
+
+        dbContext.ChangeTracker.Clear();
+        var persistedCategory = await dbContext.TemplateCategories.SingleAsync();
+        var persistedTemplate = await dbContext.TemplateItems.SingleAsync(x => x.Id == created.Value.TemplateId);
+
+        Assert.Equal("Studio Portrait", persistedCategory.Name);
+        Assert.Equal("STUDIO PORTRAIT", persistedCategory.NormalizedName);
+        Assert.Equal("Studio Portrait", persistedTemplate.Category);
+        await AssertCategoryRenameOutboxEventAsync(dbContext, "Studio Portrait");
+    }
+
+    [Fact]
+    public async Task UpdateCategoryAsync_ShouldRollbackRenameAndSkipInvalidation_WhenRelationalSaveFails()
+    {
+        var failure = new FailCategoryTemplateUpdateCommandInterceptor();
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        await using var dbContext = await CreateSqliteDbContextAsync(connection, failure);
+        var realtimeService = new RecordingTemplateFeedRealtimeService();
+        var service = CreateService(dbContext, realtimeService: realtimeService);
+
+        var created = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Portrait",
+                "Cozy portrait",
+                "Portrait",
+                ["cozy"],
+                false,
+                20,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset("https://cdn.example.com/portrait.jpg", "portrait.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet."),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+        var category = await dbContext.TemplateCategories.SingleAsync(x => x.Name == "Portrait");
+        var invalidationCountBeforeRename = realtimeService.InvalidatedCount;
+
+        failure.Enabled = true;
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.UpdateCategoryAsync(
+            new UpdateTemplateCategoryCommand(category.Id, "Studio Portrait"),
+            CancellationToken.None));
+
+        Assert.Equal(1, failure.ThrowCount);
+        Assert.Equal(invalidationCountBeforeRename, realtimeService.InvalidatedCount);
+
+        dbContext.ChangeTracker.Clear();
+        var persistedCategory = await dbContext.TemplateCategories.SingleAsync();
+        var persistedTemplate = await dbContext.TemplateItems.SingleAsync(x => x.Id == created.Value.TemplateId);
+
+        Assert.Equal("Portrait", persistedCategory.Name);
+        Assert.Equal("PORTRAIT", persistedCategory.NormalizedName);
+        Assert.Equal("Portrait", persistedTemplate.Category);
+        Assert.False(await dbContext.TemplateCategories.AnyAsync(x => x.Name == "Studio Portrait"));
+        Assert.False(await dbContext.TemplateItems.AnyAsync(x => x.Category == "Studio Portrait"));
+        Assert.Empty(await dbContext.TemplateRealtimeEvents.ToArrayAsync());
+    }
+
+    [Fact]
+    public async Task UpdateCategoryAsync_ShouldRollbackRename_WhenOutboxEventCannotBeSaved()
+    {
+        var failure = new FailOnRealtimeEventSaveInterceptor { Enabled = false };
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        await using var dbContext = await CreateSqliteDbContextAsync(connection, failure);
+        var realtimeService = new RecordingTemplateFeedRealtimeService();
+        var service = CreateService(dbContext, realtimeService: realtimeService);
+
+        var created = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Portrait",
+                "Cozy portrait",
+                "Portrait",
+                ["cozy"],
+                false,
+                20,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset("https://cdn.example.com/portrait.jpg", "portrait.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet."),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+        var category = await dbContext.TemplateCategories.SingleAsync(x => x.Name == "Portrait");
+        var invalidationCountBeforeRename = realtimeService.InvalidatedCount;
+        failure.Enabled = true;
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => service.UpdateCategoryAsync(
+            new UpdateTemplateCategoryCommand(category.Id, "Studio Portrait"),
+            CancellationToken.None));
+
+        Assert.Equal(invalidationCountBeforeRename, realtimeService.InvalidatedCount);
+
+        dbContext.ChangeTracker.Clear();
+        var persistedCategory = await dbContext.TemplateCategories.SingleAsync();
+        var persistedTemplate = await dbContext.TemplateItems.SingleAsync(x => x.Id == created.Value.TemplateId);
+
+        Assert.Equal("Portrait", persistedCategory.Name);
+        Assert.Equal("PORTRAIT", persistedCategory.NormalizedName);
+        Assert.Equal("Portrait", persistedTemplate.Category);
+        Assert.Empty(await dbContext.TemplateRealtimeEvents.ToArrayAsync());
     }
 
     [Fact]
@@ -133,6 +282,67 @@ public sealed partial class TemplatesServiceTests
         Assert.True(restored.IsSuccess);
         Assert.False(restored.Value.IsArchived);
         Assert.Equal(3, realtimeService.InvalidatedCount);
+    }
+
+    private sealed class FailCategoryTemplateUpdateCommandInterceptor : DbCommandInterceptor
+    {
+        public bool Enabled { get; set; }
+
+        public int ThrowCount { get; private set; }
+
+        public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            ThrowIfTemplateUpdate(command);
+
+            return base.NonQueryExecutingAsync(command, eventData, result, cancellationToken);
+        }
+
+        public override InterceptionResult<DbDataReader> ReaderExecuting(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<DbDataReader> result)
+        {
+            ThrowIfTemplateUpdate(command);
+
+            return base.ReaderExecuting(command, eventData, result);
+        }
+
+        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<DbDataReader> result,
+            CancellationToken cancellationToken = default)
+        {
+            ThrowIfTemplateUpdate(command);
+
+            return base.ReaderExecutingAsync(command, eventData, result, cancellationToken);
+        }
+
+        private void ThrowIfTemplateUpdate(DbCommand command)
+        {
+            if (Enabled
+                && ThrowCount == 0
+                && command.CommandText.Contains("templates_items", StringComparison.OrdinalIgnoreCase))
+            {
+                ThrowCount++;
+                throw new InvalidOperationException("Simulated category rename failure after category update started.");
+            }
+        }
+    }
+
+    private static async Task AssertCategoryRenameOutboxEventAsync(TemplatesDbContext dbContext, string category)
+    {
+        var realtimeEvent = await dbContext.TemplateRealtimeEvents.SingleAsync();
+        Assert.Equal(TemplateFeedRealtimeTopics.TemplatesFeedInvalidated, realtimeEvent.Topic);
+        using var payload = JsonDocument.Parse(realtimeEvent.Data!);
+        Assert.Equal(TemplateFeedInvalidationScopes.Category, payload.RootElement.GetProperty("scope").GetString());
+        Assert.Equal(category, payload.RootElement.GetProperty("category").GetString());
+        Assert.Equal("renamed", payload.RootElement.GetProperty("reason").GetString());
+        Assert.False(payload.RootElement.GetProperty("isCritical").GetBoolean());
     }
 
     [Fact]
@@ -914,7 +1124,7 @@ public sealed partial class TemplatesServiceTests
 
         var feedItem = Assert.Single(feed.Value.Items);
         Assert.Equal(portraitTemplateId, feedItem.TemplateId);
-        Assert.Equal("Portrait", feedItem.Category);
+        Assert.Equal("Portrait", feedItem.Category.Title);
 
         Assert.Empty(unknownCategory.Value.Items);
     }
@@ -955,14 +1165,14 @@ public sealed partial class TemplatesServiceTests
         Assert.True(feed.IsSuccess);
         var item = Assert.Single(feed.Value.Items);
         Assert.Equal(created.Value.TemplateId, item.TemplateId);
-        Assert.Equal(["front-facing pet", "clear lighting"], item.PetPhotoRequirements);
-        Assert.True(item.SupportsGenerationResultInput);
-        Assert.Equal(TemplateType.Image.ToString(), item.RequiredInputMediaType);
-        Assert.True(item.RecommendedAfterImageGeneration);
-        Assert.False(item.SupportsGenerateSimilar);
-        Assert.Equal("high", item.DefaultVariationStrength);
+        Assert.Null(item.PetPhotoRequirements);
+        Assert.False(item.SupportsGenerationResultInput);
+        Assert.Null(item.RequiredInputMediaType);
+        Assert.False(item.RecommendedAfterImageGeneration);
+        Assert.True(item.SupportsGenerateSimilar);
+        Assert.Equal("medium", item.DefaultVariationStrength);
         Assert.True(item.Version > 0);
-        Assert.NotNull(item.UpdatedAtUtc);
+        Assert.Null(item.UpdatedAtUtc);
     }
 
     [Fact]

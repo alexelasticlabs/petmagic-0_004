@@ -27,6 +27,11 @@ internal static class TemplateGenerationMetrics
         unit: "{job}",
         description: "Number of template generation jobs that reached Failed status.");
 
+    private static readonly Counter<long> AcceptedJobsTotal = Meter.CreateCounter<long>(
+        "generation_jobs_accepted_total",
+        unit: "{job}",
+        description: "Number of generation jobs accepted after admission and charge.");
+
     private static readonly Counter<long> LifecycleEventsTotal = Meter.CreateCounter<long>(
         "generation_lifecycle_events_total",
         unit: "{event}",
@@ -62,6 +67,16 @@ internal static class TemplateGenerationMetrics
         unit: "{attempt}",
         description: "Number of duplicate template generation refund attempts.");
 
+    private static readonly Counter<long> RefundFailuresTotal = Meter.CreateCounter<long>(
+        "generation_refund_failures_total",
+        unit: "{failure}",
+        description: "Number of template generation refund failures.");
+
+    private static readonly Counter<long> CancelRefundsTotal = Meter.CreateCounter<long>(
+        "generation_cancel_refunds_total",
+        unit: "{refund}",
+        description: "Number of refunds issued from queued generation cancellation.");
+
     private static readonly Counter<long> FalTimeoutsTotal = Meter.CreateCounter<long>(
         "generation_fal_timeouts_total",
         unit: "{timeout}",
@@ -71,6 +86,36 @@ internal static class TemplateGenerationMetrics
         "generation_sse_delivery_failures_total",
         unit: "{failure}",
         description: "Number of template generation SSE delivery or polling failures.");
+
+    private static readonly Counter<long> SseEventsPublishedTotal = Meter.CreateCounter<long>(
+        "sse_events_published_count",
+        unit: "{event}",
+        description: "Number of template SSE events published by scope.");
+
+    private static readonly Counter<long> SseFullInvalidationsTotal = Meter.CreateCounter<long>(
+        "sse_full_invalidation_count",
+        unit: "{event}",
+        description: "Number of full template feed invalidation SSE events.");
+
+    private static readonly Counter<long> RetryAttemptsTotal = Meter.CreateCounter<long>(
+        "generation_retry_attempts_total",
+        unit: "{attempt}",
+        description: "Number of generation retry attempts by reason.");
+
+    private static readonly Counter<long> MediaImportFailuresTotal = Meter.CreateCounter<long>(
+        "generation_media_import_failures_total",
+        unit: "{failure}",
+        description: "Number of generated media import failures.");
+
+    private static readonly Counter<long> PreviewNotFoundTotal = Meter.CreateCounter<long>(
+        "generation_preview_404_total",
+        unit: "{failure}",
+        description: "Number of template preview/reference media probes that returned 404.");
+
+    private static readonly Counter<long> R2UploadFailuresTotal = Meter.CreateCounter<long>(
+        "generation_r2_upload_failures_total",
+        unit: "{failure}",
+        description: "Number of R2 media upload failures.");
 
     private static readonly Histogram<long> QueueDepth = Meter.CreateHistogram<long>(
         "generation_queue_depth",
@@ -91,6 +136,11 @@ internal static class TemplateGenerationMetrics
         "generation_oldest_processing_job_age_seconds",
         unit: "s",
         description: "Observed age of the oldest processing template generation job.");
+
+    private static readonly Histogram<double> StuckStageAgeSeconds = Meter.CreateHistogram<double>(
+        "generation_stuck_stage_age_seconds",
+        unit: "s",
+        description: "Observed age for generations that remain in provider/import stages beyond alert thresholds.");
 
     private static readonly Histogram<double> QueueWaitSeconds = Meter.CreateHistogram<double>(
         "generation_queue_wait_seconds",
@@ -227,6 +277,11 @@ internal static class TemplateGenerationMetrics
         RecordLifecycleEvent(job, "start", "queued", null);
     }
 
+    public static void RecordJobAccepted(TemplateGenerationJob job)
+    {
+        AcceptedJobsTotal.Add(1, JobTags(job));
+    }
+
     public static void RecordJobClaimed(TemplateGenerationJob job)
     {
         var tags = JobTags(job);
@@ -300,9 +355,21 @@ internal static class TemplateGenerationMetrics
         RefundedJobsTotal.Add(1, JobTags(job));
     }
 
+    public static void RecordCancelRefund(TemplateGenerationJob job)
+    {
+        CancelRefundsTotal.Add(1, JobTags(job));
+    }
+
     public static void RecordDuplicateRefundAttempt(TemplateGenerationJob job)
     {
         DuplicateRefundAttemptsTotal.Add(1, JobTags(job));
+    }
+
+    public static void RecordRefundFailure(TemplateGenerationJob job, string errorCode)
+    {
+        RefundFailuresTotal.Add(
+            1,
+            [.. JobTags(job), new KeyValuePair<string, object?>("error_code", string.IsNullOrWhiteSpace(errorCode) ? "unknown" : errorCode)]);
     }
 
     public static void RecordFalTimeout(string mediaType, string stage, string? model = null)
@@ -317,6 +384,47 @@ internal static class TemplateGenerationMetrics
     public static void RecordSseDeliveryFailure(string topic)
     {
         SseDeliveryFailuresTotal.Add(1, new KeyValuePair<string, object?>("topic", topic));
+    }
+
+    public static void RecordSseEventPublished(string scope)
+    {
+        SseEventsPublishedTotal.Add(
+            1,
+            new KeyValuePair<string, object?>("scope", string.IsNullOrWhiteSpace(scope) ? "unknown" : scope));
+    }
+
+    public static void RecordSseFullInvalidation()
+    {
+        SseFullInvalidationsTotal.Add(1);
+    }
+
+    public static void RecordRetryAttempt(TemplateGenerationJob job, string reason)
+    {
+        RetryAttemptsTotal.Add(
+            1,
+            [.. JobTags(job), new KeyValuePair<string, object?>("reason", string.IsNullOrWhiteSpace(reason) ? "unknown" : reason)]);
+    }
+
+    public static void RecordMediaImportFailure(string mediaType, string reason)
+    {
+        MediaImportFailuresTotal.Add(
+            1,
+            new KeyValuePair<string, object?>("media_type", TemplateGenerationQueue.NormalizeMediaType(mediaType)),
+            new KeyValuePair<string, object?>("reason", string.IsNullOrWhiteSpace(reason) ? "unknown" : reason));
+    }
+
+    public static void RecordPreviewNotFound(string role)
+    {
+        PreviewNotFoundTotal.Add(
+            1,
+            new KeyValuePair<string, object?>("role", string.IsNullOrWhiteSpace(role) ? "unknown" : role));
+    }
+
+    public static void RecordR2UploadFailure(string operation)
+    {
+        R2UploadFailuresTotal.Add(
+            1,
+            new KeyValuePair<string, object?>("operation", string.IsNullOrWhiteSpace(operation) ? "unknown" : operation));
     }
 
     public static void RecordQueueSnapshot(
@@ -356,6 +464,16 @@ internal static class TemplateGenerationMetrics
         {
             OldestProcessingJobAgeSeconds.Record(Math.Max(0, oldestProcessingJobAgeSeconds.Value), tags);
         }
+    }
+
+    public static void RecordStuckStageAge(string stage, string mediaType, string tier, double ageSeconds)
+    {
+        StuckStageAgeSeconds.Record(
+            Math.Max(0, ageSeconds),
+            new KeyValuePair<string, object?>("stage", string.IsNullOrWhiteSpace(stage) ? "unknown" : stage),
+            new KeyValuePair<string, object?>("media_type", TemplateGenerationQueue.NormalizeMediaType(mediaType)),
+            new KeyValuePair<string, object?>("tier", TemplateGenerationQueue.NormalizeTier(tier)),
+            new KeyValuePair<string, object?>("lane", TemplateGenerationQueue.ResolveLane(mediaType, tier)));
     }
 
     public static void RecordJobRejected(string reason, string mediaType, string tier)

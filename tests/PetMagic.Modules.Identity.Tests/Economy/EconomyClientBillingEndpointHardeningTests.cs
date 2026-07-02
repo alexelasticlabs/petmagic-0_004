@@ -35,6 +35,7 @@ public sealed class EconomyClientBillingEndpointHardeningTests
             "var statusCode = string.Equals(result.Error.Code, \"economy.premium_billing_unavailable\", StringComparison.Ordinal)\r\n                ? StatusCodes.Status404NotFound",
             source,
             StringComparison.Ordinal);
+        Assert.DoesNotContain("/purchases/{orderId:guid}/confirm", source, StringComparison.Ordinal);
     }
 
     private static string ReadEconomyEndpointSource()

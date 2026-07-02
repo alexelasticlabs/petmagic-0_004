@@ -1,4 +1,5 @@
 using System.Threading.Channels;
+using System.Text.Json;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -12,6 +13,7 @@ using PetMagic.Modules.Templates.Infrastructure;
 using PetMagic.Modules.Templates.Infrastructure.Data;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
 using PetMagic.Modules.Templates.Infrastructure.Options;
+using PetMagic.Modules.Identity.Tests.Host;
 
 namespace PetMagic.Modules.Identity.Tests.Templates;
 
@@ -147,6 +149,51 @@ public sealed class TemplateFeedRealtimeServiceTests
         Assert.DoesNotContain(remainingEvents, x => x.CreatedAtUtc < DateTime.UtcNow.AddMinutes(-1));
         Assert.Contains(remainingEvents, x => x.Topic == TemplateFeedRealtimeTopics.GenerationStatusChanged);
         Assert.Contains(remainingEvents, x => x.Topic == TemplateFeedRealtimeTopics.TemplatesFeedInvalidated);
+    }
+
+    [Fact]
+    public async Task PublishTemplatesFeedInvalidatedAsync_ShouldDeliverScopedPayload()
+    {
+        var databaseName = $"template-realtime-scoped-payload-{Guid.NewGuid():N}";
+        var databaseRoot = new InMemoryDatabaseRoot();
+        await using var provider = CreateProvider(databaseName, databaseRoot);
+
+        var realtime = provider.GetRequiredService<ITemplateFeedRealtimeService>();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+        var subscription = realtime.Subscribe(timeout.Token);
+        var templateId = Guid.NewGuid();
+        using var metrics = new MeterMeasurementRecorder(
+            TemplateGenerationMetrics.MeterName,
+            "sse_events_published_count",
+            "sse_full_invalidation_count");
+
+        await realtime.PublishTemplatesFeedInvalidatedAsync(
+            new TemplateFeedInvalidationPayload(
+                TemplateFeedInvalidationScopes.Template,
+                TemplateId: templateId,
+                Category: "Portrait",
+                MediaVersion: 42,
+                TemplateType: "Image",
+                IsPubliclyVisible: true,
+                Reason: "media_updated"),
+            timeout.Token);
+
+        var realtimeEvent = await ReadNextAsync(subscription, timeout.Token);
+        using var payload = JsonDocument.Parse(realtimeEvent.Data);
+
+        Assert.Equal(TemplateFeedRealtimeTopics.TemplatesFeedInvalidated, realtimeEvent.Topic);
+        Assert.Equal(TemplateFeedInvalidationScopes.Template, payload.RootElement.GetProperty("scope").GetString());
+        Assert.Equal(templateId, payload.RootElement.GetProperty("templateId").GetGuid());
+        Assert.Equal(42, payload.RootElement.GetProperty("mediaVersion").GetInt64());
+        Assert.True(payload.RootElement.GetProperty("isPubliclyVisible").GetBoolean());
+        Assert.Contains(
+            metrics.Measurements,
+            x => x.InstrumentName == "sse_events_published_count"
+                && x.Value == 1
+                && Equals(x.Tags["scope"], TemplateFeedInvalidationScopes.Template));
+        Assert.DoesNotContain(
+            metrics.Measurements,
+            x => x.InstrumentName == "sse_full_invalidation_count");
     }
 
     [Fact]

@@ -5,6 +5,8 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 internal static class TemplatesErrors
 {
     public static readonly Error NotFound = new("templates.not_found", "Template was not found.");
+    public static readonly Error TemplateUnavailable = new("TEMPLATE_UNAVAILABLE", "Template is no longer available.");
+    public static readonly Error TemplateChanged = new("TEMPLATE_CHANGED", "Template was changed. Please reopen it and try again.");
     public static readonly Error GenerationJobNotFound = new("GENERATION_JOB_NOT_FOUND", "Generation job was not found.");
     public static readonly Error CategoryNotFound = new("templates.category_not_found", "Template category was not found.");
     public static readonly Error CategoryAlreadyExists = new("templates.category_already_exists", "Template category already exists.");
@@ -13,6 +15,7 @@ internal static class TemplatesErrors
     public static readonly Error TypeMismatch = new("templates.type_mismatch", "Template type does not match the requested operation.");
     public static readonly Error UpdateConflict = new("templates.update_conflict", "Template was changed while saving. Please reload and try again.");
     public static readonly Error InvalidStatus = new("templates.invalid_status", "Template status is invalid.");
+    public static readonly Error PremiumRequired = new("templates.premium_required", "Premium subscription is required for this template.");
     public static readonly Error MissingPreview = new("templates.preview_required", "Preview asset is required before activation.");
     public static readonly Error MissingImageModel = new("templates.image_model_required", "Image model is required before activation.");
     public static readonly Error MissingReferenceMotion = new("templates.reference_motion_required", "Reference motion video is required before activation.");

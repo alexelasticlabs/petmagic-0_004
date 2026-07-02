@@ -18,15 +18,21 @@ internal sealed partial class TemplateGenerationService
         var normalizedIdempotencyKey = NormalizeOptionalText(command.IdempotencyKey, 256);
         var correlationId = NormalizeOptionalText(CorrelationContext.CurrentId, CorrelationContext.MaxLength);
 
-        var template = await dbContext.TemplateItems
-            .Include(x => x.Assets)
-            .FirstOrDefaultAsync(x => x.Id == command.TemplateId, cancellationToken);
-        if (template is null)
+        var templateLookup = await FindPublicGenerationTemplateAsync(
+            command.TemplateId,
+            new TemplateVisibilityContext(
+                RequireGenerationAccess: true,
+                HasPremiumAccess: command.HasPremiumAccess,
+                ExpectedVersion: command.ExpectedTemplateVersion),
+            command.UserId,
+            cancellationToken);
+        if (templateLookup.IsFailure)
         {
-            return Result.Failure<TemplateGenerationResponse>(TemplatesErrors.NotFound);
+            return Result.Failure<TemplateGenerationResponse>(templateLookup.Error);
         }
 
-        var readiness = ValidateTemplate(template, requireActiveStatus: true);
+        var template = templateLookup.Value;
+        var readiness = ValidateTemplateReadiness(template);
         if (readiness is not null)
         {
             return Result.Failure<TemplateGenerationResponse>(readiness);
@@ -176,6 +182,7 @@ internal sealed partial class TemplateGenerationService
         job.ChargedAtUtc = DateTime.UtcNow;
         job.UpdatedAtUtc = job.ChargedAtUtc.Value;
         await dbContext.SaveChangesAsync(cancellationToken);
+        TemplateGenerationMetrics.RecordJobAccepted(job);
 
         return Result.Success(await MapResponseWithQueueMetricsAsync(job, cancellationToken));
     }
@@ -194,7 +201,7 @@ internal sealed partial class TemplateGenerationService
             return Result.Failure<TemplateGenerationResponse>(TemplatesErrors.NotFound);
         }
 
-        var readiness = ValidateTemplate(template, requireActiveStatus: false);
+        var readiness = ValidateTemplateReadiness(template);
         if (readiness is not null)
         {
             return Result.Failure<TemplateGenerationResponse>(readiness);

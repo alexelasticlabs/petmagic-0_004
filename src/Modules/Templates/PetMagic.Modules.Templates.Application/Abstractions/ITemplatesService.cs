@@ -8,6 +8,8 @@ public interface ITemplatesService
 {
     Task<Result<IReadOnlyList<AdminTemplateCategoryListItemResponse>>> ListAdminCategoriesAsync(bool includeArchived, CancellationToken cancellationToken);
 
+    Task<Result<AdminTemplateCategoryDiagnosticsResponse>> GetAdminCategoryDiagnosticsAsync(CancellationToken cancellationToken);
+
     Task<Result<AdminTemplateCategoryListItemResponse>> CreateCategoryAsync(CreateTemplateCategoryCommand command, CancellationToken cancellationToken);
 
     Task<Result<AdminTemplateCategoryListItemResponse>> UpdateCategoryAsync(UpdateTemplateCategoryCommand command, CancellationToken cancellationToken);
@@ -92,7 +94,7 @@ public interface ITemplatesService
 
     Task<Result<PublicRandomTemplateResponse>> GetPublicRandomTemplateAsync(PublicRandomTemplateQuery query, CancellationToken cancellationToken);
 
-    Task<Result<PublicTemplateResponse>> GetPublicAsync(Guid templateId, string? locale, CancellationToken cancellationToken);
+    Task<Result<TemplateDetailDto>> GetPublicAsync(Guid templateId, string? locale, bool includeQaOnly, CancellationToken cancellationToken);
 
     Task<Result<PublicTemplateOfTheDayResponse>> GetPublicTemplateOfTheDayAsync(DateOnly? date, string? locale, CancellationToken cancellationToken);
 }

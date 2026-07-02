@@ -254,15 +254,6 @@ public sealed class RemovePaymentMethodCommandValidator : AbstractValidator<Remo
     }
 }
 
-public sealed class ConfirmPackPurchaseCommandValidator : AbstractValidator<ConfirmPackPurchaseCommand>
-{
-    public ConfirmPackPurchaseCommandValidator()
-    {
-        RuleFor(x => x.UserId).NotEmpty();
-        RuleFor(x => x.OrderId).NotEmpty();
-    }
-}
-
 public sealed class StripeWebhookCommandValidator : AbstractValidator<StripeWebhookCommand>
 {
     public StripeWebhookCommandValidator()

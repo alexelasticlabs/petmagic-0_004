@@ -83,6 +83,32 @@ public sealed class TemplateMediaCleanupProcessorTests
     }
 
     [Fact]
+    public async Task CleanupNextExpiredGenerationMediaAsync_ShouldNotDeleteCompletedResultBeforeRetentionCutoff()
+    {
+        await using var dbContext = CreateDbContext();
+        var template = CreateReadyTemplate();
+        var job = CreateGenerationJob(template, TemplateGenerationStatus.Completed, DateTime.UtcNow.AddDays(-1));
+        job.SourceImageUrl = "templates-media/source.jpg";
+        job.ResultUrl = "templates-media/output.mp4";
+
+        dbContext.TemplateItems.Add(template);
+        dbContext.TemplateGenerationJobs.Add(job);
+        await dbContext.SaveChangesAsync();
+
+        var mediaStorage = new TrackingMediaStorage();
+        var processor = CreateProcessor(dbContext, mediaStorage: mediaStorage, options: CreateOptions(retentionDays: 7));
+
+        var processed = await processor.CleanupNextExpiredGenerationMediaAsync(CancellationToken.None);
+
+        var persisted = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == job.Id);
+        Assert.False(processed);
+        Assert.Null(persisted.UserMediaDeletedAtUtc);
+        Assert.Equal("templates-media/source.jpg", persisted.SourceImageUrl);
+        Assert.Equal("templates-media/output.mp4", persisted.ResultUrl);
+        Assert.Empty(mediaStorage.DeletedUrls);
+    }
+
+    [Fact]
     public async Task CleanupNextExpiredMetadataTempFileAsync_ShouldDeleteOldOwnedFile()
     {
         var path = await TemplateMediaTempFiles.WriteAsync("metadata"u8.ToArray(), ".tmp", CancellationToken.None);

@@ -357,6 +357,20 @@ public sealed class IdentityInfrastructureConfigurationTests
             exception.Message);
     }
 
+    [Fact]
+    public void AddIdentityInfrastructure_ShouldUseShortLivedAvatarReadUrlsByDefault()
+    {
+        var services = CreateServices();
+        var configuration = CreateConfiguration([]);
+
+        services.AddIdentityInfrastructure(configuration);
+
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<AvatarReadUrlSigningOptions>();
+
+        Assert.Equal(60, options.ReadUrlTtlMinutes);
+    }
+
     private static IConfiguration CreateConfiguration(IEnumerable<KeyValuePair<string, string?>> values)
     {
         var defaults = new Dictionary<string, string?>

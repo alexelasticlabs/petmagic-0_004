@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using Microsoft.EntityFrameworkCore;
 
 using PetMagic.BuildingBlocks.Results;
@@ -13,6 +15,8 @@ internal sealed class TemplateCategoryAdminService(
     TemplatesDbContext dbContext,
     ITemplateFeedRealtimeService templateFeedRealtimeService)
 {
+    private static readonly JsonSerializerOptions RealtimeJsonSerializerOptions = new(JsonSerializerDefaults.Web);
+
     public async Task<Result<IReadOnlyList<AdminTemplateCategoryListItemResponse>>> ListAdminCategoriesAsync(bool includeArchived, CancellationToken cancellationToken)
     {
         var categories = await dbContext.TemplateCategories
@@ -57,6 +61,66 @@ internal sealed class TemplateCategoryAdminService(
         return Result.Success<IReadOnlyList<AdminTemplateCategoryListItemResponse>>(response);
     }
 
+    public async Task<Result<AdminTemplateCategoryDiagnosticsResponse>> GetAdminCategoryDiagnosticsAsync(CancellationToken cancellationToken)
+    {
+        var activeCategoryKeys = await dbContext.TemplateCategories
+            .AsNoTracking()
+            .Where(category => !category.IsArchived)
+            .Select(category => category.NormalizedName)
+            .ToArrayAsync(cancellationToken);
+        var activeCategoryKeySet = activeCategoryKeys
+            .Where(key => !string.IsNullOrWhiteSpace(key))
+            .ToHashSet(StringComparer.Ordinal);
+
+        var templates = await dbContext.TemplateItems
+            .AsNoTracking()
+            // TemplateVisibilityPolicy direct-check allowlist: admin diagnostics intentionally inspect active, non-deleted
+            // rows to report noncanonical category data. This is not a public visibility filter.
+            .Where(template => template.DeletedAtUtc == null && template.Status == TemplateStatus.Active)
+            .Select(template => new
+            {
+                template.Id,
+                template.Title,
+                template.Category,
+                template.TemplateType,
+                template.Status,
+                template.UpdatedAtUtc
+            })
+            .ToArrayAsync(cancellationToken);
+
+        var items = templates
+            .Select(template => new
+            {
+                Template = template,
+                NormalizedCategory = NormalizeCategoryKey(template.Category ?? string.Empty)
+            })
+            .Where(template => !activeCategoryKeySet.Contains(template.NormalizedCategory))
+            .OrderBy(template => template.NormalizedCategory, StringComparer.Ordinal)
+            .ThenBy(template => template.Template.Title, StringComparer.Ordinal)
+            .Select(template => new AdminTemplateCategoryDiagnosticItemResponse(
+                template.Template.Id,
+                template.Template.Title ?? string.Empty,
+                template.Template.Category ?? string.Empty,
+                template.NormalizedCategory,
+                template.Template.TemplateType.ToString(),
+                template.Template.Status.ToString(),
+                template.Template.UpdatedAtUtc))
+            .ToArray();
+
+        TemplateCategoryMetrics.RecordNoncanonicalCategoryTemplatesCount(items.Length);
+
+        var percent = templates.Length == 0
+            ? 0d
+            : Math.Round(items.Length * 100d / templates.Length, 2, MidpointRounding.AwayFromZero);
+
+        return Result.Success(new AdminTemplateCategoryDiagnosticsResponse(
+            templates.Length,
+            items.Length,
+            percent,
+            items,
+            DateTime.UtcNow));
+    }
+
     public async Task<Result<AdminTemplateCategoryListItemResponse>> CreateCategoryAsync(CreateTemplateCategoryCommand command, CancellationToken cancellationToken)
     {
         var categoryName = NormalizeCategoryName(command.Name);
@@ -84,7 +148,7 @@ internal sealed class TemplateCategoryAdminService(
 
         dbContext.TemplateCategories.Add(category);
         await dbContext.SaveChangesAsync(cancellationToken);
-        await PublishFeedInvalidatedAsync(cancellationToken);
+        await PublishCategoryInvalidatedAsync(category.Name, "created", isCritical: false, cancellationToken);
 
         return Result.Success(MapAdminCategory(category, []));
     }
@@ -111,25 +175,21 @@ internal sealed class TemplateCategoryAdminService(
         var previousName = category.Name;
         var updatedAtUtc = DateTime.UtcNow;
 
-        category.Name = categoryName;
-        category.NormalizedName = normalizedName;
-        category.UpdatedAtUtc = updatedAtUtc;
-
-        if (!string.Equals(previousName, categoryName, StringComparison.Ordinal))
+        if (dbContext.Database.IsRelational())
         {
-            var templates = await dbContext.TemplateItems
-                .Where(x => x.Category == previousName)
-                .ToArrayAsync(cancellationToken);
-
-            foreach (var template in templates)
-            {
-                template.Category = categoryName;
-                template.UpdatedAtUtc = updatedAtUtc;
-            }
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+            await ApplyCategoryRenameAsync(category, previousName, categoryName, normalizedName, updatedAtUtc, cancellationToken);
+            StageCategoryInvalidated(categoryName, "renamed", isCritical: false, updatedAtUtc);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        else
+        {
+            await ApplyCategoryRenameAsync(category, previousName, categoryName, normalizedName, updatedAtUtc, cancellationToken);
+            StageCategoryInvalidated(categoryName, "renamed", isCritical: false, updatedAtUtc);
+            await dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        await dbContext.SaveChangesAsync(cancellationToken);
-        await PublishFeedInvalidatedAsync(cancellationToken);
         return Result.Success(await BuildAdminCategoryResponseAsync(category, cancellationToken));
     }
 
@@ -146,7 +206,11 @@ internal sealed class TemplateCategoryAdminService(
             category.IsArchived = command.IsArchived;
             category.UpdatedAtUtc = DateTime.UtcNow;
             await dbContext.SaveChangesAsync(cancellationToken);
-            await PublishFeedInvalidatedAsync(cancellationToken);
+            await PublishCategoryInvalidatedAsync(
+                category.Name,
+                command.IsArchived ? "archived" : "unarchived",
+                isCritical: command.IsArchived,
+                cancellationToken);
         }
 
         return Result.Success(await BuildAdminCategoryResponseAsync(category, cancellationToken));
@@ -171,7 +235,7 @@ internal sealed class TemplateCategoryAdminService(
 
         dbContext.TemplateCategories.Remove(category);
         await dbContext.SaveChangesAsync(cancellationToken);
-        await PublishFeedInvalidatedAsync(cancellationToken);
+        await PublishCategoryInvalidatedAsync(category.Name, "deleted", isCritical: true, cancellationToken);
         return Result.Success();
     }
 
@@ -179,6 +243,32 @@ internal sealed class TemplateCategoryAdminService(
     {
         return dbContext.TemplateCategories
             .FirstOrDefaultAsync(x => x.Id == categoryId, cancellationToken);
+    }
+
+    private async Task ApplyCategoryRenameAsync(
+        TemplateCategory category,
+        string previousName,
+        string categoryName,
+        string normalizedName,
+        DateTime updatedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        category.Name = categoryName;
+        category.NormalizedName = normalizedName;
+        category.UpdatedAtUtc = updatedAtUtc;
+
+        if (!string.Equals(previousName, categoryName, StringComparison.Ordinal))
+        {
+            var templates = await dbContext.TemplateItems
+                .Where(x => x.Category == previousName)
+                .ToArrayAsync(cancellationToken);
+
+            foreach (var template in templates)
+            {
+                template.Category = categoryName;
+                template.UpdatedAtUtc = updatedAtUtc;
+            }
+        }
     }
 
     private async Task<AdminTemplateCategoryListItemResponse> BuildAdminCategoryResponseAsync(TemplateCategory category, CancellationToken cancellationToken)
@@ -197,24 +287,64 @@ internal sealed class TemplateCategoryAdminService(
         return MapAdminCategory(category, templates);
     }
 
-    private ValueTask PublishFeedInvalidatedAsync(CancellationToken cancellationToken)
+    private ValueTask PublishCategoryInvalidatedAsync(
+        string category,
+        string reason,
+        bool isCritical,
+        CancellationToken cancellationToken)
     {
-        return templateFeedRealtimeService.PublishTemplatesFeedInvalidatedAsync(cancellationToken);
+        return templateFeedRealtimeService.PublishTemplatesFeedInvalidatedAsync(
+            new TemplateFeedInvalidationPayload(
+                TemplateFeedInvalidationScopes.Category,
+                Category: category,
+                IsCritical: isCritical,
+                Reason: reason),
+            cancellationToken);
+    }
+
+    private void StageCategoryInvalidated(
+        string category,
+        string reason,
+        bool isCritical,
+        DateTime createdAtUtc)
+    {
+        var payload = new TemplateFeedInvalidationPayload(
+            TemplateFeedInvalidationScopes.Category,
+            Category: category,
+            IsCritical: isCritical,
+            Reason: reason);
+
+        dbContext.TemplateRealtimeEvents.Add(new TemplateRealtimeEventRecord
+        {
+            Id = Guid.NewGuid(),
+            Topic = TemplateFeedRealtimeTopics.TemplatesFeedInvalidated,
+            Data = JsonSerializer.Serialize(payload, RealtimeJsonSerializerOptions),
+            CreatedAtUtc = createdAtUtc
+        });
     }
 
     private static string NormalizeCategoryName(string rawCategoryName)
     {
-        return rawCategoryName.Trim();
+        return CollapseWhitespace(rawCategoryName);
     }
 
     private static string NormalizeCategoryKey(string categoryName)
     {
-        return categoryName.Trim().ToUpperInvariant();
+        return CollapseWhitespace(categoryName).ToUpperInvariant();
     }
 
     private static string NormalizeCategoryLookupKey(string? categoryName)
     {
-        return categoryName?.Trim() ?? string.Empty;
+        return string.IsNullOrWhiteSpace(categoryName)
+            ? string.Empty
+            : CollapseWhitespace(categoryName);
+    }
+
+    private static string CollapseWhitespace(string value)
+    {
+        return string.Join(' ', value
+            .Trim()
+            .Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries));
     }
 
     private static string[] NormalizeTags(IEnumerable<string> tags)

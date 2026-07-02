@@ -47,6 +47,7 @@ public sealed class TemplatesInfrastructureConfigurationTests
         Assert.Equal(1, options.VideoMaxConcurrentGenerations);
         Assert.Equal(0, options.VideoBorrowMaxConcurrentGenerations);
         Assert.False(options.EnableElasticLaneBorrowing);
+        Assert.False(options.QaFixturesEnabled);
         Assert.True(options.AllowVideoBorrowWhenImageQueueEmpty);
         Assert.Equal(120, options.AllowVideoBorrowWhenImageEstimatedWaitBelowSeconds);
         Assert.Equal("natural_completion", options.VideoBorrowReleaseMode);
@@ -95,6 +96,25 @@ public sealed class TemplatesInfrastructureConfigurationTests
         Assert.Equal("FakeGeneratedMediaImporter", generatedMediaImporter.GetType().Name);
         Assert.Contains(hostedServices, service => service.GetType().Name == "TemplateGenerationWorker");
         Assert.Contains(hostedServices, service => service.GetType().Name == "TemplateMediaCleanupWorker");
+    }
+
+    [Fact]
+    public void AddTemplatesInfrastructure_ShouldUseExplicitSchedulerComponent_WhenProvided()
+    {
+        var services = CreateServices();
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["Templates:GenerationWorkerEnabled"] = "true"
+        });
+
+        services.AddTemplatesInfrastructure(
+            configuration,
+            schedulerComponent: TemplateSchedulerConfigFingerprint.ApiComponent);
+
+        using var provider = services.BuildServiceProvider();
+
+        var component = provider.GetRequiredService<TemplateSchedulerConfigComponent>();
+        Assert.Equal(TemplateSchedulerConfigFingerprint.ApiComponent, component.Value);
     }
 
     [Fact]
@@ -519,6 +539,33 @@ public sealed class TemplatesInfrastructureConfigurationTests
         var exception = Assert.Throws<InvalidOperationException>(() => services.AddTemplatesInfrastructure(configuration, environment));
 
         Assert.Contains("Sample template seed data", exception.Message);
+    }
+
+    [Fact]
+    public void AddTemplatesInfrastructure_ShouldRejectQaFixtures_InProduction()
+    {
+        var services = CreateServices();
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["Templates:PublicBaseUrl"] = "https://cdn.petmagic.app/templates",
+            ["Templates:StorageProvider"] = TemplateStorageProviders.R2,
+            ["Templates:AiProvider"] = TemplateAiProviders.Fal,
+            ["Templates:QaFixturesEnabled"] = "true",
+            ["Templates:R2:AccountId"] = "test-account",
+            ["Templates:R2:AccessKey"] = "test-access-key",
+            ["Templates:R2:SecretKey"] = "test-secret-key",
+            ["Templates:R2:BucketName"] = "petmagic-test",
+            ["Templates:R2:PublicBaseUrl"] = "https://cdn.example.test",
+            ["Templates:Fal:ApiKey"] = "test-fal-key"
+        });
+        var environment = new TestHostEnvironment(Directory.GetCurrentDirectory())
+        {
+            EnvironmentName = Environments.Production
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(() => services.AddTemplatesInfrastructure(configuration, environment));
+
+        Assert.Contains("Template QA fixtures", exception.Message);
     }
 
     [Theory]

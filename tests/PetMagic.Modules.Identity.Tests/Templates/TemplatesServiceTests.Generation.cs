@@ -158,6 +158,77 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task StartAsync_ShouldAllowTemplateInArchivedCategory()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var billing = new RecordingGenerationBilling();
+        var generationService = CreateGenerationService(dbContext, billing: billing);
+        var templateId = await CreateActiveImageTemplateAsync(
+            service,
+            "Archived Category Generation",
+            "Seasonal",
+            ["generation"]);
+
+        var archivedCategory = await dbContext.TemplateCategories.SingleAsync(category => category.Name == "Seasonal");
+        archivedCategory.IsArchived = true;
+        await dbContext.SaveChangesAsync();
+
+        var userId = Guid.NewGuid();
+        var started = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                userId,
+                templateId,
+                new TemplateAssetCommand("https://cdn.example.com/source.jpg", "source.jpg", "image/jpeg", 2048, null),
+                "archived-category-key",
+                "archived-category-hash",
+                3),
+            CancellationToken.None);
+
+        Assert.True(started.IsSuccess);
+        Assert.Equal(started.Value.GenerationId, Assert.Single(billing.ChargedGenerationIds));
+        var job = await dbContext.TemplateGenerationJobs.SingleAsync();
+        Assert.Equal(templateId, job.TemplateId);
+        Assert.Equal(userId, job.UserId);
+    }
+
+    [Fact]
+    public async Task StartAsync_ShouldRejectTemplateChangedAfterPreviewBeforeCharge()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var billing = new RecordingGenerationBilling();
+        var generationService = CreateGenerationService(dbContext, billing: billing);
+        var templateId = await CreateActiveImageTemplateAsync(
+            service,
+            "Changed Preview Generation",
+            "Portrait",
+            ["generation"]);
+
+        var template = await dbContext.TemplateItems.SingleAsync(x => x.Id == templateId);
+        var previewVersion = template.Version;
+        template.Version = previewVersion + 1;
+        template.UpdatedAtUtc = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync();
+
+        var started = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                UserId: Guid.NewGuid(),
+                TemplateId: templateId,
+                SourceImageAsset: new TemplateAssetCommand("https://cdn.example.com/source.jpg", "source.jpg", "image/jpeg", 2048, null),
+                IdempotencyKey: "changed-template-key",
+                RequestHash: "changed-template-hash",
+                ActiveGenerationLimit: 3,
+                ExpectedTemplateVersion: previewVersion),
+            CancellationToken.None);
+
+        Assert.True(started.IsFailure);
+        Assert.Equal(TemplatesErrors.TemplateChanged.Code, started.Error.Code);
+        Assert.Empty(billing.ChargedGenerationIds);
+        Assert.Empty(await dbContext.TemplateGenerationJobs.ToArrayAsync());
+    }
+
+    [Fact]
     public async Task StartAsync_ShouldRejectOverloadedFreeImageBeforeCharge()
     {
         await using var dbContext = CreateDbContext();
