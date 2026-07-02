@@ -7,9 +7,12 @@ from pathlib import Path
 
 def read_text(path: Path) -> str:
     try:
-        return path.read_text(errors="replace")
+        raw = path.read_bytes()
     except OSError:
         return ""
+    if raw.startswith(b"\xff\xfe") or raw.startswith(b"\xfe\xff"):
+        return raw.decode("utf-16", errors="replace")
+    return raw.decode("utf-8", errors="replace")
 
 
 def first_du_total(path: Path) -> int | None:

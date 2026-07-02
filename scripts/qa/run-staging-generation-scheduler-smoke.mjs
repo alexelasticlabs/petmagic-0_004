@@ -66,6 +66,33 @@ const realtimeGrowthBudget = intEnv('STAGING_REALTIME_GROWTH_BUDGET', Math.max(2
 const sourceBytes = process.env.STAGING_SOURCE_IMAGE_PATH
   ? readFileSync(process.env.STAGING_SOURCE_IMAGE_PATH)
   : png1x1;
+const useQaFixtures = boolEnv('STAGING_USE_QA_FIXTURES', boolEnv('PETMAGIC_QA_FIXTURES_ENABLED', false));
+const requiredPrometheusMetricNames = parseList(process.env.STAGING_REQUIRED_GENERATION_METRICS).length > 0
+  ? parseList(process.env.STAGING_REQUIRED_GENERATION_METRICS)
+  : [
+      'fal_provider_configured_concurrency',
+      'fal_provider_inflight_requests',
+      'fal_provider_balance_low',
+      'fal_provider_balance_critical',
+      'fal_provider_balance_usd',
+      'fal_provider_rejected_due_to_capacity',
+      'fal_provider_rate_limit_errors',
+      'fal_provider_queue_wait_seconds_bucket',
+      'generation_queue_depth_bucket',
+      'generation_active_jobs_bucket',
+      'generation_oldest_queued_job_age_seconds_bucket',
+      'generation_jobs_accepted_total',
+      'generation_jobs_rejected_total',
+      'generation_jobs_cancelled_total',
+      'generation_jobs_refunded_total',
+      'generation_cancel_refunds_total',
+      'generation_duplicate_refund_attempts_total',
+      'generation_scheduler_active_image_native_slots',
+      'generation_scheduler_active_video_native_slots',
+      'generation_scheduler_active_video_borrowed_slots',
+      'generation_scheduler_video_borrow_denied_total',
+      'generation_sse_delivery_failures_total'
+    ];
 
 const checks = [];
 const createdGenerations = [];
@@ -100,16 +127,29 @@ const evidence = {
   checks,
   createdGenerations,
   rejectedResponses,
+  qaFixtures: {
+    enabled: useQaFixtures,
+    probes: []
+  },
   sql: {},
   prometheus: {}
 };
 
-main().catch(error => {
+main().catch(async error => {
   checks.push({
     name: 'runner.completed_without_unhandled_error',
     ok: false,
     detail: error.stack || String(error)
   });
+  if (useQaFixtures) {
+    await cleanupQaFixtures('unhandled_error').catch(cleanupError => {
+      checks.push({
+        name: 'qa_fixtures.cleanup_after_unhandled_error',
+        ok: false,
+        detail: cleanupError.stack || String(cleanupError)
+      });
+    });
+  }
   finish(1);
 });
 
@@ -130,6 +170,9 @@ async function main() {
   verifyMigrationsAndConcurrentIndexes();
   verifyConcurrentMigrationSource();
 
+  const qaStateFixturesProbe = await runQaStateFixturesProbe();
+  evidence.qaFixtures.stateProbe = qaStateFixturesProbe;
+
   const waitTooLongProbe = await tryProduceWaitTooLong(before);
   evidence.waitTooLongProbe = waitTooLongProbe;
 
@@ -149,6 +192,10 @@ async function main() {
   verifyDatabaseOutcomes(before, after, waitTooLongProbe, cancelProbe, failingProbe, sseProbe);
 
   await queryPrometheus();
+
+  if (useQaFixtures) {
+    evidence.qaFixtures.finalCleanup = await cleanupQaFixtures('final');
+  }
 
   finish(hasFailedChecks() && !allowIncomplete ? 1 : 0);
 }
@@ -203,6 +250,7 @@ async function runPreflightChecks() {
     existingGenerations >= minExistingGenerations,
     `existing=${existingGenerations}, minimum=${minExistingGenerations}`);
 
+  verifyRuntimeConfigFingerprintEvidence();
   verifyMigrationLogEvidence();
 }
 
@@ -312,6 +360,9 @@ function verifyConcurrentMigrationSource() {
 }
 
 async function tryProduceWaitTooLong(before) {
+  const qaFixture = useQaFixtures
+    ? await createQaFixtures(['waitTooLongVideo'], 'wait_too_long')
+    : null;
   const attempts = [];
   const tokens = [...freeTokens].reverse().concat([...premiumTokens].reverse());
   const maxAttempts = Math.max(8, Math.min(smokeTotal, tokens.length * 4));
@@ -359,15 +410,38 @@ async function tryProduceWaitTooLong(before) {
     'api.generation_wait_too_long_observed',
     Boolean(rejected),
     rejected ? JSON.stringify(summarizeResponse(rejected)) : 'No GENERATION_WAIT_TOO_LONG response observed.');
-  return { attempts: attempts.map(summarizeResponse), rejected: rejected ? summarizeResponse(rejected) : null };
+  return {
+    qaFixture,
+    attempts: attempts.map(summarizeResponse),
+    rejected: rejected ? summarizeResponse(rejected) : null
+  };
 }
 
 async function runCancelProbe() {
-  const token = premiumTokens[0] || freeTokens[0];
-  const created = await submitGeneration(token, cancelTemplateId, 'cancel-probe');
+  const token = useQaFixtures
+    ? adminToken
+    : premiumTokens[0] || freeTokens[0];
+  const qaFixture = useQaFixtures
+    ? await createQaFixtures(['queued'], 'cancel_queued')
+    : null;
+  const queuedFixture = qaFixture?.body?.generations?.find(item => String(item.status).toLowerCase() === 'queued');
+  const created = queuedFixture
+    ? {
+      status: 202,
+      body: {
+        generationId: queuedFixture.generationId,
+        estimatedWaitSeconds: queuedFixture.estimatedWaitSeconds,
+        queuePosition: queuedFixture.queuePosition,
+        priorityClass: queuedFixture.priorityClass
+      },
+      token,
+      label: 'cancel-probe-fixture',
+      idempotencyKey: `qa-fixture:${queuedFixture.generationId}`
+    }
+    : await submitGeneration(token, cancelTemplateId, 'cancel-probe');
   if (created.status !== 202 || !created.body?.generationId) {
     addCheck('api.cancel_probe_generation_accepted', false, JSON.stringify(summarizeResponse(created)));
-    return { created: summarizeResponse(created), cancelled: null, duplicateCancel: null };
+    return { qaFixture, created: summarizeResponse(created), cancelled: null, duplicateCancel: null };
   }
 
   createdGenerations.push({
@@ -431,6 +505,7 @@ async function runCancelProbe() {
     `generation=${created.body.generationId}, refundCount=${refundCount}`);
 
   return {
+    qaFixture,
     created: summarizeResponse(created),
     cancelled: summarizeResponse(firstCancel),
     duplicateCancel: summarizeResponse(duplicateCancel),
@@ -438,6 +513,92 @@ async function runCancelProbe() {
     refundReason,
     refundCount
   };
+}
+
+async function runQaStateFixturesProbe() {
+  if (!useQaFixtures) {
+    addCheck(
+      'qa_fixtures.state_probe_skipped_when_disabled',
+      true,
+      'Set STAGING_USE_QA_FIXTURES=true and PETMAGIC_QA_FIXTURES_ENABLED=true on API for deterministic local/staging QA.');
+    return { enabled: false };
+  }
+
+  const created = await createQaFixtures(
+    ['providerQueued', 'providerProcessing', 'importingMedia', 'failed'],
+    'state_probe');
+  const generations = Array.isArray(created.body?.generations)
+    ? created.body.generations
+    : [];
+  const statuses = new Set(generations.map(item => item.status));
+  for (const expectedStatus of ['ProviderQueued', 'ProviderProcessing', 'ImportingMedia', 'Failed']) {
+    addCheck(
+      `qa_fixtures.state_${expectedStatus}_created`,
+      statuses.has(expectedStatus),
+      JSON.stringify(generations.map(item => ({
+        generationId: item.generationId,
+        status: item.status,
+        canCancel: item.canCancel,
+        refundedAtUtc: item.refundedAtUtc ?? null
+      }))));
+  }
+
+  const cancellableInternalStates = generations
+    .filter(item => ['ProviderQueued', 'ProviderProcessing', 'ImportingMedia'].includes(item.status))
+    .filter(item => item.canCancel !== false);
+  addCheck(
+    'qa_fixtures.internal_states_are_not_cancellable',
+    cancellableInternalStates.length === 0,
+    JSON.stringify(cancellableInternalStates.map(item => ({ generationId: item.generationId, status: item.status, canCancel: item.canCancel }))));
+
+  const failed = generations.find(item => item.status === 'Failed');
+  addCheck(
+    'qa_fixtures.failed_fixture_refund_safe',
+    !failed || Boolean(failed.refundedAtUtc),
+    failed ? JSON.stringify({ generationId: failed.generationId, refundedAtUtc: failed.refundedAtUtc ?? null, lastErrorCode: failed.lastErrorCode }) : 'failed fixture missing');
+
+  return created;
+}
+
+async function createQaFixtures(scenarios, label) {
+  const response = await postJson('/api/templates/qa/generation-fixtures', adminToken, {
+    imageTemplateId,
+    videoTemplateId,
+    scenarios
+  });
+  const summarized = {
+    label,
+    status: response.status,
+    scenarios,
+    generationStatuses: Array.isArray(response.body?.generations)
+      ? response.body.generations.map(item => item.status)
+      : [],
+    waitTooLong: response.body?.waitTooLong || [],
+    deletedBeforeCreate: response.body?.deletedBeforeCreate
+  };
+  evidence.qaFixtures.probes.push(summarized);
+  addCheck(
+    `qa_fixtures.${label}.create_success`,
+    response.status === 200,
+    JSON.stringify(summarized));
+  return { ...response, label, summarized };
+}
+
+async function cleanupQaFixtures(label) {
+  const response = await deleteJson('/api/templates/qa/generation-fixtures', adminToken);
+  const summarized = {
+    label,
+    status: response.status,
+    deletedGenerationJobs: response.body?.deletedGenerationJobs,
+    deletedMediaRecords: response.body?.deletedMediaRecords,
+    deletedRealtimeEvents: response.body?.deletedRealtimeEvents,
+    refundedGenerationJobs: response.body?.refundedGenerationJobs
+  };
+  addCheck(
+    `qa_fixtures.${label}.cleanup_success`,
+    response.status === 200,
+    JSON.stringify(summarized));
+  return summarized;
 }
 
 async function createGenerationMatrix() {
@@ -621,16 +782,29 @@ async function queryPrometheus() {
     return;
   }
 
+  await verifyPrometheusMetricNames(base);
+
   const queries = {
-    queueDepthP95: 'histogram_quantile(0.95, sum by (le)(rate(generation_queue_depth_bucket[5m])))',
-    activeJobsP95: 'histogram_quantile(0.95, sum by (le, media_type, tier, lane)(rate(generation_active_jobs_bucket[5m])))',
-    oldestQueuedAgeP95: 'histogram_quantile(0.95, sum by (le)(rate(generation_oldest_queued_job_age_seconds_bucket[5m])))',
-    rejectedJobsRate: 'sum(rate(generation_jobs_rejected_total[10m]))',
-    cancelledJobs15m: 'increase(generation_jobs_cancelled_total[15m])',
-    refundedJobs15m: 'increase(generation_jobs_refunded_total[15m])',
-    duplicateRefundAttempts15m: 'increase(generation_duplicate_refund_attempts_total[15m])',
-    falTimeouts15m: 'increase(generation_fal_timeouts_total[15m])',
-    sseDeliveryFailures15m: 'increase(generation_sse_delivery_failures_total[15m])'
+    queueDepthP95: 'histogram_quantile(0.95, sum by (le)(rate(generation_queue_depth_bucket[5m]))) or vector(0)',
+    activeJobsP95: 'histogram_quantile(0.95, sum by (le, media_type, tier, lane)(rate(generation_active_jobs_bucket[5m]))) or vector(0)',
+    oldestQueuedAgeP95: 'histogram_quantile(0.95, sum by (le)(rate(generation_oldest_queued_job_age_seconds_bucket[5m]))) or vector(0)',
+    stuckProviderQueuedAgeP95: 'histogram_quantile(0.95, sum by (le)(rate(generation_stuck_stage_age_seconds_bucket{stage="ProviderQueued"}[5m]))) or vector(0)',
+    stuckProviderProcessingAgeP95: 'histogram_quantile(0.95, sum by (le)(rate(generation_stuck_stage_age_seconds_bucket{stage="ProviderProcessing"}[5m]))) or vector(0)',
+    stuckImportingMediaAgeP95: 'histogram_quantile(0.95, sum by (le)(rate(generation_stuck_stage_age_seconds_bucket{stage="ImportingMedia"}[5m]))) or vector(0)',
+    acceptedJobsRate: 'sum(rate(generation_jobs_accepted_total[10m])) or vector(0)',
+    rejectedJobsRate: 'sum(rate(generation_jobs_rejected_total[10m])) or vector(0)',
+    cancelledJobs15m: 'increase(generation_jobs_cancelled_total[15m]) or vector(0)',
+    refundedJobs15m: 'increase(generation_jobs_refunded_total[15m]) or vector(0)',
+    cancelRefunds15m: 'increase(generation_cancel_refunds_total[15m]) or vector(0)',
+    refundFailures15m: 'increase(generation_refund_failures_total[15m]) or vector(0)',
+    duplicateRefundAttempts15m: 'increase(generation_duplicate_refund_attempts_total[15m]) or vector(0)',
+    falTimeouts15m: 'increase(generation_fal_timeouts_total[15m]) or vector(0)',
+    webhookDeliveryFailures15m: 'increase(generation_webhook_delivery_failures_total[15m]) or vector(0)',
+    webhookSignatureFailures15m: 'increase(generation_webhook_signature_failures_total[15m]) or vector(0)',
+    sseDeliveryFailures15m: 'increase(generation_sse_delivery_failures_total[15m]) or vector(0)',
+    mediaImportFailures15m: 'increase(generation_media_import_failures_total[15m]) or vector(0)',
+    preview40415m: 'increase(generation_preview_404_total[15m]) or vector(0)',
+    r2UploadFailures15m: 'increase(generation_r2_upload_failures_total[15m]) or vector(0)'
   };
 
   for (const [name, query] of Object.entries(queries)) {
@@ -642,6 +816,28 @@ async function queryPrometheus() {
       response.ok && body?.status === 'success' && Array.isArray(body?.data?.result) && body.data.result.length > 0,
       JSON.stringify(body));
   }
+}
+
+async function verifyPrometheusMetricNames(base) {
+  const response = await fetch(`${base.replace(/\/$/, '')}/api/v1/label/__name__/values`);
+  const body = await response.json().catch(() => null);
+  evidence.prometheus.metricNames = {
+    status: response.status,
+    required: requiredPrometheusMetricNames,
+    missing: []
+  };
+
+  const metricNames = Array.isArray(body?.data)
+    ? new Set(body.data)
+    : new Set();
+  const missing = requiredPrometheusMetricNames.filter(name => !metricNames.has(name));
+  evidence.prometheus.metricNames.missing = missing;
+  addCheck(
+    'prometheus.required_generation_metrics_present',
+    response.ok && body?.status === 'success' && missing.length === 0,
+    missing.length === 0
+      ? `required=${requiredPrometheusMetricNames.length}`
+      : `missing=${missing.join(',')}`);
 }
 
 async function submitGeneration(token, templateId, label) {
@@ -685,6 +881,17 @@ async function postJson(path, token, payload) {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify(payload)
+  });
+  const body = await parseBody(response);
+  return { status: response.status, body };
+}
+
+async function deleteJson(path, token) {
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
   });
   const body = await parseBody(response);
   return { status: response.status, body };
@@ -1426,6 +1633,65 @@ function verifyMigrationLogEvidence() {
     `log=${anonymize(logPath)}`);
 }
 
+function verifyRuntimeConfigFingerprintEvidence() {
+  const rows = queryRows(`
+    WITH ranked AS (
+      SELECT "Component",
+             "ProfileName",
+             "Checksum",
+             "StartedAtUtc",
+             "MismatchDetected",
+             "MismatchDetails",
+             row_number() OVER (
+               PARTITION BY "Component", "ProfileName"
+               ORDER BY "StartedAtUtc" DESC, "Id" DESC
+             ) AS rn
+      FROM templates_runtime_config_fingerprints
+    )
+    SELECT "Component",
+           "ProfileName",
+           "Checksum",
+           COALESCE(to_char("StartedAtUtc", 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'), ''),
+           "MismatchDetected"::text,
+           COALESCE("MismatchDetails", '')
+    FROM ranked
+    WHERE rn = 1
+    ORDER BY "ProfileName", "Component";
+  `).map(row => ({
+    component: row[0],
+    profileName: row[1],
+    checksum: row[2],
+    startedAtUtc: row[3],
+    mismatchDetected: parsePgBool(row[4]),
+    mismatchDetails: row[5]
+  }));
+
+  evidence.sql.runtimeConfigFingerprints = rows;
+  const apiRows = rows.filter(row => row.component === 'api');
+  const workerRows = rows.filter(row => row.component === 'generation-worker');
+  const matchingPairs = [];
+  for (const api of apiRows) {
+    const worker = workerRows.find(candidate => candidate.profileName === api.profileName);
+    if (worker) {
+      matchingPairs.push({ api, worker });
+    }
+  }
+
+  const matched = matchingPairs.find(pair =>
+    pair.api.checksum === pair.worker.checksum
+    && !pair.api.mismatchDetected
+    && !pair.worker.mismatchDetected);
+  addCheck(
+    'runtime_config.api_worker_scheduler_fingerprints_match',
+    Boolean(matched),
+    JSON.stringify(rows.map(row => ({
+      component: row.component,
+      profileName: row.profileName,
+      checksum: row.checksum,
+      mismatchDetected: row.mismatchDetected
+    }))));
+}
+
 function hasAnyStagingProcessEnv() {
   return Object.keys(process.env).some(name => name.startsWith('STAGING_'));
 }
@@ -1459,6 +1725,10 @@ function sanitizeLabel(value) {
 }
 
 function parseList(raw) {
+  if (!raw) {
+    return [];
+  }
+
   return raw.split(',').map(value => value.trim()).filter(Boolean);
 }
 
@@ -1525,6 +1795,8 @@ Optional environment:
   STAGING_SUBMIT_CONCURRENCY            default 8
   STAGING_EXPECT_FAILED_STATUS          require failed DB status evidence, default false
   STAGING_ALLOW_INCOMPLETE              write evidence but exit 0 on failed checks, default false
+  STAGING_USE_QA_FIXTURES               use deterministic local/staging QA fixtures, default false
+  STAGING_REQUIRED_GENERATION_METRICS   comma-separated override for Prometheus metric-name gate
   STAGING_SOURCE_IMAGE_PATH             PNG/JPEG/WebP source image path
   STAGING_PSQL_COMMAND                  psql command path, default psql
   STAGING_ARTIFACT_DIR                  output dir, default artifacts/staging-generation-scheduler-smoke/<run>

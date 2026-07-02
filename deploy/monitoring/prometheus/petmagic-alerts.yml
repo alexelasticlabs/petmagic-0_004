@@ -89,6 +89,16 @@ groups:
           summary: "Template generation admission rejections are elevated"
           description: "Generation jobs are being rejected before charge at an elevated rate. Check wait thresholds, queue depth, and current staging caps."
 
+      - alert: PetMagicGenerationWaitTooLongHigh
+        expr: sum by (media_type, tier) (increase(generation_jobs_rejected_total{reason="GENERATION_WAIT_TOO_LONG"}[15m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: petmagic-api
+        annotations:
+          summary: "Generation wait-too-long rejections are elevated"
+          description: "GENERATION_WAIT_TOO_LONG rejections are elevated for {{ $labels.media_type }}/{{ $labels.tier }}. Check queue depth, max-wait thresholds, provider capacity, and admission settings."
+
       - alert: PetMagicGenerationFalTimeouts
         expr: increase(generation_fal_timeouts_total[15m]) > 0
         for: 0m
@@ -98,6 +108,36 @@ groups:
         annotations:
           summary: "FAL generation timeouts detected"
           description: "At least one FAL timeout occurred in the last 15 minutes. Check media type, stage, model tags, and provider queue status."
+
+      - alert: PetMagicGenerationQueuedWithoutCharge
+        expr: increase(generation_jobs_queued_without_charge_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          service: petmagic-api
+        annotations:
+          summary: "Generation job was queued without charge"
+          description: "A non-admin queued generation was found without a charge. Generation admission/charge ordering is broken or a request crashed between queue and charge."
+
+      - alert: PetMagicGenerationRefundFailures
+        expr: increase(generation_refund_failures_total[10m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          service: petmagic-generation-worker
+        annotations:
+          summary: "Generation refund failures detected"
+          description: "A generation refund failed. Check billing provider availability, wallet ledger writes, and RefundLastErrorCode."
+
+      - alert: PetMagicGenerationDuplicateRefundAttempt
+        expr: increase(generation_duplicate_refund_attempts_total[10m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          service: petmagic-generation-worker
+        annotations:
+          summary: "Duplicate generation refund attempt detected"
+          description: "A generation refund was attempted after RefundedAtUtc was already set. Check idempotency and retry concurrency."
 
       - alert: PetMagicFalProviderBalanceLow
         expr: fal_provider_balance_low > 0
@@ -142,6 +182,16 @@ groups:
           summary: "fal.ai provider in-flight requests near configured concurrency"
           description: "Provider in-flight requests are above 85% of configured fal.ai concurrency for 10 minutes. Check queue wait and consider reducing admission or increasing fal.ai credits."
 
+      - alert: PetMagicFalProviderSubmitFailures
+        expr: increase(fal_provider_submit_failures[10m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          service: petmagic-generation-worker
+        annotations:
+          summary: "fal.ai submit failures detected"
+          description: "fal.ai submit requests failed. Check model, stage, status_code tag, network path, provider dashboard, and API key permissions."
+
       - alert: PetMagicFalProviderQueueWaitHigh
         expr: |
           histogram_quantile(
@@ -168,6 +218,46 @@ groups:
           summary: "fal.ai rate limit errors detected"
           description: "fal.ai returned rate limit responses. Check configured concurrency, reserved concurrency, and provider dashboard notifications."
 
+      - alert: PetMagicFalWebhookDeliveryFailures
+        expr: increase(generation_webhook_delivery_failures_total[10m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          service: petmagic-api
+        annotations:
+          summary: "fal.ai webhook delivery or payload failures detected"
+          description: "Webhook payload delivery/processing failed. Check public callback URL, gateway routing, request id consistency, and API logs."
+
+      - alert: PetMagicFalWebhookSignatureFailures
+        expr: increase(generation_webhook_signature_failures_total[10m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          service: petmagic-api
+        annotations:
+          summary: "fal.ai webhook signature failures detected"
+          description: "fal.ai webhook signature verification failed. Check JWKS reachability, clock skew, callback headers, and whether non-fal traffic is hitting the endpoint."
+
+      - alert: PetMagicGenerationVideoBorrowDeniedByImageBacklog
+        expr: increase(generation_scheduler_video_borrow_denied_total{reason="image_backlog"}[10m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: petmagic-generation-worker
+        annotations:
+          summary: "Video borrowing denied because image backlog needs protected capacity"
+          description: "Elastic video borrowing is being denied due to image backlog. Check image queue depth, protected capacity, and whether video admission should be tightened."
+
+      - alert: PetMagicGenerationBorrowingCapViolation
+        expr: increase(generation_scheduler_borrowing_cap_violations_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          service: petmagic-generation-worker
+        annotations:
+          summary: "Generation borrowing cap violation detected"
+          description: "Scheduler observed an elastic borrowing cap violation. Stop rollout and compare API/Worker scheduler fingerprints."
+
       - alert: PetMagicGenerationWorkerNotProcessing
         expr: |
           sum(generation_jobs_queued) > 0
@@ -179,6 +269,54 @@ groups:
         annotations:
           summary: "Template generation workers are not processing queued jobs"
           description: "Jobs are queued, but no processing/completion lifecycle events were observed for 10 minutes."
+
+      - alert: PetMagicGenerationStuckProviderQueued
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (
+              rate(generation_stuck_stage_age_seconds_bucket{stage="ProviderQueued"}[5m])
+            )
+          ) > 1800
+        for: 10m
+        labels:
+          severity: warning
+          service: petmagic-generation-worker
+        annotations:
+          summary: "Generation jobs are stuck in ProviderQueued"
+          description: "ProviderQueued p95 age is above 30 minutes. Check fal.ai queue, provider request ids, and webhook/polling status."
+
+      - alert: PetMagicGenerationStuckProviderProcessing
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (
+              rate(generation_stuck_stage_age_seconds_bucket{stage="ProviderProcessing"}[5m])
+            )
+          ) > 1800
+        for: 10m
+        labels:
+          severity: warning
+          service: petmagic-generation-worker
+        annotations:
+          summary: "Generation jobs are stuck in ProviderProcessing"
+          description: "ProviderProcessing p95 age is above 30 minutes. Check fal.ai job status, polling timeout settings, and provider callbacks."
+
+      - alert: PetMagicGenerationStuckImportingMedia
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (
+              rate(generation_stuck_stage_age_seconds_bucket{stage="ImportingMedia"}[5m])
+            )
+          ) > 600
+        for: 10m
+        labels:
+          severity: critical
+          service: petmagic-generation-worker
+        annotations:
+          summary: "Generation jobs are stuck importing media"
+          description: "ImportingMedia p95 age is above 10 minutes. Check generated media URL expiry, R2 upload failures, and worker import logs."
 
       - alert: PetMagicGenerationFailuresHigh
         expr: sum(rate(generation_jobs_failed_total[10m])) > 0.1
@@ -200,6 +338,16 @@ groups:
           summary: "Template generation retries exhausted"
           description: "At least one generation job exhausted all retry attempts in the last 15 minutes."
 
+      - alert: PetMagicGenerationRetryRateHigh
+        expr: sum(rate(generation_retry_attempts_total[10m])) > 0.1
+        for: 15m
+        labels:
+          severity: warning
+          service: petmagic-generation-worker
+        annotations:
+          summary: "Template generation retry rate is elevated"
+          description: "Generation retry attempts are elevated. Check failure_code/reason tags, provider health, and worker stability."
+
       - alert: PetMagicAiProviderErrorsHigh
         expr: sum(rate(ai_provider_errors_total[10m])) > 0.2
         for: 15m
@@ -209,6 +357,36 @@ groups:
         annotations:
           summary: "AI provider errors are elevated"
           description: "AI provider error rate is above threshold. Check provider status, model config, and rate limits."
+
+      - alert: PetMagicGenerationMediaImportFailures
+        expr: increase(generation_media_import_failures_total[10m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          service: petmagic-generation-worker
+        annotations:
+          summary: "Generated media import failures detected"
+          description: "Generated media import failed. Check provider result URL expiry, content type, size limits, and R2 upload path."
+
+      - alert: PetMagicTemplatePreview404
+        expr: increase(generation_preview_404_total[15m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          service: petmagic-api
+        annotations:
+          summary: "Template preview/reference media returned 404"
+          description: "Template content health found a preview/reference 404. Remove or fix the template before production feed exposure."
+
+      - alert: PetMagicR2UploadFailures
+        expr: increase(generation_r2_upload_failures_total[10m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          service: petmagic-generation-worker
+        annotations:
+          summary: "R2 media upload failures detected"
+          description: "R2 upload failed for generation/template media. Check credentials, bucket policy, endpoint URL, and object key prefix."
 
   - name: petmagic-economy
     interval: 30s

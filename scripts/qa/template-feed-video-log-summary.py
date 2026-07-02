@@ -27,9 +27,14 @@ def main() -> int:
 
     matches = []
     try:
-        lines = log_path.read_text(errors="replace").splitlines()
+        raw = log_path.read_bytes()
     except OSError:
         lines = []
+    else:
+        if raw.startswith(b"\xff\xfe") or raw.startswith(b"\xfe\xff"):
+            lines = raw.decode("utf-16", errors="replace").splitlines()
+        else:
+            lines = raw.decode("utf-8", errors="replace").splitlines()
 
     for index, line in enumerate(lines, start=1):
         for name, pattern in patterns:

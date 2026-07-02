@@ -46,6 +46,14 @@ Before traffic:
 - Confirm realtime retention is fixed for staging:
   `RealtimeEventRetentionMinutes=60`, `RealtimeEventCleanupIntervalMinutes=10`,
   `RealtimeEventCleanupBatchSize=1000`.
+- Confirm API and generation worker startup logs contain the same sanitized scheduler fingerprint
+  line: `Template scheduler config startup fingerprint`, with the same `ProfileName` and `Checksum`.
+- Confirm `/health` reports a healthy `templates_scheduler_config` check for the API process.
+  Detailed `schedulerConfig` fields such as `checksum` are intentionally redacted from the public
+  anonymous response and should be verified with an authenticated admin `/health` request or from
+  `templates_runtime_config_fingerprints`.
+- Confirm the latest rows in `templates_runtime_config_fingerprints` contain matching checksums for
+  `Component='api'` and `Component='generation-worker'` in the same `ProfileName`.
 
 After the API host applies migrations, verify the concurrent indexes exist:
 
@@ -71,6 +79,14 @@ rg -n "CONCURRENTLY|suppressTransaction" src\Modules\Templates\PetMagic.Modules.
 Expected evidence: both concurrent index commands and both rollback commands include
 `suppressTransaction: true`; deployment logs do not contain PostgreSQL errors saying
 `CREATE INDEX CONCURRENTLY cannot run inside a transaction block`.
+
+Dangerous scheduler mismatches are any API/worker difference in the normalized fingerprint: global,
+image, video, preprocessing, reserved, protected, or provider concurrency; elastic lane borrowing;
+max-wait thresholds; queue priority and aging; queue size and active-generation admission limits;
+provider timeout and polling settings; worker polling; retry, stale-lock, orphan-queue, and refund
+retry settings. The API reports these through degraded/unhealthy health evidence. The generation
+worker treats a mismatch against the latest API fingerprint as fatal and fails startup, because the
+worker is the component that actually consumes the queue.
 
 ## Staging smoke matrix
 
@@ -154,7 +170,8 @@ summary includes `LOCAL DEVELOPMENT SMOKE ONLY - NOT STAGING OR PRODUCTION EVIDE
 Local smoke data setup:
 
 - Start local Docker Compose with `ASPNETCORE_ENVIRONMENT=Development` and the separate
-  `backend`, `generation-worker`, and `postgres` services running.
+  `backend`, `generation-worker`, and `postgres` services running. For deterministic queue-state
+  checks, set `PETMAGIC_QA_FIXTURES_ENABLED=true` on the backend before startup.
 - Create or reuse one Free local test user and one Premium local test user, then put their local JWTs
   into `.env.local-smoke` as `LOCAL_FREE_JWT` and `LOCAL_PREMIUM_JWT`.
 - Create or reuse one active image template and one active video template, then put their IDs into
@@ -171,6 +188,82 @@ Copy-Item .env.staging.local.example .env.staging.local
 # Fill real STAGING_* values from secret storage; do not commit .env.staging.local.
 node scripts/qa/run-staging-generation-scheduler-smoke.mjs
 ```
+
+## Deterministic QA generation fixtures
+
+QA fixtures are allowed only in `Development` and `Staging`. They are disabled by default and require
+`PETMAGIC_QA_FIXTURES_ENABLED=true` on the API host. Production startup rejects this flag. The
+fixture worker guard excludes jobs with `InputSourceType='qa_fixture'`, so controlled jobs stay in
+the requested queue/provider/import/failure state until the fixture cleanup endpoint deletes them.
+
+The authenticated QA endpoints are:
+
+- `POST /api/templates/qa/generation-fixtures`
+- `DELETE /api/templates/qa/generation-fixtures`
+
+Create all UI-state fixtures:
+
+```powershell
+$body = @{
+  imageTemplateId = $env:STAGING_IMAGE_TEMPLATE_ID
+  videoTemplateId = $env:STAGING_VIDEO_TEMPLATE_ID
+  scenarios = @('queued', 'providerQueued', 'providerProcessing', 'importingMedia', 'failed')
+} | ConvertTo-Json
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "$env:STAGING_API_BASE_URL/api/templates/qa/generation-fixtures" `
+  -Headers @{ Authorization = "Bearer $env:STAGING_ADMIN_AUTH_TOKEN" } `
+  -ContentType 'application/json' `
+  -Body $body
+```
+
+Supported scenarios:
+
+- `queued`: charged image job that remains `Queued`; cancel is available and should refund once.
+- `providerQueued`: video job in `ProviderQueued`; cancel is unavailable.
+- `providerProcessing`: video job in `ProviderProcessing`; polling and realtime status evidence are
+  available.
+- `importingMedia`: video job in `ImportingMedia`; cancel is unavailable.
+- `failed`: charged image job in `Failed` with a user-facing provider error and an immediate refund.
+- `waitTooLongImage` / `waitTooLongVideo`: system-owned backlog jobs that make the next normal
+  generation start return `GENERATION_WAIT_TOO_LONG` before charge.
+
+Create deterministic overload for Android QA:
+
+```powershell
+$body = @{
+  imageTemplateId = $env:STAGING_IMAGE_TEMPLATE_ID
+  videoTemplateId = $env:STAGING_VIDEO_TEMPLATE_ID
+  scenarios = @('waitTooLongImage', 'waitTooLongVideo')
+} | ConvertTo-Json
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "$env:STAGING_API_BASE_URL/api/templates/qa/generation-fixtures" `
+  -Headers @{ Authorization = "Bearer $env:STAGING_ADMIN_AUTH_TOKEN" } `
+  -ContentType 'application/json' `
+  -Body $body
+```
+
+Then start a normal image or video generation with the same staging user. The expected API response
+is HTTP 503 with `code=GENERATION_WAIT_TOO_LONG`, structured `mediaType`, `tier`,
+`estimatedWaitSeconds`, `maxAllowedWaitSeconds`, `retryAfterSeconds`, `canRetry`, and
+`canUpgradeForPriority` metadata, no wallet charge, and no active job for that idempotency key.
+
+Cleanup:
+
+```powershell
+Invoke-RestMethod `
+  -Method Delete `
+  -Uri "$env:STAGING_API_BASE_URL/api/templates/qa/generation-fixtures" `
+  -Headers @{ Authorization = "Bearer $env:STAGING_ADMIN_AUTH_TOKEN" }
+```
+
+The cleanup endpoint refunds any still-charged fixture job before deleting fixture jobs, fixture
+media records, and matching realtime events for the caller plus system-owned wait-too-long backlog.
+Fixtures use `InputSourceType='qa_fixture'`, so they are not part of normal production feed content
+and must never be enabled in Production.
 
 ## Automated smoke runner
 
@@ -204,6 +297,8 @@ Before running the smoke:
 
 - Confirm staging migrations are applied by the same tooling used for production.
 - Confirm staging API and generation worker run as separate processes or containers.
+- Confirm both processes have already started once after the latest deployment, so
+  `templates_runtime_config_fingerprints` has fresh API and worker rows.
 - Confirm the staging database is a production-like copy or has enough historical generation rows to
   exercise queue depth, realtime cleanup, and refund queries.
 - Confirm the image and video template IDs are active and generate successfully with the staging AI
@@ -212,10 +307,19 @@ Before running the smoke:
   model, or reference media URL.
 - Confirm the Free and Premium JWTs belong to different staging test users and are not expired.
 - Confirm `STAGING_PROMETHEUS_BASE_URL` is reachable from the runner host.
+- Confirm `prometheus.required_generation_metrics_present` passes. The required metric-name gate is
+  defined in `docs/observability/generation-release-gate.md` and is production-blocking.
 - Keep `STAGING_MIN_EXISTING_GENERATIONS=100` unless the production-like staging copy has a documented
   lower but still representative generation history.
+- To use deterministic cancel, provider-state, and overload probes, enable
+  `PETMAGIC_QA_FIXTURES_ENABLED=true` on the staging API and set `STAGING_USE_QA_FIXTURES=true` for
+  the runner. The local wrapper defaults `LOCAL_USE_QA_FIXTURES=true`.
 - Optionally set `STAGING_MIGRATION_LOG_PATH` to a local deployment log; the runner stores only
   boolean evidence about the scheduler migration and transaction-block errors.
+
+The runner fails `runtime_config.api_worker_scheduler_fingerprints_match` when the latest API and
+generation-worker rows for the same profile are missing, have different checksums, or were marked as
+mismatched at startup.
 
 Run:
 
@@ -240,6 +344,9 @@ Default checks:
 - accepted, cancelled, completed, queue-rejected, and media/tier DB evidence is collected;
 - when `STAGING_FAILING_TEMPLATE_ID` is set, one extra generation is submitted and must reach
   terminal `failed` status;
+- when QA fixtures are enabled, deterministic `ProviderQueued`, `ProviderProcessing`,
+  `ImportingMedia`, `Failed`, queued cancel, and `GENERATION_WAIT_TOO_LONG` fixture probes are
+  created and cleaned up through the API;
 - `GENERATION_WAIT_TOO_LONG`, when observed, does not change the submitting user's wallet balance;
 - `GENERATION_WAIT_TOO_LONG` includes structured queue metadata and does not create an active job;
 - queued cancel refund ledger rows are not duplicated and charged cancels refund exactly once;
@@ -424,7 +531,7 @@ Example environment for current limit `10` / `FalConcurrency10`:
 ```env
 GENERATION_GLOBAL_MAX_CONCURRENT=8
 GENERATION_IMAGE_MAX_CONCURRENT=7
-GENERATION_VIDEO_MAX_CONCURRENT=2
+GENERATION_VIDEO_MAX_CONCURRENT=4
 GENERATION_WORKER_MAX_CONCURRENT_JOBS=2
 GENERATION_FREE_IMAGE_MAX_WAIT_SECONDS=1800
 GENERATION_PREMIUM_IMAGE_MAX_WAIT_SECONDS=900
@@ -443,7 +550,7 @@ Example environment for `$500` / `FalConcurrency30`:
 ```env
 GENERATION_GLOBAL_MAX_CONCURRENT=24
 GENERATION_IMAGE_MAX_CONCURRENT=21
-GENERATION_VIDEO_MAX_CONCURRENT=8
+GENERATION_VIDEO_MAX_CONCURRENT=14
 GENERATION_WORKER_MAX_CONCURRENT_JOBS=4
 GENERATION_FREE_IMAGE_MAX_WAIT_SECONDS=2700
 GENERATION_PREMIUM_IMAGE_MAX_WAIT_SECONDS=1200
@@ -460,7 +567,7 @@ Example environment for `$1000+` / `FalConcurrency40`:
 ```env
 GENERATION_GLOBAL_MAX_CONCURRENT=32
 GENERATION_IMAGE_MAX_CONCURRENT=28
-GENERATION_VIDEO_MAX_CONCURRENT=10
+GENERATION_VIDEO_MAX_CONCURRENT=20
 GENERATION_WORKER_MAX_CONCURRENT_JOBS=4
 GENERATION_FREE_IMAGE_MAX_WAIT_SECONDS=3600
 GENERATION_PREMIUM_IMAGE_MAX_WAIT_SECONDS=1500

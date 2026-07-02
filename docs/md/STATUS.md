@@ -77,7 +77,6 @@
 - POST /api/economy/wallet/spend
 - GET /api/economy/packs
 - POST /api/economy/purchases/create
-- POST /api/economy/purchases/{orderId}/confirm
 - GET /api/economy/purchases/{orderId}
 - POST /api/economy/webhooks/stripe
 

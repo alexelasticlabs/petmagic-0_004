@@ -49,6 +49,7 @@ const stagingRunnerEnv = {
   STAGING_POLL_ATTEMPTS: process.env.LOCAL_POLL_ATTEMPTS || process.env.STAGING_POLL_ATTEMPTS || '60',
   STAGING_POLL_DELAY_MS: process.env.LOCAL_POLL_DELAY_MS || process.env.STAGING_POLL_DELAY_MS || '1000',
   STAGING_REALTIME_GROWTH_BUDGET: process.env.LOCAL_REALTIME_GROWTH_BUDGET || process.env.STAGING_REALTIME_GROWTH_BUDGET || '200',
+  STAGING_USE_QA_FIXTURES: process.env.LOCAL_USE_QA_FIXTURES || process.env.PETMAGIC_QA_FIXTURES_ENABLED || process.env.STAGING_USE_QA_FIXTURES || 'true',
   STAGING_PSQL_COMMAND: process.env.LOCAL_PSQL_COMMAND || process.env.STAGING_PSQL_COMMAND || 'docker-compose-psql'
 };
 
@@ -152,6 +153,7 @@ Optional environment:
   LOCAL_SMOKE_TOTAL              default 20
   LOCAL_SUBMIT_CONCURRENCY       default 4
   LOCAL_MIN_EXISTING_GENERATIONS default 0
+  LOCAL_USE_QA_FIXTURES          default true; backend must set PETMAGIC_QA_FIXTURES_ENABLED=true
   LOCAL_SOURCE_IMAGE_PATH        PNG/JPEG/WebP source image path
   LOCAL_PSQL_COMMAND             psql command path, default docker-compose-psql
   LOCAL_ARTIFACT_DIR             output dir, default artifacts/local-generation-scheduler-smoke/<run>

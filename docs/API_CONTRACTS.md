@@ -44,35 +44,68 @@ Response shape:
 
 Item fields required by mobile:
 
-- `templateId`: GUID string.
-- `templateType`: `Image` or `Video`.
-- `title`, `shortDescription`, `category`.
-- `effectivePromoBadge`: nullable string.
+- `id`: GUID string.
+- `type`: `Image` or `Video`.
+- `title`, `shortDescription`.
+- `category`: object with nullable `id`, stable `slug`, and display `title`.
 - `tags`: string array.
 - `isPremium`: boolean.
-- `tokenCost`: integer.
-- `previewAsset`: nullable object with `url`, `fileName`, `contentType`, optional `fileSizeBytes`, optional `durationSeconds`.
-- `thumbnailUrl`: nullable string. For image previews this mirrors `previewAsset.url`; for video previews it is null unless a separate image thumbnail is introduced.
-- `musicDescription`: nullable string.
-- `referenceVideoDurationSeconds`: nullable number.
-- `petPhotoRequirements`: string array. Localized when `locale` can be resolved; otherwise backend default requirements.
-- `supportsGenerationResultInput`: boolean.
-- `requiredInputMediaType`: nullable `Image` or `Video`.
-- `recommendedAfterImageGeneration`: boolean.
-- `supportsGenerateSimilar`: boolean.
-- `defaultVariationStrength`: string, defaults to `medium`.
+- `access`: `free` or `premium`.
+- `thumbnailUrl`: nullable static image URL for immediate card paint.
+- `media`: lightweight feed media object:
+  - `thumbnailUrl`: static image for placeholders and first paint.
+  - `animatedPreviewUrl`: cheap animated image/loop for many visible cards.
+  - `feedLoopLowUrl`: low-bitrate muted loop for feed playback.
+  - `feedLoopMediumUrl`: medium-bitrate muted loop reserved for adaptive playback.
+  - `mediaKind`: `image` or `video`.
+  - `aspectRatio`, `durationMs`, `sizeBytes`, `dominantColor`, `blurHash`: nullable rendering/cache hints.
+  - `mediaVersion`: integer cache invalidation stamp.
+- `mediaKind`, `aspectRatio`, `durationMs`, `sizeBytes`: top-level card hints mirroring the selected feed media.
 - `version`: integer catalog version for the item.
-- `updatedAtUtc`: nullable UTC timestamp for item ordering/cache freshness.
+- `mediaVersion`: integer media cache invalidation stamp.
 
 Compatibility rules:
 
 - Do not rename or remove any listed field without updating `apps/petmagic-mobile` DTOs/tests.
-- Feed items must stay bounded for card rendering and generation entry decisions. They may expose public generation capability metadata and version stamps, but must not expose admin/detail-only or provider fields such as model names, prompts, reference motion assets, status/promo internals, provider cost estimates, raw assets collections, deleted timestamps, or create timestamps. Fetch template detail separately when heavier media/detail metadata is needed.
+- Feed items must stay bounded for card rendering. They must not expose prompts, generation parameters, pet photo requirements, admin/audit fields, detail media, original/source media, reference motion assets, status/promo internals, provider cost estimates, raw assets collections, deleted timestamps, create timestamps, or `updatedAtUtc`. Fetch `GET /api/templates/{id}` for `TemplateDetailDto` when preview/detail data is needed.
+- `TemplateDetailDto` may include `detailPreviewUrl` inside its `media` object; this field must not appear in `/api/templates/feed`.
+- `AdminTemplateDto` is a separate admin contract and may include all media variants plus source/reference assets for moderation and CRUD.
 - Invalid non-empty `type` values must return HTTP 400 problem details with `templates.invalid_type`; unknown or numeric values must not fall back to the full feed. `type=all` must remain accepted.
 - Invalid non-empty cursors must return HTTP 400 problem details with `templates.invalid_cursor`.
-- Backend-emitted cursors include the feed sort timestamp, catalog version, and template id; legacy timestamp/template id cursors remain accepted, but clients must not parse either format.
-- Search/category filters are backend-bounded to public field limits. Tag filters must stay within the public tag count and length bounds; out-of-bounds tag filters must not broaden the feed.
+- Backend-emitted cursors include `PublishedAtUtc` ticks plus template id. Legacy timestamp/version/template-id cursors remain accepted as opaque compatibility input, but clients must not parse either format.
+- Public feed ordering is stable public ranking, not technical edit time: `PublishedAtUtc DESC, Id DESC`. `PublishedAtUtc` is set once on first public activation and is not rewritten by title, description, media, prompt, or metadata edits. Existing active templates are backfilled once from `CreatedAtUtc`; inactive/draft templates keep it null until first activation.
+- Search/category filters are backend-bounded to public field limits. Tag filters must stay within the public tag count and length bounds; out-of-bounds tag filters must not broaden the feed. Archived categories are hidden from `/api/templates/categories` and explicit category filters, but active templates assigned to an archived category remain available in unfiltered public feed, catalog/search, random, detail, template-of-the-day, and user-started generation flows.
+- Normal public feed responses must include only production-visible templates: active, non-deleted, and `IsQaOnly=false`. QA/local/failing/smoke templates must stay hidden unless a non-production admin QA request explicitly opts in.
 - Feed queries must stay bounded and must not require authentication.
+
+### Template Visibility Policy Bypass Allowlist
+
+Direct checks of template active/deleted state outside `TemplateVisibilityPolicy` are allowed only for non-public operational/admin contexts that are documented here and marked in source with `TemplateVisibilityPolicy direct-check allowlist`.
+
+- `src/Modules/Templates/PetMagic.Modules.Templates.Infrastructure/TemplateCategoryAdminService.cs`: admin category diagnostics inspect active, non-deleted rows to report noncanonical category data; this is not a public feed/detail/generation visibility decision.
+- `src/Modules/Templates/PetMagic.Modules.Templates.Infrastructure/TemplateGenerationQaFixtureService.cs`: non-production QA fixture generation selects active, non-deleted seed candidates outside public traffic.
+- `src/Modules/Templates/PetMagic.Modules.Templates.Infrastructure/TemplateContentHealthCheck.cs`: operational content health probes active, non-deleted production templates without request/user visibility context.
+
+Any new direct `Status == Active` or `DeletedAtUtc == null` check in templates public/generation code must either move into `TemplateVisibilityPolicy` or be added to this allowlist with a source comment and a source-contract test update.
+
+### Admin Template Bulk Operations
+
+The current admin template API exposes single-template status/media/content mutations only. There is no bulk template status/update endpoint, so SSE batching for bulk template operations is not applicable yet. If a bulk endpoint is introduced, it must include a batching test proving that N affected templates do not emit N independent full-feed reload signals.
+
+## Generation Media URLs
+
+Consumers:
+
+- Flutter mobile generation status, gallery/history, download/share/remove-watermark flows.
+- Next.js admin generation list and user analytics.
+
+Compatibility rules:
+
+- Template preview/reference assets are stable public catalog media.
+- User uploads, normalized images, generated results, watermarked results, input previews, and result previews are private generation media.
+- Client/admin generation media fields must be produced through storage read-url signing and treated as short-lived.
+- If read-url signing fails, APIs must return `null` for that media field instead of exposing raw storage keys, provider URLs, or stale public URLs.
+- Completed generation responses must use imported managed storage for `outputUrl`/`mediaUrl`; provider result URLs are not a final user-facing contract.
 
 ## Public Random Template
 
@@ -187,6 +220,7 @@ Compatibility rules:
 - Recent generation history defaults must stay bounded when `take` is omitted.
 - Template status, type, promo badge, asset, and analytics field names must stay aligned with `apps/admin-web/src/lib/api-client.types.ts`.
 - Admin endpoints must keep `ModeratorOrAdmin` or stricter authorization policies according to route intent.
+- `GET /api/admin/templates/categories/diagnostics` is `AdminOnly` and reports active templates whose string category no longer maps to a non-archived canonical category.
 
 ## Template Generation History
 
@@ -205,6 +239,7 @@ Compatibility rules:
 - History query parameters `status`, `skip`, and `take` must remain optional and backend-bounded. `take` must never allow unbounded history loads.
 - List ordering must stay stable by `createdAtUtc desc, generationId desc`.
 - Response items must keep `generationId`, `userId`, `templateId`, `status`, `tokenCost`, `sourceImageAsset`, `outputUrl`, `mediaUrl`, `templateTitle`, `templateType`, `stage`, `progressPercent`, `queuePosition`, `estimatedWaitSeconds`, `hasWatermark`, `canRemoveWatermark`, `isWatermarkRemoved`, `supportsGenerateSimilar`, `inputSourceType`, `inputMediaAssetId`, `resultMediaAssetId`, `inputPreviewUrl`, `resultPreviewUrl`, and `canCompareBeforeAfter`.
+- Response `status` is a public string contract, not a numeric enum. Current wire values include `Queued`, `ProviderQueued`, `ProviderProcessing`, `ImportingMedia`, `Completed`, `Failed`, and `Cancelled`; clients must never receive numeric enum values such as `"8"`, `"9"`, or `"10"` for provider queue/import stages.
 - Completed image generations with available input and result previews must return `canCompareBeforeAfter=true` plus both preview URLs. Mobile treats these fields as optional but uses them when present.
 - Compare preview lookup for history must stay batched; do not add per-generation database queries for `TemplateMediaRecords` or `PetPhotos`.
 - Legacy `/api/generations/{generationId}` aliases must remain compatible until the mobile app fully migrates to `/api/templates/generations/{generationId}`.
