@@ -25,11 +25,15 @@ public interface ITemplateGenerationService
 
     Task<Result<IReadOnlyList<TemplateGenerationResponse>>> ListAsync(Guid userId, TemplateGenerationHistoryQuery query, bool isPremium, CancellationToken cancellationToken);
 
+    Task<Result<GalleryPageResponse>> ListPageAsync(Guid userId, TemplateGenerationHistoryQuery query, bool isPremium, CancellationToken cancellationToken);
+
     Task<Result<RemoveGenerationWatermarkResponse>> RemoveWatermarkAsync(RemoveGenerationWatermarkCommand command, CancellationToken cancellationToken);
 
-    Task<Result<GenerationDownloadResponse>> GetDownloadAsync(Guid userId, Guid generationId, bool isPremium, CancellationToken cancellationToken);
+    Task<Result<GalleryDownloadResponse>> GetDownloadAsync(Guid userId, Guid generationId, bool isPremium, CancellationToken cancellationToken);
 
-    Task<Result<GenerationDownloadResponse>> GetShareAsync(Guid userId, Guid generationId, bool isPremium, CancellationToken cancellationToken);
+    Task<Result<GalleryShareResponse>> GetShareAsync(Guid userId, Guid generationId, bool isPremium, CancellationToken cancellationToken);
+
+    Task<Result<PublicGalleryShareResponse>> GetPublicShareAsync(string shareToken, CancellationToken cancellationToken);
 
     Task<Result<TemplateGenerationUnreadCountResponse>> GetUnreadCountAsync(Guid userId, CancellationToken cancellationToken);
 
@@ -42,6 +46,8 @@ public interface ITemplateGenerationService
     Task<Result<TemplateGenerationResponse>> GetAdminAsync(Guid generationId, CancellationToken cancellationToken);
 
     Task<Result<RemoveGenerationWatermarkResponse>> GrantAdminCleanDownloadAsync(Guid adminUserId, Guid generationId, CancellationToken cancellationToken);
+
+    Task<Result<TemplateGenerationResponse>> RetryAdminGenerationRefundAsync(Guid adminUserId, Guid generationId, CancellationToken cancellationToken);
 }
 
 public interface ITemplateGenerationQaFixtureService

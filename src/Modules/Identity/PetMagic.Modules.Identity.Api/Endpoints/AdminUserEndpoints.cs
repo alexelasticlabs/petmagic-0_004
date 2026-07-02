@@ -17,6 +17,9 @@ namespace PetMagic.Modules.Identity.Api.Endpoints;
 
 public static class AdminUserEndpoints
 {
+    private const int MaxAdminUserMutationRequestBodyBytes = 8 * 1024;
+    private const int MaxAdminBulkEmailRequestBodyBytes = 64 * 1024;
+
     public static IEndpointRouteBuilder MapAdminUserEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/admin/users")
@@ -28,13 +31,25 @@ public static class AdminUserEndpoints
         group.MapGet("/dashboard/metrics", GetDashboardMetricsAsync);
         group.MapGet("/{userId:guid}", GetUserAsync);
         group.MapGet("/{userId:guid}/analytics", GetUserAnalyticsAsync);
-        group.MapPost("/{userId:guid}/wallet", AdjustWalletAsync).RequireAuthorization("AdminOnly");
-        group.MapPost("/emails", SendBulkEmailAsync).RequireAuthorization("AdminOnly");
-        group.MapPut("/{userId:guid}/role", AssignRoleAsync).RequireAuthorization("AdminOnly");
-        group.MapDelete("/{userId:guid}/role", RevokeRoleAsync).RequireAuthorization("AdminOnly");
+        group.MapPost("/{userId:guid}/wallet", AdjustWalletAsync)
+            .RequireAuthorization("AdminOnly")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminUserMutationRequestBodyBytes));
+        group.MapPost("/emails", SendBulkEmailAsync)
+            .RequireAuthorization("AdminOnly")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminBulkEmailRequestBodyBytes));
+        group.MapPut("/{userId:guid}/role", AssignRoleAsync)
+            .RequireAuthorization("AdminOnly")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminUserMutationRequestBodyBytes));
+        group.MapDelete("/{userId:guid}/role", RevokeRoleAsync)
+            .RequireAuthorization("AdminOnly")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminUserMutationRequestBodyBytes));
         group.MapDelete("/{userId:guid}", DeleteUserAsync).RequireAuthorization("AdminOnly");
-        group.MapPut("/{userId:guid}/premium", SetPremiumStatusAsync).RequireAuthorization("AdminOnly");
-        group.MapPut("/{userId:guid}/active", SetActiveStatusAsync).RequireAuthorization("AdminOnly");
+        group.MapPut("/{userId:guid}/premium", SetPremiumStatusAsync)
+            .RequireAuthorization("AdminOnly")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminUserMutationRequestBodyBytes));
+        group.MapPut("/{userId:guid}/active", SetActiveStatusAsync)
+            .RequireAuthorization("AdminOnly")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminUserMutationRequestBodyBytes));
 
         return endpoints;
     }

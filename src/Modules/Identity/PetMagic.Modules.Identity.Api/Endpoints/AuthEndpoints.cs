@@ -37,6 +37,8 @@ public static partial class AuthEndpoints
     private const string MobileRedirectScheme = "petmagic";
     private const string MobileRedirectHost = "auth";
     private const string MobileRedirectPath = "/external";
+    private const int MaxAuthJsonRequestBodyBytes = 32 * 1024;
+    private const long MaxAvatarUploadRequestBodyBytes = 9L * 1024 * 1024;
 
     public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -46,46 +48,57 @@ public static partial class AuthEndpoints
 
         group.MapPost("/register", RegisterAsync)
             .AllowAnonymous()
-            .RequireRateLimiting("auth-register");
+            .RequireRateLimiting("auth-register")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAuthJsonRequestBodyBytes));
 
         group.MapPost("/login", LoginAsync)
-            .AllowAnonymous();
+            .AllowAnonymous()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAuthJsonRequestBodyBytes));
 
         group.MapPost("/email-confirmation/request", RequestEmailConfirmationAsync)
             .AllowAnonymous()
-            .RequireRateLimiting("auth-email-verification");
+            .RequireRateLimiting("auth-email-verification")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAuthJsonRequestBodyBytes));
 
         group.MapPost("/email-confirmation/confirm", ConfirmEmailAsync)
             .AllowAnonymous()
-            .RequireRateLimiting("auth-email-verification");
+            .RequireRateLimiting("auth-email-verification")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAuthJsonRequestBodyBytes));
 
         group.MapPost("/resend-email-verification-code", ResendEmailVerificationCodeAsync)
             .AllowAnonymous()
-            .RequireRateLimiting("auth-email-verification");
+            .RequireRateLimiting("auth-email-verification")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAuthJsonRequestBodyBytes));
 
         group.MapPost("/verify-email-code", VerifyEmailCodeAsync)
             .AllowAnonymous()
-            .RequireRateLimiting("auth-email-verification");
+            .RequireRateLimiting("auth-email-verification")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAuthJsonRequestBodyBytes));
 
         group.MapPost("/password-reset/request", RequestPasswordResetAsync)
             .AllowAnonymous()
-            .RequireRateLimiting("auth-password-reset");
+            .RequireRateLimiting("auth-password-reset")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAuthJsonRequestBodyBytes));
 
         group.MapPost("/password-reset/confirm", ConfirmPasswordResetAsync)
             .AllowAnonymous()
-            .RequireRateLimiting("auth-password-reset");
+            .RequireRateLimiting("auth-password-reset")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAuthJsonRequestBodyBytes));
 
         group.MapPost("/request-password-reset", RequestPasswordResetAsync)
             .AllowAnonymous()
-            .RequireRateLimiting("auth-password-reset");
+            .RequireRateLimiting("auth-password-reset")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAuthJsonRequestBodyBytes));
 
         group.MapPost("/verify-password-reset-code", VerifyPasswordResetCodeAsync)
             .AllowAnonymous()
-            .RequireRateLimiting("auth-password-reset");
+            .RequireRateLimiting("auth-password-reset")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAuthJsonRequestBodyBytes));
 
         group.MapPost("/reset-password", ResetPasswordAsync)
             .AllowAnonymous()
-            .RequireRateLimiting("auth-password-reset");
+            .RequireRateLimiting("auth-password-reset")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAuthJsonRequestBodyBytes));
 
         group.MapPost("/me/password-change/request", RequestCurrentPasswordChangeCodeAsync)
             .RequireAuthorization()
@@ -93,25 +106,30 @@ public static partial class AuthEndpoints
 
         group.MapPost("/me/password-change/confirm", ConfirmCurrentPasswordChangeAsync)
             .RequireAuthorization()
-            .RequireRateLimiting("auth-password-reset");
+            .RequireRateLimiting("auth-password-reset")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAuthJsonRequestBodyBytes));
 
         group.MapPost("/refresh", RefreshAsync)
-            .AllowAnonymous();
+            .AllowAnonymous()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAuthJsonRequestBodyBytes));
 
         group.MapPost("/logout", LogoutAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAuthJsonRequestBodyBytes));
 
         group.MapGet("/me", MeAsync)
             .RequireAuthorization();
 
         group.MapPut("/me/profile", UpdateMeProfileAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAuthJsonRequestBodyBytes));
 
         group.MapDelete("/me", DeleteMeAsync)
             .RequireAuthorization();
 
         group.MapPost("/me/legal-acceptance", AcceptCurrentLegalDocumentsAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAuthJsonRequestBodyBytes));
 
         group.MapGet("/me/linked-accounts", GetLinkedAccountsAsync)
             .RequireAuthorization();
@@ -124,7 +142,8 @@ public static partial class AuthEndpoints
 
         group.MapPut("/me/avatar", UpdateAvatarAsync)
             .RequireAuthorization()
-            .DisableAntiforgery();
+            .DisableAntiforgery()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAvatarUploadRequestBodyBytes));
 
         group.MapDelete("/me/avatar", RemoveAvatarAsync)
             .RequireAuthorization();
@@ -143,19 +162,23 @@ public static partial class AuthEndpoints
 
         group.MapPost("/external/exchange", ExchangeExternalLoginAsync)
             .AllowAnonymous()
-            .RequireRateLimiting("auth-external");
+            .RequireRateLimiting("auth-external")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAuthJsonRequestBodyBytes));
 
         group.MapPost("/external/google/native", GoogleNativeLoginAsync)
             .AllowAnonymous()
-            .RequireRateLimiting("auth-external");
+            .RequireRateLimiting("auth-external")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAuthJsonRequestBodyBytes));
 
         group.MapPost("/google", GoogleSocialLoginAsync)
             .AllowAnonymous()
-            .RequireRateLimiting("auth-external");
+            .RequireRateLimiting("auth-external")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAuthJsonRequestBodyBytes));
 
         group.MapPost("/apple", AppleSocialLoginAsync)
             .AllowAnonymous()
-            .RequireRateLimiting("auth-external");
+            .RequireRateLimiting("auth-external")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAuthJsonRequestBodyBytes));
 
         return endpoints;
     }

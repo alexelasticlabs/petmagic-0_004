@@ -33,7 +33,7 @@ public static partial class SupportChatEndpoints
         var result = await service.MarkConversationReadAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return ToProblem(result.Error);
+            return ToUserProblem(result.Error);
         }
 
         return TypedResults.NoContent();
@@ -62,7 +62,7 @@ public static partial class SupportChatEndpoints
         var result = await service.ResolveConversationAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return ToProblem(result.Error);
+            return ToUserProblem(result.Error);
         }
 
         return TypedResults.Ok(SignAttachmentUrls(result.Value, attachmentReadUrlSigner));
@@ -91,7 +91,7 @@ public static partial class SupportChatEndpoints
         var result = await service.CloseConversationAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return ToProblem(result.Error);
+            return ToUserProblem(result.Error);
         }
 
         return TypedResults.Ok(SignAttachmentUrls(result.Value, attachmentReadUrlSigner));
@@ -120,7 +120,7 @@ public static partial class SupportChatEndpoints
         var result = await service.ReopenConversationAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return ToProblem(result.Error);
+            return ToUserProblem(result.Error);
         }
 
         return TypedResults.Ok(SignAttachmentUrls(result.Value, attachmentReadUrlSigner));
@@ -150,7 +150,7 @@ public static partial class SupportChatEndpoints
         var result = await service.SubmitConversationFeedbackAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return ToProblem(result.Error);
+            return ToUserProblem(result.Error);
         }
 
         return TypedResults.Ok(SignAttachmentUrls(result.Value, attachmentReadUrlSigner));
@@ -185,7 +185,7 @@ public static partial class SupportChatEndpoints
 
         if (result.IsFailure)
         {
-            return ToProblem(result.Error);
+            return ToUserProblem(result.Error);
         }
 
         return TypedResults.NoContent();
@@ -214,7 +214,7 @@ public static partial class SupportChatEndpoints
 
         if (result.IsFailure)
         {
-            return ToProblem(result.Error);
+            return ToUserProblem(result.Error);
         }
 
         return TypedResults.NoContent();

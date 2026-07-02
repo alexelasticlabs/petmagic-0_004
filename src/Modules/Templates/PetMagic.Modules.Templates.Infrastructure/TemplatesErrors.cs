@@ -15,6 +15,7 @@ internal static class TemplatesErrors
     public static readonly Error TypeMismatch = new("templates.type_mismatch", "Template type does not match the requested operation.");
     public static readonly Error UpdateConflict = new("templates.update_conflict", "Template was changed while saving. Please reload and try again.");
     public static readonly Error InvalidStatus = new("templates.invalid_status", "Template status is invalid.");
+    public static readonly Error InvalidGalleryCursor = new("templates.gallery_cursor_invalid", "Gallery cursor is invalid.");
     public static readonly Error PremiumRequired = new("templates.premium_required", "Premium subscription is required for this template.");
     public static readonly Error MissingPreview = new("templates.preview_required", "Preview asset is required before activation.");
     public static readonly Error MissingImageModel = new("templates.image_model_required", "Image model is required before activation.");
@@ -37,6 +38,7 @@ internal static class TemplatesErrors
     public static readonly Error MediaMetadataFailed = new("templates.media_metadata_failed", "Media metadata could not be determined.");
     public static readonly Error AiProviderUnavailable = new("templates.ai_provider_unavailable", "AI provider is not configured.");
     public static readonly Error AiProviderFailed = new("templates.ai_provider_failed", "AI provider request failed.");
+    public static readonly Error AiProviderTransientFailure = new("templates.ai_provider_transient", "AI provider is temporarily unavailable. The generation will be retried.");
     public static readonly Error AiProviderTimedOut = new("templates.ai_provider_timed_out", "AI provider request timed out.");
     public static readonly Error GenerationAttemptsExceeded = new("templates.generation_attempts_exceeded", "Template generation exceeded the maximum number of attempts.");
     public static readonly Error GenerationQueueOrphaned = new("templates.generation_queue_orphaned", "Generation was not charged and was removed from the queue.");
@@ -46,6 +48,7 @@ internal static class TemplatesErrors
     public static readonly Error ProviderCapacityUnavailable = new("PROVIDER_CAPACITY_UNAVAILABLE", "Generation provider is temporarily unavailable. Please retry later.");
     public static readonly Error GenerationCancelDisabled = new("templates.generation_cancel_disabled", "Queued generation cancellation is disabled.");
     public static readonly Error GenerationCancelNotAllowed = new("templates.generation_cancel_not_allowed", "Only queued generations can be cancelled.");
+    public static readonly Error GenerationRefundNotPending = new("templates.generation_refund_not_pending", "Generation has no pending refund to retry.");
     public static readonly Error InvalidFeedback = new("templates.invalid_feedback", "Generation feedback is invalid.");
     public static readonly Error FeedbackNotFound = new("feedback.not_found", "Feedback was not found.");
     public static readonly Error FeedbackRateLimited = new("feedback.rate_limited", "Feedback rate limit was reached.");

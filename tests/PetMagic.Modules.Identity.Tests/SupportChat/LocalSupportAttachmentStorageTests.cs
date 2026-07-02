@@ -160,6 +160,64 @@ public sealed class LocalSupportAttachmentStorageTests
     }
 
     [Fact]
+    public async Task DeleteAsync_ShouldIgnoreTraversalLikeManagedPaths()
+    {
+        var rootPath = CreateTempDirectory();
+        var storage = CreateStorage(rootPath);
+        var siblingPath = Path.Combine(
+            Directory.GetParent(rootPath)!.FullName,
+            $"petmagic-support-sibling-{Guid.NewGuid():N}.jpg");
+        var unmanagedRootPath = Path.Combine(rootPath, "unmanaged-support.jpg");
+
+        try
+        {
+            await File.WriteAllTextAsync(siblingPath, "sibling");
+            await File.WriteAllTextAsync(unmanagedRootPath, "unmanaged");
+
+            var siblingDelete = await storage.DeleteAsync(
+                $"support-attachments/../{Path.GetFileName(siblingPath)}",
+                CancellationToken.None);
+            var unmanagedDelete = await storage.DeleteAsync(
+                "http://localhost:5000/support-attachments/2026/../unmanaged-support.jpg?pmexp=123&pmsig=abc",
+                CancellationToken.None);
+
+            Assert.True(siblingDelete.IsSuccess);
+            Assert.True(unmanagedDelete.IsSuccess);
+            Assert.True(File.Exists(siblingPath));
+            Assert.True(File.Exists(unmanagedRootPath));
+        }
+        finally
+        {
+            File.Delete(siblingPath);
+            Directory.Delete(rootPath, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task DeleteAsync_ShouldIgnoreMalformedPublicBaseUrlPrefix()
+    {
+        var rootPath = CreateTempDirectory();
+        var storage = CreateStorage(rootPath);
+        var unmanagedRootPath = Path.Combine(rootPath, "prefix-support.jpg");
+
+        try
+        {
+            await File.WriteAllTextAsync(unmanagedRootPath, "unmanaged");
+
+            var deleteResult = await storage.DeleteAsync(
+                "http://localhost:5000support-attachments/prefix-support.jpg",
+                CancellationToken.None);
+
+            Assert.True(deleteResult.IsSuccess);
+            Assert.True(File.Exists(unmanagedRootPath));
+        }
+        finally
+        {
+            Directory.Delete(rootPath, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task StoreAsync_ShouldLogWarning_WhenDirectoryCreationFails()
     {
         var rootPath = Path.Combine(Path.GetTempPath(), $"petmagic-support-root-file-{Guid.NewGuid():N}");

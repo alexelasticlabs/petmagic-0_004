@@ -43,7 +43,7 @@ public static partial class SupportChatEndpoints
         var result = await service.OpenConversationAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return ToProblem(result.Error);
+            return ToUserProblem(result.Error);
         }
 
         return TypedResults.Ok(SignAttachmentUrls(result.Value, attachmentReadUrlSigner));
@@ -66,13 +66,13 @@ public static partial class SupportChatEndpoints
         var result = await service.GetUserConversationAsync(
             userId,
             new SupportConversationMessagesQuery(
-                Take: take ?? 60,
+                Take: NormalizeConversationMessagesTake(take),
                 BeforeMessageCreatedAtUtc: beforeMessageCreatedAtUtc,
                 BeforeMessageId: beforeMessageId),
             cancellationToken);
         if (result.IsFailure)
         {
-            return ToProblem(result.Error);
+            return ToUserProblem(result.Error);
         }
 
         return TypedResults.Ok(SignAttachmentUrls(result.Value, attachmentReadUrlSigner));

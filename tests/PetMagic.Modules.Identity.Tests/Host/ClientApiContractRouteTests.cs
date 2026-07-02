@@ -60,6 +60,7 @@ public sealed class ClientApiContractRouteTests
         { "POST", "/api/templates/{templateId:guid}/generations", "mobile start generation" },
         { "GET", "/api/templates/generations", "mobile generation history" },
         { "GET", "/api/templates/generations/unread-count", "mobile unread generation count" },
+        { "GET", "/api/templates/generations/events", "mobile generation realtime events" },
         { "GET", "/api/templates/generations/{generationId:guid}", "mobile generation detail" },
         { "DELETE", "/api/templates/generations/{generationId:guid}", "mobile delete generation" },
         { "POST", "/api/templates/generations/{generationId:guid}/feedback", "mobile generation feedback" },

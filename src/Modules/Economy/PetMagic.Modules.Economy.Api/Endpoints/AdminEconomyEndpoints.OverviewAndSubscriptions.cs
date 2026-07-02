@@ -207,6 +207,133 @@ public static partial class AdminEconomyEndpoints
         return TypedResults.Ok(result.Value);
     }
 
+    private static async Task<Results<Ok<OffsetPagedResponse<AdminEconomyIncidentResponse>>, ProblemHttpResult>> GetIncidentsAsync(
+        [FromQuery] int? skip,
+        [FromQuery] int? take,
+        [FromQuery] string? status,
+        [FromQuery] string? type,
+        [FromQuery] string? category,
+        [FromQuery] Guid? userId,
+        [FromServices] IServiceProvider serviceProvider,
+        CancellationToken cancellationToken)
+    {
+        var invalidFilterProblem = ValidateIncidentFilters(status, category);
+        if (invalidFilterProblem is not null)
+        {
+            return invalidFilterProblem;
+        }
+
+        var service = serviceProvider.GetRequiredService<IEconomyAdminService>();
+        var result = await service.GetAdminEconomyIncidentsAsync(skip ?? 0, take ?? 50, status, type, category, userId, cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToAdminEconomyProblem(result.Error, StatusCodes.Status400BadRequest);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<AdminEconomyIncidentDetailResponse>, ProblemHttpResult>> GetIncidentAsync(
+        [FromRoute] Guid incidentId,
+        [FromServices] IEconomyAdminService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.GetAdminEconomyIncidentAsync(incidentId, cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToAdminEconomyProblem(result.Error, StatusCodes.Status400BadRequest);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<EconomyReconciliationRunResponse>, ProblemHttpResult>> RunReconciliationAsync(
+        [FromServices] IEconomyAdminService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.RunEconomyReconciliationAsync(cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToAdminEconomyProblem(result.Error, StatusCodes.Status400BadRequest);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<AdminEconomyIncidentResponse>, ValidationProblem, ProblemHttpResult>> ResolveIncidentAsync(
+        [FromRoute] Guid incidentId,
+        [FromBody] ResolveIncidentRequest? request,
+        [FromServices] IEconomyAdminService service,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request?.ResolutionNote))
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["resolutionNote"] = ["Resolution note is required."]
+            });
+        }
+
+        var result = await service.ResolveAdminEconomyIncidentAsync(incidentId, request?.ResolutionNote, cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToAdminEconomyProblem(result.Error, StatusCodes.Status400BadRequest);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<AdminEconomyIncidentResponse>, ValidationProblem, ProblemHttpResult>> ReopenIncidentAsync(
+        [FromRoute] Guid incidentId,
+        [FromBody] ReopenIncidentRequest? request,
+        [FromServices] IEconomyAdminService service,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request?.Reason))
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["reason"] = ["Reason is required."]
+            });
+        }
+
+        var result = await service.ReopenAdminEconomyIncidentAsync(incidentId, request.Reason, cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToAdminEconomyProblem(result.Error, StatusCodes.Status400BadRequest);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<AdminEconomyIncidentActionResponse>, ValidationProblem, ProblemHttpResult>> ApplyIncidentActionAsync(
+        [FromRoute] Guid incidentId,
+        [FromBody] ApplyIncidentActionRequest? request,
+        [FromServices] IValidator<AdminEconomyIncidentActionCommand> validator,
+        [FromServices] IEconomyAdminService service,
+        CancellationToken cancellationToken)
+    {
+        var command = new AdminEconomyIncidentActionCommand(
+            incidentId,
+            request?.Action ?? string.Empty,
+            request?.Reason ?? string.Empty,
+            request?.Amount,
+            request?.ExternalReferenceId);
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await service.ApplyAdminEconomyIncidentActionAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToAdminEconomyProblem(result.Error, StatusCodes.Status400BadRequest);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
     private static async Task<Results<Ok<AdminCurrencyPackResponse>, ValidationProblem, ProblemHttpResult>> UpdatePackAsync(
         [FromRoute] Guid packId,
         [FromBody] UpdatePackRequest request,
@@ -296,4 +423,14 @@ public static partial class AdminEconomyEndpoints
     public sealed record AdminRevokePremiumRequest(string? PaymentProvider);
 
     public sealed record AdminRefundPurchaseRequest(string? Reason);
+
+    public sealed record ResolveIncidentRequest(string? ResolutionNote);
+
+    public sealed record ReopenIncidentRequest(string? Reason);
+
+    public sealed record ApplyIncidentActionRequest(
+        string? Action,
+        string? Reason,
+        int? Amount,
+        string? ExternalReferenceId);
 }

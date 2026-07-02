@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 
 using Microsoft.EntityFrameworkCore;
@@ -44,6 +45,7 @@ internal sealed partial class TemplateGenerationService
             .AsNoTracking()
             .Include(x => x.Template)
             .Include(x => x.WatermarkUnlocks)
+            .Include(x => x.MediaRecords)
             .Where(x => x.UserId == userId && x.HiddenByUserAtUtc == null);
 
         generationsQuery = ApplyStatusFilter(generationsQuery, query.Status);
@@ -59,18 +61,108 @@ internal sealed partial class TemplateGenerationService
             await MapResponsesWithQueueMetricsAsync(jobs, cancellationToken, isPremium));
     }
 
+    public async Task<Result<GalleryPageResponse>> ListPageAsync(Guid userId, TemplateGenerationHistoryQuery query, bool isPremium, CancellationToken cancellationToken)
+    {
+        var take = Math.Clamp(query.Take ?? 50, 1, 100);
+        var appliedFilter = NormalizeGalleryFilter(query.Status);
+
+        var generationsQuery = dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .Include(x => x.Template)
+            .Include(x => x.WatermarkUnlocks)
+            .Include(x => x.MediaRecords)
+            .Where(x => x.UserId == userId && x.HiddenByUserAtUtc == null);
+
+        generationsQuery = ApplyStatusFilter(generationsQuery, appliedFilter);
+
+        if (!string.IsNullOrWhiteSpace(query.Cursor))
+        {
+            var cursor = TryDecodeGalleryCursor(query.Cursor);
+            if (cursor is null)
+            {
+                return Result.Failure<GalleryPageResponse>(TemplatesErrors.InvalidGalleryCursor);
+            }
+
+            generationsQuery = generationsQuery.Where(x =>
+                x.CreatedAtUtc < cursor.CreatedAtUtc
+                || (x.CreatedAtUtc == cursor.CreatedAtUtc && x.Id.CompareTo(cursor.Id) < 0));
+        }
+
+        var jobs = await generationsQuery
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .ThenByDescending(x => x.Id)
+            .Take(take + 1)
+            .ToArrayAsync(cancellationToken);
+
+        var hasMore = jobs.Length > take;
+        var pageJobs = hasMore
+            ? jobs.Take(take).ToArray()
+            : jobs;
+        var items = await MapGalleryItemsWithQueueMetricsAsync(pageJobs, cancellationToken, isPremium);
+        var unreadCount = await CountUnreadGenerationsAsync(userId, cancellationToken);
+
+        return Result.Success(new GalleryPageResponse(
+            items,
+            hasMore && pageJobs.Length > 0 ? EncodeGalleryCursor(pageJobs[^1]) : null,
+            hasMore,
+            DateTime.UtcNow,
+            unreadCount,
+            appliedFilter));
+    }
+
     public async Task<Result<TemplateGenerationUnreadCountResponse>> GetUnreadCountAsync(Guid userId, CancellationToken cancellationToken)
     {
-        var count = await dbContext.TemplateGenerationJobs
+        var count = await CountUnreadGenerationsAsync(userId, cancellationToken);
+
+        return Result.Success(new TemplateGenerationUnreadCountResponse(count));
+    }
+
+    private Task<int> CountUnreadGenerationsAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        return dbContext.TemplateGenerationJobs
             .AsNoTracking()
             .CountAsync(x => x.UserId == userId
                 && x.HiddenByUserAtUtc == null
                 && x.Status == TemplateGenerationStatus.Completed
                 && x.ResultViewedAtUtc == null,
                 cancellationToken);
-
-        return Result.Success(new TemplateGenerationUnreadCountResponse(count));
     }
+
+    private static string NormalizeGalleryFilter(string? rawStatus)
+    {
+        var normalized = rawStatus?.Trim().ToLowerInvariant();
+        return string.IsNullOrWhiteSpace(normalized) ? "all" : normalized;
+    }
+
+    private static string EncodeGalleryCursor(TemplateGenerationJob job)
+    {
+        var payload = JsonSerializer.Serialize(new GalleryCursor(job.CreatedAtUtc, job.Id));
+        return Convert.ToBase64String(Encoding.UTF8.GetBytes(payload))
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+    }
+
+    private static GalleryCursor? TryDecodeGalleryCursor(string rawCursor)
+    {
+        try
+        {
+            var padded = rawCursor.Trim().Replace('-', '+').Replace('_', '/');
+            var padding = padded.Length % 4;
+            if (padding > 0)
+            {
+                padded = padded.PadRight(padded.Length + 4 - padding, '=');
+            }
+
+            return JsonSerializer.Deserialize<GalleryCursor>(Encoding.UTF8.GetString(Convert.FromBase64String(padded)));
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    private sealed record GalleryCursor(DateTime CreatedAtUtc, Guid Id);
 
     public async Task<Result> MarkReadAsync(Guid userId, Guid generationId, bool isPremium, CancellationToken cancellationToken)
     {

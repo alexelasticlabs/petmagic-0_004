@@ -315,6 +315,49 @@ public sealed class SupportChatServiceTests
         Assert.Equal("broken-screen.png", attachment.FileName);
     }
 
+    [Theory]
+    [InlineData("http://localhost:5000support-attachments/2026/05/test-image.png")]
+    [InlineData("http://localhost:5000/support-attachments/2026/../private.png")]
+    [InlineData("http://localhost:5000/support-attachments/2026/%2e%2e/private.png")]
+    public async Task SendMessageWithAttachmentsAsync_WithUnsafeManagedAttachmentUrl_ShouldSuppressReturnedFileUrl(
+        string attachmentUrl)
+    {
+        var store = CreateStore();
+
+        var userId = Guid.NewGuid();
+        await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
+
+        Guid conversationId;
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            var openResult = await openScope.CreateService().OpenConversationAsync(
+                new OpenSupportConversationCommand(userId, "Need help", SupportConversationPriority.Normal),
+                CancellationToken.None);
+            conversationId = openResult.Value.ConversationId;
+        }
+
+        await using var sendScope = await store.CreateScopeAsync();
+        var sendResult = await sendScope.CreateService().SendMessageWithAttachmentsAsync(
+            new SendSupportAttachmentsCommand(
+                conversationId,
+                userId,
+                "Screenshot from the broken screen",
+                false,
+                [
+                    new SupportMessageAttachmentInput(
+                        attachmentUrl,
+                        "image/png",
+                        "broken-screen.png",
+                        2048)
+                ]),
+            CancellationToken.None);
+
+        Assert.True(sendResult.IsSuccess);
+        var attachment = Assert.Single(sendResult.Value.Attachments);
+        Assert.Equal(string.Empty, attachment.FileUrl);
+        Assert.Equal("broken-screen.png", attachment.FileName);
+    }
+
     [Fact]
     public async Task LegacyNullAttachmentMimeType_ShouldNotCrashConversationOrReplyPreview()
     {

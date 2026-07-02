@@ -89,6 +89,10 @@ internal sealed class TemplateMediaCleanupProcessor(
             return false;
         }
 
+        var mediaRecords = await dbContext.TemplateMediaRecords
+            .Where(record => record.GenerationJobId == job.Id || record.GenerationId == job.Id)
+            .ToArrayAsync(cancellationToken);
+
         var urls = new[]
             {
                 job.SourceImageUrl,
@@ -96,6 +100,13 @@ internal sealed class TemplateMediaCleanupProcessor(
                 job.ResultUrl,
                 job.WatermarkedResultUrl
             }
+            .Concat(mediaRecords.SelectMany(record => new[]
+            {
+                record.StoragePath,
+                record.WatermarkedStoragePath,
+                record.PreviewUrl,
+                record.WatermarkedPreviewUrl
+            }))
             .Where(url => !string.IsNullOrWhiteSpace(url))
             .Cast<string>()
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -124,9 +135,6 @@ internal sealed class TemplateMediaCleanupProcessor(
         job.UserMediaDeletedAtUtc = now;
         job.LastUserMediaCleanupAttemptAtUtc = now;
         job.UserMediaCleanupFailureCode = null;
-        var mediaRecords = await dbContext.TemplateMediaRecords
-            .Where(record => record.GenerationJobId == job.Id || record.GenerationId == job.Id)
-            .ToArrayAsync(cancellationToken);
         foreach (var record in mediaRecords)
         {
             record.IsDeleted = true;

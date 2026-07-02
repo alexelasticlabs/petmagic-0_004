@@ -4,8 +4,6 @@ using Microsoft.Extensions.Logging;
 using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Contracts;
-using PetMagic.Modules.Identity.Application.Contracts;
-
 using Stripe;
 
 namespace PetMagic.Modules.Economy.Infrastructure;
@@ -173,13 +171,17 @@ public sealed partial class EconomyService
             }
         }
 
-        var premiumResult = await identityService.SetPremiumStatusAsync(
-            new SetPremiumStatusCommand(command.UserId, false),
+        var premiumSyncResult = await SynchronizePremiumEntitlementAsync(
+            command.UserId,
+            false,
+            "stripe",
+            "AdminImmediateCancelRequested",
+            subscription?.Id,
+            subscription?.ExternalSubscriptionId,
             cancellationToken);
-
-        if (premiumResult.IsFailure)
+        if (premiumSyncResult.IsFailure)
         {
-            return Result.Failure<SubscriptionSummaryResponse>(premiumResult.Error);
+            return Result.Failure<SubscriptionSummaryResponse>(premiumSyncResult.Error);
         }
 
         return await GetSubscriptionSummaryAsync(command.UserId, cancellationToken);

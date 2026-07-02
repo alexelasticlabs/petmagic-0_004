@@ -132,6 +132,12 @@ public sealed class TemplateGenerationJob
 
     public DateTime QueuedAtUtc { get; set; }
 
+    /// <summary>
+    /// Earliest time this queued job may be claimed again after a transient provider failure.
+    /// Null means the job is claimable immediately.
+    /// </summary>
+    public DateTime? NextAttemptEarliestAtUtc { get; set; }
+
     public int? EstimatedWaitSecondsAtQueue { get; set; }
 
     public DateTime? EstimatedCompletionAtQueueUtc { get; set; }

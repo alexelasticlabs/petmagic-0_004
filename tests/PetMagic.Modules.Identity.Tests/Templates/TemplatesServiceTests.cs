@@ -204,7 +204,8 @@ public sealed partial class TemplatesServiceTests
         int freeImageMaxEstimatedWaitSeconds = 1_800,
         int premiumImageMaxEstimatedWaitSeconds = 600,
         int freeVideoMaxEstimatedWaitSeconds = 3_600,
-        int premiumVideoMaxEstimatedWaitSeconds = 1_800)
+        int premiumVideoMaxEstimatedWaitSeconds = 1_800,
+        int generationShareTokenTtlDays = 30)
     {
         return new TemplatesOptions
         {
@@ -242,6 +243,7 @@ public sealed partial class TemplatesServiceTests
             PremiumImageMaxEstimatedWaitSeconds = premiumImageMaxEstimatedWaitSeconds,
             FreeVideoMaxEstimatedWaitSeconds = freeVideoMaxEstimatedWaitSeconds,
             PremiumVideoMaxEstimatedWaitSeconds = premiumVideoMaxEstimatedWaitSeconds,
+            GenerationShareTokenTtlDays = generationShareTokenTtlDays,
             SeedSampleTemplates = false
         };
     }

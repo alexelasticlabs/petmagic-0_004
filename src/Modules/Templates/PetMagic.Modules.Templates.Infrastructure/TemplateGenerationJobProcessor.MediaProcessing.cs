@@ -1,6 +1,7 @@
+using System.Security.Cryptography;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using System.Security.Cryptography;
 
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Contracts;
@@ -139,7 +140,7 @@ internal sealed partial class TemplateGenerationJobProcessor
                 cancellationToken);
         job.ResultUrl = storedOutput.Value.StorageKey;
         job.MediaImportCompletedAtUtc = DateTime.UtcNow;
-        RegisterGenerationOutputMediaRecord(
+        await RegisterGenerationOutputMediaRecordAsync(
             job,
             storedOutput.Value,
             TemplateType.Image,
@@ -316,10 +317,24 @@ internal sealed partial class TemplateGenerationJobProcessor
             job.MotionProviderCostUsd = FalModelPricing.TryCalculateMotionCostUsd(motionModel, durationResult.Value);
         }
 
-        await ApplyWatermarkAsync(job, storedOutput.Value, TemplateType.Video, cancellationToken);
+        var watermarkedOutput = await ApplyWatermarkAsync(job, storedOutput.Value, TemplateType.Video, cancellationToken);
+        var resultPreview = await videoThumbnailGenerator.CreateThumbnailAsync(
+            storedOutput.Value,
+            job.Id,
+            $"generation-{job.Id:N}-result-preview.jpg",
+            BuildGenerationPreviewStorageKey(job.UserId, job.Id, "result-preview", "jpg"),
+            cancellationToken);
+        var watermarkedPreview = watermarkedOutput is null
+            ? null
+            : await videoThumbnailGenerator.CreateThumbnailAsync(
+                watermarkedOutput,
+                job.Id,
+                $"generation-{job.Id:N}-watermarked-result-preview.jpg",
+                BuildGenerationPreviewStorageKey(job.UserId, job.Id, "result-preview-watermarked", "jpg"),
+                cancellationToken);
         job.ResultUrl = storedOutput.Value.StorageKey;
         job.MediaImportCompletedAtUtc = DateTime.UtcNow;
-        RegisterGenerationOutputMediaRecord(job, storedOutput.Value, TemplateType.Video, null, null);
+        await RegisterGenerationOutputMediaRecordAsync(job, storedOutput.Value, TemplateType.Video, resultPreview, watermarkedPreview);
         job.Status = TemplateGenerationStatus.Completed;
         job.UpdatedAtUtc = job.MediaImportCompletedAtUtc.Value;
         job.CompletedAtUtc = job.UpdatedAtUtc;
@@ -444,7 +459,7 @@ internal sealed partial class TemplateGenerationJobProcessor
         return null;
     }
 
-    private void RegisterGenerationOutputMediaRecord(
+    private async Task RegisterGenerationOutputMediaRecordAsync(
         TemplateGenerationJob job,
         StoredMediaResponse storedOutput,
         TemplateType mediaType,
@@ -458,6 +473,12 @@ internal sealed partial class TemplateGenerationJobProcessor
             && x.SourceType == "generation_result"
             && x.MediaType == mediaTypeText);
 
+        existing ??= await dbContext.TemplateMediaRecords
+            .FirstOrDefaultAsync(x =>
+                x.GenerationId == job.Id
+                && x.SourceType == "generation_result"
+                && x.MediaType == mediaTypeText);
+
         if (existing is null)
         {
             existing = new TemplateMediaRecord
@@ -465,7 +486,11 @@ internal sealed partial class TemplateGenerationJobProcessor
                 Id = Guid.NewGuid(),
                 UploadedAtUtc = now
             };
-            job.MediaRecords.Add(existing);
+            dbContext.TemplateMediaRecords.Add(existing);
+            if (dbContext.Entry(job).Collection(x => x.MediaRecords).IsLoaded)
+            {
+                job.MediaRecords.Add(existing);
+            }
         }
 
         existing.UserId = job.UserId;
@@ -494,9 +519,9 @@ internal sealed partial class TemplateGenerationJobProcessor
         job.ResultMediaAssetId = existing.Id;
     }
 
-    private static string BuildGenerationPreviewStorageKey(Guid userId, Guid generationId, string fileName)
+    private static string BuildGenerationPreviewStorageKey(Guid userId, Guid generationId, string fileName, string extension = "webp")
     {
-        return $"users/{userId:N}/generations/{generationId:N}/{fileName}.webp";
+        return $"users/{userId:N}/generations/{generationId:N}/{fileName}.{extension}";
     }
 
     private async Task<string?> CreateProviderReadUrlAsync(string assetUrl, CancellationToken cancellationToken)

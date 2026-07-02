@@ -23,6 +23,8 @@ public static partial class EconomyEndpoints
     private const string InvalidStripeSignatureCode = "economy.invalid_stripe_signature";
     private const string InvalidStoreWebhookSignatureCode = "economy.invalid_store_webhook_signature";
     private const string InvalidWebhookPayloadCode = "economy.invalid_webhook_payload";
+    private const int MaxEconomyJsonRequestBodyBytes = 32 * 1024;
+    private const int MaxEconomyWebhookRequestBodyBytes = 256 * 1024;
 
     public static IEndpointRouteBuilder MapEconomyEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -53,22 +55,27 @@ public static partial class EconomyEndpoints
             .RequireAuthorization();
 
         group.MapPost("/wallet/spend", SpendAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyJsonRequestBodyBytes));
 
         group.MapPost("/wallet/redeem", RedeemCodeAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyJsonRequestBodyBytes));
 
         group.MapPut("/notifications/push-token", RegisterPushTokenAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyJsonRequestBodyBytes));
 
         group.MapDelete("/notifications/push-token", UnregisterPushTokenAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyJsonRequestBodyBytes));
 
         group.MapGet("/rewards", GetRewardsSummaryAsync)
             .RequireAuthorization();
 
         group.MapPost("/referrals/activate", ActivateReferralCodeAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyJsonRequestBodyBytes));
 
         group.MapGet("/packs", ListPacksAsync)
             .AllowAnonymous();
@@ -97,35 +104,43 @@ public static partial class EconomyEndpoints
             .RequireAuthorization("AdminOnly");
 
         group.MapPost("/premium/checkout", CreatePremiumCheckoutAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyJsonRequestBodyBytes));
 
         group.MapPost("/premium/manage", CreatePremiumBillingPortalAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyJsonRequestBodyBytes));
 
         group.MapPost("/premium/cancel", CancelPremiumSubscriptionAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyJsonRequestBodyBytes));
 
         group.MapPost("/premium/store/verify", VerifyPremiumStorePurchaseAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyJsonRequestBodyBytes));
 
         endpoints.MapPost("/api/billing/google/validate", ValidateGooglePlayBillingAsync)
             .WithTags("Billing")
             .RequireAuthorization()
-            .RequireRateLimiting("economy");
+            .RequireRateLimiting("economy")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyJsonRequestBodyBytes));
 
         endpoints.MapPost("/api/billing/apple/validate", ValidateAppleAppStoreBillingAsync)
             .WithTags("Billing")
             .RequireAuthorization()
-            .RequireRateLimiting("economy");
+            .RequireRateLimiting("economy")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyJsonRequestBodyBytes));
 
         group.MapPost("/premium/verify-stripe", VerifyPremiumStripeSubscriptionAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyJsonRequestBodyBytes));
 
         group.MapGet("/payment-methods", ListPaymentMethodsAsync)
             .RequireAuthorization();
 
         group.MapPost("/payment-methods/setup", CreatePaymentMethodSetupAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyJsonRequestBodyBytes));
 
         group.MapDelete("/payment-methods/{paymentMethodId:guid}", RemovePaymentMethodAsync)
             .RequireAuthorization();
@@ -134,38 +149,46 @@ public static partial class EconomyEndpoints
             .RequireAuthorization();
 
         group.MapPost("/purchases/create", CreatePurchaseAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyJsonRequestBodyBytes));
 
         group.MapPost("/purchases/{orderId:guid}/verify-stripe", VerifyStripeCheckoutAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyJsonRequestBodyBytes));
 
         group.MapPost("/purchases/{orderId:guid}/verify-store", VerifyStoreCheckoutAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyJsonRequestBodyBytes));
 
         group.MapGet("/purchases/{orderId:guid}", GetPurchaseAsync)
             .RequireAuthorization();
 
         group.MapPost("/webhooks/stripe", StripeWebhookAsync)
             .AllowAnonymous()
-            .RequireRateLimiting("webhooks");
+            .RequireRateLimiting("webhooks")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyWebhookRequestBodyBytes));
 
         group.MapPost("/webhooks/app-store", AppStoreServerNotificationAsync)
             .AllowAnonymous()
-            .RequireRateLimiting("webhooks");
+            .RequireRateLimiting("webhooks")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyWebhookRequestBodyBytes));
 
         endpoints.MapPost("/api/webhooks/apple-app-store", AppStoreServerNotificationAsync)
             .WithTags("Billing Webhooks")
             .AllowAnonymous()
-            .RequireRateLimiting("webhooks");
+            .RequireRateLimiting("webhooks")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyWebhookRequestBodyBytes));
 
         group.MapPost("/webhooks/google-play", GooglePlayDeveloperNotificationAsync)
             .AllowAnonymous()
-            .RequireRateLimiting("webhooks");
+            .RequireRateLimiting("webhooks")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyWebhookRequestBodyBytes));
 
         endpoints.MapPost("/api/webhooks/google-play", GooglePlayDeveloperNotificationAsync)
             .WithTags("Billing Webhooks")
             .AllowAnonymous()
-            .RequireRateLimiting("webhooks");
+            .RequireRateLimiting("webhooks")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyWebhookRequestBodyBytes));
 
         var stripePaymentsGroup = endpoints.MapGroup("/api/payments/stripe")
             .WithTags("Stripe Payments")
@@ -182,13 +205,16 @@ public static partial class EconomyEndpoints
                         StringComparison.Ordinal)));
 
         stripePaymentsGroup.MapPost("/token-purchase", CreateStripeTokenPurchaseAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyJsonRequestBodyBytes));
 
         stripePaymentsGroup.MapPost("/subscription", CreateStripeSubscriptionAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyJsonRequestBodyBytes));
 
         stripePaymentsGroup.MapPost("/customer-portal", CreateStripeCustomerPortalAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyJsonRequestBodyBytes));
 
         stripePaymentsGroup.MapGet("/diagnostics", GetStripeDiagnosticsAsync)
             .RequireAuthorization("AdminOnly");

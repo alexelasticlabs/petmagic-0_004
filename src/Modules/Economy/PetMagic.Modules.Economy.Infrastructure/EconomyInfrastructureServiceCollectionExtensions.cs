@@ -80,6 +80,22 @@ public static class EconomyInfrastructureServiceCollectionExtensions
             AppStoreBundleId = section["AppStoreBundleId"] ?? "com.petmagic.app",
             AppStoreSharedSecret = ReadValue(section, "AppStoreSharedSecret", "APP_STORE_SHARED_SECRET") ?? string.Empty,
             AppStoreEnvironment = ReadValue(section, "AppStoreEnvironment", "APP_STORE_ENVIRONMENT") ?? "production",
+            MaxStoreReceiptAgeHours = ParseInt(section["MaxStoreReceiptAgeHours"], 24),
+            EconomyReconciliationEnabled = ParseBool(
+                ReadValue(section, "EconomyReconciliationEnabled", "ECONOMY_RECONCILIATION_ENABLED"),
+                true),
+            EconomyReconciliationIntervalMinutes = ParseInt(
+                ReadValue(section, "EconomyReconciliationIntervalMinutes", "ECONOMY_RECONCILIATION_INTERVAL_MINUTES"),
+                15),
+            EconomyReconciliationPendingOrderMinutes = ParseInt(
+                ReadValue(section, "EconomyReconciliationPendingOrderMinutes", "ECONOMY_RECONCILIATION_PENDING_ORDER_MINUTES"),
+                30),
+            EconomyReconciliationLookbackDays = ParseInt(
+                ReadValue(section, "EconomyReconciliationLookbackDays", "ECONOMY_RECONCILIATION_LOOKBACK_DAYS"),
+                30),
+            EconomyReconciliationRetryDelayMinutes = ParseInt(
+                ReadValue(section, "EconomyReconciliationRetryDelayMinutes", "ECONOMY_RECONCILIATION_RETRY_DELAY_MINUTES"),
+                30),
             FirebasePushEnabled =
                 bool.TryParse(
                     ReadValue(
@@ -137,6 +153,7 @@ public static class EconomyInfrastructureServiceCollectionExtensions
             economyOptions.IsFirebasePushConfigured
                 ? serviceProvider.GetRequiredService<FcmEconomyPushNotificationSender>()
                 : serviceProvider.GetRequiredService<NoopEconomyPushNotificationSender>());
+        services.AddHostedService<EconomyReconciliationWorker>();
         services.AddSingleton<IStoreSubscriptionVerifier>(serviceProvider =>
             new StoreSubscriptionVerifier(
                 serviceProvider.GetRequiredService<IHttpClientFactory>(),
@@ -152,6 +169,11 @@ public static class EconomyInfrastructureServiceCollectionExtensions
     private static int ParseInt(string? raw, int fallback)
     {
         return int.TryParse(raw, out var value) ? value : fallback;
+    }
+
+    private static bool ParseBool(string? raw, bool fallback)
+    {
+        return bool.TryParse(raw, out var value) ? value : fallback;
     }
 
     private static string? ReadValue(IConfigurationSection section, string key, params string[] environmentVariables)
@@ -500,7 +522,7 @@ public static class EconomyInfrastructureServiceCollectionExtensions
                 DisplayLabel = "Stripe",
                 DisplaySubtitle = "Recommended · secure card checkout",
                 WarningTitle = "Payment via Stripe",
-                WarningMessage = "Stripe billing is completed inside PetMagic with native payment sheet.",
+                WarningMessage = "Stripe billing opens in secure Stripe-hosted Checkout. PetMagic updates access after Stripe confirms payment.",
                 Mode = defaultMode,
                 Notes = "Primary Stripe billing provider.",
                 CreatedAtUtc = now,
@@ -523,7 +545,7 @@ public static class EconomyInfrastructureServiceCollectionExtensions
                 DisplayLabel = "Stripe",
                 DisplaySubtitle = "Pay securely via Stripe",
                 WarningTitle = "Payment via Stripe",
-                WarningMessage = "Stripe billing is completed inside PetMagic with native payment sheet.",
+                WarningMessage = "Stripe billing opens in secure Stripe-hosted Checkout. PetMagic updates access after Stripe confirms payment.",
                 Mode = defaultMode,
                 Notes = "Global Stripe billing route for iOS.",
                 CreatedAtUtc = now,
@@ -546,7 +568,7 @@ public static class EconomyInfrastructureServiceCollectionExtensions
                 DisplayLabel = "Stripe",
                 DisplaySubtitle = "Recommended · secure card payment",
                 WarningTitle = "Payment via Stripe",
-                WarningMessage = "Stripe billing is completed inside PetMagic with native payment sheet. Provider terms and support may differ from App Store or Google Play.",
+                WarningMessage = "Stripe billing opens in secure Stripe-hosted Checkout. Provider terms and support may differ from App Store or Google Play.",
                 Mode = defaultMode,
                 Notes = "EU Stripe alternative billing route for iOS.",
                 CreatedAtUtc = now,
@@ -569,7 +591,7 @@ public static class EconomyInfrastructureServiceCollectionExtensions
                 DisplayLabel = "Stripe",
                 DisplaySubtitle = "Recommended · secure card payment",
                 WarningTitle = "Payment via Stripe",
-                WarningMessage = "Stripe billing is completed inside PetMagic with native payment sheet. Provider terms and support may differ from App Store or Google Play.",
+                WarningMessage = "Stripe billing opens in secure Stripe-hosted Checkout. Provider terms and support may differ from App Store or Google Play.",
                 Mode = defaultMode,
                 Notes = "EU Stripe alternative billing route for Android.",
                 CreatedAtUtc = now,
@@ -592,7 +614,7 @@ public static class EconomyInfrastructureServiceCollectionExtensions
                 DisplayLabel = "Stripe",
                 DisplaySubtitle = "Pay securely via Stripe",
                 WarningTitle = "Payment via Stripe",
-                WarningMessage = "Stripe billing is completed inside PetMagic with native payment sheet.",
+                WarningMessage = "Stripe billing opens in secure Stripe-hosted Checkout. PetMagic updates access after Stripe confirms payment.",
                 Mode = defaultMode,
                 Notes = "Global Stripe billing route for Android.",
                 CreatedAtUtc = now,
@@ -607,6 +629,7 @@ public static class EconomyInfrastructureServiceCollectionExtensions
 
             if (existing is not null)
             {
+                NormalizeSeededStripeCheckoutCopy(existing, config, now);
                 continue;
             }
 
@@ -614,5 +637,35 @@ public static class EconomyInfrastructureServiceCollectionExtensions
         }
 
         await dbContext.SaveChangesAsync();
+    }
+
+    private static void NormalizeSeededStripeCheckoutCopy(
+        PaymentProviderConfiguration existing,
+        PaymentProviderConfiguration seeded,
+        DateTime now)
+    {
+        if (!string.Equals(existing.Provider, "stripe", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        if (!ContainsNativePaymentSheetCopy(existing.WarningMessage)
+            && !ContainsNativePaymentSheetCopy(existing.DisplaySubtitle)
+            && !ContainsNativePaymentSheetCopy(existing.Notes))
+        {
+            return;
+        }
+
+        existing.DisplaySubtitle = seeded.DisplaySubtitle;
+        existing.WarningTitle = seeded.WarningTitle;
+        existing.WarningMessage = seeded.WarningMessage;
+        existing.Notes = seeded.Notes;
+        existing.UpdatedAtUtc = now;
+    }
+
+    private static bool ContainsNativePaymentSheetCopy(string? value)
+    {
+        return (value ?? string.Empty).Contains("native payment sheet", StringComparison.OrdinalIgnoreCase)
+            || (value ?? string.Empty).Contains("native payment sheets", StringComparison.OrdinalIgnoreCase);
     }
 }

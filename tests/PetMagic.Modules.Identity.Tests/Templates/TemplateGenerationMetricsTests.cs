@@ -7,6 +7,7 @@ using PetMagic.Modules.Identity.Tests.Host;
 
 namespace PetMagic.Modules.Identity.Tests.Templates;
 
+[Collection(TemplateTelemetryCollection.Name)]
 public sealed class TemplateGenerationMetricsTests
 {
     [Fact]

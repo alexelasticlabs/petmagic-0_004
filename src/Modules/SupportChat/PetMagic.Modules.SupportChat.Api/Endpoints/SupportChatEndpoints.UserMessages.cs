@@ -41,7 +41,7 @@ public static partial class SupportChatEndpoints
         var result = await service.SendMessageAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return ToProblem(result.Error);
+            return ToUserProblem(result.Error);
         }
 
         return TypedResults.Ok(SignAttachmentUrls(result.Value, attachmentReadUrlSigner));

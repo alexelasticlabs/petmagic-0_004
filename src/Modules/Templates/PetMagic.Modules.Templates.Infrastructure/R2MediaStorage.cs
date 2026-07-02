@@ -242,21 +242,52 @@ internal sealed class R2MediaStorage(
         }
 
         var prefix = NormalizePrefix(options.R2.ObjectKeyPrefix);
-        if (candidate.StartsWith($"{prefix}/", StringComparison.OrdinalIgnoreCase))
+        if (TryNormalizeManagedKey(candidate, prefix, out var managedKey))
         {
-            return candidate;
+            return managedKey;
         }
 
         var baseUrl = options.R2.PublicBaseUrl.TrimEnd('/');
-        if (!candidate.StartsWith(baseUrl, StringComparison.OrdinalIgnoreCase))
+        if (!candidate.StartsWith(baseUrl, StringComparison.OrdinalIgnoreCase)
+            || candidate.Length <= baseUrl.Length
+            || candidate[baseUrl.Length] != '/')
         {
             return null;
         }
 
         var storageKey = candidate[baseUrl.Length..].TrimStart('/');
-        return storageKey.StartsWith($"{prefix}/", StringComparison.OrdinalIgnoreCase)
-            ? storageKey
+        return TryNormalizeManagedKey(storageKey, prefix, out managedKey)
+            ? managedKey
             : null;
+    }
+
+    private static bool TryNormalizeManagedKey(string candidate, string prefix, out string managedKey)
+    {
+        managedKey = string.Empty;
+        var keyOnly = candidate.TrimStart('/');
+        if (string.IsNullOrWhiteSpace(keyOnly)
+            || keyOnly.EndsWith("/", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var segments = keyOnly
+            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (segments.Any(segment =>
+                string.Equals(segment, ".", StringComparison.Ordinal)
+                || string.Equals(segment, "..", StringComparison.Ordinal)))
+        {
+            return false;
+        }
+
+        var normalizedKey = string.Join('/', segments);
+        if (!normalizedKey.StartsWith($"{prefix}/", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        managedKey = normalizedKey;
+        return true;
     }
 
     private static bool ContentTypesMatch(string detectedContentType, string declaredContentType)

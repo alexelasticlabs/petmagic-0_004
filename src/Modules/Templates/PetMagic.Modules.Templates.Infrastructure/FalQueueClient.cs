@@ -59,7 +59,12 @@ internal sealed class FalQueueClient(
                     TemplateGenerationMetrics.RecordFalProviderRateLimitError(stageKind.Stage, model);
                 }
 
-                return ProviderFailure<FalQueueSubmitResult>("submit", model, TemplatesErrors.AiProviderFailed);
+                return ProviderFailure<FalQueueSubmitResult>(
+                    "submit",
+                    model,
+                    IsTransientStatusCode(submitResponse.StatusCode)
+                        ? TemplatesErrors.AiProviderTransientFailure
+                        : TemplatesErrors.AiProviderFailed);
             }
 
             var submitBody = await submitResponse.Content.ReadAsStringAsync(cancellationToken);
@@ -87,15 +92,37 @@ internal sealed class FalQueueClient(
 
             return Result.Success(new FalQueueSubmitResult(requestId, statusUrl, responseUrl));
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
+        }
+        catch (OperationCanceledException)
+        {
+            // HttpClient timeout (not an external shutdown request): the provider is slow or
+            // unreachable, which is a transient condition worth requeueing instead of failing.
+            TemplateGenerationMetrics.RecordFalProviderSubmitFailure(stageKind.Stage, model, "timeout");
+            return ProviderFailure<FalQueueSubmitResult>("request.timeout", model, TemplatesErrors.AiProviderTransientFailure);
+        }
+        catch (HttpRequestException)
+        {
+            TemplateGenerationMetrics.RecordFalProviderSubmitFailure(stageKind.Stage, model, "network");
+            return ProviderFailure<FalQueueSubmitResult>("request.network", model, TemplatesErrors.AiProviderTransientFailure);
         }
         catch
         {
             TemplateGenerationMetrics.RecordFalProviderSubmitFailure(stageKind.Stage, model, "exception");
             return ProviderFailure<FalQueueSubmitResult>("request.exception", model, TemplatesErrors.AiProviderFailed);
         }
+    }
+
+    private static bool IsTransientStatusCode(System.Net.HttpStatusCode statusCode)
+    {
+        return statusCode is System.Net.HttpStatusCode.RequestTimeout
+            or System.Net.HttpStatusCode.TooManyRequests
+            or System.Net.HttpStatusCode.InternalServerError
+            or System.Net.HttpStatusCode.BadGateway
+            or System.Net.HttpStatusCode.ServiceUnavailable
+            or System.Net.HttpStatusCode.GatewayTimeout;
     }
 
     public async Task<Result<FalQueueStatusResult>> GetStatusAsync(
@@ -210,32 +237,72 @@ internal sealed class FalQueueClient(
 
     private async Task<Result<JsonDocument>> FetchStatusAsync(Uri statusUrl, string model, CancellationToken cancellationToken)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, statusUrl);
-        ApplyAuth(request);
-
-        using var response = await CreateClient().SendAsync(request, cancellationToken);
-        if (!response.IsSuccessStatusCode)
+        try
         {
-            return ProviderFailure<JsonDocument>("status", model, TemplatesErrors.AiProviderFailed);
-        }
+            using var request = new HttpRequestMessage(HttpMethod.Get, statusUrl);
+            ApplyAuth(request);
 
-        var body = await response.Content.ReadAsStringAsync(cancellationToken);
-        return Result.Success(JsonDocument.Parse(body));
+            using var response = await CreateClient().SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return ProviderFailure<JsonDocument>(
+                    "status",
+                    model,
+                    IsTransientStatusCode(response.StatusCode)
+                        ? TemplatesErrors.AiProviderTransientFailure
+                        : TemplatesErrors.AiProviderFailed);
+            }
+
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            return Result.Success(JsonDocument.Parse(body));
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (OperationCanceledException)
+        {
+            return ProviderFailure<JsonDocument>("status.timeout", model, TemplatesErrors.AiProviderTransientFailure);
+        }
+        catch (HttpRequestException)
+        {
+            return ProviderFailure<JsonDocument>("status.network", model, TemplatesErrors.AiProviderTransientFailure);
+        }
     }
 
     private async Task<Result<JsonDocument>> FetchResponseAsync(Uri responseUrl, string model, CancellationToken cancellationToken)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, responseUrl);
-        ApplyAuth(request);
-
-        using var response = await CreateClient().SendAsync(request, cancellationToken);
-        if (!response.IsSuccessStatusCode)
+        try
         {
-            return ProviderFailure<JsonDocument>("response", model, TemplatesErrors.AiProviderFailed);
-        }
+            using var request = new HttpRequestMessage(HttpMethod.Get, responseUrl);
+            ApplyAuth(request);
 
-        var body = await response.Content.ReadAsStringAsync(cancellationToken);
-        return Result.Success(JsonDocument.Parse(body));
+            using var response = await CreateClient().SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return ProviderFailure<JsonDocument>(
+                    "response",
+                    model,
+                    IsTransientStatusCode(response.StatusCode)
+                        ? TemplatesErrors.AiProviderTransientFailure
+                        : TemplatesErrors.AiProviderFailed);
+            }
+
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            return Result.Success(JsonDocument.Parse(body));
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (OperationCanceledException)
+        {
+            return ProviderFailure<JsonDocument>("response.timeout", model, TemplatesErrors.AiProviderTransientFailure);
+        }
+        catch (HttpRequestException)
+        {
+            return ProviderFailure<JsonDocument>("response.network", model, TemplatesErrors.AiProviderTransientFailure);
+        }
     }
 
     private HttpClient CreateClient() => httpClientFactory.CreateClient(HttpClientName);

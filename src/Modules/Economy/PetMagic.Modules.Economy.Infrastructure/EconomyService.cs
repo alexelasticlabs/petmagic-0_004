@@ -1,4 +1,6 @@
 using System.Data;
+using System.Security.Cryptography;
+using System.Text;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -30,7 +32,8 @@ public sealed partial class EconomyService(
     IIdentityService? identityService = null,
     ILogger<EconomyService>? logger = null,
     IAdminAuditLog? adminAuditLog = null,
-    IStoreWebhookSecurityValidator? storeWebhookSecurityValidator = null) : IEconomyService, IEconomyAdminService
+    IStoreWebhookSecurityValidator? storeWebhookSecurityValidator = null,
+    IGenerationBillingReconciliationService? generationBillingReconciliation = null) : IEconomyService, IEconomyAdminService
 {
     private readonly EconomyAdminConfigurationService _adminConfigurationService =
         new(dbContext, options);
@@ -43,6 +46,9 @@ public sealed partial class EconomyService(
 
     private readonly IEconomyPushNotificationSender _pushNotificationSender =
         pushNotificationSender ?? new NoopEconomyPushNotificationSender();
+
+    private readonly IGenerationBillingReconciliationService? _generationBillingReconciliation =
+        generationBillingReconciliation;
 
     public async Task<Result<WalletStateResponse>> GetWalletAsync(Guid userId, bool isPremium, CancellationToken cancellationToken)
     {
@@ -73,90 +79,137 @@ public sealed partial class EconomyService(
 
     public async Task<Result<WalletOperationResponse>> ClaimWeeklyGrantAsync(ClaimWeeklyGrantCommand command, CancellationToken cancellationToken)
     {
-        await using var transaction = await BeginWalletSerializableTransactionAsync(cancellationToken);
-        var wallet = await GetOrCreateWalletAsync(command.UserId, cancellationToken);
-        var now = DateTime.UtcNow;
-        var resolvedPremium = await ResolvePremiumStatusAsync(command.UserId, command.IsPremium, cancellationToken);
+        return await ExecuteWalletSerializableMutationWithRetryAsync(
+            "claim_weekly_grant",
+            ExecuteAsync,
+            cancellationToken);
 
-        if (resolvedPremium)
+        async Task<Result<WalletOperationResponse>> ExecuteAsync(CancellationToken operationCancellationToken)
         {
-            var balanceBefore = wallet.Balance;
-            var nextGrantAtUtc = await GrantPremiumWeeklyTokensIfDueAsync(command.UserId, wallet, now, cancellationToken);
-            var delta = wallet.Balance - balanceBefore;
+            await using var transaction = await BeginWalletSerializableTransactionAsync(operationCancellationToken);
+            var wallet = await GetOrCreateWalletAsync(command.UserId, operationCancellationToken);
+            var now = DateTime.UtcNow;
+            var resolvedPremium = await ResolvePremiumStatusAsync(command.UserId, command.IsPremium, operationCancellationToken);
 
-            if (delta <= 0)
+            if (resolvedPremium)
             {
-                return Result.Failure<WalletOperationResponse>(EconomyErrors.WeeklyGrantCooldown);
+                var balanceBefore = wallet.Balance;
+                var nextGrantAtUtc = await GrantPremiumWeeklyTokensIfDueAsync(command.UserId, wallet, now, operationCancellationToken);
+                var delta = wallet.Balance - balanceBefore;
+
+                if (delta <= 0)
+                {
+                    return Result.Failure<WalletOperationResponse>(EconomyErrors.WeeklyGrantCooldown);
+                }
+
+                var adRewardsRemainingToday = Math.Max(0, options.Value.AdRewardDailyLimit - wallet.AdRewardsClaimedInWindow);
+                if (transaction is not null)
+                {
+                    await transaction.CommitAsync(operationCancellationToken);
+                }
+
+                return Result.Success(new WalletOperationResponse(
+                    wallet.UserId,
+                    delta,
+                    wallet.Balance,
+                    WalletLedgerSource.PremiumSubscriptionWeeklyGrant,
+                    now,
+                    nextGrantAtUtc,
+                    adRewardsRemainingToday));
             }
 
-            var adRewardsRemainingToday = Math.Max(0, options.Value.AdRewardDailyLimit - wallet.AdRewardsClaimedInWindow);
+            if (wallet.LastWeeklyGrantAtUtc is DateTime lastWeeklyGrantAtUtc)
+            {
+                var nextWeeklyAtUtc = lastWeeklyGrantAtUtc.AddDays(7);
+                if (nextWeeklyAtUtc > now)
+                {
+                    return Result.Failure<WalletOperationResponse>(EconomyErrors.WeeklyGrantCooldown);
+                }
+            }
+
+            var amount = options.Value.WeeklyFreeSpark;
+            var walletMutation = await ApplyWalletMutationAsync(
+                wallet,
+                amount,
+                WalletLedgerSource.WeeklyGrant,
+                "weekly payout",
+                now,
+                operationCancellationToken);
+            if (walletMutation.IsFailure)
+            {
+                return Result.Failure<WalletOperationResponse>(walletMutation.Error);
+            }
+
+            wallet.LastWeeklyGrantAtUtc = now;
+
+            await dbContext.SaveChangesAsync(operationCancellationToken);
             if (transaction is not null)
             {
-                await transaction.CommitAsync(cancellationToken);
+                await transaction.CommitAsync(operationCancellationToken);
             }
 
-            return Result.Success(new WalletOperationResponse(
-                wallet.UserId,
-                delta,
-                wallet.Balance,
-                WalletLedgerSource.PremiumSubscriptionWeeklyGrant,
-                now,
-                nextGrantAtUtc,
-                adRewardsRemainingToday));
+            return Result.Success(walletMutation.Value.Response);
         }
-
-        if (wallet.LastWeeklyGrantAtUtc is DateTime lastWeeklyGrantAtUtc)
-        {
-            var nextWeeklyAtUtc = lastWeeklyGrantAtUtc.AddDays(7);
-            if (nextWeeklyAtUtc > now)
-            {
-                return Result.Failure<WalletOperationResponse>(EconomyErrors.WeeklyGrantCooldown);
-            }
-        }
-
-        var amount = options.Value.WeeklyFreeSpark;
-        var response = ApplyWalletDelta(wallet, amount, WalletLedgerSource.WeeklyGrant, "weekly payout", now);
-        wallet.LastWeeklyGrantAtUtc = now;
-
-        await dbContext.SaveChangesAsync(cancellationToken);
-        if (transaction is not null)
-        {
-            await transaction.CommitAsync(cancellationToken);
-        }
-
-        return Result.Success(response);
     }
 
     public async Task<Result<WalletOperationResponse>> ClaimAdRewardAsync(ClaimAdRewardCommand command, CancellationToken cancellationToken)
     {
-        await using var transaction = await BeginWalletSerializableTransactionAsync(cancellationToken);
-        var wallet = await GetOrCreateWalletAsync(command.UserId, cancellationToken);
-        var now = DateTime.UtcNow;
+        return await ExecuteWalletSerializableMutationWithRetryAsync(
+            "claim_ad_reward",
+            ExecuteAsync,
+            cancellationToken);
 
-        if (wallet.AdRewardWindowStartedAtUtc is null || wallet.AdRewardWindowStartedAtUtc.Value.Date != now.Date)
+        async Task<Result<WalletOperationResponse>> ExecuteAsync(CancellationToken operationCancellationToken)
         {
-            wallet.AdRewardWindowStartedAtUtc = now;
-            wallet.AdRewardsClaimedInWindow = 0;
+            await using var transaction = await BeginWalletSerializableTransactionAsync(operationCancellationToken);
+            var wallet = await GetOrCreateWalletAsync(command.UserId, operationCancellationToken);
+            var now = DateTime.UtcNow;
+
+            if (wallet.AdRewardWindowStartedAtUtc is null || wallet.AdRewardWindowStartedAtUtc.Value.Date != now.Date)
+            {
+                wallet.AdRewardWindowStartedAtUtc = now;
+                wallet.AdRewardsClaimedInWindow = 0;
+            }
+
+            if (wallet.AdRewardsClaimedInWindow >= options.Value.AdRewardDailyLimit)
+            {
+                return Result.Failure<WalletOperationResponse>(EconomyErrors.AdRewardLimitReached);
+            }
+
+            var walletMutation = await ApplyWalletMutationAsync(
+                wallet,
+                options.Value.AdRewardSpark,
+                WalletLedgerSource.AdReward,
+                "rewarded ad",
+                now,
+                operationCancellationToken);
+            if (walletMutation.IsFailure)
+            {
+                return Result.Failure<WalletOperationResponse>(walletMutation.Error);
+            }
+
+            wallet.AdRewardsClaimedInWindow += 1;
+
+            await dbContext.SaveChangesAsync(operationCancellationToken);
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(operationCancellationToken);
+            }
+
+            return Result.Success(walletMutation.Value.Response);
         }
-
-        if (wallet.AdRewardsClaimedInWindow >= options.Value.AdRewardDailyLimit)
-        {
-            return Result.Failure<WalletOperationResponse>(EconomyErrors.AdRewardLimitReached);
-        }
-
-        var response = ApplyWalletDelta(wallet, options.Value.AdRewardSpark, WalletLedgerSource.AdReward, "rewarded ad", now);
-        wallet.AdRewardsClaimedInWindow += 1;
-
-        await dbContext.SaveChangesAsync(cancellationToken);
-        if (transaction is not null)
-        {
-            await transaction.CommitAsync(cancellationToken);
-        }
-
-        return Result.Success(response);
     }
 
     public async Task<Result<WalletOperationResponse>> SpendAsync(SpendBalanceCommand command, CancellationToken cancellationToken)
+    {
+        return await ExecuteWalletSerializableMutationWithRetryAsync(
+            "wallet_spend",
+            SpendInternalAsync,
+            command,
+            cancellationToken);
+    }
+
+    private async Task<Result<WalletOperationResponse>> SpendInternalAsync(SpendBalanceCommand command, CancellationToken cancellationToken)
     {
         if (command.Amount <= 0)
         {
@@ -169,48 +222,47 @@ public sealed partial class EconomyService(
         var source = string.IsNullOrWhiteSpace(command.Source)
             ? WalletLedgerSource.GenerationSpend
             : command.Source;
-        if (source == WalletLedgerSource.WatermarkUnlock)
+        var walletMutation = await ApplyWalletMutationAsync(
+            wallet,
+            -command.Amount,
+            source,
+            command.Reason,
+            now,
+            cancellationToken);
+        if (walletMutation.IsFailure)
         {
-            var existingSpend = await dbContext.WalletLedgerEntries
-                .AsNoTracking()
-                .FirstOrDefaultAsync(
-                    x => x.UserId == command.UserId
-                        && x.Source == WalletLedgerSource.WatermarkUnlock
-                        && x.Reason == command.Reason
-                        && x.Delta < 0,
-                    cancellationToken);
-            if (existingSpend is not null)
-            {
-                return Result.Success(new WalletOperationResponse(
-                    wallet.UserId,
-                    0,
-                    wallet.Balance,
-                    source,
-                    existingSpend.CreatedAtUtc,
-                    wallet.LastWeeklyGrantAtUtc?.AddDays(7),
-                    Math.Max(0, options.Value.AdRewardDailyLimit - wallet.AdRewardsClaimedInWindow)));
-            }
+            return Result.Failure<WalletOperationResponse>(walletMutation.Error);
         }
 
-        if (wallet.Balance < command.Amount)
-        {
-            return Result.Failure<WalletOperationResponse>(EconomyErrors.InsufficientBalance);
-        }
-
-        var response = ApplyWalletDelta(wallet, -command.Amount, source, command.Reason, now);
         try
         {
             await dbContext.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException) when (source == WalletLedgerSource.WatermarkUnlock)
+        catch (DbUpdateException exception) when (IsWalletBalanceCheckViolation(exception))
         {
-            var existing = await TryResolveExistingWatermarkUnlockSpendAsync(
+            dbContext.ChangeTracker.Clear();
+            EconomyMetrics.RecordWalletBalanceNegativePrevented("spend", source);
+            logger?.LogError(
+                "Wallet balance CHECK constraint prevented an overdraft. UserId={UserId} Amount={Amount} Source={Source} CorrelationId={CorrelationId}",
                 command.UserId,
+                command.Amount,
+                source,
+                CurrentCorrelationId);
+            return Result.Failure<WalletOperationResponse>(EconomyErrors.InsufficientBalance);
+        }
+        catch (DbUpdateException)
+        {
+            var existing = await TryResolveExistingWalletMutationAsync(
+                command.UserId,
+                source,
                 command.Reason,
+                sourceProvider: null,
+                sourceTransactionId: null,
+                clearChangeTracker: true,
                 cancellationToken);
             if (existing is not null)
             {
-                return Result.Success(existing);
+                return Result.Success(existing.Response);
             }
 
             throw;
@@ -221,51 +273,75 @@ public sealed partial class EconomyService(
             await transaction.CommitAsync(cancellationToken);
         }
 
-        return Result.Success(response);
+        return Result.Success(walletMutation.Value.Response);
     }
 
     public async Task<Result<WalletOperationResponse>> CreditAsync(CreditBalanceCommand command, CancellationToken cancellationToken)
+    {
+        return await ExecuteWalletSerializableMutationWithRetryAsync(
+            "wallet_credit",
+            CreditInternalAsync,
+            command,
+            cancellationToken);
+    }
+
+    private async Task<Result<WalletOperationResponse>> CreditInternalAsync(CreditBalanceCommand command, CancellationToken cancellationToken)
     {
         if (command.Amount <= 0)
         {
             return Result.Failure<WalletOperationResponse>(EconomyErrors.InvalidAmount);
         }
 
+        await using var transaction = await BeginWalletSerializableTransactionAsync(cancellationToken);
         var normalizedReason = NormalizeCreditReason(command);
-        if (IsGenerationRefund(command.Source))
-        {
-            var existingRefund = await TryResolveExistingGenerationRefundCreditAsync(
-                command.UserId,
-                normalizedReason,
-                cancellationToken);
-            if (existingRefund is not null)
-            {
-                return Result.Success(existingRefund);
-            }
-        }
-
         var wallet = await GetOrCreateWalletAsync(command.UserId, cancellationToken);
         var now = DateTime.UtcNow;
-        var response = ApplyWalletDelta(wallet, command.Amount, command.Source, normalizedReason, now);
+        var sourceTransactionId = BuildInternalWalletIdempotencyTransactionId(
+            command.UserId,
+            command.Source,
+            command.IdempotencyKey);
+        var walletMutation = await ApplyWalletMutationAsync(
+            wallet,
+            command.Amount,
+            command.Source,
+            normalizedReason,
+            now,
+            cancellationToken,
+            sourceTransactionId is null ? null : InternalWalletMutationProvider,
+            sourceTransactionId);
+        if (walletMutation.IsFailure)
+        {
+            return Result.Failure<WalletOperationResponse>(walletMutation.Error);
+        }
+
         try
         {
             await dbContext.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException) when (IsGenerationRefund(command.Source))
+        catch (DbUpdateException)
         {
-            var existing = await TryResolveExistingGenerationRefundCreditAsync(
+            var existing = await TryResolveExistingWalletMutationAsync(
                 command.UserId,
+                command.Source,
                 normalizedReason,
+                sourceTransactionId is null ? null : InternalWalletMutationProvider,
+                sourceTransactionId,
+                clearChangeTracker: true,
                 cancellationToken);
             if (existing is not null)
             {
-                return Result.Success(existing);
+                return Result.Success(existing.Response);
             }
 
             throw;
         }
 
-        return Result.Success(response);
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
+
+        return Result.Success(walletMutation.Value.Response);
     }
 
     public async Task<Result<RedeemCodeAppliedResponse>> ApplyRedeemCodeAsync(ApplyRedeemCodeCommand command, CancellationToken cancellationToken)
@@ -342,14 +418,20 @@ public sealed partial class EconomyService(
             case RedeemCodeRewardKind.Spark:
                 {
                     var wallet = await GetOrCreateWalletAsync(command.UserId, cancellationToken);
-                    walletOperation = ApplyWalletDelta(
+                    var walletMutation = await ApplyWalletMutationAsync(
                         wallet,
                         redeemCode.RewardValue,
                         WalletLedgerSource.RedeemCode,
                         $"redeem:{redeemCode.CodePrefix}",
                         now,
-                        out var createdLedgerEntryId);
-                    ledgerEntryId = createdLedgerEntryId;
+                        cancellationToken);
+                    if (walletMutation.IsFailure)
+                    {
+                        return Result.Failure<RedeemCodeAppliedResponse>(walletMutation.Error);
+                    }
+
+                    walletOperation = walletMutation.Value.Response;
+                    ledgerEntryId = walletMutation.Value.LedgerEntryId;
                     break;
                 }
             default:
@@ -482,85 +564,23 @@ public sealed partial class EconomyService(
             now));
     }
 
-    private async Task<WalletOperationResponse?> TryResolveExistingWatermarkUnlockSpendAsync(
-        Guid userId,
-        string reason,
-        CancellationToken cancellationToken)
-    {
-        dbContext.ChangeTracker.Clear();
-
-        var existingSpend = await dbContext.WalletLedgerEntries
-            .AsNoTracking()
-            .FirstOrDefaultAsync(
-                x => x.UserId == userId
-                    && x.Source == WalletLedgerSource.WatermarkUnlock
-                    && x.Reason == reason
-                    && x.Delta < 0,
-                cancellationToken);
-        if (existingSpend is null)
-        {
-            return null;
-        }
-
-        var wallet = await dbContext.Wallets
-            .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
-        var balance = wallet?.Balance ?? 0;
-
-        return new WalletOperationResponse(
-            userId,
-            0,
-            balance,
-            WalletLedgerSource.WatermarkUnlock,
-            existingSpend.CreatedAtUtc,
-            wallet?.LastWeeklyGrantAtUtc?.AddDays(7),
-            Math.Max(0, options.Value.AdRewardDailyLimit - (wallet?.AdRewardsClaimedInWindow ?? 0)));
-    }
-
-    private async Task<WalletOperationResponse?> TryResolveExistingGenerationRefundCreditAsync(
-        Guid userId,
-        string reason,
-        CancellationToken cancellationToken)
-    {
-        dbContext.ChangeTracker.Clear();
-
-        var existingCredit = await dbContext.WalletLedgerEntries
-            .AsNoTracking()
-            .FirstOrDefaultAsync(
-                x => x.UserId == userId
-                    && x.Source == WalletLedgerSource.GenerationRefund
-                    && x.Reason == reason
-                    && x.Delta > 0,
-                cancellationToken);
-        if (existingCredit is null)
-        {
-            return null;
-        }
-
-        var wallet = await dbContext.Wallets
-            .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
-
-        return new WalletOperationResponse(
-            userId,
-            0,
-            wallet?.Balance ?? existingCredit.BalanceAfter,
-            WalletLedgerSource.GenerationRefund,
-            existingCredit.CreatedAtUtc,
-            wallet?.LastWeeklyGrantAtUtc?.AddDays(7),
-            Math.Max(0, options.Value.AdRewardDailyLimit - (wallet?.AdRewardsClaimedInWindow ?? 0)));
-    }
-
-    private static bool IsGenerationRefund(string source)
-    {
-        return string.Equals(source, WalletLedgerSource.GenerationRefund, StringComparison.Ordinal);
-    }
-
     private static string NormalizeCreditReason(CreditBalanceCommand command)
     {
         return string.IsNullOrWhiteSpace(command.IdempotencyKey)
             ? command.Reason
             : command.IdempotencyKey.Trim();
+    }
+
+    private static string? BuildInternalWalletIdempotencyTransactionId(Guid userId, string source, string? idempotencyKey)
+    {
+        if (string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            return null;
+        }
+
+        var rawKey = $"{userId:D}:{source.Trim()}:{idempotencyKey.Trim()}";
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawKey))).ToLowerInvariant();
+        return $"wallet:{hash}";
     }
 
     private async Task<IDbContextTransaction?> BeginWalletSerializableTransactionAsync(CancellationToken cancellationToken)
@@ -571,5 +591,87 @@ public sealed partial class EconomyService(
         }
 
         return await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+    }
+
+    private Task<Result<T>> ExecuteWalletSerializableMutationWithRetryAsync<T, TCommand>(
+        string operation,
+        Func<TCommand, CancellationToken, Task<Result<T>>> action,
+        TCommand command,
+        CancellationToken cancellationToken)
+    {
+        return ExecuteWalletSerializableMutationWithRetryAsync(
+            operation,
+            ct => action(command, ct),
+            cancellationToken);
+    }
+
+    private async Task<Result<T>> ExecuteWalletSerializableMutationWithRetryAsync<T>(
+        string operation,
+        Func<CancellationToken, Task<Result<T>>> action,
+        CancellationToken cancellationToken)
+    {
+        const int maxAttempts = 3;
+
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await action(cancellationToken);
+            }
+            catch (Exception exception) when (ShouldRetryWalletSerializableMutation(exception, attempt, maxAttempts, cancellationToken))
+            {
+                dbContext.ChangeTracker.Clear();
+                var delay = TimeSpan.FromMilliseconds(25 * attempt * attempt);
+                logger?.LogWarning(
+                    exception,
+                    "Retrying serializable wallet mutation after transient database failure. Operation={Operation} Attempt={Attempt} MaxAttempts={MaxAttempts} DelayMs={DelayMs} CorrelationId={CorrelationId}",
+                    operation,
+                    attempt,
+                    maxAttempts,
+                    delay.TotalMilliseconds,
+                    CurrentCorrelationId);
+                await Task.Delay(delay, cancellationToken);
+            }
+        }
+    }
+
+    private static bool ShouldRetryWalletSerializableMutation(
+        Exception exception,
+        int attempt,
+        int maxAttempts,
+        CancellationToken cancellationToken)
+    {
+        return attempt < maxAttempts
+            && !cancellationToken.IsCancellationRequested
+            && IsWalletSerializableRetryableException(exception);
+    }
+
+    internal static bool IsWalletSerializableRetryableException(Exception exception)
+    {
+        for (var current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is Npgsql.PostgresException postgresException
+                && (postgresException.SqlState == Npgsql.PostgresErrorCodes.SerializationFailure
+                    || postgresException.SqlState == Npgsql.PostgresErrorCodes.DeadlockDetected))
+            {
+                return true;
+            }
+
+            if (current is Npgsql.NpgsqlException { IsTransient: true })
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsWalletBalanceCheckViolation(DbUpdateException exception)
+    {
+        return exception.InnerException is Npgsql.PostgresException
+        {
+            SqlState: Npgsql.PostgresErrorCodes.CheckViolation,
+            ConstraintName: "CK_economy_wallets_Balance_NonNegative"
+        };
     }
 }

@@ -54,7 +54,12 @@ public sealed partial class EconomyService
                 x.Reason,
                 x.CreatedAtUtc,
                 x.SourceProvider,
-                null))
+                x.SourceProvider == "google_play" || x.SourceProvider == "app_store" ? null : x.SourceTransactionId,
+                x.TokenKind,
+                x.OperationKind,
+                x.TokenBucketId,
+                x.BucketDeltasJson,
+                x.ExpiresAtUtc))
             .ToListAsync(cancellationToken);
 
         return Result.Success(ToPaged(items, normalizedSkip, normalizedTake));
@@ -159,11 +164,12 @@ public sealed partial class EconomyService
                 x.CreatedAtUtc,
                 x.ConfirmedAtUtc,
                 x.PaymentProvider == "stripe"
-                    && x.Status == PurchaseOrderStatus.Succeeded
+                    && (x.Status == PurchaseOrderStatus.Succeeded
+                        || x.Status == PurchaseOrderStatus.RefundPending)
                     && !string.IsNullOrWhiteSpace(x.ExternalPaymentId),
                 "TokenPack",
                 x.SparkToGrant,
-                x.Status == PurchaseOrderStatus.Refunded ? "refunded" : "none"))
+                ResolvePurchaseRefundStatus(x.Status)))
             .ToList();
 
         return Result.Success(ToPaged(items, normalizedSkip, normalizedTake));
@@ -185,8 +191,10 @@ public sealed partial class EconomyService
         {
             return Result.Failure<PurchaseHistoryItemResponse>(EconomyErrors.PurchaseNotRefundable);
         }
+        var externalPaymentId = order.ExternalPaymentId;
 
-        if (string.Equals(order.Status, PurchaseOrderStatus.Refunded, StringComparison.Ordinal))
+        if (string.Equals(order.Status, PurchaseOrderStatus.Refunded, StringComparison.Ordinal)
+            || string.Equals(order.Status, PurchaseOrderStatus.RefundRequiresManualReview, StringComparison.Ordinal))
         {
             var refundedPack = await dbContext.CurrencyPacks
                 .AsNoTracking()
@@ -195,16 +203,50 @@ public sealed partial class EconomyService
             return Result.Success(ToPurchaseHistoryItem(order, refundedPack));
         }
 
-        if (!string.Equals(order.Status, PurchaseOrderStatus.Succeeded, StringComparison.Ordinal))
+        if (!string.Equals(order.Status, PurchaseOrderStatus.Succeeded, StringComparison.Ordinal)
+            && !string.Equals(order.Status, PurchaseOrderStatus.RefundPending, StringComparison.Ordinal))
         {
             return Result.Failure<PurchaseHistoryItemResponse>(EconomyErrors.PurchaseNotRefundable);
+        }
+
+        var oldStatus = order.Status;
+        var preparedRefund = string.Equals(order.Status, PurchaseOrderStatus.RefundPending, StringComparison.Ordinal)
+            ? Result.Success(order)
+            : await PreparePurchaseRefundInternalAsync(order, cancellationToken);
+        if (preparedRefund.IsFailure)
+        {
+            return Result.Failure<PurchaseHistoryItemResponse>(preparedRefund.Error);
+        }
+
+        order = preparedRefund.Value;
+        if (string.Equals(order.Status, PurchaseOrderStatus.RefundRequiresManualReview, StringComparison.Ordinal))
+        {
+            if (adminAuditLog is not null)
+            {
+                await adminAuditLog.WriteAsync(
+                    new AdminAuditEntry(
+                        "admin.payment.refund_manual_review_required",
+                        "purchase_order",
+                        order.Id.ToString("D"),
+                        oldStatus,
+                        order.Status,
+                        $"Refund blocked before provider call. Wallet balance cannot revoke {order.SparkToGrant} tokens automatically.",
+                        order.UserId),
+                    cancellationToken);
+            }
+
+            var reviewPack = await dbContext.CurrencyPacks
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == order.PackId, cancellationToken);
+
+            return Result.Success(ToPurchaseHistoryItem(order, reviewPack));
         }
 
         var refundResult = await paymentGateway.RefundPaymentAsync(
             new PaymentRefundRequest(
                 order.PaymentProvider,
                 order.Id,
-                order.ExternalPaymentId,
+                externalPaymentId,
                 order.PriceAmount,
                 order.CurrencyCode,
                 NormalizeRefundReason(command.Reason),
@@ -213,10 +255,23 @@ public sealed partial class EconomyService
 
         if (refundResult.IsFailure)
         {
+            if (adminAuditLog is not null)
+            {
+                await adminAuditLog.WriteAsync(
+                    new AdminAuditEntry(
+                        "admin.payment.refund_provider_failed",
+                        "purchase_order",
+                        order.Id.ToString("D"),
+                        oldStatus,
+                        order.Status,
+                        $"Refund provider call failed after local token revoke reservation. Retry is required.",
+                        order.UserId),
+                    cancellationToken);
+            }
+
             return Result.Failure<PurchaseHistoryItemResponse>(refundResult.Error);
         }
 
-        var oldStatus = order.Status;
         var refundSettlement = await ApplyPurchaseRefundInternalAsync(
             order,
             refundResult.Value.ExternalRefundId,
@@ -237,7 +292,7 @@ public sealed partial class EconomyService
                     order.Id.ToString("D"),
                     oldStatus,
                     order.Status,
-                    $"Refunded {order.PriceAmount} {order.CurrencyCode}. Provider refund: {refundResult.Value.ExternalRefundId}. Revoked {order.SparkToGrant} tokens.",
+                    $"Refunded {order.PriceAmount} {order.CurrencyCode}. Provider refund recorded. Revoked {order.SparkToGrant} tokens.",
                     order.UserId),
                 cancellationToken);
         }
@@ -261,28 +316,9 @@ public sealed partial class EconomyService
             .AsNoTracking()
             .Select(x => new UserSubscription
             {
-                Id = x.Id,
-                UserId = x.UserId,
-                Provider = x.Provider,
-                PurchaseChannel = x.PurchaseChannel,
-                Region = x.Region,
-                PlanId = x.PlanId,
-                ProductId = x.ProductId,
                 Status = x.Status,
-                ExternalCustomerId = x.ExternalCustomerId,
-                ExternalSubscriptionId = x.ExternalSubscriptionId,
-                ExternalTransactionId = x.ExternalTransactionId,
-                CurrentPeriodStartUtc = x.CurrentPeriodStartUtc,
                 CurrentPeriodEndUtc = x.CurrentPeriodEndUtc,
-                CancelAtPeriodEnd = x.CancelAtPeriodEnd,
-                CancelledAtUtc = x.CancelledAtUtc,
-                ExpiredAtUtc = x.ExpiredAtUtc,
-                MonthlyTokenLimit = x.MonthlyTokenLimit,
-                MonthlyTokensGranted = x.MonthlyTokensGranted,
-                LastTokenGrantAtUtc = x.LastTokenGrantAtUtc,
-                LastValidatedAtUtc = x.LastValidatedAtUtc,
-                CreatedAtUtc = x.CreatedAtUtc,
-                UpdatedAtUtc = x.UpdatedAtUtc
+                CancelAtPeriodEnd = x.CancelAtPeriodEnd
             })
             .ToListAsync(cancellationToken);
         var activeSubscriptions = subscriptionSnapshots.Count(IsActivePremiumSubscription);
@@ -542,7 +578,18 @@ public sealed partial class EconomyService
             false,
             "TokenPack",
             order.SparkToGrant,
-            order.Status == PurchaseOrderStatus.Refunded ? "refunded" : "none");
+            ResolvePurchaseRefundStatus(order.Status));
+    }
+
+    private static string ResolvePurchaseRefundStatus(string? status)
+    {
+        return status switch
+        {
+            PurchaseOrderStatus.Refunded => "refunded",
+            PurchaseOrderStatus.RefundPending => "pending_provider",
+            PurchaseOrderStatus.RefundRequiresManualReview => "requires_manual_review",
+            _ => "none"
+        };
     }
 
     public async Task<Result<IReadOnlyList<AdminCurrencyPackResponse>>> ListAdminCurrencyPacksAsync(CancellationToken cancellationToken)

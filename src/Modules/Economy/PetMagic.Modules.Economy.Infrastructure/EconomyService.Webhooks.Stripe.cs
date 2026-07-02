@@ -7,7 +7,6 @@ using PetMagic.Modules.Economy.Application.Contracts;
 using PetMagic.Modules.Economy.Domain.Enums;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
 using PetMagic.Modules.Economy.Infrastructure.Payments;
-using PetMagic.Modules.Identity.Application.Contracts;
 
 using Stripe;
 
@@ -87,41 +86,36 @@ public sealed partial class EconomyService
             return StripeWebhookFailure(EconomyErrors.InvalidWebhookPayload, "event.parse", eventType);
         }
 
+        var safeStripeEventId = EconomyLogSanitizer.SafeExternalId(eventId) ?? eventId;
+        var safeStripeObjectId = EconomyLogSanitizer.SafeExternalId(parsedEvent.ObjectId);
+        var safeStripeCustomerId = EconomyLogSanitizer.SafeExternalId(parsedEvent.CustomerId);
         LogPaymentWebhookReceived(
             "stripe",
-            eventId,
+            safeStripeEventId,
             eventType,
             parsedEvent.UserId,
-            parsedEvent.ObjectId,
-            parsedEvent.CustomerId);
-
-        if (!dbContext.Database.IsRelational()
-            && await dbContext.ProcessedWebhookEvents.AnyAsync(x => x.Provider == "stripe" && x.EventId == eventId, cancellationToken))
-        {
-            LogDuplicatePaymentWebhook(
-                "stripe",
-                eventId,
-                eventType,
-                parsedEvent.UserId,
-                parsedEvent.ObjectId,
-                parsedEvent.CustomerId);
-            return Result.Success(new StripeWebhookResultResponse(eventId, false, "ignored_duplicate"));
-        }
+            safeStripeObjectId,
+            safeStripeCustomerId);
 
         await using var transaction = dbContext.Database.IsRelational()
-            ? await dbContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, cancellationToken)
+            ? await dbContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken)
             : null;
+        PendingPremiumEntitlementSync? pendingPremiumSync = null;
 
         try
         {
-            dbContext.ProcessedWebhookEvents.Add(new ProcessedWebhookEvent
+            if (!await TryClaimWebhookEventAsync("stripe", eventId, eventType, cancellationToken))
             {
-                Id = Guid.NewGuid(),
-                Provider = "stripe",
-                EventId = eventId,
-                EventType = eventType,
-                ProcessedAtUtc = DateTime.UtcNow
-            });
+                EconomyMetrics.RecordDuplicateWebhook("stripe", eventType);
+                LogDuplicatePaymentWebhook(
+                    "stripe",
+                    eventId,
+                    eventType,
+                    parsedEvent.UserId,
+                    parsedEvent.ObjectId,
+                    parsedEvent.CustomerId);
+                return Result.Success(new StripeWebhookResultResponse(eventId, false, "ignored_duplicate"));
+            }
 
             var shouldConfirmPackPurchase = string.Equals(eventType, "payment_intent.succeeded", StringComparison.Ordinal)
                 || (string.Equals(eventType, "checkout.session.completed", StringComparison.Ordinal)
@@ -148,6 +142,8 @@ public sealed partial class EconomyService
                 var refundOrder = await ResolveOrderAsync(parsedEvent.OrderId, parsedEvent.PaymentReferenceId, cancellationToken);
                 if (refundOrder is not null
                     && (string.Equals(refundOrder.Status, PurchaseOrderStatus.Succeeded, StringComparison.Ordinal)
+                        || string.Equals(refundOrder.Status, PurchaseOrderStatus.RefundPending, StringComparison.Ordinal)
+                        || string.Equals(refundOrder.Status, PurchaseOrderStatus.RefundRequiresManualReview, StringComparison.Ordinal)
                         || string.Equals(refundOrder.Status, PurchaseOrderStatus.Refunded, StringComparison.Ordinal)))
                 {
                     var refundResult = await ApplyPurchaseRefundInternalAsync(
@@ -291,39 +287,14 @@ public sealed partial class EconomyService
 
                     if (shouldUpdateIdentity)
                     {
-                        if (identityService is null)
-                        {
-                            return StripeWebhookFailure(EconomyErrors.PremiumBillingUnavailable, "premium.identity", eventType);
-                        }
-
-                        var premiumResult = await identityService.SetPremiumStatusAsync(
-                            new SetPremiumStatusCommand(effectiveUserId.Value, desiredPremiumState),
-                            cancellationToken);
-
-                        if (premiumResult.IsFailure)
-                        {
-                            return StripeWebhookFailure(premiumResult.Error, "premium.identity", eventType);
-                        }
-
-                        logger?.LogInformation(
-                            "Premium entitlement updated from Stripe webhook. Provider={Provider} UserId={UserId} EventId={EventId} EventType={EventType} Activated={Activated} Status={Status} PaymentIntentId={PaymentIntentId} StripeCustomerId={StripeCustomerId} CorrelationId={CorrelationId}",
-                            "stripe",
+                        pendingPremiumSync = new PendingPremiumEntitlementSync(
                             effectiveUserId.Value,
-                            EconomyLogSanitizer.SafeExternalId(eventId),
-                            eventType,
                             desiredPremiumState,
-                            parsedEvent.Status,
-                            EconomyLogSanitizer.SafeExternalId(parsedEvent.ObjectId),
-                            EconomyLogSanitizer.SafeExternalId(parsedEvent.CustomerId),
-                            CurrentCorrelationId);
-
-                        await _pushNotificationSender.NotifyPremiumUpdateAsync(
-                            effectiveUserId.Value,
-                            new PremiumPushNotification(
-                                Status: desiredPremiumState ? "active" : "inactive",
-                                Provider: "stripe",
-                                PlanCode: parsedEvent.PlanCode),
-                            cancellationToken);
+                            "stripe",
+                            eventType,
+                            subscription.Id,
+                            subscription.ExternalSubscriptionId,
+                            parsedEvent.PlanCode);
                     }
 
                     if (shouldActivatePremium || isInvoiceFailed || isSubscriptionDeleted || shouldDeactivatePremium)
@@ -409,6 +380,28 @@ public sealed partial class EconomyService
                 await transaction.CommitAsync(cancellationToken);
             }
 
+            if (pendingPremiumSync is not null)
+            {
+                var premiumSyncResult = await SynchronizePremiumEntitlementAsync(
+                    pendingPremiumSync.UserId,
+                    pendingPremiumSync.DesiredPremium,
+                    pendingPremiumSync.Provider,
+                    pendingPremiumSync.Reason,
+                    pendingPremiumSync.SubscriptionId,
+                    pendingPremiumSync.ExternalSubscriptionId,
+                    cancellationToken);
+                if (premiumSyncResult.IsSuccess)
+                {
+                    await _pushNotificationSender.NotifyPremiumUpdateAsync(
+                        pendingPremiumSync.UserId,
+                        new PremiumPushNotification(
+                            Status: pendingPremiumSync.DesiredPremium ? "active" : "inactive",
+                            Provider: pendingPremiumSync.Provider,
+                            PlanCode: pendingPremiumSync.PlanCode),
+                        cancellationToken);
+                }
+            }
+
             LogPaymentWebhookProcessed(
                 "stripe",
                 eventId,
@@ -421,6 +414,7 @@ public sealed partial class EconomyService
         catch (DbUpdateException exception) when (IsUniqueWebhookEventConflict(exception))
         {
             dbContext.ChangeTracker.Clear();
+            EconomyMetrics.RecordDuplicateWebhook("stripe", eventType);
             LogDuplicatePaymentWebhook(
                 "stripe",
                 eventId,
@@ -454,4 +448,13 @@ public sealed partial class EconomyService
 
         return false;
     }
+
+    private sealed record PendingPremiumEntitlementSync(
+        Guid UserId,
+        bool DesiredPremium,
+        string Provider,
+        string Reason,
+        Guid? SubscriptionId,
+        string? ExternalSubscriptionId,
+        string? PlanCode);
 }

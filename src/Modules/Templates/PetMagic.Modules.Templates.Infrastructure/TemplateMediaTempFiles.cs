@@ -78,19 +78,37 @@ internal static class TemplateMediaTempFiles
             }
 
             var cutoff = DateTime.UtcNow.Subtract(retention);
-            var file = new DirectoryInfo(Root)
+            var files = new DirectoryInfo(Root)
                 .EnumerateFiles("*", SearchOption.TopDirectoryOnly)
                 .Where(x => x.LastWriteTimeUtc <= cutoff)
+                .Where(x => !x.Name.EndsWith(".part", StringComparison.OrdinalIgnoreCase))
                 .OrderBy(x => x.LastWriteTimeUtc)
-                .FirstOrDefault();
+                .ToArray();
 
-            if (file is null)
+            if (files.Length == 0)
             {
                 return false;
             }
 
-            file.Delete();
-            return true;
+            foreach (var file in files)
+            {
+                try
+                {
+                    file.Delete();
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    logger?.LogWarning(
+                        exception,
+                        "Template metadata temp file sweep failed. Operation={Operation} RetentionHours={RetentionHours} TempFileName={TempFileName}",
+                        "sweep_expired",
+                        retention.TotalHours,
+                        file.Name);
+                }
+            }
+
+            return false;
         }
         catch (Exception exception)
         {

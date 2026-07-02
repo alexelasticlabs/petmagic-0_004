@@ -136,6 +136,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             StaleProcessingRecoveryDelayMilliseconds = ParsePositiveInt(section["StaleProcessingRecoveryDelayMilliseconds"], 900_000),
             OrphanQueuedJobTimeoutMilliseconds = ParsePositiveInt(section["OrphanQueuedJobTimeoutMilliseconds"], 120_000),
             MaxGenerationAttempts = ParsePositiveInt(section["MaxGenerationAttempts"], 3),
+            ProviderTransientRetryBaseDelaySeconds = ParsePositiveInt(section["ProviderTransientRetryBaseDelaySeconds"], 30),
             MaxRefundAttempts = ParsePositiveInt(section["MaxRefundAttempts"], 5),
             RefundRetryDelayMilliseconds = ParseNonNegativeInt(section["RefundRetryDelayMilliseconds"], 30_000),
             GenerationRetentionDaysAfterCompletion = ParseInt(section["GenerationRetentionDaysAfterCompletion"], 7),
@@ -151,6 +152,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             MetadataTempRetentionHours = ParsePositiveInt(section["MetadataTempRetentionHours"], 24),
             CleanupExpiredGenerationMediaWhileRefundPending = ParseBool(section["CleanupExpiredGenerationMediaWhileRefundPending"], true),
             UserMediaReadUrlTtlSeconds = ParsePositiveInt(section["UserMediaReadUrlTtlSeconds"], 900),
+            GenerationShareTokenTtlDays = ParsePositiveInt(section["GenerationShareTokenTtlDays"], 30),
             GeneratedVideoMaxFileSizeBytes = ParseLong(section["GeneratedVideoMaxFileSizeBytes"], 250 * 1024 * 1024),
             GeneratedImageMaxFileSizeBytes = ParseLong(section["GeneratedImageMaxFileSizeBytes"], 30 * 1024 * 1024),
             R2 = new R2StorageOptions
@@ -222,7 +224,11 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         {
             ConfigureExternalHttpClient(client);
             client.Timeout = TimeSpan.FromSeconds(5);
-        });
+        })
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                AllowAutoRedirect = false
+            });
         services.AddHttpClient(FalProviderHealthService.HttpClientName, ConfigureExternalHttpClient);
         services.AddScoped<ITemplateAiProviderHealthService, FalProviderHealthService>();
         services.AddScoped<ITemplatePushTokenService, TemplatePushTokenService>();
@@ -245,6 +251,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         services.AddScoped<ITemplateGenerationService, TemplateGenerationService>();
         services.AddScoped<ITemplateGenerationQaFixtureService, TemplateGenerationQaFixtureService>();
         services.AddScoped<IImagePreviewGenerator, ImagePreviewGenerator>();
+        services.AddScoped<IVideoThumbnailGenerator, VideoThumbnailGenerator>();
         services.AddScoped<TemplateMediaCleanupProcessor>();
         AddGenerationProviderPipelineServices(services, options);
         services.AddScoped<ITemplateGenerationProviderCallbackService, TemplateGenerationProviderCallbackService>();
@@ -478,7 +485,11 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
     {
         if (IsProvider(options.AiProvider, TemplateAiProviders.Fal))
         {
-            services.AddHttpClient(HttpGeneratedMediaImporter.HttpClientName, ConfigureExternalHttpClient);
+            services.AddHttpClient(HttpGeneratedMediaImporter.HttpClientName, ConfigureExternalHttpClient)
+                .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+                {
+                    AllowAutoRedirect = false
+                });
             services.AddSingleton<IGeneratedMediaImporter, HttpGeneratedMediaImporter>();
             return;
         }
@@ -500,6 +511,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         if (services.Any(descriptor => descriptor.ServiceType == typeof(IEconomyService)))
         {
             services.AddScoped<ITemplateGenerationBilling, EconomyTemplateGenerationBilling>();
+            services.AddScoped<IGenerationBillingReconciliationService, TemplateGenerationBillingReconciliationService>();
             return;
         }
 

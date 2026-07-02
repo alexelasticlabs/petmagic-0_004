@@ -23,22 +23,25 @@ internal sealed class TemplateFeedRealtimeService(
     private static readonly JsonSerializerOptions RealtimeJsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly TimeSpan TemplatesInvalidationThrottleWindow = TimeSpan.FromSeconds(2);
 
-    private readonly ConcurrentDictionary<Guid, Channel<TemplateFeedRealtimeEvent>> subscribers = new();
+    private readonly ConcurrentDictionary<Guid, RealtimeSubscriber> subscribers = new();
     private long _lastTemplatesInvalidationTicks;
     private long _lastRealtimeEventCleanupTicks;
 
     public ChannelReader<TemplateFeedRealtimeEvent> Subscribe(CancellationToken cancellationToken = default)
     {
         var subscriptionId = Guid.NewGuid();
-        var channel = Channel.CreateUnbounded<TemplateFeedRealtimeEvent>(new UnboundedChannelOptions
+        var channel = Channel.CreateBounded<TemplateFeedRealtimeEvent>(new BoundedChannelOptions(
+            Math.Max(1, options.RealtimeSubscriberBufferSize))
         {
             SingleReader = true,
-            SingleWriter = false
+            SingleWriter = false,
+            FullMode = BoundedChannelFullMode.Wait
         });
+        var subscriber = new RealtimeSubscriber(channel, DateTime.UtcNow);
 
-        subscribers[subscriptionId] = channel;
+        subscribers[subscriptionId] = subscriber;
         cancellationToken.Register(() => RemoveSubscriber(subscriptionId));
-        _ = Task.Run(() => PollPersistedEventsAsync(subscriptionId, channel, DateTime.UtcNow, cancellationToken), CancellationToken.None);
+        _ = Task.Run(() => PollPersistedEventsAsync(subscriptionId, subscriber, cancellationToken), CancellationToken.None);
         return channel.Reader;
     }
 
@@ -89,38 +92,39 @@ internal sealed class TemplateFeedRealtimeService(
         return PublishAsync(new TemplateFeedRealtimeEvent(TemplateFeedRealtimeTopics.GenerationStatusChanged, data), cancellationToken);
     }
 
-    private ValueTask PublishAsync(TemplateFeedRealtimeEvent realtimeEvent, CancellationToken cancellationToken)
+    private async ValueTask PublishAsync(TemplateFeedRealtimeEvent realtimeEvent, CancellationToken cancellationToken)
     {
-        _ = PersistAsync(realtimeEvent, CancellationToken.None);
+        var persistedEvent = await PersistAsync(realtimeEvent, CancellationToken.None);
         foreach (var entry in subscribers)
         {
-            if (!entry.Value.Writer.TryWrite(realtimeEvent))
+            if (TryWriteSubscriberEvent(entry.Value.Channel, realtimeEvent) && persistedEvent is not null)
             {
-                RemoveSubscriber(entry.Key);
+                entry.Value.AdvanceCursor(persistedEvent.CreatedAtUtc, persistedEvent.Id);
             }
         }
-
-        return ValueTask.CompletedTask;
     }
 
-    private async Task PersistAsync(TemplateFeedRealtimeEvent realtimeEvent, CancellationToken cancellationToken)
+    private async Task<TemplateRealtimeEventRecord?> PersistAsync(TemplateFeedRealtimeEvent realtimeEvent, CancellationToken cancellationToken)
     {
         try
         {
             using var scope = serviceScopeFactory.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
-            dbContext.TemplateRealtimeEvents.Add(new TemplateRealtimeEventRecord
+            var persistedEvent = new TemplateRealtimeEventRecord
             {
                 Id = Guid.NewGuid(),
                 Topic = realtimeEvent.Topic,
                 Data = realtimeEvent.Data,
                 CreatedAtUtc = DateTime.UtcNow
-            });
+            };
+            dbContext.TemplateRealtimeEvents.Add(persistedEvent);
             await dbContext.SaveChangesAsync(cancellationToken);
             await PrunePersistedEventsIfDueAsync(dbContext, cancellationToken);
+            return persistedEvent;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            return null;
         }
         catch (Exception exception)
         {
@@ -129,6 +133,7 @@ internal sealed class TemplateFeedRealtimeService(
                 exception,
                 "Template realtime event persistence failed. Topic={Topic}",
                 realtimeEvent.Topic);
+            return null;
         }
     }
 
@@ -177,12 +182,9 @@ internal sealed class TemplateFeedRealtimeService(
 
     private async Task PollPersistedEventsAsync(
         Guid subscriptionId,
-        Channel<TemplateFeedRealtimeEvent> channel,
-        DateTime startedAtUtc,
+        RealtimeSubscriber subscriber,
         CancellationToken cancellationToken)
     {
-        var lastSeenCreatedAtUtc = startedAtUtc;
-        var lastSeenId = Guid.Empty;
         var delay = TimeSpan.FromMilliseconds(Math.Max(250, options.RealtimePollingIntervalMilliseconds));
 
         while (!cancellationToken.IsCancellationRequested && subscribers.ContainsKey(subscriptionId))
@@ -191,23 +193,24 @@ internal sealed class TemplateFeedRealtimeService(
             {
                 using var scope = serviceScopeFactory.CreateScope();
                 var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+                var cursor = subscriber.ReadCursor();
                 var events = await LoadPersistedEventsAfterCursorAsync(
                     dbContext,
-                    lastSeenCreatedAtUtc,
-                    lastSeenId,
+                    cursor.CreatedAtUtc,
+                    cursor.Id,
                     cancellationToken);
 
                 foreach (var realtimeEvent in events)
                 {
-                    lastSeenCreatedAtUtc = realtimeEvent.CreatedAtUtc;
-                    lastSeenId = realtimeEvent.Id;
-                    if (!channel.Writer.TryWrite(new TemplateFeedRealtimeEvent(
-                            realtimeEvent.Topic,
-                            string.IsNullOrWhiteSpace(realtimeEvent.Data) ? "{}" : realtimeEvent.Data)))
+                    var eventPayload = new TemplateFeedRealtimeEvent(
+                        realtimeEvent.Topic,
+                        string.IsNullOrWhiteSpace(realtimeEvent.Data) ? "{}" : realtimeEvent.Data);
+                    if (!TryWriteSubscriberEvent(subscriber.Channel, eventPayload))
                     {
-                        RemoveSubscriber(subscriptionId);
-                        return;
+                        break;
                     }
+
+                    subscriber.AdvanceCursor(realtimeEvent.CreatedAtUtc, realtimeEvent.Id);
                 }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -265,11 +268,60 @@ internal sealed class TemplateFeedRealtimeService(
 
     private void RemoveSubscriber(Guid subscriptionId)
     {
-        if (!subscribers.TryRemove(subscriptionId, out var channel))
+        if (!subscribers.TryRemove(subscriptionId, out var subscriber))
         {
             return;
         }
 
-        channel.Writer.TryComplete();
+        subscriber.Channel.Writer.TryComplete();
+    }
+
+    private static bool TryWriteSubscriberEvent(
+        Channel<TemplateFeedRealtimeEvent> channel,
+        TemplateFeedRealtimeEvent realtimeEvent)
+    {
+        if (channel.Writer.TryWrite(realtimeEvent))
+        {
+            return true;
+        }
+
+        TemplateGenerationMetrics.RecordSseSubscriberDrop(realtimeEvent.Topic);
+        return false;
+    }
+
+    private sealed class RealtimeSubscriber(Channel<TemplateFeedRealtimeEvent> channel, DateTime startedAtUtc)
+    {
+        private readonly object cursorLock = new();
+        private DateTime lastSeenCreatedAtUtc = startedAtUtc;
+        private Guid lastSeenId = Guid.Empty;
+
+        public Channel<TemplateFeedRealtimeEvent> Channel { get; } = channel;
+
+        public (DateTime CreatedAtUtc, Guid Id) ReadCursor()
+        {
+            lock (cursorLock)
+            {
+                return (lastSeenCreatedAtUtc, lastSeenId);
+            }
+        }
+
+        public void AdvanceCursor(DateTime createdAtUtc, Guid id)
+        {
+            lock (cursorLock)
+            {
+                if (createdAtUtc < lastSeenCreatedAtUtc)
+                {
+                    return;
+                }
+
+                if (createdAtUtc == lastSeenCreatedAtUtc && id.CompareTo(lastSeenId) <= 0)
+                {
+                    return;
+                }
+
+                lastSeenCreatedAtUtc = createdAtUtc;
+                lastSeenId = id;
+            }
+        }
     }
 }

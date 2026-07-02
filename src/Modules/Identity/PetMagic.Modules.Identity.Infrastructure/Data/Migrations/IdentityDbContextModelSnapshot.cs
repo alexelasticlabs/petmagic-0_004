@@ -17,7 +17,7 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.8")
+                .HasAnnotation("ProductVersion", "10.0.9")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -522,6 +522,40 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("external_auth_providers", (string)null);
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.Identity.Infrastructure.Entities.ExternalAuthTicket", b =>
+                {
+                    b.Property<string>("Ticket")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("ConsumedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasMaxLength(8000)
+                        .HasColumnType("character varying(8000)");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.HasKey("Ticket");
+
+                    b.HasIndex("ConsumedAtUtc");
+
+                    b.HasIndex("Purpose", "ExpiresAtUtc");
+
+                    b.ToTable("external_auth_tickets", (string)null);
                 });
 
             modelBuilder.Entity("PetMagic.Modules.Identity.Infrastructure.Entities.RefreshTokenSession", b =>

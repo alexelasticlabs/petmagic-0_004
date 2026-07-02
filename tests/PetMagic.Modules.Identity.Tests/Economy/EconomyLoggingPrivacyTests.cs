@@ -42,6 +42,14 @@ public sealed class EconomyLoggingPrivacyTests
             "PetMagic.Modules.Economy.Infrastructure",
             "Payments",
             "StripePaymentGateway.Helpers.cs"));
+        var webhookParserSource = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "Modules",
+            "Economy",
+            "PetMagic.Modules.Economy.Infrastructure",
+            "Payments",
+            "EconomyWebhookParser.cs"));
 
         Assert.Contains("EconomyLogSanitizer.SafeExternalId(eventId)", loggingSource, StringComparison.Ordinal);
         Assert.Contains("EconomyLogSanitizer.SafeExternalId(paymentIntentId)", loggingSource, StringComparison.Ordinal);
@@ -49,11 +57,21 @@ public sealed class EconomyLoggingPrivacyTests
         Assert.Contains("EconomyLogSanitizer.SafePaymentIntentId(order.ExternalPaymentId)", loggingSource, StringComparison.Ordinal);
         Assert.Contains("internal static string? SafeExternalId(string? value)", sanitizerSource, StringComparison.Ordinal);
         Assert.Contains("internal static string? SafePaymentIntentId(string? externalPaymentId)", sanitizerSource, StringComparison.Ordinal);
-        Assert.Contains("EconomyLogSanitizer.SafeExternalId(parsed.EventId)", appStoreWebhookSource, StringComparison.Ordinal);
-        Assert.Contains("EconomyLogSanitizer.SafeExternalId(parsed.EventId)", googlePlayWebhookSource, StringComparison.Ordinal);
+        Assert.Contains("var safeAppStoreEventId = EconomyLogSanitizer.SafeExternalId(parsed.EventId)", appStoreWebhookSource, StringComparison.Ordinal);
+        Assert.Contains("LogStoreWebhookReceived(\"app_store\", safeAppStoreEventId", appStoreWebhookSource, StringComparison.Ordinal);
+        Assert.Contains("LogDuplicateStoreWebhook(\"app_store\", parsed.EventId", appStoreWebhookSource, StringComparison.Ordinal);
+        Assert.Contains("LogStoreWebhookProcessed(\"app_store\", parsed.EventId", appStoreWebhookSource, StringComparison.Ordinal);
+        Assert.Contains("var safeGooglePlayEventId = EconomyLogSanitizer.SafeExternalId(parsed.EventId)", googlePlayWebhookSource, StringComparison.Ordinal);
+        Assert.Contains("LogStoreWebhookReceived(\"google_play\", safeGooglePlayEventId", googlePlayWebhookSource, StringComparison.Ordinal);
+        Assert.Contains("LogDuplicateStoreWebhook(\"google_play\", parsed.EventId", googlePlayWebhookSource, StringComparison.Ordinal);
+        Assert.Contains("LogStoreWebhookProcessed(\"google_play\", parsed.EventId", googlePlayWebhookSource, StringComparison.Ordinal);
         Assert.Contains("EconomyLogSanitizer.SafeExternalId(externalCustomerId)", stripeGatewayHelpersSource, StringComparison.Ordinal);
         Assert.Contains("EconomyLogSanitizer.SafeExternalId(externalPaymentMethodId)", stripeGatewayHelpersSource, StringComparison.Ordinal);
         Assert.Contains("EconomyLogSanitizer.SafeExternalId(externalSetupId)", stripeGatewayHelpersSource, StringComparison.Ordinal);
+        Assert.Contains("BuildGooglePlayFallbackEventId(purchaseToken, notificationType, \"sub\")", webhookParserSource, StringComparison.Ordinal);
+        Assert.Contains("BuildGooglePlayFallbackEventId(purchaseToken, notificationType, \"one_time\")", webhookParserSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("\":{notificationType}:sub\"", webhookParserSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("\":{notificationType}:one_time\"", webhookParserSource, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -101,6 +119,13 @@ public sealed class EconomyLoggingPrivacyTests
             "Economy",
             "PetMagic.Modules.Economy.Infrastructure",
             "EconomyService.PremiumSubscriptionManagement.cs"));
+        var loggingSource = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "Modules",
+            "Economy",
+            "PetMagic.Modules.Economy.Infrastructure",
+            "EconomyService.Logging.cs"));
         var stripeWebhookSource = File.ReadAllText(Path.Combine(
             root,
             "src",
@@ -115,9 +140,14 @@ public sealed class EconomyLoggingPrivacyTests
 
         Assert.Contains("EconomyLogSanitizer.SafeExternalId(subscription.ExternalSubscriptionId)", subscriptionManagementSource, StringComparison.Ordinal);
 
-        Assert.Contains("EconomyLogSanitizer.SafeExternalId(eventId)", stripeWebhookSource, StringComparison.Ordinal);
-        Assert.Contains("EconomyLogSanitizer.SafeExternalId(parsedEvent.ObjectId)", stripeWebhookSource, StringComparison.Ordinal);
-        Assert.Contains("EconomyLogSanitizer.SafeExternalId(parsedEvent.CustomerId)", stripeWebhookSource, StringComparison.Ordinal);
+        Assert.Contains("EconomyLogSanitizer.SafeExternalId(eventId)", loggingSource, StringComparison.Ordinal);
+        Assert.Contains("EconomyLogSanitizer.SafeExternalId(paymentIntentId)", loggingSource, StringComparison.Ordinal);
+        Assert.Contains("EconomyLogSanitizer.SafeExternalId(stripeCustomerId)", loggingSource, StringComparison.Ordinal);
+        Assert.Contains("LogPaymentWebhookReceived(", stripeWebhookSource, StringComparison.Ordinal);
+        Assert.Contains("LogPaymentWebhookProcessed(", stripeWebhookSource, StringComparison.Ordinal);
+        Assert.Contains("LogDuplicatePaymentWebhook(", stripeWebhookSource, StringComparison.Ordinal);
+        Assert.Contains("parsedEvent.ObjectId", stripeWebhookSource, StringComparison.Ordinal);
+        Assert.Contains("parsedEvent.CustomerId", stripeWebhookSource, StringComparison.Ordinal);
     }
 
     private static string FindRepositoryRoot()

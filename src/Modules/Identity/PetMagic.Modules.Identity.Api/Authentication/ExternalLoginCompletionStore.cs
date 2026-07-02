@@ -1,32 +1,64 @@
-using Microsoft.Extensions.Caching.Memory;
+using System.Text.Json;
+
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 using PetMagic.Modules.Identity.Application.Contracts;
+using PetMagic.Modules.Identity.Infrastructure.Data;
+using PetMagic.Modules.Identity.Infrastructure.Entities;
 
 namespace PetMagic.Modules.Identity.Api.Authentication;
 
-public sealed class ExternalLoginCompletionStore(IMemoryCache cache)
+public sealed class ExternalLoginCompletionStore(IServiceScopeFactory serviceScopeFactory)
 {
+    private const string Purpose = "external_login_completion";
     private static readonly TimeSpan TicketLifetime = TimeSpan.FromMinutes(2);
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    private readonly IMemoryCache _cache = cache;
-
-    public string Create(TokenPairResponse session)
+    public async Task<string> CreateAsync(TokenPairResponse session, CancellationToken cancellationToken)
     {
         var ticket = Guid.NewGuid().ToString("N");
-        _cache.Set(ticket, session, TicketLifetime);
+        var now = DateTime.UtcNow;
+        using var scope = serviceScopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        await ExternalAuthTicketCleanup.PruneAsync(dbContext, Purpose, now, cancellationToken);
+        dbContext.ExternalAuthTickets.Add(new ExternalAuthTicket
+        {
+            Ticket = ticket,
+            Purpose = Purpose,
+            PayloadJson = JsonSerializer.Serialize(session, JsonOptions),
+            CreatedAtUtc = now,
+            ExpiresAtUtc = now.Add(TicketLifetime)
+        });
+        await dbContext.SaveChangesAsync(cancellationToken);
         return ticket;
     }
 
-    public bool TryTake(string ticket, out TokenPairResponse? session)
+    public async Task<TokenPairResponse?> TryTakeAsync(string ticket, CancellationToken cancellationToken)
     {
-        if (_cache.TryGetValue<TokenPairResponse>(ticket, out var cachedSession))
+        if (string.IsNullOrWhiteSpace(ticket))
         {
-            _cache.Remove(ticket);
-            session = cachedSession;
-            return true;
+            return null;
         }
 
-        session = null;
-        return false;
+        var now = DateTime.UtcNow;
+        using var scope = serviceScopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        var persisted = await dbContext.ExternalAuthTickets
+            .SingleOrDefaultAsync(
+                x => x.Ticket == ticket
+                    && x.Purpose == Purpose
+                    && x.ConsumedAtUtc == null
+                    && x.ExpiresAtUtc > now,
+                cancellationToken);
+
+        if (persisted is null)
+        {
+            return null;
+        }
+
+        persisted.ConsumedAtUtc = now;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return JsonSerializer.Deserialize<TokenPairResponse>(persisted.PayloadJson, JsonOptions);
     }
 }

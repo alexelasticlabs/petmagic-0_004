@@ -55,9 +55,31 @@ public sealed class TemplateMediaCleanupProcessorTests
         job.NormalizedImageUrl = "http://localhost:5000/templates-media/normalized.jpg";
         job.ReferenceMotionUrl = "http://localhost:5000/templates-media/reference.mp4";
         job.ResultUrl = "http://localhost:5000/templates-media/output.mp4";
+        job.WatermarkedResultUrl = "http://localhost:5000/templates-media/output-watermarked.mp4";
         job.RefundAttemptCount = 2;
         job.RefundLastErrorCode = "economy.unavailable";
         job.RefundLastAttemptedAtUtc = DateTime.UtcNow.AddDays(-9);
+        job.MediaRecords.Add(new TemplateMediaRecord
+        {
+            Id = Guid.NewGuid(),
+            UserId = job.UserId,
+            MediaType = "video",
+            StoragePath = "http://localhost:5000/templates-media/output.mp4",
+            WatermarkedStoragePath = "http://localhost:5000/templates-media/output-watermarked.mp4",
+            PreviewUrl = "http://localhost:5000/templates-media/output-thumb.jpg",
+            WatermarkedPreviewUrl = "http://localhost:5000/templates-media/output-watermarked-thumb.jpg",
+            SourceType = "generation_result",
+            GenerationId = job.Id,
+            Url = "http://localhost:5000/templates-media/output.mp4",
+            FileName = "output.mp4",
+            ContentType = "video/mp4",
+            FileSizeBytes = 1024,
+            Role = TemplateMediaRole.GenerationOutputVideo,
+            LifecycleState = TemplateMediaLifecycleState.AttachedToGeneration,
+            GenerationJobId = job.Id,
+            UploadedAtUtc = DateTime.UtcNow.AddDays(-10),
+            AttachedAtUtc = DateTime.UtcNow.AddDays(-10)
+        });
 
         dbContext.TemplateItems.Add(template);
         dbContext.TemplateGenerationJobs.Add(job);
@@ -75,10 +97,14 @@ public sealed class TemplateMediaCleanupProcessorTests
         Assert.Equal(string.Empty, persisted.SourceImageUrl);
         Assert.Null(persisted.NormalizedImageUrl);
         Assert.Null(persisted.ResultUrl);
+        Assert.Null(persisted.WatermarkedResultUrl);
         Assert.Null(persisted.UserMediaCleanupFailureCode);
         Assert.Contains("http://localhost:5000/templates-media/source.jpg", mediaStorage.DeletedUrls);
         Assert.Contains("http://localhost:5000/templates-media/normalized.jpg", mediaStorage.DeletedUrls);
         Assert.Contains("http://localhost:5000/templates-media/output.mp4", mediaStorage.DeletedUrls);
+        Assert.Contains("http://localhost:5000/templates-media/output-watermarked.mp4", mediaStorage.DeletedUrls);
+        Assert.Contains("http://localhost:5000/templates-media/output-thumb.jpg", mediaStorage.DeletedUrls);
+        Assert.Contains("http://localhost:5000/templates-media/output-watermarked-thumb.jpg", mediaStorage.DeletedUrls);
         Assert.DoesNotContain("http://localhost:5000/templates-media/reference.mp4", mediaStorage.DeletedUrls);
     }
 
@@ -121,6 +147,53 @@ public sealed class TemplateMediaCleanupProcessorTests
 
         Assert.True(processed);
         Assert.False(File.Exists(path));
+    }
+
+    [Fact]
+    public async Task CleanupNextExpiredMetadataTempFileAsync_ShouldNotDeleteActivePartFiles()
+    {
+        var path = await TemplateMediaTempFiles.WriteAsync("metadata"u8.ToArray(), ".tmp.part", CancellationToken.None);
+        File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddHours(-6));
+
+        try
+        {
+            await using var dbContext = CreateDbContext();
+            var processor = CreateProcessor(dbContext, options: CreateOptions(metadataTempRetentionHours: 1));
+
+            await processor.CleanupNextExpiredMetadataTempFileAsync(CancellationToken.None);
+
+            Assert.True(File.Exists(path));
+        }
+        finally
+        {
+            TemplateMediaTempFiles.TryDeleteIfOwned(path);
+        }
+    }
+
+    [Fact]
+    public async Task CleanupNextExpiredMetadataTempFileAsync_ShouldKeepUnsafeOutsideFiles()
+    {
+        var outsidePath = Path.Combine(Path.GetTempPath(), $"petmagic-outside-metadata-{Guid.NewGuid():N}.tmp");
+        await File.WriteAllBytesAsync(outsidePath, "metadata"u8.ToArray());
+        File.SetLastWriteTimeUtc(outsidePath, DateTime.UtcNow.AddHours(-6));
+
+        try
+        {
+            TemplateMediaTempFiles.TryDeleteIfOwned(outsidePath);
+
+            await using var dbContext = CreateDbContext();
+            var processor = CreateProcessor(dbContext, options: CreateOptions(metadataTempRetentionHours: 1));
+            await processor.CleanupNextExpiredMetadataTempFileAsync(CancellationToken.None);
+
+            Assert.True(File.Exists(outsidePath));
+        }
+        finally
+        {
+            if (File.Exists(outsidePath))
+            {
+                File.Delete(outsidePath);
+            }
+        }
     }
 
     [Fact]

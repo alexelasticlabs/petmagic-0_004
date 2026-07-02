@@ -50,6 +50,18 @@ public sealed class EconomyOptions
 
     public string AppStoreEnvironment { get; init; } = "production";
 
+    public int MaxStoreReceiptAgeHours { get; init; } = 24;
+
+    public bool EconomyReconciliationEnabled { get; init; } = true;
+
+    public int EconomyReconciliationIntervalMinutes { get; init; } = 15;
+
+    public int EconomyReconciliationPendingOrderMinutes { get; init; } = 30;
+
+    public int EconomyReconciliationLookbackDays { get; init; } = 30;
+
+    public int EconomyReconciliationRetryDelayMinutes { get; init; } = 30;
+
     public bool FirebasePushEnabled { get; init; }
 
     public string FirebaseProjectId { get; init; } = string.Empty;

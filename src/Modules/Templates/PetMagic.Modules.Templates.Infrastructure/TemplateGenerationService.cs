@@ -1,5 +1,6 @@
 using System.Text.Json;
 
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -26,10 +27,14 @@ internal sealed partial class TemplateGenerationService(
     ILogger<TemplateGenerationService>? logger = null,
     ITemplateFeedRealtimeService? realtimeService = null,
     ITemplateAiProviderHealthService? aiProviderHealthService = null,
-    ITemplateVisibilityPolicy? visibilityPolicy = null) : ITemplateGenerationService
+    ITemplateVisibilityPolicy? visibilityPolicy = null,
+    IDataProtectionProvider? dataProtectionProvider = null) : ITemplateGenerationService
 {
     private readonly ITemplateVisibilityPolicy _visibilityPolicy =
         visibilityPolicy ?? new TemplateVisibilityPolicy();
+    private readonly IDataProtector _generationShareProtector =
+        (dataProtectionProvider ?? new EphemeralDataProtectionProvider())
+            .CreateProtector("PetMagic.Templates.GenerationShare.v1");
 
     internal static readonly Guid AdminTestUserId = Guid.Empty;
 

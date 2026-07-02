@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 
 namespace PetMagic.Modules.Templates.Api.Endpoints;
@@ -14,13 +15,26 @@ public static partial class TemplateGenerationEndpoints
     private const int PremiumActiveGenerationLimit = 3;
     private const int PrivilegedActiveGenerationLimit = 10;
     private const int MaxIdempotencyKeyLength = 256;
+    private const int MaxGenerationJsonRequestBodyBytes = 16 * 1024;
+    private const int MaxGenerationQaFixtureRequestBodyBytes = 64 * 1024;
+    private const int MaxGenerationProviderWebhookRequestBodyBytes = 256 * 1024;
+    private const long MaxGenerationUploadRequestBodyBytes = 26L * 1024 * 1024;
 
     public static IEndpointRouteBuilder MapTemplateGenerationEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapPost("/api/templates/provider/fal/webhook", HandleFalWebhookAsync)
             .AllowAnonymous()
             .RequireRateLimiting("templates")
-            .DisableAntiforgery();
+            .DisableAntiforgery()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxGenerationProviderWebhookRequestBodyBytes));
+
+        endpoints.MapGet("/share/generation/{token}", GetSharedGenerationPageAsync)
+            .AllowAnonymous()
+            .RequireRateLimiting("templates");
+
+        endpoints.MapGet("/api/templates/generations/share/{token}", GetSharedGenerationAsync)
+            .AllowAnonymous()
+            .RequireRateLimiting("templates");
 
         var group = endpoints.MapGroup("/api/templates")
             .WithTags("Template Generations")
@@ -38,7 +52,8 @@ public static partial class TemplateGenerationEndpoints
         group.MapPost("/{templateId:guid}/generations", StartGenerationAsync)
             .RequireAuthorization()
             .RequireRateLimiting("generation-create")
-            .DisableAntiforgery();
+            .DisableAntiforgery()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxGenerationUploadRequestBodyBytes));
 
         group.MapGet("/generation-results/{resultId:guid}/compatible-templates", GetCompatibleTemplatesAsync)
             .RequireAuthorization()
@@ -46,11 +61,13 @@ public static partial class TemplateGenerationEndpoints
 
         group.MapPost("/generations/from-result", StartGenerationFromResultAsync)
             .RequireAuthorization()
-            .RequireRateLimiting("generation-create");
+            .RequireRateLimiting("generation-create")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxGenerationJsonRequestBodyBytes));
 
         group.MapPost("/generations/{generationId:guid}/generate-similar", GenerateSimilarAsync)
             .RequireAuthorization()
-            .RequireRateLimiting("generation-create");
+            .RequireRateLimiting("generation-create")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxGenerationJsonRequestBodyBytes));
 
         group.MapGet("/generations", ListGenerationsAsync)
             .RequireAuthorization()
@@ -60,13 +77,18 @@ public static partial class TemplateGenerationEndpoints
             .RequireAuthorization()
             .RequireRateLimiting("generation-status");
 
+        group.MapGet("/generations/events", StreamGenerationEventsAsync)
+            .RequireAuthorization()
+            .RequireRateLimiting("templates-events");
+
         group.MapGet("/generations/{generationId:guid}", GetGenerationAsync)
             .RequireAuthorization()
             .RequireRateLimiting("generation-status");
 
         group.MapPost("/generations/{generationId:guid}/remove-watermark", RemoveWatermarkAsync)
             .RequireAuthorization()
-            .RequireRateLimiting("templates");
+            .RequireRateLimiting("templates")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxGenerationJsonRequestBodyBytes));
 
         group.MapGet("/generations/{generationId:guid}/download", DownloadGenerationAsync)
             .RequireAuthorization()
@@ -90,11 +112,13 @@ public static partial class TemplateGenerationEndpoints
 
         group.MapPost("/generations/{generationId:guid}/feedback", RecordFeedbackAsync)
             .RequireAuthorization()
-            .RequireRateLimiting("templates");
+            .RequireRateLimiting("templates")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxGenerationJsonRequestBodyBytes));
 
         group.MapPost("/qa/generation-fixtures", CreateQaGenerationFixturesAsync)
             .RequireAuthorization("AdminOnly")
-            .RequireRateLimiting("templates");
+            .RequireRateLimiting("templates")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxGenerationQaFixtureRequestBodyBytes));
 
         group.MapDelete("/qa/generation-fixtures", CleanupQaGenerationFixturesAsync)
             .RequireAuthorization("AdminOnly")
@@ -102,11 +126,13 @@ public static partial class TemplateGenerationEndpoints
 
         group.MapPut("/notifications/push-token", RegisterPushTokenAsync)
             .RequireAuthorization()
-            .RequireRateLimiting("templates");
+            .RequireRateLimiting("templates")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxGenerationJsonRequestBodyBytes));
 
         group.MapDelete("/notifications/push-token", UnregisterPushTokenAsync)
             .RequireAuthorization()
-            .RequireRateLimiting("templates");
+            .RequireRateLimiting("templates")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxGenerationJsonRequestBodyBytes));
 
         return endpoints;
     }

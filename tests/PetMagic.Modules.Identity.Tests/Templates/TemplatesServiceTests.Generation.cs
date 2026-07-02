@@ -91,6 +91,39 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task StartAsync_ShouldSettleDurableBillingCommandBeforeJobBecomesClaimable()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var generationService = CreateGenerationService(dbContext);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Billing Command Portrait", "Portrait", ["billing"]);
+        var userId = Guid.NewGuid();
+
+        var started = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                userId,
+                templateId,
+                new TemplateAssetCommand("https://cdn.example.com/source.jpg", "source.jpg", "image/jpeg", 2048, null),
+                "billing-command-key",
+                "billing-command-hash",
+                3),
+            CancellationToken.None);
+
+        Assert.True(started.IsSuccess);
+
+        var persisted = await dbContext.TemplateGenerationJobs
+            .SingleAsync(x => x.Id == started.Value.GenerationId);
+        var command = await dbContext.TemplateGenerationBillingCommands
+            .SingleAsync(x => x.GenerationId == started.Value.GenerationId);
+
+        Assert.NotNull(persisted.ChargedAtUtc);
+        Assert.Equal(TemplateGenerationBillingCommandStatuses.Succeeded, command.Status);
+        Assert.Equal(persisted.ChargedAtUtc, command.CompletedAtUtc);
+        Assert.Equal(userId, command.UserId);
+        Assert.Equal(persisted.TokenCost, command.TokenCost);
+    }
+
+    [Fact]
     public Task MapResponse_ShouldNormalizeLegacyNullSourceImageAssetFields()
     {
         var now = DateTime.UtcNow;

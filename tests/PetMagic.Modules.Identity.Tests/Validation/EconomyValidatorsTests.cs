@@ -293,4 +293,31 @@ public sealed class EconomyValidatorsTests
         Assert.Contains(result.Errors, error => error.PropertyName == "WarningMessage");
         Assert.Contains(result.Errors, error => error.PropertyName == "Notes");
     }
+
+    [Fact]
+    public void CreatePaymentProviderConfigurationValidator_ShouldFail_WhenNativePaymentSheetCopyProvided()
+    {
+        var validator = new CreatePaymentProviderConfigurationCommandValidator();
+        var result = validator.Validate(new CreatePaymentProviderConfigurationCommand(
+            "stripe",
+            "android",
+            "*",
+            true,
+            true,
+            true,
+            true,
+            true,
+            "0.0.0",
+            true,
+            0,
+            "Stripe",
+            null,
+            null,
+            "Stripe billing is completed inside PetMagic with native payment sheet.",
+            "test",
+            "Secure hosted checkout."));
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error => error.PropertyName == "WarningMessage");
+    }
 }

@@ -26,7 +26,12 @@ public sealed record WalletLedgerItemResponse(
     string Reason,
     DateTime CreatedAtUtc,
     string? SourceProvider = null,
-    string? SourceTransactionId = null);
+    string? SourceTransactionId = null,
+    string TokenKind = "legacy",
+    string OperationKind = "credit",
+    Guid? TokenBucketId = null,
+    string? BucketDeltasJson = null,
+    DateTime? ExpiresAtUtc = null);
 
 public sealed record CurrencyPackResponse(
     Guid PackId,

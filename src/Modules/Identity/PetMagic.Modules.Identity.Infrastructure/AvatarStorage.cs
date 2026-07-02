@@ -213,31 +213,60 @@ internal sealed class LocalAvatarStorage(
 
     private string? TryResolveManagedRelativePath(string avatarUrl)
     {
-        var candidate = avatarUrl.Trim().Replace('\\', '/');
-        var queryIndex = candidate.IndexOfAny(['?', '#']);
-        if (queryIndex >= 0)
+        var candidate = avatarUrl.Trim();
+        if (string.IsNullOrWhiteSpace(candidate))
         {
-            candidate = candidate[..queryIndex];
+            return null;
         }
 
-        if (candidate.StartsWith("user-avatars/", StringComparison.OrdinalIgnoreCase))
+        if (TryNormalizeManagedRelativePath(candidate, out var managedRelativePath))
         {
-            return candidate;
+            return managedRelativePath;
         }
 
         var baseUrl = options.PublicBaseUrl.TrimEnd('/');
-        if (!candidate.StartsWith(baseUrl, StringComparison.OrdinalIgnoreCase))
+        if (!candidate.StartsWith(baseUrl, StringComparison.OrdinalIgnoreCase)
+            || candidate.Length <= baseUrl.Length
+            || candidate[baseUrl.Length] != '/')
         {
             return null;
         }
 
         var relativePath = candidate[baseUrl.Length..].TrimStart('/');
-        if (!relativePath.StartsWith("user-avatars/", StringComparison.OrdinalIgnoreCase))
+        if (!TryNormalizeManagedRelativePath(relativePath, out managedRelativePath))
         {
             return null;
         }
 
-        return relativePath;
+        return managedRelativePath;
+    }
+
+    private static bool TryNormalizeManagedRelativePath(string candidate, out string managedRelativePath)
+    {
+        managedRelativePath = string.Empty;
+        var normalized = candidate
+            .Replace('\\', '/')
+            .TrimStart('/');
+        var pathOnly = normalized.Split(['?', '#'])[0];
+        if (string.IsNullOrWhiteSpace(pathOnly)
+            || pathOnly.EndsWith("/", StringComparison.Ordinal)
+            || !pathOnly.StartsWith("user-avatars/", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var segments = pathOnly
+            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (segments.Length <= 1
+            || segments.Any(segment =>
+                string.Equals(segment, ".", StringComparison.Ordinal)
+                || string.Equals(segment, "..", StringComparison.Ordinal)))
+        {
+            return false;
+        }
+
+        managedRelativePath = string.Join('/', segments);
+        return true;
     }
 
     private static bool TryResolveAvatarFileFormat(string contentType, out string extension, out string normalizedContentType)

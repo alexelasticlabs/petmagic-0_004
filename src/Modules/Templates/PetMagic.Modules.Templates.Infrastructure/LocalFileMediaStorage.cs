@@ -270,24 +270,51 @@ internal sealed class LocalFileMediaStorage(
             candidate = candidate[..queryIndex];
         }
 
-        if (candidate.StartsWith("templates-media/", StringComparison.OrdinalIgnoreCase))
+        if (TryNormalizeManagedRelativePath(candidate, out var managedRelativePath))
         {
-            return candidate;
+            return managedRelativePath;
         }
 
         var baseUrl = options.PublicBaseUrl.TrimEnd('/');
-        if (!candidate.StartsWith(baseUrl, StringComparison.OrdinalIgnoreCase))
+        if (!candidate.StartsWith(baseUrl, StringComparison.OrdinalIgnoreCase)
+            || candidate.Length <= baseUrl.Length
+            || candidate[baseUrl.Length] != '/')
         {
             return null;
         }
 
         var relativePath = candidate[baseUrl.Length..].TrimStart('/');
-        if (!relativePath.StartsWith("templates-media/", StringComparison.OrdinalIgnoreCase))
+        if (!TryNormalizeManagedRelativePath(relativePath, out managedRelativePath))
         {
             return null;
         }
 
-        return relativePath;
+        return managedRelativePath;
+    }
+
+    private static bool TryNormalizeManagedRelativePath(string candidate, out string managedRelativePath)
+    {
+        managedRelativePath = string.Empty;
+        var pathOnly = candidate.TrimStart('/');
+        if (string.IsNullOrWhiteSpace(pathOnly)
+            || pathOnly.EndsWith("/", StringComparison.Ordinal)
+            || !pathOnly.StartsWith("templates-media/", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var segments = pathOnly
+            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (segments.Length <= 1
+            || segments.Any(segment =>
+                string.Equals(segment, ".", StringComparison.Ordinal)
+                || string.Equals(segment, "..", StringComparison.Ordinal)))
+        {
+            return false;
+        }
+
+        managedRelativePath = string.Join('/', segments);
+        return true;
     }
 
     private static bool TryResolveStoredFileFormat(

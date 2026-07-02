@@ -311,6 +311,48 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task RefundCreditsAsync_ShouldUseDefaultReason_WhenReasonIsBlank()
+    {
+        await using var dbContext = CreateDbContext();
+        var templateService = CreateService(dbContext);
+        var userId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        var generation = await CreateCompletedImageGenerationAsync(dbContext, templateService, userId);
+        generation.ChargedAtUtc = DateTime.UtcNow.AddMinutes(-5);
+        generation.TokenCost = 20;
+        await dbContext.SaveChangesAsync();
+        var feedbackService = CreateFeedbackService(dbContext, out var economyProxy);
+
+        var submitted = await feedbackService.SubmitAsync(
+            new SubmitFeedbackCommand(
+                userId,
+                "BugReport",
+                "low_quality",
+                -1,
+                "Bad quality",
+                generation.Id,
+                null,
+                null,
+                "result",
+                "1.2.3",
+                "ios",
+                "iPhone",
+                "en-US"),
+            CancellationToken.None);
+        Assert.True(submitted.IsSuccess);
+
+        var refunded = await feedbackService.RefundCreditsAsync(
+            new RefundFeedbackCreditsCommand(submitted.Value.FeedbackId, adminId, 7, "   "),
+            CancellationToken.None);
+
+        var expectedReason = $"Feedback refund {submitted.Value.FeedbackId}";
+        Assert.True(refunded.IsSuccess);
+        Assert.Equal(expectedReason, refunded.Value.Reason);
+        Assert.Equal(expectedReason, Assert.Single(economyProxy.CreditCommands).Reason);
+        Assert.Equal(expectedReason, (await dbContext.CreditRefunds.SingleAsync()).Reason);
+    }
+
+    [Fact]
     public async Task RefundCreditsAsync_ShouldRejectInvalidExplicitAmountWithoutCrediting()
     {
         await using var dbContext = CreateDbContext();

@@ -69,6 +69,146 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
                     b.ToTable("economy_currency_packs", (string)null);
                 });
 
+            modelBuilder.Entity("PetMagic.Modules.Economy.Infrastructure.Entities.EconomyIncident", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("AutoFixApplied")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("DeduplicationKey")
+                        .IsRequired()
+                        .HasMaxLength(240)
+                        .HasColumnType("character varying(240)");
+
+                    b.Property<string>("DetailsJson")
+                        .HasMaxLength(32000)
+                        .HasColumnType("character varying(32000)");
+
+                    b.Property<int>("DetectionCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ExternalReferenceId")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<DateTime>("FirstDetectedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("LastDetectedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime?>("NextRetryAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Provider")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<Guid?>("PurchaseOrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ResolutionNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime?>("ResolvedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("RetryCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("UserSubscriptionId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeduplicationKey")
+                        .IsUnique();
+
+                    b.HasIndex("PurchaseOrderId");
+
+                    b.HasIndex("UserSubscriptionId");
+
+                    b.HasIndex("Status", "LastDetectedAtUtc");
+
+                    b.HasIndex("Type", "Status", "LastDetectedAtUtc");
+
+                    b.HasIndex("UserId", "Status", "LastDetectedAtUtc");
+
+                    b.ToTable("economy_incidents", (string)null);
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.Economy.Infrastructure.Entities.EconomyIncidentAuditEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DetailsJson")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<Guid>("IncidentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("NewStatus")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("OldStatus")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IncidentId", "CreatedAtUtc");
+
+                    b.ToTable("economy_incident_audit_entries", (string)null);
+                });
+
             modelBuilder.Entity("PetMagic.Modules.Economy.Infrastructure.Entities.EconomyPushDeviceToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -865,7 +1005,10 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
 
                     b.HasIndex("UpdatedAtUtc");
 
-                    b.ToTable("economy_wallets", (string)null);
+                    b.ToTable("economy_wallets", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_economy_wallets_Balance_NonNegative", "\"Balance\" >= 0");
+                        });
                 });
 
             modelBuilder.Entity("PetMagic.Modules.Economy.Infrastructure.Entities.WalletLedgerEntry", b =>
@@ -877,11 +1020,25 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
                     b.Property<int>("BalanceAfter")
                         .HasColumnType("integer");
 
+                    b.Property<string>("BucketDeltasJson")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Delta")
                         .HasColumnType("integer");
+
+                    b.Property<DateTime?>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("OperationKind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("credit");
 
                     b.Property<string>("Reason")
                         .IsRequired()
@@ -901,6 +1058,16 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)");
 
+                    b.Property<Guid?>("TokenBucketId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TokenKind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasDefaultValue("legacy");
+
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
@@ -908,12 +1075,16 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
 
                     b.HasIndex("CreatedAtUtc");
 
+                    b.HasIndex("TokenBucketId");
+
                     b.HasIndex("Source", "CreatedAtUtc");
 
                     b.HasIndex("SourceProvider", "SourceTransactionId")
                         .IsUnique()
                         .HasDatabaseName("UX_ewl_SourceProvider_SourceTransactionId")
                         .HasFilter("\"SourceProvider\" IS NOT NULL AND \"SourceTransactionId\" IS NOT NULL");
+
+                    b.HasIndex("TokenKind", "CreatedAtUtc");
 
                     b.HasIndex("UserId", "CreatedAtUtc");
 
@@ -928,6 +1099,64 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
                         .HasFilter("\"Source\" = 'watermark_unlock'");
 
                     b.ToTable("economy_wallet_ledger", (string)null);
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.Economy.Infrastructure.Entities.WalletTokenBucket", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("InitialAmount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<int>("RemainingAmount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<Guid?>("SourceLedgerEntryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SourceLedgerEntryId");
+
+                    b.HasIndex("UserId", "Kind", "ExpiresAtUtc")
+                        .HasDatabaseName("IX_ewtb_UserId_Kind_ExpiresAtUtc");
+
+                    b.HasIndex("UserId", "RemainingAmount", "ExpiresAtUtc")
+                        .HasDatabaseName("IX_ewtb_UserId_Remaining_ExpiresAtUtc");
+
+                    b.ToTable("economy_wallet_token_buckets", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ewtb_RemainingAmount_NonNegative", "\"RemainingAmount\" >= 0");
+                        });
                 });
 #pragma warning restore 612, 618
         }

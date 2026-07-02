@@ -10,7 +10,7 @@ Content-Type: application/json
 
 {
 	"email": "demo.user@petmagic.app",
-	"password": "StrongPassword123",
+	"password": "<REPLACE_WITH_LOCAL_TEST_PASSWORD>",
 	"displayName": "Demo User"
 }
 

@@ -73,6 +73,18 @@ public sealed class SupportAttachmentReadUrlSignerTests
         Assert.Equal(string.Empty, signedUrl);
     }
 
+    [Theory]
+    [InlineData("https://api.petmagic.app/support-media/support-attachments/2026/../private.png")]
+    [InlineData("https://api.petmagic.app/support-media/support-attachments/2026/%2e%2e/private.png")]
+    public void CreateReadUrl_ShouldHideTraversalLikeManagedUrl(string fileUrl)
+    {
+        var signer = CreateSigner();
+
+        var signedUrl = signer.CreateReadUrl(fileUrl);
+
+        Assert.Equal(string.Empty, signedUrl);
+    }
+
     [Fact]
     public void IsAuthorizedRequest_ShouldAcceptSignedManagedPath()
     {
@@ -109,6 +121,36 @@ public sealed class SupportAttachmentReadUrlSignerTests
 
         Assert.False(signer.IsAuthorizedRequest(uri.AbsolutePath, expired));
         Assert.False(signer.IsAuthorizedRequest(uri.AbsolutePath, tampered));
+    }
+
+    [Fact]
+    public void IsAuthorizedRequest_ShouldRejectManagedSegmentOutsideConfiguredBasePath()
+    {
+        var signer = CreateSigner();
+        var signedUrl = signer.CreateReadUrl("https://api.petmagic.app/support-media/support-attachments/2026/06/test.png");
+        var uri = new Uri(signedUrl);
+        var query = QueryHelpers.ParseQuery(uri.Query).ToDictionary(
+            pair => pair.Key,
+            pair => (string?)pair.Value.ToString(),
+            StringComparer.OrdinalIgnoreCase);
+
+        Assert.False(signer.IsAuthorizedRequest("/other/support-attachments/2026/06/test.png", query));
+    }
+
+    [Theory]
+    [InlineData("/support-attachments/2026/../private.png")]
+    [InlineData("/support-media/support-attachments/2026/%2e%2e/private.png")]
+    public void IsAuthorizedRequest_ShouldRejectTraversalLikeManagedPath(string requestPath)
+    {
+        var signer = CreateSigner();
+        var signedUrl = signer.CreateReadUrl("https://api.petmagic.app/support-media/support-attachments/2026/06/test.png");
+        var uri = new Uri(signedUrl);
+        var query = QueryHelpers.ParseQuery(uri.Query).ToDictionary(
+            pair => pair.Key,
+            pair => (string?)pair.Value.ToString(),
+            StringComparer.OrdinalIgnoreCase);
+
+        Assert.False(signer.IsAuthorizedRequest(requestPath, query));
     }
 
     private static SupportAttachmentReadUrlSigner CreateSigner() => new(StorageOptions, SigningOptions);

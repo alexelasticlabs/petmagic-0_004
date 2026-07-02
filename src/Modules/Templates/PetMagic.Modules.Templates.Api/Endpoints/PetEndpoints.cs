@@ -24,6 +24,8 @@ public static class PetEndpoints
     private const int PremiumActiveGenerationLimit = 3;
     private const int PrivilegedActiveGenerationLimit = 10;
     private const int MaxIdempotencyKeyLength = 256;
+    private const int MaxPetJsonRequestBodyBytes = 16 * 1024;
+    private const long MaxPetPhotoUploadRequestBodyBytes = 26L * 1024 * 1024;
 
     public static IEndpointRouteBuilder MapPetEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -32,22 +34,30 @@ public static class PetEndpoints
             .RequireAuthorization();
 
         group.MapGet("", ListPetsAsync).RequireRateLimiting("templates");
-        group.MapPost("", CreatePetAsync).RequireRateLimiting("templates");
-        group.MapPut("/{petId:guid}", UpdatePetAsync).RequireRateLimiting("templates");
+        group.MapPost("", CreatePetAsync)
+            .RequireRateLimiting("templates")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxPetJsonRequestBodyBytes));
+        group.MapPut("/{petId:guid}", UpdatePetAsync)
+            .RequireRateLimiting("templates")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxPetJsonRequestBodyBytes));
         group.MapDelete("/{petId:guid}", DeletePetAsync).RequireRateLimiting("templates");
         group.MapPost("/{petId:guid}/photos", UploadPhotoAsync)
             .RequireRateLimiting("templates")
-            .DisableAntiforgery();
+            .DisableAntiforgery()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxPetPhotoUploadRequestBodyBytes));
         group.MapGet("/{petId:guid}/photos", ListPhotosAsync).RequireRateLimiting("templates");
         group.MapPost("/{petId:guid}/photos/{photoId:guid}/set-avatar", SetAvatarAsync).RequireRateLimiting("templates");
-        group.MapPost("/{petId:guid}/photos/{photoId:guid}/favorite", SetFavoriteAsync).RequireRateLimiting("templates");
+        group.MapPost("/{petId:guid}/photos/{photoId:guid}/favorite", SetFavoriteAsync)
+            .RequireRateLimiting("templates")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxPetJsonRequestBodyBytes));
         group.MapDelete("/{petId:guid}/photos/{photoId:guid}", DeletePhotoAsync).RequireRateLimiting("templates");
         group.MapGet("/{petId:guid}/generations", ListGenerationsAsync).RequireRateLimiting("generation-status");
 
         endpoints.MapPost("/api/templates/generations/from-pet", StartFromPetAsync)
             .WithTags("Template Generations")
             .RequireAuthorization()
-            .RequireRateLimiting("generation-create");
+            .RequireRateLimiting("generation-create")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxPetJsonRequestBodyBytes));
 
         var adminGroup = endpoints.MapGroup("/api/admin/users/{userId:guid}/pets")
             .WithTags("Admin Users")
@@ -57,8 +67,10 @@ public static class PetEndpoints
         adminGroup.MapGet("", ListAdminPetsAsync);
         adminGroup.MapGet("/{petId:guid}/photos", ListAdminPetPhotosAsync);
         adminGroup.MapGet("/{petId:guid}/generations", ListAdminPetGenerationsAsync);
-        adminGroup.MapPost("/{petId:guid}/status", ChangeAdminPetStatusAsync);
-        adminGroup.MapPost("/{petId:guid}/photos/{photoId:guid}/status", ChangeAdminPhotoStatusAsync);
+        adminGroup.MapPost("/{petId:guid}/status", ChangeAdminPetStatusAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxPetJsonRequestBodyBytes));
+        adminGroup.MapPost("/{petId:guid}/photos/{photoId:guid}/status", ChangeAdminPhotoStatusAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxPetJsonRequestBodyBytes));
 
         return endpoints;
     }

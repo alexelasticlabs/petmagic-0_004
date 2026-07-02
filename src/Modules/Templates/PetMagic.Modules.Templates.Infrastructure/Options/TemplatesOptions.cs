@@ -42,6 +42,8 @@ public sealed class TemplatesOptions
 
     public int RealtimePollingIntervalMilliseconds { get; init; } = 1_000;
 
+    public int RealtimeSubscriberBufferSize { get; init; } = 256;
+
     public int RealtimeEventRetentionMinutes { get; init; } = 60;
 
     public int RealtimeEventCleanupIntervalMinutes { get; init; } = 10;
@@ -138,6 +140,8 @@ public sealed class TemplatesOptions
 
     public int MaxGenerationAttempts { get; init; } = 3;
 
+    public int ProviderTransientRetryBaseDelaySeconds { get; init; } = 30;
+
     public int MaxRefundAttempts { get; init; } = 5;
 
     public int RefundRetryDelayMilliseconds { get; init; } = 30_000;
@@ -167,6 +171,8 @@ public sealed class TemplatesOptions
     public bool CleanupExpiredGenerationMediaWhileRefundPending { get; init; } = true;
 
     public int UserMediaReadUrlTtlSeconds { get; init; } = 900;
+
+    public int GenerationShareTokenTtlDays { get; init; } = 30;
 
     public long GeneratedVideoMaxFileSizeBytes { get; init; } = 250 * 1024 * 1024;
 

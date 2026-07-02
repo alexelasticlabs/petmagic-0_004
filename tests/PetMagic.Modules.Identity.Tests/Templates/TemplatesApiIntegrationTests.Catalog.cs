@@ -4,8 +4,8 @@ using System.Text;
 using System.Text.Json;
 
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 using PetMagic.Modules.Templates.Api.Endpoints;
 using PetMagic.Modules.Templates.Application.Abstractions;
@@ -236,6 +236,71 @@ public sealed partial class TemplatesApiIntegrationTests
         using var payload = JsonDocument.Parse(receivedEvent.Data);
         Assert.Equal(TemplateFeedInvalidationScopes.Full, payload.RootElement.GetProperty("scope").GetString());
         Assert.Equal("security-regression", payload.RootElement.GetProperty("reason").GetString());
+    }
+
+    [Fact]
+    public async Task GenerationEventsStream_ShouldEmitSanitizedCurrentUserEventsOnly()
+    {
+        await using var application = await TestApplication.CreateAsync(startGenerationWorker: false);
+
+        var created = await CreateActiveImageTemplateAsync(
+            application.Client,
+            "User Realtime Guard",
+            "Security",
+            ["realtime", "gallery"]);
+        var generation = await UploadGenerationSourceAsync(
+            application.Client,
+            created.TemplateId,
+            "pet.jpg",
+            "image/jpeg",
+            JpegBytes());
+
+        var currentUserGeneration = generation with
+        {
+            Status = "Completed",
+            OutputUrl = "https://signed.example.test/current-user-output.png",
+            ResultPreviewUrl = "https://signed.example.test/current-user-preview.webp",
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+        var otherUserGeneration = currentUserGeneration with
+        {
+            GenerationId = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            OutputUrl = "https://signed.example.test/other-user-output.png",
+            ResultPreviewUrl = "https://signed.example.test/other-user-preview.webp"
+        };
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/templates/generations/events");
+        using var response = await application.Client.SendAsync(
+            request,
+            HttpCompletionOption.ResponseHeadersRead);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("text/event-stream", response.Content.Headers.ContentType?.MediaType);
+
+        await using var stream = await response.Content.ReadAsStreamAsync();
+        using var reader = new StreamReader(stream, Encoding.UTF8);
+        var realtime = application.Services.GetRequiredService<ITemplateFeedRealtimeService>();
+
+        await realtime.PublishGenerationStatusChangedAsync(otherUserGeneration);
+
+        var eventTask = ReadNextServerSentEventAsync(reader);
+        await Assert.ThrowsAsync<TimeoutException>(() => eventTask.WaitAsync(TimeSpan.FromMilliseconds(400)));
+
+        await realtime.PublishGenerationStatusChangedAsync(currentUserGeneration);
+
+        var receivedEvent = await eventTask.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(TemplateFeedRealtimeTopics.GenerationStatusChanged, receivedEvent.Topic);
+        using var payload = JsonDocument.Parse(receivedEvent.Data);
+        Assert.Equal("generation.status_changed", payload.RootElement.GetProperty("eventType").GetString());
+        Assert.Equal(generation.GenerationId, payload.RootElement.GetProperty("generationId").GetGuid());
+        Assert.Equal("Completed", payload.RootElement.GetProperty("status").GetString());
+        Assert.True(payload.RootElement.GetProperty("requiresRefetch").GetBoolean());
+        Assert.True(payload.RootElement.TryGetProperty("occurredAtUtc", out _));
+        Assert.False(payload.RootElement.TryGetProperty("userId", out _));
+        Assert.DoesNotContain("outputUrl", receivedEvent.Data, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("previewUrl", receivedEvent.Data, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("signed.example.test", receivedEvent.Data, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -527,6 +592,62 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.Equal(HealthStatus.Unhealthy, result.Status);
         Assert.Equal(1, Assert.IsType<int>(result.Data["problemCount"]));
         Assert.Contains("missing_preview", Assert.IsType<string[]>(result.Data["problems"])[0]);
+    }
+
+    [Fact]
+    public async Task TemplateContentHealthCheck_ShouldRejectPrivateNetworkPreviewWithoutNetworkRequest()
+    {
+        await using var application = await TestApplication.CreateAsync();
+        var templateId = Guid.NewGuid();
+        await using (var scope = application.Services.CreateAsyncScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+            dbContext.TemplateItems.Add(new TemplateItem
+            {
+                Id = templateId,
+                Version = 1,
+                TemplateType = TemplateType.Image,
+                Title = "Private Preview Guard",
+                ShortDescription = "Active template must not trigger private network probes.",
+                Category = "Health",
+                Tags = "health,ssrf",
+                IsPremium = false,
+                TokenCost = 20,
+                Status = TemplateStatus.Active,
+                PromoBadgeMode = TemplatePromoBadgeMode.New,
+                ImageModel = "openai/gpt-image-2/edit",
+                ImagePrompt = "Keep the same pet.",
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow,
+                Assets =
+                [
+                    new TemplateAsset
+                    {
+                        Id = Guid.NewGuid(),
+                        AssetKind = TemplateAssetKind.Preview,
+                        Url = "http://169.254.169.254/latest/meta-data/iam/security-credentials",
+                        FileName = "metadata.jpg",
+                        ContentType = "image/jpeg",
+                        FileSizeBytes = 64
+                    }
+                ]
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        await using var healthScope = application.Services.CreateAsyncScope();
+        var httpClientFactory = new RecordingHttpClientFactory();
+        var healthCheck = new TemplateContentHealthCheck(
+            healthScope.ServiceProvider.GetRequiredService<TemplatesDbContext>(),
+            healthScope.ServiceProvider.GetRequiredService<TemplatesOptions>(),
+            httpClientFactory);
+        var result = await healthCheck.CheckHealthAsync(new HealthCheckContext());
+
+        Assert.Equal(HealthStatus.Unhealthy, result.Status);
+        Assert.Contains(
+            Assert.IsType<string[]>(result.Data["problems"]),
+            problem => problem.Contains("preview_url_private_network", StringComparison.Ordinal));
+        Assert.Empty(httpClientFactory.Requests);
     }
 
     [Fact]
@@ -1503,6 +1624,35 @@ public sealed partial class TemplatesApiIntegrationTests
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+        }
+    }
+
+    private sealed class RecordingHttpClientFactory : IHttpClientFactory
+    {
+        public List<Uri> Requests { get; } = [];
+
+        public HttpClient CreateClient(string name)
+        {
+            return new HttpClient(new RecordingHttpMessageHandler(Requests))
+            {
+                BaseAddress = new Uri("http://localhost")
+            };
+        }
+    }
+
+    private sealed class RecordingHttpMessageHandler(List<Uri> requests) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.RequestUri is not null)
+            {
+                lock (requests)
+                {
+                    requests.Add(request.RequestUri);
+                }
+            }
+
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
         }
     }

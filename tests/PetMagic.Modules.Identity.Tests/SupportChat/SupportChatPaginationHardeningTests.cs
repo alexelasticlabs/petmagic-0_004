@@ -79,6 +79,23 @@ public sealed class SupportChatPaginationHardeningTests
     }
 
     [Fact]
+    public void ConversationEndpoints_ShouldClampUntrustedPaginationQueries()
+    {
+        var source = ReadSupportChatApiSources(
+            "SupportChatEndpoints.AdminConversationAccess.cs",
+            "SupportChatEndpoints.UserConversationAccess.cs");
+
+        Assert.Contains("private const int MaxConversationMessagesTake = 120;", source, StringComparison.Ordinal);
+        Assert.Contains("private const int MaxAdminInboxPageSize = 100;", source, StringComparison.Ordinal);
+        Assert.Contains("var requestedPageSize = NormalizeAdminInboxPageSize(pageSize);", source, StringComparison.Ordinal);
+        Assert.Equal(2, CountOccurrences(source, "Take: NormalizeConversationMessagesTake(take)"));
+        Assert.Contains("Math.Clamp(take ?? DefaultConversationMessagesTake, 1, MaxConversationMessagesTake)", source, StringComparison.Ordinal);
+        Assert.Contains("Math.Clamp(pageSize ?? DefaultAdminInboxPageSize, 1, MaxAdminInboxPageSize)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Take: take ?? 60", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("pageSize is null or <= 0 ? 50 : pageSize.Value", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MessageHotPaths_ShouldAvoidLoadingWholeConversationHistoryForHotActions()
     {
         var source = ReadSupportChatInfrastructureSources(
@@ -125,5 +142,37 @@ public sealed class SupportChatPaginationHardeningTests
         return string.Join(
             "\n",
             fileNames.Select(ReadSupportChatInfrastructureSource));
+    }
+
+    private static string ReadSupportChatApiSource(string fileName)
+    {
+        return File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "SupportChat",
+            "PetMagic.Modules.SupportChat.Api",
+            "Endpoints",
+            fileName));
+    }
+
+    private static string ReadSupportChatApiSources(params string[] fileNames)
+    {
+        return string.Join(
+            "\n",
+            fileNames.Select(ReadSupportChatApiSource));
+    }
+
+    private static int CountOccurrences(string source, string value)
+    {
+        var count = 0;
+        var index = 0;
+        while ((index = source.IndexOf(value, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += value.Length;
+        }
+
+        return count;
     }
 }

@@ -165,8 +165,8 @@ public sealed partial class EconomyService
         if (string.IsNullOrWhiteSpace(message))
         {
             message = isEuRegion
-                ? "Stripe billing is completed inside PetMagic with native payment sheet (Card / Apple Pay / Google Pay). Provider terms and support may differ from App Store or Google Play."
-                : "Stripe billing is completed inside PetMagic with native payment sheet (Card / Apple Pay / Google Pay). Your payment details are processed securely by Stripe.";
+                ? "Stripe billing opens in secure Stripe-hosted Checkout. Provider terms and support may differ from App Store or Google Play."
+                : "Stripe billing opens in secure Stripe-hosted Checkout. Your payment details are processed securely by Stripe.";
         }
 
         if (string.IsNullOrWhiteSpace(note))
@@ -225,7 +225,7 @@ public sealed partial class EconomyService
         return new PaywallLegalTextsResponse(
             "Payments for in-app subscriptions are processed by Apple App Store or Google Play. You can manage or cancel the subscription in your store account settings.",
             "Alternative billing with Stripe is completed inside the app and may require additional provider disclosures depending on your region.",
-            "Stripe payments are completed inside PetMagic with native payment sheets. PetMagic does not store raw card details.");
+            "Stripe payments open in secure Stripe-hosted Checkout. PetMagic does not store raw card details.");
     }
 
     [GeneratedRegex("\\s+", RegexOptions.CultureInvariant)]

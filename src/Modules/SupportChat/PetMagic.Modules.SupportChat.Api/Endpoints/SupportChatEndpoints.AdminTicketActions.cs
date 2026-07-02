@@ -280,6 +280,19 @@ public static partial class SupportChatEndpoints
         return TypedResults.Problem(title: error.Code, detail: GetProblemDetail(error.Code, statusCode), statusCode: statusCode);
     }
 
+    private static ProblemHttpResult ToUserProblem(Error error)
+    {
+        if (error.Code == "support.forbidden")
+        {
+            return TypedResults.Problem(
+                title: "support.conversation_not_found",
+                detail: GetProblemDetail("support.conversation_not_found", StatusCodes.Status404NotFound),
+                statusCode: StatusCodes.Status404NotFound);
+        }
+
+        return ToProblem(error);
+    }
+
     private static string GetProblemDetail(string errorCode, int statusCode)
     {
         return errorCode switch

@@ -1,11 +1,13 @@
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using System.Security.Cryptography;
 using System.Text.Json;
+
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
+using PetMagic.Modules.Gamification.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain;
@@ -13,7 +15,6 @@ using PetMagic.Modules.Templates.Domain.Enums;
 using PetMagic.Modules.Templates.Infrastructure.Data;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
 using PetMagic.Modules.Templates.Infrastructure.Options;
-using PetMagic.Modules.Gamification.Application.Abstractions;
 
 namespace PetMagic.Modules.Templates.Infrastructure;
 
@@ -26,6 +27,7 @@ internal sealed partial class TemplateGenerationJobProcessor(
     IMediaMetadataReader mediaMetadataReader,
     IMediaStorage mediaStorage,
     IImagePreviewGenerator imagePreviewGenerator,
+    IVideoThumbnailGenerator videoThumbnailGenerator,
     ITemplateGenerationBilling billing,
     ITemplateFeedRealtimeService realtimeService,
     ITemplateGenerationPushNotificationSender pushNotificationSender,
@@ -58,6 +60,7 @@ internal sealed partial class TemplateGenerationJobProcessor(
         IMediaMetadataReader mediaMetadataReader,
         IMediaStorage mediaStorage,
         IImagePreviewGenerator imagePreviewGenerator,
+        IVideoThumbnailGenerator videoThumbnailGenerator,
         ITemplateWatermarkRenderer watermarkRenderer,
         ITemplateGenerationBilling billing,
         ITemplateFeedRealtimeService realtimeService,
@@ -73,6 +76,7 @@ internal sealed partial class TemplateGenerationJobProcessor(
             mediaMetadataReader,
             mediaStorage,
             imagePreviewGenerator,
+            videoThumbnailGenerator,
             billing,
             realtimeService,
             pushNotificationSender,
@@ -85,6 +89,11 @@ internal sealed partial class TemplateGenerationJobProcessor(
 
     public async Task<bool> ProcessNextAsync(CancellationToken cancellationToken)
     {
+        if (await SettleNextPendingGenerationBillingCommandAsync(cancellationToken))
+        {
+            return true;
+        }
+
         await RecordQueueSnapshotAsync(cancellationToken);
 
         var failedOrphanQueuedJob = await FailNextOrphanQueuedJobAsync(cancellationToken);
@@ -180,6 +189,19 @@ internal sealed partial class TemplateGenerationJobProcessor(
             oldestQueuedAtUtc is null ? null : (now - oldestQueuedAtUtc.Value).TotalSeconds,
             oldestProcessingStartedAtUtc is null ? null : (now - oldestProcessingStartedAtUtc.Value).TotalSeconds);
 
+        var refundSnapshot = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .Where(x => (x.Status == TemplateGenerationStatus.Failed || x.Status == TemplateGenerationStatus.Cancelled)
+                && x.ChargedAtUtc != null
+                && x.RefundedAtUtc == null)
+            .GroupBy(x => x.RefundAttemptCount >= options.MaxRefundAttempts)
+            .Select(x => new { Exhausted = x.Key, Count = x.LongCount() })
+            .ToArrayAsync(cancellationToken);
+
+        TemplateGenerationMetrics.RecordPendingRefundsSnapshot(
+            refundSnapshot.Where(x => !x.Exhausted).Sum(x => x.Count),
+            refundSnapshot.Where(x => x.Exhausted).Sum(x => x.Count));
+
         var laneSnapshots = await dbContext.TemplateGenerationJobs
             .AsNoTracking()
             .Where(x => x.Status == TemplateGenerationStatus.Queued
@@ -246,6 +268,13 @@ internal sealed partial class TemplateGenerationJobProcessor(
 
     public async Task<bool> RetryNextRefundAsync(CancellationToken cancellationToken)
     {
+        return string.Equals(dbContext.Database.ProviderName, NpgsqlProviderName, StringComparison.Ordinal)
+            ? await RetryNextRefundPostgresAsync(cancellationToken)
+            : await RetryNextRefundTrackedAsync(cancellationToken);
+    }
+
+    private async Task<bool> RetryNextRefundTrackedAsync(CancellationToken cancellationToken)
+    {
         var now = DateTime.UtcNow;
         var retryThreshold = now.AddMilliseconds(-options.RefundRetryDelayMilliseconds);
         var job = await dbContext.TemplateGenerationJobs
@@ -266,6 +295,47 @@ internal sealed partial class TemplateGenerationJobProcessor(
 
         await TryRefundAsync(job, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    private async Task<bool> RetryNextRefundPostgresAsync(CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        var retryThreshold = now.AddMilliseconds(-options.RefundRetryDelayMilliseconds);
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var claimedIds = await dbContext.Database.SqlQueryRaw<Guid>(
+            """
+            SELECT "Id" AS "Value"
+            FROM templates_generation_jobs
+            WHERE "Status" IN ({0}, {1})
+                AND "ChargedAtUtc" IS NOT NULL
+                AND "RefundedAtUtc" IS NULL
+                AND "RefundAttemptCount" < {2}
+                AND ("RefundLastAttemptedAtUtc" IS NULL OR "RefundLastAttemptedAtUtc" <= {3})
+            ORDER BY COALESCE("RefundLastAttemptedAtUtc", "CompletedAtUtc", "UpdatedAtUtc"), "Id"
+            FOR UPDATE SKIP LOCKED
+            LIMIT 1
+            """,
+            (int)TemplateGenerationStatus.Failed,
+            (int)TemplateGenerationStatus.Cancelled,
+            options.MaxRefundAttempts,
+            retryThreshold)
+            .ToListAsync(cancellationToken);
+
+        var claimedId = claimedIds.FirstOrDefault();
+        if (claimedId == Guid.Empty)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return false;
+        }
+
+        var job = await dbContext.TemplateGenerationJobs
+            .Include(x => x.Template)
+            .SingleAsync(x => x.Id == claimedId, cancellationToken);
+
+        await TryRefundAsync(job, cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return true;
     }
 

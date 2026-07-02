@@ -110,6 +110,64 @@ public sealed class LocalAvatarStorageTests
     }
 
     [Fact]
+    public async Task DeleteAsync_ShouldIgnoreTraversalLikeManagedPaths()
+    {
+        var rootPath = CreateTempDirectory();
+        var siblingPath = Path.Combine(
+            Directory.GetParent(rootPath)!.FullName,
+            $"petmagic-avatar-escape-{Guid.NewGuid():N}.jpg");
+        var rootFilePath = Path.Combine(rootPath, "escape-avatar.jpg");
+        var storage = CreateStorage(rootPath);
+
+        try
+        {
+            await File.WriteAllTextAsync(siblingPath, "outside-root");
+            await File.WriteAllTextAsync(rootFilePath, "inside-root");
+
+            var siblingDelete = await storage.DeleteAsync(
+                "user-avatars/../" + Path.GetFileName(siblingPath),
+                CancellationToken.None);
+            var rootDelete = await storage.DeleteAsync(
+                "http://localhost:5000/user-avatars/2026/../escape-avatar.jpg?pmexp=123&pmsig=abc",
+                CancellationToken.None);
+
+            Assert.True(siblingDelete.IsSuccess);
+            Assert.True(rootDelete.IsSuccess);
+            Assert.True(File.Exists(siblingPath));
+            Assert.True(File.Exists(rootFilePath));
+        }
+        finally
+        {
+            File.Delete(siblingPath);
+            Directory.Delete(rootPath, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task DeleteAsync_ShouldIgnoreMalformedPublicBaseUrlPrefix()
+    {
+        var rootPath = CreateTempDirectory();
+        var storage = CreateStorage(rootPath);
+        var unmanagedRootPath = Path.Combine(rootPath, "prefix-avatar.jpg");
+
+        try
+        {
+            await File.WriteAllTextAsync(unmanagedRootPath, "unmanaged");
+
+            var deleteResult = await storage.DeleteAsync(
+                "http://localhost:5000user-avatars/prefix-avatar.jpg",
+                CancellationToken.None);
+
+            Assert.True(deleteResult.IsSuccess);
+            Assert.True(File.Exists(unmanagedRootPath));
+        }
+        finally
+        {
+            Directory.Delete(rootPath, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task StoreAsync_ShouldLogWarning_WhenDirectoryCreationOrWriteFails()
     {
         var rootPath = Path.Combine(Path.GetTempPath(), $"petmagic-avatar-root-file-{Guid.NewGuid():N}");

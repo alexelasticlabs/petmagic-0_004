@@ -161,18 +161,22 @@ internal sealed class TemplateMediaLifecycleService(
     private string? ResolveManagedStoragePath(string assetUrl)
     {
         var candidate = assetUrl.Trim().Replace('\\', '/');
-        if (candidate.StartsWith("templates-media/", StringComparison.OrdinalIgnoreCase))
+        if (TryNormalizeManagedStoragePath(candidate, "templates-media", out var managedPath)
+            || (options.R2.IsConfigured
+                && TryNormalizeManagedStoragePath(candidate, NormalizeObjectKeyPrefix(options.R2.ObjectKeyPrefix), out managedPath)))
         {
-            return candidate;
+            return managedPath;
         }
 
         var localBaseUrl = options.PublicBaseUrl.TrimEnd('/');
         if (!string.IsNullOrWhiteSpace(localBaseUrl)
-            && candidate.StartsWith(localBaseUrl, StringComparison.OrdinalIgnoreCase))
+            && candidate.StartsWith(localBaseUrl, StringComparison.OrdinalIgnoreCase)
+            && candidate.Length > localBaseUrl.Length
+            && candidate[localBaseUrl.Length] == '/')
         {
             var relativePath = candidate[localBaseUrl.Length..].TrimStart('/');
-            return relativePath.StartsWith("templates-media/", StringComparison.OrdinalIgnoreCase)
-                ? relativePath
+            return TryNormalizeManagedStoragePath(relativePath, "templates-media", out managedPath)
+                ? managedPath
                 : null;
         }
 
@@ -182,16 +186,53 @@ internal sealed class TemplateMediaLifecycleService(
         }
 
         var r2BaseUrl = options.R2.PublicBaseUrl.TrimEnd('/');
-        if (!candidate.StartsWith(r2BaseUrl, StringComparison.OrdinalIgnoreCase))
+        if (!candidate.StartsWith(r2BaseUrl, StringComparison.OrdinalIgnoreCase)
+            || candidate.Length <= r2BaseUrl.Length
+            || candidate[r2BaseUrl.Length] != '/')
         {
             return null;
         }
 
         var storageKey = candidate[r2BaseUrl.Length..].TrimStart('/');
         var objectKeyPrefix = NormalizeObjectKeyPrefix(options.R2.ObjectKeyPrefix);
-        return storageKey.StartsWith($"{objectKeyPrefix}/", StringComparison.OrdinalIgnoreCase)
-            ? storageKey
+        return TryNormalizeManagedStoragePath(storageKey, objectKeyPrefix, out managedPath)
+            ? managedPath
             : null;
+    }
+
+    private static bool TryNormalizeManagedStoragePath(string candidate, string prefix, out string managedPath)
+    {
+        managedPath = string.Empty;
+        var pathOnly = candidate.TrimStart('/');
+        var queryIndex = pathOnly.IndexOfAny(['?', '#']);
+        if (queryIndex >= 0)
+        {
+            pathOnly = pathOnly[..queryIndex];
+        }
+
+        if (string.IsNullOrWhiteSpace(pathOnly)
+            || pathOnly.EndsWith("/", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var segments = pathOnly
+            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (segments.Any(segment =>
+                string.Equals(segment, ".", StringComparison.Ordinal)
+                || string.Equals(segment, "..", StringComparison.Ordinal)))
+        {
+            return false;
+        }
+
+        var normalized = string.Join('/', segments);
+        if (!normalized.StartsWith($"{prefix}/", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        managedPath = normalized;
+        return true;
     }
 
     private static string NormalizeObjectKeyPrefix(string prefix)

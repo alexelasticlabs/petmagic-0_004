@@ -18,13 +18,16 @@ public static class FeedbackEndpoints
 {
     private const string InvalidSubjectCode = "templates.invalid_subject";
     private const string InvalidSubjectMessage = "Authentication failed.";
+    private const int MaxFeedbackRequestBodyBytes = 8 * 1024;
+    private const int MaxAdminFeedbackMutationRequestBodyBytes = 8 * 1024;
 
     public static IEndpointRouteBuilder MapFeedbackEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapPost("/api/feedback", SubmitFeedbackAsync)
             .WithTags("Feedback")
             .RequireAuthorization()
-            .RequireRateLimiting("templates");
+            .RequireRateLimiting("templates")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxFeedbackRequestBodyBytes));
 
         var admin = endpoints.MapGroup("/api/admin/feedback")
             .WithTags("Admin.Feedback")
@@ -33,9 +36,11 @@ public static class FeedbackEndpoints
 
         admin.MapGet("/", ListAdminFeedbackAsync);
         admin.MapGet("/{feedbackId:guid}", GetAdminFeedbackAsync);
-        admin.MapPut("/{feedbackId:guid}", UpdateAdminFeedbackAsync);
+        admin.MapPut("/{feedbackId:guid}", UpdateAdminFeedbackAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminFeedbackMutationRequestBodyBytes));
         admin.MapPost("/{feedbackId:guid}/refund", RefundAdminFeedbackAsync)
-            .RequireAuthorization("AdminOnly");
+            .RequireAuthorization("AdminOnly")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminFeedbackMutationRequestBodyBytes));
 
         endpoints.MapGet("/api/admin/templates/{templateId:guid}/feedback-summary", GetTemplateFeedbackSummaryAsync)
             .WithTags("Admin.Feedback")
@@ -81,7 +86,7 @@ public static class FeedbackEndpoints
         var result = await service.SubmitAsync(command, cancellationToken);
 
         return result.IsFailure
-            ? ToProblem(result.Error)
+            ? ToUserProblem(result.Error)
             : TypedResults.Ok(result.Value);
     }
 
@@ -218,6 +223,19 @@ public static class FeedbackEndpoints
         };
 
         return TypedResults.Problem(title: error.Code, detail: GetProblemDetail(error.Code, statusCode), statusCode: statusCode);
+    }
+
+    private static ProblemHttpResult ToUserProblem(Error error)
+    {
+        if (error.Code == "feedback.forbidden")
+        {
+            return TypedResults.Problem(
+                title: "feedback.not_found",
+                detail: GetProblemDetail("feedback.not_found", StatusCodes.Status404NotFound),
+                statusCode: StatusCodes.Status404NotFound);
+        }
+
+        return ToProblem(error);
     }
 
     private static string GetProblemDetail(string errorCode, int statusCode)

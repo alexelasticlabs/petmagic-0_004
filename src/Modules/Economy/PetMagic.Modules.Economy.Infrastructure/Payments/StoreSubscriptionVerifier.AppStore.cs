@@ -62,12 +62,12 @@ public sealed partial class StoreSubscriptionVerifier
 
         if (productionResult.RequiresSandboxRetry)
         {
-                var sandboxResult = await SendAppStoreVerificationAsync(
-                    "https://sandbox.itunes.apple.com/verifyReceipt",
-                    verificationPayload,
-                    request,
-                    cancellationToken,
-                    requiresSandboxRetry: false);
+            var sandboxResult = await SendAppStoreVerificationAsync(
+                "https://sandbox.itunes.apple.com/verifyReceipt",
+                verificationPayload,
+                request,
+                cancellationToken,
+                requiresSandboxRetry: false);
 
             return sandboxResult.Result;
         }
@@ -161,9 +161,15 @@ public sealed partial class StoreSubscriptionVerifier
                 ? statusElement.GetInt32()
                 : -1;
 
-            if (status == 21007 && requiresSandboxRetry)
+            if (status == 21007)
             {
-                return (Result.Failure<StoreSubscriptionVerificationResponse>(EconomyErrors.StorePurchaseInvalid), true);
+                if (requiresSandboxRetry && AllowAppStoreSandboxFallback)
+                {
+                    return (Result.Failure<StoreSubscriptionVerificationResponse>(EconomyErrors.StorePurchaseInvalid), true);
+                }
+
+                LogSandboxReceiptRejected("subscription_verify", request.UserId, request.ProductId);
+                return (Result.Failure<StoreSubscriptionVerificationResponse>(EconomyErrors.StorePurchaseInvalid), false);
             }
 
             if (status != 0)
@@ -274,9 +280,15 @@ public sealed partial class StoreSubscriptionVerifier
                 ? statusElement.GetInt32()
                 : -1;
 
-            if (status == 21007 && requiresSandboxRetry)
+            if (status == 21007)
             {
-                return (Result.Failure<StoreProductVerificationResponse>(EconomyErrors.StorePurchaseInvalid), true);
+                if (requiresSandboxRetry && AllowAppStoreSandboxFallback)
+                {
+                    return (Result.Failure<StoreProductVerificationResponse>(EconomyErrors.StorePurchaseInvalid), true);
+                }
+
+                LogSandboxReceiptRejected("product_verify", request.UserId, request.ProductId);
+                return (Result.Failure<StoreProductVerificationResponse>(EconomyErrors.StorePurchaseInvalid), false);
             }
 
             if (status != 0)
@@ -350,6 +362,24 @@ public sealed partial class StoreSubscriptionVerifier
             : "production";
     }
 
+    /// <summary>
+    /// Sandbox receipt fallback (Apple status 21007) is only legitimate outside production.
+    /// In production a sandbox receipt is a fraud signal and must be rejected.
+    /// </summary>
+    private bool AllowAppStoreSandboxFallback =>
+        !string.Equals(options.Value.AppStoreEnvironment?.Trim(), "production", StringComparison.OrdinalIgnoreCase);
+
+    private void LogSandboxReceiptRejected(string operation, Guid userId, string productId)
+    {
+        EconomyMetrics.RecordSandboxReceiptInProduction("app_store", operation);
+        logger?.LogError(
+            "SECURITY: sandbox App Store receipt rejected in production. Operation={Operation} UserId={UserId} ProductId={ProductId} CorrelationId={CorrelationId}",
+            operation,
+            userId,
+            productId,
+            CorrelationContext.ResolveOrCreate());
+    }
+
     private bool IsValidAppStoreTransaction(
         EconomyWebhookParser.AppStoreTransactionInfo? transactionInfo,
         string expectedProductId)
@@ -366,9 +396,24 @@ public sealed partial class StoreSubscriptionVerifier
         }
 
         var expectedEnvironment = options.Value.AppStoreEnvironment?.Trim();
-        return string.IsNullOrWhiteSpace(expectedEnvironment)
-            || string.IsNullOrWhiteSpace(transactionInfo.Environment)
-            || string.Equals(transactionInfo.Environment, expectedEnvironment, StringComparison.OrdinalIgnoreCase);
+        if (!string.IsNullOrWhiteSpace(expectedEnvironment)
+            && !string.IsNullOrWhiteSpace(transactionInfo.Environment)
+            && !string.Equals(transactionInfo.Environment, expectedEnvironment, StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.Equals(expectedEnvironment, "production", StringComparison.OrdinalIgnoreCase))
+            {
+                EconomyMetrics.RecordSandboxReceiptInProduction("app_store", "jws_environment_mismatch");
+                logger?.LogError(
+                    "SECURITY: App Store signed transaction environment mismatch in production. TransactionEnvironment={TransactionEnvironment} ProductId={ProductId} CorrelationId={CorrelationId}",
+                    transactionInfo.Environment,
+                    transactionInfo.ProductId,
+                    CorrelationContext.ResolveOrCreate());
+            }
+
+            return false;
+        }
+
+        return true;
     }
 
     private static bool IsLikelyJws(string value)

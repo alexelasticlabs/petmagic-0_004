@@ -385,6 +385,83 @@ public sealed partial class EconomyServiceTests
     }
 
     [Fact]
+    public async Task HandleGooglePlayDeveloperNotificationAsync_ShouldNotExposePurchaseToken_WhenMessageIdIsMissing()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        var expiresAtUtc = now.AddDays(14);
+        const string purchaseToken = "gp-token-without-message-id-1";
+
+        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = "monthly",
+            Name = "PetMagic Premium Monthly",
+            BillingPeriod = "monthly",
+            PriceAmount = 14.99m,
+            CurrencyCode = "USD",
+            MonthlyTokenLimit = 500,
+            IsRecommended = false,
+            IsActive = true,
+            AppleProductId = "com.petmagic.custom.monthly.apple",
+            GoogleProductId = "com.petmagic.custom.monthly.google",
+            DisplayOrder = 1,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        dbContext.UserSubscriptions.Add(new UserSubscription
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Provider = "google_play",
+            PurchaseChannel = "in_app",
+            Region = "US",
+            PlanId = "monthly",
+            Status = "Active",
+            ExternalSubscriptionId = "order-without-message-id-1",
+            ExternalTransactionId = purchaseToken,
+            CurrentPeriodStartUtc = now.AddDays(-5),
+            CurrentPeriodEndUtc = expiresAtUtc,
+            CancelAtPeriodEnd = false,
+            MonthlyTokenLimit = 500,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        await dbContext.SaveChangesAsync();
+
+        var messageJson = $"{{\"subscriptionNotification\":{{\"notificationType\":3,\"purchaseToken\":\"{purchaseToken}\",\"subscriptionId\":\"com.petmagic.custom.monthly.google\"}}}}";
+        var messageData = Convert.ToBase64String(Encoding.UTF8.GetBytes(messageJson));
+
+        var identityService = new FakeIdentityService();
+        var storeVerifier = new FakeStoreSubscriptionVerifier
+        {
+            ExpiresAtUtc = expiresAtUtc,
+            Status = "SUBSCRIPTION_STATE_ACTIVE",
+            IsActive = true,
+        };
+        var service = CreateService(dbContext, storeVerifier: storeVerifier, identityService: identityService);
+
+        var result = await service.HandleGooglePlayDeveloperNotificationAsync(
+            new GooglePlayDeveloperNotificationCommand(messageData, null),
+            CancellationToken.None);
+
+        Assert.True(
+            result.IsSuccess,
+            result.IsFailure ? $"{result.Error.Code}:{result.Error.Message}" : "unexpected failure state");
+        Assert.StartsWith("googleplay:sub:3:", result.Value.EventId, StringComparison.Ordinal);
+        Assert.DoesNotContain(purchaseToken, result.Value.EventId, StringComparison.Ordinal);
+
+        var processedEvent = await dbContext.ProcessedWebhookEvents.SingleAsync(x => x.Provider == "google_play");
+        Assert.Equal(result.Value.EventId, processedEvent.EventId);
+        Assert.DoesNotContain(purchaseToken, processedEvent.EventId, StringComparison.Ordinal);
+
+        var eventLog = await dbContext.SubscriptionEventLogs.SingleAsync(x => x.Provider == "google_play");
+        Assert.DoesNotContain(purchaseToken, eventLog.ExternalEventId, StringComparison.Ordinal);
+        Assert.DoesNotContain(purchaseToken, eventLog.PayloadJson, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task HandleGooglePlayDeveloperNotificationAsync_ShouldIgnoreDuplicateDelivery()
     {
         await using var dbContext = CreateDbContext();

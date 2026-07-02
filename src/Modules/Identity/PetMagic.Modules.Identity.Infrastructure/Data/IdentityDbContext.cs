@@ -21,6 +21,8 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
 
     public DbSet<EmailDispatchJob> EmailDispatchJobs => Set<EmailDispatchJob>();
 
+    public DbSet<ExternalAuthTicket> ExternalAuthTickets => Set<ExternalAuthTicket>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -146,6 +148,19 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.HasIndex(x => new { x.Status, x.UpdatedAtUtc });
             entity.HasIndex(x => x.NextAttemptAtUtc);
             entity.HasIndex(x => x.UserId);
+        });
+
+        builder.Entity<ExternalAuthTicket>(entity =>
+        {
+            entity.ToTable("external_auth_tickets");
+            entity.HasKey(x => x.Ticket);
+            entity.Property(x => x.Ticket).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.Purpose).HasMaxLength(40).IsRequired();
+            entity.Property(x => x.PayloadJson).HasMaxLength(8000).IsRequired();
+            entity.Property(x => x.CreatedAtUtc).IsRequired();
+            entity.Property(x => x.ExpiresAtUtc).IsRequired();
+            entity.HasIndex(x => new { x.Purpose, x.ExpiresAtUtc });
+            entity.HasIndex(x => x.ConsumedAtUtc);
         });
     }
 }

@@ -13,6 +13,8 @@ namespace PetMagic.Modules.Identity.Api.Endpoints;
 
 public static class LegalEndpoints
 {
+    private const int MaxLegalAcceptanceRequestBodyBytes = 8 * 1024;
+
     public static IEndpointRouteBuilder MapLegalEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/legal")
@@ -23,6 +25,7 @@ public static class LegalEndpoints
             .AllowAnonymous();
 
         group.MapPost("/accept", AcceptAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxLegalAcceptanceRequestBodyBytes))
             .RequireAuthorization();
 
         return endpoints;

@@ -1,4 +1,5 @@
 using System.Globalization;
+
 using FluentValidation;
 
 using Microsoft.AspNetCore.Builder;
@@ -275,6 +276,31 @@ public static partial class AdminTemplateEndpoints
 
         return TypedResults.Ok(result.Value);
 
+    }
+
+
+    private static async Task<Results<Ok<TemplateGenerationResponse>, ProblemHttpResult>> RetryGenerationRefundAsync(
+        HttpContext context,
+        Guid generationId,
+        [FromServices] ITemplateGenerationService generationService,
+        CancellationToken cancellationToken)
+    {
+        var (adminUserId, subjectError) = TryGetAdminUserId(context);
+        if (subjectError is not null)
+        {
+            return ToAdminTemplateProblem(subjectError);
+        }
+
+        var result = await generationService.RetryAdminGenerationRefundAsync(
+            adminUserId,
+            generationId,
+            cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToAdminTemplateProblem(result.Error);
+        }
+
+        return TypedResults.Ok(result.Value);
     }
 
 

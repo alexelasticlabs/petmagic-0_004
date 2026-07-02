@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\PetMagic.Modules.Identity.Application\PetMagic.Modules.Identity.Application.csproj" />
+    <ProjectReference Include="..\PetMagic.Modules.Identity.Infrastructure\PetMagic.Modules.Identity.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

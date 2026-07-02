@@ -218,7 +218,7 @@ public sealed partial class EconomyService
             return false;
         }
 
-        if (session.AmountTotal.HasValue && session.AmountTotal.Value != ToStripeMinorUnits(order.PriceAmount))
+        if (!session.AmountTotal.HasValue || session.AmountTotal.Value != ToStripeMinorUnits(order.PriceAmount))
         {
             return false;
         }
@@ -265,8 +265,8 @@ public sealed partial class EconomyService
 
     private static bool IsStripeCurrencyMatch(string? stripeCurrency, string orderCurrency)
     {
-        return string.IsNullOrWhiteSpace(stripeCurrency)
-            || string.Equals(stripeCurrency.Trim(), orderCurrency.Trim(), StringComparison.OrdinalIgnoreCase);
+        return !string.IsNullOrWhiteSpace(stripeCurrency)
+            && string.Equals(stripeCurrency.Trim(), orderCurrency.Trim(), StringComparison.OrdinalIgnoreCase);
     }
 
     private static long ToStripeMinorUnits(decimal amount)
@@ -314,6 +314,16 @@ public sealed partial class EconomyService
         if (!string.Equals(expectedProductId, command.ProductId.Trim(), StringComparison.Ordinal))
         {
             return Result.Failure<PurchaseOrderResponse>(EconomyErrors.StorePurchaseInvalid);
+        }
+
+        var freshness = EnsureStoreReceiptIsFresh(
+            command.UserId,
+            provider,
+            "pack_verify",
+            command.TransactionDate);
+        if (freshness.IsFailure)
+        {
+            return Result.Failure<PurchaseOrderResponse>(freshness.Error);
         }
 
         var verification = await storeSubscriptionVerifier.VerifyProductPurchaseAsync(
@@ -419,7 +429,7 @@ public sealed partial class EconomyService
             command.SignedTransactionInfo,
             null,
             transactionInfo.TransactionId,
-            null,
+            transactionInfo.PurchaseDateUtc?.ToString("O"),
             cancellationToken);
     }
 
@@ -434,6 +444,16 @@ public sealed partial class EconomyService
         CancellationToken cancellationToken)
     {
         var normalizedProductId = productId.Trim();
+        var freshness = EnsureStoreReceiptIsFresh(
+            userId,
+            provider,
+            "billing_validate",
+            transactionDate);
+        if (freshness.IsFailure)
+        {
+            return Result.Failure<StoreBillingValidationResponse>(freshness.Error);
+        }
+
         var plan = await ResolveStorePlanByProductIdAsync(provider, normalizedProductId, cancellationToken);
         if (plan is not null)
         {
@@ -510,7 +530,7 @@ public sealed partial class EconomyService
                 provider,
                 "TokenPack",
                 normalizedProductId,
-                existing.Status,
+                ToStoreTokenPackValidationStatus(existing.Status, tokensGranted: false),
                 false,
                 existing.SparkToGrant,
                 false,
@@ -553,7 +573,7 @@ public sealed partial class EconomyService
             provider,
             "TokenPack",
             normalizedProductId,
-            confirmResult.Value.Status,
+            ToStoreTokenPackValidationStatus(confirmResult.Value.Status, tokensGranted: true),
             true,
             confirmResult.Value.SparkToGrant,
             false,
@@ -598,6 +618,16 @@ public sealed partial class EconomyService
         return string.Equals(provider, "google_play", StringComparison.Ordinal)
             ? serverVerificationData.Trim()
             : (externalTransactionId ?? purchaseId ?? serverVerificationData).Trim();
+    }
+
+    private static string ToStoreTokenPackValidationStatus(string orderStatus, bool tokensGranted)
+    {
+        if (string.Equals(orderStatus, PurchaseOrderStatus.Succeeded, StringComparison.Ordinal))
+        {
+            return tokensGranted ? "settled" : "already_settled";
+        }
+
+        return orderStatus;
     }
 
     private string ResolveStoreEnvironment(string provider)

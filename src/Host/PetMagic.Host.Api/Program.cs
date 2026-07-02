@@ -8,17 +8,20 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
 using PetMagic.Host.Api.Observability;
+using PetMagic.Host.Api.Startup;
 using PetMagic.Modules.Economy.Api;
 using PetMagic.Modules.Economy.Infrastructure;
 using PetMagic.Host.Api.Security;
 using PetMagic.Modules.Identity.Api;
 using PetMagic.Modules.Identity.Infrastructure;
+using PetMagic.Modules.Identity.Infrastructure.Options;
 using PetMagic.Modules.SupportChat.Api;
 using PetMagic.Modules.SupportChat.Application.Abstractions;
 using PetMagic.Modules.SupportChat.Infrastructure;
@@ -376,8 +379,7 @@ try
     {
         app.Use(async (context, next) =>
         {
-            var requestPath = context.Request.Path.Value ?? string.Empty;
-            if (requestPath.StartsWith("/templates-media", StringComparison.OrdinalIgnoreCase))
+            if (IsManagedStaticMediaPath(context.Request.Path, "/templates-media"))
             {
                 context.Response.StatusCode = StatusCodes.Status404NotFound;
                 return;
@@ -390,7 +392,13 @@ try
     app.Use(async (context, next) =>
     {
         var requestPath = context.Request.Path.Value ?? string.Empty;
-        if (requestPath.Contains("/support-attachments", StringComparison.OrdinalIgnoreCase))
+        var supportStorageOptions = context.RequestServices
+            .GetRequiredService<IOptions<SupportAttachmentStorageOptions>>()
+            .Value;
+        if (IsManagedSignedMediaPath(
+            context.Request.Path,
+            "/support-attachments",
+            supportStorageOptions.PublicBaseUrl))
         {
             var signer = context.RequestServices.GetRequiredService<ISupportAttachmentReadUrlSigner>();
             var query = context.Request.Query.ToDictionary(
@@ -404,7 +412,13 @@ try
             }
         }
 
-        if (requestPath.Contains("/user-avatars", StringComparison.OrdinalIgnoreCase))
+        var avatarStorageOptions = context.RequestServices
+            .GetRequiredService<IOptions<AvatarStorageOptions>>()
+            .Value;
+        if (IsManagedSignedMediaPath(
+            context.Request.Path,
+            "/user-avatars",
+            avatarStorageOptions.PublicBaseUrl))
         {
             var signer = context.RequestServices.GetRequiredService<IAvatarReadUrlSigner>();
             var query = context.Request.Query.ToDictionary(
@@ -427,18 +441,21 @@ try
         {
             staticFileContext.Context.Response.Headers.XContentTypeOptions = "nosniff";
 
-            var requestPath = staticFileContext.Context.Request.Path.Value ?? string.Empty;
+            var requestPath = staticFileContext.Context.Request.Path;
             var contentType = staticFileContext.Context.Response.ContentType ?? string.Empty;
-            var isManagedMediaPath = requestPath.StartsWith("/support-attachments", StringComparison.OrdinalIgnoreCase)
-                || requestPath.StartsWith("/user-avatars", StringComparison.OrdinalIgnoreCase)
-                || requestPath.StartsWith("/templates-media", StringComparison.OrdinalIgnoreCase);
+            var isSupportAttachmentsPath = IsManagedStaticMediaPath(requestPath, "/support-attachments");
+            var isUserAvatarsPath = IsManagedStaticMediaPath(requestPath, "/user-avatars");
+            var isTemplatesMediaPath = IsManagedStaticMediaPath(requestPath, "/templates-media");
+            var isManagedMediaPath = isSupportAttachmentsPath
+                || isUserAvatarsPath
+                || isTemplatesMediaPath;
 
             if (!isManagedMediaPath)
             {
                 return;
             }
 
-            if (requestPath.StartsWith("/templates-media", StringComparison.OrdinalIgnoreCase))
+            if (isTemplatesMediaPath)
             {
                 staticFileContext.Context.Response.Headers.CacheControl = "public,max-age=31536000,immutable";
             }
@@ -451,14 +468,13 @@ try
             var isImage = contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
             var isVideo = contentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase);
 
-            if (requestPath.StartsWith("/support-attachments", StringComparison.OrdinalIgnoreCase)
-                && !isImage)
+            if (isSupportAttachmentsPath && !isImage)
             {
                 staticFileContext.Context.Response.Headers.ContentDisposition = "attachment";
                 return;
             }
 
-            if (requestPath.StartsWith("/templates-media", StringComparison.OrdinalIgnoreCase)
+            if (isTemplatesMediaPath
                 && !isImage
                 && !isVideo)
             {
@@ -488,11 +504,17 @@ try
     app.MapTemplatesApiModule();
     app.MapGamificationApiModule();
 
-    await app.Services.EnsureEconomySeedDataAsync();
-    await app.Services.EnsureIdentitySeedDataAsync();
-    await app.Services.EnsureSupportChatSeedDataAsync();
-    await app.Services.EnsureTemplatesSeedDataAsync();
-    await app.Services.EnsureGamificationSeedDataAsync();
+    await StartupMigrationLock.RunWithMigrationLockAsync(
+        app.Configuration.GetConnectionString("DefaultConnection"),
+        async () =>
+        {
+            await app.Services.EnsureEconomySeedDataAsync();
+            await app.Services.EnsureIdentitySeedDataAsync();
+            await app.Services.EnsureSupportChatSeedDataAsync();
+            await app.Services.EnsureTemplatesSeedDataAsync();
+            await app.Services.EnsureGamificationSeedDataAsync();
+        },
+        acquireTimeout: TimeSpan.FromMinutes(5));
 
     app.Run();
 }
@@ -600,6 +622,40 @@ static void LoadDotEnvFileIfPresent()
 
         currentDirectory = currentDirectory.Parent;
     }
+}
+
+static bool IsManagedSignedMediaPath(PathString requestPath, string managedPathPrefix, string publicBaseUrl)
+{
+    var managedPrefix = new PathString(managedPathPrefix);
+    if (requestPath.StartsWithSegments(managedPrefix))
+    {
+        return true;
+    }
+
+    var publicBasePath = ResolvePublicBasePath(publicBaseUrl);
+    if (string.IsNullOrWhiteSpace(publicBasePath))
+    {
+        return false;
+    }
+
+    return requestPath.StartsWithSegments(new PathString($"{publicBasePath}{managedPathPrefix}"));
+}
+
+static bool IsManagedStaticMediaPath(PathString requestPath, string managedPathPrefix)
+{
+    return requestPath.StartsWithSegments(new PathString(managedPathPrefix));
+}
+
+static string ResolvePublicBasePath(string publicBaseUrl)
+{
+    if (!Uri.TryCreate(publicBaseUrl, UriKind.Absolute, out var uri)
+        || string.IsNullOrWhiteSpace(uri.AbsolutePath)
+        || uri.AbsolutePath == "/")
+    {
+        return string.Empty;
+    }
+
+    return uri.AbsolutePath.TrimEnd('/');
 }
 
 static string ResolveBootstrapEnvironment()

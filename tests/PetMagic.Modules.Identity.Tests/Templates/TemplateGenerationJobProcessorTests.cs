@@ -658,6 +658,79 @@ public sealed class TemplateGenerationJobProcessorTests
     }
 
     [Fact]
+    public async Task ProcessFalWebhookAsync_ShouldCreateVideoResultPreviewThumbnail()
+    {
+        await using var dbContext = CreateDbContext();
+        var template = CreateReadyTemplate();
+        var now = DateTime.UtcNow;
+        var job = CreateGenerationJob(template, TemplateGenerationStatus.ImportingMedia, now);
+        job.CompletedAtUtc = null;
+        job.ProviderResultUrl = "https://fal.example.test/generated-video.mp4";
+        job.CurrentProviderStage = "video_generation";
+        job.ProviderCompletedAtUtc = now.AddSeconds(-5);
+        job.UsedKlingModel = template.KlingModel;
+        var thumbnailGenerator = new RecordingVideoThumbnailGenerator();
+
+        dbContext.TemplateItems.Add(template);
+        dbContext.TemplateGenerationJobs.Add(job);
+        await dbContext.SaveChangesAsync();
+
+        var processor = CreateProcessor(
+            dbContext,
+            videoThumbnailGenerator: thumbnailGenerator);
+
+        var imported = await processor.ProcessNextAsync(CancellationToken.None);
+
+        var persisted = await dbContext.TemplateGenerationJobs
+            .Include(x => x.MediaRecords)
+            .SingleAsync(x => x.Id == job.Id);
+        var media = Assert.Single(persisted.MediaRecords, record => record.SourceType == "generation_result");
+        Assert.True(imported);
+        Assert.Equal(TemplateGenerationStatus.Completed, persisted.Status);
+        Assert.Equal("templates-media/output.mp4", persisted.ResultUrl);
+        Assert.Equal($"templates-media/generation-{job.Id:N}-result-preview.jpg", media.PreviewUrl);
+        var resultThumbnailCall = Assert.Single(
+            thumbnailGenerator.Calls,
+            call => call.OutputFileName == $"generation-{job.Id:N}-result-preview.jpg");
+        Assert.Equal("image/jpeg", resultThumbnailCall.ContentType);
+        Assert.Equal($"users/{job.UserId:N}/generations/{job.Id:N}/result-preview.jpg", resultThumbnailCall.PreferredStorageKey);
+        Assert.Equal("templates-media/output.mp4", resultThumbnailCall.OriginalStorageKey);
+    }
+
+    [Fact]
+    public async Task ProcessFalWebhookAsync_ShouldCompleteVideo_WhenThumbnailGenerationFails()
+    {
+        await using var dbContext = CreateDbContext();
+        var template = CreateReadyTemplate();
+        var now = DateTime.UtcNow;
+        var job = CreateGenerationJob(template, TemplateGenerationStatus.ImportingMedia, now);
+        job.CompletedAtUtc = null;
+        job.ProviderResultUrl = "https://fal.example.test/generated-video.mp4";
+        job.CurrentProviderStage = "video_generation";
+        job.ProviderCompletedAtUtc = now.AddSeconds(-5);
+        job.UsedKlingModel = template.KlingModel;
+
+        dbContext.TemplateItems.Add(template);
+        dbContext.TemplateGenerationJobs.Add(job);
+        await dbContext.SaveChangesAsync();
+
+        var processor = CreateProcessor(
+            dbContext,
+            videoThumbnailGenerator: new FailingVideoThumbnailGenerator());
+
+        var imported = await processor.ProcessNextAsync(CancellationToken.None);
+
+        var persisted = await dbContext.TemplateGenerationJobs
+            .Include(x => x.MediaRecords)
+            .SingleAsync(x => x.Id == job.Id);
+        var media = Assert.Single(persisted.MediaRecords, record => record.SourceType == "generation_result");
+        Assert.True(imported);
+        Assert.Equal(TemplateGenerationStatus.Completed, persisted.Status);
+        Assert.Equal("templates-media/output.mp4", persisted.ResultUrl);
+        Assert.Null(media.PreviewUrl);
+    }
+
+    [Fact]
     public async Task ProcessNextAsync_ShouldStagePollerResultAndIgnoreLaterWebhook()
     {
         await using var dbContext = CreateDbContext();
@@ -1450,6 +1523,7 @@ public sealed class TemplateGenerationJobProcessorTests
         IGeneratedMediaImporter? generatedMediaImporter = null,
         IMediaMetadataReader? mediaMetadataReader = null,
         IMediaStorage? mediaStorage = null,
+        IVideoThumbnailGenerator? videoThumbnailGenerator = null,
         TemplatesOptions? options = null,
         IGamificationService? gamificationService = null,
         IEconomyService? economyService = null,
@@ -1465,6 +1539,7 @@ public sealed class TemplateGenerationJobProcessorTests
             mediaMetadataReader ?? new FixedDurationMetadataReader(),
             mediaStorage ?? new TrackingMediaStorage(),
             imagePreviewGenerator: new NoopImagePreviewGenerator(),
+            videoThumbnailGenerator: videoThumbnailGenerator ?? new NoopVideoThumbnailGenerator(),
             billing: billing ?? new TestTemplateGenerationBilling(),
             realtimeService: new RecordingTemplateFeedRealtimeService(),
             pushNotificationSender: new NoopPushNotificationSender(),
@@ -1496,6 +1571,61 @@ public sealed class TemplateGenerationJobProcessorTests
     {
         public Task<StoredMediaResponse?> CreatePreviewAsync(
             StoredMediaResponse original,
+            string outputFileName,
+            string? preferredStorageKey,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<StoredMediaResponse?>(null);
+        }
+    }
+
+    private sealed class NoopVideoThumbnailGenerator : IVideoThumbnailGenerator
+    {
+        public Task<StoredMediaResponse?> CreateThumbnailAsync(
+            StoredMediaResponse original,
+            Guid generationId,
+            string outputFileName,
+            string? preferredStorageKey,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<StoredMediaResponse?>(null);
+        }
+    }
+
+    private sealed class RecordingVideoThumbnailGenerator : IVideoThumbnailGenerator
+    {
+        public List<ThumbnailCall> Calls { get; } = [];
+
+        public Task<StoredMediaResponse?> CreateThumbnailAsync(
+            StoredMediaResponse original,
+            Guid generationId,
+            string outputFileName,
+            string? preferredStorageKey,
+            CancellationToken cancellationToken)
+        {
+            var contentType = "image/jpeg";
+            Calls.Add(new ThumbnailCall(outputFileName, preferredStorageKey, original.StorageKey, contentType));
+            return Task.FromResult<StoredMediaResponse?>(new StoredMediaResponse(
+                $"http://localhost:5000/templates-media/{outputFileName}",
+                $"templates-media/{outputFileName}",
+                outputFileName,
+                contentType,
+                2048,
+                null));
+        }
+
+        public sealed record ThumbnailCall(
+            string OutputFileName,
+            string? PreferredStorageKey,
+            string OriginalStorageKey,
+            string ContentType);
+    }
+
+    private sealed class FailingVideoThumbnailGenerator : IVideoThumbnailGenerator
+    {
+        public Task<StoredMediaResponse?> CreateThumbnailAsync(
+            StoredMediaResponse original,
+            Guid generationId,
             string outputFileName,
             string? preferredStorageKey,
             CancellationToken cancellationToken)

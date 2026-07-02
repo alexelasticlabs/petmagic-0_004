@@ -38,6 +38,38 @@ public sealed class HttpGeneratedMediaImporterTests
         Assert.Equal(0, handler.RequestCount);
     }
 
+    [Theory]
+    [InlineData("https://169.254.169.254/latest/meta-data/iam/security-credentials")]
+    [InlineData("https://10.0.0.5/generated.png")]
+    [InlineData("https://192.168.1.10/generated.png")]
+    [InlineData("https://[::1]/generated.png")]
+    public async Task ImportImageAsync_ShouldRejectPrivateNetworkUrlWithoutSendingRequest(string url)
+    {
+        var handler = new RecordingHandler("image/png", [1, 2, 3]);
+        var importer = CreateImporter(handler);
+
+        var result = await importer.ImportImageAsync(url, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(TemplatesErrors.GeneratedMediaImportFailed.Code, result.Error.Code);
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Fact]
+    public async Task ImportImageAsync_ShouldNotStore_WhenProviderReturnsRedirect()
+    {
+        var handler = new StatusHandler(HttpStatusCode.Redirect);
+        var storage = new RecordingMediaStorage();
+        var importer = CreateImporter(handler, storage);
+
+        var result = await importer.ImportImageAsync("https://cdn.example.com/generated.png", Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(TemplatesErrors.GeneratedMediaImportFailed.Code, result.Error.Code);
+        Assert.Equal(1, handler.RequestCount);
+        Assert.Equal(0, storage.StoreCount);
+    }
+
     [Fact]
     public async Task ImportVideoAsync_ShouldRejectUnexpectedContentType()
     {

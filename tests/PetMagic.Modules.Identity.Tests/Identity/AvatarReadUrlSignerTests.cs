@@ -78,6 +78,18 @@ public sealed class AvatarReadUrlSignerTests
         Assert.Equal(string.Empty, signedUrl);
     }
 
+    [Theory]
+    [InlineData("https://api.petmagic.app/media/user-avatars/2026/../private.jpg")]
+    [InlineData("https://api.petmagic.app/media/user-avatars/2026/%2e%2e/private.jpg")]
+    public void CreateReadUrl_ShouldHideTraversalLikeManagedAvatarUrl(string fileUrl)
+    {
+        var signer = CreateSigner();
+
+        var signedUrl = signer.CreateReadUrl(fileUrl);
+
+        Assert.Equal(string.Empty, signedUrl);
+    }
+
     [Fact]
     public void IsAuthorizedRequest_ShouldRejectExpiredOrTamperedAvatarUrls()
     {
@@ -99,6 +111,36 @@ public sealed class AvatarReadUrlSignerTests
 
         Assert.False(signer.IsAuthorizedRequest("/user-avatars/2026/06/test.jpg", expired));
         Assert.False(signer.IsAuthorizedRequest("/user-avatars/2026/06/test.jpg", tampered));
+    }
+
+    [Fact]
+    public void IsAuthorizedRequest_ShouldRejectManagedSegmentOutsideConfiguredBasePath()
+    {
+        var signer = CreateSigner();
+        var signedUrl = signer.CreateReadUrl("https://api.petmagic.app/media/user-avatars/2026/06/test.jpg");
+        var uri = new Uri(signedUrl);
+        var query = QueryHelpers.ParseQuery(uri.Query).ToDictionary(
+            pair => pair.Key,
+            pair => (string?)pair.Value.ToString(),
+            StringComparer.OrdinalIgnoreCase);
+
+        Assert.False(signer.IsAuthorizedRequest("/other/user-avatars/2026/06/test.jpg", query));
+    }
+
+    [Theory]
+    [InlineData("/user-avatars/2026/../private.jpg")]
+    [InlineData("/media/user-avatars/2026/%2e%2e/private.jpg")]
+    public void IsAuthorizedRequest_ShouldRejectTraversalLikeManagedAvatarPath(string requestPath)
+    {
+        var signer = CreateSigner();
+        var signedUrl = signer.CreateReadUrl("https://api.petmagic.app/media/user-avatars/2026/06/test.jpg");
+        var uri = new Uri(signedUrl);
+        var query = QueryHelpers.ParseQuery(uri.Query).ToDictionary(
+            pair => pair.Key,
+            pair => (string?)pair.Value.ToString(),
+            StringComparer.OrdinalIgnoreCase);
+
+        Assert.False(signer.IsAuthorizedRequest(requestPath, query));
     }
 
     private static AvatarReadUrlSigner CreateSigner() => new(StorageOptions, SigningOptions);

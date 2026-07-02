@@ -138,6 +138,86 @@ public sealed class TemplatesApiStartupSmokeTests
     }
 
     [Theory]
+    [InlineData("POST", "/api/templates/generations/from-result")]
+    [InlineData("POST", "/api/templates/generations/{generationId:guid}/generate-similar")]
+    [InlineData("POST", "/api/templates/generations/{generationId:guid}/remove-watermark")]
+    [InlineData("POST", "/api/templates/generations/{generationId:guid}/feedback")]
+    [InlineData("PUT", "/api/templates/notifications/push-token")]
+    [InlineData("DELETE", "/api/templates/notifications/push-token")]
+    public async Task TemplateGenerationJsonMutationEndpoints_ShouldLimitRequestBodiesBeforeBinding(
+        string method,
+        string routePattern)
+    {
+        await using var app = await TemplatesApiStartupTestApplication.CreateAsync();
+
+        Assert.Equal(16 * 1024, app.GetRequestSizeLimit(method, routePattern));
+    }
+
+    [Theory]
+    [InlineData("POST", "/api/templates/{templateId:guid}/generations", 26L * 1024 * 1024)]
+    [InlineData("POST", "/api/templates/qa/generation-fixtures", 64L * 1024)]
+    [InlineData("POST", "/api/templates/provider/fal/webhook", 256L * 1024)]
+    public async Task TemplateGenerationPayloadEndpoints_ShouldLimitRequestBodiesBeforeReadingPayload(
+        string method,
+        string routePattern,
+        long expectedBytes)
+    {
+        await using var app = await TemplatesApiStartupTestApplication.CreateAsync();
+
+        Assert.Equal(expectedBytes, app.GetRequestSizeLimit(method, routePattern));
+    }
+
+    [Theory]
+    [InlineData("POST", "/api/pets")]
+    [InlineData("PUT", "/api/pets/{petId:guid}")]
+    [InlineData("POST", "/api/pets/{petId:guid}/photos/{photoId:guid}/favorite")]
+    [InlineData("POST", "/api/templates/generations/from-pet")]
+    [InlineData("POST", "/api/admin/users/{userId:guid}/pets/{petId:guid}/status")]
+    [InlineData("POST", "/api/admin/users/{userId:guid}/pets/{petId:guid}/photos/{photoId:guid}/status")]
+    public async Task PetJsonMutationEndpoints_ShouldLimitRequestBodiesBeforeBinding(
+        string method,
+        string routePattern)
+    {
+        await using var app = await TemplatesApiStartupTestApplication.CreateAsync();
+
+        Assert.Equal(16 * 1024, app.GetRequestSizeLimit(method, routePattern));
+    }
+
+    [Theory]
+    [InlineData("POST", "/api/admin/templates/image")]
+    [InlineData("PUT", "/api/admin/templates/image/{templateId:guid}")]
+    [InlineData("POST", "/api/admin/templates/video")]
+    [InlineData("PUT", "/api/admin/templates/video/{templateId:guid}")]
+    public async Task AdminTemplateDefinitionMutationEndpoints_ShouldLimitRequestBodiesBeforeBinding(
+        string method,
+        string routePattern)
+    {
+        await using var app = await TemplatesApiStartupTestApplication.CreateAsync();
+
+        Assert.Equal(128 * 1024, app.GetRequestSizeLimit(method, routePattern));
+    }
+
+    [Theory]
+    [InlineData("POST", "/api/admin/templates/moderation/{eventId:guid}/decision")]
+    [InlineData("PUT", "/api/admin/templates/monetization/watermark")]
+    [InlineData("PUT", "/api/admin/templates/{templateId:guid}/status")]
+    [InlineData("POST", "/api/admin/templates/categories/")]
+    [InlineData("PUT", "/api/admin/templates/categories/{categoryId:guid}")]
+    [InlineData("PUT", "/api/admin/templates/categories/{categoryId:guid}/archive")]
+    [InlineData("POST", "/api/admin/template-of-the-day")]
+    [InlineData("PUT", "/api/admin/template-of-the-day/settings")]
+    [InlineData("PUT", "/api/admin/template-of-the-day/{id:guid}")]
+    [InlineData("POST", "/api/admin/template-of-the-day/auto-pick")]
+    public async Task AdminTemplateSmallJsonMutationEndpoints_ShouldLimitRequestBodiesBeforeBinding(
+        string method,
+        string routePattern)
+    {
+        await using var app = await TemplatesApiStartupTestApplication.CreateAsync();
+
+        Assert.Equal(16 * 1024, app.GetRequestSizeLimit(method, routePattern));
+    }
+
+    [Theory]
     [InlineData("/api/admin/templates/generations?status=queued", "templates.invalid_status")]
     [InlineData("/api/admin/templates/generations?status=processing", "templates.invalid_status")]
     [InlineData("/api/admin/templates/generations?status=success", "templates.invalid_status")]
@@ -249,6 +329,26 @@ public sealed class TemplatesApiStartupSmokeTests
                         .Contains(method, StringComparer.OrdinalIgnoreCase));
 
             return endpoint.Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName;
+        }
+
+        public long? GetRequestSizeLimit(string method, string routePattern)
+        {
+            var normalizedRoutePattern = NormalizeRoutePattern(routePattern);
+            var endpoint = app.Services
+                .GetRequiredService<EndpointDataSource>()
+                .Endpoints
+                .OfType<RouteEndpoint>()
+                .Single(endpoint =>
+                    string.Equals(
+                        NormalizeRoutePattern(endpoint.RoutePattern.RawText),
+                        normalizedRoutePattern,
+                        StringComparison.Ordinal)
+                    && endpoint.Metadata
+                        .GetRequiredMetadata<IHttpMethodMetadata>()
+                        .HttpMethods
+                        .Contains(method, StringComparer.OrdinalIgnoreCase));
+
+            return endpoint.Metadata.GetMetadata<IRequestSizeLimitMetadata>()?.MaxRequestBodySize;
         }
 
         public string[] GetApiRoutesWithoutRateLimit()

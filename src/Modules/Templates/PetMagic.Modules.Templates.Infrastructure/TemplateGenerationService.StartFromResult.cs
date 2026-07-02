@@ -185,6 +185,7 @@ internal sealed partial class TemplateGenerationService
         };
 
         dbContext.TemplateGenerationJobs.Add(job);
+        dbContext.TemplateGenerationBillingCommands.Add(CreateGenerationBillingCommand(job, now));
         AddAnalyticsEvent(job, TemplateAnalyticsEventTypes.TemplateSelected);
         AddAnalyticsEvent(job, TemplateAnalyticsEventTypes.GenerationStarted);
         try
@@ -204,25 +205,6 @@ internal sealed partial class TemplateGenerationService
             throw;
         }
 
-        var charge = await billing.ChargeAsync(job.UserId, job.Id, job.TokenCost, cancellationToken);
-        if (charge.IsFailure)
-        {
-            var previousStatus = job.Status;
-            job.Status = TemplateGenerationStatus.Failed;
-            job.LastErrorCode = charge.Error.Code;
-            job.LastErrorMessage = charge.Error.Message;
-            job.UpdatedAtUtc = DateTime.UtcNow;
-            job.CompletedAtUtc = job.UpdatedAtUtc;
-            await dbContext.SaveChangesAsync(cancellationToken);
-            TemplateGenerationMetrics.RecordJobFailed(job, previousStatus, charge.Error.Code);
-            return Result.Failure<TemplateGenerationResponse>(charge.Error);
-        }
-
-        job.ChargedAtUtc = DateTime.UtcNow;
-        job.UpdatedAtUtc = job.ChargedAtUtc.Value;
-        await dbContext.SaveChangesAsync(cancellationToken);
-        TemplateGenerationMetrics.RecordJobAccepted(job);
-
-        return Result.Success(await MapResponseWithQueueMetricsAsync(job, cancellationToken));
+        return await SettleGenerationBillingAndMapAsync(job, null, cancellationToken);
     }
 }

@@ -9,6 +9,7 @@ using System.Text.Json;
 
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.TestHost;
@@ -19,8 +20,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-using PetMagic.Host.Api.Security;
 using PetMagic.BuildingBlocks.Results;
+using PetMagic.Host.Api.Security;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
 using PetMagic.Modules.Templates.Api;
@@ -231,6 +232,7 @@ public sealed partial class TemplatesApiIntegrationTests
             });
 
             builder.Services.AddProblemDetails();
+            builder.Services.AddDataProtection();
             builder.Services.AddMemoryCache();
             builder.Services.AddRateLimiter(options =>
             {
@@ -318,6 +320,7 @@ public sealed partial class TemplatesApiIntegrationTests
             builder.Services.AddSingleton<IImagePreprocessor, TestImagePreprocessor>();
             builder.Services.AddSingleton<IImageGenerator, TestImageGenerator>();
             builder.Services.AddSingleton<IImagePreviewGenerator>(new TestImagePreviewGenerator(mediaStorage));
+            builder.Services.AddSingleton<IVideoThumbnailGenerator>(new TestVideoThumbnailGenerator(mediaStorage));
             builder.Services.AddSingleton<IVideoMotionGenerator, TestVideoMotionGenerator>();
             builder.Services.AddSingleton<IGeneratedMediaImporter>(new TestGeneratedMediaImporter(mediaStorage, failGeneratedMediaImport));
             builder.Services.AddSingleton<ITemplateGenerationBilling>(billing);
@@ -479,6 +482,23 @@ public sealed partial class TemplatesApiIntegrationTests
         {
             var result = await mediaStorage.StoreAsync(
                 new MediaUploadCommand(outputFileName, "image/webp", "preview-content"u8.ToArray()),
+                cancellationToken);
+
+            return result.IsSuccess ? result.Value : null;
+        }
+    }
+
+    private sealed class TestVideoThumbnailGenerator(IMediaStorage mediaStorage) : IVideoThumbnailGenerator
+    {
+        public async Task<StoredMediaResponse?> CreateThumbnailAsync(
+            StoredMediaResponse original,
+            Guid generationId,
+            string outputFileName,
+            string? preferredStorageKey,
+            CancellationToken cancellationToken)
+        {
+            var result = await mediaStorage.StoreAsync(
+                new MediaUploadCommand(outputFileName, "image/jpeg", "video-thumbnail-content"u8.ToArray()),
                 cancellationToken);
 
             return result.IsSuccess ? result.Value : null;

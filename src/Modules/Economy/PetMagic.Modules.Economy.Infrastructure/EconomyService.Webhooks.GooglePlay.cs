@@ -6,7 +6,6 @@ using PetMagic.Modules.Economy.Application.Contracts;
 using PetMagic.Modules.Economy.Domain.Enums;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
 using PetMagic.Modules.Economy.Infrastructure.Payments;
-using PetMagic.Modules.Identity.Application.Contracts;
 
 namespace PetMagic.Modules.Economy.Infrastructure;
 
@@ -23,29 +22,21 @@ public sealed partial class EconomyService
         }
 
         var googlePlayEventType = $"notification_{parsed.NotificationType}";
-        LogStoreWebhookReceived("google_play", parsed.EventId, googlePlayEventType);
-
-        if (!dbContext.Database.IsRelational()
-            && await dbContext.ProcessedWebhookEvents.AnyAsync(x => x.Provider == "google_play" && x.EventId == parsed.EventId, cancellationToken))
-        {
-            LogDuplicateStoreWebhook("google_play", parsed.EventId, googlePlayEventType);
-            return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, false, "ignored_duplicate"));
-        }
+        var safeGooglePlayEventId = EconomyLogSanitizer.SafeExternalId(parsed.EventId) ?? string.Empty;
+        LogStoreWebhookReceived("google_play", safeGooglePlayEventId, googlePlayEventType);
 
         await using var transaction = dbContext.Database.IsRelational()
-            ? await dbContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, cancellationToken)
+            ? await dbContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken)
             : null;
 
         try
         {
-            dbContext.ProcessedWebhookEvents.Add(new ProcessedWebhookEvent
+            if (!await TryClaimWebhookEventAsync("google_play", parsed.EventId, googlePlayEventType, cancellationToken))
             {
-                Id = Guid.NewGuid(),
-                Provider = "google_play",
-                EventId = parsed.EventId,
-                EventType = googlePlayEventType,
-                ProcessedAtUtc = DateTime.UtcNow
-            });
+                EconomyMetrics.RecordDuplicateWebhook("google_play", googlePlayEventType);
+                LogDuplicateStoreWebhook("google_play", parsed.EventId, googlePlayEventType);
+                return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, false, "ignored_duplicate"));
+            }
 
             if (parsed.IsOneTimeProductNotification)
             {
@@ -177,38 +168,6 @@ public sealed partial class EconomyService
             }
             var subscription = subscriptionResult.Value;
 
-            if (identityService is null)
-            {
-                return Result.Failure<StoreWebhookResultResponse>(EconomyErrors.PremiumBillingUnavailable);
-            }
-
-            var premiumResult = await identityService.SetPremiumStatusAsync(
-                new SetPremiumStatusCommand(existingSubscription.UserId, isPremium),
-                cancellationToken);
-
-            if (premiumResult.IsFailure)
-            {
-                return Result.Failure<StoreWebhookResultResponse>(premiumResult.Error);
-            }
-
-            logger?.LogInformation(
-                "Premium entitlement updated from Google Play webhook. Provider={Provider} UserId={UserId} EventId={EventId} EventType={EventType} Status={Status} IsPremium={IsPremium} CorrelationId={CorrelationId}",
-                "google_play",
-                existingSubscription.UserId,
-                EconomyLogSanitizer.SafeExternalId(parsed.EventId),
-                googlePlayEventType,
-                status,
-                isPremium,
-                CurrentCorrelationId);
-
-            await _pushNotificationSender.NotifyPremiumUpdateAsync(
-                existingSubscription.UserId,
-                new PremiumPushNotification(
-                    Status: isPremium ? "active" : "inactive",
-                    Provider: "google_play",
-                    PlanCode: plan.PlanCode),
-                cancellationToken);
-
             await AppendSubscriptionEventAsync(
                 existingSubscription.UserId,
                 subscription.Id,
@@ -242,12 +201,32 @@ public sealed partial class EconomyService
                 await transaction.CommitAsync(cancellationToken);
             }
 
+            var premiumSyncResult = await SynchronizePremiumEntitlementAsync(
+                existingSubscription.UserId,
+                isPremium,
+                "google_play",
+                $"GooglePlayNotification:{parsed.NotificationType}",
+                subscription.Id,
+                subscription.ExternalSubscriptionId,
+                cancellationToken);
+            if (premiumSyncResult.IsSuccess)
+            {
+                await _pushNotificationSender.NotifyPremiumUpdateAsync(
+                    existingSubscription.UserId,
+                    new PremiumPushNotification(
+                        Status: isPremium ? "active" : "inactive",
+                        Provider: "google_play",
+                        PlanCode: plan.PlanCode),
+                    cancellationToken);
+            }
+
             LogStoreWebhookProcessed("google_play", parsed.EventId, googlePlayEventType, existingSubscription.UserId, "processed");
             return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, true, "processed"));
         }
         catch (DbUpdateException exception) when (IsUniqueWebhookEventConflict(exception))
         {
             dbContext.ChangeTracker.Clear();
+            EconomyMetrics.RecordDuplicateWebhook("google_play", googlePlayEventType);
             LogDuplicateStoreWebhook("google_play", parsed.EventId, googlePlayEventType);
             return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, false, "ignored_duplicate"));
         }

@@ -62,6 +62,26 @@ public sealed class AdminUserEndpointHardeningTests
         Assert.DoesNotContain("normalizedSearch.ToLower()", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void AdminUserMutationEndpoints_ShouldLimitRequestBodiesBeforeJsonBinding()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Identity",
+            "PetMagic.Modules.Identity.Api",
+            "Endpoints",
+            "AdminUserEndpoints.cs"));
+
+        Assert.Contains("private const int MaxAdminUserMutationRequestBodyBytes = 8 * 1024;", source, StringComparison.Ordinal);
+        Assert.Contains("private const int MaxAdminBulkEmailRequestBodyBytes = 64 * 1024;", source, StringComparison.Ordinal);
+        Assert.Equal(
+            5,
+            CountOccurrences(source, ".WithMetadata(new RequestSizeLimitAttribute(MaxAdminUserMutationRequestBodyBytes));"));
+        Assert.Contains(".WithMetadata(new RequestSizeLimitAttribute(MaxAdminBulkEmailRequestBodyBytes));", source, StringComparison.Ordinal);
+    }
+
     private static string FindRepositoryRoot()
     {
         var current = new DirectoryInfo(AppContext.BaseDirectory);

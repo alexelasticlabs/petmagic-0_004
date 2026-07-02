@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http.Metadata;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
@@ -79,6 +80,44 @@ public sealed class SupportChatApiStartupSmokeTests
         await using var app = await SupportChatApiStartupTestApplication.CreateAsync();
 
         Assert.Empty(app.GetAdminRoutesWithoutRolePolicy());
+    }
+
+    [Theory]
+    [InlineData("POST", "/api/support/conversation/{conversationId:guid}/messages/attachments", 255L * 1024 * 1024)]
+    [InlineData("POST", "/api/support/conversation/{conversationId:guid}/attachments", 51L * 1024 * 1024)]
+    [InlineData("POST", "/api/support/conversation/{conversationId:guid}/messages/{messageId:guid}/attachment/retry", 51L * 1024 * 1024)]
+    [InlineData("POST", "/api/admin/support/tickets/{conversationId:guid}/messages/attachments", 255L * 1024 * 1024)]
+    [InlineData("POST", "/api/admin/support/tickets/{conversationId:guid}/attachments", 51L * 1024 * 1024)]
+    [InlineData("POST", "/api/admin/support/tickets/{conversationId:guid}/messages/{messageId:guid}/attachment/retry", 51L * 1024 * 1024)]
+    public async Task SupportChatAttachmentEndpoints_ShouldLimitRequestBodiesBeforeFormBinding(
+        string method,
+        string routePattern,
+        long expectedBytes)
+    {
+        await using var app = await SupportChatApiStartupTestApplication.CreateAsync();
+
+        Assert.Equal(expectedBytes, app.GetRequestSizeLimit(method, routePattern));
+    }
+
+    [Theory]
+    [InlineData("POST", "/api/support/conversation/open")]
+    [InlineData("POST", "/api/support/conversation/{conversationId:guid}/messages")]
+    [InlineData("POST", "/api/support/conversation/{conversationId:guid}/feedback")]
+    [InlineData("PUT", "/api/support/notifications/push-token")]
+    [InlineData("DELETE", "/api/support/notifications/push-token")]
+    [InlineData("PUT", "/api/admin/support/tickets/{conversationId:guid}/status")]
+    [InlineData("PUT", "/api/admin/support/tickets/{conversationId:guid}/assignment")]
+    [InlineData("PUT", "/api/admin/support/tickets/{conversationId:guid}/metadata")]
+    [InlineData("POST", "/api/admin/support/tickets/{conversationId:guid}/messages")]
+    [InlineData("POST", "/api/admin/support/templates")]
+    [InlineData("PUT", "/api/admin/support/templates/{templateId:guid}")]
+    public async Task SupportChatJsonMutationEndpoints_ShouldLimitRequestBodiesBeforeJsonBinding(
+        string method,
+        string routePattern)
+    {
+        await using var app = await SupportChatApiStartupTestApplication.CreateAsync();
+
+        Assert.Equal(16 * 1024, app.GetRequestSizeLimit(method, routePattern));
     }
 
     private sealed class SupportChatApiStartupTestApplication : IAsyncDisposable
@@ -168,6 +207,21 @@ public sealed class SupportChatApiStartupSmokeTests
                         .Contains(method, StringComparer.OrdinalIgnoreCase));
 
             return endpoint.Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName;
+        }
+
+        public long? GetRequestSizeLimit(string method, string routePattern)
+        {
+            var endpoint = app.Services.GetRequiredService<EndpointDataSource>()
+                .Endpoints
+                .OfType<RouteEndpoint>()
+                .Single(endpoint =>
+                    string.Equals(endpoint.RoutePattern.RawText, routePattern, StringComparison.Ordinal)
+                    && endpoint.Metadata
+                        .GetRequiredMetadata<IHttpMethodMetadata>()
+                        .HttpMethods
+                        .Contains(method, StringComparer.OrdinalIgnoreCase));
+
+            return endpoint.Metadata.GetMetadata<IRequestSizeLimitMetadata>()?.MaxRequestBodySize;
         }
 
         public string[] GetApiRoutesWithoutRateLimit()

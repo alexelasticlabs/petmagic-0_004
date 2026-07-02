@@ -125,6 +125,35 @@ public interface IEconomyService
 
     Task<Result<OffsetPagedResponse<AdminSubscriptionEventResponse>>> GetAdminSubscriptionEventsAsync(int skip, int take, string? provider, string? status, CancellationToken cancellationToken);
 
+    Task<Result<OffsetPagedResponse<AdminEconomyIncidentResponse>>> GetAdminEconomyIncidentsAsync(
+        int skip,
+        int take,
+        string? status,
+        string? type,
+        string? category,
+        Guid? userId,
+        CancellationToken cancellationToken);
+
+    Task<Result<AdminEconomyIncidentDetailResponse>> GetAdminEconomyIncidentAsync(
+        Guid incidentId,
+        CancellationToken cancellationToken);
+
+    Task<Result<EconomyReconciliationRunResponse>> RunEconomyReconciliationAsync(CancellationToken cancellationToken);
+
+    Task<Result<AdminEconomyIncidentResponse>> ResolveAdminEconomyIncidentAsync(
+        Guid incidentId,
+        string? resolutionNote,
+        CancellationToken cancellationToken);
+
+    Task<Result<AdminEconomyIncidentResponse>> ReopenAdminEconomyIncidentAsync(
+        Guid incidentId,
+        string reason,
+        CancellationToken cancellationToken);
+
+    Task<Result<AdminEconomyIncidentActionResponse>> ApplyAdminEconomyIncidentActionAsync(
+        AdminEconomyIncidentActionCommand command,
+        CancellationToken cancellationToken);
+
     Task<Result<AdminRedeemCodeResponse>> CreateRedeemCodeAsync(CreateRedeemCodeCommand command, CancellationToken cancellationToken);
 
     Task<Result<AdminRedeemCodeResponse>> UpdateRedeemCodeAsync(UpdateRedeemCodeCommand command, CancellationToken cancellationToken);

@@ -114,7 +114,13 @@ public sealed partial class EconomyService
     private async Task<bool> ResolvePremiumStatusAsync(Guid userId, bool fallbackIsPremium, CancellationToken cancellationToken)
     {
         var subscription = await GetLatestUserSubscriptionAsync(userId, cancellationToken);
-        return IsActivePremiumSubscription(subscription);
+        var isPremium = IsActivePremiumSubscription(subscription);
+        if (isPremium != fallbackIsPremium)
+        {
+            await ReconcilePremiumEntitlementAsync(userId, "premium_claim_fallback_mismatch", cancellationToken);
+        }
+
+        return isPremium;
     }
 
     private async Task<Wallet> GetOrCreateWalletAsync(Guid userId, CancellationToken cancellationToken)
@@ -245,25 +251,37 @@ public sealed partial class EconomyService
         var refereeWallet = await GetOrCreateWalletAsync(referral.RefereeUserId, cancellationToken);
         var rewardSpark = referral.RewardSpark > 0 ? referral.RewardSpark : options.Value.ReferralBonusSpark;
 
-        ApplyWalletDelta(
+        var referrerMutation = await ApplyWalletMutationAsync(
             referrerWallet,
             rewardSpark,
             WalletLedgerSource.ReferralBonus,
             $"referral:inviter:{referral.RefereeUserId:D}:{triggerReason}",
             now,
-            out var referrerLedgerEntryId);
+            cancellationToken);
+        if (referrerMutation.IsFailure)
+        {
+            throw new InvalidOperationException(referrerMutation.Error.Message);
+        }
 
-        ApplyWalletDelta(
+        var refereeMutation = await ApplyWalletMutationAsync(
             refereeWallet,
             rewardSpark,
             WalletLedgerSource.ReferralBonus,
             $"referral:friend:{referral.ReferrerUserId:D}:{triggerReason}",
             now,
-            out var refereeLedgerEntryId);
+            cancellationToken);
+        if (refereeMutation.IsFailure)
+        {
+            throw new InvalidOperationException(refereeMutation.Error.Message);
+        }
 
         referral.Status = ReferralAttributionStatus.Rewarded;
-        referral.ReferrerLedgerEntryId = referrerLedgerEntryId;
-        referral.RefereeLedgerEntryId = refereeLedgerEntryId;
+        referral.ReferrerLedgerEntryId = referrerMutation.Value.LedgerEntryId == Guid.Empty
+            ? referral.ReferrerLedgerEntryId
+            : referrerMutation.Value.LedgerEntryId;
+        referral.RefereeLedgerEntryId = refereeMutation.Value.LedgerEntryId == Guid.Empty
+            ? referral.RefereeLedgerEntryId
+            : refereeMutation.Value.LedgerEntryId;
         referral.QualifiedAtUtc = now;
         referral.UpdatedAtUtc = now;
     }

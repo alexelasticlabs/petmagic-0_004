@@ -2,10 +2,12 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
@@ -71,7 +73,9 @@ public sealed partial class EconomyServiceTests
         FakePaymentGateway? gateway = null,
         FakeStoreSubscriptionVerifier? storeVerifier = null,
         IIdentityService? identityService = null,
-        IStoreWebhookSecurityValidator? storeWebhookSecurityValidator = null)
+        IStoreWebhookSecurityValidator? storeWebhookSecurityValidator = null,
+        IAdminAuditLog? adminAuditLog = null,
+        IGenerationBillingReconciliationService? generationBillingReconciliation = null)
     {
         var options = Options.Create(new EconomyOptions
         {
@@ -96,8 +100,9 @@ public sealed partial class EconomyServiceTests
             null,
             identityService,
             null,
-            null,
-            storeWebhookSecurityValidator ?? new FakeStoreWebhookSecurityValidator(Result.Success()));
+            adminAuditLog,
+            storeWebhookSecurityValidator ?? new FakeStoreWebhookSecurityValidator(Result.Success()),
+            generationBillingReconciliation);
     }
 
     private static EconomyDbContext CreateDbContext()
@@ -128,6 +133,48 @@ public sealed partial class EconomyServiceTests
         dbContext.SaveChanges();
 
         return dbContext;
+    }
+
+    private static async Task<SqliteConnection> CreateSharedSqliteEconomyDatabaseAsync()
+    {
+        var connection = new SqliteConnection($"Data Source=economy-wallet-{Guid.NewGuid():N};Mode=Memory;Cache=Shared");
+        await connection.OpenAsync();
+
+        await using var dbContext = CreateSqliteDbContext(connection.ConnectionString);
+        await dbContext.Database.EnsureCreatedAsync();
+        dbContext.PaymentProviderConfigurations.Add(new PaymentProviderConfiguration
+        {
+            Id = Guid.NewGuid(),
+            Provider = "stripe",
+            Platform = "web",
+            Region = "*",
+            IsEnabled = true,
+            IsRecommended = true,
+            IsSelectedByDefault = true,
+            RequiresExternalWarning = false,
+            RequiresStoreDisclosure = false,
+            AllowedFromAppVersion = "0.0.0",
+            ExternalCheckoutAllowed = true,
+            BonusTokensPercent = 0,
+            Mode = "test",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        await dbContext.SaveChangesAsync();
+
+        return connection;
+    }
+
+    private static EconomyDbContext CreateSqliteDbContext(string connectionString)
+    {
+        var connection = new SqliteConnection(connectionString);
+        connection.Open();
+
+        var dbOptions = new DbContextOptionsBuilder<EconomyDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        return new EconomyDbContext(dbOptions);
     }
 
     private static Guid AddStarterPack(EconomyDbContext dbContext)
@@ -285,6 +332,8 @@ public sealed partial class EconomyServiceTests
 
         public List<PaymentRefundRequest> RefundRequests { get; } = [];
 
+        public Result<PaymentRefundResponse>? RefundResult { get; set; }
+
         public Task<Result<PaymentCreateResponse>> CreatePaymentAsync(PaymentCreateRequest request, CancellationToken cancellationToken)
         {
             LastPaymentCreateRequest = request;
@@ -339,7 +388,7 @@ public sealed partial class EconomyServiceTests
         public Task<Result<PaymentRefundResponse>> RefundPaymentAsync(PaymentRefundRequest request, CancellationToken cancellationToken)
         {
             RefundRequests.Add(request);
-            return Task.FromResult(Result.Success(new PaymentRefundResponse($"re_{request.OrderId:N}", "succeeded")));
+            return Task.FromResult(RefundResult ?? Result.Success(new PaymentRefundResponse($"re_{request.OrderId:N}", "succeeded")));
         }
     }
 
@@ -379,6 +428,101 @@ public sealed partial class EconomyServiceTests
         }
     }
 
+    private sealed class RecordingAdminAuditLog : IAdminAuditLog
+    {
+        public List<AdminAuditEntry> Entries { get; } = [];
+
+        public Task WriteAsync(AdminAuditEntry entry, CancellationToken cancellationToken)
+        {
+            Entries.Add(entry);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeGenerationBillingReconciliationService : IGenerationBillingReconciliationService
+    {
+        public Dictionary<Guid, GenerationBillingSnapshot> Snapshots { get; } = [];
+
+        public List<(Guid GenerationId, DateTime ChargedAtUtc, string Reason)> RestoredChargeMarkers { get; } = [];
+
+        public List<(Guid GenerationId, DateTime RefundedAtUtc, string Reason)> RefundedMarkers { get; } = [];
+
+        public Task<Result<IReadOnlyList<GenerationBillingSnapshot>>> ListGenerationBillingSnapshotsAsync(
+            DateTime changedAfterUtc,
+            int take,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success<IReadOnlyList<GenerationBillingSnapshot>>(
+                Snapshots.Values
+                    .Where(x => x.CreatedAtUtc >= changedAfterUtc || x.UpdatedAtUtc >= changedAfterUtc || x.ChargedAtUtc is not null)
+                    .Take(Math.Max(1, take))
+                    .ToList()));
+        }
+
+        public Task<Result<GenerationBillingSnapshot>> GetGenerationBillingSnapshotAsync(
+            Guid generationId,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Snapshots.TryGetValue(generationId, out var snapshot)
+                ? Result.Success(snapshot)
+                : Result.Failure<GenerationBillingSnapshot>(EconomyErrors.GenerationBillingSnapshotNotFound));
+        }
+
+        public Task<Result<GenerationBillingRecoveryResponse>> RestoreGenerationChargeMarkerAsync(
+            Guid generationId,
+            DateTime chargedAtUtc,
+            string reason,
+            CancellationToken cancellationToken)
+        {
+            if (!Snapshots.TryGetValue(generationId, out var snapshot))
+            {
+                return Task.FromResult(Result.Failure<GenerationBillingRecoveryResponse>(EconomyErrors.GenerationBillingSnapshotNotFound));
+            }
+
+            RestoredChargeMarkers.Add((generationId, chargedAtUtc, reason));
+            var updated = snapshot with
+            {
+                ChargedAtUtc = snapshot.ChargedAtUtc ?? chargedAtUtc,
+                UpdatedAtUtc = chargedAtUtc
+            };
+            Snapshots[generationId] = updated;
+            return Task.FromResult(Result.Success(new GenerationBillingRecoveryResponse(
+                updated.GenerationId,
+                updated.UserId,
+                updated.Status,
+                updated.ChargedAtUtc,
+                updated.RefundedAtUtc,
+                updated.UpdatedAtUtc)));
+        }
+
+        public Task<Result<GenerationBillingRecoveryResponse>> MarkGenerationRefundedAsync(
+            Guid generationId,
+            DateTime refundedAtUtc,
+            string reason,
+            CancellationToken cancellationToken)
+        {
+            if (!Snapshots.TryGetValue(generationId, out var snapshot))
+            {
+                return Task.FromResult(Result.Failure<GenerationBillingRecoveryResponse>(EconomyErrors.GenerationBillingSnapshotNotFound));
+            }
+
+            RefundedMarkers.Add((generationId, refundedAtUtc, reason));
+            var updated = snapshot with
+            {
+                RefundedAtUtc = snapshot.RefundedAtUtc ?? refundedAtUtc,
+                UpdatedAtUtc = refundedAtUtc
+            };
+            Snapshots[generationId] = updated;
+            return Task.FromResult(Result.Success(new GenerationBillingRecoveryResponse(
+                updated.GenerationId,
+                updated.UserId,
+                updated.Status,
+                updated.ChargedAtUtc,
+                updated.RefundedAtUtc,
+                updated.UpdatedAtUtc)));
+        }
+    }
+
     private sealed class FakeIdentityService : IIdentityService
     {
         private static readonly LegalAcceptanceStatusResponse DefaultLegalAcceptance = new(
@@ -393,6 +537,14 @@ public sealed partial class EconomyServiceTests
             false);
 
         public List<SetPremiumStatusCommand> SetPremiumStatusCalls { get; } = [];
+
+        public List<Guid> GetCurrentUserCalls { get; } = [];
+
+        public bool CurrentUserIsPremium { get; set; }
+
+        public Error? GetCurrentUserError { get; set; }
+
+        public Error? SetPremiumStatusError { get; set; }
 
         public Task<Result<LegalDocumentsResponse>> GetCurrentLegalDocumentsAsync(string? locale, CancellationToken cancellationToken) => NotSupported<LegalDocumentsResponse>();
         public Task<Result<UserProfileResponse>> RegisterAsync(RegisterUserCommand command, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
@@ -417,11 +569,17 @@ public sealed partial class EconomyServiceTests
 
         public Task<Result<UserProfileResponse>> GetCurrentUserAsync(Guid userId, CancellationToken cancellationToken)
         {
+            GetCurrentUserCalls.Add(userId);
+            if (GetCurrentUserError is not null)
+            {
+                return Task.FromResult(Result.Failure<UserProfileResponse>(GetCurrentUserError));
+            }
+
             return Task.FromResult(Result.Success(new UserProfileResponse(
                 userId,
                 "premium@petmagic.app",
                 "Premium User",
-                false,
+                CurrentUserIsPremium,
                 true,
                 "Active",
                 true,
@@ -448,6 +606,12 @@ public sealed partial class EconomyServiceTests
         public Task<Result> SetPremiumStatusAsync(SetPremiumStatusCommand command, CancellationToken cancellationToken)
         {
             SetPremiumStatusCalls.Add(command);
+            if (SetPremiumStatusError is not null)
+            {
+                return Task.FromResult(Result.Failure(SetPremiumStatusError));
+            }
+
+            CurrentUserIsPremium = command.IsPremium;
             return Task.FromResult(Result.Success());
         }
 

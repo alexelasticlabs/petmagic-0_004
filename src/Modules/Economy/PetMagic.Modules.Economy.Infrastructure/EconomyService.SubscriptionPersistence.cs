@@ -118,8 +118,31 @@ public sealed partial class EconomyService
         subscription.MonthlyTokenLimit = monthlyTokenLimit;
         subscription.UpdatedAtUtc = now;
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (IsSubscriptionOwnershipUniqueViolation(exception))
+        {
+            // Concurrent redemption of the same store receipt/subscription by another account lost
+            // the race against the unique (Provider, ExternalSubscriptionId/ExternalTransactionId)
+            // indexes. Surface the same ownership-conflict error as the pre-check instead of a 500.
+            dbContext.ChangeTracker.Clear();
+            return Result.Failure<UserSubscription>(EconomyErrors.SubscriptionOwnershipConflict);
+        }
+
         return Result.Success(subscription);
+    }
+
+    private static bool IsSubscriptionOwnershipUniqueViolation(DbUpdateException exception)
+    {
+        return exception.InnerException is Npgsql.PostgresException
+        {
+            SqlState: Npgsql.PostgresErrorCodes.UniqueViolation,
+            ConstraintName: { } constraintName
+        }
+            && (constraintName.Contains("economy_user_subscriptions", StringComparison.OrdinalIgnoreCase)
+                || constraintName.StartsWith("UX_eus_", StringComparison.OrdinalIgnoreCase));
     }
 
     private async Task<bool> StoreSubscriptionBelongsToAnotherUserAsync(

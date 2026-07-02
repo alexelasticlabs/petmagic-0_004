@@ -52,6 +52,15 @@ public sealed class AuthCredentialAndProfileEndpointSecurityTests
         Assert.DoesNotContain("detail: error.Message", source);
     }
 
+    [Fact]
+    public void AvatarUploadEndpoint_ShouldLimitRequestBodyBeforeFormBinding()
+    {
+        var source = ReadSource("AuthEndpoints.cs");
+
+        Assert.Contains("private const long MaxAvatarUploadRequestBodyBytes = 9L * 1024 * 1024;", source);
+        Assert.Contains(".WithMetadata(new RequestSizeLimitAttribute(MaxAvatarUploadRequestBodyBytes));", source);
+    }
+
     private static string ReadSource(string fileName)
     {
         return File.ReadAllText(Path.Combine(

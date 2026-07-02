@@ -50,7 +50,7 @@ internal sealed partial class FeedbackService
             amount = command.Amount.Value;
         }
 
-        var reason = NormalizeText(command.Reason ?? $"Feedback refund {feedback.Id}", 500);
+        var reason = NormalizeOptionalText(command.Reason, 500) ?? $"Feedback refund {feedback.Id}";
         var creditResult = await economyService.CreditAsync(
             new CreditBalanceCommand(
                 feedback.UserId.Value,

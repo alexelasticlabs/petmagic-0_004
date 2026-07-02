@@ -1,3 +1,5 @@
+using System.Net;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
@@ -112,11 +114,16 @@ public sealed class TemplateContentHealthCheck(
         string rawUrl,
         CancellationToken cancellationToken)
     {
-        var resolvedUrl = ResolveAbsoluteUrl(rawUrl);
-        if (!Uri.TryCreate(resolvedUrl, UriKind.Absolute, out var uri)
+        if (!TryResolveProbeUri(rawUrl, out var uri)
             || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
         {
             AddProblem(problems, template, $"{role}_url_invalid");
+            return;
+        }
+
+        if (IsPrivateNetworkTarget(uri) && !IsConfiguredPublicOrigin(uri))
+        {
+            AddProblem(problems, template, $"{role}_url_private_network");
             return;
         }
 
@@ -150,15 +157,84 @@ public sealed class TemplateContentHealthCheck(
         return await client.SendAsync(getRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
     }
 
-    private string ResolveAbsoluteUrl(string rawUrl)
+    private bool TryResolveProbeUri(string rawUrl, out Uri uri)
     {
+        uri = null!;
         var trimmed = rawUrl.Trim();
-        if (Uri.TryCreate(trimmed, UriKind.Absolute, out _))
+        if (Uri.TryCreate(trimmed, UriKind.Absolute, out var absoluteUri))
         {
-            return trimmed;
+            uri = absoluteUri;
+            return true;
         }
 
-        return $"{options.PublicBaseUrl.TrimEnd('/')}/{trimmed.TrimStart('/')}";
+        var resolvedUrl = $"{options.PublicBaseUrl.TrimEnd('/')}/{trimmed.TrimStart('/')}";
+        if (!Uri.TryCreate(resolvedUrl, UriKind.Absolute, out var resolvedUri))
+        {
+            return false;
+        }
+
+        uri = resolvedUri;
+        return true;
+    }
+
+    private bool IsConfiguredPublicOrigin(Uri uri)
+    {
+        return IsSameOrigin(uri, options.PublicBaseUrl)
+            || IsSameOrigin(uri, options.R2.PublicBaseUrl);
+    }
+
+    private static bool IsSameOrigin(Uri uri, string configuredBaseUrl)
+    {
+        return Uri.TryCreate(configuredBaseUrl, UriKind.Absolute, out var configuredUri)
+            && string.Equals(uri.Scheme, configuredUri.Scheme, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(uri.IdnHost, configuredUri.IdnHost, StringComparison.OrdinalIgnoreCase)
+            && uri.Port == configuredUri.Port;
+    }
+
+    private static bool IsPrivateNetworkTarget(Uri uri)
+    {
+        var host = uri.IdnHost;
+        if (string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
+            || host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return IPAddress.TryParse(host, out var address) && IsPrivateNetworkAddress(address);
+    }
+
+    private static bool IsPrivateNetworkAddress(IPAddress address)
+    {
+        if (address.IsIPv4MappedToIPv6)
+        {
+            address = address.MapToIPv4();
+        }
+
+        if (IPAddress.IsLoopback(address)
+            || IPAddress.Any.Equals(address)
+            || IPAddress.None.Equals(address)
+            || IPAddress.IPv6Any.Equals(address)
+            || IPAddress.IPv6Loopback.Equals(address)
+            || IPAddress.IPv6None.Equals(address)
+            || address.IsIPv6LinkLocal
+            || address.IsIPv6SiteLocal)
+        {
+            return true;
+        }
+
+        if (address.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork)
+        {
+            return false;
+        }
+
+        var bytes = address.GetAddressBytes();
+        return bytes[0] == 10
+            || bytes[0] == 127
+            || bytes[0] == 169 && bytes[1] == 254
+            || bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31
+            || bytes[0] == 192 && bytes[1] == 168
+            || bytes[0] == 100 && bytes[1] >= 64 && bytes[1] <= 127
+            || bytes[0] >= 224;
     }
 
     private static bool IsVideoPreview(Entities.TemplateAsset asset)

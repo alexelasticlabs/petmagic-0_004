@@ -208,3 +208,100 @@ public sealed record AdminSubscriptionEventResponse(
     string? ExternalEventId,
     DateTime CreatedAtUtc,
     DateTime? ProcessedAtUtc);
+
+public sealed record AdminEconomyIncidentResponse(
+    Guid IncidentId,
+    string Type,
+    string Category,
+    string Severity,
+    string Status,
+    Guid? UserId,
+    Guid? PurchaseOrderId,
+    Guid? UserSubscriptionId,
+    string? Provider,
+    string? ExternalReferenceId,
+    string Summary,
+    int DetectionCount,
+    int RetryCount,
+    bool AutoFixApplied,
+    DateTime FirstDetectedAtUtc,
+    DateTime LastDetectedAtUtc,
+    DateTime? NextRetryAtUtc,
+    DateTime? ResolvedAtUtc,
+    string? ResolutionNote,
+    string? LastError);
+
+public sealed record AdminEconomyIncidentWalletResponse(
+    Guid UserId,
+    int Balance,
+    DateTime UpdatedAtUtc);
+
+public sealed record AdminEconomyIncidentWebhookSnapshotResponse(
+    Guid EventId,
+    Guid? UserId,
+    Guid? UserSubscriptionId,
+    string Provider,
+    string EventType,
+    string Status,
+    string? ExternalEventId,
+    string? PayloadSnapshotJson,
+    DateTime CreatedAtUtc,
+    DateTime? ProcessedAtUtc);
+
+public sealed record AdminEconomyIncidentGenerationResponse(
+    Guid GenerationId,
+    Guid UserId,
+    int TokenCost,
+    string Status,
+    DateTime CreatedAtUtc,
+    DateTime UpdatedAtUtc,
+    DateTime? ChargedAtUtc,
+    DateTime? RefundedAtUtc,
+    int RefundAttemptCount,
+    string? RefundLastErrorCode,
+    DateTime? RefundLastAttemptedAtUtc,
+    DateTime? CompletedAtUtc,
+    string? LastErrorCode,
+    string? IdempotencyKey,
+    string? RequestHash);
+
+public sealed record AdminEconomyIncidentAuditEntryResponse(
+    Guid AuditEntryId,
+    string Action,
+    string Reason,
+    string? OldStatus,
+    string? NewStatus,
+    string? DetailsJson,
+    DateTime CreatedAtUtc);
+
+public sealed record AdminEconomyIncidentDetailResponse(
+    AdminEconomyIncidentResponse Incident,
+    PurchaseHistoryItemResponse? PurchaseOrder,
+    AdminUserSubscriptionResponse? Subscription,
+    AdminEconomyIncidentWalletResponse? Wallet,
+    AdminEconomyIncidentGenerationResponse? Generation,
+    IReadOnlyList<WalletLedgerItemResponse> LedgerEntries,
+    IReadOnlyList<AdminEconomyIncidentWebhookSnapshotResponse> WebhookEvents,
+    IReadOnlyList<AdminEconomyIncidentAuditEntryResponse> AuditTrail);
+
+public sealed record AdminEconomyIncidentActionCommand(
+    Guid IncidentId,
+    string Action,
+    string Reason,
+    int? Amount = null,
+    string? ExternalReferenceId = null);
+
+public sealed record AdminEconomyIncidentActionResponse(
+    AdminEconomyIncidentResponse Incident,
+    string Action,
+    string Message);
+
+public sealed record EconomyReconciliationRunResponse(
+    DateTime StartedAtUtc,
+    DateTime CompletedAtUtc,
+    int ChecksRun,
+    int IncidentsCreated,
+    int IncidentsUpdated,
+    int IncidentsResolved,
+    int AutoFixesApplied,
+    int ManualReviewRequired);

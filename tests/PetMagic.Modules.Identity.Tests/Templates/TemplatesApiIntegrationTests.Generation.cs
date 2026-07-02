@@ -101,6 +101,7 @@ public sealed partial class TemplatesApiIntegrationTests
             await EnsureSuccessStatusCodeAsync(historyResponse, "/api/templates/generations?take=20");
             using var historyJson = JsonDocument.Parse(await historyResponse.Content.ReadAsStringAsync());
             var statusByGenerationId = historyJson.RootElement
+                .GetProperty("items")
                 .EnumerateArray()
                 .ToDictionary(
                     item => item.GetProperty("generationId").GetGuid(),
@@ -147,6 +148,339 @@ public sealed partial class TemplatesApiIntegrationTests
             realtimeStatuses.OrderBy(status => status, StringComparer.Ordinal));
     }
 
+    [Fact]
+    public async Task GenerationUserEndpoints_ShouldReturnNotFound_ForForeignGenerationId()
+    {
+        await using var application = await TestApplication.CreateAsync(startGenerationWorker: false);
+
+        var created = await CreateActiveImageTemplateAsync(
+            application.Client,
+            "Ownership Contract Portrait",
+            "Portrait",
+            ["ownership-contract"]);
+        var ownerUserId = TestUserId;
+        var otherUserId = Guid.Parse("8DE72914-19F0-4C4C-9F55-C534DB8C0D7A");
+        var generationId = Guid.NewGuid();
+        var resultUrl = "http://localhost:5000/templates-media/foreign-result.png";
+        var now = DateTime.UtcNow;
+
+        await using (var scope = application.Services.CreateAsyncScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+            dbContext.TemplateGenerationJobs.Add(new TemplateGenerationJob
+            {
+                Id = generationId,
+                UserId = ownerUserId,
+                TemplateId = created.TemplateId,
+                Status = TemplateGenerationStatus.Completed,
+                TokenCost = created.TokenCost,
+                SourceImageUrl = "http://localhost:5000/templates-media/foreign-source.jpg",
+                SourceImageFileName = "foreign-source.jpg",
+                SourceImageContentType = "image/jpeg",
+                SourceImageFileSizeBytes = 2048,
+                ResultUrl = resultUrl,
+                AttemptCount = 1,
+                CreatedAtUtc = now.AddMinutes(-5),
+                QueuedAtUtc = now.AddMinutes(-5),
+                StartedAtUtc = now.AddMinutes(-4),
+                MediaImportCompletedAtUtc = now.AddMinutes(-1),
+                CompletedAtUtc = now.AddMinutes(-1),
+                UpdatedAtUtc = now.AddMinutes(-1),
+                ChargedAtUtc = now.AddMinutes(-5),
+                QueueMediaType = TemplateGenerationQueue.MediaTypeImage,
+                QueueTier = TemplateGenerationQueue.TierFree
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        application.Client.DefaultRequestHeaders.Remove("X-Test-UserId");
+        application.Client.DefaultRequestHeaders.Add("X-Test-UserId", otherUserId.ToString());
+        application.Client.DefaultRequestHeaders.Remove("X-Test-Role");
+        application.Client.DefaultRequestHeaders.Add("X-Test-Role", "User");
+
+        var endpoints = new (HttpMethod Method, string Path)[]
+        {
+            (HttpMethod.Get, $"/api/templates/generations/{generationId}"),
+            (HttpMethod.Post, $"/api/templates/generations/{generationId}/mark-read"),
+            (HttpMethod.Delete, $"/api/templates/generations/{generationId}"),
+            (HttpMethod.Get, $"/api/templates/generations/{generationId}/download"),
+            (HttpMethod.Post, $"/api/templates/generations/{generationId}/share")
+        };
+
+        foreach (var (method, path) in endpoints)
+        {
+            using var request = new HttpRequestMessage(method, path)
+            {
+                Content = method == HttpMethod.Post
+                    ? new StringContent("{}", Encoding.UTF8, "application/json")
+                    : null
+            };
+            using var response = await application.Client.SendAsync(request);
+            var body = await response.Content.ReadAsStringAsync();
+
+            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+            Assert.DoesNotContain(resultUrl, body, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("mediaUrl", body, StringComparison.OrdinalIgnoreCase);
+        }
+
+        await using (var scope = application.Services.CreateAsyncScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+            var persisted = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == generationId);
+            Assert.Equal(ownerUserId, persisted.UserId);
+            Assert.Null(persisted.ResultViewedAtUtc);
+            Assert.Null(persisted.HiddenByUserAtUtc);
+            Assert.Equal(resultUrl, persisted.ResultUrl);
+        }
+    }
+
+    [Fact]
+    public async Task GenerationGalleryList_ShouldUseStableCursorPagination()
+    {
+        await using var application = await TestApplication.CreateAsync(startGenerationWorker: false);
+
+        var created = await CreateActiveImageTemplateAsync(
+            application.Client,
+            "Cursor Gallery Portrait",
+            "Portrait",
+            ["cursor-gallery"]);
+        var otherUserId = Guid.Parse("5E1347E2-DA5C-40A7-B9B4-2D3F93B55A11");
+        var sharedCreatedAt = DateTime.UtcNow.AddMinutes(-3);
+        var olderCreatedAt = sharedCreatedAt.AddMinutes(-1);
+        var newestId = Guid.Parse("FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFF0");
+        var secondId = Guid.Parse("EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEE0");
+        var thirdId = Guid.Parse("DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDD0");
+        var fourthId = Guid.Parse("CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCC0");
+        var fifthId = Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBB0");
+        var hiddenId = Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAA0");
+        var foreignId = Guid.Parse("99999999-9999-9999-9999-999999999990");
+        var failedId = Guid.Parse("88888888-8888-8888-8888-888888888880");
+
+        await using (var scope = application.Services.CreateAsyncScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+            dbContext.TemplateGenerationJobs.AddRange(
+                CompletedJob(newestId, TestUserId, created.TemplateId, created.TokenCost, sharedCreatedAt, "newest"),
+                CompletedJob(secondId, TestUserId, created.TemplateId, created.TokenCost, sharedCreatedAt, "second"),
+                CompletedJob(thirdId, TestUserId, created.TemplateId, created.TokenCost, olderCreatedAt, "third"),
+                CompletedJob(fourthId, TestUserId, created.TemplateId, created.TokenCost, olderCreatedAt.AddMinutes(-1), "fourth", viewed: false),
+                CompletedJob(fifthId, TestUserId, created.TemplateId, created.TokenCost, olderCreatedAt.AddMinutes(-2), "fifth"),
+                CompletedJob(hiddenId, TestUserId, created.TemplateId, created.TokenCost, olderCreatedAt.AddMinutes(-3), "hidden", hidden: true),
+                CompletedJob(foreignId, otherUserId, created.TemplateId, created.TokenCost, sharedCreatedAt.AddMinutes(1), "foreign"),
+                CompletedJob(failedId, TestUserId, created.TemplateId, created.TokenCost, sharedCreatedAt.AddMinutes(2), "failed", status: TemplateGenerationStatus.Failed));
+            await dbContext.SaveChangesAsync();
+        }
+
+        var firstPage = await GetFromJsonAsync<GalleryPageResponse>(
+            application.Client,
+            "/api/templates/generations?status=completed&take=3");
+
+        Assert.True(firstPage.HasMore);
+        Assert.False(string.IsNullOrWhiteSpace(firstPage.NextCursor));
+        Assert.Equal("completed", firstPage.AppliedFilter);
+        Assert.Equal(1, firstPage.UnreadCount);
+        Assert.Equal([newestId, secondId, thirdId], firstPage.Items.Select(x => x.GenerationId).ToArray());
+        Assert.DoesNotContain(firstPage.Items, x => x.GenerationId == hiddenId);
+        Assert.DoesNotContain(firstPage.Items, x => x.GenerationId == foreignId);
+        Assert.DoesNotContain(firstPage.Items, x => x.GenerationId == failedId);
+
+        await using (var scope = application.Services.CreateAsyncScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+            dbContext.TemplateGenerationJobs.Add(
+                CompletedJob(
+                    Guid.Parse("77777777-7777-7777-7777-777777777770"),
+                    TestUserId,
+                    created.TemplateId,
+                    created.TokenCost,
+                    DateTime.UtcNow.AddMinutes(1),
+                    "inserted-between-pages"));
+            await dbContext.SaveChangesAsync();
+        }
+
+        var secondPage = await GetFromJsonAsync<GalleryPageResponse>(
+            application.Client,
+            $"/api/templates/generations?status=completed&take=3&cursor={Uri.EscapeDataString(firstPage.NextCursor!)}");
+
+        Assert.False(secondPage.HasMore);
+        Assert.Null(secondPage.NextCursor);
+        Assert.Equal([fourthId, fifthId], secondPage.Items.Select(x => x.GenerationId).ToArray());
+        Assert.Empty(secondPage.Items.Select(x => x.GenerationId).Intersect(firstPage.Items.Select(x => x.GenerationId)));
+    }
+
+    private static TemplateGenerationJob CompletedJob(
+        Guid generationId,
+        Guid userId,
+        Guid templateId,
+        int tokenCost,
+        DateTime createdAtUtc,
+        string slug,
+        TemplateGenerationStatus status = TemplateGenerationStatus.Completed,
+        bool hidden = false,
+        bool viewed = true)
+    {
+        return new TemplateGenerationJob
+        {
+            Id = generationId,
+            UserId = userId,
+            TemplateId = templateId,
+            Status = status,
+            TokenCost = tokenCost,
+            SourceImageUrl = $"https://cdn.example.com/{slug}-source.jpg",
+            SourceImageFileName = $"{slug}-source.jpg",
+            SourceImageContentType = "image/jpeg",
+            SourceImageFileSizeBytes = 2048,
+            ResultUrl = status == TemplateGenerationStatus.Completed
+                ? $"https://cdn.example.com/{slug}-result.png"
+                : null,
+            AttemptCount = status == TemplateGenerationStatus.Failed ? 2 : 1,
+            LastErrorCode = status == TemplateGenerationStatus.Failed
+                ? "templates.ai_provider_failed"
+                : null,
+            LastErrorMessage = status == TemplateGenerationStatus.Failed
+                ? "Provider failed."
+                : null,
+            CreatedAtUtc = createdAtUtc,
+            QueuedAtUtc = createdAtUtc,
+            StartedAtUtc = createdAtUtc.AddSeconds(10),
+            MediaImportCompletedAtUtc = status == TemplateGenerationStatus.Completed
+                ? createdAtUtc.AddSeconds(40)
+                : null,
+            CompletedAtUtc = status is TemplateGenerationStatus.Completed or TemplateGenerationStatus.Failed
+                ? createdAtUtc.AddSeconds(45)
+                : null,
+            UpdatedAtUtc = createdAtUtc.AddSeconds(45),
+            ChargedAtUtc = createdAtUtc,
+            ResultViewedAtUtc = viewed ? createdAtUtc.AddSeconds(50) : null,
+            HiddenByUserAtUtc = hidden ? createdAtUtc.AddSeconds(60) : null,
+            QueueMediaType = TemplateGenerationQueue.MediaTypeImage,
+            QueueTier = TemplateGenerationQueue.TierFree
+        };
+    }
+
+    [Fact]
+    public async Task GenerationGalleryList_ShouldReturnExplicitMediaStates()
+    {
+        await using var application = await TestApplication.CreateAsync(startGenerationWorker: false);
+
+        var created = await CreateActiveImageTemplateAsync(
+            application.Client,
+            "Media State Portrait",
+            "Portrait",
+            ["media-state-gallery"]);
+        var now = DateTime.UtcNow.AddMinutes(-10);
+        var resultReadyId = Guid.Parse("10000000-0000-0000-0000-000000000001");
+        var watermarkPreparingId = Guid.Parse("10000000-0000-0000-0000-000000000002");
+        var expiredId = Guid.Parse("10000000-0000-0000-0000-000000000003");
+        var storageUnavailableId = Guid.Parse("10000000-0000-0000-0000-000000000004");
+        var previewOnlyId = Guid.Parse("10000000-0000-0000-0000-000000000005");
+        var failedId = Guid.Parse("10000000-0000-0000-0000-000000000006");
+        var unlockedId = Guid.Parse("10000000-0000-0000-0000-000000000007");
+
+        await using (var scope = application.Services.CreateAsyncScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+            var resultReady = CompletedJob(resultReadyId, TestUserId, created.TemplateId, created.TokenCost, now, "media-ready");
+            var watermarkPreparing = CompletedJob(watermarkPreparingId, TestUserId, created.TemplateId, created.TokenCost, now.AddSeconds(-1), "watermark-preparing");
+            watermarkPreparing.IsWatermarkRequired = true;
+            watermarkPreparing.WatermarkedResultUrl = null;
+            var expired = CompletedJob(expiredId, TestUserId, created.TemplateId, created.TokenCost, now.AddSeconds(-2), "media-expired");
+            expired.UserMediaDeletedAtUtc = now.AddSeconds(30);
+            var storageUnavailable = CompletedJob(storageUnavailableId, TestUserId, created.TemplateId, created.TokenCost, now.AddSeconds(-3), "storage-unavailable");
+            storageUnavailable.MediaRecords.Add(CreateResultMediaRecord(storageUnavailable, isDeleted: true));
+            var previewOnly = CompletedJob(previewOnlyId, TestUserId, created.TemplateId, created.TokenCost, now.AddSeconds(-4), "preview-only");
+            previewOnly.ResultUrl = null;
+            previewOnly.MediaRecords.Add(CreateResultMediaRecord(previewOnly, includeResult: false, includePreview: true));
+            var failed = CompletedJob(failedId, TestUserId, created.TemplateId, created.TokenCost, now.AddSeconds(-5), "media-failed", status: TemplateGenerationStatus.Failed);
+            var unlocked = CompletedJob(unlockedId, TestUserId, created.TemplateId, created.TokenCost, now.AddSeconds(-6), "watermark-unlocked");
+            unlocked.IsWatermarkRequired = true;
+            unlocked.WatermarkedResultUrl = "https://cdn.example.com/watermark-unlocked-watermarked.png";
+
+            dbContext.TemplateGenerationJobs.AddRange(
+                resultReady,
+                watermarkPreparing,
+                expired,
+                storageUnavailable,
+                previewOnly,
+                failed,
+                unlocked);
+            dbContext.TemplateGenerationWatermarkUnlocks.Add(new TemplateGenerationWatermarkUnlock
+            {
+                Id = Guid.Parse("20000000-0000-0000-0000-000000000001"),
+                UserId = TestUserId,
+                GenerationJobId = unlocked.Id,
+                UnlockMethod = TemplateWatermarkUnlockMethod.Credit,
+                CreditsSpent = 1,
+                CreatedAtUtc = now
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        GalleryPageResponse page;
+        await using (var scope = application.Services.CreateAsyncScope())
+        {
+            var generationService = scope.ServiceProvider.GetRequiredService<ITemplateGenerationService>();
+            var result = await generationService.ListPageAsync(
+                TestUserId,
+                new TemplateGenerationHistoryQuery(null, null, 20),
+                isPremium: false,
+                CancellationToken.None);
+            Assert.True(result.IsSuccess, result.Error.Code);
+            page = result.Value;
+        }
+        var byId = page.Items.ToDictionary(x => x.GenerationId);
+
+        Assert.Equal(GalleryMediaState.resultReady, byId[resultReadyId].Media.State);
+        Assert.True(byId[resultReadyId].Media.CanDownload);
+        Assert.True(byId[resultReadyId].Media.CanShare);
+        Assert.Equal(GalleryMediaState.watermarkPreparing, byId[watermarkPreparingId].Media.State);
+        Assert.False(byId[watermarkPreparingId].Media.CanDownload);
+        Assert.Equal(GalleryMediaState.expired, byId[expiredId].Media.State);
+        Assert.Equal("gallery.media.expired", byId[expiredId].Media.UserMessageKey);
+        Assert.Equal(GalleryMediaState.storageUnavailable, byId[storageUnavailableId].Media.State);
+        Assert.Equal(GalleryMediaState.previewReadyOnly, byId[previewOnlyId].Media.State);
+        Assert.NotNull(byId[previewOnlyId].Media.PreviewUrl);
+        Assert.Null(byId[previewOnlyId].Media.ResultUrl);
+        Assert.Equal(GalleryMediaState.failed, byId[failedId].Media.State);
+        Assert.Equal(GalleryMediaState.resultReady, byId[unlockedId].Media.State);
+        Assert.True(byId[unlockedId].Media.IsWatermarkRemoved);
+        Assert.False(byId[unlockedId].Media.HasWatermark);
+    }
+
+    private static TemplateMediaRecord CreateResultMediaRecord(
+        TemplateGenerationJob job,
+        bool includeResult = true,
+        bool includePreview = false,
+        bool isDeleted = false)
+    {
+        var mediaId = Guid.NewGuid();
+        if (includeResult)
+        {
+            job.ResultMediaAssetId = mediaId;
+        }
+
+        return new TemplateMediaRecord
+        {
+            Id = mediaId,
+            UserId = job.UserId,
+            MediaType = "image",
+            StoragePath = includeResult ? $"users/{job.UserId:N}/generations/{job.Id:N}/result.png" : string.Empty,
+            PreviewUrl = includePreview ? $"users/{job.UserId:N}/generations/{job.Id:N}/preview.webp" : null,
+            SourceType = "generation_result",
+            GenerationId = job.Id,
+            Url = includeResult ? job.ResultUrl ?? string.Empty : string.Empty,
+            FileName = "result.png",
+            ContentType = "image/png",
+            FileSizeBytes = 1024,
+            Role = TemplateMediaRole.GenerationOutputImage,
+            LifecycleState = isDeleted ? TemplateMediaLifecycleState.Deleted : TemplateMediaLifecycleState.AttachedToGeneration,
+            GenerationJobId = job.Id,
+            UploadedAtUtc = job.CreatedAtUtc,
+            AttachedAtUtc = job.CreatedAtUtc,
+            DeletedAtUtc = isDeleted ? job.CreatedAtUtc.AddMinutes(1) : null,
+            IsDeleted = isDeleted
+        };
+    }
 
     [Fact]
     public async Task VideoGenerationFlow_ShouldUploadSourceCreateCompletedJobAndFetchResult()
@@ -226,6 +560,15 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.Equal(generation.GenerationId, fetched.GenerationId);
         Assert.Equal("Completed", fetched.Status);
         Assert.Equal(generation.OutputUrl, fetched.OutputUrl);
+        Assert.EndsWith($"generation-{generation.GenerationId:N}-result-preview.jpg", fetched.ResultPreviewUrl, StringComparison.OrdinalIgnoreCase);
+
+        var gallery = await GetFromJsonAsync<GalleryPageResponse>(
+            application.Client,
+            "/api/templates/generations?status=completed&take=10");
+        var galleryItem = Assert.Single(gallery.Items, item => item.GenerationId == generation.GenerationId);
+        Assert.Equal("video", galleryItem.Media.MediaType);
+        Assert.Equal(GalleryMediaState.resultReady, galleryItem.Media.State);
+        Assert.Equal(fetched.ResultPreviewUrl, galleryItem.Media.PreviewUrl);
     }
 
     [Fact]
@@ -387,10 +730,10 @@ public sealed partial class TemplatesApiIntegrationTests
         using var fetchedJsonResponse = await application.Client.GetAsync($"/api/templates/generations/{generation.GenerationId}");
         fetchedJsonResponse.EnsureSuccessStatusCode();
         using var fetchedJson = JsonDocument.Parse(await fetchedJsonResponse.Content.ReadAsStringAsync());
-        var download = await GetFromJsonAsync<GenerationDownloadResponse>(
+        var download = await GetFromJsonAsync<GalleryDownloadResponse>(
             application.Client,
             $"/api/templates/generations/{generation.GenerationId}/download");
-        var share = await PostAsJsonAsync<GenerationDownloadResponse>(
+        var share = await PostAsJsonAsync<GalleryShareResponse>(
             application.Client,
             $"/api/templates/generations/{generation.GenerationId}/share",
             new { });
@@ -405,10 +748,36 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.Equal(fetched.OutputUrl, fetched.MediaUrl);
         Assert.Equal(fetched.OutputUrl, fetchedJson.RootElement.GetProperty("outputUrl").GetString());
         Assert.Equal(fetched.OutputUrl, fetchedJson.RootElement.GetProperty("mediaUrl").GetString());
+        Assert.Equal(generation.OutputUrl, download.SignedMediaUrl);
         Assert.Equal(generation.OutputUrl, download.MediaUrl);
+        Assert.Equal(generation.OutputUrl, share.SignedMediaUrl);
         Assert.Equal(generation.OutputUrl, share.MediaUrl);
+        Assert.NotEmpty(share.ShareToken);
+        Assert.StartsWith("http://localhost:5000/share/generation/", share.ShareUrl);
+        Assert.DoesNotContain("cdn.example.com", share.ShareUrl, StringComparison.OrdinalIgnoreCase);
+        Assert.NotNull(download.ExpiresAtUtc);
+        Assert.NotNull(share.ExpiresAtUtc);
+        Assert.Equal("image/png", download.ContentType);
+        Assert.Equal("image/png", share.ContentType);
+        Assert.Equal(GalleryMediaState.resultReady.ToString(), share.MediaState);
         Assert.False(download.HasWatermark);
         Assert.False(share.HasWatermark);
+
+        var publicShare = await GetFromJsonAsync<PublicGalleryShareResponse>(
+            application.Client,
+            $"/api/templates/generations/share/{Uri.EscapeDataString(share.ShareToken)}");
+        Assert.Equal(share.ShareToken, publicShare.ShareToken);
+        Assert.Equal(GalleryMediaState.resultReady.ToString(), publicShare.MediaState);
+        Assert.Equal(generation.OutputUrl, publicShare.MediaUrl);
+        Assert.Null(publicShare.ReasonCode);
+        using var publicPage = await application.Client.GetAsync($"/share/generation/{Uri.EscapeDataString(share.ShareToken)}");
+        publicPage.EnsureSuccessStatusCode();
+        var publicPageBody = await publicPage.Content.ReadAsStringAsync();
+        Assert.Contains(generation.OutputUrl!, publicPageBody, StringComparison.Ordinal);
+        Assert.DoesNotContain(TestUserId.ToString(), publicPageBody, StringComparison.OrdinalIgnoreCase);
+
+        using var invalidShare = await application.Client.GetAsync("/api/templates/generations/share/not-a-token");
+        Assert.Equal(HttpStatusCode.NotFound, invalidShare.StatusCode);
         Assert.True(unlock.WatermarkRemoved);
         Assert.Equal(generation.OutputUrl, unlock.MediaUrl);
     }

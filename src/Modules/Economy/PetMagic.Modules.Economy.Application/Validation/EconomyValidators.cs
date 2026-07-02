@@ -136,6 +136,47 @@ public sealed class AdminRefundPurchaseCommandValidator : AbstractValidator<Admi
     }
 }
 
+public sealed class AdminEconomyIncidentActionCommandValidator : AbstractValidator<AdminEconomyIncidentActionCommand>
+{
+    private static readonly HashSet<string> AllowedActions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "retry_webhook_processing",
+        "retry_settlement",
+        "manual_settle",
+        "manual_revoke",
+        "manual_refund_mark",
+        "manual_bonus_grant",
+        "manual_wallet_correction",
+        "restore_generation_charge_marker",
+        "refund_generation_spend",
+        "resolve_incident",
+        "reopen_incident"
+    };
+
+    public AdminEconomyIncidentActionCommandValidator()
+    {
+        RuleFor(x => x.IncidentId).NotEmpty();
+        RuleFor(x => x.Action)
+            .NotEmpty()
+            .MaximumLength(80)
+            .Must(value => AllowedActions.Contains(value.Trim()))
+            .WithMessage("Action is not supported.");
+        RuleFor(x => x.Reason)
+            .NotEmpty()
+            .MaximumLength(1000);
+        RuleFor(x => x.ExternalReferenceId).MaximumLength(160);
+
+        When(
+            x => string.Equals(x.Action, "manual_bonus_grant", StringComparison.OrdinalIgnoreCase),
+            () => RuleFor(x => x.Amount).NotNull().GreaterThan(0));
+
+        When(
+            x => string.Equals(x.Action, "manual_wallet_correction", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(x.Action, "manual_revoke", StringComparison.OrdinalIgnoreCase),
+            () => RuleFor(x => x.Amount).NotNull().NotEqual(0));
+    }
+}
+
 public sealed class VerifyPremiumStorePurchaseCommandValidator : AbstractValidator<VerifyPremiumStorePurchaseCommand>
 {
     public VerifyPremiumStorePurchaseCommandValidator()
@@ -557,7 +598,9 @@ internal static class PaymentProviderConfigurationValidationRules
     {
         var warningText = warningMessage ?? string.Empty;
         return warningText.Contains("stripe checkout", StringComparison.OrdinalIgnoreCase)
-            || warningText.Contains("continue to stripe", StringComparison.OrdinalIgnoreCase);
+            || warningText.Contains("continue to stripe", StringComparison.OrdinalIgnoreCase)
+            || warningText.Contains("native payment sheet", StringComparison.OrdinalIgnoreCase)
+            || warningText.Contains("native payment sheets", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool ContainsLegacyNotes(string? notes)

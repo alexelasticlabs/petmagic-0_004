@@ -1,6 +1,8 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 
+using System.Text;
 using System.Text.Json;
 
 using PetMagic.BuildingBlocks.Results;
@@ -376,6 +378,11 @@ public sealed partial class TemplatesServiceTests
         Assert.True(freeShare.Value.HasWatermark);
         Assert.Equal(job.ResultUrl, premiumDownload.Value.MediaUrl);
         Assert.Equal(job.ResultUrl, premiumShare.Value.MediaUrl);
+        Assert.NotEmpty(premiumShare.Value.ShareToken);
+        Assert.StartsWith("http://localhost:5000/share/generation/", premiumShare.Value.ShareUrl);
+        Assert.DoesNotContain("cdn.example.com", premiumShare.Value.ShareUrl, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("image/png", premiumShare.Value.ContentType);
+        Assert.Equal(GalleryMediaState.resultReady.ToString(), premiumShare.Value.MediaState);
         Assert.False(premiumDownload.Value.HasWatermark);
         Assert.False(premiumShare.Value.HasWatermark);
 
@@ -439,6 +446,8 @@ public sealed partial class TemplatesServiceTests
         Assert.True(premiumShare.IsSuccess);
         Assert.Equal($"{job.WatermarkedResultUrl}?signed=1", freeDownload.Value.MediaUrl);
         Assert.Equal($"{job.ResultUrl}?signed=1", premiumShare.Value.MediaUrl);
+        Assert.StartsWith($"{options.PublicBaseUrl}/share/generation/", premiumShare.Value.ShareUrl);
+        Assert.NotEqual(premiumShare.Value.MediaUrl, premiumShare.Value.ShareUrl);
         Assert.NotNull(job.WatermarkedResultUrl);
         Assert.NotNull(job.ResultUrl);
         Assert.Contains(job.WatermarkedResultUrl, mediaStorage.ReadUrls);
@@ -466,6 +475,106 @@ public sealed partial class TemplatesServiceTests
 
         Assert.True(share.IsSuccess);
         Assert.Equal([userId], gamification.SharedUsers);
+    }
+
+    [Fact]
+    public async Task GetPublicShareAsync_ShouldReturnFreshMediaForVisibleGenerationToken()
+    {
+        await using var dbContext = CreateDbContext();
+        var userId = Guid.NewGuid();
+        var service = CreateGenerationService(dbContext);
+        var job = await SeedCompletedWatermarkedGenerationAsync(dbContext, userId);
+
+        var share = await service.GetShareAsync(userId, job.Id, isPremium: true, CancellationToken.None);
+
+        Assert.True(share.IsSuccess);
+        var publicShare = await service.GetPublicShareAsync(share.Value.ShareToken, CancellationToken.None);
+
+        Assert.True(publicShare.IsSuccess);
+        Assert.Equal(share.Value.ShareToken, publicShare.Value.ShareToken);
+        Assert.Equal(GalleryMediaState.resultReady.ToString(), publicShare.Value.MediaState);
+        Assert.Equal(job.ResultUrl, publicShare.Value.MediaUrl);
+        Assert.Equal("image", publicShare.Value.MediaType);
+        Assert.Equal("image/png", publicShare.Value.ContentType);
+        Assert.False(publicShare.Value.HasWatermark);
+    }
+
+    [Fact]
+    public async Task GetPublicShareAsync_ShouldReturnNotFoundForInvalidOrHiddenToken()
+    {
+        await using var dbContext = CreateDbContext();
+        var userId = Guid.NewGuid();
+        var service = CreateGenerationService(dbContext);
+        var job = await SeedCompletedWatermarkedGenerationAsync(dbContext, userId);
+        var share = await service.GetShareAsync(userId, job.Id, isPremium: true, CancellationToken.None);
+        Assert.True(share.IsSuccess);
+
+        var invalid = await service.GetPublicShareAsync("not-a-valid-token", CancellationToken.None);
+        Assert.True(invalid.IsFailure);
+        Assert.Equal(TemplatesErrors.GenerationJobNotFound.Code, invalid.Error.Code);
+
+        job.HiddenByUserAtUtc = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync();
+
+        var hidden = await service.GetPublicShareAsync(share.Value.ShareToken, CancellationToken.None);
+        Assert.True(hidden.IsFailure);
+        Assert.Equal(TemplatesErrors.GenerationJobNotFound.Code, hidden.Error.Code);
+    }
+
+    [Fact]
+    public async Task GetPublicShareAsync_ShouldKeepOlderShareTokenDurableWhileGenerationIsVisible()
+    {
+        await using var dbContext = CreateDbContext();
+        var userId = Guid.NewGuid();
+        var job = await SeedCompletedWatermarkedGenerationAsync(dbContext, userId);
+        var dataProtectionProvider = new EphemeralDataProtectionProvider();
+        var options = CreateTemplatesOptions(generationShareTokenTtlDays: 1);
+        var service = new TemplateGenerationService(
+            dbContext,
+            new PassiveGenerationBilling(),
+            new RecordingMediaStorage(),
+            options,
+            dataProtectionProvider: dataProtectionProvider);
+        var olderToken = CreateGenerationShareToken(
+            dataProtectionProvider,
+            userId,
+            job.Id,
+            cleanAccess: true,
+            DateTime.UtcNow.AddDays(-2));
+
+        var share = await service.GetPublicShareAsync(olderToken, CancellationToken.None);
+
+        Assert.True(share.IsSuccess);
+        Assert.Equal(GalleryMediaState.resultReady.ToString(), share.Value.MediaState);
+        Assert.Equal(job.ResultUrl, share.Value.MediaUrl);
+    }
+
+    [Fact]
+    public async Task GetPublicShareAsync_ShouldReturnMediaForValidShareToken()
+    {
+        await using var dbContext = CreateDbContext();
+        var userId = Guid.NewGuid();
+        var job = await SeedCompletedWatermarkedGenerationAsync(dbContext, userId);
+        var dataProtectionProvider = new EphemeralDataProtectionProvider();
+        var service = new TemplateGenerationService(
+            dbContext,
+            new PassiveGenerationBilling(),
+            new RecordingMediaStorage(),
+            CreateTemplatesOptions(generationShareTokenTtlDays: 1),
+            dataProtectionProvider: dataProtectionProvider);
+        var shareToken = CreateGenerationShareToken(
+            dataProtectionProvider,
+            userId,
+            job.Id,
+            cleanAccess: true,
+            DateTime.UtcNow.AddMinutes(-10));
+
+        var share = await service.GetPublicShareAsync(shareToken, CancellationToken.None);
+
+        Assert.True(share.IsSuccess);
+        Assert.Equal(shareToken, share.Value.ShareToken);
+        Assert.Equal(job.ResultUrl, share.Value.MediaUrl);
+        Assert.False(share.Value.HasWatermark);
     }
 
     [Fact]
@@ -611,6 +720,25 @@ public sealed partial class TemplatesServiceTests
         {
             Assert.Equal(creditsSpent.Value, metadata.RootElement.GetProperty("creditsSpent").GetInt32());
         }
+    }
+
+    private static string CreateGenerationShareToken(
+        IDataProtectionProvider dataProtectionProvider,
+        Guid ownerUserId,
+        Guid generationId,
+        bool cleanAccess,
+        DateTime createdAtUtc)
+    {
+        var payload = new
+        {
+            GenerationId = generationId,
+            OwnerUserId = ownerUserId,
+            CleanAccess = cleanAccess,
+            CreatedAtUtc = createdAtUtc
+        };
+        var protector = dataProtectionProvider.CreateProtector("PetMagic.Templates.GenerationShare.v1");
+        var protectedPayload = protector.Protect(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(payload)));
+        return Convert.ToBase64String(protectedPayload);
     }
 
     private sealed class CountingWatermarkBilling(int remainingCredits) : ITemplateGenerationBilling

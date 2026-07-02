@@ -14,6 +14,7 @@ internal static partial class EconomyWebhookParser
         string? ProductId,
         string? TransactionId,
         string? OriginalTransactionId,
+        DateTime? PurchaseDateUtc,
         DateTime? ExpiresAtUtc,
         DateTime? RevokedAtUtc,
         string? Environment);
@@ -213,6 +214,9 @@ internal static partial class EconomyWebhookParser
             var expiresAtUtc = root.TryGetProperty("expiresDate", out var expiresElement)
                 ? ParseUnixMilliseconds(expiresElement)
                 : null;
+            var purchaseDateUtc = root.TryGetProperty("purchaseDate", out var purchaseDateElement)
+                ? ParseUnixMilliseconds(purchaseDateElement)
+                : null;
             var revokedAtUtc = root.TryGetProperty("revocationDate", out var revocationElement)
                 ? ParseUnixMilliseconds(revocationElement)
                 : null;
@@ -226,6 +230,7 @@ internal static partial class EconomyWebhookParser
                 productId,
                 transactionId,
                 originalTransactionId,
+                purchaseDateUtc,
                 expiresAtUtc,
                 revokedAtUtc,
                 environment);
@@ -259,7 +264,7 @@ internal static partial class EconomyWebhookParser
 
                 var eventId = !string.IsNullOrWhiteSpace(messageId)
                     ? messageId
-                    : $"{purchaseToken}:{notificationType}:sub";
+                    : BuildGooglePlayFallbackEventId(purchaseToken, notificationType, "sub");
 
                 return (!string.IsNullOrWhiteSpace(productId) && !string.IsNullOrWhiteSpace(purchaseToken), eventId, notificationType, productId, purchaseToken, true, false);
             }
@@ -281,7 +286,7 @@ internal static partial class EconomyWebhookParser
 
                 var eventId = !string.IsNullOrWhiteSpace(messageId)
                     ? messageId
-                    : $"{purchaseToken}:{notificationType}:one_time";
+                    : BuildGooglePlayFallbackEventId(purchaseToken, notificationType, "one_time");
 
                 return (!string.IsNullOrWhiteSpace(productId) && !string.IsNullOrWhiteSpace(purchaseToken), eventId, notificationType, productId, purchaseToken, false, true);
             }
@@ -667,6 +672,18 @@ internal static partial class EconomyWebhookParser
         }
 
         return Encoding.UTF8.GetString(DecodeBase64Url(parts[1]));
+    }
+
+    private static string BuildGooglePlayFallbackEventId(string? purchaseToken, int notificationType, string notificationScope)
+    {
+        var normalizedToken = purchaseToken?.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedToken))
+        {
+            return $"googleplay:{notificationScope}:{notificationType}:missing-token";
+        }
+
+        var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalizedToken)))[..24].ToLowerInvariant();
+        return $"googleplay:{notificationScope}:{notificationType}:{fingerprint}";
     }
 
     private static byte[] DecodeBase64Url(string value)

@@ -81,18 +81,67 @@ public sealed partial class IdentityService
 
         var trimmed = avatarUrl.Trim();
         var baseUrl = avatarStorageOptions.PublicBaseUrl.TrimEnd('/');
-        if (!trimmed.StartsWith(baseUrl, StringComparison.OrdinalIgnoreCase))
+        if (!trimmed.StartsWith(baseUrl, StringComparison.OrdinalIgnoreCase)
+            || trimmed.Length <= baseUrl.Length
+            || trimmed[baseUrl.Length] != '/')
         {
             return null;
         }
 
         var relativePath = trimmed[baseUrl.Length..].TrimStart('/').Replace('\\', '/');
-        if (!relativePath.StartsWith("user-avatars/", StringComparison.OrdinalIgnoreCase))
+        if (!TryNormalizeManagedAvatarPath(relativePath, out _))
         {
             return null;
         }
 
         return avatarReadUrlSigner.CreateReadUrl(trimmed);
+    }
+
+    private static bool TryNormalizeManagedAvatarPath(string candidate, out string managedPath)
+    {
+        return TryNormalizeManagedMediaPath(candidate, "user-avatars", out managedPath);
+    }
+
+    private static bool TryNormalizeManagedMediaPath(string candidate, string prefix, out string managedPath)
+    {
+        managedPath = string.Empty;
+        var pathOnly = candidate.TrimStart('/');
+        var queryIndex = pathOnly.IndexOfAny(['?', '#']);
+        if (queryIndex >= 0)
+        {
+            pathOnly = pathOnly[..queryIndex];
+        }
+
+        if (string.IsNullOrWhiteSpace(pathOnly)
+            || pathOnly.EndsWith("/", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var segments = pathOnly
+            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (segments.Length <= 1
+            || !string.Equals(segments[0], prefix, StringComparison.OrdinalIgnoreCase)
+            || segments.Any(IsUnsafeMediaPathSegment))
+        {
+            return false;
+        }
+
+        managedPath = string.Join('/', segments);
+        return true;
+    }
+
+    private static bool IsUnsafeMediaPathSegment(string segment)
+    {
+        if (string.Equals(segment, ".", StringComparison.Ordinal)
+            || string.Equals(segment, "..", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        var decodedSegment = Uri.UnescapeDataString(segment);
+        return string.Equals(decodedSegment, ".", StringComparison.Ordinal)
+            || string.Equals(decodedSegment, "..", StringComparison.Ordinal);
     }
 
     private LegalAcceptanceStatusResponse ToLegalAcceptanceResponse(AppUser user)

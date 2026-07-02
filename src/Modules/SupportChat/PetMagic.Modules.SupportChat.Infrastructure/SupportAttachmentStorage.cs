@@ -288,7 +288,9 @@ internal sealed class LocalSupportAttachmentStorage(
         }
 
         var baseUrl = options.PublicBaseUrl.TrimEnd('/');
-        if (!normalizedInput.StartsWith(baseUrl, StringComparison.OrdinalIgnoreCase))
+        if (!normalizedInput.StartsWith(baseUrl, StringComparison.OrdinalIgnoreCase)
+            || normalizedInput.Length <= baseUrl.Length
+            || normalizedInput[baseUrl.Length] != '/')
         {
             return null;
         }
@@ -321,7 +323,17 @@ internal sealed class LocalSupportAttachmentStorage(
             return false;
         }
 
-        managedRelativePath = pathOnly;
+        var segments = pathOnly
+            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (segments.Length <= 1
+            || segments.Any(segment =>
+                string.Equals(segment, ".", StringComparison.Ordinal)
+                || string.Equals(segment, "..", StringComparison.Ordinal)))
+        {
+            return false;
+        }
+
+        managedRelativePath = string.Join('/', segments);
         return true;
     }
 

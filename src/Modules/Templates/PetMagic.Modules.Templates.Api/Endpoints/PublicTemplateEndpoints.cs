@@ -21,10 +21,17 @@ public static class PublicTemplateEndpoints
 {
     private const string PublicCatalogCacheControl = "public, max-age=10";
     private const string PublicCategoriesCacheControl = "public, max-age=60";
+    private const int MaxAnalyticsRequestBodyBytes = 16 * 1024;
+    private const int MaxAnalyticsSourceLength = 64;
+    private const int MaxAnalyticsFeedbackMessageLength = 2000;
     private const int MaxAnalyticsMetadataEntries = 12;
     private const int MaxAnalyticsMetadataKeyLength = 64;
     private const int MaxAnalyticsMetadataValueLength = 160;
     private static readonly JsonSerializerOptions PublicJsonOptions = new(JsonSerializerDefaults.Web);
+    // Do not add templates.generation.status_changed to this anonymous public
+    // SSE allowlist. Generation status events carry user-specific generation
+    // and media data; gallery realtime needs an authenticated per-user stream
+    // or a payload that contains no user media data.
     private static readonly HashSet<string> AllowedPublicRealtimeTopics =
     [
         TemplateFeedRealtimeTopics.TemplatesFeedInvalidated
@@ -82,7 +89,8 @@ public static class PublicTemplateEndpoints
         endpoints.MapPost("/api/templates/{templateId:guid}/analytics/events", RecordAnalyticsEventAsync)
             .WithTags("Templates")
             .AllowAnonymous()
-            .RequireRateLimiting("templates-analytics");
+            .RequireRateLimiting("templates-analytics")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAnalyticsRequestBodyBytes));
 
         return endpoints;
     }
@@ -184,9 +192,9 @@ public static class PublicTemplateEndpoints
             await httpContext.Response.WriteAsync(": connected\n\n", cancellationToken);
             await httpContext.Response.Body.FlushAsync(cancellationToken);
 
+            var waitToReadTask = subscription.WaitToReadAsync(cancellationToken).AsTask();
             while (!cancellationToken.IsCancellationRequested)
             {
-                var waitToReadTask = subscription.WaitToReadAsync(cancellationToken).AsTask();
                 var keepAliveTask = Task.Delay(TimeSpan.FromSeconds(15), cancellationToken);
                 var completedTask = await Task.WhenAny(waitToReadTask, keepAliveTask);
 
@@ -211,6 +219,8 @@ public static class PublicTemplateEndpoints
 
                     await WriteEventAsync(httpContext, realtimeEvent, cancellationToken);
                 }
+
+                waitToReadTask = subscription.WaitToReadAsync(cancellationToken).AsTask();
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested || httpContext.RequestAborted.IsCancellationRequested)
@@ -462,7 +472,7 @@ public static class PublicTemplateEndpoints
             new RecordTemplateAnalyticsEventCommand(
                 templateId,
                 TemplateAnalyticsEventTypes.View,
-                source,
+                NormalizeAnalyticsText(source, MaxAnalyticsSourceLength),
                 DetectDeviceClass(httpContext),
                 ResolveCountryCode(httpContext),
                 ResolveUserId(httpContext),
@@ -489,12 +499,12 @@ public static class PublicTemplateEndpoints
             new RecordTemplateAnalyticsEventCommand(
                 templateId,
                 eventType,
-                request.Source,
+                NormalizeAnalyticsText(request.Source, MaxAnalyticsSourceLength),
                 ResolveAnalyticsDeviceClass(request.DeviceClass, httpContext),
                 ResolveAnalyticsCountryCode(request.CountryCode, httpContext),
                 ResolveUserId(httpContext),
                 request.GenerationId,
-                request.FeedbackMessage,
+                NormalizeAnalyticsText(request.FeedbackMessage, MaxAnalyticsFeedbackMessageLength),
                 SerializeMetadata(request.Metadata)),
             cancellationToken);
 
@@ -578,6 +588,19 @@ public static class PublicTemplateEndpoints
 
         normalizedEventType = candidate;
         return true;
+    }
+
+    private static string? NormalizeAnalyticsText(string? value, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var normalized = value.Trim();
+        return normalized.Length <= maxLength
+            ? normalized
+            : normalized[..maxLength];
     }
 
     private static string? SerializeMetadata(IReadOnlyDictionary<string, JsonElement>? metadata)

@@ -14,6 +14,8 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
 
     public DbSet<TemplateGenerationJob> TemplateGenerationJobs => Set<TemplateGenerationJob>();
 
+    public DbSet<TemplateGenerationBillingCommand> TemplateGenerationBillingCommands => Set<TemplateGenerationBillingCommand>();
+
     public DbSet<Pet> Pets => Set<Pet>();
 
     public DbSet<PetPhoto> PetPhotos => Set<PetPhoto>();
@@ -221,6 +223,8 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.HasIndex(x => new { x.UserId, x.CreatedAtUtc });
             entity.HasIndex(x => new { x.UserId, x.HiddenByUserAtUtc, x.CreatedAtUtc })
                 .HasDatabaseName("IX_tgj_UserId_HiddenByUserAtUtc_CreatedAtUtc");
+            entity.HasIndex(x => new { x.UserId, x.HiddenByUserAtUtc, x.Status, x.CreatedAtUtc, x.Id })
+                .HasDatabaseName("IX_tgj_UserId_Hidden_Status_CreatedAt_Id");
             entity.HasIndex(x => new { x.TemplateId, x.Status, x.CreatedAtUtc });
             entity.HasIndex(x => x.ParentGenerationId);
             entity.HasIndex(x => x.ParentGenerationResultId);
@@ -251,6 +255,22 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.HasOne(x => x.Template)
                 .WithMany()
                 .HasForeignKey(x => x.TemplateId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<TemplateGenerationBillingCommand>(entity =>
+        {
+            entity.ToTable("templates_generation_billing_commands");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Status).HasMaxLength(32).IsRequired();
+            entity.Property(x => x.LastErrorCode).HasMaxLength(128);
+            entity.Property(x => x.LastErrorMessage).HasMaxLength(1000);
+            entity.HasIndex(x => x.GenerationId).IsUnique();
+            entity.HasIndex(x => new { x.Status, x.LastAttemptedAtUtc, x.CreatedAtUtc })
+                .HasDatabaseName("IX_tgbc_Status_LastAttemptedAtUtc_CreatedAtUtc");
+            entity.HasOne(x => x.Generation)
+                .WithMany()
+                .HasForeignKey(x => x.GenerationId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

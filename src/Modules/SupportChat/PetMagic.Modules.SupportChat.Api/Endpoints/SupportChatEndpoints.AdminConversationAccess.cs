@@ -10,6 +10,11 @@ namespace PetMagic.Modules.SupportChat.Api.Endpoints;
 
 public static partial class SupportChatEndpoints
 {
+    private const int DefaultConversationMessagesTake = 60;
+    private const int MaxConversationMessagesTake = 120;
+    private const int DefaultAdminInboxPageSize = 50;
+    private const int MaxAdminInboxPageSize = 100;
+
     private static async Task<Results<Ok<SupportConversationInboxPageResponse>, ProblemHttpResult>> ListAdminInboxAsync(
         HttpContext httpContext,
         [FromQuery] string[]? status,
@@ -38,7 +43,7 @@ public static partial class SupportChatEndpoints
         }
 
         var requestedPage = page is null or <= 0 ? 1 : page.Value;
-        var requestedPageSize = pageSize is null or <= 0 ? 50 : pageSize.Value;
+        var requestedPageSize = NormalizeAdminInboxPageSize(pageSize);
         var query = normalizedAssignment switch
         {
             "mine" => new ListAdminSupportInboxQuery(
@@ -107,7 +112,7 @@ public static partial class SupportChatEndpoints
         var result = await service.GetAdminConversationAsync(
             conversationId,
             new SupportConversationMessagesQuery(
-                Take: take ?? 60,
+                Take: NormalizeConversationMessagesTake(take),
                 BeforeMessageCreatedAtUtc: beforeMessageCreatedAtUtc,
                 BeforeMessageId: beforeMessageId),
             cancellationToken);
@@ -132,4 +137,10 @@ public static partial class SupportChatEndpoints
 
         return TypedResults.Ok(result.Value);
     }
+
+    private static int NormalizeAdminInboxPageSize(int? pageSize)
+        => Math.Clamp(pageSize ?? DefaultAdminInboxPageSize, 1, MaxAdminInboxPageSize);
+
+    private static int NormalizeConversationMessagesTake(int? take)
+        => Math.Clamp(take ?? DefaultConversationMessagesTake, 1, MaxConversationMessagesTake);
 }

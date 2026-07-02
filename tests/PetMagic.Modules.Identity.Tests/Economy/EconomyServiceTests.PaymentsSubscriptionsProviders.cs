@@ -397,10 +397,26 @@ public sealed partial class EconomyServiceTests
             Currency = "eur",
         };
 
+        var missingAmountSession = new Stripe.Checkout.Session
+        {
+            ClientReferenceId = order.Id.ToString("D"),
+            Metadata = new Dictionary<string, string> { ["order_id"] = order.Id.ToString("D") },
+            Currency = "usd",
+        };
+
+        var missingCurrencySession = new Stripe.Checkout.Session
+        {
+            ClientReferenceId = order.Id.ToString("D"),
+            Metadata = new Dictionary<string, string> { ["order_id"] = order.Id.ToString("D") },
+            AmountTotal = 999,
+        };
+
         Assert.True(EconomyService.IsStripeCheckoutSessionForOrder(validSession, order));
         Assert.False(EconomyService.IsStripeCheckoutSessionForOrder(wrongOrderSession, order));
         Assert.False(EconomyService.IsStripeCheckoutSessionForOrder(wrongAmountSession, order));
         Assert.False(EconomyService.IsStripeCheckoutSessionForOrder(wrongCurrencySession, order));
+        Assert.False(EconomyService.IsStripeCheckoutSessionForOrder(missingAmountSession, order));
+        Assert.False(EconomyService.IsStripeCheckoutSessionForOrder(missingCurrencySession, order));
     }
 
     [Theory]
@@ -448,10 +464,17 @@ public sealed partial class EconomyServiceTests
             Currency = "eur",
         };
 
+        var missingCurrencyPaymentIntent = new Stripe.PaymentIntent
+        {
+            Metadata = new Dictionary<string, string> { ["order_id"] = order.Id.ToString("D") },
+            Amount = 499,
+        };
+
         Assert.True(EconomyService.IsStripePaymentIntentForOrder(validPaymentIntent, order));
         Assert.False(EconomyService.IsStripePaymentIntentForOrder(wrongOrderPaymentIntent, order));
         Assert.False(EconomyService.IsStripePaymentIntentForOrder(wrongAmountPaymentIntent, order));
         Assert.False(EconomyService.IsStripePaymentIntentForOrder(wrongCurrencyPaymentIntent, order));
+        Assert.False(EconomyService.IsStripePaymentIntentForOrder(missingCurrencyPaymentIntent, order));
     }
 
     [Fact]
@@ -532,6 +555,186 @@ public sealed partial class EconomyServiceTests
         Assert.Equal(40, subscription.MonthlyTokensGranted);
         Assert.Single(grantEntries);
         Assert.Equal(2, identityService.SetPremiumStatusCalls.Count);
+    }
+
+    [Fact]
+    public async Task VerifyPremiumStorePurchaseAsync_ShouldPersistEconomyState_WhenIdentitySyncFails()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var now = DateTime.UtcNow;
+        var userId = Guid.NewGuid();
+        var expiresAtUtc = now.AddDays(30);
+        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = "monthly",
+            Name = "PetMagic Premium Monthly Plus",
+            BillingPeriod = "monthly",
+            PriceAmount = 19.99m,
+            CurrencyCode = "USD",
+            MonthlyTokenLimit = 777,
+            IsRecommended = false,
+            IsActive = true,
+            AppleProductId = "com.petmagic.custom.monthly.apple",
+            GoogleProductId = "com.petmagic.custom.monthly.google",
+            DisplayOrder = 1,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        await dbContext.SaveChangesAsync();
+
+        var identityService = new FakeIdentityService
+        {
+            SetPremiumStatusError = EconomyErrors.PremiumBillingUnavailable
+        };
+        var storeVerifier = new FakeStoreSubscriptionVerifier
+        {
+            ExpiresAtUtc = expiresAtUtc,
+            Status = "active",
+            IsActive = true,
+        };
+        var service = CreateService(dbContext, storeVerifier: storeVerifier, identityService: identityService);
+
+        var result = await service.VerifyPremiumStorePurchaseAsync(
+            new VerifyPremiumStorePurchaseCommand(
+                userId,
+                "monthly",
+                "google_play",
+                "com.petmagic.custom.monthly.google",
+                "server-payload-identity-fails",
+                null,
+                "purchase-identity-fails",
+                null),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(EconomyErrors.PremiumBillingUnavailable.Code, result.Error.Code);
+
+        var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId);
+        Assert.Equal("Active", subscription.Status);
+        Assert.Equal(40, subscription.MonthlyTokensGranted);
+        Assert.Single(identityService.SetPremiumStatusCalls);
+        Assert.True(identityService.SetPremiumStatusCalls[0].IsPremium);
+        Assert.Contains(
+            await dbContext.SubscriptionEventLogs.Where(x => x.UserId == userId).ToListAsync(),
+            x => x.EventType == "PremiumIdentitySyncFailed");
+    }
+
+    [Fact]
+    public async Task GetSubscriptionSummaryAsync_ShouldReconcileActiveEconomySubscription_WhenIdentityPremiumFalse()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var now = DateTime.UtcNow;
+        var userId = Guid.NewGuid();
+        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = "monthly",
+            Name = "PetMagic Premium Monthly Plus",
+            BillingPeriod = "monthly",
+            PriceAmount = 19.99m,
+            CurrencyCode = "USD",
+            MonthlyTokenLimit = 777,
+            IsRecommended = false,
+            IsActive = true,
+            DisplayOrder = 1,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        dbContext.UserSubscriptions.Add(new UserSubscription
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Provider = "stripe",
+            PurchaseChannel = "web",
+            Region = "US",
+            PlanId = "monthly",
+            Status = "Active",
+            ExternalSubscriptionId = "sub_reconcile_active",
+            CurrentPeriodStartUtc = now.AddDays(-1),
+            CurrentPeriodEndUtc = now.AddDays(29),
+            MonthlyTokenLimit = 777,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        await dbContext.SaveChangesAsync();
+
+        var identityService = new FakeIdentityService
+        {
+            CurrentUserIsPremium = false
+        };
+        var result = await CreateService(dbContext, identityService: identityService)
+            .GetSubscriptionSummaryAsync(userId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value.IsPremium);
+        var call = Assert.Single(identityService.SetPremiumStatusCalls);
+        Assert.True(call.IsPremium);
+        Assert.Contains(
+            await dbContext.SubscriptionEventLogs.Where(x => x.UserId == userId).ToListAsync(),
+            x => x.EventType == "PremiumReconciliationFixed");
+    }
+
+    [Fact]
+    public async Task GetSubscriptionSummaryAsync_ShouldReconcileInactiveEconomySubscription_WhenIdentityPremiumTrue()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var identityService = new FakeIdentityService
+        {
+            CurrentUserIsPremium = true
+        };
+        var result = await CreateService(dbContext, identityService: identityService)
+            .GetSubscriptionSummaryAsync(userId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value.IsPremium);
+        var call = Assert.Single(identityService.SetPremiumStatusCalls);
+        Assert.False(call.IsPremium);
+        Assert.Contains(
+            await dbContext.SubscriptionEventLogs.Where(x => x.UserId == userId).ToListAsync(),
+            x => x.EventType == "PremiumReconciliationFixed");
+    }
+
+    [Fact]
+    public async Task GetSubscriptionSummaryAsync_ShouldCreateReconciliationIncident_WhenIdentityCannotBeRead()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var now = DateTime.UtcNow;
+        var userId = Guid.NewGuid();
+        dbContext.UserSubscriptions.Add(new UserSubscription
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Provider = "stripe",
+            PurchaseChannel = "web",
+            Region = "US",
+            PlanId = "monthly",
+            Status = "Active",
+            ExternalSubscriptionId = "sub_reconcile_read_fails",
+            CurrentPeriodStartUtc = now.AddDays(-1),
+            CurrentPeriodEndUtc = now.AddDays(29),
+            MonthlyTokenLimit = 777,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        await dbContext.SaveChangesAsync();
+
+        var identityService = new FakeIdentityService
+        {
+            GetCurrentUserError = EconomyErrors.PremiumBillingUnavailable
+        };
+        var result = await CreateService(dbContext, identityService: identityService)
+            .GetSubscriptionSummaryAsync(userId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value.IsPremium);
+        Assert.Empty(identityService.SetPremiumStatusCalls);
+        Assert.Contains(
+            await dbContext.SubscriptionEventLogs.Where(x => x.UserId == userId).ToListAsync(),
+            x => x.EventType == "PremiumReconciliationIncident");
     }
 
     [Fact]
@@ -1019,6 +1222,8 @@ public sealed partial class EconomyServiceTests
         Assert.True(first.IsSuccess);
         Assert.True(second.IsSuccess);
         Assert.Equal("TokenPack", first.Value.ProductType);
+        Assert.Equal("settled", first.Value.Status);
+        Assert.Equal("already_settled", second.Value.Status);
         Assert.True(first.Value.TokensGranted);
         Assert.False(second.Value.TokensGranted);
 
@@ -1223,6 +1428,8 @@ public sealed partial class EconomyServiceTests
         Assert.True(first.IsSuccess);
         Assert.True(second.IsSuccess);
         Assert.Equal("TokenPack", first.Value.ProductType);
+        Assert.Equal("settled", first.Value.Status);
+        Assert.Equal("already_settled", second.Value.Status);
         Assert.True(first.Value.TokensGranted);
         Assert.False(second.Value.TokensGranted);
 
@@ -2391,6 +2598,37 @@ public sealed partial class EconomyServiceTests
         Assert.True(create.IsFailure);
         Assert.Equal(EconomyErrors.PaymentProviderDisclosureInvalid.Code, create.Error.Code);
         Assert.Equal(1, await dbContext.PaymentProviderConfigurations.CountAsync());
+    }
+
+    [Fact]
+    public async Task CreatePaymentProviderConfigurationAsync_ShouldFail_WhenNativePaymentSheetCopyProvided()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var create = await service.CreatePaymentProviderConfigurationAsync(
+            new CreatePaymentProviderConfigurationCommand(
+                "stripe",
+                "android",
+                "EU",
+                true,
+                true,
+                true,
+                true,
+                true,
+                "1.0.0",
+                true,
+                10,
+                "Stripe",
+                null,
+                null,
+                "Stripe billing is completed inside PetMagic with native payment sheet.",
+                "test",
+                "Secure hosted checkout." ),
+            CancellationToken.None);
+
+        Assert.True(create.IsFailure);
+        Assert.Equal(EconomyErrors.PaymentProviderDisclosureInvalid.Code, create.Error.Code);
     }
 
     [Fact]

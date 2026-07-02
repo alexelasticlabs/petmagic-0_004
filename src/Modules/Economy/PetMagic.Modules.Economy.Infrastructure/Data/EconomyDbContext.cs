@@ -10,6 +10,8 @@ public sealed class EconomyDbContext(DbContextOptions<EconomyDbContext> options)
 
     public DbSet<WalletLedgerEntry> WalletLedgerEntries => Set<WalletLedgerEntry>();
 
+    public DbSet<WalletTokenBucket> WalletTokenBuckets => Set<WalletTokenBucket>();
+
     public DbSet<CurrencyPack> CurrencyPacks => Set<CurrencyPack>();
 
     public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
@@ -38,11 +40,17 @@ public sealed class EconomyDbContext(DbContextOptions<EconomyDbContext> options)
 
     public DbSet<EconomyPushDeviceToken> EconomyPushDeviceTokens => Set<EconomyPushDeviceToken>();
 
+    public DbSet<EconomyIncident> EconomyIncidents => Set<EconomyIncident>();
+
+    public DbSet<EconomyIncidentAuditEntry> EconomyIncidentAuditEntries => Set<EconomyIncidentAuditEntry>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         builder.Entity<Wallet>(entity =>
         {
-            entity.ToTable("economy_wallets");
+            entity.ToTable(
+                "economy_wallets",
+                table => table.HasCheckConstraint("CK_economy_wallets_Balance_NonNegative", "\"Balance\" >= 0"));
             entity.HasKey(x => x.UserId);
             entity.Property(x => x.Balance).IsRequired();
             entity.Property(x => x.AdRewardsClaimedInWindow).IsRequired();
@@ -56,11 +64,16 @@ public sealed class EconomyDbContext(DbContextOptions<EconomyDbContext> options)
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Source).HasMaxLength(80).IsRequired();
             entity.Property(x => x.Reason).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.TokenKind).HasMaxLength(40).HasDefaultValue("legacy").IsRequired();
+            entity.Property(x => x.OperationKind).HasMaxLength(32).HasDefaultValue("credit").IsRequired();
+            entity.Property(x => x.BucketDeltasJson).HasMaxLength(4000);
             entity.Property(x => x.SourceProvider).HasMaxLength(32);
             entity.Property(x => x.SourceTransactionId).HasMaxLength(160);
             entity.HasIndex(x => new { x.UserId, x.CreatedAtUtc });
             entity.HasIndex(x => x.CreatedAtUtc);
             entity.HasIndex(x => new { x.Source, x.CreatedAtUtc });
+            entity.HasIndex(x => new { x.TokenKind, x.CreatedAtUtc });
+            entity.HasIndex(x => x.TokenBucketId);
             entity.HasIndex(x => new { x.UserId, x.Source, x.Reason })
                 .IsUnique()
                 .HasFilter("\"Source\" = 'watermark_unlock'")
@@ -73,6 +86,26 @@ public sealed class EconomyDbContext(DbContextOptions<EconomyDbContext> options)
                 .IsUnique()
                 .HasFilter("\"SourceProvider\" IS NOT NULL AND \"SourceTransactionId\" IS NOT NULL")
                 .HasDatabaseName("UX_ewl_SourceProvider_SourceTransactionId");
+        });
+
+        builder.Entity<WalletTokenBucket>(entity =>
+        {
+            entity.ToTable(
+                "economy_wallet_token_buckets",
+                table => table.HasCheckConstraint("CK_ewtb_RemainingAmount_NonNegative", "\"RemainingAmount\" >= 0"));
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Kind).HasMaxLength(40).IsRequired();
+            entity.Property(x => x.Source).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Reason).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.InitialAmount).IsRequired();
+            entity.Property(x => x.RemainingAmount).IsRequired();
+            entity.Property(x => x.CreatedAtUtc).IsRequired();
+            entity.Property(x => x.UpdatedAtUtc).IsRequired();
+            entity.HasIndex(x => new { x.UserId, x.Kind, x.ExpiresAtUtc })
+                .HasDatabaseName("IX_ewtb_UserId_Kind_ExpiresAtUtc");
+            entity.HasIndex(x => new { x.UserId, x.RemainingAmount, x.ExpiresAtUtc })
+                .HasDatabaseName("IX_ewtb_UserId_Remaining_ExpiresAtUtc");
+            entity.HasIndex(x => x.SourceLedgerEntryId);
         });
 
         builder.Entity<CurrencyPack>(entity =>
@@ -309,6 +342,46 @@ public sealed class EconomyDbContext(DbContextOptions<EconomyDbContext> options)
             entity.HasIndex(x => x.Token).IsUnique();
             entity.HasIndex(x => new { x.UserId, x.DisabledAtUtc, x.LastSeenAtUtc })
                 .HasDatabaseName("IX_epdt_UserId_DisabledAtUtc_LastSeenAtUtc");
+        });
+
+        builder.Entity<EconomyIncident>(entity =>
+        {
+            entity.ToTable("economy_incidents");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Type).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Severity).HasMaxLength(24).IsRequired();
+            entity.Property(x => x.Status).HasMaxLength(24).IsRequired();
+            entity.Property(x => x.DeduplicationKey).HasMaxLength(240).IsRequired();
+            entity.Property(x => x.Provider).HasMaxLength(32);
+            entity.Property(x => x.ExternalReferenceId).HasMaxLength(160);
+            entity.Property(x => x.Summary).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.DetailsJson).HasMaxLength(32000);
+            entity.Property(x => x.ResolutionNote).HasMaxLength(1000);
+            entity.Property(x => x.LastError).HasMaxLength(1000);
+            entity.Property(x => x.FirstDetectedAtUtc).IsRequired();
+            entity.Property(x => x.LastDetectedAtUtc).IsRequired();
+            entity.Property(x => x.DetectionCount).IsRequired();
+            entity.Property(x => x.RetryCount).IsRequired();
+            entity.Property(x => x.AutoFixApplied).IsRequired();
+            entity.HasIndex(x => x.DeduplicationKey).IsUnique();
+            entity.HasIndex(x => new { x.Status, x.LastDetectedAtUtc });
+            entity.HasIndex(x => new { x.Type, x.Status, x.LastDetectedAtUtc });
+            entity.HasIndex(x => new { x.UserId, x.Status, x.LastDetectedAtUtc });
+            entity.HasIndex(x => x.PurchaseOrderId);
+            entity.HasIndex(x => x.UserSubscriptionId);
+        });
+
+        builder.Entity<EconomyIncidentAuditEntry>(entity =>
+        {
+            entity.ToTable("economy_incident_audit_entries");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Action).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Reason).HasMaxLength(1000).IsRequired();
+            entity.Property(x => x.OldStatus).HasMaxLength(32);
+            entity.Property(x => x.NewStatus).HasMaxLength(32);
+            entity.Property(x => x.DetailsJson).HasMaxLength(4000);
+            entity.Property(x => x.CreatedAtUtc).IsRequired();
+            entity.HasIndex(x => new { x.IncidentId, x.CreatedAtUtc });
         });
     }
 }

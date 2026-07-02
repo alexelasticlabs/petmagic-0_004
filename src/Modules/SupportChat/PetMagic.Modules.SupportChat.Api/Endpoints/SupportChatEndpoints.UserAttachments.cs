@@ -83,7 +83,7 @@ public static partial class SupportChatEndpoints
 
         if (createMessageResult.IsFailure)
         {
-            return ToProblem(createMessageResult.Error);
+            return ToUserProblem(createMessageResult.Error);
         }
 
         var uploadingStatusResult = await service.UpdateAttachmentMessageAsync(
@@ -99,7 +99,7 @@ public static partial class SupportChatEndpoints
 
         if (uploadingStatusResult.IsFailure)
         {
-            return ToProblem(uploadingStatusResult.Error);
+            return ToUserProblem(uploadingStatusResult.Error);
         }
 
         await using var stream = file.OpenReadStream();
@@ -125,7 +125,7 @@ public static partial class SupportChatEndpoints
 
             if (failedStatusResult.IsFailure)
             {
-                return ToProblem(failedStatusResult.Error);
+                return ToUserProblem(failedStatusResult.Error);
             }
 
             return TypedResults.Ok(SignAttachmentUrls(failedStatusResult.Value, attachmentReadUrlSigner));
@@ -161,7 +161,7 @@ public static partial class SupportChatEndpoints
 
             if (failedStatusResult.IsFailure)
             {
-                return ToProblem(completeStatusResult.Error);
+                return ToUserProblem(failedStatusResult.Error);
             }
 
             return TypedResults.Ok(SignAttachmentUrls(failedStatusResult.Value, attachmentReadUrlSigner));
@@ -208,7 +208,7 @@ public static partial class SupportChatEndpoints
 
         if (retryStatusResult.IsFailure)
         {
-            return ToProblem(retryStatusResult.Error);
+            return ToUserProblem(retryStatusResult.Error);
         }
 
         var uploadingStatusResult = await service.UpdateAttachmentMessageAsync(
@@ -224,7 +224,7 @@ public static partial class SupportChatEndpoints
 
         if (uploadingStatusResult.IsFailure)
         {
-            return ToProblem(uploadingStatusResult.Error);
+            return ToUserProblem(uploadingStatusResult.Error);
         }
 
         await using var stream = file.OpenReadStream();
@@ -250,7 +250,7 @@ public static partial class SupportChatEndpoints
 
             if (failedStatusResult.IsFailure)
             {
-                return ToProblem(failedStatusResult.Error);
+                return ToUserProblem(failedStatusResult.Error);
             }
 
             return TypedResults.Ok(SignAttachmentUrls(failedStatusResult.Value, attachmentReadUrlSigner));
@@ -286,7 +286,7 @@ public static partial class SupportChatEndpoints
 
             if (failedStatusResult.IsFailure)
             {
-                return ToProblem(completeStatusResult.Error);
+                return ToUserProblem(failedStatusResult.Error);
             }
 
             return TypedResults.Ok(SignAttachmentUrls(failedStatusResult.Value, attachmentReadUrlSigner));

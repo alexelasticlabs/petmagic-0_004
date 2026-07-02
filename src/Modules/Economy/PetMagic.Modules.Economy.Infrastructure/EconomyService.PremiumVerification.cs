@@ -7,8 +7,6 @@ using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Contracts;
 using PetMagic.Modules.Economy.Infrastructure.Payments;
-using PetMagic.Modules.Identity.Application.Contracts;
-
 using Stripe;
 
 namespace PetMagic.Modules.Economy.Infrastructure;
@@ -39,6 +37,16 @@ public sealed partial class EconomyService
         if (!string.Equals(expectedProductId, command.ProductId.Trim(), StringComparison.Ordinal))
         {
             return Result.Failure<PremiumStoreVerificationResponse>(EconomyErrors.StorePurchaseInvalid);
+        }
+
+        var freshness = EnsureStoreReceiptIsFresh(
+            command.UserId,
+            provider,
+            "premium_verify",
+            command.TransactionDate);
+        if (freshness.IsFailure)
+        {
+            return Result.Failure<PremiumStoreVerificationResponse>(freshness.Error);
         }
 
         var verification = await storeSubscriptionVerifier.VerifyAsync(
@@ -94,20 +102,6 @@ public sealed partial class EconomyService
                 cancellationToken))
         {
             return Result.Failure<PremiumStoreVerificationResponse>(EconomyErrors.StorePurchaseInvalid);
-        }
-
-        if (identityService is null)
-        {
-            return Result.Failure<PremiumStoreVerificationResponse>(EconomyErrors.PremiumBillingUnavailable);
-        }
-
-        var premiumResult = await identityService.SetPremiumStatusAsync(
-            new SetPremiumStatusCommand(command.UserId, isPremium),
-            cancellationToken);
-
-        if (premiumResult.IsFailure)
-        {
-            return Result.Failure<PremiumStoreVerificationResponse>(premiumResult.Error);
         }
 
         var userSubscriptionResult = await UpsertUserSubscriptionAsync(
@@ -168,6 +162,19 @@ public sealed partial class EconomyService
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        var premiumSyncResult = await SynchronizePremiumEntitlementAsync(
+            command.UserId,
+            isPremium,
+            provider,
+            "ReceiptVerified",
+            userSubscription.Id,
+            userSubscription.ExternalSubscriptionId,
+            cancellationToken);
+        if (premiumSyncResult.IsFailure)
+        {
+            return Result.Failure<PremiumStoreVerificationResponse>(premiumSyncResult.Error);
+        }
 
         return Result.Success(new PremiumStoreVerificationResponse(
             provider,
@@ -287,20 +294,6 @@ public sealed partial class EconomyService
             return Result.Failure<SubscriptionSummaryResponse>(ownershipCheck.Error);
         }
 
-        if (identityService is null)
-        {
-            return Result.Failure<SubscriptionSummaryResponse>(EconomyErrors.PremiumBillingUnavailable);
-        }
-
-        var premiumResult = await identityService.SetPremiumStatusAsync(
-            new SetPremiumStatusCommand(command.UserId, isPremium),
-            cancellationToken);
-
-        if (premiumResult.IsFailure)
-        {
-            return Result.Failure<SubscriptionSummaryResponse>(premiumResult.Error);
-        }
-
         var subscriptionResult = await UpsertUserSubscriptionAsync(
             command.UserId,
             "stripe",
@@ -345,6 +338,21 @@ public sealed partial class EconomyService
                 $"premium:stripe:{subscription.PlanId}",
                 DateTime.UtcNow,
                 cancellationToken);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var premiumSyncResult = await SynchronizePremiumEntitlementAsync(
+            command.UserId,
+            isPremium,
+            "stripe",
+            "ManualStripeVerification",
+            subscription.Id,
+            subscription.ExternalSubscriptionId,
+            cancellationToken);
+        if (premiumSyncResult.IsFailure)
+        {
+            return Result.Failure<SubscriptionSummaryResponse>(premiumSyncResult.Error);
         }
 
         return await GetSubscriptionSummaryAsync(command.UserId, cancellationToken);

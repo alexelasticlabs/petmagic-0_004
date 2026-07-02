@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 using PetMagic.Modules.Templates.Domain.Enums;
 
@@ -73,7 +74,67 @@ public sealed record StartTemplateGenerationFromPetCommand(
 public sealed record TemplateGenerationHistoryQuery(
     string? Status,
     int? Skip,
-    int? Take);
+    int? Take,
+    string? Cursor = null);
+
+public sealed record GalleryPageResponse(
+    IReadOnlyList<GalleryItemResponse> Items,
+    string? NextCursor,
+    bool HasMore,
+    DateTime ServerTimeUtc,
+    int UnreadCount,
+    string AppliedFilter);
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum GalleryMediaState
+{
+    pending,
+    processing,
+    resultReady,
+    previewReadyOnly,
+    watermarkPreparing,
+    expired,
+    storageUnavailable,
+    failed,
+    hidden
+}
+
+public sealed record GalleryMediaResponse(
+    GalleryMediaState State,
+    string MediaType,
+    string? PreviewUrl,
+    string? ResultUrl,
+    DateTime? ResultExpiresAtUtc,
+    double? DurationSeconds,
+    bool HasWatermark,
+    bool CanRemoveWatermark,
+    bool IsWatermarkRemoved,
+    bool CanDownload,
+    bool CanShare,
+    string? ReasonCode,
+    string? UserMessageKey,
+    int? RetryAfterSeconds);
+
+public sealed record GalleryFailureResponse(
+    string? Code,
+    string? Message);
+
+public sealed record GalleryItemResponse(
+    Guid GenerationId,
+    Guid TemplateId,
+    string Status,
+    DateTime CreatedAtUtc,
+    DateTime UpdatedAtUtc,
+    DateTime? CompletedAtUtc,
+    string? TemplateTitle,
+    string? TemplateType,
+    GalleryMediaResponse Media,
+    bool IsUnread,
+    int? ProgressPercent,
+    string? Stage,
+    int? QueuePosition,
+    DateTime? EstimatedCompletionAtUtc,
+    GalleryFailureResponse? Failure);
 
 public sealed record TemplateGenerationUnreadCountResponse(int Count);
 
@@ -207,10 +268,44 @@ public sealed record RemoveGenerationWatermarkResponse(
     int? RemainingCredits,
     string? MediaUrl);
 
-public sealed record GenerationDownloadResponse(
-    string MediaUrl,
+public sealed record GalleryDownloadResponse(
+    string SignedMediaUrl,
+    DateTime? ExpiresAtUtc,
+    string FileName,
+    string ContentType,
+    bool HasWatermark)
+{
+    public string MediaUrl => SignedMediaUrl;
+}
+
+public sealed record GalleryShareResponse(
+    string ShareUrl,
+    string ShareToken,
+    string? SignedMediaUrl,
+    DateTime? ExpiresAtUtc,
     bool HasWatermark,
-    string FileName);
+    string FileName,
+    string? ContentType,
+    string? MediaState)
+{
+    public string MediaUrl => SignedMediaUrl ?? string.Empty;
+}
+
+public sealed record PublicGalleryShareResponse(
+    string ShareToken,
+    string MediaState,
+    string MediaType,
+    string? TemplateTitle,
+    string? SignedMediaUrl,
+    DateTime? ExpiresAtUtc,
+    bool HasWatermark,
+    string? FileName,
+    string? ContentType,
+    string? ReasonCode,
+    string? UserMessageKey)
+{
+    public string MediaUrl => SignedMediaUrl ?? string.Empty;
+}
 
 public sealed record GenerateSimilarRequest(
     string? VariationStrength = null);

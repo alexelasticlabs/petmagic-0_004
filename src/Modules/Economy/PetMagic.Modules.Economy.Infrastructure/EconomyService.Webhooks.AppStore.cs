@@ -6,7 +6,6 @@ using PetMagic.Modules.Economy.Application.Contracts;
 using PetMagic.Modules.Economy.Domain.Enums;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
 using PetMagic.Modules.Economy.Infrastructure.Payments;
-using PetMagic.Modules.Identity.Application.Contracts;
 
 namespace PetMagic.Modules.Economy.Infrastructure;
 
@@ -23,29 +22,21 @@ public sealed partial class EconomyService
         }
 
         var appStoreEventType = parsed.NotificationType ?? "unknown";
-        LogStoreWebhookReceived("app_store", parsed.EventId, appStoreEventType);
-
-        if (!dbContext.Database.IsRelational()
-            && await dbContext.ProcessedWebhookEvents.AnyAsync(x => x.Provider == "app_store" && x.EventId == parsed.EventId, cancellationToken))
-        {
-            LogDuplicateStoreWebhook("app_store", parsed.EventId, appStoreEventType);
-            return Result.Success(new StoreWebhookResultResponse("app_store", parsed.EventId, false, "ignored_duplicate"));
-        }
+        var safeAppStoreEventId = EconomyLogSanitizer.SafeExternalId(parsed.EventId) ?? string.Empty;
+        LogStoreWebhookReceived("app_store", safeAppStoreEventId, appStoreEventType);
 
         await using var transaction = dbContext.Database.IsRelational()
-            ? await dbContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, cancellationToken)
+            ? await dbContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken)
             : null;
 
         try
         {
-            dbContext.ProcessedWebhookEvents.Add(new ProcessedWebhookEvent
+            if (!await TryClaimWebhookEventAsync("app_store", parsed.EventId, appStoreEventType, cancellationToken))
             {
-                Id = Guid.NewGuid(),
-                Provider = "app_store",
-                EventId = parsed.EventId,
-                EventType = appStoreEventType,
-                ProcessedAtUtc = DateTime.UtcNow
-            });
+                EconomyMetrics.RecordDuplicateWebhook("app_store", appStoreEventType);
+                LogDuplicateStoreWebhook("app_store", parsed.EventId, appStoreEventType);
+                return Result.Success(new StoreWebhookResultResponse("app_store", parsed.EventId, false, "ignored_duplicate"));
+            }
 
             var processedTokenPurchase = false;
             if (!string.IsNullOrWhiteSpace(parsed.ExternalPurchaseId)
@@ -140,38 +131,6 @@ public sealed partial class EconomyService
             }
             var subscription = subscriptionResult.Value;
 
-            if (identityService is null)
-            {
-                return Result.Failure<StoreWebhookResultResponse>(EconomyErrors.PremiumBillingUnavailable);
-            }
-
-            var premiumResult = await identityService.SetPremiumStatusAsync(
-                new SetPremiumStatusCommand(existingSubscription.UserId, isPremium),
-                cancellationToken);
-
-            if (premiumResult.IsFailure)
-            {
-                return Result.Failure<StoreWebhookResultResponse>(premiumResult.Error);
-            }
-
-            logger?.LogInformation(
-                "Premium entitlement updated from App Store webhook. Provider={Provider} UserId={UserId} EventId={EventId} EventType={EventType} Status={Status} IsPremium={IsPremium} CorrelationId={CorrelationId}",
-                "app_store",
-                existingSubscription.UserId,
-                EconomyLogSanitizer.SafeExternalId(parsed.EventId),
-                appStoreEventType,
-                status,
-                isPremium,
-                CurrentCorrelationId);
-
-            await _pushNotificationSender.NotifyPremiumUpdateAsync(
-                existingSubscription.UserId,
-                new PremiumPushNotification(
-                    Status: isPremium ? "active" : "inactive",
-                    Provider: "app_store",
-                    PlanCode: plan.PlanCode),
-                cancellationToken);
-
             await AppendSubscriptionEventAsync(
                 existingSubscription.UserId,
                 subscription.Id,
@@ -205,12 +164,32 @@ public sealed partial class EconomyService
                 await transaction.CommitAsync(cancellationToken);
             }
 
+            var premiumSyncResult = await SynchronizePremiumEntitlementAsync(
+                existingSubscription.UserId,
+                isPremium,
+                "app_store",
+                parsed.NotificationType ?? "AppStoreNotification",
+                subscription.Id,
+                subscription.ExternalSubscriptionId,
+                cancellationToken);
+            if (premiumSyncResult.IsSuccess)
+            {
+                await _pushNotificationSender.NotifyPremiumUpdateAsync(
+                    existingSubscription.UserId,
+                    new PremiumPushNotification(
+                        Status: isPremium ? "active" : "inactive",
+                        Provider: "app_store",
+                        PlanCode: plan.PlanCode),
+                    cancellationToken);
+            }
+
             LogStoreWebhookProcessed("app_store", parsed.EventId, appStoreEventType, existingSubscription.UserId, "processed");
             return Result.Success(new StoreWebhookResultResponse("app_store", parsed.EventId, true, "processed"));
         }
         catch (DbUpdateException exception) when (IsUniqueWebhookEventConflict(exception))
         {
             dbContext.ChangeTracker.Clear();
+            EconomyMetrics.RecordDuplicateWebhook("app_store", appStoreEventType);
             LogDuplicateStoreWebhook("app_store", parsed.EventId, appStoreEventType);
             return Result.Success(new StoreWebhookResultResponse("app_store", parsed.EventId, false, "ignored_duplicate"));
         }

@@ -85,6 +85,80 @@ public sealed class EconomyApiStartupSmokeTests
     }
 
     [Theory]
+    [InlineData("POST", "/api/economy/wallet/spend")]
+    [InlineData("POST", "/api/economy/wallet/redeem")]
+    [InlineData("PUT", "/api/economy/notifications/push-token")]
+    [InlineData("DELETE", "/api/economy/notifications/push-token")]
+    [InlineData("POST", "/api/economy/referrals/activate")]
+    [InlineData("POST", "/api/economy/premium/checkout")]
+    [InlineData("POST", "/api/economy/premium/manage")]
+    [InlineData("POST", "/api/economy/premium/cancel")]
+    [InlineData("POST", "/api/economy/premium/store/verify")]
+    [InlineData("POST", "/api/billing/google/validate")]
+    [InlineData("POST", "/api/billing/apple/validate")]
+    [InlineData("POST", "/api/economy/premium/verify-stripe")]
+    [InlineData("POST", "/api/economy/payment-methods/setup")]
+    [InlineData("POST", "/api/economy/purchases/create")]
+    [InlineData("POST", "/api/economy/purchases/{orderId:guid}/verify-stripe")]
+    [InlineData("POST", "/api/economy/purchases/{orderId:guid}/verify-store")]
+    [InlineData("POST", "/api/payments/stripe/token-purchase")]
+    [InlineData("POST", "/api/payments/stripe/subscription")]
+    [InlineData("POST", "/api/payments/stripe/customer-portal")]
+    public async Task EconomyJsonMutationEndpoints_ShouldLimitRequestBodiesBeforeBinding(
+        string method,
+        string routePattern)
+    {
+        await using var app = await EconomyApiStartupTestApplication.CreateAsync();
+
+        Assert.Equal(32 * 1024, app.GetRequestSizeLimit(method, routePattern));
+    }
+
+    [Theory]
+    [InlineData("POST", "/api/economy/webhooks/stripe")]
+    [InlineData("POST", "/api/economy/webhooks/app-store")]
+    [InlineData("POST", "/api/webhooks/apple-app-store")]
+    [InlineData("POST", "/api/economy/webhooks/google-play")]
+    [InlineData("POST", "/api/webhooks/google-play")]
+    public async Task EconomyWebhookEndpoints_ShouldLimitRequestBodiesBeforeReadingPayload(
+        string method,
+        string routePattern)
+    {
+        await using var app = await EconomyApiStartupTestApplication.CreateAsync();
+
+        Assert.Equal(256 * 1024, app.GetRequestSizeLimit(method, routePattern));
+    }
+
+    [Theory]
+    [InlineData("POST", "/api/admin/economy/purchases/{orderId:guid}/refund")]
+    [InlineData("PUT", "/api/admin/economy/users/{userId:guid}/premium/revoke")]
+    [InlineData("PUT", "/api/admin/economy/packs/{packId:guid}")]
+    [InlineData("PUT", "/api/admin/economy/subscription-plans/{planId}")]
+    [InlineData("POST", "/api/admin/economy/redeem-codes")]
+    [InlineData("PUT", "/api/admin/economy/redeem-codes/{redeemCodeId:guid}")]
+    public async Task AdminEconomyJsonMutationEndpoints_ShouldLimitRequestBodiesBeforeBinding(
+        string method,
+        string routePattern)
+    {
+        await using var app = await EconomyApiStartupTestApplication.CreateAsync();
+
+        Assert.Equal(32 * 1024, app.GetRequestSizeLimit(method, routePattern));
+    }
+
+    [Theory]
+    [InlineData("POST", "/api/admin/economy/payment-provider-configs")]
+    [InlineData("POST", "/api/admin/economy/payment-provider-configs/{configurationId:guid}/clone")]
+    [InlineData("POST", "/api/admin/economy/payment-provider-configs/test-match")]
+    [InlineData("PUT", "/api/admin/economy/payment-provider-configs/{configurationId:guid}")]
+    public async Task AdminEconomyProviderConfigurationMutationEndpoints_ShouldLimitRequestBodiesBeforeBinding(
+        string method,
+        string routePattern)
+    {
+        await using var app = await EconomyApiStartupTestApplication.CreateAsync();
+
+        Assert.Equal(64 * 1024, app.GetRequestSizeLimit(method, routePattern));
+    }
+
+    [Theory]
     [InlineData("/api/admin/economy/purchases?status=chargeback", "economy.purchase_status_invalid")]
     [InlineData("/api/admin/economy/purchases?provider=paypal", "economy.payment_provider_invalid")]
     [InlineData("/api/admin/economy/subscriptions?status=paused", "economy.subscription_status_invalid")]
@@ -202,6 +276,22 @@ public sealed class EconomyApiStartupSmokeTests
                         .Contains(method, StringComparer.OrdinalIgnoreCase));
 
             return endpoint.Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName;
+        }
+
+        public long? GetRequestSizeLimit(string method, string routePattern)
+        {
+            var endpoint = app.Services
+                .GetRequiredService<EndpointDataSource>()
+                .Endpoints
+                .OfType<RouteEndpoint>()
+                .Single(endpoint =>
+                    string.Equals(endpoint.RoutePattern.RawText, routePattern, StringComparison.Ordinal)
+                    && endpoint.Metadata
+                        .GetRequiredMetadata<IHttpMethodMetadata>()
+                        .HttpMethods
+                        .Contains(method, StringComparer.OrdinalIgnoreCase));
+
+            return endpoint.Metadata.GetMetadata<IRequestSizeLimitMetadata>()?.MaxRequestBodySize;
         }
 
         public string[] GetApiRoutesWithoutRateLimit()

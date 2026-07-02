@@ -44,6 +44,31 @@ public sealed class R2MediaStorageKeyResolutionTests
         Assert.Null(resolved);
     }
 
+    [Theory]
+    [InlineData("templates-media/2026/../private.png")]
+    [InlineData("https://cdn.petmagic.test/templates-media/2026/../private.png")]
+    [InlineData("https://cdn.petmagic.test/templates-media/./private.png")]
+    public void TryResolveManagedKey_ShouldRejectTraversalLikeManagedKeys(string assetUrl)
+    {
+        var storage = CreateStorage();
+
+        var resolved = InvokeTryResolveManagedKey(storage, assetUrl);
+
+        Assert.Null(resolved);
+    }
+
+    [Fact]
+    public void TryResolveManagedKey_ShouldRejectMalformedPublicBaseUrlPrefix()
+    {
+        var storage = CreateStorage();
+
+        var resolved = InvokeTryResolveManagedKey(
+            storage,
+            "https://cdn.petmagic.testtemplates-media/2026/06/result.png");
+
+        Assert.Null(resolved);
+    }
+
     [Fact]
     public async Task CreateReadUrlAsync_ShouldRejectExternalUrl()
     {
@@ -51,6 +76,20 @@ public sealed class R2MediaStorageKeyResolutionTests
 
         var result = await storage.CreateReadUrlAsync(
             "https://example.com/templates-media/2026/06/result.png",
+            TimeSpan.FromMinutes(5),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("templates.media_storage_failed", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task CreateReadUrlAsync_ShouldRejectTraversalLikeManagedKey()
+    {
+        var storage = CreateStorage();
+
+        var result = await storage.CreateReadUrlAsync(
+            "https://cdn.petmagic.test/templates-media/2026/../private.png",
             TimeSpan.FromMinutes(5),
             CancellationToken.None);
 

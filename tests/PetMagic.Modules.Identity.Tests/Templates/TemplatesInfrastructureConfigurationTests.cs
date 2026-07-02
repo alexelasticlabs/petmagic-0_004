@@ -304,6 +304,26 @@ public sealed class TemplatesInfrastructureConfigurationTests
         Assert.Equal(TimeSpan.FromSeconds(150), httpClientFactory.CreateClient(FalQueueClient.HttpClientName).Timeout);
         Assert.Equal(TimeSpan.FromSeconds(30), httpClientFactory.CreateClient(HttpGeneratedMediaImporter.HttpClientName).Timeout);
         Assert.Equal(TimeSpan.FromSeconds(30), httpClientFactory.CreateClient(FalProviderHealthService.HttpClientName).Timeout);
+        Assert.Equal(TimeSpan.FromSeconds(5), httpClientFactory.CreateClient(TemplateContentHealthCheck.HttpClientName).Timeout);
+    }
+
+    [Fact]
+    public void TemplateHttpClientsThatProbeMedia_ShouldNotFollowRedirects()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Infrastructure",
+            "TemplatesInfrastructureServiceCollectionExtensions.cs"));
+
+        Assert.Contains("TemplateContentHealthCheck.HttpClientName", source, StringComparison.Ordinal);
+        Assert.Contains("HttpGeneratedMediaImporter.HttpClientName", source, StringComparison.Ordinal);
+        Assert.Contains(".ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler", source, StringComparison.Ordinal);
+        Assert.True(
+            source.Split("AllowAutoRedirect = false", StringSplitOptions.None).Length >= 3,
+            "Template content health and generated media import HTTP clients must both disable automatic redirects.");
     }
 
     [Fact]
@@ -744,6 +764,23 @@ public sealed class TemplatesInfrastructureConfigurationTests
         services.AddLogging();
         services.AddSingleton<IHostEnvironment>(new TestHostEnvironment(Directory.GetCurrentDirectory()));
         return services;
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+
+        while (current is not null)
+        {
+            if (File.Exists(Path.Combine(current.FullName, ".gitignore")))
+            {
+                return current.FullName;
+            }
+
+            current = current.Parent;
+        }
+
+        throw new InvalidOperationException("Could not locate repository root.");
     }
 
     private sealed class TestHostEnvironment(string contentRootPath) : IHostEnvironment

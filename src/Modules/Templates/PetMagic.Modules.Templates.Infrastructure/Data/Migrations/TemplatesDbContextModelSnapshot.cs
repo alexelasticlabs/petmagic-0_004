@@ -463,6 +463,60 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.ToTable("templates_categories", (string)null);
                 });
 
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationBillingCommand", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("GenerationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("LastAttemptedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastErrorCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("LastErrorMessage")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<int>("TokenCost")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GenerationId")
+                        .IsUnique();
+
+                    b.HasIndex("Status", "LastAttemptedAtUtc", "CreatedAtUtc")
+                        .HasDatabaseName("IX_tgbc_Status_LastAttemptedAtUtc_CreatedAtUtc");
+
+                    b.ToTable("templates_generation_billing_commands", (string)null);
+                });
+
             modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationFeedback", b =>
                 {
                     b.Property<Guid>("Id")
@@ -713,6 +767,9 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.Property<string>("MotionProviderStatusUrl")
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)");
+
+                    b.Property<DateTime?>("NextAttemptEarliestAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("NormalizedImageUrl")
                         .HasMaxLength(2048)
@@ -970,6 +1027,9 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.HasIndex("Status", "QueueMediaType", "QueueTier", "QueuedAtUtc")
                         .HasDatabaseName("IX_tgj_Status_QueueMediaType_QueueTier_QueuedAtUtc");
 
+                    b.HasIndex("UserId", "HiddenByUserAtUtc", "Status", "CreatedAtUtc", "Id")
+                        .HasDatabaseName("IX_tgj_UserId_Hidden_Status_CreatedAt_Id");
+
                     b.ToTable("templates_generation_jobs", (string)null);
                 });
 
@@ -1085,6 +1145,9 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.Property<int>("PromoBadgeMode")
                         .HasColumnType("integer");
 
+                    b.Property<DateTime?>("PublishedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("RecommendedAfterImageGeneration")
                         .HasColumnType("boolean");
 
@@ -1124,9 +1187,6 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.Property<int>("TokenCost")
                         .HasColumnType("integer");
 
-                    b.Property<DateTime?>("PublishedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -1146,12 +1206,12 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.HasIndex("SupportsGenerateSimilar", "Status")
                         .HasDatabaseName("IX_templates_items_generate_similar");
 
-                    b.HasIndex("Status", "UpdatedAtUtc", "Id")
-                        .HasDatabaseName("IX_templates_items_Status_UpdatedAtUtc_Id")
-                        .HasFilter(" \"DeletedAtUtc\" IS NULL ");
-
                     b.HasIndex("Status", "PublishedAtUtc", "Id")
                         .HasDatabaseName("IX_templates_items_Status_PublishedAtUtc_Id")
+                        .HasFilter(" \"DeletedAtUtc\" IS NULL ");
+
+                    b.HasIndex("Status", "UpdatedAtUtc", "Id")
+                        .HasDatabaseName("IX_templates_items_Status_UpdatedAtUtc_Id")
                         .HasFilter(" \"DeletedAtUtc\" IS NULL ");
 
                     b.HasIndex("SupportsGenerationResultInput", "RequiredInputMediaType", "Status")
@@ -1621,6 +1681,17 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Template");
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationBillingCommand", b =>
+                {
+                    b.HasOne("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationJob", "Generation")
+                        .WithMany()
+                        .HasForeignKey("GenerationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Generation");
                 });
 
             modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationFeedback", b =>

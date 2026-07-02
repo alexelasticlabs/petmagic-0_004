@@ -97,6 +97,11 @@ internal static class TemplateGenerationMetrics
         unit: "{event}",
         description: "Number of full template feed invalidation SSE events.");
 
+    private static readonly Counter<long> SseSubscriberDropsTotal = Meter.CreateCounter<long>(
+        "generation_sse_subscriber_drops_total",
+        unit: "{event}",
+        description: "Number of template realtime events dropped for slow SSE subscribers.");
+
     private static readonly Counter<long> RetryAttemptsTotal = Meter.CreateCounter<long>(
         "generation_retry_attempts_total",
         unit: "{attempt}",
@@ -121,6 +126,11 @@ internal static class TemplateGenerationMetrics
         "generation_queue_depth",
         unit: "{job}",
         description: "Current count of claimable queued template generation jobs observed by the worker.");
+
+    private static readonly Histogram<long> PendingRefunds = Meter.CreateHistogram<long>(
+        "refunds_pending",
+        unit: "{job}",
+        description: "Current count of failed/cancelled charged generations still awaiting refund, observed by the worker (exhausted tag marks jobs past retry budget that need manual intervention).");
 
     private static readonly Histogram<long> ActiveJobs = Meter.CreateHistogram<long>(
         "generation_active_jobs",
@@ -398,6 +408,11 @@ internal static class TemplateGenerationMetrics
         SseFullInvalidationsTotal.Add(1);
     }
 
+    public static void RecordSseSubscriberDrop(string topic)
+    {
+        SseSubscriberDropsTotal.Add(1, new KeyValuePair<string, object?>("topic", topic));
+    }
+
     public static void RecordRetryAttempt(TemplateGenerationJob job, string reason)
     {
         RetryAttemptsTotal.Add(
@@ -442,6 +457,16 @@ internal static class TemplateGenerationMetrics
         {
             OldestProcessingJobAgeSeconds.Record(Math.Max(0, oldestProcessingJobAgeSeconds.Value));
         }
+    }
+
+    public static void RecordPendingRefundsSnapshot(long pendingRefunds, long exhaustedRefunds)
+    {
+        PendingRefunds.Record(
+            Math.Max(0, pendingRefunds),
+            new KeyValuePair<string, object?>("exhausted", "false"));
+        PendingRefunds.Record(
+            Math.Max(0, exhaustedRefunds),
+            new KeyValuePair<string, object?>("exhausted", "true"));
     }
 
     public static void RecordLaneQueueSnapshot(

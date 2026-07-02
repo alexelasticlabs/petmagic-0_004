@@ -82,6 +82,44 @@ public sealed class IdentityApiStartupSmokeTests
         Assert.Empty(app.GetAdminRoutesWithoutRolePolicy());
     }
 
+    [Theory]
+    [InlineData("POST", "/api/auth/register")]
+    [InlineData("POST", "/api/auth/login")]
+    [InlineData("POST", "/api/auth/email-confirmation/request")]
+    [InlineData("POST", "/api/auth/email-confirmation/confirm")]
+    [InlineData("POST", "/api/auth/resend-email-verification-code")]
+    [InlineData("POST", "/api/auth/verify-email-code")]
+    [InlineData("POST", "/api/auth/password-reset/request")]
+    [InlineData("POST", "/api/auth/password-reset/confirm")]
+    [InlineData("POST", "/api/auth/request-password-reset")]
+    [InlineData("POST", "/api/auth/verify-password-reset-code")]
+    [InlineData("POST", "/api/auth/reset-password")]
+    [InlineData("POST", "/api/auth/me/password-change/confirm")]
+    [InlineData("POST", "/api/auth/refresh")]
+    [InlineData("POST", "/api/auth/logout")]
+    [InlineData("PUT", "/api/auth/me/profile")]
+    [InlineData("POST", "/api/auth/me/legal-acceptance")]
+    [InlineData("POST", "/api/auth/external/exchange")]
+    [InlineData("POST", "/api/auth/external/google/native")]
+    [InlineData("POST", "/api/auth/google")]
+    [InlineData("POST", "/api/auth/apple")]
+    public async Task AuthJsonMutationEndpoints_ShouldLimitRequestBodiesBeforeJsonBinding(
+        string method,
+        string routePattern)
+    {
+        await using var app = await IdentityApiStartupTestApplication.CreateAsync();
+
+        Assert.Equal(32 * 1024, app.GetRequestSizeLimit(method, routePattern));
+    }
+
+    [Fact]
+    public async Task LegalAcceptanceEndpoint_ShouldLimitRequestBodyBeforeJsonBinding()
+    {
+        await using var app = await IdentityApiStartupTestApplication.CreateAsync();
+
+        Assert.Equal(8 * 1024, app.GetRequestSizeLimit("POST", "/api/legal/accept"));
+    }
+
     private sealed class IdentityApiStartupTestApplication : IAsyncDisposable
     {
         private readonly WebApplication app;
@@ -168,6 +206,26 @@ public sealed class IdentityApiStartupSmokeTests
                         .Contains(method, StringComparer.OrdinalIgnoreCase));
 
             return endpoint.Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName;
+        }
+
+        public long? GetRequestSizeLimit(string method, string routePattern)
+        {
+            var normalizedRoutePattern = NormalizeRoutePattern(routePattern);
+            var endpoint = app.Services
+                .GetRequiredService<EndpointDataSource>()
+                .Endpoints
+                .OfType<RouteEndpoint>()
+                .Single(endpoint =>
+                    string.Equals(
+                        NormalizeRoutePattern(endpoint.RoutePattern.RawText),
+                        normalizedRoutePattern,
+                        StringComparison.Ordinal)
+                    && endpoint.Metadata
+                        .GetRequiredMetadata<IHttpMethodMetadata>()
+                        .HttpMethods
+                        .Contains(method, StringComparer.OrdinalIgnoreCase));
+
+            return endpoint.Metadata.GetMetadata<IRequestSizeLimitMetadata>()?.MaxRequestBodySize;
         }
 
         private static string NormalizeRoutePattern(string? routePattern)

@@ -14,6 +14,16 @@ public sealed class WalletLedgerEntry
 
     public string Reason { get; set; } = string.Empty;
 
+    public string TokenKind { get; set; } = string.Empty;
+
+    public string OperationKind { get; set; } = string.Empty;
+
+    public Guid? TokenBucketId { get; set; }
+
+    public string? BucketDeltasJson { get; set; }
+
+    public DateTime? ExpiresAtUtc { get; set; }
+
     public string? SourceProvider { get; set; }
 
     public string? SourceTransactionId { get; set; }

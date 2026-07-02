@@ -40,6 +40,26 @@ internal sealed partial class TemplateGenerationJobProcessor
         }
 
         var recoveryStartedAt = System.Diagnostics.Stopwatch.GetTimestamp();
+        if (staleJob.ProviderCompletedAtUtc is not null
+            && !string.IsNullOrWhiteSpace(staleJob.ProviderResultUrl))
+        {
+            staleJob.Status = TemplateGenerationStatus.ImportingMedia;
+            staleJob.ImportStartedAtUtc ??= now;
+            staleJob.UpdatedAtUtc = now;
+            staleJob.LockedAtUtc = null;
+            staleJob.LockedBy = null;
+            staleJob.LastErrorCode = null;
+            staleJob.LastErrorMessage = null;
+            await dbContext.SaveChangesAsync(cancellationToken);
+            TemplateGenerationMetrics.RecordJobRequeued(staleJob);
+            logger.LogWarning(
+                "Stale provider-completed template generation job recovered into media import. GenerationId={GenerationId} ProviderCompletedAtUtc={ProviderCompletedAtUtc}",
+                staleJob.Id,
+                staleJob.ProviderCompletedAtUtc);
+            dbContext.ChangeTracker.Clear();
+            return true;
+        }
+
         if (HasProviderRequestId(staleJob))
         {
             logger.LogWarning(
@@ -113,6 +133,7 @@ internal sealed partial class TemplateGenerationJobProcessor
                 "LockedAtUtc" = {2},
                 "LockedBy" = {5},
                 "UpdatedAtUtc" = {2},
+                "NextAttemptEarliestAtUtc" = NULL,
                 "ResultUrl" = NULL,
                 "WatermarkedResultUrl" = NULL,
                 "IsWatermarkRequired" = FALSE,
@@ -131,6 +152,7 @@ internal sealed partial class TemplateGenerationJobProcessor
                     AND "InputSourceType" <> 'qa_fixture'
                     AND ("ChargedAtUtc" IS NOT NULL OR "UserId" = {4})
                     AND "AttemptCount" < {3}
+                    AND ("NextAttemptEarliestAtUtc" IS NULL OR "NextAttemptEarliestAtUtc" <= {2})
                     AND (
                         ({6} AND "QueueMediaType" = 'image')
                         OR ("QueueMediaType" = 'video' AND (
@@ -209,6 +231,7 @@ internal sealed partial class TemplateGenerationJobProcessor
                 && x.InputSourceType != TemplateGenerationQaFixtures.InputSourceType
                 && (x.ChargedAtUtc != null || x.UserId == TemplateGenerationService.AdminTestUserId)
                 && x.AttemptCount < options.MaxGenerationAttempts
+                && (x.NextAttemptEarliestAtUtc == null || x.NextAttemptEarliestAtUtc <= now)
                 && ((allowImage && x.QueueMediaType == TemplateGenerationQueue.MediaTypeImage)
                     || (x.QueueMediaType == TemplateGenerationQueue.MediaTypeVideo
                         && (allowNativeVideo
@@ -245,6 +268,7 @@ internal sealed partial class TemplateGenerationJobProcessor
         job.LockedAtUtc = now;
         job.LockedBy = WorkerInstanceId;
         job.UpdatedAtUtc = now;
+        job.NextAttemptEarliestAtUtc = null;
         ResetAttemptState(job);
     }
 
@@ -327,6 +351,74 @@ internal sealed partial class TemplateGenerationJobProcessor
     {
         return !string.IsNullOrWhiteSpace(job.PreprocessingProviderRequestId)
             || !string.IsNullOrWhiteSpace(job.MotionProviderRequestId);
+    }
+
+    /// <summary>
+    /// Requeues a claimed job after a transient provider submit failure (429/5xx/timeout/network).
+    /// The job returns to Queued with an exponential claim delay instead of terminally failing,
+    /// so a temporary fal.ai outage does not turn into a wave of failed jobs and refunds.
+    /// </summary>
+    private async Task<bool> RequeueForTransientSubmitFailureAsync(
+        TemplateGenerationJob job,
+        PetMagic.BuildingBlocks.Results.Error error,
+        CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        var backoffExponent = Math.Clamp(job.AttemptCount - 1, 0, 5);
+        var delaySeconds = options.ProviderTransientRetryBaseDelaySeconds * (1 << backoffExponent);
+
+        job.Status = TemplateGenerationStatus.Queued;
+        job.CurrentProviderStage = null;
+        job.ProviderStatus = null;
+        job.ProviderSubmittedAtUtc = null;
+        job.ProviderStatusCheckedAtUtc = null;
+        job.NextAttemptEarliestAtUtc = now.AddSeconds(delaySeconds);
+        job.LastErrorCode = error.Code;
+        job.LastErrorMessage = error.Message;
+        job.UpdatedAtUtc = now;
+        job.LockedAtUtc = null;
+        job.LockedBy = null;
+
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            logger.LogWarning(
+                exception,
+                "Transient provider failure requeue was skipped because the job lock changed. GenerationId={GenerationId}",
+                job.Id);
+            dbContext.ChangeTracker.Clear();
+            return true;
+        }
+
+        TemplateGenerationMetrics.RecordRetryAttempt(job, "provider_transient");
+        logger.LogWarning(
+            "Template generation job requeued after transient provider failure. GenerationId={GenerationId} ErrorCode={ErrorCode} AttemptCount={AttemptCount} RetryDelaySeconds={RetryDelaySeconds}",
+            job.Id,
+            error.Code,
+            job.AttemptCount,
+            delaySeconds);
+        await PublishStatusChangedAsync(job, cancellationToken);
+        return true;
+    }
+
+    private async Task<bool> HandleProviderSubmitFailureAsync(
+        TemplateGenerationJob job,
+        PetMagic.BuildingBlocks.Results.Error error,
+        CancellationToken cancellationToken)
+    {
+        if (string.Equals(error.Code, TemplatesErrors.AiProviderTransientFailure.Code, StringComparison.Ordinal)
+            && job.AttemptCount < options.MaxGenerationAttempts)
+        {
+            return await RequeueForTransientSubmitFailureAsync(job, error, cancellationToken);
+        }
+
+        // Permanent provider errors (or exhausted attempts) keep the existing terminal path,
+        // including the automatic refund of charged credits.
+        await MarkFailedAsync(job, error, cancellationToken);
+        return true;
     }
 
     private async Task<bool> FailNextExhaustedQueuedJobAsync(CancellationToken cancellationToken)

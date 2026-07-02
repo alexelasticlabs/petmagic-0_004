@@ -457,6 +457,8 @@ internal sealed class EconomyAdminConfigurationService(
 
         return warningText.Contains("stripe checkout", StringComparison.OrdinalIgnoreCase)
             || warningText.Contains("continue to stripe", StringComparison.OrdinalIgnoreCase)
+            || warningText.Contains("native payment sheet", StringComparison.OrdinalIgnoreCase)
+            || warningText.Contains("native payment sheets", StringComparison.OrdinalIgnoreCase)
             || noteText.Contains("external checkout", StringComparison.OrdinalIgnoreCase);
     }
 

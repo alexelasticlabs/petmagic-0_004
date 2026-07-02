@@ -45,6 +45,46 @@ public sealed class FeedbackEndpointsSecurityTests
         Assert.DoesNotContain("return Guid.TryParse(subject, out var userId) ? userId : Guid.Empty;", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void FeedbackSubmitEndpoint_ShouldHideForbiddenTargetOwnership()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Api",
+            "Endpoints",
+            "FeedbackEndpoints.cs"));
+
+        Assert.Contains("? ToUserProblem(result.Error)", source, StringComparison.Ordinal);
+        Assert.Contains("private static ProblemHttpResult ToUserProblem(Error error)", source, StringComparison.Ordinal);
+        Assert.Contains("if (error.Code == \"feedback.forbidden\")", source, StringComparison.Ordinal);
+        Assert.Contains("title: \"feedback.not_found\"", source, StringComparison.Ordinal);
+        Assert.Contains("statusCode: StatusCodes.Status404NotFound", source, StringComparison.Ordinal);
+        Assert.Contains("\"feedback.forbidden\" => StatusCodes.Status403Forbidden", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FeedbackMutationEndpoints_ShouldLimitRequestBodiesBeforeJsonBinding()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Api",
+            "Endpoints",
+            "FeedbackEndpoints.cs"));
+
+        Assert.Contains("private const int MaxFeedbackRequestBodyBytes = 8 * 1024;", source, StringComparison.Ordinal);
+        Assert.Contains("private const int MaxAdminFeedbackMutationRequestBodyBytes = 8 * 1024;", source, StringComparison.Ordinal);
+        Assert.Contains(".WithMetadata(new RequestSizeLimitAttribute(MaxFeedbackRequestBodyBytes));", source, StringComparison.Ordinal);
+        Assert.Equal(
+            2,
+            CountOccurrences(source, ".WithMetadata(new RequestSizeLimitAttribute(MaxAdminFeedbackMutationRequestBodyBytes));"));
+    }
+
     private static string FindRepositoryRoot()
     {
         var current = new DirectoryInfo(AppContext.BaseDirectory);
@@ -60,5 +100,19 @@ public sealed class FeedbackEndpointsSecurityTests
         }
 
         throw new InvalidOperationException("Could not locate repository root.");
+    }
+
+    private static int CountOccurrences(string source, string value)
+    {
+        var count = 0;
+        var index = 0;
+
+        while ((index = source.IndexOf(value, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += value.Length;
+        }
+
+        return count;
     }
 }

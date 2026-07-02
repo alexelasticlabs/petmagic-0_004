@@ -1,6 +1,7 @@
+using System.Text.Json;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using System.Text.Json;
 
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Abstractions;
@@ -113,7 +114,7 @@ internal sealed partial class TemplateGenerationJobProcessor
             cancellationToken);
         if (submission.IsFailure)
         {
-            await MarkFailedAsync(job, submission.Error, cancellationToken);
+            await HandleProviderSubmitFailureAsync(job, submission.Error, cancellationToken);
             return true;
         }
 
@@ -164,7 +165,7 @@ internal sealed partial class TemplateGenerationJobProcessor
             cancellationToken);
         if (submission.IsFailure)
         {
-            await MarkFailedAsync(job, submission.Error, cancellationToken);
+            await HandleProviderSubmitFailureAsync(job, submission.Error, cancellationToken);
             return true;
         }
 
@@ -214,7 +215,7 @@ internal sealed partial class TemplateGenerationJobProcessor
             cancellationToken);
         if (submission.IsFailure)
         {
-            await MarkFailedAsync(job, submission.Error, cancellationToken);
+            await HandleProviderSubmitFailureAsync(job, submission.Error, cancellationToken);
             return true;
         }
 
@@ -310,7 +311,8 @@ internal sealed partial class TemplateGenerationJobProcessor
         bool includePollingJobs,
         CancellationToken cancellationToken)
     {
-        var staleThreshold = DateTime.UtcNow.AddMilliseconds(-options.JobLockTimeoutMilliseconds);
+        var now = DateTime.UtcNow;
+        var staleThreshold = now.AddMilliseconds(-options.JobLockTimeoutMilliseconds);
         var job = await dbContext.TemplateGenerationJobs
             .Include(x => x.Template)
             .ThenInclude(x => x.Assets)
@@ -324,6 +326,7 @@ internal sealed partial class TemplateGenerationJobProcessor
                         && x.MotionProviderRequestId == null)
                     || x.Status == TemplateGenerationStatus.ImportingMedia)
                 && x.InputSourceType != TemplateGenerationQaFixtures.InputSourceType
+                && (x.NextAttemptEarliestAtUtc == null || x.NextAttemptEarliestAtUtc <= now)
                 && (x.LockedAtUtc == null || x.LockedAtUtc <= staleThreshold))
             .OrderBy(x => x.ProviderStatusCheckedAtUtc ?? x.UpdatedAtUtc)
             .ThenBy(x => x.QueuedAtUtc)
@@ -684,7 +687,15 @@ internal sealed partial class TemplateGenerationJobProcessor
         var statusResult = await falQueueClient!.GetStatusAsync(statusUri, model, cancellationToken);
         if (statusResult.IsFailure)
         {
-            await MarkFailedAsync(job, statusResult.Error, cancellationToken);
+            if (IsProviderTransientFailure(statusResult.Error))
+            {
+                await DeferProviderPollAfterTransientFailureAsync(job, statusResult.Error, cancellationToken);
+            }
+            else
+            {
+                await MarkFailedAsync(job, statusResult.Error, cancellationToken);
+            }
+
             return null;
         }
 
@@ -739,11 +750,49 @@ internal sealed partial class TemplateGenerationJobProcessor
         var response = await falQueueClient!.GetResponseAsync(responseUri, model, cancellationToken);
         if (response.IsFailure)
         {
-            await MarkFailedAsync(job, response.Error, cancellationToken);
+            if (IsProviderTransientFailure(response.Error))
+            {
+                await DeferProviderPollAfterTransientFailureAsync(job, response.Error, cancellationToken);
+            }
+            else
+            {
+                await MarkFailedAsync(job, response.Error, cancellationToken);
+            }
+
             return null;
         }
 
         return response.Value;
+    }
+
+    private async Task DeferProviderPollAfterTransientFailureAsync(
+        TemplateGenerationJob job,
+        Error error,
+        CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        var backoffExponent = Math.Clamp(job.AttemptCount - 1, 0, 5);
+        var delaySeconds = options.ProviderTransientRetryBaseDelaySeconds * (1 << backoffExponent);
+
+        job.NextAttemptEarliestAtUtc = now.AddSeconds(delaySeconds);
+        job.ProviderStatusCheckedAtUtc = now;
+        job.LastErrorCode = error.Code;
+        job.LastErrorMessage = error.Message;
+        job.UpdatedAtUtc = now;
+
+        await SaveClaimedChangesAsync(job, cancellationToken, releaseLock: true);
+        TemplateGenerationMetrics.RecordRetryAttempt(job, "provider_poll_transient");
+        logger.LogWarning(
+            "Template generation provider polling deferred after transient failure. GenerationId={GenerationId} ErrorCode={ErrorCode} AttemptCount={AttemptCount} RetryDelaySeconds={RetryDelaySeconds}",
+            job.Id,
+            error.Code,
+            job.AttemptCount,
+            delaySeconds);
+    }
+
+    private static bool IsProviderTransientFailure(Error error)
+    {
+        return string.Equals(error.Code, TemplatesErrors.AiProviderTransientFailure.Code, StringComparison.Ordinal);
     }
 
     private async Task<bool> ImportImageResultAsync(
@@ -785,7 +834,7 @@ internal sealed partial class TemplateGenerationJobProcessor
                 $"generation-{job.Id:N}-watermarked-result-preview.webp",
                 BuildGenerationPreviewStorageKey(job.UserId, job.Id, "result-preview-watermarked"),
                 cancellationToken);
-        CompleteImportedMedia(job, storedOutput.Value, TemplateType.Image, resultPreview, watermarkedPreview);
+        await CompleteImportedMediaAsync(job, storedOutput.Value, TemplateType.Image, resultPreview, watermarkedPreview);
         if (!await SaveClaimedChangesAsync(job, cancellationToken, releaseLock: true))
         {
             return false;
@@ -832,8 +881,22 @@ internal sealed partial class TemplateGenerationJobProcessor
             job.MotionProviderCostUsd = FalModelPricing.TryCalculateMotionCostUsd(job.UsedKlingModel, durationResult.Value);
         }
 
-        await ApplyWatermarkAsync(job, storedOutput.Value, TemplateType.Video, cancellationToken);
-        CompleteImportedMedia(job, storedOutput.Value, TemplateType.Video, null, null);
+        var watermarkedOutput = await ApplyWatermarkAsync(job, storedOutput.Value, TemplateType.Video, cancellationToken);
+        var resultPreview = await videoThumbnailGenerator.CreateThumbnailAsync(
+            storedOutput.Value,
+            job.Id,
+            $"generation-{job.Id:N}-result-preview.jpg",
+            BuildGenerationPreviewStorageKey(job.UserId, job.Id, "result-preview", "jpg"),
+            cancellationToken);
+        var watermarkedPreview = watermarkedOutput is null
+            ? null
+            : await videoThumbnailGenerator.CreateThumbnailAsync(
+                watermarkedOutput,
+                job.Id,
+                $"generation-{job.Id:N}-watermarked-result-preview.jpg",
+                BuildGenerationPreviewStorageKey(job.UserId, job.Id, "result-preview-watermarked", "jpg"),
+                cancellationToken);
+        await CompleteImportedMediaAsync(job, storedOutput.Value, TemplateType.Video, resultPreview, watermarkedPreview);
         if (!await SaveClaimedChangesAsync(job, cancellationToken, releaseLock: true))
         {
             return false;
@@ -843,7 +906,7 @@ internal sealed partial class TemplateGenerationJobProcessor
         return true;
     }
 
-    private void CompleteImportedMedia(
+    private async Task CompleteImportedMediaAsync(
         TemplateGenerationJob job,
         StoredMediaResponse storedOutput,
         TemplateType mediaType,
@@ -853,7 +916,7 @@ internal sealed partial class TemplateGenerationJobProcessor
         job.ResultUrl = storedOutput.StorageKey;
         job.MediaImportCompletedAtUtc = DateTime.UtcNow;
         job.ProviderResultUrl = null;
-        RegisterGenerationOutputMediaRecord(job, storedOutput, mediaType, resultPreview, watermarkedPreview);
+        await RegisterGenerationOutputMediaRecordAsync(job, storedOutput, mediaType, resultPreview, watermarkedPreview);
         job.Status = TemplateGenerationStatus.Completed;
         job.UpdatedAtUtc = job.MediaImportCompletedAtUtc.Value;
         job.CompletedAtUtc = job.UpdatedAtUtc;

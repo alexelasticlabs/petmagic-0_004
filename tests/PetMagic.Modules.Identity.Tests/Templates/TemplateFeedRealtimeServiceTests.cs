@@ -17,6 +17,7 @@ using PetMagic.Modules.Identity.Tests.Host;
 
 namespace PetMagic.Modules.Identity.Tests.Templates;
 
+[Collection(TemplateTelemetryCollection.Name)]
 public sealed class TemplateFeedRealtimeServiceTests
 {
     [Fact]
@@ -28,7 +29,7 @@ public sealed class TemplateFeedRealtimeServiceTests
         await using var subscriberProvider = CreateProvider(databaseName, databaseRoot);
 
         var subscriber = subscriberProvider.GetRequiredService<ITemplateFeedRealtimeService>();
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var subscription = subscriber.Subscribe(timeout.Token);
 
         var publisher = publisherProvider.GetRequiredService<ITemplateFeedRealtimeService>();

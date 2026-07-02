@@ -1,3 +1,5 @@
+using System.Text.Encodings.Web;
+
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
@@ -10,6 +12,82 @@ namespace PetMagic.Modules.Templates.Api.Endpoints;
 
 public static partial class TemplateGenerationEndpoints
 {
+    private static async Task<Results<Ok<PublicGalleryShareResponse>, ProblemHttpResult>> GetSharedGenerationAsync(
+        string token,
+        [FromServices] ITemplateGenerationService generationService,
+        CancellationToken cancellationToken)
+    {
+        var result = await generationService.GetPublicShareAsync(token, cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToClientGenerationProblem(result.Error);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<ContentHttpResult, ProblemHttpResult>> GetSharedGenerationPageAsync(
+        string token,
+        [FromServices] ITemplateGenerationService generationService,
+        CancellationToken cancellationToken)
+    {
+        var result = await generationService.GetPublicShareAsync(token, cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToClientGenerationProblem(result.Error);
+        }
+
+        return TypedResults.Content(
+            BuildSharedGenerationHtml(result.Value),
+            "text/html; charset=utf-8");
+    }
+
+    private static string BuildSharedGenerationHtml(PublicGalleryShareResponse share)
+    {
+        var title = HtmlEncoder.Default.Encode(
+            string.IsNullOrWhiteSpace(share.TemplateTitle)
+                ? "PetMagic generation"
+                : share.TemplateTitle);
+        var state = HtmlEncoder.Default.Encode(share.MediaState);
+        var message = share.MediaState == GalleryMediaState.resultReady.ToString()
+            ? "Shared PetMagic result"
+            : "This shared result is not available right now.";
+        var encodedMessage = HtmlEncoder.Default.Encode(message);
+        var mediaUrl = HtmlEncoder.Default.Encode(share.SignedMediaUrl ?? string.Empty);
+        var mediaMarkup = share.MediaState != GalleryMediaState.resultReady.ToString()
+            ? $"<p>{encodedMessage}</p><p>State: {state}</p>"
+            : share.MediaType.Equals("video", StringComparison.OrdinalIgnoreCase)
+                ? $"<video controls playsinline src=\"{mediaUrl}\"></video>"
+                : $"<img src=\"{mediaUrl}\" alt=\"{title}\" />";
+
+        return $$"""
+            <!doctype html>
+            <html lang="en">
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1">
+              <title>{{title}}</title>
+              <style>
+                body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #101214; color: #f8fafc; }
+                main { min-height: 100vh; display: grid; place-items: center; padding: 24px; box-sizing: border-box; }
+                section { width: min(720px, 100%); }
+                img, video { display: block; width: 100%; height: auto; border-radius: 8px; background: #181b1f; }
+                h1 { margin: 0 0 16px; font-size: 24px; line-height: 1.2; font-weight: 700; }
+                p { color: #cbd5e1; font-size: 16px; line-height: 1.5; }
+              </style>
+            </head>
+            <body>
+              <main>
+                <section>
+                  <h1>{{title}}</h1>
+                  {{mediaMarkup}}
+                </section>
+              </main>
+            </body>
+            </html>
+            """;
+    }
+
     private static async Task<Results<Ok<TemplateGenerationResponse>, ProblemHttpResult>> GetGenerationAsync(
         HttpContext context,
         Guid generationId,
@@ -61,7 +139,7 @@ public static partial class TemplateGenerationEndpoints
         return TypedResults.Ok(result.Value);
     }
 
-    private static async Task<Results<Ok<GenerationDownloadResponse>, ProblemHttpResult>> DownloadGenerationAsync(
+    private static async Task<Results<Ok<GalleryDownloadResponse>, ProblemHttpResult>> DownloadGenerationAsync(
         HttpContext context,
         Guid generationId,
         [FromServices] ITemplateGenerationService generationService,
@@ -83,7 +161,7 @@ public static partial class TemplateGenerationEndpoints
         return TypedResults.Ok(result.Value);
     }
 
-    private static async Task<Results<Ok<GenerationDownloadResponse>, ProblemHttpResult>> ShareGenerationAsync(
+    private static async Task<Results<Ok<GalleryShareResponse>, ProblemHttpResult>> ShareGenerationAsync(
         HttpContext context,
         Guid generationId,
         [FromServices] ITemplateGenerationService generationService,
@@ -105,11 +183,12 @@ public static partial class TemplateGenerationEndpoints
         return TypedResults.Ok(result.Value);
     }
 
-    private static async Task<Results<Ok<IReadOnlyList<TemplateGenerationResponse>>, ProblemHttpResult>> ListGenerationsAsync(
+    private static async Task<Results<Ok<GalleryPageResponse>, ProblemHttpResult>> ListGenerationsAsync(
         HttpContext context,
         [FromQuery] string? status,
         [FromQuery] int? skip,
         [FromQuery] int? take,
+        [FromQuery] string? cursor,
         [FromServices] ITemplateGenerationService generationService,
         CancellationToken cancellationToken)
     {
@@ -126,9 +205,9 @@ public static partial class TemplateGenerationEndpoints
         }
 
         var isPremium = await HasPremiumTemplateAccessAsync(context, userId!.Value, cancellationToken);
-        var result = await generationService.ListAsync(
+        var result = await generationService.ListPageAsync(
             userId!.Value,
-            new TemplateGenerationHistoryQuery(status, skip, take),
+            new TemplateGenerationHistoryQuery(status, skip, take, cursor),
             isPremium,
             cancellationToken);
 

@@ -28,7 +28,9 @@ public sealed partial class SupportChatService
     {
         if (!string.IsNullOrWhiteSpace(explicitStorageKey))
         {
-            return explicitStorageKey.Trim();
+            return TryNormalizeManagedAttachmentPath(explicitStorageKey, out var managedStorageKey)
+                ? managedStorageKey
+                : null;
         }
 
         if (string.IsNullOrWhiteSpace(fileUrl))
@@ -36,16 +38,19 @@ public sealed partial class SupportChatService
             return null;
         }
 
+        var trimmed = fileUrl.Trim();
         var baseUrl = attachmentStorageOptions.PublicBaseUrl.TrimEnd('/');
-        if (!fileUrl.StartsWith(baseUrl, StringComparison.OrdinalIgnoreCase))
+        if (!trimmed.StartsWith(baseUrl, StringComparison.OrdinalIgnoreCase)
+            || trimmed.Length <= baseUrl.Length
+            || trimmed[baseUrl.Length] != '/')
         {
             return null;
         }
 
-        var relativePath = fileUrl[baseUrl.Length..].TrimStart('/');
-        return string.IsNullOrWhiteSpace(relativePath)
-            ? null
-            : relativePath.Replace('\\', '/');
+        var relativePath = trimmed[baseUrl.Length..].TrimStart('/').Replace('\\', '/');
+        return TryNormalizeManagedAttachmentPath(relativePath, out var storageKey)
+            ? storageKey
+            : null;
     }
 
     private IReadOnlyList<SupportMessageAttachmentResponse> BuildAttachmentResponses(ConversationMessage message)
@@ -111,6 +116,48 @@ public sealed partial class SupportChatService
         return ResolveStorageKey(fileUrl, explicitStorageKey) is null
             ? string.Empty
             : fileUrl;
+    }
+
+    private static bool TryNormalizeManagedAttachmentPath(string candidate, out string managedPath)
+    {
+        managedPath = string.Empty;
+        var pathOnly = candidate.Trim().Replace('\\', '/').TrimStart('/');
+        var queryIndex = pathOnly.IndexOfAny(['?', '#']);
+        if (queryIndex >= 0)
+        {
+            pathOnly = pathOnly[..queryIndex];
+        }
+
+        if (string.IsNullOrWhiteSpace(pathOnly)
+            || pathOnly.EndsWith("/", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var segments = pathOnly
+            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (segments.Length <= 1
+            || !string.Equals(segments[0], "support-attachments", StringComparison.OrdinalIgnoreCase)
+            || segments.Any(IsUnsafeAttachmentPathSegment))
+        {
+            return false;
+        }
+
+        managedPath = string.Join('/', segments);
+        return true;
+    }
+
+    private static bool IsUnsafeAttachmentPathSegment(string segment)
+    {
+        if (string.Equals(segment, ".", StringComparison.Ordinal)
+            || string.Equals(segment, "..", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        var decodedSegment = Uri.UnescapeDataString(segment);
+        return string.Equals(decodedSegment, ".", StringComparison.Ordinal)
+            || string.Equals(decodedSegment, "..", StringComparison.Ordinal);
     }
 
     private static SupportMessagePendingAttachmentResponse? BuildPendingAttachmentResponse(

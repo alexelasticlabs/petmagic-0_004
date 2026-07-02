@@ -130,10 +130,11 @@ public static partial class AuthEndpoints
         return TypedResults.Ok(result.Value);
     }
 
-    private static Results<Ok<ExternalLinkPreparationResponse>, ProblemHttpResult> PrepareLinkedAccountAsync(
+    private static async Task<Results<Ok<ExternalLinkPreparationResponse>, ProblemHttpResult>> PrepareLinkedAccountAsync(
         string provider,
         HttpContext context,
-        ExternalAccountLinkStore linkStore)
+        ExternalAccountLinkStore linkStore,
+        CancellationToken cancellationToken)
     {
         if (NormalizeExternalProvider(provider) is null)
         {
@@ -145,7 +146,8 @@ public static partial class AuthEndpoints
             return invalidSubjectProblem!;
         }
 
-        return TypedResults.Ok(new ExternalLinkPreparationResponse(linkStore.Create(userId)));
+        return TypedResults.Ok(new ExternalLinkPreparationResponse(
+            await linkStore.CreateAsync(userId, cancellationToken)));
     }
 
     private static async Task<Results<Ok<IReadOnlyList<LinkedAccountResponse>>, ProblemHttpResult>> UnlinkLinkedAccountAsync(

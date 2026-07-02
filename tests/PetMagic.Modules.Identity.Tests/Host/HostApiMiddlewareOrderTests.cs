@@ -5,12 +5,7 @@ public sealed class HostApiMiddlewareOrderTests
     [Fact]
     public void Program_ShouldAuthenticateBeforeRateLimitingUserPartitionedRequests()
     {
-        var source = File.ReadAllText(Path.Combine(
-            FindRepositoryRoot(),
-            "src",
-            "Host",
-            "PetMagic.Host.Api",
-            "Program.cs"));
+        var source = ReadHostProgramSource();
 
         var authenticationIndex = source.IndexOf("app.UseAuthentication();", StringComparison.Ordinal);
         var rateLimiterIndex = source.IndexOf("app.UseRateLimiter();", StringComparison.Ordinal);
@@ -26,6 +21,53 @@ public sealed class HostApiMiddlewareOrderTests
             rateLimiterIndex < authorizationIndex,
             "UseRateLimiter must still run before UseAuthorization to throttle protected endpoint traffic before authorization handlers.");
     }
+
+    [Fact]
+    public void Program_ShouldAuthorizeSignedMediaOnlyForManagedPrefixes()
+    {
+        var source = ReadHostProgramSource();
+
+        Assert.Contains("IsManagedSignedMediaPath(", source, StringComparison.Ordinal);
+        Assert.Contains("ResolvePublicBasePath(", source, StringComparison.Ordinal);
+        Assert.Contains("\"/support-attachments\"", source, StringComparison.Ordinal);
+        Assert.Contains("\"/user-avatars\"", source, StringComparison.Ordinal);
+        Assert.Contains("requestPath.StartsWithSegments(managedPrefix)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "requestPath.Contains(\"/support-attachments\", StringComparison.OrdinalIgnoreCase)",
+            source,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "requestPath.Contains(\"/user-avatars\", StringComparison.OrdinalIgnoreCase)",
+            source,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Program_ShouldClassifyStaticMediaOnlyByManagedPathSegments()
+    {
+        var source = ReadHostProgramSource();
+
+        Assert.Contains("IsManagedStaticMediaPath(", source, StringComparison.Ordinal);
+        Assert.Contains("IsManagedStaticMediaPath(requestPath, \"/support-attachments\")", source, StringComparison.Ordinal);
+        Assert.Contains("IsManagedStaticMediaPath(requestPath, \"/user-avatars\")", source, StringComparison.Ordinal);
+        Assert.Contains("IsManagedStaticMediaPath(requestPath, \"/templates-media\")", source, StringComparison.Ordinal);
+        Assert.Contains("requestPath.StartsWithSegments(new PathString(managedPathPrefix))", source, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "requestPath.StartsWith(\"/support-attachments\", StringComparison.OrdinalIgnoreCase)",
+            source,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "requestPath.StartsWith(\"/user-avatars\", StringComparison.OrdinalIgnoreCase)",
+            source,
+            StringComparison.Ordinal);
+    }
+
+    private static string ReadHostProgramSource() => File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "Host",
+        "PetMagic.Host.Api",
+        "Program.cs"));
 
     private static string FindRepositoryRoot()
     {

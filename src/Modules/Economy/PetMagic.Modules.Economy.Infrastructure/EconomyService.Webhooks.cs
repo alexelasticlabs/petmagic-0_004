@@ -6,6 +6,7 @@ using Npgsql;
 
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Contracts;
+using PetMagic.Modules.Economy.Infrastructure.Entities;
 
 namespace PetMagic.Modules.Economy.Infrastructure;
 
@@ -14,6 +15,42 @@ public sealed partial class EconomyService
     private static bool IsUniqueWebhookEventConflict(DbUpdateException exception)
     {
         return exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation };
+    }
+
+    /// <summary>
+    /// Claims a webhook event for processing. Returns <c>false</c> when the event was already processed.
+    /// On relational databases the claim row is flushed immediately (inside the ambient transaction),
+    /// so a concurrent duplicate delivery blocks on the unique (Provider, EventId) index and fails
+    /// before any side effects run, while a rollback of the transaction also releases the claim.
+    /// </summary>
+    private async Task<bool> TryClaimWebhookEventAsync(
+        string provider,
+        string eventId,
+        string eventType,
+        CancellationToken cancellationToken)
+    {
+        if (await dbContext.ProcessedWebhookEvents.AnyAsync(
+                x => x.Provider == provider && x.EventId == eventId,
+                cancellationToken))
+        {
+            return false;
+        }
+
+        dbContext.ProcessedWebhookEvents.Add(new ProcessedWebhookEvent
+        {
+            Id = Guid.NewGuid(),
+            Provider = provider,
+            EventId = eventId,
+            EventType = eventType,
+            ProcessedAtUtc = DateTime.UtcNow
+        });
+
+        if (dbContext.Database.IsRelational())
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        return true;
     }
 
     private Result<StripeWebhookResultResponse> StripeWebhookFailure(Error error, string stage, string? eventType = null)

@@ -1,7 +1,10 @@
-using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 using PetMagic.Modules.Identity.Api.Authentication;
 using PetMagic.Modules.Identity.Application.Contracts;
+using PetMagic.Modules.Identity.Infrastructure.Data;
 
 namespace PetMagic.Modules.Identity.Tests.Identity;
 
@@ -19,35 +22,71 @@ public sealed class ExternalLoginCompletionStoreTests
         false);
 
     [Fact]
-    public void Create_and_try_take_returns_payload_once()
+    public async Task Create_and_try_take_returns_payload_once()
     {
-        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
-        var store = new ExternalLoginCompletionStore(memoryCache);
+        await using var services = CreateServices();
+        var store = new ExternalLoginCompletionStore(
+            services.GetRequiredService<IServiceScopeFactory>());
         var session = CreateSession();
 
-        var ticket = store.Create(session);
+        var ticket = await store.CreateAsync(session, CancellationToken.None);
 
-        var firstTake = store.TryTake(ticket, out var restoredSession);
-        var secondTake = store.TryTake(ticket, out var missingSession);
+        using (var scope = services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+            Assert.True(await dbContext.ExternalAuthTickets.AnyAsync(x => x.Ticket == ticket));
+        }
 
-        Assert.True(firstTake);
+        var restoredSession = await store.TryTakeAsync(ticket, CancellationToken.None);
+        var missingSession = await store.TryTakeAsync(ticket, CancellationToken.None);
+
         Assert.NotNull(restoredSession);
-        Assert.Equal(session.AccessToken, restoredSession!.AccessToken);
+        Assert.Equal(session.AccessToken, restoredSession.AccessToken);
         Assert.Equal(session.RefreshToken, restoredSession.RefreshToken);
-        Assert.False(secondTake);
         Assert.Null(missingSession);
     }
 
     [Fact]
-    public void Try_take_returns_false_for_unknown_ticket()
+    public async Task Try_take_returns_false_for_unknown_ticket()
     {
-        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
-        var store = new ExternalLoginCompletionStore(memoryCache);
+        await using var services = CreateServices();
+        var store = new ExternalLoginCompletionStore(
+            services.GetRequiredService<IServiceScopeFactory>());
 
-        var found = store.TryTake("missing-ticket", out var session);
+        var session = await store.TryTakeAsync("missing-ticket", CancellationToken.None);
 
-        Assert.False(found);
         Assert.Null(session);
+    }
+
+    [Fact]
+    public async Task Account_link_ticket_returns_user_once()
+    {
+        await using var services = CreateServices();
+        var store = new ExternalAccountLinkStore(
+            services.GetRequiredService<IServiceScopeFactory>());
+        var userId = Guid.NewGuid();
+
+        var ticket = await store.CreateAsync(userId, CancellationToken.None);
+
+        var restoredUserId = await store.TryTakeAsync(ticket, CancellationToken.None);
+        var missingUserId = await store.TryTakeAsync(ticket, CancellationToken.None);
+
+        Assert.Equal(userId, restoredUserId);
+        Assert.Null(missingUserId);
+    }
+
+    private static ServiceProvider CreateServices()
+    {
+        var connection = new SqliteConnection("Data Source=:memory:");
+        connection.Open();
+        var services = new ServiceCollection();
+        services.AddSingleton(connection);
+        services.AddDbContext<IdentityDbContext>(options =>
+            options.UseSqlite(connection));
+        var serviceProvider = services.BuildServiceProvider();
+        using var scope = serviceProvider.CreateScope();
+        scope.ServiceProvider.GetRequiredService<IdentityDbContext>().Database.EnsureCreated();
+        return serviceProvider;
     }
 
     private static TokenPairResponse CreateSession()

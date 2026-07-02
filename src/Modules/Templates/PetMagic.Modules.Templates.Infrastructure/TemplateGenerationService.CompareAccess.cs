@@ -23,14 +23,32 @@ internal sealed partial class TemplateGenerationService
         bool hasCleanAccess,
         CancellationToken cancellationToken)
     {
-        if (job.Status != TemplateGenerationStatus.Completed
-            || job.Template?.TemplateType != TemplateType.Image)
+        if (job.Status != TemplateGenerationStatus.Completed)
         {
             return response with
             {
                 ResultMediaAssetId = job.ResultMediaAssetId,
                 InputPreviewUrl = null,
                 ResultPreviewUrl = null,
+                CanCompareBeforeAfter = false
+            };
+        }
+
+        if (job.Template?.TemplateType != TemplateType.Image)
+        {
+            var nonImageMediaType = TemplateGenerationQueue.ResolveMediaType(job) == TemplateGenerationQueue.MediaTypeVideo
+                ? "video"
+                : "image";
+            var nonImageResultMediaRecord = await ResolveResultMediaRecordAsync(job, cancellationToken, nonImageMediaType);
+            return response with
+            {
+                ResultMediaAssetId = nonImageResultMediaRecord?.Id ?? job.ResultMediaAssetId,
+                InputPreviewUrl = null,
+                ResultPreviewUrl = ResolveResultComparePreviewUrl(
+                    job,
+                    nonImageResultMediaRecord,
+                    hasCleanAccess,
+                    allowResultFallback: false),
                 CanCompareBeforeAfter = false
             };
         }
@@ -268,7 +286,8 @@ internal sealed partial class TemplateGenerationService
 
     private async Task<TemplateMediaRecord?> ResolveResultMediaRecordAsync(
         TemplateGenerationJob job,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string mediaType = "image")
     {
         if (job.ResultMediaAssetId is Guid resultMediaAssetId)
         {
@@ -278,7 +297,7 @@ internal sealed partial class TemplateGenerationService
                     x => x.Id == resultMediaAssetId
                         && x.UserId == job.UserId
                         && !x.IsDeleted
-                        && x.MediaType == "image",
+                        && x.MediaType == mediaType,
                     cancellationToken);
             if (resultMediaRecord is not null)
             {
@@ -292,7 +311,7 @@ internal sealed partial class TemplateGenerationService
                 x => x.GenerationId == job.Id
                     && x.UserId == job.UserId
                     && x.SourceType == "generation_result"
-                    && x.MediaType == "image"
+                    && x.MediaType == mediaType
                     && !x.IsDeleted,
                 cancellationToken);
     }
@@ -300,18 +319,19 @@ internal sealed partial class TemplateGenerationService
     private static string? ResolveResultComparePreviewUrl(
         TemplateGenerationJob job,
         TemplateMediaRecord? resultMediaRecord,
-        bool hasCleanAccess)
+        bool hasCleanAccess,
+        bool allowResultFallback = true)
     {
         if (hasCleanAccess)
         {
             return resultMediaRecord?.PreviewUrl
-                ?? resultMediaRecord?.Url
-                ?? job.ResultUrl;
+                ?? (allowResultFallback ? resultMediaRecord?.Url : null)
+                ?? (allowResultFallback ? job.ResultUrl : null);
         }
 
         return resultMediaRecord?.WatermarkedPreviewUrl
-            ?? resultMediaRecord?.WatermarkedStoragePath
-            ?? job.WatermarkedResultUrl;
+            ?? (allowResultFallback ? resultMediaRecord?.WatermarkedStoragePath : null)
+            ?? (allowResultFallback ? job.WatermarkedResultUrl : null);
     }
 
     internal TemplateGenerationResponse ApplyWatermarkAccess(

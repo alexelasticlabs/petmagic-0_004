@@ -88,6 +88,11 @@ public sealed class AvatarReadUrlSigner(
             return false;
         }
 
+        if (ContainsUnsafePathSegments(fileUrl.Replace('\\', '/')))
+        {
+            return false;
+        }
+
         if (!Uri.TryCreate(fileUrl, UriKind.Absolute, out var uri)
             || !Uri.TryCreate(storageOptions.PublicBaseUrl, UriKind.Absolute, out var baseUri))
         {
@@ -99,10 +104,13 @@ public sealed class AvatarReadUrlSigner(
             return false;
         }
 
-        return TryExtractCanonicalManagedPath(uri.AbsolutePath.Replace('\\', '/'), out managedPath);
+        return TryExtractCanonicalManagedPath(
+            uri.AbsolutePath.Replace('\\', '/'),
+            baseUri.AbsolutePath,
+            out managedPath);
     }
 
-    private static bool TryResolveManagedRequestPath(string? requestPath, out string managedPath)
+    private bool TryResolveManagedRequestPath(string? requestPath, out string managedPath)
     {
         managedPath = string.Empty;
         if (string.IsNullOrWhiteSpace(requestPath) || requestPath.Contains('\\'))
@@ -110,7 +118,10 @@ public sealed class AvatarReadUrlSigner(
             return false;
         }
 
-        return TryExtractCanonicalManagedPath(requestPath.Replace('\\', '/'), out managedPath);
+        var basePath = Uri.TryCreate(storageOptions.PublicBaseUrl, UriKind.Absolute, out var baseUri)
+            ? baseUri.AbsolutePath
+            : string.Empty;
+        return TryExtractCanonicalManagedPath(requestPath.Replace('\\', '/'), basePath, out managedPath);
     }
 
     private string ComputeSignature(string managedPath, long expiresAtUnixSeconds)
@@ -128,17 +139,83 @@ public sealed class AvatarReadUrlSigner(
             && uri.Port == baseUri.Port;
     }
 
-    private static bool TryExtractCanonicalManagedPath(string normalizedPath, out string managedPath)
+    private static bool TryExtractCanonicalManagedPath(
+        string normalizedPath,
+        string? publicBasePath,
+        out string managedPath)
     {
         managedPath = string.Empty;
-        var segmentIndex = normalizedPath.IndexOf(ManagedPathSegment, StringComparison.OrdinalIgnoreCase);
-        if (segmentIndex < 0)
+        if (normalizedPath.StartsWith(ManagedPathSegment, StringComparison.OrdinalIgnoreCase))
+        {
+            return TryNormalizeManagedPath(normalizedPath, out managedPath);
+        }
+
+        var normalizedBasePath = NormalizePublicBasePath(publicBasePath);
+        if (string.IsNullOrWhiteSpace(normalizedBasePath))
         {
             return false;
         }
 
-        managedPath = normalizedPath[segmentIndex..];
-        return managedPath.Length > ManagedPathSegment.Length;
+        var prefixedManagedPath = $"{normalizedBasePath}{ManagedPathSegment}";
+        if (!normalizedPath.StartsWith(prefixedManagedPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return TryNormalizeManagedPath(normalizedPath[normalizedBasePath.Length..], out managedPath);
+    }
+
+    private static bool TryNormalizeManagedPath(string candidate, out string managedPath)
+    {
+        managedPath = string.Empty;
+        if (!candidate.StartsWith(ManagedPathSegment, StringComparison.OrdinalIgnoreCase)
+            || candidate.Length <= ManagedPathSegment.Length
+            || candidate.EndsWith("/", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var segments = candidate
+            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (segments.Length <= 1
+            || !string.Equals(segments[0], ManagedPathSegment.Trim('/'), StringComparison.OrdinalIgnoreCase)
+            || segments.Any(IsUnsafePathSegment))
+        {
+            return false;
+        }
+
+        managedPath = $"/{string.Join('/', segments)}";
+        return true;
+    }
+
+    private static bool IsUnsafePathSegment(string segment)
+    {
+        if (string.Equals(segment, ".", StringComparison.Ordinal)
+            || string.Equals(segment, "..", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        var decodedSegment = Uri.UnescapeDataString(segment);
+        return string.Equals(decodedSegment, ".", StringComparison.Ordinal)
+            || string.Equals(decodedSegment, "..", StringComparison.Ordinal);
+    }
+
+    private static bool ContainsUnsafePathSegments(string value)
+    {
+        return value
+            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Any(IsUnsafePathSegment);
+    }
+
+    private static string NormalizePublicBasePath(string? publicBasePath)
+    {
+        if (string.IsNullOrWhiteSpace(publicBasePath) || publicBasePath == "/")
+        {
+            return string.Empty;
+        }
+
+        return publicBasePath.TrimEnd('/');
     }
 
     private static bool ContainsManagedPathSegment(string fileUrl)

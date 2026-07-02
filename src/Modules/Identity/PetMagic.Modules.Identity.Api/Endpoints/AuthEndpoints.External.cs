@@ -112,7 +112,10 @@ public static partial class AuthEndpoints
 
         if (string.Equals(flowMode, ExternalFlowModeLink, StringComparison.OrdinalIgnoreCase))
         {
-            if (string.IsNullOrWhiteSpace(linkTicket) || !linkStore.TryTake(linkTicket, out var userId))
+            var linkedUserId = string.IsNullOrWhiteSpace(linkTicket)
+                ? null
+                : await linkStore.TryTakeAsync(linkTicket, cancellationToken);
+            if (linkedUserId is null)
             {
                 await httpContext.SignOutAsync(IdentityConstants.ExternalScheme);
                 return BuildExternalCallbackErrorResult(
@@ -121,7 +124,7 @@ public static partial class AuthEndpoints
                     StatusCodes.Status401Unauthorized);
             }
 
-            var linkedResult = await service.LinkExternalLoginAsync(userId, command, cancellationToken);
+            var linkedResult = await service.LinkExternalLoginAsync(linkedUserId.Value, command, cancellationToken);
             await httpContext.SignOutAsync(IdentityConstants.ExternalScheme);
 
             if (linkedResult.IsFailure)
@@ -160,7 +163,7 @@ public static partial class AuthEndpoints
 
         if (clientRedirectUri is not null)
         {
-            var ticket = completionStore.Create(result.Value);
+            var ticket = await completionStore.CreateAsync(result.Value, cancellationToken);
             var redirectUrl = QueryHelpers.AddQueryString(clientRedirectUri, new Dictionary<string, string?>
             {
                 ["ticket"] = ticket,
@@ -287,10 +290,11 @@ public static partial class AuthEndpoints
         return TypedResults.Ok(result.Value);
     }
 
-    private static Results<Ok<TokenPairResponse>, ValidationProblem, ProblemHttpResult> ExchangeExternalLoginAsync(
+    private static async Task<Results<Ok<TokenPairResponse>, ValidationProblem, ProblemHttpResult>> ExchangeExternalLoginAsync(
         HttpContext context,
         ExternalLoginExchangeRequest request,
-        ExternalLoginCompletionStore completionStore)
+        ExternalLoginCompletionStore completionStore,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Ticket))
         {
@@ -300,7 +304,8 @@ public static partial class AuthEndpoints
             });
         }
 
-        if (!completionStore.TryTake(request.Ticket, out var session) || session is null)
+        var session = await completionStore.TryTakeAsync(request.Ticket, cancellationToken);
+        if (session is null)
         {
             return ToExternalAuthProblem(ExternalTicketInvalidCode, StatusCodes.Status401Unauthorized);
         }

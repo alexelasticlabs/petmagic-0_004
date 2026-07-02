@@ -12,6 +12,8 @@ public static class EconomyErrors
 
     public static readonly Error InvalidAmount = new("economy.invalid_amount", "Wallet amount must be greater than zero.");
 
+    public static readonly Error InvalidWalletReason = new("economy.invalid_wallet_reason", "Wallet operation reason is invalid.");
+
     public static readonly Error InvalidSubject = new("economy.invalid_subject", "Invalid access token subject.");
 
     public static readonly Error CurrencyPackNotFound = new("economy.pack_not_found", "Currency pack was not found.");
@@ -40,7 +42,7 @@ public static class EconomyErrors
 
     public static readonly Error PaymentProviderConfigurationAlreadyExists = new("economy.payment_provider_config_exists", "Payment provider configuration already exists for this provider, platform, and region.");
 
-    public static readonly Error PaymentProviderDisclosureInvalid = new("economy.payment_provider_disclosure_invalid", "Payment provider disclosures must not reference deprecated external Stripe checkout copy.");
+    public static readonly Error PaymentProviderDisclosureInvalid = new("economy.payment_provider_disclosure_invalid", "Payment provider disclosures must not reference deprecated Stripe checkout or native PaymentSheet copy.");
 
     public static readonly Error PremiumBillingUnavailable = new("economy.premium_billing_unavailable", "Premium billing is not available right now.");
 
@@ -82,4 +84,16 @@ public static class EconomyErrors
     public static readonly Error ReferralPaidUserIneligible = new("economy.referral_paid_user_ineligible", "Referral code must be activated before the first paid purchase.");
 
     public static readonly Error InvalidPushToken = new("economy.push_token_invalid", "Economy push token is invalid.");
+
+    public static readonly Error EconomyIncidentNotFound = new("economy.incident_not_found", "Economy incident was not found.");
+
+    public static readonly Error EconomyIncidentActionInvalid = new("economy.incident_action_invalid", "Economy incident action is not supported.");
+
+    public static readonly Error EconomyIncidentActionReasonRequired = new("economy.incident_action_reason_required", "Economy incident action reason is required.");
+
+    public static readonly Error GenerationBillingReconciliationUnavailable = new("economy.generation_billing_reconciliation_unavailable", "Generation billing reconciliation is not available.");
+
+    public static readonly Error GenerationBillingSnapshotNotFound = new("economy.generation_billing_snapshot_not_found", "Generation billing snapshot was not found.");
+
+    public static readonly Error GenerationBillingLedgerNotFound = new("economy.generation_billing_ledger_not_found", "Generation billing ledger entry was not found.");
 }

@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 
+using PetMagic.BuildingBlocks.Results;
+using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
 using PetMagic.Modules.Economy.Domain.Enums;
 using PetMagic.Modules.Economy.Infrastructure;
@@ -198,6 +200,96 @@ public sealed partial class EconomyServiceTests
         Assert.Equal(60, ledger.Delta);
         Assert.Equal("generation_refund", ledger.Source);
         Assert.Equal("template_generation:test", ledger.Reason);
+        Assert.Equal(WalletTokenKind.RefundAdjustment, ledger.TokenKind);
+        Assert.Equal("credit", ledger.OperationKind);
+
+        var bucket = await dbContext.WalletTokenBuckets.SingleAsync(x => x.UserId == userId);
+        Assert.Equal(WalletTokenKind.RefundAdjustment, bucket.Kind);
+        Assert.Equal(60, bucket.InitialAmount);
+        Assert.Equal(60, bucket.RemainingAmount);
+        Assert.Equal(ledger.Id, bucket.SourceLedgerEntryId);
+    }
+
+    [Fact]
+    public async Task SpendAsync_ShouldConsumeNonPurchasedBucketsBeforePurchasedBuckets()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var service = CreateService(dbContext);
+        await service.CreditAsync(
+            new CreditBalanceCommand(userId, 100, WalletLedgerSource.PackPurchase, "purchase:one", "purchase:one"),
+            CancellationToken.None);
+        await service.CreditAsync(
+            new CreditBalanceCommand(userId, 30, WalletLedgerSource.RedeemCode, "promo:one", "promo:one"),
+            CancellationToken.None);
+
+        var spend = await service.SpendAsync(
+            new SpendBalanceCommand(userId, 40, "template_generation:spend-one", WalletLedgerSource.GenerationSpend),
+            CancellationToken.None);
+
+        Assert.True(spend.IsSuccess);
+        Assert.Equal(90, spend.Value.NewBalance);
+
+        var buckets = await dbContext.WalletTokenBuckets
+            .Where(x => x.UserId == userId)
+            .ToDictionaryAsync(x => x.Kind);
+        Assert.Equal(0, buckets[WalletTokenKind.Promo].RemainingAmount);
+        Assert.Equal(90, buckets[WalletTokenKind.Purchased].RemainingAmount);
+
+        var spendLedger = await dbContext.WalletLedgerEntries.SingleAsync(x => x.Source == WalletLedgerSource.GenerationSpend);
+        Assert.Equal(WalletTokenKind.MixedSpend, spendLedger.TokenKind);
+        Assert.Contains(WalletTokenKind.Promo, spendLedger.BucketDeltasJson);
+        Assert.Contains(WalletTokenKind.Purchased, spendLedger.BucketDeltasJson);
+    }
+
+    [Fact]
+    public async Task PurchaseRefund_ShouldConsumePurchasedBucketsBeforeBonusBuckets()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var service = CreateService(dbContext);
+        await service.CreditAsync(
+            new CreditBalanceCommand(userId, 100, WalletLedgerSource.PackPurchase, "purchase:refund-source", "purchase:refund-source"),
+            CancellationToken.None);
+        await service.CreditAsync(
+            new CreditBalanceCommand(userId, 50, WalletLedgerSource.AdReward, "ad:bonus", "ad:bonus"),
+            CancellationToken.None);
+
+        var debit = await service.SpendAsync(
+            new SpendBalanceCommand(userId, 80, "purchase_refund:refund-source", WalletLedgerSource.PurchaseRefund),
+            CancellationToken.None);
+
+        Assert.True(debit.IsSuccess);
+        var purchasedBucket = await dbContext.WalletTokenBuckets.SingleAsync(x => x.Kind == WalletTokenKind.Purchased);
+        var bonusBucket = await dbContext.WalletTokenBuckets.SingleAsync(x => x.Kind == WalletTokenKind.Bonus);
+        Assert.Equal(20, purchasedBucket.RemainingAmount);
+        Assert.Equal(50, bonusBucket.RemainingAmount);
+    }
+
+    [Fact]
+    public async Task SpendAsync_ShouldCreateLegacyBucketProjectionForExistingWalletBalance()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        dbContext.Wallets.Add(new Wallet
+        {
+            UserId = userId,
+            Balance = 20,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        await dbContext.SaveChangesAsync();
+
+        var result = await CreateService(dbContext).SpendAsync(
+            new SpendBalanceCommand(userId, 5, "template_generation:legacy-spend"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var legacyBucket = await dbContext.WalletTokenBuckets.SingleAsync(x => x.UserId == userId);
+        Assert.Equal(WalletTokenKind.Legacy, legacyBucket.Kind);
+        Assert.Equal(15, legacyBucket.RemainingAmount);
     }
 
     [Fact]
@@ -300,6 +392,313 @@ public sealed partial class EconomyServiceTests
         var ledgerEntry = Assert.Single(ledgerEntries);
         Assert.Equal(-1, ledgerEntry.Delta);
         Assert.Equal(command.Reason, ledgerEntry.Reason);
+    }
+
+    [Fact]
+    public async Task CreditAsync_ShouldBeIdempotentForGenericIdempotencyKey()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var service = CreateService(dbContext);
+        var command = new CreditBalanceCommand(
+            userId,
+            75,
+            WalletLedgerSource.AdminGrant,
+            "support:manual-credit",
+            "admin-credit-ticket-1");
+
+        var first = await service.CreditAsync(command, CancellationToken.None);
+        var duplicate = await service.CreditAsync(command, CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(duplicate.IsSuccess);
+        Assert.Equal(75, first.Value.NewBalance);
+        Assert.Equal(75, duplicate.Value.NewBalance);
+        Assert.Equal(0, duplicate.Value.Delta);
+
+        var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
+        var ledgerEntry = await dbContext.WalletLedgerEntries.SingleAsync(x => x.UserId == userId);
+
+        Assert.Equal(75, wallet.Balance);
+        Assert.Equal(75, ledgerEntry.Delta);
+        Assert.Equal(WalletLedgerSource.AdminGrant, ledgerEntry.Source);
+        Assert.Equal("admin-credit-ticket-1", ledgerEntry.Reason);
+        Assert.Equal("internal", ledgerEntry.SourceProvider);
+        Assert.StartsWith("wallet:", ledgerEntry.SourceTransactionId, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CreditAsync_ShouldRejectInvalidWalletReasonsWithoutPersistingLedger()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var service = CreateService(dbContext);
+
+        var blankReason = await service.CreditAsync(
+            new CreditBalanceCommand(Guid.NewGuid(), 75, WalletLedgerSource.AdminGrant, "   "),
+            CancellationToken.None);
+        var oversizedReason = await service.CreditAsync(
+            new CreditBalanceCommand(Guid.NewGuid(), 75, WalletLedgerSource.AdminGrant, new string('r', 121)),
+            CancellationToken.None);
+
+        Assert.True(blankReason.IsFailure);
+        Assert.Equal(EconomyErrors.InvalidWalletReason.Code, blankReason.Error.Code);
+        Assert.True(oversizedReason.IsFailure);
+        Assert.Equal(EconomyErrors.InvalidWalletReason.Code, oversizedReason.Error.Code);
+        Assert.Empty(await dbContext.WalletLedgerEntries.ToListAsync());
+    }
+
+    [Fact]
+    public async Task SpendAsync_ShouldBeIdempotentForGenerationSpendReason()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        dbContext.Wallets.Add(new Wallet
+        {
+            UserId = userId,
+            Balance = 100,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext);
+        var command = new SpendBalanceCommand(userId, 60, "template_generation:job-1");
+
+        var first = await service.SpendAsync(command, CancellationToken.None);
+        var duplicate = await service.SpendAsync(command, CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(duplicate.IsSuccess);
+        Assert.Equal(40, first.Value.NewBalance);
+        Assert.Equal(40, duplicate.Value.NewBalance);
+        Assert.Equal(0, duplicate.Value.Delta);
+
+        var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
+        var ledgerEntry = await dbContext.WalletLedgerEntries.SingleAsync(x => x.UserId == userId);
+
+        Assert.Equal(40, wallet.Balance);
+        Assert.Equal(-60, ledgerEntry.Delta);
+        Assert.Equal(WalletLedgerSource.GenerationSpend, ledgerEntry.Source);
+    }
+
+    [Fact]
+    public async Task WalletMutations_ShouldPreserveLedgerConsistencyAcrossCreditAndSpendRace()
+    {
+        await using var anchorConnection = await CreateSharedSqliteEconomyDatabaseAsync();
+        var userId = Guid.NewGuid();
+
+        await using (var seedContext = CreateSqliteDbContext(anchorConnection.ConnectionString))
+        {
+            seedContext.Wallets.Add(new Wallet
+            {
+                UserId = userId,
+                Balance = 50,
+                UpdatedAtUtc = DateTime.UtcNow
+            });
+            await seedContext.SaveChangesAsync();
+        }
+
+        var creditTask = Task.Run(async () =>
+        {
+            await using var dbContext = CreateSqliteDbContext(anchorConnection.ConnectionString);
+            var result = await CreateService(dbContext).CreditAsync(
+                new CreditBalanceCommand(userId, 30, WalletLedgerSource.AdminGrant, "race:credit", "race-credit-1"),
+                CancellationToken.None);
+            Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : string.Empty);
+        });
+        var spendTask = Task.Run(async () =>
+        {
+            await using var dbContext = CreateSqliteDbContext(anchorConnection.ConnectionString);
+            var result = await CreateService(dbContext).SpendAsync(
+                new SpendBalanceCommand(userId, 40, "template_generation:race-spend"),
+                CancellationToken.None);
+            Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : string.Empty);
+        });
+
+        await Task.WhenAll(creditTask, spendTask);
+
+        await using var verifyContext = CreateSqliteDbContext(anchorConnection.ConnectionString);
+        var wallet = await verifyContext.Wallets.SingleAsync(x => x.UserId == userId);
+        var ledgerEntries = await verifyContext.WalletLedgerEntries
+            .Where(x => x.UserId == userId)
+            .OrderBy(x => x.CreatedAtUtc)
+            .ToArrayAsync();
+
+        Assert.Equal(40, wallet.Balance);
+        Assert.Equal(2, ledgerEntries.Length);
+        Assert.Equal(wallet.Balance, ledgerEntries.Last().BalanceAfter);
+        Assert.Equal(40, 50 + ledgerEntries.Sum(x => x.Delta));
+    }
+
+    [Fact]
+    public async Task WalletMutations_ShouldPreserveParallelCredits()
+    {
+        await using var anchorConnection = await CreateSharedSqliteEconomyDatabaseAsync();
+        var userId = Guid.NewGuid();
+
+        var tasks = Enumerable.Range(0, 2)
+            .Select(index => Task.Run(async () =>
+            {
+                await using var dbContext = CreateSqliteDbContext(anchorConnection.ConnectionString);
+                var result = await CreateService(dbContext).CreditAsync(
+                    new CreditBalanceCommand(
+                        userId,
+                        25,
+                        WalletLedgerSource.AdminGrant,
+                        $"parallel-credit:{index}",
+                        $"parallel-credit:{index}"),
+                    CancellationToken.None);
+                Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : string.Empty);
+            }))
+            .ToArray();
+
+        await Task.WhenAll(tasks);
+
+        await using var verifyContext = CreateSqliteDbContext(anchorConnection.ConnectionString);
+        var wallet = await verifyContext.Wallets.SingleAsync(x => x.UserId == userId);
+        var ledgerEntries = await verifyContext.WalletLedgerEntries
+            .Where(x => x.UserId == userId && x.Source == WalletLedgerSource.AdminGrant)
+            .ToArrayAsync();
+
+        Assert.Equal(50, wallet.Balance);
+        Assert.Equal(2, ledgerEntries.Length);
+        Assert.Equal(50, ledgerEntries.Sum(x => x.Delta));
+    }
+
+    [Fact]
+    public async Task WalletMutations_ShouldPreserveParallelSpends()
+    {
+        await using var anchorConnection = await CreateSharedSqliteEconomyDatabaseAsync();
+        var userId = Guid.NewGuid();
+
+        await using (var seedContext = CreateSqliteDbContext(anchorConnection.ConnectionString))
+        {
+            seedContext.Wallets.Add(new Wallet
+            {
+                UserId = userId,
+                Balance = 50,
+                UpdatedAtUtc = DateTime.UtcNow
+            });
+            await seedContext.SaveChangesAsync();
+        }
+
+        var tasks = Enumerable.Range(0, 2)
+            .Select(index => Task.Run(async () =>
+            {
+                await using var dbContext = CreateSqliteDbContext(anchorConnection.ConnectionString);
+                var result = await CreateService(dbContext).SpendAsync(
+                    new SpendBalanceCommand(userId, 20, $"template_generation:parallel-spend-{index}"),
+                    CancellationToken.None);
+                Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : string.Empty);
+            }))
+            .ToArray();
+
+        await Task.WhenAll(tasks);
+
+        await using var verifyContext = CreateSqliteDbContext(anchorConnection.ConnectionString);
+        var wallet = await verifyContext.Wallets.SingleAsync(x => x.UserId == userId);
+        var ledgerEntries = await verifyContext.WalletLedgerEntries
+            .Where(x => x.UserId == userId && x.Source == WalletLedgerSource.GenerationSpend)
+            .ToArrayAsync();
+
+        Assert.Equal(10, wallet.Balance);
+        Assert.Equal(2, ledgerEntries.Length);
+        Assert.Equal(-40, ledgerEntries.Sum(x => x.Delta));
+    }
+
+    [Fact]
+    public async Task WalletMutations_ShouldPreserveAdminGrantAndPurchaseConfirmationTogether()
+    {
+        await using var anchorConnection = await CreateSharedSqliteEconomyDatabaseAsync();
+        var userId = Guid.NewGuid();
+        PurchaseCheckoutResponse checkout;
+
+        await using (var setupContext = CreateSqliteDbContext(anchorConnection.ConnectionString))
+        {
+            var packId = AddStarterPack(setupContext);
+            var createResult = await CreateService(setupContext).CreatePackPurchaseAsync(
+                new CreatePackPurchaseCommand(userId, packId, "USD", "stripe", "web", "1.0.0", "*", "en"),
+                CancellationToken.None);
+            Assert.True(createResult.IsSuccess, createResult.IsFailure ? createResult.Error.Code : string.Empty);
+            checkout = createResult.Value;
+        }
+
+        var eventId = $"evt_{Guid.NewGuid():N}";
+        var created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var payload = $"{{\"id\":\"{eventId}\",\"object\":\"event\",\"type\":\"checkout.session.completed\",\"created\":{created},\"data\":{{\"object\":{{\"id\":\"{checkout.ExternalPaymentId}\",\"object\":\"checkout.session\",\"status\":\"complete\",\"payment_status\":\"paid\",\"metadata\":{{\"order_id\":\"{checkout.OrderId:D}\"}}}}}}}}";
+        var signature = BuildStripeSignature(payload, "test_webhook_secret");
+
+        var adminGrantTask = Task.Run(async () =>
+        {
+            await using var dbContext = CreateSqliteDbContext(anchorConnection.ConnectionString);
+            var result = await CreateService(dbContext).CreditAsync(
+                new CreditBalanceCommand(userId, 25, WalletLedgerSource.AdminGrant, "support:parallel-grant", "support:parallel-grant"),
+                CancellationToken.None);
+            Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : string.Empty);
+        });
+        var purchaseConfirmationTask = Task.Run(async () =>
+        {
+            await using var dbContext = CreateSqliteDbContext(anchorConnection.ConnectionString);
+            var result = await CreateService(dbContext).HandleStripeWebhookAsync(
+                new StripeWebhookCommand(payload, signature),
+                CancellationToken.None);
+            Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : string.Empty);
+        });
+
+        await Task.WhenAll(adminGrantTask, purchaseConfirmationTask);
+
+        await using var verifyContext = CreateSqliteDbContext(anchorConnection.ConnectionString);
+        var wallet = await verifyContext.Wallets.SingleAsync(x => x.UserId == userId);
+        var ledgerEntries = await verifyContext.WalletLedgerEntries
+            .Where(x => x.UserId == userId)
+            .ToArrayAsync();
+
+        Assert.Equal(145, wallet.Balance);
+        Assert.Contains(ledgerEntries, x => x.Source == WalletLedgerSource.AdminGrant && x.Delta == 25);
+        Assert.Contains(ledgerEntries, x => x.Source == WalletLedgerSource.PackPurchase && x.Delta == 120);
+    }
+
+    [Fact]
+    public async Task GenerationRefundAndNewSpend_ShouldRemainConsistentWhenAppliedTogether()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        dbContext.Wallets.Add(new Wallet
+        {
+            UserId = userId,
+            Balance = 60,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext);
+
+        var refund = await service.CreditAsync(
+            new CreditBalanceCommand(
+                userId,
+                60,
+                WalletLedgerSource.GenerationRefund,
+                "template_generation:failed-job",
+                "generation_refund:failed-job"),
+            CancellationToken.None);
+        var newSpend = await service.SpendAsync(
+            new SpendBalanceCommand(userId, 60, "template_generation:new-job"),
+            CancellationToken.None);
+
+        Assert.True(refund.IsSuccess);
+        Assert.True(newSpend.IsSuccess);
+
+        var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
+        var ledgerEntries = await dbContext.WalletLedgerEntries
+            .Where(x => x.UserId == userId)
+            .ToArrayAsync();
+
+        Assert.Equal(60, wallet.Balance);
+        Assert.Equal(2, ledgerEntries.Length);
+        Assert.Equal(0, ledgerEntries.Sum(x => x.Delta));
     }
 
     [Fact]
@@ -716,7 +1115,8 @@ public sealed partial class EconomyServiceTests
         });
         await dbContext.SaveChangesAsync();
 
-        var result = await CreateService(dbContext).RefundAdminPurchaseAsync(
+        var auditLog = new RecordingAdminAuditLog();
+        var result = await CreateService(dbContext, adminAuditLog: auditLog).RefundAdminPurchaseAsync(
             new AdminRefundPurchaseCommand(orderId, "support refund"),
             CancellationToken.None);
 
@@ -739,8 +1139,157 @@ public sealed partial class EconomyServiceTests
         Assert.Equal(-120, refundLedger.Delta);
         Assert.Equal(0, refundLedger.BalanceAfter);
         Assert.Equal($"purchase_refund:{orderId:D}", refundLedger.Reason);
-        Assert.Equal("stripe", refundLedger.SourceProvider);
-        Assert.Equal($"re_{orderId:N}", refundLedger.SourceTransactionId);
+        Assert.Equal("internal", refundLedger.SourceProvider);
+        Assert.Equal($"refund-reservation:{orderId:D}", refundLedger.SourceTransactionId);
+        var auditEntry = Assert.Single(auditLog.Entries);
+        Assert.Equal("admin.payment.refunded", auditEntry.Action);
+        Assert.DoesNotContain($"re_{orderId:N}", auditEntry.Details, StringComparison.Ordinal);
+        Assert.Contains("Provider refund recorded.", auditEntry.Details, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RefundAdminPurchaseAsync_ShouldCreateManualReviewWithoutCallingStripe_WhenTokensWereSpent()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var packId = AddStarterPack(dbContext);
+        var orderId = Guid.NewGuid();
+        var confirmedAtUtc = DateTime.UtcNow;
+        dbContext.Wallets.Add(new Wallet
+        {
+            UserId = userId,
+            Balance = 0,
+            UpdatedAtUtc = confirmedAtUtc
+        });
+        dbContext.WalletLedgerEntries.Add(new WalletLedgerEntry
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Delta = 120,
+            BalanceAfter = 120,
+            Source = WalletLedgerSource.PackPurchase,
+            Reason = $"purchase:{orderId:D}",
+            SourceProvider = "stripe",
+            SourceTransactionId = "pi_spent",
+            CreatedAtUtc = confirmedAtUtc.AddMinutes(-2)
+        });
+        dbContext.WalletLedgerEntries.Add(new WalletLedgerEntry
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Delta = -120,
+            BalanceAfter = 0,
+            Source = WalletLedgerSource.GenerationSpend,
+            Reason = "template_generation:spent-before-refund",
+            CreatedAtUtc = confirmedAtUtc.AddMinutes(-1)
+        });
+        dbContext.PurchaseOrders.Add(new PurchaseOrder
+        {
+            Id = orderId,
+            UserId = userId,
+            PackId = packId,
+            PaymentProvider = "stripe",
+            Status = PurchaseOrderStatus.Succeeded,
+            PriceAmount = 4.99m,
+            CurrencyCode = "USD",
+            SparkToGrant = 120,
+            ExternalPaymentId = "pi_spent",
+            CreatedAtUtc = confirmedAtUtc.AddMinutes(-5),
+            ConfirmedAtUtc = confirmedAtUtc
+        });
+        await dbContext.SaveChangesAsync();
+
+        var gateway = new FakePaymentGateway();
+        var auditLog = new RecordingAdminAuditLog();
+        var result = await CreateService(dbContext, gateway: gateway, adminAuditLog: auditLog).RefundAdminPurchaseAsync(
+            new AdminRefundPurchaseCommand(orderId, "spent tokens"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(PurchaseOrderStatus.RefundRequiresManualReview, result.Value.Status);
+        Assert.Equal("requires_manual_review", result.Value.RefundStatus);
+        Assert.False(result.Value.CanRefund);
+        Assert.Empty(gateway.RefundRequests);
+        Assert.Equal(0, await dbContext.Wallets
+            .Where(x => x.UserId == userId)
+            .Select(x => x.Balance)
+            .SingleAsync());
+        Assert.False(await dbContext.WalletLedgerEntries
+            .AnyAsync(x => x.UserId == userId && x.Source == WalletLedgerSource.PurchaseRefund));
+
+        var auditEntry = Assert.Single(auditLog.Entries);
+        Assert.Equal("admin.payment.refund_manual_review_required", auditEntry.Action);
+        Assert.Equal(PurchaseOrderStatus.Succeeded, auditEntry.OldValue);
+        Assert.Equal(PurchaseOrderStatus.RefundRequiresManualReview, auditEntry.NewValue);
+    }
+
+    [Fact]
+    public async Task RefundAdminPurchaseAsync_ShouldLeaveRefundPendingForRetry_WhenStripeCallFailsAfterLocalReservation()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var packId = AddStarterPack(dbContext);
+        var orderId = Guid.NewGuid();
+        var confirmedAtUtc = DateTime.UtcNow;
+        dbContext.Wallets.Add(new Wallet
+        {
+            UserId = userId,
+            Balance = 120,
+            UpdatedAtUtc = confirmedAtUtc
+        });
+        dbContext.PurchaseOrders.Add(new PurchaseOrder
+        {
+            Id = orderId,
+            UserId = userId,
+            PackId = packId,
+            PaymentProvider = "stripe",
+            Status = PurchaseOrderStatus.Succeeded,
+            PriceAmount = 4.99m,
+            CurrencyCode = "USD",
+            SparkToGrant = 120,
+            ExternalPaymentId = "pi_retry",
+            CreatedAtUtc = confirmedAtUtc.AddMinutes(-5),
+            ConfirmedAtUtc = confirmedAtUtc
+        });
+        await dbContext.SaveChangesAsync();
+
+        var gateway = new FakePaymentGateway
+        {
+            RefundResult = Result.Failure<PaymentRefundResponse>(EconomyErrors.PaymentGatewayFailed)
+        };
+        var auditLog = new RecordingAdminAuditLog();
+        var failed = await CreateService(dbContext, gateway: gateway, adminAuditLog: auditLog).RefundAdminPurchaseAsync(
+            new AdminRefundPurchaseCommand(orderId, "temporary gateway failure"),
+            CancellationToken.None);
+
+        Assert.True(failed.IsFailure);
+        Assert.Equal(EconomyErrors.PaymentGatewayFailed.Code, failed.Error.Code);
+        Assert.Single(gateway.RefundRequests);
+        Assert.Equal(PurchaseOrderStatus.RefundPending, await dbContext.PurchaseOrders
+            .Where(x => x.Id == orderId)
+            .Select(x => x.Status)
+            .SingleAsync());
+        Assert.Equal(0, await dbContext.Wallets
+            .Where(x => x.UserId == userId)
+            .Select(x => x.Balance)
+            .SingleAsync());
+        Assert.Single(await dbContext.WalletLedgerEntries
+            .Where(x => x.UserId == userId && x.Source == WalletLedgerSource.PurchaseRefund)
+            .ToListAsync());
+
+        gateway.RefundResult = null;
+        var retried = await CreateService(dbContext, gateway: gateway, adminAuditLog: auditLog).RefundAdminPurchaseAsync(
+            new AdminRefundPurchaseCommand(orderId, "retry"),
+            CancellationToken.None);
+
+        Assert.True(retried.IsSuccess);
+        Assert.Equal(PurchaseOrderStatus.Refunded, retried.Value.Status);
+        Assert.Equal(2, gateway.RefundRequests.Count);
+        Assert.Single(await dbContext.WalletLedgerEntries
+            .Where(x => x.UserId == userId && x.Source == WalletLedgerSource.PurchaseRefund)
+            .ToListAsync());
     }
 
     [Fact]
@@ -866,6 +1415,112 @@ public sealed partial class EconomyServiceTests
             .SingleAsync();
         Assert.Equal(-120, refundLedger.Delta);
         Assert.Equal(refundId, refundLedger.SourceTransactionId);
+    }
+
+    [Fact]
+    public async Task HandleStripeWebhook_ShouldCreateManualReview_WhenExternalRefundArrivesAfterTokensWereSpent()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var packId = AddStarterPack(dbContext);
+        var orderId = Guid.NewGuid();
+        var confirmedAtUtc = DateTime.UtcNow.AddMinutes(-5);
+        dbContext.Wallets.Add(new Wallet
+        {
+            UserId = userId,
+            Balance = 0,
+            UpdatedAtUtc = confirmedAtUtc
+        });
+        dbContext.PurchaseOrders.Add(new PurchaseOrder
+        {
+            Id = orderId,
+            UserId = userId,
+            PackId = packId,
+            PaymentProvider = "stripe",
+            Status = PurchaseOrderStatus.Succeeded,
+            PriceAmount = 4.99m,
+            CurrencyCode = "USD",
+            SparkToGrant = 120,
+            ExternalPaymentId = "pi_external_refund_spent",
+            CreatedAtUtc = confirmedAtUtc.AddMinutes(-1),
+            ConfirmedAtUtc = confirmedAtUtc
+        });
+        await dbContext.SaveChangesAsync();
+
+        var eventId = $"evt_{Guid.NewGuid():N}";
+        var refundId = $"re_{orderId:N}";
+        var created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var payload = $"{{\"id\":\"{eventId}\",\"object\":\"event\",\"type\":\"refund.created\",\"created\":{created},\"data\":{{\"object\":{{\"id\":\"{refundId}\",\"object\":\"refund\",\"status\":\"succeeded\",\"metadata\":{{\"order_id\":\"{orderId:D}\",\"reason\":\"dashboard refund\"}}}}}}}}";
+        var signature = BuildStripeSignature(payload, "test_webhook_secret");
+
+        var result = await CreateService(dbContext).HandleStripeWebhookAsync(
+            new StripeWebhookCommand(payload, signature),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value.Processed);
+        Assert.Equal(PurchaseOrderStatus.RefundRequiresManualReview, await dbContext.PurchaseOrders
+            .Where(x => x.Id == orderId)
+            .Select(x => x.Status)
+            .SingleAsync());
+        Assert.Empty(await dbContext.WalletLedgerEntries
+            .Where(x => x.UserId == userId && x.Source == WalletLedgerSource.PurchaseRefund)
+            .ToListAsync());
+    }
+
+    [Fact]
+    public async Task HandleStripeWebhook_ShouldBeIdempotentForDuplicateRefundWebhook()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var packId = AddStarterPack(dbContext);
+        var orderId = Guid.NewGuid();
+        var confirmedAtUtc = DateTime.UtcNow.AddMinutes(-5);
+        dbContext.Wallets.Add(new Wallet
+        {
+            UserId = userId,
+            Balance = 120,
+            UpdatedAtUtc = confirmedAtUtc
+        });
+        dbContext.PurchaseOrders.Add(new PurchaseOrder
+        {
+            Id = orderId,
+            UserId = userId,
+            PackId = packId,
+            PaymentProvider = "stripe",
+            Status = PurchaseOrderStatus.Succeeded,
+            PriceAmount = 4.99m,
+            CurrencyCode = "USD",
+            SparkToGrant = 120,
+            ExternalPaymentId = "pi_duplicate_refund",
+            CreatedAtUtc = confirmedAtUtc.AddMinutes(-1),
+            ConfirmedAtUtc = confirmedAtUtc
+        });
+        await dbContext.SaveChangesAsync();
+
+        var eventId = $"evt_{Guid.NewGuid():N}";
+        var refundId = $"re_{orderId:N}";
+        var created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var payload = $"{{\"id\":\"{eventId}\",\"object\":\"event\",\"type\":\"refund.created\",\"created\":{created},\"data\":{{\"object\":{{\"id\":\"{refundId}\",\"object\":\"refund\",\"status\":\"succeeded\",\"metadata\":{{\"order_id\":\"{orderId:D}\",\"reason\":\"duplicate refund\"}}}}}}}}";
+        var signature = BuildStripeSignature(payload, "test_webhook_secret");
+        var service = CreateService(dbContext);
+
+        var first = await service.HandleStripeWebhookAsync(new StripeWebhookCommand(payload, signature), CancellationToken.None);
+        var duplicate = await service.HandleStripeWebhookAsync(new StripeWebhookCommand(payload, signature), CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(duplicate.IsSuccess);
+        Assert.True(first.Value.Processed);
+        Assert.False(duplicate.Value.Processed);
+        Assert.Equal(PurchaseOrderStatus.Refunded, await dbContext.PurchaseOrders
+            .Where(x => x.Id == orderId)
+            .Select(x => x.Status)
+            .SingleAsync());
+        Assert.Single(await dbContext.WalletLedgerEntries
+            .Where(x => x.UserId == userId && x.Source == WalletLedgerSource.PurchaseRefund)
+            .ToListAsync());
     }
 
     [Fact]

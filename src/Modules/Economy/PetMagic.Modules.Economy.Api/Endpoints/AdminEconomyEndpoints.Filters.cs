@@ -13,7 +13,7 @@ public static partial class AdminEconomyEndpoints
         {
             return ToAdminEconomyFilterProblem(
                 "economy.purchase_status_invalid",
-                "Query parameter status must be pending, succeeded, failed, or refunded.");
+                "Query parameter status must be pending, succeeded, failed, refund_pending, refund_review, or refunded.");
         }
 
         return ValidatePaymentProviderFilter(provider);
@@ -41,6 +41,25 @@ public static partial class AdminEconomyEndpoints
         }
 
         return ValidatePaymentProviderFilter(provider);
+    }
+
+    private static ProblemHttpResult? ValidateIncidentFilters(string? status, string? category)
+    {
+        if (!IsAllowedOptionalFilter(status, IncidentStatusFilters))
+        {
+            return ToAdminEconomyFilterProblem(
+                "economy.incident_status_invalid",
+                "Query parameter status must be open, resolved, or suppressed.");
+        }
+
+        if (!IsAllowedOptionalFilter(category, IncidentCategoryFilters))
+        {
+            return ToAdminEconomyFilterProblem(
+                "economy.incident_category_invalid",
+                "Query parameter category is not supported for admin incident filtering.");
+        }
+
+        return null;
     }
 
     private static ProblemHttpResult? ValidatePaymentProviderFilter(string? provider)

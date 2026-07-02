@@ -108,6 +108,84 @@ public sealed class LocalFileMediaStorageTests
     }
 
     [Fact]
+    public async Task DeleteAsync_ShouldIgnoreTraversalLikeManagedPaths()
+    {
+        var rootPath = CreateTempDirectory();
+        var storage = CreateStorage(rootPath);
+        var siblingPath = Path.Combine(
+            Directory.GetParent(rootPath)!.FullName,
+            $"petmagic-media-sibling-{Guid.NewGuid():N}.jpg");
+        var unmanagedRootPath = Path.Combine(rootPath, "unmanaged-template.jpg");
+
+        try
+        {
+            await File.WriteAllTextAsync(siblingPath, "sibling");
+            await File.WriteAllTextAsync(unmanagedRootPath, "unmanaged");
+
+            var siblingDelete = await storage.DeleteAsync(
+                $"templates-media/../{Path.GetFileName(siblingPath)}",
+                CancellationToken.None);
+            var unmanagedDelete = await storage.DeleteAsync(
+                "http://localhost:5000/templates-media/2026/../unmanaged-template.jpg?pmexp=123&pmsig=abc",
+                CancellationToken.None);
+
+            Assert.True(siblingDelete.IsSuccess);
+            Assert.True(unmanagedDelete.IsSuccess);
+            Assert.True(File.Exists(siblingPath));
+            Assert.True(File.Exists(unmanagedRootPath));
+        }
+        finally
+        {
+            File.Delete(siblingPath);
+            Directory.Delete(rootPath, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task CreateReadUrlAsync_ShouldRejectTraversalLikeManagedPath()
+    {
+        var rootPath = CreateTempDirectory();
+        var storage = CreateStorage(rootPath);
+
+        try
+        {
+            var readUrl = await storage.CreateReadUrlAsync(
+                "http://localhost:5000/templates-media/2026/../private.png",
+                TimeSpan.FromMinutes(5),
+                CancellationToken.None);
+
+            Assert.True(readUrl.IsFailure);
+            Assert.Equal("templates.media_storage_failed", readUrl.Error.Code);
+        }
+        finally
+        {
+            Directory.Delete(rootPath, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task CreateReadUrlAsync_ShouldRejectMalformedPublicBaseUrlPrefix()
+    {
+        var rootPath = CreateTempDirectory();
+        var storage = CreateStorage(rootPath);
+
+        try
+        {
+            var readUrl = await storage.CreateReadUrlAsync(
+                "http://localhost:5000templates-media/2026/06/result.png",
+                TimeSpan.FromMinutes(5),
+                CancellationToken.None);
+
+            Assert.True(readUrl.IsFailure);
+            Assert.Equal("templates.media_storage_failed", readUrl.Error.Code);
+        }
+        finally
+        {
+            Directory.Delete(rootPath, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task StoreAsync_ShouldUseExtensionFromContentType_WhenFileNameExtensionIsUnsafe()
     {
         var rootPath = CreateTempDirectory();

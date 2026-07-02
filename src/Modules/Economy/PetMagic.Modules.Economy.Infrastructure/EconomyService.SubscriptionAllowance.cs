@@ -1,8 +1,7 @@
-using System.Data;
-
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Domain.Enums;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
 
@@ -58,12 +57,18 @@ public sealed partial class EconomyService
                 continue;
             }
 
-            ApplyWalletDelta(
+            var walletMutation = await ApplyWalletMutationAsync(
                 wallet,
                 options.Value.WeeklyPremiumSpark,
                 WalletLedgerSource.PremiumSubscriptionWeeklyGrant,
                 reason,
-                now);
+                now,
+                cancellationToken);
+            if (walletMutation.IsFailure)
+            {
+                throw new InvalidOperationException(walletMutation.Error.Message);
+            }
+
             grantedReasons.Add(reason);
             grantedCount += 1;
             appliedAnyGrants = true;
@@ -82,9 +87,27 @@ public sealed partial class EconomyService
         string providerContext,
         CancellationToken cancellationToken)
     {
-        await using var transaction = dbContext.Database.IsRelational() && dbContext.Database.CurrentTransaction is null
-            ? await dbContext.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken)
-            : null;
+        var result = await ExecuteWalletSerializableMutationWithRetryAsync(
+            "premium_subscription_allowance",
+            async ct =>
+            {
+                await GrantPremiumSubscriptionAllowanceIfDueOnceAsync(subscription, providerContext, ct);
+                return Result.Success(true);
+            },
+            cancellationToken);
+
+        if (result.IsFailure)
+        {
+            throw new InvalidOperationException(result.Error.Message);
+        }
+    }
+
+    private async Task GrantPremiumSubscriptionAllowanceIfDueOnceAsync(
+        UserSubscription subscription,
+        string providerContext,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await BeginWalletSerializableTransactionAsync(cancellationToken);
 
         try
         {
@@ -144,12 +167,17 @@ public sealed partial class EconomyService
 
             var wallet = await GetOrCreateWalletAsync(subscription.UserId, cancellationToken);
 
-            ApplyWalletDelta(
+            var walletMutation = await ApplyWalletMutationAsync(
                 wallet,
                 options.Value.WeeklyPremiumSpark,
                 WalletLedgerSource.PremiumSubscriptionGrant,
                 allowanceReason,
-                now);
+                now,
+                cancellationToken);
+            if (walletMutation.IsFailure)
+            {
+                throw new InvalidOperationException(walletMutation.Error.Message);
+            }
 
             subscription.MonthlyTokensGranted = options.Value.WeeklyPremiumSpark;
             subscription.LastTokenGrantAtUtc = now;

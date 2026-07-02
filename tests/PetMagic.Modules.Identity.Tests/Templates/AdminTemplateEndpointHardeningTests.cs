@@ -28,6 +28,45 @@ public sealed class AdminTemplateEndpointHardeningTests
     }
 
     [Fact]
+    public void FileUploadEndpoints_ShouldLimitRequestBodiesBeforeFormBinding()
+    {
+        var root = FindRepositoryRoot();
+        var petEndpoints = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Api",
+            "Endpoints",
+            "PetEndpoints.cs"));
+        var generationEndpoints = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Api",
+            "Endpoints",
+            "TemplateGenerationEndpoints.cs"));
+        var adminEndpoints = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Api",
+            "Endpoints",
+            "AdminTemplateEndpoints.cs"));
+
+        Assert.Contains("private const long MaxPetPhotoUploadRequestBodyBytes = 26L * 1024 * 1024;", petEndpoints, StringComparison.Ordinal);
+        Assert.Contains(".WithMetadata(new RequestSizeLimitAttribute(MaxPetPhotoUploadRequestBodyBytes));", petEndpoints, StringComparison.Ordinal);
+        Assert.Contains("private const long MaxGenerationUploadRequestBodyBytes = 26L * 1024 * 1024;", generationEndpoints, StringComparison.Ordinal);
+        Assert.Contains(".WithMetadata(new RequestSizeLimitAttribute(MaxGenerationUploadRequestBodyBytes));", generationEndpoints, StringComparison.Ordinal);
+        Assert.Contains("private const long MaxAdminGenerationTestUploadRequestBodyBytes = 26L * 1024 * 1024;", adminEndpoints, StringComparison.Ordinal);
+        Assert.Contains("private const long MaxAdminTemplateMediaUploadRequestBodyBytes = 110L * 1024 * 1024;", adminEndpoints, StringComparison.Ordinal);
+        Assert.Contains(".WithMetadata(new RequestSizeLimitAttribute(MaxAdminGenerationTestUploadRequestBodyBytes));", adminEndpoints, StringComparison.Ordinal);
+        Assert.Contains(".WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateMediaUploadRequestBodyBytes));", adminEndpoints, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void AdminTemplatesCatalog_ShouldUseStablePaginationOrder()
     {
         var source = File.ReadAllText(Path.Combine(
@@ -700,6 +739,64 @@ public sealed class AdminTemplateEndpointHardeningTests
         Assert.Contains("TemplateFeedRealtimeTopics.TemplatesFeedInvalidated", source, StringComparison.Ordinal);
         Assert.Contains("if (!IsPublicRealtimeTopic(realtimeEvent.Topic))", method, StringComparison.Ordinal);
         Assert.DoesNotContain("GenerationStatusChanged", method, StringComparison.Ordinal);
+
+        var allowlistStart = source.IndexOf("private static readonly HashSet<string> AllowedPublicRealtimeTopics", StringComparison.Ordinal);
+        var allowlistEnd = source.IndexOf("private static readonly HashSet<string> AllowedPublicAnalyticsEventTypes", StringComparison.Ordinal);
+        Assert.True(allowlistStart >= 0 && allowlistEnd > allowlistStart);
+        var allowlist = source[allowlistStart..allowlistEnd];
+        Assert.DoesNotContain("GenerationStatusChanged", allowlist, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RealtimeEventStreams_ShouldReusePendingChannelReadAcrossKeepAlives()
+    {
+        var publicSource = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Api",
+            "Endpoints",
+            "PublicTemplateEndpoints.cs"));
+        var generationSource = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Api",
+            "Endpoints",
+            "TemplateGenerationEndpoints.Realtime.cs"));
+
+        AssertRealtimeStreamReusesPendingChannelRead(
+            ExtractMethodBody(publicSource, "private static async Task StreamEventsAsync"));
+        AssertRealtimeStreamReusesPendingChannelRead(
+            ExtractMethodBody(generationSource, "private static async Task StreamGenerationEventsAsync"));
+    }
+
+    [Fact]
+    public void PublicTemplateAnalyticsEndpoint_ShouldBoundAnonymousPayloadAndNormalizeClientText()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Api",
+            "Endpoints",
+            "PublicTemplateEndpoints.cs"));
+        var detailMethod = ExtractMethodBody(source, "private static async Task<Results<Ok<TemplateDetailDto>, ProblemHttpResult>> GetAsync");
+        var analyticsMethod = ExtractMethodBody(source, "private static async Task<Results<NoContent, ProblemHttpResult>> RecordAnalyticsEventAsync");
+
+        Assert.Contains("private const int MaxAnalyticsRequestBodyBytes = 16 * 1024;", source, StringComparison.Ordinal);
+        Assert.Contains("private const int MaxAnalyticsSourceLength = 64;", source, StringComparison.Ordinal);
+        Assert.Contains("private const int MaxAnalyticsFeedbackMessageLength = 2000;", source, StringComparison.Ordinal);
+        Assert.Contains(".WithMetadata(new RequestSizeLimitAttribute(MaxAnalyticsRequestBodyBytes));", source, StringComparison.Ordinal);
+        Assert.Contains("NormalizeAnalyticsText(source, MaxAnalyticsSourceLength)", detailMethod, StringComparison.Ordinal);
+        Assert.Contains("NormalizeAnalyticsText(request.Source, MaxAnalyticsSourceLength)", analyticsMethod, StringComparison.Ordinal);
+        Assert.Contains(
+            "NormalizeAnalyticsText(request.FeedbackMessage, MaxAnalyticsFeedbackMessageLength)",
+            analyticsMethod,
+            StringComparison.Ordinal);
     }
 
     private static string FindRepositoryRoot()
@@ -763,6 +860,21 @@ public sealed class AdminTemplateEndpointHardeningTests
         }
 
         return count;
+    }
+
+    private static void AssertRealtimeStreamReusesPendingChannelRead(string method)
+    {
+        const string readExpression = "subscription.WaitToReadAsync(cancellationToken).AsTask()";
+        var loopIndex = method.IndexOf("while (!cancellationToken.IsCancellationRequested)", StringComparison.Ordinal);
+        var initialReadIndex = method.IndexOf($"var waitToReadTask = {readExpression};", StringComparison.Ordinal);
+
+        Assert.True(loopIndex > 0);
+        Assert.InRange(initialReadIndex, 0, loopIndex - 1);
+        Assert.Equal(2, CountOccurrences(method, readExpression));
+
+        var loopBody = method[loopIndex..];
+        Assert.DoesNotContain($"var waitToReadTask = {readExpression};", loopBody, StringComparison.Ordinal);
+        Assert.Contains($"waitToReadTask = {readExpression};", loopBody, StringComparison.Ordinal);
     }
 
     private static string ExtractMethodBody(string source, string methodName)

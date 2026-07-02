@@ -233,6 +233,7 @@ public sealed partial class EconomyService
 
         var isPremium = IsActivePremiumSubscription(subscription);
         var manageAction = GetManageSubscriptionAction(subscription?.Provider);
+        await ReconcilePremiumEntitlementAsync(userId, "subscription_summary", cancellationToken);
 
         string? cardBrand = null;
         string? cardLast4 = null;
@@ -379,7 +380,12 @@ public sealed partial class EconomyService
                 x.Reason,
                 x.CreatedAtUtc,
                 x.SourceProvider,
-                null))
+                x.SourceProvider == "google_play" || x.SourceProvider == "app_store" ? null : x.SourceTransactionId,
+                x.TokenKind,
+                x.OperationKind,
+                x.TokenBucketId,
+                x.BucketDeltasJson,
+                x.ExpiresAtUtc))
             .ToListAsync(cancellationToken);
 
         return Result.Success(ToPaged(items, normalizedSkip, normalizedTake));

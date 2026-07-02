@@ -93,22 +93,30 @@ internal sealed partial class TemplateGenerationService
         return Result.Success(new RemoveGenerationWatermarkResponse(true, cost, spend.Value, signedUrl));
     }
 
-    public async Task<Result<GenerationDownloadResponse>> GetDownloadAsync(
+    public async Task<Result<GalleryDownloadResponse>> GetDownloadAsync(
         Guid userId,
         Guid generationId,
         bool isPremium,
         CancellationToken cancellationToken)
     {
-        return await GetMediaAccessAsync(
+        var access = await GetMediaAccessAsync(
             userId,
             generationId,
             isPremium,
             TemplateAnalyticsEventTypes.DownloadWatermarked,
             TemplateAnalyticsEventTypes.DownloadClean,
             cancellationToken);
+        return access.IsFailure
+            ? Result.Failure<GalleryDownloadResponse>(access.Error)
+            : Result.Success(new GalleryDownloadResponse(
+                access.Value.SignedMediaUrl,
+                access.Value.ExpiresAtUtc,
+                access.Value.FileName,
+                access.Value.ContentType,
+                access.Value.HasWatermark));
     }
 
-    public async Task<Result<GenerationDownloadResponse>> GetShareAsync(
+    public async Task<Result<GalleryShareResponse>> GetShareAsync(
         Guid userId,
         Guid generationId,
         bool isPremium,
@@ -138,10 +146,29 @@ internal sealed partial class TemplateGenerationService
             }
         }
 
-        return result;
+        return result.IsFailure
+            ? Result.Failure<GalleryShareResponse>(result.Error)
+            : BuildGalleryShareResponse(userId, generationId, result.Value);
     }
 
-    private async Task<Result<GenerationDownloadResponse>> GetMediaAccessAsync(
+    private Result<GalleryShareResponse> BuildGalleryShareResponse(
+        Guid userId,
+        Guid generationId,
+        GalleryMediaAccess access)
+    {
+        var shareToken = CreateGenerationShareToken(userId, generationId, cleanAccess: !access.HasWatermark);
+        return Result.Success(new GalleryShareResponse(
+            ShareUrl: BuildGenerationShareUrl(shareToken),
+            ShareToken: shareToken,
+            SignedMediaUrl: access.SignedMediaUrl,
+            ExpiresAtUtc: access.ExpiresAtUtc,
+            HasWatermark: access.HasWatermark,
+            FileName: access.FileName,
+            ContentType: access.ContentType,
+            MediaState: GalleryMediaState.resultReady.ToString()));
+    }
+
+    private async Task<Result<GalleryMediaAccess>> GetMediaAccessAsync(
         Guid userId,
         Guid generationId,
         bool isPremium,
@@ -152,12 +179,12 @@ internal sealed partial class TemplateGenerationService
         var response = await GetAsync(userId, generationId, isPremium, cancellationToken);
         if (response.IsFailure)
         {
-            return Result.Failure<GenerationDownloadResponse>(response.Error);
+            return Result.Failure<GalleryMediaAccess>(response.Error);
         }
 
         if (string.IsNullOrWhiteSpace(response.Value.OutputUrl))
         {
-            return Result.Failure<GenerationDownloadResponse>(
+            return Result.Failure<GalleryMediaAccess>(
                 response.Value.HasWatermark || response.Value.CanRemoveWatermark
                     ? TemplatesErrors.WatermarkNotReady
                     : TemplatesErrors.InvalidStatus);
@@ -173,9 +200,18 @@ internal sealed partial class TemplateGenerationService
             response.Value.TemplateType,
             response.Value.UserPlan,
             cancellationToken);
-        return Result.Success(new GenerationDownloadResponse(
+        return Result.Success(new GalleryMediaAccess(
             response.Value.OutputUrl,
-            response.Value.HasWatermark,
-            $"petmagic-{response.Value.GenerationId:N}.{extension}"));
+            DateTime.UtcNow.AddSeconds(Math.Max(1, options.UserMediaReadUrlTtlSeconds)),
+            $"petmagic-{response.Value.GenerationId:N}.{extension}",
+            extension.Equals("mp4", StringComparison.OrdinalIgnoreCase) ? "video/mp4" : "image/png",
+            response.Value.HasWatermark));
     }
+
+    private sealed record GalleryMediaAccess(
+        string SignedMediaUrl,
+        DateTime? ExpiresAtUtc,
+        string FileName,
+        string ContentType,
+        bool HasWatermark);
 }

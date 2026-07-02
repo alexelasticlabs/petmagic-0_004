@@ -22,6 +22,7 @@ public static class EconomyApiModule
         services.AddScoped<IValidator<CreatePremiumBillingPortalCommand>, CreatePremiumBillingPortalCommandValidator>();
         services.AddScoped<IValidator<CancelPremiumSubscriptionCommand>, CancelPremiumSubscriptionCommandValidator>();
         services.AddScoped<IValidator<AdminRefundPurchaseCommand>, AdminRefundPurchaseCommandValidator>();
+        services.AddScoped<IValidator<AdminEconomyIncidentActionCommand>, AdminEconomyIncidentActionCommandValidator>();
         services.AddScoped<IValidator<VerifyPremiumStorePurchaseCommand>, VerifyPremiumStorePurchaseCommandValidator>();
         services.AddScoped<IValidator<VerifyPremiumStripeSubscriptionCommand>, VerifyPremiumStripeSubscriptionCommandValidator>();
         services.AddScoped<IValidator<VerifyPackStorePurchaseCommand>, VerifyPackStorePurchaseCommandValidator>();

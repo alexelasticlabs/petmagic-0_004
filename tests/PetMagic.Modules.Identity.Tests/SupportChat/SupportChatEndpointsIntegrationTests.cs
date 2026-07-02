@@ -73,11 +73,11 @@ public sealed partial class SupportChatEndpointsIntegrationTests
             fetched.Messages,
             message => message.SenderType == "User" && message.Body == "Need help with premium");
 
-        using var forbiddenResponse = await application.CreateClient(OtherUserId, "User").PostAsJsonAsync(
+        using var hiddenConversationResponse = await application.CreateClient(OtherUserId, "User").PostAsJsonAsync(
             $"/api/support/conversation/{openResponse.ConversationId}/messages",
             new SendSupportMessageRequest("I should not be here"));
 
-        Assert.Equal(HttpStatusCode.Forbidden, forbiddenResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, hiddenConversationResponse.StatusCode);
     }
 
     [Fact]

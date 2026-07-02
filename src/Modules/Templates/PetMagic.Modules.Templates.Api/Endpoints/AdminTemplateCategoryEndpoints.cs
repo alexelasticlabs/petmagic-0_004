@@ -13,6 +13,8 @@ namespace PetMagic.Modules.Templates.Api.Endpoints;
 
 public static class AdminTemplateCategoryEndpoints
 {
+    private const int MaxAdminTemplateCategoryJsonRequestBodyBytes = 16 * 1024;
+
     public static IEndpointRouteBuilder MapAdminTemplateCategoryEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/admin/templates/categories")
@@ -24,10 +26,13 @@ public static class AdminTemplateCategoryEndpoints
         group.MapGet("/diagnostics", DiagnosticsAsync)
             .RequireAuthorization("AdminOnly");
         group.MapPost("/", CreateAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateCategoryJsonRequestBodyBytes))
             .RequireAuthorization("AdminOnly");
         group.MapPut("/{categoryId:guid}", UpdateAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateCategoryJsonRequestBodyBytes))
             .RequireAuthorization("AdminOnly");
         group.MapPut("/{categoryId:guid}/archive", ChangeArchiveStateAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateCategoryJsonRequestBodyBytes))
             .RequireAuthorization("AdminOnly");
         group.MapDelete("/{categoryId:guid}", DeleteAsync)
             .RequireAuthorization("AdminOnly");
