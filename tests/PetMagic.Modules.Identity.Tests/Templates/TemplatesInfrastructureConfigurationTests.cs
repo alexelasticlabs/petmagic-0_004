@@ -327,6 +327,34 @@ public sealed class TemplatesInfrastructureConfigurationTests
     }
 
     [Fact]
+    public void TemplateMediaNetworkSafetyPolicy_ShouldStayShared()
+    {
+        var root = FindRepositoryRoot();
+        var policySource = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Infrastructure",
+            "SafeNetworkTargetPolicy.cs"));
+
+        Assert.Contains("IsPrivateNetworkTarget", policySource, StringComparison.Ordinal);
+        Assert.Contains("IsPrivateNetworkAddress", policySource, StringComparison.Ordinal);
+
+        foreach (var relativePath in new[]
+        {
+            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "TemplateContentHealthCheck.cs"),
+            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "HttpGeneratedMediaImporter.cs")
+        })
+        {
+            var source = File.ReadAllText(Path.Combine(root, relativePath));
+            Assert.Contains("SafeNetworkTargetPolicy.IsPrivateNetworkTarget", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("static bool IsPrivateNetworkAddress", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("IPAddress.TryParse", source, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public void AddTemplatesInfrastructure_ShouldNotRegisterHostedGenerationWorker_WhenDisabled()
     {
         var services = CreateServices();
