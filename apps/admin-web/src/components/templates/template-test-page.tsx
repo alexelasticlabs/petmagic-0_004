@@ -13,9 +13,7 @@ import {
   StepHeader,
   WorkflowConnector,
 } from "@/components/templates/template-test-page.components";
-import {
-  getTemplateTestPageText,
-} from "@/components/templates/template-test-page.content";
+import { getTemplateTestPageText } from "@/components/templates/template-test-page.content";
 import {
   buildGeneratedDownloadName,
   buildRunDetails,
@@ -212,11 +210,20 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
   );
 
   useEffect(() => {
+    let isActive = true;
     if (!selectedHistoryGenerationId || historyGenerationIds.has(selectedHistoryGenerationId)) {
       return;
     }
 
-    queueMicrotask(() => setSelectedHistoryGenerationId(null));
+    queueMicrotask(() => {
+      if (isActive) {
+        setSelectedHistoryGenerationId(null);
+      }
+    });
+
+    return () => {
+      isActive = false;
+    };
   }, [historyGenerationIds, selectedHistoryGenerationId]);
 
   async function handleStartTest() {

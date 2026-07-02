@@ -12,6 +12,7 @@ import type {
 
 export const ADMIN_FEEDBACK_FILTER_MAX_LENGTH = 120;
 export const ADMIN_FEEDBACK_ADMIN_NOTE_MAX_LENGTH = 2000;
+export const ADMIN_FEEDBACK_REFUND_REASON_MAX_LENGTH = 240;
 
 const ADMIN_FEEDBACK_STATUSES = ["New", "InReview", "Resolved", "Dismissed"] as const;
 const ADMIN_FEEDBACK_PRIORITIES = ["Low", "Medium", "High", "Critical"] as const;
@@ -43,6 +44,18 @@ function normalizeAdminFeedbackUpdatePayload(
       typeof payload.adminNote === "string"
         ? payload.adminNote.slice(0, ADMIN_FEEDBACK_ADMIN_NOTE_MAX_LENGTH)
         : payload.adminNote,
+  };
+}
+
+function normalizeFeedbackRefundPayload(
+  payload: RefundFeedbackCreditsPayload
+): RefundFeedbackCreditsPayload {
+  return {
+    ...payload,
+    reason:
+      typeof payload.reason === "string"
+        ? payload.reason.trim().slice(0, ADMIN_FEEDBACK_REFUND_REASON_MAX_LENGTH) || undefined
+        : payload.reason,
   };
 }
 
@@ -119,7 +132,7 @@ export async function refundAdminFeedbackCredits(
 ): Promise<CreditRefund> {
   return apiRequest<CreditRefund>(`/api/admin/feedback/${encodePathSegment(feedbackId)}/refund`, {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: JSON.stringify(normalizeFeedbackRefundPayload(payload)),
   });
 }
 

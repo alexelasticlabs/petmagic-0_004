@@ -163,7 +163,10 @@ describe("admin retry hardening", () => {
     expect(source).toContain(
       'visibleActionUserIdSignature.split("|").includes(pendingAction.targetUserId)'
     );
-    expect(source).toContain("queueMicrotask(() => setPendingAction(null));");
+    expect(source).toContain("let isActive = true;");
+    expect(source).toContain("queueMicrotask(() => {");
+    expect(source).toContain("if (isActive) {\n        setPendingAction(null);");
+    expect(source).toContain("return () => {\n      isActive = false;\n    };");
   });
 
   it("swallows safe manual retry failures on promo and generations pages", () => {

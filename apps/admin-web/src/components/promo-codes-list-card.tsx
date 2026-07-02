@@ -483,10 +483,7 @@ export function PromoCodesListCard({
                     size="sm"
                     className={styles.paginationNumber}
                     aria-current={pageNumber === currentPage ? "page" : undefined}
-                    aria-label={buildPromoCodesPageLabel(
-                      locale,
-                      formatNumber(pageNumber, locale)
-                    )}
+                    aria-label={buildPromoCodesPageLabel(locale, formatNumber(pageNumber, locale))}
                     onClick={() => onSelectPage(pageNumber)}
                     disabled={promoCodesQueryIsFetching}
                   >
@@ -549,12 +546,43 @@ function PromoCodesAutoRefreshBadge({
   }, [autoRefreshMs, dataUpdatedAt, nowTick]);
 
   useEffect(() => {
-    const timerId = window.setInterval(() => {
+    let timerId: number | null = null;
+
+    const stopTimer = () => {
+      if (timerId === null) {
+        return;
+      }
+
+      window.clearInterval(timerId);
+      timerId = null;
+    };
+
+    const startTimer = () => {
+      if (document.visibilityState === "hidden" || timerId !== null) {
+        return;
+      }
+
       setNowTick(Date.now());
-    }, 1000);
+      timerId = window.setInterval(() => {
+        setNowTick(Date.now());
+      }, 1000);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        stopTimer();
+        return;
+      }
+
+      startTimer();
+    };
+
+    startTimer();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      window.clearInterval(timerId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      stopTimer();
     };
   }, []);
 

@@ -54,6 +54,7 @@ export function SupportInboxPage({ locale }: SupportInboxPageProps) {
     .join("|");
 
   useEffect(() => {
+    let isActive = true;
     if (
       !selectedConversationId ||
       inboxQuery.isFetching ||
@@ -62,7 +63,15 @@ export function SupportInboxPage({ locale }: SupportInboxPageProps) {
       return;
     }
 
-    queueMicrotask(() => setSelectedConversationId(null));
+    queueMicrotask(() => {
+      if (isActive) {
+        setSelectedConversationId(null);
+      }
+    });
+
+    return () => {
+      isActive = false;
+    };
   }, [inboxQuery.isFetching, selectedConversationId, sortedConversationIdSignature]);
 
   const activeConversationId = useMemo(() => {
@@ -72,7 +81,9 @@ export function SupportInboxPage({ locale }: SupportInboxPageProps) {
 
     if (
       selectedConversationId &&
-      sortedConversations.some((conversation) => conversation.conversationId === selectedConversationId)
+      sortedConversations.some(
+        (conversation) => conversation.conversationId === selectedConversationId
+      )
     ) {
       return selectedConversationId;
     }

@@ -1,4 +1,4 @@
-import { type DragEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type DragEvent, useEffect, useRef, useState } from "react";
 
 import assetStyles from "@/components/templates/template-editor-assets.module.css";
 import styles from "@/components/templates/template-editor.module.css";
@@ -33,10 +33,8 @@ export function TemplatePreviewAssetSection({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
   const [selectionError, setSelectionError] = useState<string | null>(null);
-  const localPreviewUrl = useMemo(
-    () => (previewFile ? URL.createObjectURL(previewFile) : null),
-    [previewFile]
-  );
+  const [localPreview, setLocalPreview] = useState<{ file: File; url: string } | null>(null);
+  const localPreviewUrl = localPreview?.file === previewFile ? localPreview.url : null;
   const persistedPreviewUrl = form.previewUrl.trim();
   const effectivePreviewUrl = localPreviewUrl ?? persistedPreviewUrl;
   const hasPreview = Boolean(effectivePreviewUrl);
@@ -56,6 +54,14 @@ export function TemplatePreviewAssetSection({
       }
     };
   }, [localPreviewUrl]);
+
+  function clearLocalPreviewUrl() {
+    if (localPreview?.url) {
+      URL.revokeObjectURL(localPreview.url);
+    }
+
+    setLocalPreview(null);
+  }
 
   function openFilePicker() {
     fileInputRef.current?.click();
@@ -77,6 +83,8 @@ export function TemplatePreviewAssetSection({
     }
 
     setSelectionError(null);
+    clearLocalPreviewUrl();
+    setLocalPreview({ file, url: URL.createObjectURL(file) });
     setPreviewFile(file);
   }
 
@@ -171,7 +179,9 @@ export function TemplatePreviewAssetSection({
         ) : (
           <div className={assetStyles.assetPreviewPlaceholder}>
             <span className={assetStyles.assetPreviewPlaceholderTitle}>{text.uploadPreview}</span>
-            <span className={assetStyles.assetPreviewPlaceholderHint}>{text.mediaDropzoneHint}</span>
+            <span className={assetStyles.assetPreviewPlaceholderHint}>
+              {text.mediaDropzoneHint}
+            </span>
           </div>
         )}
       </div>

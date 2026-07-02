@@ -1,4 +1,4 @@
-import { type DragEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type DragEvent, useEffect, useRef, useState } from "react";
 
 import assetStyles from "@/components/templates/template-editor-assets.module.css";
 import styles from "@/components/templates/template-editor.module.css";
@@ -52,10 +52,8 @@ export function TemplateReferenceAssetSection({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
   const [selectionError, setSelectionError] = useState<string | null>(null);
-  const localReferenceUrl = useMemo(
-    () => (referenceFile ? URL.createObjectURL(referenceFile) : null),
-    [referenceFile]
-  );
+  const [localReference, setLocalReference] = useState<{ file: File; url: string } | null>(null);
+  const localReferenceUrl = localReference?.file === referenceFile ? localReference.url : null;
   const persistedReferenceUrl = form.referenceUrl.trim();
   const effectiveReferenceUrl = localReferenceUrl ?? persistedReferenceUrl;
   const hasReference = Boolean(effectiveReferenceUrl);
@@ -72,6 +70,14 @@ export function TemplateReferenceAssetSection({
       }
     };
   }, [localReferenceUrl]);
+
+  function clearLocalReferenceUrl() {
+    if (localReference?.url) {
+      URL.revokeObjectURL(localReference.url);
+    }
+
+    setLocalReference(null);
+  }
 
   function openFilePicker() {
     fileInputRef.current?.click();
@@ -91,6 +97,8 @@ export function TemplateReferenceAssetSection({
     }
 
     setSelectionError(null);
+    clearLocalReferenceUrl();
+    setLocalReference({ file, url: URL.createObjectURL(file) });
     setReferenceFile(file);
   }
 
@@ -168,7 +176,9 @@ export function TemplateReferenceAssetSection({
         ) : (
           <div className={assetStyles.assetPreviewPlaceholder}>
             <span className={assetStyles.assetPreviewPlaceholderTitle}>{text.uploadReference}</span>
-            <span className={assetStyles.assetPreviewPlaceholderHint}>{text.mediaDropzoneHint}</span>
+            <span className={assetStyles.assetPreviewPlaceholderHint}>
+              {text.mediaDropzoneHint}
+            </span>
           </div>
         )}
       </div>

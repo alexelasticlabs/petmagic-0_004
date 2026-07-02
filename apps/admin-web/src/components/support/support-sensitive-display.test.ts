@@ -169,6 +169,16 @@ describe("support sensitive display", () => {
     const secureMediaSource = readFileSync(supportSecureMediaPath, "utf8");
 
     expect(secureMediaSource).toContain("import { sanitizeSensitiveText }");
+    expect(secureMediaSource).toContain("const activeObjectUrlRef = useRef<string | null>(null);");
+    expect(secureMediaSource).toContain("const revokeActiveObjectUrl = useCallback(");
+    expect(secureMediaSource).toContain("const markRemoteMediaFailed = useCallback(");
+    expect(secureMediaSource).toContain(
+      "revokeActiveObjectUrl();\n        activeObjectUrlRef.current = createdObjectUrl;"
+    );
+    expect(secureMediaSource).toContain(
+      "if (createdObjectUrl && activeObjectUrlRef.current === createdObjectUrl)"
+    );
+    expect(secureMediaSource).toContain("onError={markRemoteMediaFailed}");
     expect(secureMediaSource).toContain("function formatSupportMediaLogText(");
     expect(secureMediaSource).toContain("function getSupportMediaErrorDetails(error: unknown)");
     expect(secureMediaSource).toContain(

@@ -1,6 +1,9 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  SUPPORT_CONVERSATION_MESSAGES_MAX_TAKE,
   fetchSupportConversation,
   fetchSupportInbox,
   fetchSupportInboxMetrics,
@@ -8,6 +11,9 @@ import {
   SUPPORT_INBOX_SEARCH_MAX_LENGTH,
   SUPPORT_MESSAGE_BODY_MAX_LENGTH,
 } from "@/lib/api-client.support";
+
+const supportClientPath = fileURLToPath(new URL("./api-client.support.ts", import.meta.url));
+const coreClientPath = fileURLToPath(new URL("./api-client.core.ts", import.meta.url));
 
 describe("api-client.support query normalization", () => {
   const originalPublicApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -149,6 +155,25 @@ describe("api-client.support query normalization", () => {
     );
   });
 
+  it("caps support conversation message take at the backend limit", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json({
+        conversationId: "conversation-1",
+        subjectUserId: "user-1",
+        status: "New",
+        priority: "Normal",
+        messages: [],
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchSupportConversation("conversation-1", { take: 500.9 });
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+      `https://api.example.com/api/admin/support/tickets/conversation-1?take=${SUPPORT_CONVERSATION_MESSAGES_MAX_TAKE}`
+    );
+  });
+
   it("encodes support ids before placing them in API path segments", async () => {
     const fetchMock = vi.fn<typeof fetch>(async () =>
       Response.json({
@@ -193,5 +218,15 @@ describe("api-client.support query normalization", () => {
       body: "b".repeat(SUPPORT_MESSAGE_BODY_MAX_LENGTH),
       replyToMessageId: "message-parent",
     });
+  });
+
+  it("does not clear unrelated in-flight GET dedupe when support conversations mutate", () => {
+    const supportSource = readFileSync(supportClientPath, "utf8");
+    const coreSource = readFileSync(coreClientPath, "utf8");
+
+    expect(supportSource).not.toContain("inflightGetRequests.clear()");
+    expect(supportSource).toContain('inflightGetRequests.delete("support-templates")');
+    expect(coreSource).not.toContain("cachedSupportConversations");
+    expect(coreSource).not.toContain("cachedSupportInbox");
   });
 });

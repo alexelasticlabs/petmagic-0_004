@@ -8,7 +8,9 @@ const catalogContentPath = fileURLToPath(
   new URL("./templates-catalog-view.content.ts", import.meta.url)
 );
 const catalogCssPath = fileURLToPath(new URL("./templates-catalog.module.css", import.meta.url));
-const templatesApiClientPath = fileURLToPath(new URL("../../lib/api-client.templates.ts", import.meta.url));
+const templatesApiClientPath = fileURLToPath(
+  new URL("../../lib/api-client.templates.ts", import.meta.url)
+);
 
 describe("templates catalog actions", () => {
   it("confirms archive changes and sanitizes backend action errors", () => {
@@ -119,7 +121,8 @@ describe("templates catalog actions", () => {
     );
     expect(source).toContain("currentPage >= totalPages");
     expect(source).toContain("if (!isFetching && currentPage > totalPages)");
-    expect(source).toContain("queueMicrotask(() => resetCatalogContext(totalPages));");
+    expect(source).toContain("let isActive = true;");
+    expect(source).toContain("if (isActive) {\n          resetCatalogContext(totalPages);");
     expect(source).toContain("}, [currentPage, isFetching, resetCatalogContext, totalPages]);");
     expect(source).toContain("const resetPendingTemplateAction = useCallback(() => {");
     expect(source).toContain(
@@ -138,6 +141,7 @@ describe("templates catalog actions", () => {
       "templatePendingDeleteId !== null && !visibleTemplateIds.has(templatePendingDeleteId)"
     );
     expect(source).toContain("queueMicrotask(() => {");
+    expect(source).toContain("if (!isActive) {\n        return;\n      }");
     expect(source).toContain("setTemplatePendingArchiveId(null);");
     expect(source).toContain("setTemplatePendingDeleteId(null);");
     expect(source).toContain("onClick={() => resetCatalogContext(Math.max(1, currentPage - 1))}");

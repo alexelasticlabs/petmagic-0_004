@@ -204,6 +204,7 @@ export function ModerationPage({ locale }: ModerationPageProps) {
   const visibleEventIdSignature = visibleItems.map((item) => item.eventId).join("|");
 
   useEffect(() => {
+    let isActive = true;
     if (
       !decision ||
       decisionInFlightRef.current ||
@@ -215,10 +216,18 @@ export function ModerationPage({ locale }: ModerationPageProps) {
     }
 
     queueMicrotask(() => {
+      if (!isActive) {
+        return;
+      }
+
       setDecision(null);
       setReason("");
       setReasonError(null);
     });
+
+    return () => {
+      isActive = false;
+    };
   }, [decision, decisionMutation.isPending, isQueueRefreshing, visibleEventIdSignature]);
 
   function assertCanModerate(): boolean {
@@ -306,41 +315,41 @@ export function ModerationPage({ locale }: ModerationPageProps) {
       {!canModerate ? <AdminStateCard title={text.loading} /> : null}
 
       {canModerate ? (
-      <AdminCard title={text.filtersTitle}>
-        <div className={styles.filters}>
-          <label className={styles.field}>
-            <span className={styles.label}>{text.status}</span>
-            <select
-              className={styles.select}
-              value={status}
-              disabled={isQueueContextLocked}
-              onChange={(event) => {
-                setStatus(event.target.value as StatusFilter);
-                resetQueueContext();
-              }}
-            >
-              <option value="pending">{text.statusPending}</option>
-              <option value="approved">{text.statusApproved}</option>
-              <option value="rejected">{text.statusRejected}</option>
-              <option value="all">{text.statusAll}</option>
-            </select>
-          </label>
-          <label className={styles.field}>
-            <span className={styles.label}>{text.search}</span>
-            <input
-              className={styles.input}
-              value={search}
-              disabled={isQueueContextLocked}
-              onChange={(event) => {
-                setSearch(event.target.value.slice(0, MODERATION_SEARCH_MAX_LENGTH));
-                resetQueueContext();
-              }}
-              maxLength={MODERATION_SEARCH_MAX_LENGTH}
-              placeholder={text.searchPlaceholder}
-            />
-          </label>
-        </div>
-      </AdminCard>
+        <AdminCard title={text.filtersTitle}>
+          <div className={styles.filters}>
+            <label className={styles.field}>
+              <span className={styles.label}>{text.status}</span>
+              <select
+                className={styles.select}
+                value={status}
+                disabled={isQueueContextLocked}
+                onChange={(event) => {
+                  setStatus(event.target.value as StatusFilter);
+                  resetQueueContext();
+                }}
+              >
+                <option value="pending">{text.statusPending}</option>
+                <option value="approved">{text.statusApproved}</option>
+                <option value="rejected">{text.statusRejected}</option>
+                <option value="all">{text.statusAll}</option>
+              </select>
+            </label>
+            <label className={styles.field}>
+              <span className={styles.label}>{text.search}</span>
+              <input
+                className={styles.input}
+                value={search}
+                disabled={isQueueContextLocked}
+                onChange={(event) => {
+                  setSearch(event.target.value.slice(0, MODERATION_SEARCH_MAX_LENGTH));
+                  resetQueueContext();
+                }}
+                maxLength={MODERATION_SEARCH_MAX_LENGTH}
+                placeholder={text.searchPlaceholder}
+              />
+            </label>
+          </div>
+        </AdminCard>
       ) : null}
 
       {canModerate ? (
@@ -366,122 +375,124 @@ export function ModerationPage({ locale }: ModerationPageProps) {
           <AdminStateCard title={text.empty} />
         ) : (
           <AdminCard title={text.queueTitle}>
-          <div
-            className={adminTableStyles.tableWrap}
-            aria-busy={queueQuery.isFetching ? "true" : undefined}
-          >
-            <table className={adminTableStyles.table}>
-              <thead>
-                <tr>
-                  <th>{text.template}</th>
-                  <th>{text.event}</th>
-                  <th>{text.status}</th>
-                  <th>{text.message}</th>
-                  <th>{text.source}</th>
-                  <th>{text.created}</th>
-                  <th>{text.actions}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleItems.map((item) => (
-                  <tr key={item.eventId}>
-                    <td>
-                      <strong>{formatModerationText(item.templateTitle, "-", 120)}</strong>
-                      <div className={styles.meta}>
-                        {formatTemplateType(item.templateType, text)} / {shortId(item.templateId)}
-                      </div>
-                    </td>
-                    <td>
-                      <AdminBadge tone={item.eventType === "complaint" ? "danger" : "info"}>
-                        {formatModerationEvent(item.eventType, text)}
-                      </AdminBadge>
-                    </td>
-                    <td>
-                      <AdminStatusBadge color={statusColor(item.status)}>
-                        {formatModerationStatus(item.status, text)}
-                      </AdminStatusBadge>
-                    </td>
-                    <td>
-                      <span className={styles.message}>{formatModerationText(item.message)}</span>
-                      {item.moderationComment ? (
-                        <div className={styles.meta}>
-                          {formatModerationText(item.moderationComment)}
-                        </div>
-                      ) : null}
-                    </td>
-                    <td>
-                      {formatModerationText(item.source, "-", 64)}
-                      <div className={styles.meta}>
-                        {formatModerationText(item.deviceClass, "-", 32)} /{" "}
-                        {formatModerationText(item.countryCode, "-", 8)} / {text.userPrefix}{" "}
-                        {shortId(item.userId)}
-                      </div>
-                    </td>
-                    <td>{formatDateTime(item.createdAtUtc, locale)}</td>
-                    <td>
-                      <div className={styles.actions}>
-                        <button
-                          type="button"
-                          className={styles.button}
-                          aria-label={`${text.approveItemLabel}: ${formatModerationText(
-                            item.templateTitle,
-                            item.eventId,
-                            80
-                          )}`}
-                          disabled={
-                            !canModerate || item.status !== "pending" || isDecisionSubmitting
-                          }
-                          onClick={() => openDecision(item, "approve")}
-                        >
-                          {text.approve}
-                        </button>
-                        <button
-                          type="button"
-                          className={`${styles.button} ${styles.danger}`}
-                          aria-label={`${text.rejectItemLabel}: ${formatModerationText(
-                            item.templateTitle,
-                            item.eventId,
-                            80
-                          )}`}
-                          disabled={
-                            !canModerate || item.status !== "pending" || isDecisionSubmitting
-                          }
-                          onClick={() => openDecision(item, "reject")}
-                        >
-                          {text.reject}
-                        </button>
-                      </div>
-                    </td>
+            <div
+              className={adminTableStyles.tableWrap}
+              aria-busy={queueQuery.isFetching ? "true" : undefined}
+            >
+              <table className={adminTableStyles.table}>
+                <thead>
+                  <tr>
+                    <th>{text.template}</th>
+                    <th>{text.event}</th>
+                    <th>{text.status}</th>
+                    <th>{text.message}</th>
+                    <th>{text.source}</th>
+                    <th>{text.created}</th>
+                    <th>{text.actions}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className={styles.pager}>
-            <span className={styles.pageInfo}>
-              {text.pageLabel} {page + 1}
-            </span>
-            <button
-              type="button"
-              className={`${styles.button} ${styles.pagerButton}`}
-              disabled={page === 0 || isQueueContextLocked || queueQuery.isFetching}
-              aria-label={text.previousPageLabel}
-              title={text.previousPageLabel}
-              onClick={() => resetQueueContext(Math.max(0, page - 1))}
-            >
-              <CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconPrevious}`} />
-            </button>
-            <button
-              type="button"
-              className={`${styles.button} ${styles.pagerButton}`}
-              disabled={!queueQuery.data?.hasMore || isQueueContextLocked || queueQuery.isFetching}
-              aria-label={text.nextPageLabel}
-              title={text.nextPageLabel}
-              onClick={() => resetQueueContext(page + 1)}
-            >
-              <CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconNext}`} />
-            </button>
-          </div>
+                </thead>
+                <tbody>
+                  {visibleItems.map((item) => (
+                    <tr key={item.eventId}>
+                      <td>
+                        <strong>{formatModerationText(item.templateTitle, "-", 120)}</strong>
+                        <div className={styles.meta}>
+                          {formatTemplateType(item.templateType, text)} / {shortId(item.templateId)}
+                        </div>
+                      </td>
+                      <td>
+                        <AdminBadge tone={item.eventType === "complaint" ? "danger" : "info"}>
+                          {formatModerationEvent(item.eventType, text)}
+                        </AdminBadge>
+                      </td>
+                      <td>
+                        <AdminStatusBadge color={statusColor(item.status)}>
+                          {formatModerationStatus(item.status, text)}
+                        </AdminStatusBadge>
+                      </td>
+                      <td>
+                        <span className={styles.message}>{formatModerationText(item.message)}</span>
+                        {item.moderationComment ? (
+                          <div className={styles.meta}>
+                            {formatModerationText(item.moderationComment)}
+                          </div>
+                        ) : null}
+                      </td>
+                      <td>
+                        {formatModerationText(item.source, "-", 64)}
+                        <div className={styles.meta}>
+                          {formatModerationText(item.deviceClass, "-", 32)} /{" "}
+                          {formatModerationText(item.countryCode, "-", 8)} / {text.userPrefix}{" "}
+                          {shortId(item.userId)}
+                        </div>
+                      </td>
+                      <td>{formatDateTime(item.createdAtUtc, locale)}</td>
+                      <td>
+                        <div className={styles.actions}>
+                          <button
+                            type="button"
+                            className={styles.button}
+                            aria-label={`${text.approveItemLabel}: ${formatModerationText(
+                              item.templateTitle,
+                              item.eventId,
+                              80
+                            )}`}
+                            disabled={
+                              !canModerate || item.status !== "pending" || isDecisionSubmitting
+                            }
+                            onClick={() => openDecision(item, "approve")}
+                          >
+                            {text.approve}
+                          </button>
+                          <button
+                            type="button"
+                            className={`${styles.button} ${styles.danger}`}
+                            aria-label={`${text.rejectItemLabel}: ${formatModerationText(
+                              item.templateTitle,
+                              item.eventId,
+                              80
+                            )}`}
+                            disabled={
+                              !canModerate || item.status !== "pending" || isDecisionSubmitting
+                            }
+                            onClick={() => openDecision(item, "reject")}
+                          >
+                            {text.reject}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className={styles.pager}>
+              <span className={styles.pageInfo}>
+                {text.pageLabel} {page + 1}
+              </span>
+              <button
+                type="button"
+                className={`${styles.button} ${styles.pagerButton}`}
+                disabled={page === 0 || isQueueContextLocked || queueQuery.isFetching}
+                aria-label={text.previousPageLabel}
+                title={text.previousPageLabel}
+                onClick={() => resetQueueContext(Math.max(0, page - 1))}
+              >
+                <CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconPrevious}`} />
+              </button>
+              <button
+                type="button"
+                className={`${styles.button} ${styles.pagerButton}`}
+                disabled={
+                  !queueQuery.data?.hasMore || isQueueContextLocked || queueQuery.isFetching
+                }
+                aria-label={text.nextPageLabel}
+                title={text.nextPageLabel}
+                onClick={() => resetQueueContext(page + 1)}
+              >
+                <CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconNext}`} />
+              </button>
+            </div>
           </AdminCard>
         )
       ) : null}

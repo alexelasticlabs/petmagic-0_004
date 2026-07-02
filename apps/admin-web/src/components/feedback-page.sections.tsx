@@ -168,17 +168,34 @@ export function DetailsPanel({
       ]);
     },
   });
+  const refundableCredits =
+    typeof details.generation?.creditsCharged === "number" &&
+    Number.isFinite(details.generation.creditsCharged)
+      ? Math.max(0, Math.trunc(details.generation.creditsCharged))
+      : 0;
   const refundMutation = useMutation({
     mutationFn: () =>
       refundAdminFeedbackCredits(details.id, {
-        amount: details.generation?.creditsCharged,
+        amount: refundableCredits,
         reason: `Feedback refund ${details.id}`,
       }),
     onSuccess: async () => {
-      await Promise.allSettled([
+      const invalidations = [
         queryClient.invalidateQueries({ queryKey: adminQueryKeys.feedbackDetails(details.id) }),
         queryClient.invalidateQueries({ queryKey: ["admin", "feedback"] }),
-      ]);
+        queryClient.invalidateQueries({ queryKey: ["admin", "economy", "ledger"] }),
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyDashboardMetrics }),
+      ];
+      if (details.userId) {
+        invalidations.push(
+          queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDetail(details.userId) }),
+          queryClient.invalidateQueries({ queryKey: adminQueryKeys.userAnalytics(details.userId) }),
+          queryClient.invalidateQueries({ queryKey: adminQueryKeys.usersRoot }),
+          queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDashboardMetrics })
+        );
+      }
+
+      await Promise.allSettled(invalidations);
     },
   });
   const isFeedbackActionLocked =
@@ -188,7 +205,8 @@ export function DetailsPanel({
     priority !== ((details.priority as FeedbackPriority) || "Low") ||
     adminNote !== (details.adminNote ?? "");
   const isSaveFeedbackDisabled = !isFeedbackDraftDirty || isFeedbackActionLocked;
-  const isRefundFeedbackDisabled = !details.canRefund || isFeedbackActionLocked;
+  const isRefundFeedbackDisabled =
+    !details.canRefund || refundableCredits <= 0 || isFeedbackActionLocked;
   const requestSaveFeedback = () => {
     if (isSaveFeedbackDisabled) {
       return;

@@ -296,7 +296,10 @@ describe("template test media actions", () => {
     expect(source).toContain(
       "if (!selectedHistoryGenerationId || historyGenerationIds.has(selectedHistoryGenerationId))"
     );
-    expect(source).toContain("queueMicrotask(() => setSelectedHistoryGenerationId(null));");
+    expect(source).toContain("let isActive = true;");
+    expect(source).toContain("queueMicrotask(() => {");
+    expect(source).toContain("if (isActive) {\n        setSelectedHistoryGenerationId(null);");
+    expect(source).toContain("return () => {\n      isActive = false;\n    };");
     expect(source).toContain("}, [historyGenerationIds, selectedHistoryGenerationId]);");
     expect(source).toContain(
       "return history.find((item) => item.generationId === selectedHistoryGenerationId) ?? run;"
@@ -345,6 +348,17 @@ describe("template test media actions", () => {
     expect(source).not.toContain("fileName: file.name");
   });
 
+  it("cleans template editor video metadata probes without retaining blob URLs", () => {
+    const source = readFileSync(templateEditorControllerPath, "utf8");
+
+    expect(source).toContain("const objectUrl = URL.createObjectURL(file);");
+    expect(source).toContain('video.removeAttribute("src");');
+    expect(source).toContain("video.onloadedmetadata = null;");
+    expect(source).toContain("video.onerror = null;");
+    expect(source).toContain("video.load();");
+    expect(source).toContain("URL.revokeObjectURL(objectUrl);");
+  });
+
   it("keeps template editor save and upload actions admin-only at the handler layer", () => {
     const source = readFileSync(templateEditorControllerPath, "utf8");
     const contentSource = readFileSync(templateEditorContentPath, "utf8");
@@ -378,13 +392,14 @@ describe("template test media actions", () => {
       'setToast({ type: "error", message: templateEditorActionsAdminOnly });'
     );
     expect(source).toContain("if (!assertCanManageTemplateEditor()) {\n      return;\n    }");
+    expect(source).toContain("saveTemplateMutation.isPending");
+    expect(source).toContain("uploadTemplateMediaMutation.isPending");
+    expect(source).toContain("uploadingKind !== null");
     expect(source.indexOf("if (!assertCanManageTemplateEditor())")).toBeLessThan(
-      source.indexOf(
-        "if (saveTemplateMutation.isPending || uploadTemplateMediaMutation.isPending || uploadingKind !== null)"
-      )
+      source.indexOf("saveTemplateMutation.isPending")
     );
     expect(source.lastIndexOf("if (!assertCanManageTemplateEditor())")).toBeLessThan(
-      source.indexOf("if (uploadTemplateMediaMutation.isPending || uploadingKind !== null)")
+      source.lastIndexOf("uploadTemplateMediaMutation.isPending")
     );
   });
 

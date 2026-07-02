@@ -3,7 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ADMIN_FEEDBACK_ADMIN_NOTE_MAX_LENGTH,
   ADMIN_FEEDBACK_FILTER_MAX_LENGTH,
+  ADMIN_FEEDBACK_REFUND_REASON_MAX_LENGTH,
   normalizeAdminFeedbackQuery,
+  refundAdminFeedbackCredits,
   updateAdminFeedback,
 } from "@/lib/api-client.feedback";
 
@@ -111,6 +113,35 @@ describe("api-client.feedback query normalization", () => {
       status: "InReview",
       priority: "High",
       adminNote: "n".repeat(ADMIN_FEEDBACK_ADMIN_NOTE_MAX_LENGTH),
+    });
+  });
+
+  it("bounds feedback refund reasons before sending audit payloads", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json({
+        id: "refund-1",
+        userId: "user-1",
+        feedbackId: "feedback-1",
+        amount: 5,
+        reason: "refund",
+        adminId: "admin-1",
+        createdAtUtc: "2026-06-15T00:00:00.000Z",
+      })
+    );
+    const overlongReason = "r".repeat(ADMIN_FEEDBACK_REFUND_REASON_MAX_LENGTH + 50);
+    vi.stubGlobal("fetch", fetchMock);
+
+    await refundAdminFeedbackCredits("feedback/one", {
+      amount: 5,
+      reason: ` ${overlongReason} `,
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(String(url)).toBe("https://api.example.com/api/admin/feedback/feedback%2Fone/refund");
+    expect(init?.method).toBe("POST");
+    expect(JSON.parse(String(init?.body))).toEqual({
+      amount: 5,
+      reason: "r".repeat(ADMIN_FEEDBACK_REFUND_REASON_MAX_LENGTH),
     });
   });
 });

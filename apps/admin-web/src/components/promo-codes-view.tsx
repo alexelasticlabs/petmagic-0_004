@@ -450,6 +450,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
   }, [isEditorOpen, isMutating]);
 
   useEffect(() => {
+    let isActive = true;
     if (!promoCodesPage || isPromoCodesRefreshing || isMutating) {
       return;
     }
@@ -464,6 +465,10 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     }
 
     queueMicrotask(() => {
+      if (!isActive) {
+        return;
+      }
+
       if (shouldCloseActionsMenu) {
         closeActionsMenu();
       }
@@ -472,6 +477,10 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
         setCodePendingArchive(null);
       }
     });
+
+    return () => {
+      isActive = false;
+    };
   }, [
     actionsMenuCodeId,
     closeActionsMenu,

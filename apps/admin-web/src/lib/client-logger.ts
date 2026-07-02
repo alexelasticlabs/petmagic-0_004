@@ -100,6 +100,11 @@ function maskSensitiveString(key: string, value: string): string {
   if (
     normalizedKey.includes("authorization") ||
     normalizedKey.includes("token") ||
+    normalizedKey.includes("jwt") ||
+    normalizedKey.includes("session") ||
+    normalizedKey.includes("cookie") ||
+    normalizedKey.includes("credential") ||
+    normalizedKey.includes("signature") ||
     normalizedKey.includes("secret") ||
     normalizedKey.includes("password") ||
     normalizedKey.includes("receipt") ||
@@ -144,9 +149,11 @@ function containsSensitiveInlineValue(value: string): boolean {
     /"(authorization|access_?token|refresh_?token|token|secret|password|api_?key|receipt)"\s*:/i.test(
       value
     ) ||
+    /"(jwt|session|cookie|set-cookie|credential|signature)"\s*:/i.test(value) ||
     /\b(authorization|access_?token|refresh_?token|token|secret|password|api_?key|receipt)=/i.test(
       value
     ) ||
+    /\b(jwt|session|cookie|set-cookie|credential|signature)=/i.test(value) ||
     /\b(signature|x-amz-signature|x-goog-signature|expires|x-amz-credential|x-goog-credential)=/i.test(
       value
     ) ||

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { clientLogger } from "@/lib/client-logger";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
@@ -64,9 +64,26 @@ export function SupportSecureMedia({
     objectUrl: string | null;
     failed: boolean;
   }>({ sourceUrl: "", objectUrl: null, failed: false });
+  const activeObjectUrlRef = useRef<string | null>(null);
   const objectUrl =
     localObjectUrl ?? (remoteMedia.sourceUrl === url ? remoteMedia.objectUrl : null);
   const loadFailed = !localObjectUrl && remoteMedia.sourceUrl === url && remoteMedia.failed;
+  const revokeActiveObjectUrl = useCallback(() => {
+    if (!activeObjectUrlRef.current) {
+      return;
+    }
+
+    URL.revokeObjectURL(activeObjectUrlRef.current);
+    activeObjectUrlRef.current = null;
+  }, []);
+  const markRemoteMediaFailed = useCallback(() => {
+    if (localObjectUrl) {
+      return;
+    }
+
+    revokeActiveObjectUrl();
+    setRemoteMedia({ sourceUrl: url, objectUrl: null, failed: true });
+  }, [localObjectUrl, revokeActiveObjectUrl, url]);
 
   useEffect(() => {
     if (localObjectUrl) {
@@ -90,7 +107,7 @@ export function SupportSecureMedia({
             kind,
             status: response.status,
           });
-          setRemoteMedia({ sourceUrl: url, objectUrl: null, failed: true });
+          markRemoteMediaFailed();
           return;
         }
 
@@ -100,6 +117,8 @@ export function SupportSecureMedia({
         }
 
         createdObjectUrl = URL.createObjectURL(blob);
+        revokeActiveObjectUrl();
+        activeObjectUrlRef.current = createdObjectUrl;
         setRemoteMedia({ sourceUrl: url, objectUrl: createdObjectUrl, failed: false });
       })
       .catch((error) => {
@@ -113,17 +132,25 @@ export function SupportSecureMedia({
           kind,
           ...getSupportMediaErrorDetails(error),
         });
-        setRemoteMedia({ sourceUrl: url, objectUrl: null, failed: true });
+        markRemoteMediaFailed();
       });
 
     return () => {
       isActive = false;
       controller.abort();
-      if (createdObjectUrl) {
-        URL.revokeObjectURL(createdObjectUrl);
+      if (createdObjectUrl && activeObjectUrlRef.current === createdObjectUrl) {
+        revokeActiveObjectUrl();
       }
     };
-  }, [kind, localObjectUrl, logContext?.messageId, logContext?.mimeType, url]);
+  }, [
+    kind,
+    localObjectUrl,
+    logContext?.messageId,
+    logContext?.mimeType,
+    markRemoteMediaFailed,
+    revokeActiveObjectUrl,
+    url,
+  ]);
 
   if (!objectUrl) {
     return (
@@ -147,6 +174,7 @@ export function SupportSecureMedia({
         playsInline={playsInline}
         muted={muted}
         aria-hidden={ariaHidden || undefined}
+        onError={markRemoteMediaFailed}
       />
     );
   }
@@ -161,6 +189,7 @@ export function SupportSecureMedia({
       height={height}
       loading={loading}
       aria-hidden={ariaHidden || undefined}
+      onError={markRemoteMediaFailed}
     />
   );
 }

@@ -140,11 +140,20 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
   const isGrantCleanLocked = grantCleanMutation.isPending || generationsQuery.isFetching;
 
   useEffect(() => {
+    let isActive = true;
     if (!expandedGenerationId || visibleGenerationIds.has(expandedGenerationId)) {
       return;
     }
 
-    queueMicrotask(() => setExpandedGeneration(null));
+    queueMicrotask(() => {
+      if (isActive) {
+        setExpandedGeneration(null);
+      }
+    });
+
+    return () => {
+      isActive = false;
+    };
   }, [expandedGenerationId, visibleGenerationIds]);
 
   function resetGenerationListContext(nextPageIndex = 0) {

@@ -9,6 +9,7 @@ import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
   fetchAdminCurrencyPacks,
   fetchAdminEconomyDashboardMetrics,
+  fetchAdminEconomyIncidents,
   fetchAdminEconomyLedger,
   fetchAdminEconomyPurchases,
   fetchAdminEconomySubscriptions,
@@ -18,6 +19,7 @@ import {
   ECONOMY_QUERY_FILTER_MAX_LENGTH,
   normalizeAdminEconomyPurchasesQuery,
   normalizeAdminEconomySubscriptionsQuery,
+  normalizeAdminEconomyIncidentsQuery,
   useAuthSession,
 } from "@/lib/api-client";
 import { type Locale } from "@/lib/i18n";
@@ -55,15 +57,20 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
   const [subscriptionPage, setSubscriptionPage] = useState(0);
   const [eventStatus, setEventStatus] = useState("");
   const [eventProvider, setEventProvider] = useState("");
+  const [incidentStatus, setIncidentStatus] = useState("open");
+  const [incidentCategory, setIncidentCategory] = useState("");
+  const [incidentType, setIncidentType] = useState("");
+  const [incidentPage, setIncidentPage] = useState(0);
   const debouncedPurchaseSearch = useDebouncedValue(purchaseSearch, 350);
   const debouncedSubscriptionSearch = useDebouncedValue(subscriptionSearch, 350);
+  const debouncedIncidentType = useDebouncedValue(incidentType, 350);
 
   useEffect(() => {
     ensureAdminSession(locale, router, { requiredRole: "Admin" });
   }, [locale, router, session]);
 
   const updateLedgerSource = useCallback((value: string) => {
-    setLedgerSource(value);
+    setLedgerSource(value.trim().slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH));
     setLedgerPage(0);
   }, []);
 
@@ -95,6 +102,21 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
   const updateSubscriptionSearch = useCallback((value: string) => {
     setSubscriptionSearch(value.slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH));
     setSubscriptionPage(0);
+  }, []);
+
+  const updateIncidentStatus = useCallback((value: string) => {
+    setIncidentStatus(value);
+    setIncidentPage(0);
+  }, []);
+
+  const updateIncidentCategory = useCallback((value: string) => {
+    setIncidentCategory(value);
+    setIncidentPage(0);
+  }, []);
+
+  const updateIncidentType = useCallback((value: string) => {
+    setIncidentType(value.slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH));
+    setIncidentPage(0);
   }, []);
 
   const ledgerQueryParams = useMemo(
@@ -177,6 +199,25 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
     enabled: canLoadEconomy,
   });
 
+  const incidentsQueryParams = useMemo(
+    () =>
+      normalizeAdminEconomyIncidentsQuery({
+        skip: incidentPage * ECONOMY_PAGE_SIZE,
+        take: ECONOMY_PAGE_SIZE,
+        status: incidentStatus,
+        category: incidentCategory,
+        type: debouncedIncidentType,
+      }),
+    [debouncedIncidentType, incidentCategory, incidentPage, incidentStatus]
+  );
+
+  const incidentsQuery = useQuery({
+    queryKey: adminQueryKeys.economyIncidents(incidentsQueryParams),
+    queryFn: ({ signal }) => fetchAdminEconomyIncidents(incidentsQueryParams, signal),
+    enabled: canLoadEconomy,
+    placeholderData: keepPreviousData,
+  });
+
   const packsQuery = useQuery({
     queryKey: adminQueryKeys.economyPacks,
     queryFn: ({ signal }) => fetchAdminCurrencyPacks(signal),
@@ -200,6 +241,7 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
   const purchasesIsRefreshing = purchasesQuery.isFetching && purchasesQuery.isPlaceholderData;
   const subscriptionsIsRefreshing =
     subscriptionsQuery.isFetching && subscriptionsQuery.isPlaceholderData;
+  const incidentsIsRefreshing = incidentsQuery.isFetching && incidentsQuery.isPlaceholderData;
 
   const ledgerItems = useMemo(() => visibleLedgerPage?.items ?? [], [visibleLedgerPage?.items]);
   const purchaseItems = useMemo(
@@ -216,6 +258,11 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
     () => subscriptionEventsQuery.data?.items ?? [],
     [subscriptionEventsQuery.data?.items]
   );
+  const visibleIncidentsPage = incidentsQuery.isPlaceholderData ? undefined : incidentsQuery.data;
+  const incidentItems = useMemo(
+    () => visibleIncidentsPage?.items ?? [],
+    [visibleIncidentsPage?.items]
+  );
   const packs = useMemo(() => packsQuery.data ?? [], [packsQuery.data]);
 
   const refetchAll = useCallback(async () => {
@@ -230,6 +277,7 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
       subscriptionPlansQuery.refetch(),
       providerConfigsQuery.refetch(),
       subscriptionEventsQuery.refetch(),
+      incidentsQuery.refetch(),
       packsQuery.refetch(),
       economyDashboardMetricsQuery.refetch(),
     ]);
@@ -237,6 +285,7 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
     economyDashboardMetricsQuery,
     canLoadEconomy,
     ledgerQuery,
+    incidentsQuery,
     packsQuery,
     providerConfigsQuery,
     purchasesQuery,
@@ -266,6 +315,7 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
   const activePlans = subscriptionPlans.filter((item) => item.isActive).length;
   const enabledRoutes = providerConfigs.filter((item) => item.isEnabled).length;
   const premiumMetrics = { activeSubscriptions, renewalStops, activePlans, enabledRoutes };
+  const openIncidents = incidentItems.filter((item) => item.status.toLowerCase() === "open").length;
 
   const isLoading =
     ledgerQuery.isLoading ||
@@ -274,6 +324,7 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
     subscriptionPlansQuery.isLoading ||
     providerConfigsQuery.isLoading ||
     subscriptionEventsQuery.isLoading ||
+    incidentsQuery.isLoading ||
     packsQuery.isLoading ||
     economyDashboardMetricsQuery.isLoading;
 
@@ -284,6 +335,7 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
     subscriptionPlansQuery.isError ||
     providerConfigsQuery.isError ||
     subscriptionEventsQuery.isError ||
+    incidentsQuery.isError ||
     packsQuery.isError ||
     economyDashboardMetricsQuery.isError;
 
@@ -294,6 +346,7 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
     subscriptionPlansQuery.isSuccess ||
     providerConfigsQuery.isSuccess ||
     subscriptionEventsQuery.isSuccess ||
+    incidentsQuery.isSuccess ||
     packsQuery.isSuccess ||
     economyDashboardMetricsQuery.isSuccess;
 
@@ -304,6 +357,7 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
     subscriptionPlansQuery.error ??
     providerConfigsQuery.error ??
     subscriptionEventsQuery.error ??
+    incidentsQuery.error ??
     packsQuery.error ??
     economyDashboardMetricsQuery.error ??
     null;
@@ -315,6 +369,7 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
     subscriptionPlansQuery.isFetching ||
     providerConfigsQuery.isFetching ||
     subscriptionEventsQuery.isFetching ||
+    incidentsQuery.isFetching ||
     packsQuery.isFetching ||
     economyDashboardMetricsQuery.isFetching;
 
@@ -325,6 +380,14 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
     hasPartialError: hasError && hasResolvedData,
     economyError,
     isFetching,
+    incidentItems,
+    incidentCategory,
+    incidentPage,
+    incidentStatus,
+    incidentType,
+    incidentsHasMore: visibleIncidentsPage?.hasMore ?? false,
+    incidentsIsFetching: incidentsQuery.isFetching,
+    incidentsIsRefreshing,
     isLoading,
     ledgerHasMore: visibleLedgerPage?.hasMore ?? false,
     ledgerItems,
@@ -343,8 +406,13 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
     purchasesIsFetching: purchasesQuery.isFetching,
     purchasesIsRefreshing,
     premiumMetrics,
+    openIncidents,
     setEventProvider,
     setEventStatus,
+    setIncidentPage,
+    setIncidentCategory: updateIncidentCategory,
+    setIncidentStatus: updateIncidentStatus,
+    setIncidentType: updateIncidentType,
     setLedgerPage,
     setLedgerSource: updateLedgerSource,
     setPurchasePage,

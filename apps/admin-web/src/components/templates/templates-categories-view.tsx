@@ -123,6 +123,7 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
   }, [canViewCategories, locale, router, session]);
 
   useEffect(() => {
+    let isActive = true;
     if (isCategoryActionLocked) {
       return;
     }
@@ -138,6 +139,10 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
     }
 
     queueMicrotask(() => {
+      if (!isActive) {
+        return;
+      }
+
       if (shouldResetArchive) {
         setCategoryPendingArchive(null);
       }
@@ -151,6 +156,10 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
         setEditingName("");
       }
     });
+
+    return () => {
+      isActive = false;
+    };
   }, [
     categoryIds,
     categoryPendingArchive,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import styles from "@/components/users/user-avatar.module.css";
 import type { UserAvatar } from "@/lib/api-client";
@@ -39,12 +39,22 @@ export function UserAvatarView({ avatar, label, fallbackLabel, size = "sm" }: Us
     objectUrl: string | null;
     failed: boolean;
   }>({ sourceUrl: "", objectUrl: null, failed: false });
+  const activeObjectUrlRef = useRef<string | null>(null);
   const failedToLoad = Boolean(
     imageUrl && avatarMedia.sourceUrl === imageUrl && avatarMedia.failed
   );
   const objectUrl = !failedToLoad
-    ? (localObjectUrl ?? (imageUrl && avatarMedia.sourceUrl === imageUrl ? avatarMedia.objectUrl : null))
+    ? (localObjectUrl ??
+      (imageUrl && avatarMedia.sourceUrl === imageUrl ? avatarMedia.objectUrl : null))
     : null;
+  const revokeActiveObjectUrl = useCallback(() => {
+    if (!activeObjectUrlRef.current) {
+      return;
+    }
+
+    URL.revokeObjectURL(activeObjectUrlRef.current);
+    activeObjectUrlRef.current = null;
+  }, []);
 
   useEffect(() => {
     if (!imageUrl || localObjectUrl) {
@@ -75,6 +85,8 @@ export function UserAvatarView({ avatar, label, fallbackLabel, size = "sm" }: Us
         }
 
         createdObjectUrl = URL.createObjectURL(blob);
+        revokeActiveObjectUrl();
+        activeObjectUrlRef.current = createdObjectUrl;
         setAvatarMedia({ sourceUrl: imageUrl, objectUrl: createdObjectUrl, failed: false });
       })
       .catch((error) => {
@@ -89,11 +101,11 @@ export function UserAvatarView({ avatar, label, fallbackLabel, size = "sm" }: Us
     return () => {
       isActive = false;
       controller.abort();
-      if (createdObjectUrl) {
-        URL.revokeObjectURL(createdObjectUrl);
+      if (createdObjectUrl && activeObjectUrlRef.current === createdObjectUrl) {
+        revokeActiveObjectUrl();
       }
     };
-  }, [imageUrl, localObjectUrl]);
+  }, [imageUrl, localObjectUrl, revokeActiveObjectUrl]);
 
   return (
     <span
@@ -108,6 +120,7 @@ export function UserAvatarView({ avatar, label, fallbackLabel, size = "sm" }: Us
           className={styles.image}
           onError={() => {
             if (imageUrl) {
+              revokeActiveObjectUrl();
               setAvatarMedia({ sourceUrl: imageUrl, objectUrl: null, failed: true });
             }
           }}

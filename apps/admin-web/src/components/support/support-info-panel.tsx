@@ -4,9 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { getSupportConversationCopy } from "@/components/support/support-conversation.content";
 import { useSupportInfoPanelAttachmentActions } from "@/components/support/support-info-panel-attachment-actions";
-import {
-  SupportInfoPanelAttachmentsTab,
-} from "@/components/support/support-info-panel-attachments";
+import { SupportInfoPanelAttachmentsTab } from "@/components/support/support-info-panel-attachments";
 import {
   SupportInfoPanelActivityTab,
   SupportInfoPanelDialogTab,
@@ -69,6 +67,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
   });
 
   useEffect(() => {
+    let isActive = true;
     const previousConversationId = previousConversationIdRef.current;
     previousConversationIdRef.current = conversation?.conversationId ?? null;
 
@@ -81,8 +80,16 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
       conversation.status === pendingStatusConfirm ||
       (previousConversationId !== null && previousConversationId !== conversation.conversationId)
     ) {
-      queueMicrotask(() => setPendingStatusConfirm(null));
+      queueMicrotask(() => {
+        if (isActive) {
+          setPendingStatusConfirm(null);
+        }
+      });
     }
+
+    return () => {
+      isActive = false;
+    };
   }, [conversation, pendingStatusConfirm, statusMutation.isPending]);
 
   if (!conversation) {

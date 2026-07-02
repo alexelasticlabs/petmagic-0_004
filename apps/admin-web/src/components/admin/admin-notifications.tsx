@@ -104,6 +104,24 @@ const notificationCategories = new Set<AdminNotificationCategory>([
 ]);
 const notificationTones = new Set<AdminNotificationTone>(["info", "success", "warning", "error"]);
 const notificationPriorities = new Set<AdminNotificationPriority>(["normal", "critical"]);
+let adminNotificationIdSequence = 0;
+
+export function createAdminNotificationId(now: number = Date.now()): string {
+  const crypto = globalThis.crypto;
+  if (typeof crypto?.randomUUID === "function") {
+    return `${now}-${crypto.randomUUID()}`;
+  }
+
+  if (typeof crypto?.getRandomValues === "function") {
+    const bytes = new Uint8Array(8);
+    crypto.getRandomValues(bytes);
+    const randomHex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    return `${now}-${randomHex}`;
+  }
+
+  adminNotificationIdSequence = (adminNotificationIdSequence + 1) % Number.MAX_SAFE_INTEGER;
+  return `${now}-${adminNotificationIdSequence.toString(36)}`;
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -326,7 +344,7 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
     dedupeMapRef.current.set(dedupeKey, now);
 
     const notification: AdminNotificationItem = {
-      id: `${now}-${Math.random().toString(36).slice(2, 8)}`,
+      id: createAdminNotificationId(now),
       title: sanitizedTitle,
       message: sanitizedMessage,
       category: input.category,

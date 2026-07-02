@@ -553,6 +553,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
   }, [selectedUserId]);
 
   useEffect(() => {
+    let isActive = true;
     if (isUsersRefreshing || isUserActionLocked) {
       return;
     }
@@ -576,6 +577,10 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
     }
 
     queueMicrotask(() => {
+      if (!isActive) {
+        return;
+      }
+
       if (shouldCloseActionsMenu) {
         closeActionsMenu();
       }
@@ -592,6 +597,10 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
         setConfirmationDialog(null);
       }
     });
+
+    return () => {
+      isActive = false;
+    };
   }, [
     closeActionsMenu,
     confirmationDialog,

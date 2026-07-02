@@ -67,4 +67,17 @@ describe("client logger privacy hardening", () => {
       status: 504,
     });
   });
+
+  it("redacts cookie, JWT, credential, and signature assignments in free-form text", () => {
+    const sanitized = sanitizeClientLogTextForTesting(
+      "message",
+      "Request failed with cookie=raw-cookie jwt=eyJhbGciOi.raw.payload credential=raw-credential signature=raw-signature"
+    );
+
+    expect(sanitized).toBe("[redacted]");
+    expect(sanitized).not.toContain("raw-cookie");
+    expect(sanitized).not.toContain("eyJhbGciOi.raw.payload");
+    expect(sanitized).not.toContain("raw-credential");
+    expect(sanitized).not.toContain("raw-signature");
+  });
 });

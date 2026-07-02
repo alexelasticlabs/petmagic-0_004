@@ -25,6 +25,12 @@
   font-size: 0.82rem;
 }
 
+.sectionStack {
+  display: grid;
+  gap: 0.85rem;
+  margin-top: 1rem;
+}
+
 .mutedText {
   color: var(--text-muted);
 }
@@ -416,4 +422,3 @@
     font-size: 0.84rem;
   }
 }
-

@@ -14,6 +14,7 @@ import {
   getAnalyticsOverviewCacheKey,
   getTemplateListCacheKey,
   getTemplateRecentGenerationsCacheKey,
+  inflightGetRequests,
 } from "./api-client.core";
 
 import type {
@@ -114,6 +115,50 @@ function normalizeTemplateCatalogTakeValue(value: number | undefined): number | 
   return typeof value === "number" && Number.isFinite(value) && value > 0
     ? Math.min(Math.floor(value), 100)
     : undefined;
+}
+
+function deleteInflightGetRequestsByPrefix(prefix: string): void {
+  for (const key of inflightGetRequests.keys()) {
+    if (key.startsWith(prefix)) {
+      inflightGetRequests.delete(key);
+    }
+  }
+}
+
+function deleteTemplateRecentGenerationCaches(templateId: string): void {
+  const prefix = `admin-template-recent:${templateId}:`;
+  for (const key of cachedAdminTemplateRecentGenerations.keys()) {
+    if (key.startsWith(prefix)) {
+      cachedAdminTemplateRecentGenerations.delete(key);
+    }
+  }
+  deleteInflightGetRequestsByPrefix(prefix);
+}
+
+function clearAdminTemplateMutationCaches(templateId?: string): void {
+  cachedTemplateLists.clear();
+  cachedTemplatesAnalyticsOverview.clear();
+  deleteInflightGetRequestsByPrefix("templates:");
+  deleteInflightGetRequestsByPrefix("templates-analytics:");
+
+  if (!templateId) {
+    return;
+  }
+
+  const statisticsKey = `admin-template-statistics:${templateId}`;
+  const trendsKey = `admin-template-trends:${templateId}`;
+  const failuresKey = `admin-template-failures:${templateId}`;
+  const eventsKey = `admin-template-events:${templateId}`;
+
+  cachedAdminTemplateStatistics.delete(statisticsKey);
+  cachedAdminTemplateTrends.delete(trendsKey);
+  cachedAdminTemplateFailureBreakdowns.delete(failuresKey);
+  cachedAdminTemplateEventAnalytics.delete(eventsKey);
+  inflightGetRequests.delete(statisticsKey);
+  inflightGetRequests.delete(trendsKey);
+  inflightGetRequests.delete(failuresKey);
+  inflightGetRequests.delete(eventsKey);
+  deleteTemplateRecentGenerationCaches(templateId);
 }
 
 export function normalizeAdminTemplateCatalogQuery(
@@ -653,7 +698,7 @@ export async function createImageTemplate(payload: ImageTemplatePayload): Promis
   {
     timeoutMs: 60_000,
   });
-  cachedTemplateLists.clear();
+  clearAdminTemplateMutationCaches(template.templateId);
   return template;
 }
 
@@ -669,7 +714,7 @@ export async function updateImageTemplate(
       body: JSON.stringify(payload),
     }
   );
-  cachedTemplateLists.clear();
+  clearAdminTemplateMutationCaches(templateId);
   return template;
 }
 
@@ -681,7 +726,7 @@ export async function createVideoTemplate(payload: VideoTemplatePayload): Promis
   {
     timeoutMs: 60_000,
   });
-  cachedTemplateLists.clear();
+  clearAdminTemplateMutationCaches(template.templateId);
   return template;
 }
 
@@ -697,7 +742,7 @@ export async function updateVideoTemplate(
       body: JSON.stringify(payload),
     }
   );
-  cachedTemplateLists.clear();
+  clearAdminTemplateMutationCaches(templateId);
   return template;
 }
 
@@ -713,7 +758,7 @@ export async function changeTemplateStatus(
       body: JSON.stringify({ status }),
     }
   );
-  cachedTemplateLists.clear();
+  clearAdminTemplateMutationCaches(templateId);
   return template;
 }
 
@@ -722,7 +767,7 @@ export async function deleteTemplate(templateId: string): Promise<void> {
   await apiRequest<void>(`/api/admin/templates/${encodedTemplateId}`, {
     method: "DELETE",
   });
-  cachedTemplateLists.clear();
+  clearAdminTemplateMutationCaches(templateId);
 }
 
 export async function uploadTemplateMedia(

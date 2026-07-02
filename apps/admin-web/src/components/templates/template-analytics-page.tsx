@@ -177,9 +177,7 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
 
   useEffect(() => {
     const handle = window.setTimeout(() => {
-      setFeedbackSearch(
-        feedbackSearchInput.trim().slice(0, TEMPLATE_FEEDBACK_SEARCH_MAX_LENGTH)
-      );
+      setFeedbackSearch(feedbackSearchInput.trim().slice(0, TEMPLATE_FEEDBACK_SEARCH_MAX_LENGTH));
     }, 250);
 
     return () => {
@@ -195,21 +193,34 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
 
   useEffect(
     () => () => {
-      recentRunsAbortControllerRef.current?.abort();
+      const controller = recentRunsAbortControllerRef.current;
+      controller?.abort();
+      if (recentRunsAbortControllerRef.current === controller) {
+        recentRunsAbortControllerRef.current = null;
+      }
     },
     []
   );
 
   useEffect(() => {
+    let isActive = true;
     recentRunsAbortControllerRef.current?.abort();
     recentRunsAbortControllerRef.current = null;
 
     queueMicrotask(() => {
+      if (!isActive) {
+        return;
+      }
+
       setIsRecentRunsLoading(false);
       setAllRecentRuns(null);
       setRecentRunsError(null);
       setRecentRunsMode((current) => (current === "latest" ? current : "latest"));
     });
+
+    return () => {
+      isActive = false;
+    };
   }, [recentRunsPreviewSignature]);
 
   function requestAnalyticsRetry() {
@@ -254,9 +265,7 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
   const editorPath = `/${locale}/templates/${templateSlug}/editor?templateId=${encodeURIComponent(templateId)}`;
   const templateTitle = sanitizeSensitiveText(template.title, 120);
   const breadcrumbsRoot =
-    template.templateType === "Video"
-      ? text.videoTemplatesLabel
-      : text.imageTemplatesLabel;
+    template.templateType === "Video" ? text.videoTemplatesLabel : text.imageTemplatesLabel;
   const activeRuns = statistics.queuedRuns + statistics.processingRuns;
   const canShowAllRecentRuns = statistics.totalRuns > RECENT_RUNS_PREVIEW_LIMIT;
   const canShowFailedRecentRuns = statistics.failedRuns > 0;

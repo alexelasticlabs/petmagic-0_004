@@ -330,6 +330,7 @@ describe("templates daily featured page", () => {
     expect(pageSource).toContain("const [assignmentPendingDelete, setAssignmentPendingDelete]");
     expect(pageSource).toContain("const scheduleAssignmentIds = useMemo(");
     expect(pageSource).toContain("new Set(schedule.map((assignment) => assignment.id))");
+    expect(pageSource).toContain("if (signal?.aborted) {\n        return;\n      }");
     expect(pageSource).toContain(
       "if (isScheduleLoading || isActionLocked) {\n      return;\n    }"
     );
@@ -340,6 +341,8 @@ describe("templates daily featured page", () => {
       "const shouldResetForm = form.id && !scheduleAssignmentIds.has(form.id);"
     );
     expect(pageSource).toContain("queueMicrotask(() => {");
+    expect(pageSource).toContain("let isActive = true;");
+    expect(pageSource).toContain("if (!isActive) {\n        return;\n      }");
     expect(pageSource).toContain(
       "if (shouldResetPendingDelete) {\n        setAssignmentPendingDelete(null);\n      }"
     );
@@ -356,6 +359,7 @@ describe("templates daily featured page", () => {
     expect(pageSource).toContain("onClick={() => onRequestDeleteAssignment(assignment)}");
     expect(pageSource).toContain("<ConfirmationDialog");
     expect(pageSource).toContain("void handleDelete(assignmentPendingDelete).then((succeeded) =>");
+    expect(pageSource).toContain("isActive = false;");
     expect(pageSource).not.toContain("window.confirm");
   });
 });

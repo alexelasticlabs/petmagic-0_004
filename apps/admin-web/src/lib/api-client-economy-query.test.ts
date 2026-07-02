@@ -380,7 +380,9 @@ describe("api-client.economy query normalization", () => {
 
     expect(source).toContain("ECONOMY_QUERY_FILTER_MAX_LENGTH,");
     expect(source).toContain("const [ledgerPage, setLedgerPage] = useState(0);");
-    expect(source).toContain("setLedgerSource(value);");
+    expect(source).toContain(
+      "setLedgerSource(value.trim().slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH));"
+    );
     expect(source).toContain("setLedgerPage(0);");
     expect(source).toContain("const ledgerQueryParams = useMemo(");
     expect(source).toContain("setPurchaseSearch(value.slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH));");

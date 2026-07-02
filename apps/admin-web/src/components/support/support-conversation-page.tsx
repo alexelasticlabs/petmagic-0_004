@@ -293,18 +293,27 @@ export function SupportConversationPage({
   }, [conversationId, resetSelectedAttachment, selectReplyToMessage, setReply]);
 
   useEffect(() => {
+    let isActive = true;
     fullscreenActionAbortControllerRef.current?.abort();
     fullscreenActionAbortControllerRef.current = null;
     attachmentActionAbortControllerRef.current?.abort();
     attachmentActionAbortControllerRef.current = null;
 
     queueMicrotask(() => {
+      if (!isActive) {
+        return;
+      }
+
       setFullscreenImage(null);
       setPendingFullscreenAction(null);
       setPendingAttachmentActionKey(null);
       setHighlightedMessageId(null);
       setIsDragging(false);
     });
+
+    return () => {
+      isActive = false;
+    };
   }, [conversationId]);
 
   const submitReply = () => {

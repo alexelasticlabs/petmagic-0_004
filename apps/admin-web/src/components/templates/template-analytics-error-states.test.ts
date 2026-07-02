@@ -345,7 +345,12 @@ describe("template analytics error states", () => {
     );
     expect(pageSource).toContain("recentRunsAbortControllerRef.current?.abort();");
     expect(pageSource).toContain("recentRunsAbortControllerRef.current = null;");
+    expect(pageSource).toContain("const controller = recentRunsAbortControllerRef.current;");
+    expect(pageSource).toContain("controller?.abort();");
+    expect(pageSource).toContain("recentRunsAbortControllerRef.current === controller");
     expect(pageSource).toContain("queueMicrotask(() => {");
+    expect(pageSource).toContain("let isActive = true;");
+    expect(pageSource).toContain("if (!isActive) {\n        return;\n      }");
     expect(pageSource).toContain("setIsRecentRunsLoading(false);");
     expect(pageSource).toContain("setAllRecentRuns(null);");
     expect(pageSource).toContain("setRecentRunsError(null);");
@@ -353,5 +358,6 @@ describe("template analytics error states", () => {
       'setRecentRunsMode((current) => (current === "latest" ? current : "latest"));'
     );
     expect(pageSource).toContain("}, [recentRunsPreviewSignature]);");
+    expect(pageSource).toContain("isActive = false;");
   });
 });

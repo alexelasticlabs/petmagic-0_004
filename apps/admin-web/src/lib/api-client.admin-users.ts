@@ -119,6 +119,12 @@ function assertAssignableRole(role: string): AdminAssignableRole {
   throw new Error("Invalid admin role.");
 }
 
+function clearAdminUserCaches(userId: string): void {
+  cachedUsersLists.clear();
+  cachedAdminUserDetails.delete(`admin-user:${userId}`);
+  cachedAdminUserAnalytics.delete(`admin-user-analytics:${userId}`);
+}
+
 export async function fetchUsers(
   query: FetchUsersQuery = {},
   signal?: AbortSignal
@@ -275,9 +281,7 @@ export async function adjustAdminUserWallet(
     }
   );
 
-  cachedUsersLists.clear();
-  cachedAdminUserDetails.delete(`admin-user:${userId}`);
-  cachedAdminUserAnalytics.delete(`admin-user-analytics:${userId}`);
+  clearAdminUserCaches(userId);
   return result;
 }
 
@@ -288,9 +292,7 @@ export async function assignRole(userId: string, role: string): Promise<void> {
     method: "PUT",
     body: JSON.stringify({ role: normalizedRole }),
   });
-  cachedUsersLists.clear();
-  cachedAdminUserDetails.delete(`admin-user:${userId}`);
-  cachedAdminUserAnalytics.delete(`admin-user-analytics:${userId}`);
+  clearAdminUserCaches(userId);
 }
 
 export async function revokeRole(userId: string, role: string): Promise<void> {
@@ -300,9 +302,7 @@ export async function revokeRole(userId: string, role: string): Promise<void> {
     method: "DELETE",
     body: JSON.stringify({ role: normalizedRole }),
   });
-  cachedUsersLists.clear();
-  cachedAdminUserDetails.delete(`admin-user:${userId}`);
-  cachedAdminUserAnalytics.delete(`admin-user-analytics:${userId}`);
+  clearAdminUserCaches(userId);
 }
 
 export async function setPremium(userId: string, isPremium: boolean): Promise<void> {
@@ -311,9 +311,7 @@ export async function setPremium(userId: string, isPremium: boolean): Promise<vo
     method: "PUT",
     body: JSON.stringify({ isPremium }),
   });
-  cachedUsersLists.clear();
-  cachedAdminUserDetails.delete(`admin-user:${userId}`);
-  cachedAdminUserAnalytics.delete(`admin-user-analytics:${userId}`);
+  clearAdminUserCaches(userId);
 }
 
 export async function revokePremium(userId: string): Promise<void> {
@@ -322,9 +320,7 @@ export async function revokePremium(userId: string): Promise<void> {
     method: "PUT",
     body: JSON.stringify({ paymentProvider: "stripe" }),
   });
-  cachedUsersLists.clear();
-  cachedAdminUserDetails.delete(`admin-user:${userId}`);
-  cachedAdminUserAnalytics.delete(`admin-user-analytics:${userId}`);
+  clearAdminUserCaches(userId);
 }
 
 export async function setActive(userId: string, isActive: boolean): Promise<void> {
@@ -333,9 +329,7 @@ export async function setActive(userId: string, isActive: boolean): Promise<void
     method: "PUT",
     body: JSON.stringify({ isActive }),
   });
-  cachedUsersLists.clear();
-  cachedAdminUserDetails.delete(`admin-user:${userId}`);
-  cachedAdminUserAnalytics.delete(`admin-user-analytics:${userId}`);
+  clearAdminUserCaches(userId);
 }
 
 export async function deleteAdminUser(userId: string): Promise<void> {
@@ -343,7 +337,5 @@ export async function deleteAdminUser(userId: string): Promise<void> {
   await apiRequest<void>(`/api/admin/users/${encodedUserId}`, {
     method: "DELETE",
   });
-  cachedUsersLists.clear();
-  cachedAdminUserDetails.delete(`admin-user:${userId}`);
-  cachedAdminUserAnalytics.delete(`admin-user-analytics:${userId}`);
+  clearAdminUserCaches(userId);
 }

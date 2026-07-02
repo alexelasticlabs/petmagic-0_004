@@ -365,7 +365,10 @@ describe("generations page hardening", () => {
     expect(source).toContain(
       "if (!expandedGenerationId || visibleGenerationIds.has(expandedGenerationId)) {"
     );
-    expect(source).toContain("queueMicrotask(() => setExpandedGeneration(null));");
+    expect(source).toContain("let isActive = true;");
+    expect(source).toContain("queueMicrotask(() => {");
+    expect(source).toContain("if (isActive) {\n        setExpandedGeneration(null);");
+    expect(source).toContain("return () => {\n      isActive = false;\n    };");
     expect(source).toContain("function resetGenerationListContext(nextPageIndex = 0)");
     expect(source).toContain("setExpandedGeneration(null);");
     expect(source).toContain("setPageIndex(nextPageIndex);");

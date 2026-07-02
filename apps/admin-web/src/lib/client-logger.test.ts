@@ -89,4 +89,28 @@ describe("clientLogger", () => {
     expect(serialized).not.toContain("abc123");
     expect(serialized).not.toContain("X-Amz-Signature=abc123");
   });
+
+  it("masks session cookies, JWTs, credentials, and signatures by field name", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    clientLogger.warn("unit.structured_secret_context", {
+      cookie: "sessionid=raw-cookie-secret",
+      setCookie: "admin=raw-set-cookie-secret; HttpOnly",
+      jwt: "eyJhbGciOi.raw.payload",
+      sessionId: "raw-session-id",
+      credential: "AKIA-raw-credential",
+      requestSignature: "raw-signature",
+    });
+
+    expect(warnSpy).toHaveBeenCalledOnce();
+    const [, payload] = warnSpy.mock.calls[0] ?? [];
+    const serialized = JSON.stringify(payload);
+
+    expect(serialized).not.toContain("raw-cookie-secret");
+    expect(serialized).not.toContain("raw-set-cookie-secret");
+    expect(serialized).not.toContain("eyJhbGciOi.raw.payload");
+    expect(serialized).not.toContain("raw-session-id");
+    expect(serialized).not.toContain("AKIA-raw-credential");
+    expect(serialized).not.toContain("raw-signature");
+  });
 });

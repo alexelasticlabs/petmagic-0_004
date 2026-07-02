@@ -60,4 +60,28 @@ describe("sensitive-display", () => {
     expect(sanitized).not.toContain("ios-receipt-data");
     expect(sanitized).not.toContain("4242 4242 4242 4242");
   });
+
+  it("redacts session cookies, JWTs, credentials, and signatures in display text", () => {
+    const sanitized = sanitizeSensitiveText(
+      [
+        "cookie=raw-cookie-secret",
+        "jwt=eyJhbGciOi.raw.payload",
+        "credential=raw-credential",
+        "signature=raw-signature",
+        "set-cookie=raw-set-cookie",
+      ].join(" "),
+      500
+    );
+
+    expect(sanitized).toContain("cookie=[redacted]");
+    expect(sanitized).toContain("jwt=[redacted]");
+    expect(sanitized).toContain("credential=[redacted]");
+    expect(sanitized).toContain("signature=[redacted]");
+    expect(sanitized).toContain("set-cookie=[redacted]");
+    expect(sanitized).not.toContain("raw-cookie-secret");
+    expect(sanitized).not.toContain("eyJhbGciOi.raw.payload");
+    expect(sanitized).not.toContain("raw-credential");
+    expect(sanitized).not.toContain("raw-signature");
+    expect(sanitized).not.toContain("raw-set-cookie");
+  });
 });

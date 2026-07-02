@@ -74,6 +74,7 @@ export function AdminShell({ locale, children }: AdminShellProps) {
     Boolean(session) && hasPanelAccess && (!session?.accessToken || isAuthSessionExpired(session));
   const hasFreshAccessToken =
     Boolean(session?.accessToken) && Boolean(session) && !isAuthSessionExpired(session);
+  const canUseSupportRealtime = hasFreshAccessToken && hasPanelAccess && !isLoginPage;
   const isRestoringSessionRef = useRef(false);
 
   /* Support unread count for nav badge */
@@ -84,8 +85,9 @@ export function AdminShell({ locale, children }: AdminShellProps) {
     enabled: hasFreshAccessToken && hasPanelAccess && !isLoginPage,
     staleTime: 30_000,
     refetchInterval: 120_000,
+    refetchIntervalInBackground: false,
   });
-  useSupportRealtime(hasFreshAccessToken ? session?.accessToken : undefined, (event) => {
+  useSupportRealtime(canUseSupportRealtime ? session?.accessToken : undefined, (event) => {
     void queryClient.invalidateQueries({ queryKey: adminQueryKeys.supportInboxRoot });
 
     const isUserMessage =
@@ -316,10 +318,7 @@ export function AdminShell({ locale, children }: AdminShellProps) {
     : "";
   const userName = safeSessionDisplayName || maskedSessionEmail;
   const userPanelRole = getAdminPanelRole(sessionRoles);
-  const userRole =
-    userPanelRole === "Moderator"
-      ? copy.roles.moderator
-      : copy.roles.admin;
+  const userRole = userPanelRole === "Moderator" ? copy.roles.moderator : copy.roles.admin;
   const userInitial = (userName || "A")[0].toUpperCase();
   const userBadgeName = userName || copy.roles.adminFallback;
   const pageMeta = getAdminPageMeta(locale, currentPath, userName);

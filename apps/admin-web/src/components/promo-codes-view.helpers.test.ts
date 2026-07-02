@@ -6,6 +6,7 @@ import {
   PROMO_CAMPAIGN_FIELD_MAX_LENGTH,
   PROMO_DESCRIPTION_MAX_LENGTH,
   buildPromoCodesCsv,
+  createGeneratedPromoCode,
   formatCampaignMeta,
   getUserLabels,
   normalizePromoIntegerInput,
@@ -150,6 +151,16 @@ describe("promo codes editor drawer hardening", () => {
 });
 
 describe("promo code numeric form validation", () => {
+  it("generates promo codes with Web Crypto instead of Math.random", () => {
+    const helpersSource = readFileSync(promoCodesHelpersPath, "utf8");
+    const code = createGeneratedPromoCode();
+
+    expect(code).toMatch(/^PM-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+    expect(helpersSource).toContain("globalThis.crypto");
+    expect(helpersSource).toContain("crypto.getRandomValues");
+    expect(helpersSource).not.toContain("Math.random");
+  });
+
   it("normalizes numeric input to bounded digits only", () => {
     expect(normalizePromoIntegerInput("1e6+250.5abc999999")).toBe("16250599");
   });
@@ -316,8 +327,11 @@ describe("promo code dangerous action hardening", () => {
       "codePendingArchive !== null && !visiblePromoCodeIds.has(codePendingArchive.redeemCodeId)"
     );
     expect(source).toContain("queueMicrotask(() => {");
+    expect(source).toContain("let isActive = true;");
+    expect(source).toContain("if (!isActive) {\n        return;\n      }");
     expect(source).toContain("closeActionsMenu();");
     expect(source).toContain("setCodePendingArchive(null);");
+    expect(source).toContain("return () => {\n      isActive = false;\n    };");
   });
 
   it("gates promo code export and copy actions behind Admin role checks", () => {
@@ -350,12 +364,8 @@ describe("promo code dangerous action hardening", () => {
     );
     expect(viewSource).not.toContain("sanitizeSensitiveText(error.message, 160)");
     expect(viewSource).not.toContain('clientLogger.warn("promo.copy_failed", { error });');
-    expect(viewSource).toContain(
-      'await copyTextToClipboard(code, text.promoCodesCopyError);'
-    );
-    expect(viewSource).toContain(
-      'message: getAdminErrorMessage(error, text.promoCodesCopyError)'
-    );
+    expect(viewSource).toContain("await copyTextToClipboard(code, text.promoCodesCopyError);");
+    expect(viewSource).toContain("message: getAdminErrorMessage(error, text.promoCodesCopyError)");
     expect(viewSource).toContain(
       "function handleExport() {\n    if (!assertCanManagePromoCodes())"
     );
@@ -367,6 +377,10 @@ describe("promo code dangerous action hardening", () => {
     expect(viewSource).toContain("promoCodesActionLocked={isMutating}");
     expect(listCardSource).toContain("canManagePromoCodes: boolean;");
     expect(listCardSource).toContain("promoCodesActionLocked: boolean;");
+    expect(listCardSource).toContain('document.addEventListener("visibilitychange"');
+    expect(listCardSource).toContain('document.removeEventListener("visibilitychange"');
+    expect(listCardSource).toContain('document.visibilityState === "hidden"');
+    expect(listCardSource).toContain("window.clearInterval(timerId);");
     expect(listCardSource).toContain(
       "disabled={!hasFilteredCodes || !canManagePromoCodes || promoCodesQueryIsFetching}"
     );

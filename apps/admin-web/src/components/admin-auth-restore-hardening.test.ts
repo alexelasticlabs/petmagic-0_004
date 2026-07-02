@@ -35,6 +35,17 @@ describe("admin auth restore hardening", () => {
     expect(source).toContain("fetchSupportInboxMetrics,");
     expect(source).toContain("queryKey: adminQueryKeys.supportInboxMetrics");
     expect(source).toContain("queryFn: ({ signal }) => fetchSupportInboxMetrics(signal)");
+    expect(source).toContain("enabled: hasFreshAccessToken && hasPanelAccess && !isLoginPage");
+    expect(source).toContain("refetchIntervalInBackground: false");
+    expect(source).toContain(
+      "const canUseSupportRealtime = hasFreshAccessToken && hasPanelAccess && !isLoginPage;"
+    );
+    expect(source).toContain(
+      "useSupportRealtime(canUseSupportRealtime ? session?.accessToken : undefined"
+    );
+    expect(source).not.toContain(
+      "useSupportRealtime(hasFreshAccessToken ? session?.accessToken : undefined"
+    );
     expect(source).toContain('import { getSupportUnreadCount } from "@/lib/support-unread-count";');
     expect(source).toContain(
       "const supportUnreadCount = getSupportUnreadCount(inboxMetricsQuery.data);"

@@ -20,7 +20,10 @@ import { ensureAdminSession } from "@/components/admin/admin-session";
 import { Button } from "@/components/ui/button";
 import { useAdminUserProfile } from "@/components/users/use-admin-user-profile";
 import { UserAvatarView } from "@/components/users/user-avatar";
-import { getUserDetailPetText, type UserDetailPetText } from "@/components/users/user-detail-page.content";
+import {
+  getUserDetailPetText,
+  type UserDetailPetText,
+} from "@/components/users/user-detail-page.content";
 import styles from "@/components/users/user-detail-page.module.css";
 import { formatLabeledMetric } from "@/components/users/user-monetization-format";
 import { UserSecureMediaImage } from "@/components/users/user-secure-media-image";
@@ -152,6 +155,7 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
   );
 
   useEffect(() => {
+    let isActive = true;
     if (!petsQuery.data || expandedPetIds.size === 0) {
       return;
     }
@@ -164,11 +168,19 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
     }
 
     queueMicrotask(() => {
+      if (!isActive) {
+        return;
+      }
+
       setExpandedPetIds((current) => {
         const next = new Set([...current].filter((petId) => visiblePetIds.has(petId)));
         return next.size === current.size ? current : next;
       });
     });
+
+    return () => {
+      isActive = false;
+    };
   }, [expandedPetIds, petsQuery.data, visiblePetIds]);
 
   function requestPetStatusChange(pet: AdminUserPet) {
@@ -401,7 +413,9 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
                 <article key={pet.id} className={styles.dataCard}>
                   <div className={styles.dataHeader}>
                     <strong>{sanitizeSensitiveText(pet.name, 80)}</strong>
-                    <AdminStatusBadge color={pet.status === "active" ? "var(--success)" : "var(--warning)"}>
+                    <AdminStatusBadge
+                      color={pet.status === "active" ? "var(--success)" : "var(--warning)"}
+                    >
                       {formatPetStatus(pet.status, petText)}
                     </AdminStatusBadge>
                   </div>
@@ -487,7 +501,9 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
             items={analytics.recentPurchases.slice(0, RECENT_ITEMS_LIMIT).map((purchase) => (
               <article key={purchase.orderId} className={styles.dataCard}>
                 <div className={styles.dataHeader}>
-                  <strong>{formatLabeledMetric(text.purchasedSparkLabel, purchase.sparkToGrant)}</strong>
+                  <strong>
+                    {formatLabeledMetric(text.purchasedSparkLabel, purchase.sparkToGrant)}
+                  </strong>
                   <AdminStatusBadge color={getPurchaseStatusColor(purchase.status)}>
                     {sanitizeSensitiveText(purchase.status, 48)}
                   </AdminStatusBadge>
@@ -629,13 +645,8 @@ function AdminPetDetails({
     queryFn: ({ signal }) => fetchAdminUserPetGenerations(userId, pet.id, signal),
   });
   const photoStatusMutation = useMutation({
-    mutationFn: ({
-      photoId,
-      status,
-    }: {
-      photoId: string;
-      status: "active" | "hidden";
-    }) => changeAdminUserPetPhotoStatus(userId, pet.id, photoId, status),
+    mutationFn: ({ photoId, status }: { photoId: string; status: "active" | "hidden" }) =>
+      changeAdminUserPetPhotoStatus(userId, pet.id, photoId, status),
     onMutate: () => {
       setPhotoActionError(null);
     },
@@ -724,9 +735,7 @@ function AdminPetDetails({
                 alt={`${sanitizeSensitiveText(pet.name, 40)} ${text.photoAlt}`}
                 className={styles.petPhotoImage}
                 logEvent="users.pet_photo_fetch_failed"
-                fallback={
-                  <span className={styles.petPhotoPreviewFallback}>{text.noPhotos}</span>
-                }
+                fallback={<span className={styles.petPhotoPreviewFallback}>{text.noPhotos}</span>}
               />
               <span>
                 {photo.isAvatar ? `${text.avatar} • ` : ""}
@@ -735,7 +744,9 @@ function AdminPetDetails({
               </span>
               <span>
                 {sanitizeSensitiveText(photo.contentType, 64)}
-                {typeof photo.fileSizeBytes === "number" ? ` • ${formatBytes(photo.fileSizeBytes)}` : ""}
+                {typeof photo.fileSizeBytes === "number"
+                  ? ` • ${formatBytes(photo.fileSizeBytes)}`
+                  : ""}
                 {" • "}
                 {photo.thumbnailUrl ? text.thumbnailReady : text.originalOnly}
               </span>
@@ -780,7 +791,9 @@ function AdminPetDetails({
           items={generations.slice(0, 6).map((generation) => (
             <article key={generation.generationId} className={styles.dataCard}>
               <div className={styles.dataHeader}>
-                <strong>{sanitizeSensitiveText(generation.templateTitle ?? generation.templateId, 120)}</strong>
+                <strong>
+                  {sanitizeSensitiveText(generation.templateTitle ?? generation.templateId, 120)}
+                </strong>
                 <AdminStatusBadge color={getGenerationStatusColor(generation.status)}>
                   {sanitizeSensitiveText(generation.status, 48)}
                 </AdminStatusBadge>
@@ -789,7 +802,9 @@ function AdminPetDetails({
                 {sanitizeSensitiveText(generation.templateType ?? text.fallbackTemplate, 48)} •{" "}
                 {formatLabeledMetric(text.tokenCostLabel, generation.tokenCost)}
               </p>
-              <span>{formatDateTime(generation.completedAtUtc ?? generation.createdAtUtc, locale)}</span>
+              <span>
+                {formatDateTime(generation.completedAtUtc ?? generation.createdAtUtc, locale)}
+              </span>
             </article>
           ))}
         />

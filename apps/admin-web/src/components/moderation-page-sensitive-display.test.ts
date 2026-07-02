@@ -48,7 +48,9 @@ describe("moderation page sensitive display", () => {
     const stylesSource = readFileSync(moderationStylesPath, "utf8");
 
     expect(source).toContain("queueQuery.refetch().catch(() => undefined)");
-    expect(source).toContain("disabled={!canModerate || isQueueContextLocked || queueQuery.isFetching}");
+    expect(source).toContain(
+      "disabled={!canModerate || isQueueContextLocked || queueQuery.isFetching}"
+    );
     expect(source).toContain("function requestQueueRetry()");
     expect(source).toContain(
       "if (!canModerate || isQueueContextLocked || queueQuery.isFetching) {\n      return;\n    }"
@@ -74,21 +76,23 @@ describe("moderation page sensitive display", () => {
     expect(contentSource).toContain('nextPageLabel: "Следующая страница очереди"');
     expect(contentSource).toContain('nextPageLabel: "Next queue page"');
     expect(source).toContain('import { CaretDownIcon } from "@/components/admin/admin-icons";');
-    expect(source).toContain('className={`${styles.button} ${styles.pagerButton}`}');
+    expect(source).toContain("className={`${styles.button} ${styles.pagerButton}`}");
     expect(source).toContain("{text.pageLabel} {page + 1}");
-    expect(source).toContain("disabled={page === 0 || isQueueContextLocked || queueQuery.isFetching}");
+    expect(source).toContain(
+      "disabled={page === 0 || isQueueContextLocked || queueQuery.isFetching}"
+    );
     expect(source).toContain("aria-label={text.previousPageLabel}");
     expect(source).toContain("title={text.previousPageLabel}");
     expect(source).toContain(
-      "disabled={!queueQuery.data?.hasMore || isQueueContextLocked || queueQuery.isFetching}"
+      "!queueQuery.data?.hasMore || isQueueContextLocked || queueQuery.isFetching"
     );
     expect(source).toContain("aria-label={text.nextPageLabel}");
     expect(source).toContain("title={text.nextPageLabel}");
     expect(source).toContain(
-      '<CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconPrevious}`} />'
+      "<CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconPrevious}`} />"
     );
     expect(source).toContain(
-      '<CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconNext}`} />'
+      "<CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconNext}`} />"
     );
     expect(source).not.toContain("{text.previous}");
     expect(source).not.toContain("{text.next}");
@@ -125,12 +129,8 @@ describe("moderation page sensitive display", () => {
     expect(contentSource).toContain('approveItemLabel: "Одобрить элемент"');
     expect(contentSource).toContain('rejectItemLabel: "Отклонить элемент"');
     expect(source).toContain('badge={<AdminBadge tone="info">{text.workspaceBadge}</AdminBadge>}');
-    expect(source).toContain(
-      "aria-label={`${text.approveItemLabel}: ${formatModerationText("
-    );
-    expect(source).toContain(
-      "aria-label={`${text.rejectItemLabel}: ${formatModerationText("
-    );
+    expect(source).toContain("aria-label={`${text.approveItemLabel}: ${formatModerationText(");
+    expect(source).toContain("aria-label={`${text.rejectItemLabel}: ${formatModerationText(");
     expect(source).toContain("formatModerationStatus(item.status, text)");
     expect(source).toContain("formatModerationEvent(item.eventType, text)");
     expect(source).toContain("formatTemplateType(item.templateType, text)");
@@ -159,8 +159,12 @@ describe("moderation page sensitive display", () => {
     expect(source).toContain('import { clientLogger } from "@/lib/client-logger";');
     expect(source).toContain("function getModerationDecisionErrorDetails(error: unknown)");
     expect(source).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
-    expect(source).toContain("function getModerationDecisionContext(decision: DecisionState | null)");
-    expect(source).toContain("eventId: decision?.item.eventId ? sanitizeSensitiveText(decision.item.eventId, 80) : undefined");
+    expect(source).toContain(
+      "function getModerationDecisionContext(decision: DecisionState | null)"
+    );
+    expect(source).toContain(
+      "eventId: decision?.item.eventId ? sanitizeSensitiveText(decision.item.eventId, 80) : undefined"
+    );
     expect(source).toContain("templateId: decision?.item.templateId");
     expect(source).toContain('clientLogger.warn("moderation.decision_failed", {');
     expect(source).toContain("...getModerationDecisionContext(decision)");
@@ -223,7 +227,7 @@ describe("moderation page sensitive display", () => {
     expect(source).toContain("setIsDecisionInFlight(true);");
     expect(source).toContain("function resetDecisionDraft()");
     expect(source).toContain(
-      "if (decisionInFlightRef.current || decisionMutation.isPending) {\n      return;\n    }\n\n    setDecision(null);\n    setReason(\"\");\n    setReasonError(null);"
+      'if (decisionInFlightRef.current || decisionMutation.isPending) {\n      return;\n    }\n\n    setDecision(null);\n    setReason("");\n    setReasonError(null);'
     );
     expect(source).toContain("function resetQueueContext(nextPage = 0)");
     expect(source).toContain("if (isQueueContextLocked) {\n      return;\n    }");
@@ -232,10 +236,13 @@ describe("moderation page sensitive display", () => {
     expect(source).toContain("onClick={() => resetQueueContext(Math.max(0, page - 1))}");
     expect(source).toContain("onClick={() => resetQueueContext(page + 1)}");
     expect(source).toContain(
-      "const visibleEventIdSignature = visibleItems.map((item) => item.eventId).join(\"|\");"
+      'const visibleEventIdSignature = visibleItems.map((item) => item.eventId).join("|");'
     );
-    expect(source).toContain("visibleEventIdSignature.split(\"|\").includes(decision.item.eventId)");
+    expect(source).toContain('visibleEventIdSignature.split("|").includes(decision.item.eventId)');
     expect(source).toContain("queueMicrotask(() => {");
+    expect(source).toContain("let isActive = true;");
+    expect(source).toContain("if (!isActive) {\n        return;\n      }");
+    expect(source).toContain("return () => {\n      isActive = false;\n    };");
     expect(source).toContain("isSubmitting={isDecisionSubmitting}");
     expect(source).toContain("disabled={isDecisionSubmitting}");
     expect(source).toContain("if (!decisionInFlightRef.current && !decisionMutation.isPending) {");
@@ -267,12 +274,14 @@ describe("moderation page sensitive display", () => {
     expect(source).toContain(
       'import { ensureAdminSession } from "@/components/admin/admin-session";'
     );
-    expect(source).toContain("const router = useRouter();");
+    expect(source).toContain("const router = useRouter");
     expect(source).toContain("ensureAdminSession(locale, router);");
     expect(source).toContain("enabled: canModerate");
     expect(source).toContain("{!canModerate ? <AdminStateCard title={text.loading} /> : null}");
-    expect(source).toContain("{canModerate ? (\n      <AdminCard title={text.filtersTitle}>");
-    expect(source).toContain("{canModerate ? (\n        queueQuery.isLoading || isQueueRefreshing ? (");
+    expect(source).toContain("canModerate ? (\n        <AdminCard title={text.filtersTitle}>");
+    expect(source).toContain(
+      "canModerate ? (\n        queueQuery.isLoading || isQueueRefreshing ? ("
+    );
     expect(source).not.toContain("enabled: Boolean(session)");
     expect(source).not.toContain("disabled={!session || queueQuery.isFetching}");
   });
@@ -280,7 +289,9 @@ describe("moderation page sensitive display", () => {
   it("keeps local moderation form controls accessible in locked and keyboard states", () => {
     const stylesSource = readFileSync(moderationStylesPath, "utf8");
 
-    expect(stylesSource).toContain(".input:focus-visible,\n.select:focus-visible,\n.textarea:focus-visible,\n.button:focus-visible");
+    expect(stylesSource).toContain(
+      ".input:focus-visible,\n.select:focus-visible,\n.textarea:focus-visible,\n.button:focus-visible"
+    );
     expect(stylesSource).toContain("box-shadow: var(--focus-ring);");
     expect(stylesSource).toContain(".input:disabled,\n.select:disabled,\n.textarea:disabled");
     expect(stylesSource).toContain("cursor: not-allowed;");

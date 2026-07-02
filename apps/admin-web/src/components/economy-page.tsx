@@ -1,12 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useState } from "react";
 
 import { useSyncFeedbackToAdminNotifications } from "@/components/admin/admin-notifications";
 import {
@@ -17,6 +12,7 @@ import {
   AdminStateCard,
 } from "@/components/admin/admin-primitives";
 import { EconomyPageConfirmationDialogs } from "@/components/economy-page-confirmation-dialogs";
+import { EconomyPageIncidentsSection } from "@/components/economy-page-incidents-section";
 import { EconomyPageLedgerPurchasesSection } from "@/components/economy-page-ledger-purchases-section";
 import { EconomyPagePacksSection } from "@/components/economy-page-packs-section";
 import { EconomyPageProviderConfigsSection } from "@/components/economy-page-provider-configs-section";
@@ -24,33 +20,10 @@ import { EconomyPageSubscriptionPlansSection } from "@/components/economy-page-s
 import { EconomyPageSubscriptionsSection } from "@/components/economy-page-subscriptions-section";
 import { EconomyPageWatermarkSection } from "@/components/economy-page-watermark-section";
 import { getEconomyText } from "@/components/economy-page.content";
-import {
-  canCancelSubscription,
-  canRefundPurchase,
-  createDefaultProviderConfigDraft,
-  isPackDraftDirty,
-  isProviderConfigDraftDirty,
-  isSubscriptionPlanDraftDirty,
-  toDraft,
-  toCurrencyPackPayload,
-  toProviderConfigCreatePayload,
-  toProviderConfigDraft,
-  toProviderConfigMatchPayload,
-  toProviderConfigPayload,
-  toSubscriptionPlanDraft,
-  toSubscriptionPlanPayload,
-  type PackDraft,
-  type ProviderConfigCreateDraft,
-  type ProviderConfigDraft,
-  type ProviderConfigMatchDraft,
-  type SubscriptionPlanDraft,
-} from "@/components/economy-page.helpers";
 import styles from "@/components/economy-page.module.css";
 import {
   formatCurrency,
-  formatEconomyLogText,
   formatTokens,
-  getEconomyActionErrorDetails,
   humanizeBillingPeriod,
   humanizeProvider,
   humanizeStatus,
@@ -59,28 +32,21 @@ import {
   useTimedFeedbackReset,
 } from "@/components/economy-page.shared";
 import { Button } from "@/components/ui/button";
+import { useEconomyCatalogMutations } from "@/components/use-economy-catalog-mutations";
 import { useEconomyPageController } from "@/components/use-economy-page-controller";
+import { useEconomySubscriptionPurchaseActions } from "@/components/use-economy-subscription-purchase-actions";
 import { getAdminErrorMessage } from "@/lib/admin-error-message";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
-  adminCancelPremiumSubscription,
-  cloneAdminPaymentProviderConfig,
-  createAdminPaymentProviderConfig,
-  deleteAdminPaymentProviderConfig,
-  refundAdminEconomyPurchase,
-  testAdminPaymentProviderConfigMatch,
-  updateAdminCurrencyPack,
-  fetchAdminWatermarkSettings,
-  updateAdminPaymentProviderConfig,
-  updateAdminWatermarkSettings,
-  updateAdminSubscriptionPlan,
+  applyAdminEconomyIncidentAction,
+  fetchAdminEconomyIncidentDetail,
+  resolveAdminEconomyIncident,
+  runAdminEconomyReconciliation,
+  type AdminEconomyIncident,
+  type AdminEconomyIncidentAction,
+  type EconomyReconciliationRun,
   useAuthSession,
-  type AdminEconomyPurchase,
-  type AdminPaymentProviderConfigurationMatch,
-  type AdminEconomySubscription,
-  type AdminWatermarkSettings,
 } from "@/lib/api-client";
-import { clientLogger } from "@/lib/client-logger";
 import { type Locale } from "@/lib/i18n";
 
 type EconomyPageProps = {
@@ -89,8 +55,8 @@ type EconomyPageProps = {
 
 export function EconomyPage({ locale }: EconomyPageProps) {
   const text = getEconomyText(locale);
-  const queryClient = useQueryClient();
   const session = useAuthSession();
+  const queryClient = useQueryClient();
   const canManageEconomy = session?.user.roles.includes("Admin") ?? false;
   const {
     eventProvider,
@@ -101,6 +67,14 @@ export function EconomyPage({ locale }: EconomyPageProps) {
     hasPartialError,
     isFetching,
     isLoading,
+    incidentCategory,
+    incidentItems,
+    incidentPage,
+    incidentStatus,
+    incidentType,
+    incidentsHasMore,
+    incidentsIsFetching,
+    incidentsIsRefreshing,
     ledgerHasMore,
     ledgerItems,
     ledgerIsFetching,
@@ -118,9 +92,14 @@ export function EconomyPage({ locale }: EconomyPageProps) {
     purchasesIsFetching,
     purchasesIsRefreshing,
     premiumMetrics,
+    openIncidents,
     purchasesHasMore,
     setEventProvider,
     setEventStatus,
+    setIncidentPage,
+    setIncidentCategory,
+    setIncidentStatus,
+    setIncidentType,
     setLedgerPage,
     setLedgerSource,
     setPurchasePage,
@@ -142,40 +121,10 @@ export function EconomyPage({ locale }: EconomyPageProps) {
     subscriptionProvider,
     subscriptionStatus,
   } = useEconomyPageController({ locale });
-  const [drafts, setDrafts] = useState<Record<string, PackDraft>>({});
-  const [planDrafts, setPlanDrafts] = useState<Record<string, SubscriptionPlanDraft>>({});
-  const [providerConfigDrafts, setProviderConfigDrafts] = useState<
-    Record<string, ProviderConfigDraft>
-  >({});
-  const [cloneRegionDrafts, setCloneRegionDrafts] = useState<Record<string, string>>({});
-  const [createProviderDraft, setCreateProviderDraft] = useState<ProviderConfigCreateDraft>(() =>
-    createDefaultProviderConfigDraft()
-  );
-  const [matchDraft, setMatchDraft] = useState<ProviderConfigMatchDraft>({
-    provider: "stripe",
-    platform: "web",
-    country: "US",
-    appVersion: "1.0.0",
-  });
-  const [matchResult, setMatchResult] = useState<AdminPaymentProviderConfigurationMatch | null>(
-    null
-  );
   const [feedback, setFeedback] = useState<{ tone: "success" | "danger"; message: string } | null>(
     null
   );
-  const [cancelTarget, setCancelTarget] = useState<AdminEconomySubscription | null>(null);
-  const [refundTarget, setRefundTarget] = useState<AdminEconomyPurchase | null>(null);
-  const [isCancelSubscriptionInFlight, setIsCancelSubscriptionInFlight] = useState(false);
-  const [isRefundPurchaseInFlight, setIsRefundPurchaseInFlight] = useState(false);
-  const [watermarkDraft, setWatermarkDraft] = useState<AdminWatermarkSettings | null>(null);
-  const cancelSubscriptionInFlightRef = useRef(false);
-  const refundPurchaseInFlightRef = useRef(false);
-
-  const watermarkQuery = useQuery({
-    queryKey: adminQueryKeys.templateWatermarkSettings,
-    queryFn: ({ signal }) => fetchAdminWatermarkSettings(signal),
-    enabled: canManageEconomy,
-  });
+  const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
 
   useSyncFeedbackToAdminNotifications(feedback, {
     category: "economy",
@@ -186,450 +135,75 @@ export function EconomyPage({ locale }: EconomyPageProps) {
 
   useTimedFeedbackReset(feedback, () => setFeedback(null));
 
-  function assertCanManageEconomy() {
-    if (!canManageEconomy) {
-      throw new Error(text.financialActionsAdminOnly);
-    }
-  }
+  const invalidateEconomyQueries = async () => {
+    await queryClient.invalidateQueries({ queryKey: ["admin", "economy"] });
+  };
 
-  function reportEconomyAccessDenied(error: unknown) {
-    setFeedback({
-      tone: "danger",
-      message: getAdminErrorMessage(error, text.financialActionsAdminOnly),
-    });
-  }
-
-  function updateWatermarkDraft(patch: Partial<AdminWatermarkSettings>) {
-    setWatermarkDraft((current) => {
-      const base = current ?? watermarkQuery.data;
-      return base ? { ...base, ...patch } : current;
-    });
-  }
-
-  const savePackMutation = useMutation({
-    mutationFn: async (packId: string) => {
-      assertCanManageEconomy();
-      const pack = packs.find((item) => item.packId === packId);
-      const draft = drafts[packId] ?? (pack ? toDraft(pack) : null);
-      if (!draft) {
-        throw new Error(text.packMissingDraft);
-      }
-
-      return updateAdminCurrencyPack(packId, toCurrencyPackPayload(draft, text));
-    },
-    onSuccess: async (pack) => {
-      setFeedback({ tone: "success", message: text.packSaved });
-      setDrafts((current) => ({ ...current, [pack.packId]: toDraft(pack) }));
-      await Promise.allSettled([
-        queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyPacks }),
-      ]);
-    },
-    onError: (error) => {
-      setFeedback({ tone: "danger", message: getAdminErrorMessage(error, text.packSaveError) });
-    },
-  });
-
-  const saveWatermarkMutation = useMutation({
-    mutationFn: async () => {
-      assertCanManageEconomy();
-      const draft = watermarkDraft ?? watermarkQuery.data;
-      if (!draft) {
-        throw new Error(text.watermarkSettingsNotLoaded);
-      }
-
-      return updateAdminWatermarkSettings(draft);
-    },
-    onSuccess: async (settings) => {
-      setFeedback({
-        tone: "success",
-        message: text.watermarkSaved,
-      });
-      setWatermarkDraft(settings);
-      await Promise.allSettled([
-        queryClient.invalidateQueries({ queryKey: adminQueryKeys.templateWatermarkSettings }),
-      ]);
-    },
-    onError: (error) => {
-      setFeedback({
-        tone: "danger",
-        message: getAdminErrorMessage(error, text.watermarkSaveError),
-      });
-    },
-  });
-
-  const savePlanMutation = useMutation({
-    mutationFn: async (planId: string) => {
-      assertCanManageEconomy();
-      const plan = subscriptionPlans.find((item) => item.planId === planId);
-      const draft = planDrafts[planId] ?? (plan ? toSubscriptionPlanDraft(plan) : null);
-      if (!draft) {
-        throw new Error(text.planMissingDraft);
-      }
-
-      return updateAdminSubscriptionPlan(planId, toSubscriptionPlanPayload(draft, text));
-    },
-    onSuccess: async (plan) => {
-      setFeedback({ tone: "success", message: text.planSaved });
-      setPlanDrafts((current) => ({ ...current, [plan.planId]: toSubscriptionPlanDraft(plan) }));
-      await Promise.allSettled([
-        queryClient.invalidateQueries({ queryKey: adminQueryKeys.economySubscriptionPlans }),
-      ]);
-    },
-    onError: (error) => {
-      setFeedback({
-        tone: "danger",
-        message: getAdminErrorMessage(error, text.planSaveError),
-      });
-    },
-  });
-
-  const saveProviderConfigMutation = useMutation({
-    mutationFn: async (configurationId: string) => {
-      assertCanManageEconomy();
-      const config = providerConfigs.find((item) => item.configurationId === configurationId);
-      const draft =
-        providerConfigDrafts[configurationId] ?? (config ? toProviderConfigDraft(config) : null);
-      if (!draft) {
-        throw new Error(text.providerConfigMissingDraft);
-      }
-
-      return updateAdminPaymentProviderConfig(
-        configurationId,
-        toProviderConfigPayload(draft, text)
-      );
-    },
-    onSuccess: async (config) => {
-      setFeedback({ tone: "success", message: text.providerConfigSaved });
-      setProviderConfigDrafts((current) => ({
-        ...current,
-        [config.configurationId]: toProviderConfigDraft(config),
-      }));
-      await Promise.allSettled([
-        queryClient.invalidateQueries({
-          queryKey: adminQueryKeys.economyPaymentProviderConfigs,
-        }),
-      ]);
-    },
-    onError: (error) => {
-      setFeedback({
-        tone: "danger",
-        message: getAdminErrorMessage(error, text.providerConfigSaveError),
-      });
-    },
-  });
-
-  function requestSavePack(packId: string) {
-    if (savePackMutation.isPending) {
-      return;
-    }
-
-    const pack = packs.find((item) => item.packId === packId);
-    const draft = drafts[packId] ?? (pack ? toDraft(pack) : null);
-    if (!pack || !draft || !isPackDraftDirty(pack, draft)) {
-      return;
-    }
-
-    savePackMutation.mutate(packId);
-  }
-
-  function requestSavePlan(planId: string) {
-    if (savePlanMutation.isPending) {
-      return;
-    }
-
-    const plan = subscriptionPlans.find((item) => item.planId === planId);
-    const draft = planDrafts[planId] ?? (plan ? toSubscriptionPlanDraft(plan) : null);
-    if (!plan || !draft || !isSubscriptionPlanDraftDirty(plan, draft)) {
-      return;
-    }
-
-    savePlanMutation.mutate(planId);
-  }
-
-  function requestSaveProviderConfig(configurationId: string) {
-    if (saveProviderConfigMutation.isPending) {
-      return;
-    }
-
-    const config = providerConfigs.find((item) => item.configurationId === configurationId);
-    const draft =
-      providerConfigDrafts[configurationId] ?? (config ? toProviderConfigDraft(config) : null);
-    if (!config || !draft || !isProviderConfigDraftDirty(config, draft)) {
-      return;
-    }
-
-    saveProviderConfigMutation.mutate(configurationId);
-  }
-
-  const createProviderConfigMutation = useMutation({
-    mutationFn: async () => {
-      assertCanManageEconomy();
-      return createAdminPaymentProviderConfig(
-        toProviderConfigCreatePayload(createProviderDraft, text)
-      );
-    },
+  const reconciliationMutation = useMutation<EconomyReconciliationRun, Error>({
+    mutationFn: runAdminEconomyReconciliation,
     onSuccess: async () => {
-      setFeedback({ tone: "success", message: text.providerConfigCreated });
-      setCreateProviderDraft(createDefaultProviderConfigDraft());
-      await Promise.allSettled([
-        queryClient.invalidateQueries({
-          queryKey: adminQueryKeys.economyPaymentProviderConfigs,
-        }),
-      ]);
+      setFeedback({ tone: "success", message: text.reconciliationStarted });
+      await invalidateEconomyQueries();
     },
-    onError: (error) => {
-      setFeedback({
-        tone: "danger",
-        message: getAdminErrorMessage(error, text.providerConfigCreateError),
-      });
-    },
+    onError: () => setFeedback({ tone: "danger", message: text.reconciliationFailed }),
   });
 
-  const cloneProviderConfigMutation = useMutation({
-    mutationFn: async (payload: { configurationId: string; region: string }) => {
-      assertCanManageEconomy();
-      return cloneAdminPaymentProviderConfig(payload.configurationId, { region: payload.region });
-    },
-    onSuccess: async (_, variables) => {
-      setFeedback({ tone: "success", message: text.providerConfigCloned });
-      setCloneRegionDrafts((current) => ({ ...current, [variables.configurationId]: "" }));
-      await Promise.allSettled([
-        queryClient.invalidateQueries({
-          queryKey: adminQueryKeys.economyPaymentProviderConfigs,
-        }),
-      ]);
-    },
-    onError: (error) => {
-      setFeedback({
-        tone: "danger",
-        message: getAdminErrorMessage(error, text.providerConfigCloneError),
-      });
-    },
-  });
-
-  const deleteProviderConfigMutation = useMutation({
-    mutationFn: async (configurationId: string) => {
-      assertCanManageEconomy();
-      await deleteAdminPaymentProviderConfig(configurationId);
-    },
+  const resolveIncidentMutation = useMutation<AdminEconomyIncident, Error, AdminEconomyIncident>({
+    mutationFn: async (incident) =>
+      resolveAdminEconomyIncident(incident.incidentId, "Resolved from admin economy page"),
     onSuccess: async () => {
-      setFeedback({ tone: "success", message: text.providerConfigDeleted });
-      await Promise.allSettled([
-        queryClient.invalidateQueries({
-          queryKey: adminQueryKeys.economyPaymentProviderConfigs,
-        }),
-      ]);
+      setFeedback({ tone: "success", message: text.incidentResolved });
+      await queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyIncidents({}) });
+      await invalidateEconomyQueries();
     },
-    onError: (error) => {
-      setFeedback({
-        tone: "danger",
-        message: getAdminErrorMessage(error, text.providerConfigDeleteError),
-      });
-    },
+    onError: () => setFeedback({ tone: "danger", message: text.incidentResolveError }),
   });
 
-  const testProviderConfigMutation = useMutation({
-    mutationFn: async () => {
-      assertCanManageEconomy();
-      const payload = toProviderConfigMatchPayload(matchDraft, text);
-      return testAdminPaymentProviderConfigMatch(payload);
-    },
-    onSuccess: (result) => {
-      setMatchResult(result);
-    },
-    onError: (error) => {
-      setMatchResult(null);
-      setFeedback({
-        tone: "danger",
-        message: getAdminErrorMessage(error, text.providerConfigTestError),
-      });
-    },
+  const selectedIncidentDetailQuery = useQuery({
+    queryKey: selectedIncidentId
+      ? adminQueryKeys.economyIncident(selectedIncidentId)
+      : adminQueryKeys.economyIncident("disabled"),
+    queryFn: ({ signal }) => fetchAdminEconomyIncidentDetail(selectedIncidentId ?? "", signal),
+    enabled: canManageEconomy && Boolean(selectedIncidentId),
   });
 
-  function requestCreateProviderConfig() {
-    if (createProviderConfigMutation.isPending) {
-      return;
+  const incidentActionMutation = useMutation<
+    AdminEconomyIncidentAction,
+    Error,
+    {
+      incidentId: string;
+      action: string;
+      reason: string;
+      amount?: number;
+      externalReferenceId?: string;
     }
-
-    createProviderConfigMutation.mutate();
-  }
-
-  function requestTestProviderConfig() {
-    if (testProviderConfigMutation.isPending) {
-      return;
-    }
-
-    testProviderConfigMutation.mutate();
-  }
-
-  function requestCloneProviderConfig(payload: { configurationId: string; region: string }) {
-    if (cloneProviderConfigMutation.isPending) {
-      return;
-    }
-
-    cloneProviderConfigMutation.mutate(payload);
-  }
-
-  const cancelSubscriptionMutation = useMutation({
-    mutationFn: async (subscription: AdminEconomySubscription) => {
-      assertCanManageEconomy();
-      if (!canCancelSubscription(subscription)) {
-        throw new Error(text.cancelSubscriptionError);
-      }
-
-      await adminCancelPremiumSubscription(subscription.userId, subscription.provider);
+  >({
+    mutationFn: ({ incidentId, ...payload }) =>
+      applyAdminEconomyIncidentAction(incidentId, payload),
+    onSuccess: async (result) => {
+      setFeedback({ tone: "success", message: text.incidentActionSuccess });
+      setSelectedIncidentId(result.incident.incidentId);
+      await invalidateEconomyQueries();
     },
-    onSuccess: async (_, subscription) => {
-      setFeedback({ tone: "success", message: text.cancelSubscriptionSuccess });
-      setCancelTarget(null);
-      await Promise.allSettled([
-        queryClient.invalidateQueries({ queryKey: ["admin", "economy", "subscriptions"] }),
-        queryClient.invalidateQueries({ queryKey: ["admin", "economy", "subscription-events"] }),
-        queryClient.invalidateQueries({
-          queryKey: adminQueryKeys.economyUserSubscriptionSummary(subscription.userId),
-        }),
-        queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyDashboardMetrics }),
-        queryClient.invalidateQueries({ queryKey: adminQueryKeys.usersRoot }),
-        queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDashboardMetrics }),
-        queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDetail(subscription.userId) }),
-        queryClient.invalidateQueries({
-          queryKey: adminQueryKeys.userAnalytics(subscription.userId),
-        }),
-      ]);
-    },
-    onError: (error, subscription) => {
-      clientLogger.error("economy.cancel_subscription_failed", {
-        subscriptionId: formatEconomyLogText(subscription?.subscriptionId),
-        userId: formatEconomyLogText(subscription?.userId),
-        provider: formatEconomyLogText(subscription?.provider, 48),
-        status: formatEconomyLogText(subscription?.status, 48),
-        ...getEconomyActionErrorDetails(error),
-      });
-      setFeedback({
-        tone: "danger",
-        message: getAdminErrorMessage(error, text.cancelSubscriptionError),
-      });
-    },
-    onSettled: () => {
-      cancelSubscriptionInFlightRef.current = false;
-      setIsCancelSubscriptionInFlight(false);
-    },
+    onError: () => setFeedback({ tone: "danger", message: text.incidentActionError }),
   });
 
-  const refundPurchaseMutation = useMutation({
-    mutationFn: async (purchase: AdminEconomyPurchase) => {
-      assertCanManageEconomy();
-      if (!canRefundPurchase(purchase)) {
-        throw new Error(text.refundPurchaseError);
-      }
-
-      await refundAdminEconomyPurchase(purchase.orderId, "admin refund");
-    },
-    onSuccess: async (_, purchase) => {
-      setFeedback({ tone: "success", message: text.refundPurchaseSuccess });
-      setRefundTarget(null);
-      await Promise.allSettled([
-        queryClient.invalidateQueries({ queryKey: ["admin", "economy", "purchases"] }),
-        queryClient.invalidateQueries({ queryKey: ["admin", "economy", "ledger"] }),
-        queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyDashboardMetrics }),
-        queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDetail(purchase.userId) }),
-        queryClient.invalidateQueries({
-          queryKey: adminQueryKeys.userAnalytics(purchase.userId),
-        }),
-      ]);
-    },
-    onError: (error, purchase) => {
-      clientLogger.error("economy.refund_purchase_failed", {
-        orderId: formatEconomyLogText(purchase?.orderId),
-        userId: formatEconomyLogText(purchase?.userId),
-        provider: formatEconomyLogText(purchase?.paymentProvider, 48),
-        status: formatEconomyLogText(purchase?.status, 48),
-        ...getEconomyActionErrorDetails(error),
-      });
-      setFeedback({
-        tone: "danger",
-        message: getAdminErrorMessage(error, text.refundPurchaseError),
-      });
-    },
-    onSettled: () => {
-      refundPurchaseInFlightRef.current = false;
-      setIsRefundPurchaseInFlight(false);
-    },
+  const catalog = useEconomyCatalogMutations({
+    text,
+    canManageEconomy,
+    packs,
+    subscriptionPlans,
+    providerConfigs,
+    setFeedback,
   });
 
-  function requestCancelSubscription(subscription: AdminEconomySubscription) {
-    try {
-      assertCanManageEconomy();
-    } catch (error) {
-      reportEconomyAccessDenied(error);
-      return;
-    }
-
-    if (
-      cancelSubscriptionInFlightRef.current ||
-      cancelSubscriptionMutation.isPending ||
-      !canCancelSubscription(subscription)
-    ) {
-      return;
-    }
-
-    setCancelTarget(subscription);
-  }
-
-  function requestRefundPurchase(purchase: AdminEconomyPurchase) {
-    try {
-      assertCanManageEconomy();
-    } catch (error) {
-      reportEconomyAccessDenied(error);
-      return;
-    }
-
-    if (
-      refundPurchaseInFlightRef.current ||
-      refundPurchaseMutation.isPending ||
-      !canRefundPurchase(purchase)
-    ) {
-      return;
-    }
-
-    setRefundTarget(purchase);
-  }
-
-  const isCancelSubscriptionSubmitting =
-    isCancelSubscriptionInFlight || cancelSubscriptionMutation.isPending;
-  const isRefundPurchaseSubmitting = isRefundPurchaseInFlight || refundPurchaseMutation.isPending;
-  const visiblePurchaseIds = useMemo(
-    () => new Set(purchaseItems.map((purchase) => purchase.orderId)),
-    [purchaseItems]
-  );
-  const visibleSubscriptionIds = useMemo(
-    () => new Set(subscriptionItems.map((subscription) => subscription.subscriptionId)),
-    [subscriptionItems]
-  );
-
-  useEffect(() => {
-    if (
-      !refundTarget ||
-      isRefundPurchaseSubmitting ||
-      visiblePurchaseIds.has(refundTarget.orderId)
-    ) {
-      return;
-    }
-
-    queueMicrotask(() => setRefundTarget(null));
-  }, [isRefundPurchaseSubmitting, refundTarget, visiblePurchaseIds]);
-
-  useEffect(() => {
-    if (
-      !cancelTarget ||
-      isCancelSubscriptionSubmitting ||
-      visibleSubscriptionIds.has(cancelTarget.subscriptionId)
-    ) {
-      return;
-    }
-
-    queueMicrotask(() => setCancelTarget(null));
-  }, [cancelTarget, isCancelSubscriptionSubmitting, visibleSubscriptionIds]);
+  const subscriptionPurchaseActions = useEconomySubscriptionPurchaseActions({
+    text,
+    canManageEconomy,
+    purchaseItems,
+    subscriptionItems,
+    setFeedback,
+  });
 
   if (!canManageEconomy) {
     return (
@@ -688,18 +262,6 @@ export function EconomyPage({ locale }: EconomyPageProps) {
     );
   }
 
-  const effectiveWatermarkDraft = watermarkDraft ?? watermarkQuery.data ?? null;
-  const isSaveWatermarkDisabled =
-    !canManageEconomy || !effectiveWatermarkDraft || saveWatermarkMutation.isPending;
-
-  function requestSaveWatermark() {
-    if (isSaveWatermarkDisabled) {
-      return;
-    }
-
-    saveWatermarkMutation.mutate();
-  }
-
   return (
     <AdminPage className={styles.page}>
       <AdminPageHero eyebrow={text.eyebrow} title={text.title} description={text.description} />
@@ -748,6 +310,11 @@ export function EconomyPage({ locale }: EconomyPageProps) {
           value={String(premiumMetrics.enabledRoutes)}
           tone="info"
         />
+        <AdminKpiCard
+          label={text.openIncidentsLabel}
+          value={String(openIncidents)}
+          tone={openIncidents > 0 ? "warning" : "success"}
+        />
       </AdminPageGrid>
 
       {feedback ? <AdminStateCard tone={feedback.tone} title={feedback.message} /> : null}
@@ -772,11 +339,11 @@ export function EconomyPage({ locale }: EconomyPageProps) {
       <EconomyPagePacksSection
         text={text}
         packs={packs}
-        drafts={drafts}
-        setDrafts={setDrafts}
-        savePackPending={savePackMutation.isPending}
-        savePackId={savePackMutation.variables}
-        onSavePack={requestSavePack}
+        drafts={catalog.drafts}
+        setDrafts={catalog.setDrafts}
+        savePackPending={catalog.savePackPending}
+        savePackId={catalog.savePackId}
+        onSavePack={catalog.requestSavePack}
       />
 
       <EconomyPageLedgerPurchasesSection
@@ -802,18 +369,44 @@ export function EconomyPage({ locale }: EconomyPageProps) {
         purchasePage={purchasePage}
         purchasesHasMore={purchasesHasMore}
         setPurchasePage={setPurchasePage}
-        isRefundPurchaseSubmitting={isRefundPurchaseSubmitting}
-        onRefundPurchase={requestRefundPurchase}
+        isRefundPurchaseSubmitting={subscriptionPurchaseActions.isRefundPurchaseSubmitting}
+        onRefundPurchase={subscriptionPurchaseActions.requestRefundPurchase}
       />
 
       <EconomyPageWatermarkSection
         text={text}
-        effectiveWatermarkDraft={effectiveWatermarkDraft}
-        isLoading={watermarkQuery.isLoading}
-        isSaveDisabled={isSaveWatermarkDisabled}
-        isSavePending={saveWatermarkMutation.isPending}
-        onSubmit={requestSaveWatermark}
-        onUpdateDraft={updateWatermarkDraft}
+        effectiveWatermarkDraft={catalog.effectiveWatermarkDraft}
+        isLoading={catalog.watermarkQuery.isLoading}
+        isSaveDisabled={catalog.isSaveWatermarkDisabled}
+        isSavePending={catalog.saveWatermarkPending}
+        onSubmit={catalog.requestSaveWatermark}
+        onUpdateDraft={catalog.updateWatermarkDraft}
+      />
+
+      <EconomyPageIncidentsSection
+        locale={locale}
+        text={text}
+        selectedIncidentId={selectedIncidentId}
+        selectedIncidentDetail={selectedIncidentDetailQuery.data ?? null}
+        selectedIncidentLoading={selectedIncidentDetailQuery.isFetching}
+        incidentItems={incidentItems}
+        incidentCategory={incidentCategory}
+        incidentStatus={incidentStatus}
+        incidentType={incidentType}
+        incidentPage={incidentPage}
+        incidentsHasMore={incidentsHasMore}
+        incidentsIsFetching={incidentsIsFetching}
+        incidentsIsRefreshing={incidentsIsRefreshing}
+        runReconciliationPending={reconciliationMutation.isPending}
+        actionPending={resolveIncidentMutation.isPending || incidentActionMutation.isPending}
+        setIncidentCategory={setIncidentCategory}
+        setIncidentStatus={setIncidentStatus}
+        setIncidentType={setIncidentType}
+        setIncidentPage={setIncidentPage}
+        onSelectIncident={(incident) => setSelectedIncidentId(incident.incidentId)}
+        onRunReconciliation={() => reconciliationMutation.mutate()}
+        onResolveIncident={(incident) => resolveIncidentMutation.mutate(incident)}
+        onApplyIncidentAction={(payload) => incidentActionMutation.mutate(payload)}
       />
 
       <AdminPageGrid columns="two">
@@ -821,11 +414,11 @@ export function EconomyPage({ locale }: EconomyPageProps) {
           locale={locale}
           text={text}
           subscriptionPlans={subscriptionPlans}
-          planDrafts={planDrafts}
-          setPlanDrafts={setPlanDrafts}
-          savePlanPending={savePlanMutation.isPending}
-          savePlanId={savePlanMutation.variables}
-          onSavePlan={requestSavePlan}
+          planDrafts={catalog.planDrafts}
+          setPlanDrafts={catalog.setPlanDrafts}
+          savePlanPending={catalog.savePlanPending}
+          savePlanId={catalog.savePlanId}
+          onSavePlan={catalog.requestSavePlan}
           humanizeBillingPeriod={humanizeBillingPeriod}
         />
 
@@ -833,35 +426,28 @@ export function EconomyPage({ locale }: EconomyPageProps) {
           locale={locale}
           text={text}
           providerConfigs={providerConfigs}
-          providerConfigDrafts={providerConfigDrafts}
-          createProviderDraft={createProviderDraft}
-          setCreateProviderDraft={setCreateProviderDraft}
-          matchDraft={matchDraft}
-          setMatchDraft={setMatchDraft}
-          matchResult={matchResult}
-          setProviderConfigDrafts={setProviderConfigDrafts}
-          cloneRegionDrafts={cloneRegionDrafts}
-          setCloneRegionDrafts={setCloneRegionDrafts}
-          saveProviderConfigPending={saveProviderConfigMutation.isPending}
-          saveProviderConfigId={saveProviderConfigMutation.variables}
-          createProviderConfigPending={createProviderConfigMutation.isPending}
-          testProviderConfigPending={testProviderConfigMutation.isPending}
-          cloneProviderConfigPending={cloneProviderConfigMutation.isPending}
-          cloneProviderConfigId={cloneProviderConfigMutation.variables?.configurationId}
-          deleteProviderConfigPending={deleteProviderConfigMutation.isPending}
-          deleteProviderConfigId={deleteProviderConfigMutation.variables}
-          onSaveProviderConfig={requestSaveProviderConfig}
-          onCreateProviderConfig={requestCreateProviderConfig}
-          onTestProviderConfig={requestTestProviderConfig}
-          onCloneProviderConfig={requestCloneProviderConfig}
-          onDeleteProviderConfig={async (configurationId) => {
-            try {
-              await deleteProviderConfigMutation.mutateAsync(configurationId);
-              return true;
-            } catch {
-              return false;
-            }
-          }}
+          providerConfigDrafts={catalog.providerConfigDrafts}
+          createProviderDraft={catalog.createProviderDraft}
+          setCreateProviderDraft={catalog.setCreateProviderDraft}
+          matchDraft={catalog.matchDraft}
+          setMatchDraft={catalog.setMatchDraft}
+          matchResult={catalog.matchResult}
+          setProviderConfigDrafts={catalog.setProviderConfigDrafts}
+          cloneRegionDrafts={catalog.cloneRegionDrafts}
+          setCloneRegionDrafts={catalog.setCloneRegionDrafts}
+          saveProviderConfigPending={catalog.saveProviderConfigPending}
+          saveProviderConfigId={catalog.saveProviderConfigId}
+          createProviderConfigPending={catalog.createProviderConfigPending}
+          testProviderConfigPending={catalog.testProviderConfigPending}
+          cloneProviderConfigPending={catalog.cloneProviderConfigPending}
+          cloneProviderConfigId={catalog.cloneProviderConfigId}
+          deleteProviderConfigPending={catalog.deleteProviderConfigPending}
+          deleteProviderConfigId={catalog.deleteProviderConfigId}
+          onSaveProviderConfig={catalog.requestSaveProviderConfig}
+          onCreateProviderConfig={catalog.requestCreateProviderConfig}
+          onTestProviderConfig={catalog.requestTestProviderConfig}
+          onCloneProviderConfig={catalog.requestCloneProviderConfig}
+          onDeleteProviderConfig={catalog.requestDeleteProviderConfig}
           humanizeProvider={humanizeProvider}
         />
       </AdminPageGrid>
@@ -880,7 +466,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
           subscriptionItems={subscriptionItems}
           subscriptionsIsFetching={subscriptionsIsFetching}
           subscriptionsIsRefreshing={subscriptionsIsRefreshing}
-          cancelSubscriptionPending={isCancelSubscriptionSubmitting}
+          cancelSubscriptionPending={subscriptionPurchaseActions.isCancelSubscriptionSubmitting}
           subscriptionEvents={subscriptionEvents}
           setSubscriptionProvider={setSubscriptionProvider}
           setSubscriptionStatus={setSubscriptionStatus}
@@ -888,7 +474,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
           setSubscriptionPage={setSubscriptionPage}
           setEventProvider={setEventProvider}
           setEventStatus={setEventStatus}
-          onCancelSubscription={requestCancelSubscription}
+          onCancelSubscription={subscriptionPurchaseActions.requestCancelSubscription}
           shortGuid={shortGuid}
           humanizeProvider={humanizeProvider}
           humanizeStatus={humanizeStatus}
@@ -899,42 +485,14 @@ export function EconomyPage({ locale }: EconomyPageProps) {
       <EconomyPageConfirmationDialogs
         text={text}
         locale={locale}
-        cancelTarget={cancelTarget}
-        refundTarget={refundTarget}
-        isCancelSubscriptionSubmitting={isCancelSubscriptionSubmitting}
-        isRefundPurchaseSubmitting={isRefundPurchaseSubmitting}
-        onCancelSubscriptionClose={() => {
-          if (!cancelSubscriptionInFlightRef.current && !cancelSubscriptionMutation.isPending) {
-            setCancelTarget(null);
-          }
-        }}
-        onCancelSubscriptionConfirm={() => {
-          if (cancelSubscriptionInFlightRef.current || cancelSubscriptionMutation.isPending) {
-            return;
-          }
-
-          if (cancelTarget && canCancelSubscription(cancelTarget)) {
-            cancelSubscriptionInFlightRef.current = true;
-            setIsCancelSubscriptionInFlight(true);
-            cancelSubscriptionMutation.mutate(cancelTarget);
-          }
-        }}
-        onRefundPurchaseClose={() => {
-          if (!refundPurchaseInFlightRef.current && !refundPurchaseMutation.isPending) {
-            setRefundTarget(null);
-          }
-        }}
-        onRefundPurchaseConfirm={() => {
-          if (refundPurchaseInFlightRef.current || refundPurchaseMutation.isPending) {
-            return;
-          }
-
-          if (refundTarget && canRefundPurchase(refundTarget)) {
-            refundPurchaseInFlightRef.current = true;
-            setIsRefundPurchaseInFlight(true);
-            refundPurchaseMutation.mutate(refundTarget);
-          }
-        }}
+        cancelTarget={subscriptionPurchaseActions.cancelTarget}
+        refundTarget={subscriptionPurchaseActions.refundTarget}
+        isCancelSubscriptionSubmitting={subscriptionPurchaseActions.isCancelSubscriptionSubmitting}
+        isRefundPurchaseSubmitting={subscriptionPurchaseActions.isRefundPurchaseSubmitting}
+        onCancelSubscriptionClose={subscriptionPurchaseActions.onCancelSubscriptionClose}
+        onCancelSubscriptionConfirm={subscriptionPurchaseActions.onCancelSubscriptionConfirm}
+        onRefundPurchaseClose={subscriptionPurchaseActions.onRefundPurchaseClose}
+        onRefundPurchaseConfirm={subscriptionPurchaseActions.onRefundPurchaseConfirm}
       />
     </AdminPage>
   );

@@ -1,8 +1,6 @@
 import {
   apiRequest,
   cachedGet,
-  cachedSupportConversations,
-  cachedSupportInbox,
   cachedSupportTemplates,
   encodePathSegment,
   inflightGetRequests,
@@ -26,6 +24,7 @@ function normalizePositiveInteger(value: number | undefined, maxValue: number): 
 }
 
 export const SUPPORT_INBOX_SEARCH_MAX_LENGTH = 120;
+export const SUPPORT_CONVERSATION_MESSAGES_MAX_TAKE = 120;
 export const SUPPORT_MESSAGE_BODY_MAX_LENGTH = 2_000;
 export type SupportInboxSort = "default" | "priority" | "waiting" | "updated" | "created";
 
@@ -131,7 +130,10 @@ export async function fetchSupportConversation(
   }
 ): Promise<AdminSupportConversation> {
   const encodedConversationId = encodePathSegment(conversationId);
-  const normalizedTake = normalizePositiveInteger(options?.take, 100);
+  const normalizedTake = normalizePositiveInteger(
+    options?.take,
+    SUPPORT_CONVERSATION_MESSAGES_MAX_TAKE
+  );
   const searchParams = new URLSearchParams();
   if (normalizedTake) {
     searchParams.set("take", String(normalizedTake));
@@ -337,15 +339,7 @@ export async function deleteSupportReplyTemplate(templateId: string): Promise<vo
 }
 
 function clearSupportCaches(conversationId?: string): void {
-  cachedSupportInbox.clear();
-  inflightGetRequests.clear();
-
-  if (conversationId) {
-    cachedSupportConversations.delete(`support-conversation:${conversationId}`);
-    return;
-  }
-
-  cachedSupportConversations.clear();
+  void conversationId;
 }
 
 function clearSupportTemplateCaches(): void {

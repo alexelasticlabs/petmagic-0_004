@@ -29,9 +29,7 @@ import {
 } from "@/components/support/support-conversation-controller.helpers";
 import { useSupportConversationMutations } from "@/components/support/support-conversation-controller.mutations";
 import { useSupportConversationSubjectQueries } from "@/components/support/support-conversation-controller.subject";
-import {
-  sortSupportQueueItems,
-} from "@/components/support/support-conversation-helpers";
+import { sortSupportQueueItems } from "@/components/support/support-conversation-helpers";
 import { getSupportConversationCopy } from "@/components/support/support-conversation.content";
 import { getAdminErrorMessage } from "@/lib/admin-error-message";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
@@ -51,7 +49,11 @@ import { clientLogger } from "@/lib/client-logger";
 import { getDictionary } from "@/lib/i18n";
 import { useSupportRealtime } from "@/lib/support-realtime";
 
-export { SUPPORT_REPLY_MAX_LENGTH, SUPPORT_SEARCH_MAX_LENGTH, statusOptions } from "@/components/support/support-conversation-controller.helpers";
+export {
+  SUPPORT_REPLY_MAX_LENGTH,
+  SUPPORT_SEARCH_MAX_LENGTH,
+  statusOptions,
+} from "@/components/support/support-conversation-controller.helpers";
 
 export function useSupportConversationController({
   locale,
@@ -80,8 +82,13 @@ export function useSupportConversationController({
     () => typeof window !== "undefined" && window.matchMedia("(min-width: 1321px)").matches
   );
   const [toast, setToast] = useState<ToastState | null>(null);
-  const [selectedAttachment, setSelectedAttachment] = useState<File | null>(null);
+  const [selectedAttachment, setSelectedAttachmentState] = useState<File | null>(null);
+  const [attachmentPreview, setAttachmentPreview] = useState<{
+    file: File;
+    url: string;
+  } | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
+  const attachmentPreviewUrlRef = useRef<string | null>(null);
   const markReadRequestRef = useRef<Promise<void> | null>(null);
   const markReadDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastRealtimeToastRef = useRef<string | null>(null);
@@ -89,12 +96,42 @@ export function useSupportConversationController({
   const lastConversationRealtimeFetchRef = useRef(0);
   const loadOlderAbortControllerRef = useRef<AbortController | null>(null);
 
+  const revokeAttachmentPreviewUrl = useCallback(() => {
+    if (!attachmentPreviewUrlRef.current) {
+      return;
+    }
+
+    URL.revokeObjectURL(attachmentPreviewUrlRef.current);
+    attachmentPreviewUrlRef.current = null;
+  }, []);
+
+  const clearAttachmentPreview = useCallback(() => {
+    revokeAttachmentPreviewUrl();
+    setAttachmentPreview(null);
+  }, [revokeAttachmentPreviewUrl]);
+
+  const setSupportSelectedAttachment = useCallback(
+    (file: File | null) => {
+      clearAttachmentPreview();
+      setSelectedAttachmentState(file);
+
+      if (!file?.type.startsWith("image/")) {
+        return;
+      }
+
+      const previewUrl = URL.createObjectURL(file);
+      attachmentPreviewUrlRef.current = previewUrl;
+      setAttachmentPreview({ file, url: previewUrl });
+    },
+    [clearAttachmentPreview]
+  );
+
   const resetSelectedAttachment = useCallback(() => {
-    setSelectedAttachment(null);
+    setSupportSelectedAttachment(null);
     if (attachmentInputRef.current) {
       attachmentInputRef.current.value = "";
     }
-  }, [setSelectedAttachment]);
+  }, [setSupportSelectedAttachment]);
 
   const refreshConversationData = useCallback(async () => {
     await Promise.allSettled([
@@ -180,32 +217,19 @@ export function useSupportConversationController({
     return () => window.clearTimeout(timer);
   }, [toast]);
 
-  const attachmentPreviewUrl = useMemo(() => {
-    if (!selectedAttachment || !selectedAttachment.type.startsWith("image/")) {
-      return null;
-    }
-
-    return URL.createObjectURL(selectedAttachment);
-  }, [selectedAttachment]);
+  const attachmentPreviewUrl =
+    attachmentPreview?.file === selectedAttachment ? attachmentPreview.url : null;
 
   useEffect(() => {
     return () => {
-      if (attachmentPreviewUrl) {
-        URL.revokeObjectURL(attachmentPreviewUrl);
-      }
-    };
-  }, [attachmentPreviewUrl]);
-
-  useEffect(
-    () => () => {
+      revokeAttachmentPreviewUrl();
       if (markReadDebounceRef.current) {
         clearTimeout(markReadDebounceRef.current);
         markReadDebounceRef.current = null;
       }
       loadOlderAbortControllerRef.current?.abort();
-    },
-    []
-  );
+    };
+  }, [revokeAttachmentPreviewUrl]);
 
   const conversationQuery = useQuery<AdminSupportConversation>({
     queryKey: adminQueryKeys.supportConversation(conversationId),
@@ -261,17 +285,12 @@ export function useSupportConversationController({
     sessionUserId && conversation?.assignedAdminId === sessionUserId
   );
   const subjectUserId = conversation?.initiatorUserId ?? null;
-  const {
-    analyticsQuery,
-    isSubjectUserDeleted,
-    purchasesQuery,
-    subscriptionQuery,
-    userQuery,
-  } = useSupportConversationSubjectQueries({
-    hasSession: Boolean(session),
-    subjectUserId,
-    canViewSubjectUserContext,
-  });
+  const { analyticsQuery, isSubjectUserDeleted, purchasesQuery, subscriptionQuery, userQuery } =
+    useSupportConversationSubjectQueries({
+      hasSession: Boolean(session),
+      subjectUserId,
+      canViewSubjectUserContext,
+    });
 
   useSupportRealtime(canManageSupportWorkspace ? session?.accessToken : undefined, (event) => {
     void queryClient.invalidateQueries({ queryKey: adminQueryKeys.supportInboxRoot });
@@ -422,6 +441,10 @@ export function useSupportConversationController({
       if (loadOlderAbortControllerRef.current === abortController) {
         loadOlderAbortControllerRef.current = null;
       }
+    }
+
+    if (abortController.signal.aborted) {
+      return;
     }
 
     queryClient.setQueryData<AdminSupportConversation>(
@@ -673,7 +696,7 @@ export function useSupportConversationController({
     setSearchQuery: setSupportSearchQuery,
     setQueueFilter: setSupportQueueFilter,
     setQueuePage: setSupportQueuePage,
-    setSelectedAttachment,
+    setSelectedAttachment: setSupportSelectedAttachment,
     setMessagesViewportVisible,
     loadOlderMessages,
     sidePanelDescription,

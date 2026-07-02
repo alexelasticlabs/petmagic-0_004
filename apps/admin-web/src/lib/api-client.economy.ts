@@ -3,6 +3,9 @@ import { apiRequest, encodePathSegment } from "./api-client.core";
 import type {
   AdminCurrencyPack,
   AdminEconomyDashboardMetrics,
+  AdminEconomyIncidentAction,
+  AdminEconomyIncidentDetail,
+  AdminEconomyIncident,
   AdminEconomyLedgerItem,
   AdminEconomyPurchase,
   AdminEconomySubscription,
@@ -16,6 +19,7 @@ import type {
   AdminRedeemRewardKind,
   AdminSubscriptionEvent,
   AdminSubscriptionPlan,
+  EconomyReconciliationRun,
   OffsetPagedResponse,
 } from "./api-client.types";
 
@@ -36,6 +40,15 @@ export type AdminEconomySubscriptionsQuery = {
   search?: string;
 };
 
+export type AdminEconomyIncidentsQuery = {
+  skip?: number;
+  take?: number;
+  status?: string;
+  type?: string;
+  category?: string;
+  userId?: string;
+};
+
 export type AdminRedeemCodesQuery = {
   skip?: number;
   take?: number;
@@ -47,6 +60,7 @@ export type AdminRedeemCodesQuery = {
 
 export const ECONOMY_QUERY_FILTER_MAX_LENGTH = 120;
 export const ECONOMY_REFUND_REASON_MAX_LENGTH = 240;
+export const ECONOMY_INCIDENT_REASON_MAX_LENGTH = 1000;
 
 const ECONOMY_PAYMENT_PROVIDERS = ["stripe", "app_store", "google_play"] as const;
 const ECONOMY_PURCHASE_STATUSES = ["pending", "succeeded", "failed", "refunded"] as const;
@@ -63,6 +77,18 @@ const ECONOMY_SUBSCRIPTION_EVENT_STATUSES = [
   "expired",
   "processed",
   "failed",
+] as const;
+const ECONOMY_INCIDENT_STATUSES = ["open", "resolved", "suppressed"] as const;
+const ECONOMY_INCIDENT_CATEGORIES = [
+  "pending",
+  "failed",
+  "disputed",
+  "refund_pending",
+  "settlement_failed",
+  "webhook_failed",
+  "reconciliation_required",
+  "manual_review_required",
+  "resolved",
 ] as const;
 const REDEEM_CODE_STATUSES = [
   "draft",
@@ -127,6 +153,19 @@ export function normalizeAdminEconomySubscriptionsQuery(
     status: normalizeAllowedFilter(params.status, ECONOMY_SUBSCRIPTION_STATUSES),
     provider: normalizeAllowedFilter(params.provider, ECONOMY_PAYMENT_PROVIDERS),
     search: normalizeFilterValue(params.search),
+  };
+}
+
+export function normalizeAdminEconomyIncidentsQuery(
+  params: AdminEconomyIncidentsQuery = {}
+): AdminEconomyIncidentsQuery {
+  return {
+    skip: normalizePagedValue(params.skip),
+    take: normalizeTakeValue(params.take),
+    status: normalizeAllowedFilter(params.status, ECONOMY_INCIDENT_STATUSES),
+    type: normalizeFilterValue(params.type),
+    category: normalizeAllowedFilter(params.category, ECONOMY_INCIDENT_CATEGORIES),
+    userId: normalizeFilterValue(params.userId),
   };
 }
 
@@ -427,6 +466,101 @@ export async function fetchAdminSubscriptionEvents(
   return apiRequest<OffsetPagedResponse<AdminSubscriptionEvent>>(
     `/api/admin/economy/subscription-events${query}`,
     { method: "GET", signal }
+  );
+}
+
+export async function fetchAdminEconomyIncidents(
+  params?: AdminEconomyIncidentsQuery,
+  signal?: AbortSignal
+): Promise<OffsetPagedResponse<AdminEconomyIncident>> {
+  const normalizedParams = normalizeAdminEconomyIncidentsQuery(params);
+  const search = new URLSearchParams();
+  if (normalizedParams.skip !== undefined) search.set("skip", String(normalizedParams.skip));
+  if (normalizedParams.take !== undefined) search.set("take", String(normalizedParams.take));
+  if (normalizedParams.status) search.set("status", normalizedParams.status);
+  if (normalizedParams.type) search.set("type", normalizedParams.type);
+  if (normalizedParams.category) search.set("category", normalizedParams.category);
+  if (normalizedParams.userId) search.set("userId", normalizedParams.userId);
+
+  const query = search.size ? `?${search.toString()}` : "";
+  return apiRequest<OffsetPagedResponse<AdminEconomyIncident>>(
+    `/api/admin/economy/incidents${query}`,
+    { method: "GET", signal }
+  );
+}
+
+export async function fetchAdminEconomyIncidentDetail(
+  incidentId: string,
+  signal?: AbortSignal
+): Promise<AdminEconomyIncidentDetail> {
+  const encodedIncidentId = encodePathSegment(incidentId);
+  return apiRequest<AdminEconomyIncidentDetail>(
+    `/api/admin/economy/incidents/${encodedIncidentId}`,
+    { method: "GET", signal }
+  );
+}
+
+export async function runAdminEconomyReconciliation(): Promise<EconomyReconciliationRun> {
+  return apiRequest<EconomyReconciliationRun>("/api/admin/economy/reconciliation/run", {
+    method: "POST",
+  });
+}
+
+export async function resolveAdminEconomyIncident(
+  incidentId: string,
+  resolutionNote?: string
+): Promise<AdminEconomyIncident> {
+  const encodedIncidentId = encodePathSegment(incidentId);
+  const normalizedResolutionNote =
+    resolutionNote?.trim().slice(0, ECONOMY_INCIDENT_REASON_MAX_LENGTH) || undefined;
+  return apiRequest<AdminEconomyIncident>(
+    `/api/admin/economy/incidents/${encodedIncidentId}/resolve`,
+    {
+      method: "POST",
+      body: JSON.stringify({ resolutionNote: normalizedResolutionNote }),
+    }
+  );
+}
+
+export async function reopenAdminEconomyIncident(
+  incidentId: string,
+  reason: string
+): Promise<AdminEconomyIncident> {
+  const encodedIncidentId = encodePathSegment(incidentId);
+  const normalizedReason = reason.trim().slice(0, ECONOMY_INCIDENT_REASON_MAX_LENGTH);
+  return apiRequest<AdminEconomyIncident>(
+    `/api/admin/economy/incidents/${encodedIncidentId}/reopen`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason: normalizedReason }),
+    }
+  );
+}
+
+export async function applyAdminEconomyIncidentAction(
+  incidentId: string,
+  payload: {
+    action: string;
+    reason: string;
+    amount?: number;
+    externalReferenceId?: string;
+  }
+): Promise<AdminEconomyIncidentAction> {
+  const encodedIncidentId = encodePathSegment(incidentId);
+  return apiRequest<AdminEconomyIncidentAction>(
+    `/api/admin/economy/incidents/${encodedIncidentId}/actions`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        action: payload.action.trim(),
+        reason: payload.reason.trim().slice(0, ECONOMY_INCIDENT_REASON_MAX_LENGTH),
+        amount:
+          typeof payload.amount === "number" && Number.isFinite(payload.amount)
+            ? Math.trunc(payload.amount)
+            : undefined,
+        externalReferenceId: normalizeFilterValue(payload.externalReferenceId),
+      }),
+    }
   );
 }
 

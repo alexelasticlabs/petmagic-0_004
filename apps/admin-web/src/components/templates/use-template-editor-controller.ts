@@ -259,7 +259,11 @@ export function useTemplateEditorController({
       return;
     }
 
-    if (saveTemplateMutation.isPending || uploadTemplateMediaMutation.isPending || uploadingKind !== null) {
+    if (
+      saveTemplateMutation.isPending ||
+      uploadTemplateMediaMutation.isPending ||
+      uploadingKind !== null
+    ) {
       return;
     }
 
@@ -462,9 +466,9 @@ function applyUploadedAssetToForm(
 
 async function readVideoDurationSeconds(file: File): Promise<number | undefined> {
   const objectUrl = URL.createObjectURL(file);
+  const video = document.createElement("video");
   try {
     const duration = await new Promise<number | undefined>((resolve) => {
-      const video = document.createElement("video");
       let settled = false;
       const timeoutId = window.setTimeout(() => {
         if (settled) {
@@ -488,7 +492,8 @@ async function readVideoDurationSeconds(file: File): Promise<number | undefined>
       video.preload = "metadata";
       video.src = objectUrl;
       video.onloadedmetadata = () => {
-        const value = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : undefined;
+        const value =
+          Number.isFinite(video.duration) && video.duration > 0 ? video.duration : undefined;
         finalize(value);
       };
       video.onerror = () => finalize(undefined);
@@ -496,6 +501,10 @@ async function readVideoDurationSeconds(file: File): Promise<number | undefined>
 
     return duration;
   } finally {
+    video.onloadedmetadata = null;
+    video.onerror = null;
+    video.removeAttribute("src");
+    video.load();
     URL.revokeObjectURL(objectUrl);
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { clientLogger } from "@/lib/client-logger";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
@@ -87,11 +87,32 @@ export function TemplateSecureMedia({
     objectUrl: string | null;
     failed: boolean;
   }>({ sourceUrl: "", objectUrl: null, failed: false });
+  const activeObjectUrlRef = useRef<string | null>(null);
   const resolvedUrl =
-    localObjectUrl ?? directMediaUrl ?? (remoteMedia.sourceUrl === url ? remoteMedia.objectUrl : null);
+    localObjectUrl ??
+    directMediaUrl ??
+    (remoteMedia.sourceUrl === url ? remoteMedia.objectUrl : null);
   const loadFailed =
     !localObjectUrl && !directMediaUrl && remoteMedia.sourceUrl === url && remoteMedia.failed;
   const onLoadFailedRef = useRef(onLoadFailed);
+  const revokeActiveObjectUrl = useCallback(() => {
+    if (!activeObjectUrlRef.current) {
+      return;
+    }
+
+    URL.revokeObjectURL(activeObjectUrlRef.current);
+    activeObjectUrlRef.current = null;
+  }, []);
+  const markRemoteMediaFailed = useCallback(() => {
+    if (localObjectUrl || directMediaUrl) {
+      onLoadFailedRef.current?.();
+      return;
+    }
+
+    revokeActiveObjectUrl();
+    setRemoteMedia({ sourceUrl: url, objectUrl: null, failed: true });
+    onLoadFailedRef.current?.();
+  }, [directMediaUrl, localObjectUrl, revokeActiveObjectUrl, url]);
 
   useEffect(() => {
     onLoadFailedRef.current = onLoadFailed;
@@ -120,8 +141,7 @@ export function TemplateSecureMedia({
             kind,
             status: response.status,
           });
-          setRemoteMedia({ sourceUrl: url, objectUrl: null, failed: true });
-          onLoadFailedRef.current?.();
+          markRemoteMediaFailed();
           return;
         }
 
@@ -131,6 +151,8 @@ export function TemplateSecureMedia({
         }
 
         createdObjectUrl = URL.createObjectURL(blob);
+        revokeActiveObjectUrl();
+        activeObjectUrlRef.current = createdObjectUrl;
         setRemoteMedia({ sourceUrl: url, objectUrl: createdObjectUrl, failed: false });
       })
       .catch((error) => {
@@ -145,15 +167,14 @@ export function TemplateSecureMedia({
           kind,
           errorName: getMediaFetchErrorName(error),
         });
-        setRemoteMedia({ sourceUrl: url, objectUrl: null, failed: true });
-        onLoadFailedRef.current?.();
+        markRemoteMediaFailed();
       });
 
     return () => {
       isActive = false;
       controller.abort();
-      if (createdObjectUrl) {
-        URL.revokeObjectURL(createdObjectUrl);
+      if (createdObjectUrl && activeObjectUrlRef.current === createdObjectUrl) {
+        revokeActiveObjectUrl();
       }
     };
   }, [
@@ -163,6 +184,8 @@ export function TemplateSecureMedia({
     logContext?.contentType,
     logContext?.surface,
     logContext?.templateId,
+    markRemoteMediaFailed,
+    revokeActiveObjectUrl,
     url,
   ]);
 
@@ -191,7 +214,7 @@ export function TemplateSecureMedia({
         preload={preload}
         aria-hidden={ariaHidden || undefined}
         aria-label={!ariaHidden ? ariaLabel : undefined}
-        onError={onLoadFailed}
+        onError={markRemoteMediaFailed}
       />
     );
   }
@@ -206,7 +229,7 @@ export function TemplateSecureMedia({
       height={height}
       loading={loading}
       aria-hidden={ariaHidden || undefined}
-      onError={onLoadFailed}
+      onError={markRemoteMediaFailed}
     />
   );
 }

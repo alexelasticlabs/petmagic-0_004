@@ -144,11 +144,20 @@ export function FeedbackPage({ locale }: FeedbackPageProps) {
   );
 
   useEffect(() => {
+    let isActive = true;
     if (!visiblePageData || !selectedId || visibleFeedbackIds.has(selectedId)) {
       return;
     }
 
-    queueMicrotask(() => setSelectedId(null));
+    queueMicrotask(() => {
+      if (isActive) {
+        setSelectedId(null);
+      }
+    });
+
+    return () => {
+      isActive = false;
+    };
   }, [selectedId, visibleFeedbackIds, visiblePageData]);
 
   function resetFeedbackSelection(nextPage = 0) {

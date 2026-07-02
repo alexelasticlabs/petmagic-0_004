@@ -14,9 +14,7 @@ import {
 } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import { getTemplateStatusLabel } from "@/components/templates/template-admin-shared";
-import {
-  TemplateCatalogCard,
-} from "@/components/templates/templates-catalog-view.card";
+import { TemplateCatalogCard } from "@/components/templates/templates-catalog-view.card";
 import { getTemplatesCatalogViewText } from "@/components/templates/templates-catalog-view.content";
 import { TemplatesCatalogDialogs } from "@/components/templates/templates-catalog-view.dialogs";
 import { TemplatesCatalogListTable } from "@/components/templates/templates-catalog-view.list";
@@ -344,11 +342,21 @@ export function TemplatesCatalogView({
     [resetPendingTemplateAction]
   );
   useEffect(() => {
+    let isActive = true;
     if (!isFetching && currentPage > totalPages) {
-      queueMicrotask(() => resetCatalogContext(totalPages));
+      queueMicrotask(() => {
+        if (isActive) {
+          resetCatalogContext(totalPages);
+        }
+      });
     }
+
+    return () => {
+      isActive = false;
+    };
   }, [currentPage, isFetching, resetCatalogContext, totalPages]);
   useEffect(() => {
+    let isActive = true;
     if (isCatalogInteractionLocked) {
       return;
     }
@@ -363,6 +371,10 @@ export function TemplatesCatalogView({
     }
 
     queueMicrotask(() => {
+      if (!isActive) {
+        return;
+      }
+
       if (shouldResetArchive) {
         setTemplatePendingArchiveId(null);
       }
@@ -371,6 +383,10 @@ export function TemplatesCatalogView({
         setTemplatePendingDeleteId(null);
       }
     });
+
+    return () => {
+      isActive = false;
+    };
   }, [
     isCatalogInteractionLocked,
     templatePendingArchiveId,

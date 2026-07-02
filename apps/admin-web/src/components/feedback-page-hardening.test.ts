@@ -138,7 +138,10 @@ describe("feedback page hardening", () => {
     expect(source).toContain(
       "if (!visiblePageData || !selectedId || visibleFeedbackIds.has(selectedId)) {\n      return;\n    }"
     );
-    expect(source).toContain("queueMicrotask(() => setSelectedId(null));");
+    expect(source).toContain("let isActive = true;");
+    expect(source).toContain("queueMicrotask(() => {");
+    expect(source).toContain("if (isActive) {\n        setSelectedId(null);");
+    expect(source).toContain("return () => {\n      isActive = false;\n    };");
     expect(source).toContain("}, [selectedId, visibleFeedbackIds, visiblePageData]);");
     expect(source).not.toContain("if (!pageData || !selectedId");
   });
@@ -191,8 +194,11 @@ describe("feedback page hardening", () => {
       "const isSaveFeedbackDisabled = !isFeedbackDraftDirty || isFeedbackActionLocked;"
     );
     expect(source).toContain(
-      "const isRefundFeedbackDisabled = !details.canRefund || isFeedbackActionLocked;"
+      "const isRefundFeedbackDisabled =\n    !details.canRefund || refundableCredits <= 0 || isFeedbackActionLocked;"
     );
+    expect(source).toContain("amount: refundableCredits,");
+    expect(source).toContain("Number.isFinite(details.generation.creditsCharged)");
+    expect(source).toContain("Math.max(0, Math.trunc(details.generation.creditsCharged))");
     expect(source).toContain("const requestSaveFeedback = () => {");
     expect(source).toContain("if (isSaveFeedbackDisabled) {\n      return;\n    }");
     expect(source).toContain("const requestRefundFeedback = () => {");
@@ -273,12 +279,19 @@ describe("feedback page hardening", () => {
   it("keeps feedback action cache refreshes partial after successful backend mutations", () => {
     const source = readFeedbackPageLibrarySource();
 
-    expect(source.match(/await Promise\.allSettled\(\[/g) ?? []).toHaveLength(2);
+    expect(source.match(/await Promise\.allSettled\(/g) ?? []).toHaveLength(2);
+    expect(source).toContain("await Promise.allSettled(invalidations);");
     expect(source.match(/void Promise\.allSettled\(\[/g) ?? []).toHaveLength(1);
     expect(source).toContain(
       "queryClient.invalidateQueries({ queryKey: adminQueryKeys.feedbackDetails(details.id) })"
     );
     expect(source).toContain('queryClient.invalidateQueries({ queryKey: ["admin", "feedback"] })');
+    expect(source).toContain('queryClient.invalidateQueries({ queryKey: ["admin", "economy", "ledger"] })');
+    expect(source).toContain("queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyDashboardMetrics })");
+    expect(source).toContain("queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDetail(details.userId) })");
+    expect(source).toContain("queryClient.invalidateQueries({ queryKey: adminQueryKeys.userAnalytics(details.userId) })");
+    expect(source).toContain("queryClient.invalidateQueries({ queryKey: adminQueryKeys.usersRoot })");
+    expect(source).toContain("queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDashboardMetrics })");
     expect(source).not.toContain(
       'await queryClient.invalidateQueries({ queryKey: adminQueryKeys.feedbackDetails(details.id) });\n      await queryClient.invalidateQueries({ queryKey: ["admin", "feedback"] });'
     );

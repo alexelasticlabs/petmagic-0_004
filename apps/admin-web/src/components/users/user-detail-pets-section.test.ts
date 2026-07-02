@@ -11,10 +11,12 @@ describe("user detail pets section", () => {
     const source = readFileSync(detailPagePath, "utf8");
     const contentSource = readFileSync(detailContentPath, "utf8");
 
+    expect(source).toContain("getUserDetailPetText");
+    expect(source).toContain("type UserDetailPetText");
+    expect(source).toContain('from "@/components/users/user-detail-page.content";');
     expect(source).toContain(
-      'import { getUserDetailPetText, type UserDetailPetText } from "@/components/users/user-detail-page.content";'
+      "const petText = useMemo(() => getUserDetailPetText(locale), [locale]);"
     );
-    expect(source).toContain("const petText = useMemo(() => getUserDetailPetText(locale), [locale]);");
     expect(source).not.toContain("function getUserPetsCopy(locale: Locale)");
     expect(source).not.toContain('const isRu = locale === "ru";');
     expect(contentSource).toContain('title: "Питомцы"');
@@ -72,9 +74,7 @@ describe("user detail pets section", () => {
     expect(source).toContain("void generationsQuery.refetch().catch(() => undefined)");
     expect(source).toContain("onClick={requestGenerationsRetry}");
     expect(source).toContain("disabled={!canManagePets || generationsQuery.isFetching}");
-    expect(source).not.toContain(
-      "onClick={() => void petsQuery.refetch().catch(() => undefined)}"
-    );
+    expect(source).not.toContain("onClick={() => void petsQuery.refetch().catch(() => undefined)}");
     expect(source).not.toContain("disabled={photosQuery.isFetching}");
     expect(source).not.toContain("disabled={generationsQuery.isFetching}");
   });
@@ -96,7 +96,9 @@ describe("user detail pets section", () => {
     expect(source).toContain("status: variables.status");
     expect(source).toContain("function getUserPetActionErrorDetails(error: unknown)");
     expect(source).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
-    expect(source).toContain("setPetActionError(getAdminErrorMessage(error, petText.statusUpdateError));");
+    expect(source).toContain(
+      "setPetActionError(getAdminErrorMessage(error, petText.statusUpdateError));"
+    );
     expect(source).toContain(
       '{petActionError ? <AdminStateCard tone="warning" title={petActionError} /> : null}'
     );
@@ -128,20 +130,18 @@ describe("user detail pets section", () => {
     expect(source).toContain(
       "const isPhotoActionLocked = photoStatusMutation.isPending || photosQuery.isFetching;"
     );
-    expect(source).toContain(
-      "if (!canManagePets || isPhotoActionLocked) {\n      return;\n    }"
-    );
+    expect(source).toContain("if (!canManagePets || isPhotoActionLocked) {\n      return;\n    }");
     expect(source).toContain("disabled={!canManagePets || isPhotoActionLocked}");
     expect(source).toContain(
       'aria-label={`${\n                  photo.status === "active" ? text.hidePhotoLabel : text.restorePhotoLabel'
     );
     expect(source).toContain("aria-busy={");
     expect(source).toContain("onClick={() => requestPhotoStatusChange(photo)}");
-    expect(source).not.toContain(
-      "onClick={() =>\n                  photoStatusMutation.mutate({"
-    );
+    expect(source).not.toContain("onClick={() =>\n                  photoStatusMutation.mutate({");
     expect(source).not.toContain('clientLogger.warn("users.pet_status_update_failed", { error');
-    expect(source).not.toContain('clientLogger.warn("users.pet_photo_status_update_failed", { error');
+    expect(source).not.toContain(
+      'clientLogger.warn("users.pet_photo_status_update_failed", { error'
+    );
     expect(styles).toContain(".petDetailState");
   });
 
@@ -152,15 +152,16 @@ describe("user detail pets section", () => {
       "const visiblePetIds = useMemo(\n    () => new Set((petsQuery.data ?? []).map((pet) => pet.id)),"
     );
     expect(source).toContain("if (!petsQuery.data || expandedPetIds.size === 0) {");
-    expect(source).toContain(
-      "const hasStaleExpandedPet = Array.from(expandedPetIds).some("
-    );
+    expect(source).toContain("const hasStaleExpandedPet = Array.from(expandedPetIds).some(");
     expect(source).toContain("(petId) => !visiblePetIds.has(petId)");
     expect(source).toContain("queueMicrotask(() => {");
+    expect(source).toContain("let isActive = true;");
+    expect(source).toContain("if (!isActive) {\n        return;\n      }");
     expect(source).toContain(
       "const next = new Set([...current].filter((petId) => visiblePetIds.has(petId)));"
     );
     expect(source).toContain("return next.size === current.size ? current : next;");
+    expect(source).toContain("return () => {\n      isActive = false;\n    };");
   });
 
   it("keeps pet and photo status refreshes non-blocking after successful mutations", () => {

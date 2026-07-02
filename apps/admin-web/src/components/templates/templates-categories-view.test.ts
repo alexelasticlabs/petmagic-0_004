@@ -297,10 +297,13 @@ describe("template categories view actions", () => {
     );
     expect(source).toContain("editingCategoryId !== null && !categoryIds.has(editingCategoryId)");
     expect(source).toContain("queueMicrotask(() => {");
+    expect(source).toContain("let isActive = true;");
+    expect(source).toContain("if (!isActive) {\n        return;\n      }");
     expect(source).toContain("setCategoryPendingArchive(null);");
     expect(source).toContain("setCategoryPendingDelete(null);");
     expect(source).toContain("setEditingCategoryId(null);");
     expect(source).toContain('setEditingName("");');
+    expect(source).toContain("return () => {\n      isActive = false;\n    };");
     expect(source).not.toContain("useEffect(() => {\n    setCategoryPendingArchive(null);");
   });
 

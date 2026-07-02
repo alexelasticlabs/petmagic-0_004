@@ -115,7 +115,11 @@ export function EconomyPageLedgerPurchasesSection({
                     <th>{text.deltaColumn}</th>
                     <th>{text.balanceColumn}</th>
                     <th>{text.sourceColumn}</th>
+                    <th>{text.tokenKindColumn}</th>
+                    <th>{text.operationKindColumn}</th>
+                    <th>{text.expiryColumn}</th>
                     <th>{text.reasonColumn}</th>
+                    <th>{text.bucketAllocationColumn}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -131,7 +135,13 @@ export function EconomyPageLedgerPurchasesSection({
                       </td>
                       <td>{item.balanceAfter}</td>
                       <td>{humanizeSource(item.source, locale)}</td>
+                      <td>{safeText(item.tokenKind ?? "legacy", 64)}</td>
+                      <td>{safeText(item.operationKind ?? "-", 64)}</td>
+                      <td>
+                        {item.expiresAtUtc ? formatDateTime(item.expiresAtUtc, locale) : "-"}
+                      </td>
                       <td>{safeText(item.reason)}</td>
+                      <td>{safeText(item.bucketDeltasJson ?? "-", 160)}</td>
                     </tr>
                   ))}
                 </tbody>

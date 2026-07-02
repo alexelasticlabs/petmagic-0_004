@@ -3,7 +3,7 @@ const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
 const URL_PATTERN = /\bhttps?:\/\/[^\s<>"')]+/gi;
 const PHONE_PATTERN = /(^|[^\w])(\+?\d[\d\s().-]{6,}\d)(?=$|[^\w])/g;
 const SECRET_ASSIGNMENT_PATTERN =
-  /\b(authorization|access_?token|refresh_?token|token|secret|password|api_?key|receipt|stripe_signature)\s*[:=]\s*["']?[^"',\s}&]+/gi;
+  /\b(authorization|access_?token|refresh_?token|token|jwt|session|cookie|set-cookie|secret|password|api_?key|credential|signature|stripe_signature|receipt)\s*[:=]\s*["']?[^"',\s}&]+/gi;
 const CARD_ASSIGNMENT_PATTERN = /\b(card(?:_?number)?|pan|cvv|cvc)\s*[:=]\s*["']?[\d\s-]{3,19}/gi;
 const BEARER_TOKEN_PATTERN = /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi;
 const JWT_PATTERN = /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g;

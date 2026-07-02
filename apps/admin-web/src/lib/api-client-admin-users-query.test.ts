@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -12,6 +14,10 @@ import {
   USER_WALLET_REASON_MAX_LENGTH,
 } from "@/lib/api-client.admin-users";
 import { clearAdminListCaches } from "@/lib/api-client.core";
+
+const adminUsersClientPath = fileURLToPath(
+  new URL("./api-client.admin-users.ts", import.meta.url)
+);
 
 describe("admin users api client query and role guards", () => {
   const originalPublicApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -210,5 +216,17 @@ describe("admin users api client query and role guards", () => {
       amount: 10,
       reason: "r".repeat(USER_WALLET_REASON_MAX_LENGTH),
     });
+  });
+
+  it("centralizes admin user cache invalidation for user mutations", () => {
+    const source = readFileSync(adminUsersClientPath, "utf8");
+
+    expect(source).toContain("function clearAdminUserCaches(userId: string): void");
+    expect(source).toContain("cachedUsersLists.clear();");
+    expect(source).toContain("cachedAdminUserDetails.delete(`admin-user:${userId}`);");
+    expect(source).toContain(
+      "cachedAdminUserAnalytics.delete(`admin-user-analytics:${userId}`);"
+    );
+    expect(source.match(/clearAdminUserCaches\(userId\);/g)).toHaveLength(7);
   });
 });

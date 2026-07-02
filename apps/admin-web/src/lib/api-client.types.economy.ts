@@ -8,6 +8,13 @@ export type AdminEconomyLedgerItem = {
   source: string;
   reason: string;
   createdAtUtc: string;
+  sourceProvider?: string | null;
+  sourceTransactionId?: string | null;
+  tokenKind?: string | null;
+  operationKind?: string | null;
+  tokenBucketId?: string | null;
+  bucketDeltasJson?: string | null;
+  expiresAtUtc?: string | null;
 };
 
 export type AdminEconomyPurchase = {
@@ -153,6 +160,104 @@ export type AdminSubscriptionEvent = {
   externalEventId?: string | null;
   createdAtUtc: string;
   processedAtUtc?: string | null;
+};
+
+export type AdminEconomyIncident = {
+  incidentId: string;
+  type: string;
+  category: string;
+  severity: string;
+  status: string;
+  userId?: string | null;
+  purchaseOrderId?: string | null;
+  userSubscriptionId?: string | null;
+  provider?: string | null;
+  externalReferenceId?: string | null;
+  summary: string;
+  detectionCount: number;
+  retryCount: number;
+  autoFixApplied: boolean;
+  firstDetectedAtUtc: string;
+  lastDetectedAtUtc: string;
+  nextRetryAtUtc?: string | null;
+  resolvedAtUtc?: string | null;
+  resolutionNote?: string | null;
+  lastError?: string | null;
+};
+
+export type AdminEconomyIncidentWallet = {
+  userId: string;
+  balance: number;
+  updatedAtUtc: string;
+};
+
+export type AdminEconomyIncidentWebhookSnapshot = {
+  eventId: string;
+  userId?: string | null;
+  userSubscriptionId?: string | null;
+  provider: string;
+  eventType: string;
+  status: string;
+  externalEventId?: string | null;
+  payloadSnapshotJson?: string | null;
+  createdAtUtc: string;
+  processedAtUtc?: string | null;
+};
+
+export type AdminEconomyIncidentGeneration = {
+  generationId: string;
+  userId: string;
+  tokenCost: number;
+  status: string;
+  createdAtUtc: string;
+  updatedAtUtc: string;
+  chargedAtUtc?: string | null;
+  refundedAtUtc?: string | null;
+  refundAttemptCount: number;
+  refundLastErrorCode?: string | null;
+  refundLastAttemptedAtUtc?: string | null;
+  completedAtUtc?: string | null;
+  lastErrorCode?: string | null;
+  idempotencyKey?: string | null;
+  requestHash?: string | null;
+};
+
+export type AdminEconomyIncidentAuditEntry = {
+  auditEntryId: string;
+  action: string;
+  reason: string;
+  oldStatus?: string | null;
+  newStatus?: string | null;
+  detailsJson?: string | null;
+  createdAtUtc: string;
+};
+
+export type AdminEconomyIncidentDetail = {
+  incident: AdminEconomyIncident;
+  purchaseOrder?: AdminEconomyPurchase | null;
+  subscription?: AdminEconomySubscription | null;
+  wallet?: AdminEconomyIncidentWallet | null;
+  generation?: AdminEconomyIncidentGeneration | null;
+  ledgerEntries: AdminEconomyLedgerItem[];
+  webhookEvents: AdminEconomyIncidentWebhookSnapshot[];
+  auditTrail: AdminEconomyIncidentAuditEntry[];
+};
+
+export type AdminEconomyIncidentAction = {
+  incident: AdminEconomyIncident;
+  action: string;
+  message: string;
+};
+
+export type EconomyReconciliationRun = {
+  startedAtUtc: string;
+  completedAtUtc: string;
+  checksRun: number;
+  incidentsCreated: number;
+  incidentsUpdated: number;
+  incidentsResolved: number;
+  autoFixesApplied: number;
+  manualReviewRequired: number;
 };
 
 export type AdminCurrencyPack = {

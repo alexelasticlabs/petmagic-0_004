@@ -33,14 +33,23 @@ describe("support inbox page", () => {
     expect(source).toContain("sortSupportQueueItems(inboxQuery.data?.items ?? [])");
     expect(source).toContain("const sortedConversationIdSignature = sortedConversations");
     expect(source).toContain(".map((conversation) => conversation.conversationId)");
-    expect(source).toContain("sortedConversationIdSignature.split(\"|\").includes(selectedConversationId)");
-    expect(source).toContain("queueMicrotask(() => setSelectedConversationId(null));");
     expect(source).toContain(
-      "selectedConversationId &&\n      sortedConversations.some((conversation) => conversation.conversationId === selectedConversationId)"
+      'sortedConversationIdSignature.split("|").includes(selectedConversationId)'
+    );
+    expect(source).toContain("let isActive = true;");
+    expect(source).toContain("queueMicrotask(() => {");
+    expect(source).toContain("if (isActive) {\n        setSelectedConversationId(null);");
+    expect(source).toContain("return () => {\n      isActive = false;\n    };");
+    expect(source).toContain("selectedConversationId &&");
+    expect(source).toContain("sortedConversations.some(");
+    expect(source).toContain(
+      "(conversation) => conversation.conversationId === selectedConversationId"
     );
     expect(source).not.toContain("enabled: Boolean(session)");
     expect(source).not.toContain("disabled={!session || inboxQuery.isFetching}");
     expect(source).not.toContain("sortSupportQueueItems(inboxQuery.data ?? [])");
-    expect(source).not.toContain("onClick={() => {\n                if (!canManageSupportWorkspace)");
+    expect(source).not.toContain(
+      "onClick={() => {\n                if (!canManageSupportWorkspace)"
+    );
   });
 });

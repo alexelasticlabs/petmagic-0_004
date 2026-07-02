@@ -411,6 +411,7 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
   const hasBlockingRoleError = isError && !hasAnyRoleData;
 
   useEffect(() => {
+    let isActive = true;
     if (
       !pendingAction ||
       roleActionInFlightRef.current ||
@@ -422,7 +423,15 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
       return;
     }
 
-    queueMicrotask(() => setPendingAction(null));
+    queueMicrotask(() => {
+      if (isActive) {
+        setPendingAction(null);
+      }
+    });
+
+    return () => {
+      isActive = false;
+    };
   }, [
     isModeratorsRefreshing,
     isSearchRefreshing,

@@ -33,13 +33,23 @@ describe("support conversation controller errors", () => {
     expect(controllerSource).toContain('pushSupportError(error, "update_status")');
     expect(controllerSource).toContain('pushSupportError(error, "assign_conversation")');
     expect(controllerSource).toContain('pushSupportError(error, "update_metadata")');
-    expect(controllerSource).toContain("conversationId: formatSupportControllerLogText(conversationId)");
+    expect(controllerSource).toContain(
+      "conversationId: formatSupportControllerLogText(conversationId)"
+    );
     expect(controllerSource).toContain("...getSupportControllerErrorDetails(error)");
-    expect(helpersSource).toContain("export function getSupportControllerErrorDetails(error: unknown)");
-    expect(helpersSource).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
+    expect(helpersSource).toContain(
+      "export function getSupportControllerErrorDetails(error: unknown)"
+    );
+    expect(helpersSource).toContain(
+      'errorName: error instanceof Error ? error.name : "UnknownError"'
+    );
     expect(helpersSource).toContain("export function formatSupportControllerLogText(");
-    expect(controllerSource).not.toContain('setToast({ type: "error", message: text.supportLoadError });');
-    expect(controllerSource).not.toContain('pushSupportNotification("error", text.supportLoadError);');
+    expect(controllerSource).not.toContain(
+      'setToast({ type: "error", message: text.supportLoadError });'
+    );
+    expect(controllerSource).not.toContain(
+      'pushSupportNotification("error", text.supportLoadError);'
+    );
     expect(controllerSource).not.toContain('clientLogger.warn("support.action_failed", { error');
     expect(controllerSource).not.toContain("conversationId,\n            error");
     expect(controllerSource).not.toContain("conversationId,\n          error");
@@ -64,7 +74,9 @@ describe("support conversation controller errors", () => {
       'setToast({ type: "error", message: supportActionsForbidden });'
     );
     expect(controllerSource).toContain("enabled: Boolean(session && canManageSupportWorkspace)");
-    expect(helpersSource).toContain("export const supportInboxStaleTimeMs = supportPollingIntervalMs;");
+    expect(helpersSource).toContain(
+      "export const supportInboxStaleTimeMs = supportPollingIntervalMs;"
+    );
     expect(helpersSource).toContain("export const supportSubjectContextStaleTimeMs = 30_000;");
     expect(controllerSource).toContain("staleTime: supportInboxStaleTimeMs");
     expect(controllerSource).toContain("staleTime: supportSubjectContextStaleTimeMs");
@@ -173,8 +185,10 @@ describe("support conversation controller errors", () => {
     );
     expect(pageSource).not.toContain('{locale === "ru" ? "Назад" : "Previous"}');
     expect(pageSource).not.toContain('{locale === "ru" ? "Вперёд" : "Next"}');
+    expect(inboxPageSource).toContain("selectedConversationId &&");
+    expect(inboxPageSource).toContain("sortedConversations.some(");
     expect(inboxPageSource).toContain(
-      "selectedConversationId &&\n      sortedConversations.some((conversation) => conversation.conversationId === selectedConversationId)"
+      "(conversation) => conversation.conversationId === selectedConversationId"
     );
   });
 
@@ -191,8 +205,12 @@ describe("support conversation controller errors", () => {
     expect(helpersSource).toContain(
       "export const SUPPORT_REPLY_MAX_LENGTH = SUPPORT_MESSAGE_BODY_MAX_LENGTH;"
     );
+    expect(controllerSource).toContain("export {");
+    expect(controllerSource).toContain("SUPPORT_REPLY_MAX_LENGTH,");
+    expect(controllerSource).toContain("SUPPORT_SEARCH_MAX_LENGTH,");
+    expect(controllerSource).toContain("statusOptions,");
     expect(controllerSource).toContain(
-      'export { SUPPORT_REPLY_MAX_LENGTH, SUPPORT_SEARCH_MAX_LENGTH, statusOptions } from "@/components/support/support-conversation-controller.helpers";'
+      '} from "@/components/support/support-conversation-controller.helpers";'
     );
     expect(controllerSource).toContain(
       "setRawSearchQuery(value.slice(0, SUPPORT_SEARCH_MAX_LENGTH));"
@@ -503,7 +521,10 @@ describe("support conversation controller errors", () => {
     expect(infoPanelSource).toContain(
       "!conversation ||\n      conversation.status === pendingStatusConfirm ||\n      (previousConversationId !== null && previousConversationId !== conversation.conversationId)"
     );
-    expect(infoPanelSource).toContain("queueMicrotask(() => setPendingStatusConfirm(null));");
+    expect(infoPanelSource).toContain("let isActive = true;");
+    expect(infoPanelSource).toContain("queueMicrotask(() => {");
+    expect(infoPanelSource).toContain("if (isActive) {\n          setPendingStatusConfirm(null);");
+    expect(infoPanelSource).toContain("return () => {\n      isActive = false;\n    };");
   });
 
   it("guards support reopen status actions in handlers, not only disabled UI", () => {
@@ -540,6 +561,9 @@ describe("support conversation controller errors", () => {
     expect(pageSource).toContain("setPendingAttachmentActionKey(null);");
     expect(pageSource).toContain("setHighlightedMessageId(null);");
     expect(pageSource).toContain("setIsDragging(false);");
+    expect(pageSource).toContain("let isActive = true;");
+    expect(pageSource).toContain("if (!isActive) {\n        return;\n      }");
+    expect(pageSource).toContain("return () => {\n      isActive = false;\n    };");
     expect(pageSource).toContain(
       "[conversationId, resetSelectedAttachment, selectReplyToMessage, setReply]"
     );
@@ -600,7 +624,25 @@ describe("support conversation controller errors", () => {
     const controllerSource = readSupportConversationControllerLibrarySource();
     const pageSource = readSupportConversationPageLibrarySource();
 
-    expect(controllerSource).toContain("}, [attachmentPreviewUrl]);");
+    expect(controllerSource).toContain(
+      "const [attachmentPreview, setAttachmentPreview] = useState<"
+    );
+    expect(controllerSource).toContain(
+      "attachmentPreview?.file === selectedAttachment ? attachmentPreview.url : null"
+    );
+    expect(controllerSource).toContain(
+      "const attachmentPreviewUrlRef = useRef<string | null>(null);"
+    );
+    expect(controllerSource).toContain("const setSupportSelectedAttachment = useCallback(");
+    expect(controllerSource).toContain("const previewUrl = URL.createObjectURL(file);");
+    expect(controllerSource).toContain("attachmentPreviewUrlRef.current = previewUrl;");
+    expect(controllerSource).toContain("setAttachmentPreview({ file, url: previewUrl });");
+    expect(controllerSource).toContain("URL.revokeObjectURL(attachmentPreviewUrlRef.current);");
+    expect(controllerSource).toContain("revokeAttachmentPreviewUrl();");
+    expect(controllerSource).toContain("setSelectedAttachment: setSupportSelectedAttachment,");
+    expect(controllerSource).not.toContain(
+      "const attachmentPreviewUrl = useMemo(() => {\n    if (!selectedAttachment"
+    );
     expect(controllerSource).toContain("const loadOlderMessages = useCallback(async () => {");
     expect(controllerSource).toContain("if (!canManageSupportWorkspace) {\n      return;\n    }");
     expect(pageSource).toContain("const requestOlderMessagesLoad = () => {");
@@ -615,6 +657,10 @@ describe("support conversation controller errors", () => {
     expect(controllerSource).toContain("clearTimeout(markReadDebounceRef.current);");
     expect(controllerSource).toContain("markReadDebounceRef.current = null;");
     expect(controllerSource).toContain("loadOlderAbortControllerRef.current?.abort();");
+    expect(controllerSource).toContain("signal: abortController.signal");
+    expect(controllerSource).toContain(
+      "if (abortController.signal.aborted) {\n      return;\n    }"
+    );
     expect(controllerSource).toContain("optimisticAttachmentObjectUrlsRef.current.clear();");
     expect(controllerSource).toContain("},\n    []\n  );");
     expect(controllerSource).not.toContain(

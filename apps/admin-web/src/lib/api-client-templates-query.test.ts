@@ -8,6 +8,7 @@ import {
   createTemplateOfTheDay,
   decideAdminModerationItem,
   fetchAdminModerationQueue,
+  fetchAdminTemplateStatistics,
   fetchAdminTemplateGenerationMetrics,
   fetchAdminTemplates,
   fetchAdminTemplatesAnalyticsOverview,
@@ -27,6 +28,7 @@ import {
   normalizeAdminTemplatesAnalyticsQuery,
   TEMPLATE_CATALOG_SEARCH_MAX_LENGTH,
   TEMPLATE_FEEDBACK_SEARCH_MAX_LENGTH,
+  updateImageTemplate,
   updateTemplateOfTheDaySettings,
 } from "@/lib/api-client.templates";
 
@@ -557,6 +559,33 @@ describe("api-client.templates query normalization", () => {
       action: "reject",
       reason: "r".repeat(MODERATION_DECISION_REASON_MAX_LENGTH),
     });
+  });
+
+  it("invalidates cached template analytics after template mutations", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/api/admin/templates/template-analytics/statistics")) {
+        return Response.json({ templateId: "template-analytics", totalRuns: 1 });
+      }
+      if (url.endsWith("/api/admin/templates/image/template-analytics")) {
+        return Response.json({ templateId: "template-analytics" });
+      }
+      return Response.json({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchAdminTemplateStatistics("template-analytics");
+    await fetchAdminTemplateStatistics("template-analytics");
+    await updateImageTemplate(
+      "template-analytics",
+      {} as Parameters<typeof updateImageTemplate>[1]
+    );
+    await fetchAdminTemplateStatistics("template-analytics");
+
+    const statisticsRequests = fetchMock.mock.calls.filter((call) =>
+      String(call[0]).endsWith("/api/admin/templates/template-analytics/statistics")
+    );
+    expect(statisticsRequests).toHaveLength(2);
   });
 
   it("propagates AbortSignal through template GET helpers", () => {

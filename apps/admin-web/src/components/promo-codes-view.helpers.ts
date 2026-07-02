@@ -10,13 +10,7 @@ import { maskEmail, sanitizeSensitiveText } from "@/lib/sensitive-display";
 type PromoDictionary = ReturnType<typeof getDictionary>;
 
 export type PromoStatusKey =
-  | "draft"
-  | "scheduled"
-  | "active"
-  | "paused"
-  | "exhausted"
-  | "expired"
-  | "archived";
+  "draft" | "scheduled" | "active" | "paused" | "exhausted" | "expired" | "archived";
 export type PromoStatusFilter = "all" | PromoStatusKey;
 export type PromoSortMode = "updated" | "usage" | "reward" | "code" | "expiry";
 export type PromoFormMode = "create" | "edit" | "duplicate";
@@ -94,7 +88,8 @@ export function toCreatePayload(form: PromoForm, text: PromoDictionary) {
     code: normalizePromoText(form.code, PROMO_CODE_MAX_LENGTH),
     description: normalizePromoText(form.description, PROMO_DESCRIPTION_MAX_LENGTH),
     campaignName: normalizePromoText(form.campaignName, PROMO_CAMPAIGN_FIELD_MAX_LENGTH) || null,
-    campaignChannel: normalizePromoText(form.campaignChannel, PROMO_CAMPAIGN_FIELD_MAX_LENGTH) || null,
+    campaignChannel:
+      normalizePromoText(form.campaignChannel, PROMO_CAMPAIGN_FIELD_MAX_LENGTH) || null,
     minimumSuccessfulPurchases: Number(form.minimumSuccessfulPurchases.trim()),
     rewardKind: form.rewardKind,
     rewardValue: Number(form.rewardValue.trim()),
@@ -112,7 +107,8 @@ export function toUpdatePayload(form: PromoForm, code: AdminRedeemCode, text: Pr
   return {
     description: normalizePromoText(form.description, PROMO_DESCRIPTION_MAX_LENGTH),
     campaignName: normalizePromoText(form.campaignName, PROMO_CAMPAIGN_FIELD_MAX_LENGTH) || null,
-    campaignChannel: normalizePromoText(form.campaignChannel, PROMO_CAMPAIGN_FIELD_MAX_LENGTH) || null,
+    campaignChannel:
+      normalizePromoText(form.campaignChannel, PROMO_CAMPAIGN_FIELD_MAX_LENGTH) || null,
     minimumSuccessfulPurchases: Number(form.minimumSuccessfulPurchases.trim()),
     createdBy: code.createdBy?.trim() || null,
     rewardKind: form.rewardKind,
@@ -135,10 +131,7 @@ function validatePromoForm(
   const rewardValue = parsePromoIntegerInput(form.rewardValue, false);
   const maxRedemptions = parsePromoIntegerInput(form.maxRedemptions, false);
   const maxRedemptionsPerUser = parsePromoIntegerInput(form.maxRedemptionsPerUser, false);
-  const minimumSuccessfulPurchases = parsePromoIntegerInput(
-    form.minimumSuccessfulPurchases,
-    true
-  );
+  const minimumSuccessfulPurchases = parsePromoIntegerInput(form.minimumSuccessfulPurchases, true);
 
   if (
     !normalizedCode ||
@@ -428,9 +421,24 @@ function getMaxUserRedemptions(code: AdminRedeemCode) {
 export function createGeneratedPromoCode() {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   const segments = Array.from({ length: 3 }, () =>
-    Array.from({ length: 4 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join("")
+    Array.from({ length: 4 }, () => alphabet[secureRandomIndex(alphabet.length)]).join("")
   );
   return `PM-${segments.join("-")}`;
+}
+
+function secureRandomIndex(length: number) {
+  const crypto = globalThis.crypto;
+  if (!crypto?.getRandomValues) {
+    throw new Error("Secure random source is unavailable.");
+  }
+
+  const values = new Uint32Array(1);
+  const maxUnbiasedValue = Math.floor(0xffffffff / length) * length;
+  do {
+    crypto.getRandomValues(values);
+  } while (values[0] >= maxUnbiasedValue);
+
+  return values[0] % length;
 }
 
 function shortGuid(value: string) {

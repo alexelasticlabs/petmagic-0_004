@@ -31,6 +31,9 @@ export const adminQueryKeys = {
   economyPaymentProviderConfigs: ["admin", "economy", "payment-provider-configs"] as const,
   economySubscriptionEvents: (provider: string, status: string) =>
     ["admin", "economy", "subscription-events", provider, status] as const,
+  economyIncidents: (query: unknown) => ["admin", "economy", "incidents", query] as const,
+  economyIncident: (incidentId: string) =>
+    ["admin", "economy", "incidents", incidentId, "detail"] as const,
   economyPacks: ["admin", "economy", "packs"] as const,
   economyRedeemCodesRoot: ["admin", "economy", "redeem-codes"] as const,
   economyRedeemCodes: (query: unknown) => ["admin", "economy", "redeem-codes", query] as const,

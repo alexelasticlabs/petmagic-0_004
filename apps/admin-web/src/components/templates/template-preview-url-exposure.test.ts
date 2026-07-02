@@ -48,6 +48,16 @@ describe("template preview media URL exposure", () => {
     expect(sources).not.toContain("value={form.referenceUrl}");
     expect(sources).toContain("<TemplateSecureMedia");
     expect(secureMediaSource).toContain("URL.createObjectURL(blob)");
+    expect(secureMediaSource).toContain("const activeObjectUrlRef = useRef<string | null>(null);");
+    expect(secureMediaSource).toContain("const revokeActiveObjectUrl = useCallback(");
+    expect(secureMediaSource).toContain("const markRemoteMediaFailed = useCallback(");
+    expect(secureMediaSource).toContain(
+      "revokeActiveObjectUrl();\n        activeObjectUrlRef.current = createdObjectUrl;"
+    );
+    expect(secureMediaSource).toContain(
+      "if (createdObjectUrl && activeObjectUrlRef.current === createdObjectUrl)"
+    );
+    expect(secureMediaSource).toContain("onError={markRemoteMediaFailed}");
     expect(secureMediaSource).toContain("function shouldUseDirectMediaUrl(url: string)");
     expect(secureMediaSource).toContain("candidate.origin !== globalThis.location.origin");
     expect(secureMediaSource).toContain("fetchWithTimeout(url");
@@ -72,7 +82,9 @@ describe("template preview media URL exposure", () => {
     expect(secureMediaSource).not.toContain("contentType: logContext?.contentType");
     expect(secureMediaSource).not.toContain("surface: logContext?.surface");
     expect(secureMediaSource).not.toContain("error,\n        });");
-    expect(secureMediaSource).not.toContain("clientLogger.warn(\"templates.secure_media_origin_check_failed\", { url");
+    expect(secureMediaSource).not.toContain(
+      'clientLogger.warn("templates.secure_media_origin_check_failed", { url'
+    );
   });
 
   it("sanitizes visible template media file names before rendering them", () => {
@@ -85,5 +97,32 @@ describe("template preview media URL exposure", () => {
     expect(templateTestSource).toContain("const safeFileName = sanitizeSensitiveText(fileName");
     expect(templateTestSource).not.toContain("alt={fileName}");
     expect(templateTestSource).not.toContain("{imageUrl ? fileName");
+  });
+
+  it("creates local template preview blob URLs only from file selection handlers", () => {
+    const previewAssetSource = readFileSync(previewAssetSectionPath, "utf8");
+    const editorSectionsSource = readFileSync(editorSectionsPath, "utf8");
+
+    expect(previewAssetSource).toContain(
+      "const localPreviewUrl = localPreview?.file === previewFile ? localPreview.url : null;"
+    );
+    expect(previewAssetSource).toContain(
+      "setLocalPreview({ file, url: URL.createObjectURL(file) });"
+    );
+    expect(previewAssetSource).toContain("URL.revokeObjectURL(localPreview.url);");
+    expect(previewAssetSource).not.toContain(
+      "() => (previewFile ? URL.createObjectURL(previewFile) : null)"
+    );
+
+    expect(editorSectionsSource).toContain(
+      "const localReferenceUrl = localReference?.file === referenceFile ? localReference.url : null;"
+    );
+    expect(editorSectionsSource).toContain(
+      "setLocalReference({ file, url: URL.createObjectURL(file) });"
+    );
+    expect(editorSectionsSource).toContain("URL.revokeObjectURL(localReference.url);");
+    expect(editorSectionsSource).not.toContain(
+      "() => (referenceFile ? URL.createObjectURL(referenceFile) : null)"
+    );
   });
 });

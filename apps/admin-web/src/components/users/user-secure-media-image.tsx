@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { clientLogger } from "@/lib/client-logger";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
@@ -33,10 +33,20 @@ export function UserSecureMediaImage({
     objectUrl: string | null;
     failed: boolean;
   }>({ sourceUrl: "", objectUrl: null, failed: false });
+  const activeObjectUrlRef = useRef<string | null>(null);
   const failedToLoad = Boolean(imageUrl && mediaState.sourceUrl === imageUrl && mediaState.failed);
   const objectUrl = !failedToLoad
-    ? (localObjectUrl ?? (imageUrl && mediaState.sourceUrl === imageUrl ? mediaState.objectUrl : null))
+    ? (localObjectUrl ??
+      (imageUrl && mediaState.sourceUrl === imageUrl ? mediaState.objectUrl : null))
     : null;
+  const revokeActiveObjectUrl = useCallback(() => {
+    if (!activeObjectUrlRef.current) {
+      return;
+    }
+
+    URL.revokeObjectURL(activeObjectUrlRef.current);
+    activeObjectUrlRef.current = null;
+  }, []);
 
   useEffect(() => {
     if (!imageUrl || localObjectUrl) {
@@ -65,6 +75,8 @@ export function UserSecureMediaImage({
         }
 
         createdObjectUrl = URL.createObjectURL(blob);
+        revokeActiveObjectUrl();
+        activeObjectUrlRef.current = createdObjectUrl;
         setMediaState({ sourceUrl: imageUrl, objectUrl: createdObjectUrl, failed: false });
       })
       .catch((error) => {
@@ -79,11 +91,11 @@ export function UserSecureMediaImage({
     return () => {
       isActive = false;
       controller.abort();
-      if (createdObjectUrl) {
-        URL.revokeObjectURL(createdObjectUrl);
+      if (createdObjectUrl && activeObjectUrlRef.current === createdObjectUrl) {
+        revokeActiveObjectUrl();
       }
     };
-  }, [imageUrl, localObjectUrl, logEvent]);
+  }, [imageUrl, localObjectUrl, logEvent, revokeActiveObjectUrl]);
 
   if (!objectUrl || failedToLoad) {
     return <>{fallback}</>;
@@ -97,6 +109,7 @@ export function UserSecureMediaImage({
       className={className}
       onError={() => {
         if (imageUrl) {
+          revokeActiveObjectUrl();
           setMediaState({ sourceUrl: imageUrl, objectUrl: null, failed: true });
         }
       }}

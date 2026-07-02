@@ -118,6 +118,7 @@ export function EconomyPageProviderConfigsSection({
     [providerConfigs]
   );
   useEffect(() => {
+    let isActive = true;
     if (
       !configurationPendingDeleteId ||
       providerConfigIds.has(configurationPendingDeleteId) ||
@@ -126,7 +127,15 @@ export function EconomyPageProviderConfigsSection({
       return;
     }
 
-    queueMicrotask(() => setConfigurationPendingDeleteId(null));
+    queueMicrotask(() => {
+      if (isActive) {
+        setConfigurationPendingDeleteId(null);
+      }
+    });
+
+    return () => {
+      isActive = false;
+    };
   }, [configurationPendingDeleteId, deleteProviderConfigPending, providerConfigIds]);
   const isCreateProviderConfigInvalid =
     !createProviderDraft.provider.trim() ||
@@ -653,9 +662,7 @@ export function EconomyPageProviderConfigsSection({
                                 setProviderConfigDrafts,
                                 config.configurationId,
                                 {
-                                  displaySubtitle: normalizeProviderLabelInput(
-                                    event.target.value
-                                  ),
+                                  displaySubtitle: normalizeProviderLabelInput(event.target.value),
                                 }
                               )
                             }
@@ -693,9 +700,7 @@ export function EconomyPageProviderConfigsSection({
                                 setProviderConfigDrafts,
                                 config.configurationId,
                                 {
-                                  warningMessage: normalizeProviderMessageInput(
-                                    event.target.value
-                                  ),
+                                  warningMessage: normalizeProviderMessageInput(event.target.value),
                                 }
                               )
                             }

@@ -5,7 +5,9 @@ import { describe, expect, it } from "vitest";
 const userAvatarPath = fileURLToPath(new URL("./user-avatar.tsx", import.meta.url));
 const userAvatarStylesPath = fileURLToPath(new URL("./user-avatar.module.css", import.meta.url));
 const userDetailPath = fileURLToPath(new URL("./user-detail-page.tsx", import.meta.url));
-const secureMediaImagePath = fileURLToPath(new URL("./user-secure-media-image.tsx", import.meta.url));
+const secureMediaImagePath = fileURLToPath(
+  new URL("./user-secure-media-image.tsx", import.meta.url)
+);
 const secureMediaHelperPath = fileURLToPath(new URL("./user-secure-media.ts", import.meta.url));
 
 describe("user avatar URL exposure", () => {
@@ -16,21 +18,38 @@ describe("user avatar URL exposure", () => {
     expect(source).not.toContain('from "next/image"');
     expect(source).not.toContain("src={imageUrl}");
     expect(source).toContain("URL.createObjectURL(blob)");
+    expect(source).toContain("const activeObjectUrlRef = useRef<string | null>(null);");
+    expect(source).toContain("const revokeActiveObjectUrl = useCallback(");
+    expect(source).toContain(
+      "revokeActiveObjectUrl();\n        activeObjectUrlRef.current = createdObjectUrl;"
+    );
+    expect(source).toContain(
+      "if (createdObjectUrl && activeObjectUrlRef.current === createdObjectUrl)"
+    );
+    expect(source).toContain(
+      "onError={() => {\n            if (imageUrl) {\n              revokeActiveObjectUrl();"
+    );
     expect(source).toContain("fetchWithTimeout(imageUrl");
     expect(source).toContain("users.avatar_fetch_failed");
     expect(helperSource).toContain("import { sanitizeSensitiveText }");
     expect(helperSource).toContain("export function getUserMediaFetchErrorDetails(error: unknown)");
-    expect(helperSource).toContain("function getUserMediaUrlResolutionErrorDetails(rawUrl: string, error: unknown)");
+    expect(helperSource).toContain(
+      "function getUserMediaUrlResolutionErrorDetails(rawUrl: string, error: unknown)"
+    );
     expect(helperSource).toContain('clientLogger.warn(\n      "users.media_url_resolve_failed",');
     expect(helperSource).toContain("rawLength: rawUrl.length");
-    expect(helperSource).toContain("startsWithSlash: rawUrl.startsWith(\"/\")");
+    expect(helperSource).toContain('startsWithSlash: rawUrl.startsWith("/")');
     expect(helperSource).toContain(
       'isBlobOrData: rawUrl.startsWith("blob:") || rawUrl.startsWith("data:")'
     );
-    expect(helperSource).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
+    expect(helperSource).toContain(
+      'errorName: error instanceof Error ? error.name : "UnknownError"'
+    );
     expect(source).toContain("getUserMediaFetchErrorDetails(error)");
     expect(source).not.toContain('clientLogger.warn("users.avatar_fetch_failed", { error })');
-    expect(helperSource).not.toContain("clientLogger.warn(\"users.media_url_resolve_failed\", { rawUrl");
+    expect(helperSource).not.toContain(
+      'clientLogger.warn("users.media_url_resolve_failed", { rawUrl'
+    );
   });
 
   it("does not render backend pet photo URLs directly in user detail cards", () => {
@@ -43,10 +62,21 @@ describe("user avatar URL exposure", () => {
     expect(detailSource).toContain('logEvent="users.pet_photo_fetch_failed"');
     expect(secureImageSource).not.toContain("src={imageUrl}");
     expect(secureImageSource).toContain("URL.createObjectURL(blob)");
+    expect(secureImageSource).toContain("const activeObjectUrlRef = useRef<string | null>(null);");
+    expect(secureImageSource).toContain("const revokeActiveObjectUrl = useCallback(");
+    expect(secureImageSource).toContain(
+      "revokeActiveObjectUrl();\n        activeObjectUrlRef.current = createdObjectUrl;"
+    );
+    expect(secureImageSource).toContain(
+      "if (createdObjectUrl && activeObjectUrlRef.current === createdObjectUrl)"
+    );
+    expect(secureImageSource).toContain(
+      "onError={() => {\n        if (imageUrl) {\n          revokeActiveObjectUrl();"
+    );
     expect(secureImageSource).toContain("fetchWithTimeout(imageUrl");
     expect(secureImageSource).toContain("getUserMediaFetchErrorDetails(error)");
     expect(secureImageSource).toContain("clientLogger.warn(logEvent, { status: response.status })");
-    expect(secureImageSource).not.toContain('clientLogger.warn(logEvent, { error })');
+    expect(secureImageSource).not.toContain("clientLogger.warn(logEvent, { error })");
   });
 
   it("keeps avatar fallback styling theme-token based", () => {

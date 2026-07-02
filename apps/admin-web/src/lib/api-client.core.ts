@@ -9,10 +9,7 @@ import { sanitizeSensitiveText } from "./sensitive-display";
 
 import type {
   AcceptLegalDocumentsCommand,
-  AdminSupportConversation,
-  AdminSupportInboxPage,
   AdminSupportReplyTemplate,
-  AdminTemplate,
   AdminTemplateCategory,
   AdminTemplateEventAnalytics,
   AdminTemplateFailureBreakdownItem,
@@ -61,14 +58,6 @@ export const cachedAdminUserAnalytics = new Map<
   string,
   { value: AdminUserAnalytics; expiresAt: number }
 >();
-export const cachedSupportInbox = new Map<
-  string,
-  { value: AdminSupportInboxPage; expiresAt: number }
->();
-export const cachedSupportConversations = new Map<
-  string,
-  { value: AdminSupportConversation; expiresAt: number }
->();
 export const cachedSupportTemplates = new Map<
   string,
   { value: AdminSupportReplyTemplate[]; expiresAt: number }
@@ -84,10 +73,6 @@ export const cachedTemplateCategories = new Map<
 export const cachedTemplatesAnalyticsOverview = new Map<
   string,
   { value: AdminTemplatesAnalyticsOverview; expiresAt: number }
->();
-export const cachedAdminTemplateDetails = new Map<
-  string,
-  { value: AdminTemplate; expiresAt: number }
 >();
 export const cachedAdminTemplateStatistics = new Map<
   string,
@@ -159,13 +144,10 @@ export function clearAdminListCaches(): void {
   cachedUsersLists.clear();
   cachedAdminUserDetails.clear();
   cachedAdminUserAnalytics.clear();
-  cachedSupportInbox.clear();
-  cachedSupportConversations.clear();
   cachedSupportTemplates.clear();
   cachedTemplateLists.clear();
   cachedTemplateCategories.clear();
   cachedTemplatesAnalyticsOverview.clear();
-  cachedAdminTemplateDetails.clear();
   cachedAdminTemplateStatistics.clear();
   cachedAdminTemplateTrends.clear();
   cachedAdminTemplateRecentGenerations.clear();

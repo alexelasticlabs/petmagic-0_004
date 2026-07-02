@@ -150,10 +150,13 @@ describe("users admin action hardening", () => {
       "confirmationDialog !== null && !pageUserIdSet.has(confirmationDialog.userId)"
     );
     expect(pageSource).toContain("queueMicrotask(() => {");
+    expect(pageSource).toContain("let isActive = true;");
+    expect(pageSource).toContain("if (!isActive) {\n        return;\n      }");
     expect(pageSource).toContain("closeActionsMenu();");
     expect(pageSource).toContain("setSelectedUserId(null);");
     expect(pageSource).toContain("setWalletDialog(null);");
     expect(pageSource).toContain("setConfirmationDialog(null);");
+    expect(pageSource).toContain("return () => {\n      isActive = false;\n    };");
     expect(pageSource).toContain("selectedUserId,");
   });
 

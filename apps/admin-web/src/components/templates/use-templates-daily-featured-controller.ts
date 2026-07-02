@@ -147,6 +147,10 @@ export function useTemplatesDailyFeaturedController({ locale }: TemplatesDailyFe
 
   const loadTemplateOptions = useCallback(
     async (query: string, signal?: AbortSignal) => {
+      if (signal?.aborted) {
+        return;
+      }
+
       if (!canManageTemplates) {
         setTemplates([]);
         setTemplateOptionsError(null);
@@ -189,6 +193,10 @@ export function useTemplatesDailyFeaturedController({ locale }: TemplatesDailyFe
 
   const loadScheduleData = useCallback(
     async (signal?: AbortSignal) => {
+      if (signal?.aborted) {
+        return;
+      }
+
       if (!canManageTemplates) {
         setIsScheduleLoading(false);
         return;
@@ -293,7 +301,12 @@ export function useTemplatesDailyFeaturedController({ locale }: TemplatesDailyFe
       return;
     }
 
+    let isActive = true;
     queueMicrotask(() => {
+      if (!isActive) {
+        return;
+      }
+
       if (shouldResetPendingDelete) {
         setAssignmentPendingDelete(null);
       }
@@ -303,6 +316,10 @@ export function useTemplatesDailyFeaturedController({ locale }: TemplatesDailyFe
         setForm(emptyForm(form.startDate));
       }
     });
+
+    return () => {
+      isActive = false;
+    };
   }, [
     assignmentPendingDelete,
     form.id,

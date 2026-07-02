@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildAdminNotificationDedupeKey,
+  createAdminNotificationId,
   sanitizeAdminNotificationDedupeKey,
   sanitizeAdminNotificationSource,
   sanitizeAdminNotificationText,
@@ -109,6 +110,18 @@ describe("admin notification sanitization", () => {
 
     expect(key).not.toContain(longPath);
     expect(key).not.toContain("x".repeat(240));
+  });
+
+  it("creates local notification ids without Math.random", () => {
+    const source = readFileSync(adminNotificationsPath, "utf8");
+    const id = createAdminNotificationId(123456);
+
+    expect(id).toMatch(/^123456-/);
+    expect(source).toContain("function createAdminNotificationId");
+    expect(source).toContain("crypto.randomUUID");
+    expect(source).toContain("crypto.getRandomValues");
+    expect(source).toContain("id: createAdminNotificationId(now)");
+    expect(source).not.toContain("Math.random");
   });
 
   it("avoids notification state updates when read actions do not change data", () => {
