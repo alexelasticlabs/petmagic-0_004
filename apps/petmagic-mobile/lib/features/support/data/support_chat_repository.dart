@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/authenticated_request_options.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
@@ -92,7 +93,7 @@ class SupportChatRepository {
     String? beforeMessageId,
     CancelToken? cancelToken,
   }) async {
-    final query = <String, dynamic>{'take': take};
+    final query = <String, dynamic>{'take': _supportPageSize(take)};
     if (beforeMessageCreatedAtUtc != null) {
       query['beforeMessageCreatedAtUtc'] = beforeMessageCreatedAtUtc
           .toUtc()
@@ -120,9 +121,10 @@ class SupportChatRepository {
     required String localeTag,
     String? replyToMessageId,
   }) async {
+    final encodedConversationId = _supportPathSegment(conversationId);
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) async => _dio.post<Map<String, dynamic>>(
-        '/api/support/conversation/$conversationId/messages',
+        '/api/support/conversation/$encodedConversationId/messages',
         data: {
           'body': body.trim(),
           'locale': localeTag,
@@ -148,6 +150,7 @@ class SupportChatRepository {
     ProgressCallback? onSendProgress,
     CancelToken? cancelToken,
   }) async {
+    final encodedConversationId = _supportPathSegment(conversationId);
     final prepared = await _prepareAttachmentForUpload(
       filePath: filePath,
       fileName: fileName,
@@ -158,7 +161,7 @@ class SupportChatRepository {
       final trimmedBody = body?.trim() ?? '';
       final response = await _authorizedRequest<Map<String, dynamic>>(
         (session) async => _dio.post<Map<String, dynamic>>(
-          '/api/support/conversation/$conversationId/attachments',
+          '/api/support/conversation/$encodedConversationId/attachments',
           data: FormData.fromMap({
             if (trimmedBody.isNotEmpty) 'body': trimmedBody,
             'locale': localeTag,
@@ -192,6 +195,7 @@ class SupportChatRepository {
     ProgressCallback? onSendProgress,
     CancelToken? cancelToken,
   }) async {
+    final encodedConversationId = _supportPathSegment(conversationId);
     if (attachments.isEmpty) {
       throw const AppException(
         'support.attachment_invalid_upload',
@@ -227,7 +231,7 @@ class SupportChatRepository {
       final trimmedBody = body?.trim() ?? '';
       final response = await _authorizedRequest<Map<String, dynamic>>(
         (session) async => _dio.post<Map<String, dynamic>>(
-          '/api/support/conversation/$conversationId/messages/attachments',
+          '/api/support/conversation/$encodedConversationId/messages/attachments',
           data: FormData.fromMap({
             if (trimmedBody.isNotEmpty) 'body': trimmedBody,
             'locale': localeTag,
@@ -258,6 +262,8 @@ class SupportChatRepository {
     required String contentType,
     CancelToken? cancelToken,
   }) async {
+    final encodedConversationId = _supportPathSegment(conversationId);
+    final encodedMessageId = _supportPathSegment(messageId);
     final prepared = await _prepareAttachmentForUpload(
       filePath: filePath,
       fileName: fileName,
@@ -267,7 +273,7 @@ class SupportChatRepository {
     try {
       final response = await _authorizedRequest<Map<String, dynamic>>(
         (session) async => _dio.post<Map<String, dynamic>>(
-          '/api/support/conversation/$conversationId/messages/$messageId/attachment/retry',
+          '/api/support/conversation/$encodedConversationId/messages/$encodedMessageId/attachment/retry',
           data: FormData.fromMap({
             'file': await MultipartFile.fromFile(
               prepared.filePath,
@@ -291,9 +297,10 @@ class SupportChatRepository {
     String conversationId, {
     CancelToken? cancelToken,
   }) async {
+    final encodedConversationId = _supportPathSegment(conversationId);
     await _authorizedRequest<void>(
       (session) => _dio.post<void>(
-        '/api/support/conversation/$conversationId/read',
+        '/api/support/conversation/$encodedConversationId/read',
         options: authenticatedRequestOptions(session.accessToken),
         cancelToken: cancelToken,
       ),
@@ -304,9 +311,10 @@ class SupportChatRepository {
   Future<SupportChatConversation> resolveConversation(
     String conversationId,
   ) async {
+    final encodedConversationId = _supportPathSegment(conversationId);
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
-        '/api/support/conversation/$conversationId/resolve',
+        '/api/support/conversation/$encodedConversationId/resolve',
         options: authenticatedRequestOptions(session.accessToken),
       ),
       retryTransientFailures: false,
@@ -318,9 +326,10 @@ class SupportChatRepository {
   Future<SupportChatConversation> reopenConversation(
     String conversationId,
   ) async {
+    final encodedConversationId = _supportPathSegment(conversationId);
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
-        '/api/support/conversation/$conversationId/reopen',
+        '/api/support/conversation/$encodedConversationId/reopen',
         options: authenticatedRequestOptions(session.accessToken),
       ),
       retryTransientFailures: false,
@@ -332,9 +341,10 @@ class SupportChatRepository {
   Future<SupportChatConversation> closeConversation(
     String conversationId,
   ) async {
+    final encodedConversationId = _supportPathSegment(conversationId);
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
-        '/api/support/conversation/$conversationId/close',
+        '/api/support/conversation/$encodedConversationId/close',
         options: authenticatedRequestOptions(session.accessToken),
       ),
       retryTransientFailures: false,
@@ -348,9 +358,10 @@ class SupportChatRepository {
     required int rating,
     String? comment,
   }) async {
+    final encodedConversationId = _supportPathSegment(conversationId);
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
-        '/api/support/conversation/$conversationId/feedback',
+        '/api/support/conversation/$encodedConversationId/feedback',
         data: {
           'rating': rating,
           if (comment != null && comment.trim().isNotEmpty)
@@ -541,30 +552,48 @@ class SupportChatRepository {
     required String contentType,
     CancelToken? cancelToken,
   }) async {
-    final isImage = contentType.toLowerCase().startsWith('image/');
-    final optimizedFile = isImage
-        ? await _imageUploadOptimizer.optimizeForSupportImage(
-            XFile(filePath, name: fileName, mimeType: contentType),
-            cancelToken: cancelToken,
-          )
-        : null;
-    final uploadFile =
-        optimizedFile?.file ??
-        XFile(filePath, name: fileName, mimeType: contentType);
-    final uploadContentType = await _validateAttachmentForUpload(
-      filePath: uploadFile.path,
-      contentType: uploadFile.mimeType ?? contentType,
+    final sourceContentType = await _validateAttachmentForUpload(
+      filePath: filePath,
+      contentType: contentType,
     );
-
-    return PreparedSupportAttachmentUpload(
-      filePath: uploadFile.path,
-      contentType: uploadContentType,
-      safeFileName: _safeMultipartFileName(
-        fileName: uploadFile.name,
+    OptimizedUploadFile? optimizedFile;
+    try {
+      final isImage = sourceContentType.toLowerCase().startsWith('image/');
+      optimizedFile = isImage
+          ? await _imageUploadOptimizer.optimizeForSupportImage(
+              XFile(filePath, name: fileName, mimeType: sourceContentType),
+              cancelToken: cancelToken,
+            )
+          : null;
+      final uploadFile =
+          optimizedFile?.file ??
+          XFile(filePath, name: fileName, mimeType: sourceContentType);
+      final uploadContentType = await _validateAttachmentForUpload(
         filePath: uploadFile.path,
-      ),
-      optimizedFile: optimizedFile,
-    );
+        contentType: uploadFile.mimeType ?? sourceContentType,
+      );
+
+      return PreparedSupportAttachmentUpload(
+        filePath: uploadFile.path,
+        contentType: uploadContentType,
+        safeFileName: _safeMultipartFileName(
+          fileName: uploadFile.name,
+          filePath: uploadFile.path,
+        ),
+        optimizedFile: optimizedFile,
+      );
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Support.Chat',
+        operation: 'prepare_attachment_for_upload',
+        message: 'Failed to prepare support attachment upload',
+        context: {'contentType': contentType},
+        error: error,
+        stackTrace: stackTrace,
+      );
+      await optimizedFile?.dispose();
+      rethrow;
+    }
   }
 
   AppException _mapDioException(
@@ -591,6 +620,14 @@ class SupportChatRepository {
       includeCause: false,
     );
   }
+}
+
+String _supportPathSegment(String value) {
+  return Uri.encodeComponent(value.trim());
+}
+
+int _supportPageSize(int take) {
+  return take.clamp(1, 100);
 }
 
 class PreparedSupportAttachmentUpload {

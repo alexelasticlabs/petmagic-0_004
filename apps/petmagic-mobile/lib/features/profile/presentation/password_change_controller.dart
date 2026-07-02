@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_password_policy.dart';
 
@@ -59,6 +61,7 @@ class PasswordChangeState {
 
 class PasswordChangeController extends Notifier<PasswordChangeState> {
   static const _genericActionError = 'profile.action_failed';
+  CancelToken? _activeRequestCancelToken;
 
   void _logPasswordChangeFailure(
     String stage,
@@ -79,6 +82,11 @@ class PasswordChangeController extends Notifier<PasswordChangeState> {
 
   @override
   PasswordChangeState build() {
+    ref.listen<bool>(
+      networkStatusControllerProvider.select((state) => state.hasInternet),
+      (_, hasInternet) => _handleNetworkStatusChanged(hasInternet),
+    );
+    ref.onDispose(_cancelActiveRequest);
     return const PasswordChangeState();
   }
 
@@ -90,6 +98,42 @@ class PasswordChangeController extends Notifier<PasswordChangeState> {
     }
 
     state = update(state);
+  }
+
+  void _handleNetworkStatusChanged(bool hasInternet) {
+    if (hasInternet) {
+      return;
+    }
+
+    _cancelActiveRequest();
+    _updateStateIfMounted(
+      (state) => state.copyWith(
+        isSaving: false,
+        errorMessage: 'templates.network_unavailable',
+        clearSuccess: true,
+      ),
+    );
+  }
+
+  CancelToken _startRequestCancelToken() {
+    _cancelActiveRequest();
+    final cancelToken = CancelToken();
+    _activeRequestCancelToken = cancelToken;
+    return cancelToken;
+  }
+
+  void _cancelActiveRequest() {
+    final cancelToken = _activeRequestCancelToken;
+    if (cancelToken != null && !cancelToken.isCancelled) {
+      cancelToken.cancel('password_change_cancelled');
+    }
+    _activeRequestCancelToken = null;
+  }
+
+  void _clearActiveRequest(CancelToken cancelToken) {
+    if (identical(_activeRequestCancelToken, cancelToken)) {
+      _activeRequestCancelToken = null;
+    }
   }
 
   void reset({required String email}) {
@@ -121,6 +165,11 @@ class PasswordChangeController extends Notifier<PasswordChangeState> {
       return false;
     }
 
+    if (!ref.read(networkStatusControllerProvider).hasInternet) {
+      _setFailure('templates.network_unavailable');
+      return false;
+    }
+
     state = state.copyWith(
       isSaving: true,
       clearError: true,
@@ -128,9 +177,12 @@ class PasswordChangeController extends Notifier<PasswordChangeState> {
     );
 
     final repository = _repository;
+    final cancelToken = _startRequestCancelToken();
     try {
-      await repository.requestCurrentPasswordChangeCode();
-      if (!ref.mounted) {
+      await repository.requestCurrentPasswordChangeCode(
+        cancelToken: cancelToken,
+      );
+      if (!ref.mounted || cancelToken.isCancelled) {
         return false;
       }
       _updateStateIfMounted(
@@ -141,6 +193,8 @@ class PasswordChangeController extends Notifier<PasswordChangeState> {
         ),
       );
       return true;
+    } on RequestCancelledException {
+      return false;
     } on AppException catch (error) {
       _setFailure(error.message);
       return false;
@@ -148,6 +202,8 @@ class PasswordChangeController extends Notifier<PasswordChangeState> {
       _logPasswordChangeFailure('request_code_unknown', error, stackTrace);
       _setFailure(_genericActionError);
       return false;
+    } finally {
+      _clearActiveRequest(cancelToken);
     }
   }
 
@@ -172,6 +228,11 @@ class PasswordChangeController extends Notifier<PasswordChangeState> {
       return false;
     }
 
+    if (!ref.read(networkStatusControllerProvider).hasInternet) {
+      _setFailure('templates.network_unavailable');
+      return false;
+    }
+
     state = state.copyWith(
       isSaving: true,
       clearError: true,
@@ -179,12 +240,14 @@ class PasswordChangeController extends Notifier<PasswordChangeState> {
     );
 
     final repository = _repository;
+    final cancelToken = _startRequestCancelToken();
     try {
       await repository.confirmCurrentPasswordChange(
         code: state.code,
         newPassword: state.newPassword,
+        cancelToken: cancelToken,
       );
-      if (!ref.mounted) {
+      if (!ref.mounted || cancelToken.isCancelled) {
         return false;
       }
       _updateStateIfMounted(
@@ -197,6 +260,8 @@ class PasswordChangeController extends Notifier<PasswordChangeState> {
         ),
       );
       return true;
+    } on RequestCancelledException {
+      return false;
     } on AppException catch (error) {
       _setFailure(error.message);
       return false;
@@ -204,6 +269,8 @@ class PasswordChangeController extends Notifier<PasswordChangeState> {
       _logPasswordChangeFailure('confirm_change_unknown', error, stackTrace);
       _setFailure(_genericActionError);
       return false;
+    } finally {
+      _clearActiveRequest(cancelToken);
     }
   }
 

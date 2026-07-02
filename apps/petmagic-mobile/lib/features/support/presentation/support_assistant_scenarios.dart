@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 
+const int maxSupportScenarioQueryLength = 64;
+final RegExp _supportScenarioControlPattern = RegExp(r'[\x00-\x1F\x7F]');
+
 class SupportAssistantScenario {
   const SupportAssistantScenario({
     required this.key,
@@ -76,4 +79,17 @@ String normalizeSupportScenarioKey(String? key) {
     'Other' => 'Other',
     _ => 'Other',
   };
+}
+
+String? normalizeSupportScenarioQuery(String? value) {
+  final normalized = value?.trim();
+  if (normalized == null ||
+      normalized.isEmpty ||
+      _supportScenarioControlPattern.hasMatch(normalized)) {
+    return null;
+  }
+
+  return normalized.length <= maxSupportScenarioQueryLength
+      ? normalized
+      : normalized.substring(0, maxSupportScenarioQueryLength);
 }

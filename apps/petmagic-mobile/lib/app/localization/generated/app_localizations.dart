@@ -1692,53 +1692,29 @@ abstract class AppLocalizations {
   /// **'View Premium'**
   String get walletViewPremiumAction;
 
-  /// No description provided for @walletWhatYouCanCreateTitle.
+  /// No description provided for @walletApproxGenerations.
   ///
   /// In en, this message translates to:
-  /// **'Enough for approximately:'**
-  String get walletWhatYouCanCreateTitle;
+  /// **'≈ {count} generations at current template prices'**
+  String walletApproxGenerations(Object count);
 
-  /// No description provided for @walletApproxPhotos.
+  /// No description provided for @walletApproxGenerationRange.
   ///
   /// In en, this message translates to:
-  /// **'{count} photos'**
-  String walletApproxPhotos(Object count);
+  /// **'≈ {fromCount}-{toCount} generations at current template prices'**
+  String walletApproxGenerationRange(Object fromCount, Object toCount);
 
-  /// No description provided for @walletApproxVideos.
+  /// No description provided for @walletApproxGenerationBelowOne.
   ///
   /// In en, this message translates to:
-  /// **'{count} videos'**
-  String walletApproxVideos(Object count);
+  /// **'Less than one generation at current template prices'**
+  String get walletApproxGenerationBelowOne;
 
-  /// No description provided for @walletApproxPhotosOnly.
+  /// No description provided for @walletGenerationPricingUnavailable.
   ///
   /// In en, this message translates to:
-  /// **'≈ {photos}'**
-  String walletApproxPhotosOnly(Object photos);
-
-  /// No description provided for @walletApproxPhotosOrVideos.
-  ///
-  /// In en, this message translates to:
-  /// **'≈ {photos} or {videos}'**
-  String walletApproxPhotosOrVideos(Object photos, Object videos);
-
-  /// No description provided for @walletSpendPhotoSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Photos\nfrom 10 Spark'**
-  String get walletSpendPhotoSubtitle;
-
-  /// No description provided for @walletSpendVideoSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Videos\nfrom 50 Spark'**
-  String get walletSpendVideoSubtitle;
-
-  /// No description provided for @walletSpendPremiumSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Premium\nfrom 80 Spark'**
-  String get walletSpendPremiumSubtitle;
+  /// **'Template prices are loading from PetMagic.'**
+  String get walletGenerationPricingUnavailable;
 
   /// No description provided for @walletContactSupportAction.
   ///
@@ -6638,6 +6614,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Show more ({hiddenCount}) ▾'**
   String generationStatusShowMoreAction(Object hiddenCount);
+
+  /// No description provided for @generationStatusLoadMoreAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Load more'**
+  String get generationStatusLoadMoreAction;
+
+  /// No description provided for @generationStatusLoadMoreFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load more results.'**
+  String get generationStatusLoadMoreFailed;
+
+  /// No description provided for @generationStatusMediaPreparingMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing media...'**
+  String get generationStatusMediaPreparingMessage;
+
+  /// No description provided for @generationStatusMediaPreviewOnlyMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview is available while the final file is being prepared.'**
+  String get generationStatusMediaPreviewOnlyMessage;
+
+  /// No description provided for @generationStatusMediaWatermarkPreparingMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing the clean version...'**
+  String get generationStatusMediaWatermarkPreparingMessage;
+
+  /// No description provided for @generationStatusMediaExpiredMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This media has expired.'**
+  String get generationStatusMediaExpiredMessage;
+
+  /// No description provided for @generationStatusMediaUnavailableMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Media is unavailable.'**
+  String get generationStatusMediaUnavailableMessage;
+
+  /// No description provided for @generationStatusMediaFailedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Media processing failed.'**
+  String get generationStatusMediaFailedMessage;
+
+  /// No description provided for @generationStatusMediaHiddenMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Media is hidden.'**
+  String get generationStatusMediaHiddenMessage;
 
   /// No description provided for @generationStatusCollapseAction.
   ///

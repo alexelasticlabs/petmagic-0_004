@@ -28,20 +28,31 @@ Future<File> cacheRemoteMediaFile({
   if (!hasSupportedMediaSignature(bytes)) {
     throw StateError('Downloaded media file is not usable.');
   }
-  final safeFileName = sanitizeFileName(
-    fileName,
-    fallback: 'petmagic_${DateTime.now().millisecondsSinceEpoch}',
-  );
+  final safeFileName = _safeMediaFileName(fileName);
   final tempFile = TempMediaCleanup.createScopedTempFile(safeFileName);
 
-  await tempFile.writeAsBytes(bytes, flush: true);
-  return tempFile;
+  try {
+    await tempFile.writeAsBytes(bytes, flush: true);
+    return tempFile;
+  } catch (error, stackTrace) {
+    AppLogger.warn(
+      feature: 'Files.MediaShare',
+      operation: 'cache_remote_media_file',
+      message: 'Failed to write remote media cache file',
+      context: {'fileName': safeFileName},
+      error: error,
+      stackTrace: stackTrace,
+    );
+    await TempMediaCleanup.deleteIfExists(tempFile);
+    rethrow;
+  }
 }
 
 Future<void> shareRemoteMediaFile({
   required String mediaUrl,
   required String fileName,
   String? title,
+  String? text,
   Duration downloadTimeout = const Duration(seconds: 20),
   CancelToken? cancelToken,
   int maxBytes = defaultRemoteFileDownloadMaxBytes,
@@ -56,7 +67,11 @@ Future<void> shareRemoteMediaFile({
 
   try {
     await SharePlus.instance.share(
-      ShareParams(files: [XFile(tempFile.path)], title: title, text: title),
+      ShareParams(
+        files: [XFile(tempFile.path, name: _safeMediaFileName(fileName))],
+        title: title,
+        text: text ?? title,
+      ),
     );
   } finally {
     await TempMediaCleanup.deleteIfExists(tempFile);
@@ -67,6 +82,7 @@ Future<void> shareLocalMediaFile({
   required String filePath,
   required String fileName,
   String? title,
+  String? text,
   CancelToken? cancelToken,
 }) async {
   _throwIfCancelled(cancelToken, filePath);
@@ -84,7 +100,7 @@ Future<void> shareLocalMediaFile({
     ShareParams(
       files: [XFile(usablePath, name: safeFileName)],
       title: title,
-      text: title,
+      text: text ?? title,
     ),
   );
 }
@@ -106,10 +122,7 @@ Future<bool> saveRemoteMediaToGallery({
     maxBytes: maxBytes,
   );
 
-  final saveTitle = sanitizeFileName(
-    fileName,
-    fallback: 'petmagic_${DateTime.now().millisecondsSinceEpoch}',
-  );
+  final saveTitle = _safeMediaFileName(fileName);
 
   try {
     if (isVideo) {
@@ -125,7 +138,6 @@ Future<bool> saveRemoteMediaToGallery({
         relativePath: albumName,
       );
     }
-    await TempMediaCleanup.deleteIfExists(tempFile);
     return true;
   } catch (error, stackTrace) {
     AppLogger.warn(
@@ -140,8 +152,9 @@ Future<bool> saveRemoteMediaToGallery({
       error: error,
       stackTrace: stackTrace,
     );
-    TempMediaCleanup.scheduleTtlSweep();
     return false;
+  } finally {
+    await TempMediaCleanup.deleteIfExists(tempFile);
   }
 }
 
@@ -159,10 +172,7 @@ Future<bool> saveLocalMediaToGallery({
   }
   final file = File(usablePath);
 
-  final saveTitle = sanitizeFileName(
-    fileName,
-    fallback: 'petmagic_${DateTime.now().millisecondsSinceEpoch}',
-  );
+  final saveTitle = _safeMediaFileName(fileName);
 
   try {
     _throwIfCancelled(cancelToken, filePath);
@@ -270,4 +280,11 @@ void _throwIfCancelled(CancelToken? cancelToken, String path) {
 String _safePathLabel(String path) {
   final segments = Uri.file(path).pathSegments;
   return segments.isEmpty ? path : segments.last;
+}
+
+String _safeMediaFileName(String fileName) {
+  return sanitizeFileName(
+    fileName,
+    fallback: 'petmagic_${DateTime.now().millisecondsSinceEpoch}',
+  );
 }

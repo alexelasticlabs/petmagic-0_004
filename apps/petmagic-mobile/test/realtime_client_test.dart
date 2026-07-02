@@ -2,13 +2,18 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/core/network/api_base_url_resolver.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
+import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
+import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   setUp(() {
     SharedPreferencesAsyncPlatform.instance =
         InMemorySharedPreferencesAsync.empty();
@@ -28,28 +33,29 @@ void main() {
 
       await client.connect();
       await client.connect();
-      await Future<void>.delayed(const Duration(milliseconds: 40));
+      await _waitUntil(() => events.isNotEmpty);
 
       expect(events, isNotEmpty);
 
       events.clear();
       await client.disconnect();
-      await Future<void>.delayed(const Duration(milliseconds: 40));
+      await _waitUntil(() => events.isNotEmpty);
 
       expect(events, isNotEmpty);
 
       events.clear();
       await client.disconnect();
+      final eventsAfterFinalDisconnect = events.length;
       await Future<void>.delayed(const Duration(milliseconds: 40));
 
-      expect(events, isEmpty);
+      expect(events.length, eventsAfterFinalDisconnect);
 
       final resumedEvents = <RealtimeEvent>[];
       final secondSubscription = client.events.listen(resumedEvents.add);
       addTearDown(secondSubscription.cancel);
 
       await client.connect();
-      await Future<void>.delayed(const Duration(milliseconds: 40));
+      await _waitUntil(() => resumedEvents.isNotEmpty);
 
       expect(resumedEvents, isNotEmpty);
     },
@@ -63,6 +69,7 @@ void main() {
       ]);
       final client = ServerSentEventsRealtimeClient(
         apiBaseUrlResolver: resolver,
+        sessionStorage: _StaticAuthSessionStorage(),
         httpClient: _FakeHttpClient(
           onGetUrl: (_) async => _FakeHttpClientRequest(
             response: _FakeHttpClientResponse(HttpStatus.unauthorized),
@@ -88,6 +95,7 @@ void main() {
       ]);
       final client = ServerSentEventsRealtimeClient(
         apiBaseUrlResolver: resolver,
+        sessionStorage: _StaticAuthSessionStorage(),
         httpClient: _FakeHttpClient(
           onGetUrl: (_) async => _FakeHttpClientRequest(
             closeError: const SocketException('network down'),
@@ -107,18 +115,106 @@ void main() {
 
   test('server-sent events realtime client configures transport timeout', () {
     final httpClient = _FakeHttpClient(
-      onGetUrl: (_) async =>
-          _FakeHttpClientRequest(response: _FakeHttpClientResponse(HttpStatus.ok)),
+      onGetUrl: (_) async => _FakeHttpClientRequest(
+        response: _FakeHttpClientResponse(HttpStatus.ok),
+      ),
     );
 
     ServerSentEventsRealtimeClient(
-      apiBaseUrlResolver: _TrackingApiBaseUrlResolver(const ['https://api.example']),
+      apiBaseUrlResolver: _TrackingApiBaseUrlResolver(const [
+        'https://api.example',
+      ]),
+      sessionStorage: _StaticAuthSessionStorage(),
       httpClient: httpClient,
       connectionTimeout: const Duration(seconds: 8),
     );
 
     expect(httpClient.connectionTimeout, const Duration(seconds: 8));
   });
+
+  test(
+    'server-sent events realtime client uses authenticated gallery stream',
+    () async {
+      Uri? requestedUri;
+      _FakeHttpClientRequest? capturedRequest;
+      final client = ServerSentEventsRealtimeClient(
+        apiBaseUrlResolver: _TrackingApiBaseUrlResolver(const [
+          'https://api.example',
+        ]),
+        sessionStorage: _StaticAuthSessionStorage(
+          accessToken: 'access-token-1',
+        ),
+        httpClient: _FakeHttpClient(
+          onGetUrl: (uri) async {
+            requestedUri = uri;
+            capturedRequest = _FakeHttpClientRequest(
+              response: _FakeHttpClientResponse(HttpStatus.ok),
+            );
+            return capturedRequest!;
+          },
+        ),
+        reconnectDelay: const Duration(hours: 1),
+      );
+      addTearDown(client.disconnect);
+
+      await client.connect();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      expect(
+        requestedUri?.toString(),
+        'https://api.example/api/templates/generations/events',
+      );
+      expect(
+        capturedRequest?.headers.values[HttpHeaders.authorizationHeader],
+        'Bearer access-token-1',
+      );
+    },
+  );
+
+  test(
+    'lifecycle realtime client disconnects in background and resumes',
+    () async {
+      final delegate = _RecordingRealtimeClient();
+      final client = LifecycleAwareRealtimeClient(delegate);
+      addTearDown(client.dispose);
+
+      await client.connect();
+      await client.connect();
+
+      expect(delegate.connectCalls, 1);
+      expect(delegate.disconnectCalls, 0);
+
+      client.didChangeAppLifecycleState(AppLifecycleState.paused);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(delegate.disconnectCalls, 1);
+
+      client.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(delegate.connectCalls, 2);
+
+      await client.disconnect();
+      expect(delegate.disconnectCalls, 1);
+
+      await client.disconnect();
+      expect(delegate.disconnectCalls, 2);
+    },
+  );
+}
+
+Future<void> _waitUntil(
+  bool Function() condition, {
+  Duration timeout = const Duration(seconds: 1),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (!condition()) {
+    if (DateTime.now().isAfter(deadline)) {
+      throw StateError('Condition was not met before timeout.');
+    }
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
 }
 
 class _TrackingApiBaseUrlResolver extends ApiBaseUrlResolver {
@@ -139,6 +235,64 @@ class _TrackingApiBaseUrlResolver extends ApiBaseUrlResolver {
   @override
   Future<void> markSuccessful(String baseUrl) async {
     successfulBaseUrls.add(baseUrl);
+  }
+}
+
+class _RecordingRealtimeClient implements RealtimeClient {
+  int connectCalls = 0;
+  int disconnectCalls = 0;
+  final StreamController<RealtimeEvent> _events =
+      StreamController<RealtimeEvent>.broadcast();
+
+  @override
+  Stream<RealtimeEvent> get events => _events.stream;
+
+  @override
+  Future<void> connect() async {
+    connectCalls++;
+  }
+
+  @override
+  Future<void> disconnect() async {
+    disconnectCalls++;
+  }
+}
+
+class _StaticAuthSessionStorage extends AuthSessionStorage {
+  _StaticAuthSessionStorage({this.accessToken = 'access-token'});
+
+  final String accessToken;
+
+  @override
+  Future<AuthSession?> read() async {
+    return AuthSession(
+      accessToken: accessToken,
+      refreshToken: 'refresh-token',
+      expiresAtUtc: DateTime.utc(2026, 1, 2),
+      user: MobileUserProfile(
+        userId: 'user-1',
+        email: 'user@example.test',
+        displayName: 'User',
+        isPremium: false,
+        emailConfirmed: true,
+        termsOfUseAccepted: true,
+        privacyPolicyAccepted: true,
+        marketingEmailsEnabled: false,
+        legalAcceptance: MobileLegalAcceptanceStatus(
+          termsOfUseAccepted: true,
+          termsOfUseAcceptedVersion: '1',
+          termsOfUseAcceptedAtUtc: DateTime.utc(2026),
+          privacyPolicyAccepted: true,
+          privacyPolicyAcceptedVersion: '1',
+          privacyPolicyAcceptedAtUtc: DateTime.utc(2026),
+          currentTermsOfUseVersion: '1',
+          currentPrivacyPolicyVersion: '1',
+          requiresAcceptance: false,
+        ),
+        roles: const ['User'],
+        avatar: null,
+      ),
+    );
   }
 }
 

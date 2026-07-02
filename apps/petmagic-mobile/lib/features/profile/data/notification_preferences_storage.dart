@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -101,13 +102,21 @@ class NotificationPreferences {
 
 class NotificationPreferencesStorage {
   static const _keyPrefix = 'petmagic_mobile_notification_preferences_v1_';
+  static const _hashedKeyPrefix =
+      'petmagic_mobile_notification_preferences_v2_';
   final SharedPreferencesAsync _preferences = SharedPreferencesAsync();
 
   Future<NotificationPreferences> read({
     required String scope,
     required bool fallbackMarketingEmails,
   }) async {
-    final rawValue = await _preferences.getString('$_keyPrefix$scope');
+    final storageKey = _keyForScope(scope);
+    final legacyStorageKey = _legacyKeyForScope(scope);
+    var rawValue = await _preferences.getString(storageKey);
+    final shouldMigrateLegacy = rawValue == null || rawValue.isEmpty;
+    if (shouldMigrateLegacy) {
+      rawValue = await _preferences.getString(legacyStorageKey);
+    }
 
     if (rawValue == null || rawValue.isEmpty) {
       return NotificationPreferences.defaults().copyWith(
@@ -123,19 +132,28 @@ class NotificationPreferencesStorage {
         );
       }
 
-      return NotificationPreferences.fromJson(
+      final preferences = NotificationPreferences.fromJson(
         decoded,
         fallbackMarketingEmails: fallbackMarketingEmails,
       );
+      if (shouldMigrateLegacy) {
+        await save(scope: scope, preferences: preferences);
+        await _preferences.remove(legacyStorageKey);
+      }
+
+      return preferences;
     } catch (error, stackTrace) {
       AppLogger.warn(
         feature: 'Profile.Notifications',
         operation: 'read_preferences',
         message: 'Notification preferences read failed',
-        context: {'scope': scope},
+        context: {'hasScope': scope.trim().isNotEmpty},
         error: error,
         stackTrace: stackTrace,
       );
+      if (shouldMigrateLegacy) {
+        await _preferences.remove(legacyStorageKey);
+      }
       return NotificationPreferences.defaults().copyWith(
         emailOffersAndDiscounts: fallbackMarketingEmails,
       );
@@ -147,8 +165,18 @@ class NotificationPreferencesStorage {
     required NotificationPreferences preferences,
   }) async {
     await _preferences.setString(
-      '$_keyPrefix$scope',
+      _keyForScope(scope),
       jsonEncode(preferences.toJson()),
     );
+  }
+
+  static String _keyForScope(String scope) {
+    final normalizedScope = scope.trim().toLowerCase();
+    final digest = sha256.convert(utf8.encode(normalizedScope));
+    return '$_hashedKeyPrefix$digest';
+  }
+
+  static String _legacyKeyForScope(String scope) {
+    return '$_keyPrefix$scope';
   }
 }

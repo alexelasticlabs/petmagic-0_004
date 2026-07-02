@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,22 +6,19 @@ import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/logging/log_correlation_context.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
+import 'package:petmagic_mobile/core/network/request_identity.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/mappers/template_error_key_mapper.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
-import 'package:petmagic_mobile/shared/files/image_upload_optimizer.dart';
 
 final templateGenerationControllerProvider =
     NotifierProvider<TemplateGenerationController, TemplateGenerationState>(
       TemplateGenerationController.new,
     );
-
-final generationImageUploadOptimizerProvider = Provider<ImageUploadOptimizer>(
-  (ref) => const ImageUploadOptimizer(),
-);
 
 enum TemplateGenerationGateKind { allowed, notEnoughTokens, premiumRequired }
 
@@ -85,13 +81,11 @@ class TemplateGenerationState {
 }
 
 class TemplateGenerationController extends Notifier<TemplateGenerationState> {
-  static final Random _correlationRandom = Random.secure();
-
   late final TemplateGenerationRepository _repository;
-  late final ImageUploadOptimizer _imageUploadOptimizer;
   Timer? _pollTimer;
   bool _pollTickInFlight = false;
   bool _disposed = false;
+  bool _hasInternet = true;
   int _generationFlowEpoch = 0;
   String? _activeCorrelationId;
   CancelToken? _activeRequestCancelToken;
@@ -99,7 +93,11 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
   @override
   TemplateGenerationState build() {
     _repository = ref.watch(templateGenerationRepositoryProvider);
-    _imageUploadOptimizer = ref.watch(generationImageUploadOptimizerProvider);
+    _hasInternet = ref.read(networkStatusControllerProvider).hasInternet;
+    ref.listen<bool>(
+      networkStatusControllerProvider.select((status) => status.hasInternet),
+      (_, hasInternet) => _handleNetworkStatusChanged(hasInternet),
+    );
     ref.onDispose(() {
       _disposed = true;
       _cancelActiveRequest();
@@ -141,7 +139,8 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
 
   Future<TemplateGenerationGate> checkGate(TemplateItem template) async {
     var wallet = ref.read(walletControllerProvider).wallet;
-    if (wallet == null) {
+    if (wallet == null &&
+        ref.read(networkStatusControllerProvider).hasInternet) {
       await ref.read(walletControllerProvider.notifier).load(refresh: true);
       wallet = ref.read(walletControllerProvider).wallet;
     }
@@ -208,19 +207,14 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
     XFile photo,
   ) async {
     CancelToken? requestCancelToken;
-    OptimizedUploadFile? optimizedPhoto;
     try {
       requestCancelToken = _newActiveRequestCancelToken();
-      optimizedPhoto = await _imageUploadOptimizer.optimizeGenerationSource(
-        photo,
-        cancelToken: requestCancelToken,
-      );
       if (_disposed) {
         return null;
       }
       final generation = await _repository.startGeneration(
         templateId: template.templateId,
-        sourceImage: optimizedPhoto.file,
+        sourceImage: photo,
         expectedTemplateVersion: template.version,
         correlationId: _activeCorrelationId,
         cancelToken: requestCancelToken,
@@ -285,7 +279,6 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
       if (cancelToken != null) {
         _clearActiveRequest(cancelToken);
       }
-      await optimizedPhoto?.dispose();
     }
   }
 
@@ -316,6 +309,9 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
     if (generationId == null || generationId.isEmpty) {
       return;
     }
+    if (!_hasInternet) {
+      return;
+    }
 
     _pollTimer?.cancel();
     _pollTimer = Timer(_generationPollInterval(generation), () {
@@ -341,7 +337,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
     String generationId, {
     required bool scheduleNext,
   }) async {
-    if (_disposed) {
+    if (_disposed || !_hasInternet) {
       return;
     }
 
@@ -438,6 +434,9 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
     if (!_isRestoreCurrent(restoreEpoch) || active == null) {
       return;
     }
+    if (!_hasInternet) {
+      return;
+    }
 
     _activeCorrelationId = active.correlationId;
     state = state.copyWith(isPolling: true, clearError: true);
@@ -504,8 +503,34 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
     return !_disposed && _generationFlowEpoch == restoreEpoch;
   }
 
+  void _handleNetworkStatusChanged(bool hasInternet) {
+    if (_disposed || _hasInternet == hasInternet) {
+      return;
+    }
+
+    _hasInternet = hasInternet;
+    if (!hasInternet) {
+      _stopPolling();
+      _cancelActiveRequest();
+      final generation = state.generation;
+      if (state.isCreating || generation != null && !generation.isTerminal) {
+        state = state.copyWith(isCreating: false, isPolling: false);
+      }
+      return;
+    }
+
+    final generation = state.generation;
+    if (generation != null && !generation.isTerminal) {
+      state = state.copyWith(isPolling: true, clearError: true);
+      unawaited(_pollGeneration(generation.generationId, scheduleNext: true));
+      return;
+    }
+
+    unawaited(_restoreActiveGeneration());
+  }
+
   Future<void> _refreshWalletIfAlive() async {
-    if (_disposed) {
+    if (_disposed || !_hasInternet) {
       return;
     }
 
@@ -523,9 +548,10 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
   }
 
   String _createGenerationCorrelationId() {
-    final now = DateTime.now().toUtc().microsecondsSinceEpoch;
-    final suffix = _correlationRandom.nextInt(1 << 24).toRadixString(16);
-    return 'generation-$now-$suffix';
+    return RequestIdentity.createCorrelationId().replaceFirst(
+      'flow-',
+      'generation-',
+    );
   }
 
   bool _isCancelled(Object error) {

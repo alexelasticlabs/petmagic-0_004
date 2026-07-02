@@ -291,6 +291,10 @@ class TemplatesController extends Notifier<TemplatesState> {
     _hasInternet = hasInternet;
     if (!hasInternet) {
       _pauseRealtime();
+      _invalidateActiveFeedWork(
+        clearLoadingState: true,
+        reason: 'network_offline',
+      );
       return;
     }
 
@@ -747,6 +751,7 @@ class TemplatesController extends Notifier<TemplatesState> {
       await realtimeClient.connect();
       if (!ref.mounted ||
           !_isScreenVisible ||
+          !_hasInternet ||
           !identical(_activeRealtimeClient, realtimeClient)) {
         unawaited(realtimeClient.disconnect());
         return;

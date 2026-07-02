@@ -129,6 +129,91 @@ void main() {
   });
 
   test(
+    'catalog cache strips signed media URL secrets before persistence',
+    () async {
+      final preferences = SharedPreferencesAsync();
+      final cacheDataSource = TemplatesCacheDataSource(preferences);
+      await cacheDataSource.replaceCatalog([
+        _catalogDto(
+          id: 'signed-media',
+          title: 'Signed media',
+          thumbnailUrl:
+              'https://cdn.petmagic.test/signed-thumb.jpg?X-Amz-Signature=thumb-secret&token=raw#thumb-fragment',
+          previewUrl:
+              'https://cdn.petmagic.test/signed-preview.mp4?X-Amz-Signature=preview-secret&token=raw#preview-fragment',
+        ),
+      ], version: 1);
+
+      final raw = await preferences.getString('templates_catalog_items_v2');
+      final cachedItems = await cacheDataSource.readCatalogItems();
+
+      expect(raw, isNotNull);
+      expect(raw, isNot(contains('X-Amz-Signature')));
+      expect(raw, isNot(contains('token=raw')));
+      expect(raw, isNot(contains('thumb-secret')));
+      expect(raw, isNot(contains('preview-secret')));
+      expect(raw, isNot(contains('fragment')));
+      expect(
+        cachedItems.single.thumbnailUrl,
+        'https://cdn.petmagic.test/signed-thumb.jpg',
+      );
+      expect(
+        cachedItems.single.previewAsset?.url,
+        'https://cdn.petmagic.test/signed-preview.mp4',
+      );
+    },
+  );
+
+  test(
+    'catalog delta ignores signed media URL rotation when cleaning stale media',
+    () async {
+      final cacheDataSource = TemplatesCacheDataSource(
+        SharedPreferencesAsync(),
+      );
+      await cacheDataSource.replaceCatalog([
+        _catalogDto(
+          id: 'rotating-signature',
+          title: 'Rotating signature',
+          thumbnailUrl:
+              'https://cdn.petmagic.test/rotating-thumb.jpg?X-Amz-Signature=old-thumb',
+          previewUrl:
+              'https://cdn.petmagic.test/rotating-preview.mp4?token=old-preview',
+        ),
+      ], version: 1);
+
+      final staleUrls = await cacheDataSource.applyCatalogChanges(
+        TemplatesCatalogChangesDto(
+          fromVersion: 1,
+          toVersion: 2,
+          upserts: [
+            _catalogDto(
+              id: 'rotating-signature',
+              title: 'Rotating signature',
+              thumbnailUrl:
+                  'https://cdn.petmagic.test/rotating-thumb.jpg?X-Amz-Signature=new-thumb',
+              previewUrl:
+                  'https://cdn.petmagic.test/rotating-preview.mp4?token=new-preview',
+            ),
+          ],
+          deletedIds: const [],
+          needsFullResync: false,
+        ),
+      );
+
+      expect(staleUrls, isEmpty);
+      final cachedItems = await cacheDataSource.readCatalogItems();
+      expect(
+        cachedItems.single.thumbnailUrl,
+        'https://cdn.petmagic.test/rotating-thumb.jpg',
+      );
+      expect(
+        cachedItems.single.previewAsset?.url,
+        'https://cdn.petmagic.test/rotating-preview.mp4',
+      );
+    },
+  );
+
+  test(
     'local cached feed preserves backend version ordering for tied timestamps',
     () async {
       final cacheDataSource = TemplatesCacheDataSource(

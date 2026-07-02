@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
@@ -13,6 +15,7 @@ import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_unavailable_view.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 
 class AllTransactionsPage extends ConsumerStatefulWidget {
@@ -99,7 +102,7 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
         return;
       }
 
-      _walletController.load();
+      unawaited(_loadIfOnline());
     });
   }
 
@@ -108,9 +111,30 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
         (state.hasCompletedFullLoad && state.wallet != null);
   }
 
+  Future<void> _loadIfOnline({bool refresh = false}) async {
+    if (!mounted ||
+        !ref.read(appLaunchControllerProvider).isAuthenticated ||
+        !ref.read(networkStatusControllerProvider).hasInternet) {
+      return;
+    }
+
+    await _walletController.load(refresh: refresh);
+  }
+
+  Future<void> _loadMoreIfOnline({bool force = false}) async {
+    if (!mounted ||
+        !ref.read(appLaunchControllerProvider).isAuthenticated ||
+        !ref.read(networkStatusControllerProvider).hasInternet) {
+      return;
+    }
+
+    await _walletController.loadMoreLedger(force: force);
+  }
+
   void _handleScroll() {
     if (!_scrollController.hasClients ||
-        !ref.read(appLaunchControllerProvider).isAuthenticated) {
+        !ref.read(appLaunchControllerProvider).isAuthenticated ||
+        !ref.read(networkStatusControllerProvider).hasInternet) {
       return;
     }
 
@@ -119,7 +143,7 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
       return;
     }
 
-    _walletController.loadMoreLedger();
+    unawaited(_loadMoreIfOnline());
   }
 
   void _scheduleAutoLoadMoreIfNeeded(WalletState state) {
@@ -127,16 +151,20 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
         state.ledger.isEmpty ||
         !state.ledgerHasMore ||
         state.isLoadingMoreLedger ||
-        state.ledgerLoadMoreErrorMessage != null) {
+        state.ledgerLoadMoreErrorMessage != null ||
+        !ref.read(networkStatusControllerProvider).hasInternet) {
       return;
     }
 
     _autoLoadMoreScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _autoLoadMoreScheduled = false;
-      if (!mounted ||
-          !_scrollController.hasClients ||
-          !ref.read(appLaunchControllerProvider).isAuthenticated) {
+      if (!mounted) {
+        return;
+      }
+      if (!_scrollController.hasClients ||
+          !ref.read(appLaunchControllerProvider).isAuthenticated ||
+          !ref.read(networkStatusControllerProvider).hasInternet) {
         return;
       }
 
@@ -145,7 +173,7 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
         return;
       }
 
-      _walletController.loadMoreLedger();
+      unawaited(_loadMoreIfOnline());
     });
   }
 
@@ -153,11 +181,16 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final hasInternet = ref.watch(
+      networkStatusControllerProvider.select((status) => status.hasInternet),
+    );
     final isAuthenticated = ref.watch(
       appLaunchControllerProvider.select((launch) => launch.isAuthenticated),
     );
     final state = ref.watch(walletControllerProvider);
     final router = GoRouter.of(context);
+    final showOfflineUnavailable =
+        !_hasHydratedTransactionsSnapshot(state) && !hasInternet;
     final errorToShow = state.errorMessage != null && state.ledger.isEmpty
         ? _friendlyTransactionsError(text, state.errorMessage!)
         : null;
@@ -192,15 +225,39 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
       );
     }
 
+    ref.listen<NetworkStatusState>(networkStatusControllerProvider, (
+      previous,
+      next,
+    ) {
+      if (previous?.hasInternet != false || !next.hasInternet) {
+        return;
+      }
+      if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
+        return;
+      }
+
+      final current = ref.read(walletControllerProvider);
+      if (_hasHydratedTransactionsSnapshot(current)) {
+        return;
+      }
+
+      unawaited(_loadIfOnline(refresh: true));
+    });
+
     _scheduleAutoLoadMoreIfNeeded(state);
 
     return ProfileScreenBackground(
       child: SafeArea(
-        child: state.isInitialLoading
+        child: showOfflineUnavailable
+            ? PetMagicUnavailableView(
+                kind: AppUnavailableKind.offline,
+                onRetry: () => unawaited(_loadIfOnline(refresh: true)),
+              )
+            : state.isInitialLoading
             ? const Center(child: CircularProgressIndicator.adaptive())
             : RefreshIndicator.adaptive(
                 color: colors.accent,
-                onRefresh: () => _walletController.load(refresh: true),
+                onRefresh: () => _loadIfOnline(refresh: true),
                 child: ListView.builder(
                   controller: _scrollController,
                   padding: EdgeInsets.fromLTRB(16, 14, 16, bottomInset),
@@ -234,7 +291,7 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
                           message: errorToShow,
                           tone: colors.gold,
                           onRetry: () =>
-                              unawaited(_walletController.load(refresh: true)),
+                              unawaited(_loadIfOnline(refresh: true)),
                         ),
                       );
                     }
@@ -257,9 +314,8 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
                           child: _AllTransactionsLoadMoreError(
                             message: loadMoreErrorToShow,
                             tone: colors.gold,
-                            onRetry: () => unawaited(
-                              _walletController.loadMoreLedger(force: true),
-                            ),
+                            onRetry: () =>
+                                unawaited(_loadMoreIfOnline(force: true)),
                           ),
                         );
                       }

@@ -7,6 +7,7 @@ class _SupportConversationViewport extends StatelessWidget {
     required this.messages,
     required this.scrollController,
     required this.isWaitingForInitialConversation,
+    required this.unavailableKind,
     required this.showLoadingFallback,
     required this.loadingFallbackMessageCode,
     required this.onRefresh,
@@ -30,6 +31,7 @@ class _SupportConversationViewport extends StatelessWidget {
   final List<SupportChatMessage> messages;
   final ScrollController scrollController;
   final bool isWaitingForInitialConversation;
+  final AppUnavailableKind? unavailableKind;
   final bool showLoadingFallback;
   final String loadingFallbackMessageCode;
   final Future<void> Function() onRefresh;
@@ -91,6 +93,23 @@ class _SupportConversationViewport extends StatelessWidget {
     }
 
     if (conversation == null) {
+      if (unavailableKind != null) {
+        return CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: PetMagicUnavailableView(
+                  kind: unavailableKind!,
+                  onRetry: onRetryInitialize,
+                ),
+              ),
+            ),
+          ],
+        );
+      }
+
       if (state.errorMessage == null && !showLoadingFallback) {
         return RefreshIndicator(
           onRefresh: onRefresh,

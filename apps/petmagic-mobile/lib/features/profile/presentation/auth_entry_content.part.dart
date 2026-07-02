@@ -28,7 +28,7 @@ class _AuthFlowContentSection extends StatelessWidget {
   final bool isDark;
   final bool compactLayout;
   final bool isShortViewport;
-  final AsyncValue<MobileLegalDocuments> legalDocumentsAsync;
+  final AsyncValue<MobileLegalDocuments>? legalDocumentsAsync;
   final bool confirmPasswordMismatch;
   final bool submitDisabled;
   final bool showInlineTermsError;
@@ -176,7 +176,7 @@ class _AuthFlowContentSection extends StatelessWidget {
           ] else if (showInlineLegalError) ...[
             SizedBox(height: isShortViewport ? 4 : 5),
             _LegalStateLine(message: text.authLegalUnavailable, isError: true),
-          ] else if (legalDocumentsAsync.isLoading) ...[
+          ] else if (legalDocumentsAsync?.isLoading == true) ...[
             SizedBox(height: isShortViewport ? 4 : 5),
             _LegalStateLine(message: text.authLegalLoading),
           ],
@@ -195,10 +195,12 @@ class _AuthFlowContentSection extends StatelessWidget {
           forgotPasswordAction: text.authForgotPasswordAction,
           onForgotPassword: () {
             final email = page._emailController.text.trim();
-            final query = email.isEmpty
-                ? ''
-                : '?email=${Uri.encodeQueryComponent(email)}';
-            context.go('${PasswordResetPage.routePath}$query');
+            context.go(
+              PasswordResetPage.routePath,
+              extra: email.isEmpty
+                  ? null
+                  : PasswordResetRouteArgs(initialEmail: email),
+            );
           },
           onSwitchMode: () {
             final redirectQuery = page._redirectQuery();

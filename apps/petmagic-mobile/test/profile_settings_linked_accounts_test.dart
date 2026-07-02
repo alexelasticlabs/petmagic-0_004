@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
@@ -105,6 +106,58 @@ void main() {
     );
     expect(find.widgetWithText(TextButton, 'Retry'), findsOneWidget);
   });
+
+  testWidgets(
+    'linked accounts stays offline without loading and retries on reconnect',
+    (tester) async {
+      var linkedAccountsReads = 0;
+      final networkController = _TestLinkedAccountsNetworkStatusController(
+        initialHasInternet: false,
+      );
+      final container = ProviderContainer(
+        retry: (attempt, error) => null,
+        overrides: [
+          profileControllerProvider.overrideWith(_FakeProfileController.new),
+          networkStatusControllerProvider.overrideWith(() => networkController),
+          linkedAccountsProvider.overrideWith((ref) async {
+            linkedAccountsReads++;
+            return const <MobileLinkedAccount>[];
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp.router(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            locale: const Locale('en'),
+            theme: AppTheme.light(),
+            darkTheme: AppTheme.dark(),
+            routerConfig: _testRouter(
+              const ProfileSettingsDetailPage(
+                kind: ProfileSettingsDetailKind.linkedAccounts,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      expect(linkedAccountsReads, 0);
+      expect(find.text("You're offline"), findsOneWidget);
+
+      networkController.setHasInternet(true);
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(linkedAccountsReads, 1);
+      expect(find.text('Google'), findsOneWidget);
+      expect(find.text("You're offline"), findsNothing);
+    },
+  );
 
   testWidgets(
     'linked accounts detail shows auth gate for guests without loading provider',
@@ -283,5 +336,23 @@ class _GuestProfileController extends ProfileController {
       password: '',
       confirmPassword: '',
     );
+  }
+}
+
+class _TestLinkedAccountsNetworkStatusController
+    extends NetworkStatusController {
+  _TestLinkedAccountsNetworkStatusController({
+    required this.initialHasInternet,
+  });
+
+  final bool initialHasInternet;
+
+  @override
+  NetworkStatusState build() {
+    return NetworkStatusState(hasInternet: initialHasInternet);
+  }
+
+  void setHasInternet(bool value) {
+    state = state.copyWith(hasInternet: value);
   }
 }

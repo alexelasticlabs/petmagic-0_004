@@ -35,7 +35,7 @@ mixin _PremiumControllerLoading
           else
             Future<PremiumStatusModel>.value(_guestPremiumStatus),
         ]);
-        if (!ref.mounted) {
+        if (!ref.mounted || loadCancelToken.isCancelled) {
           return;
         }
 
@@ -51,7 +51,7 @@ mixin _PremiumControllerLoading
           plans,
           configuredProviders,
         );
-        if (!ref.mounted) {
+        if (!ref.mounted || loadCancelToken.isCancelled) {
           return;
         }
 

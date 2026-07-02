@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
@@ -10,8 +12,9 @@ import 'package:petmagic_mobile/features/profile/presentation/password_change_pa
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_unavailable_view.dart';
 
-class ProfileLinkedAccountsSettingsSection extends ConsumerWidget {
+class ProfileLinkedAccountsSettingsSection extends ConsumerStatefulWidget {
   const ProfileLinkedAccountsSettingsSection({
     required this.title,
     required this.subtitle,
@@ -24,28 +27,83 @@ class ProfileLinkedAccountsSettingsSection extends ConsumerWidget {
   final double bottomInset;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfileLinkedAccountsSettingsSection> createState() =>
+      _ProfileLinkedAccountsSettingsSectionState();
+}
+
+class _ProfileLinkedAccountsSettingsSectionState
+    extends ConsumerState<ProfileLinkedAccountsSettingsSection> {
+  List<MobileLinkedAccount>? _cachedLinkedAccounts;
+
+  @override
+  Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final state = ref.watch(profileControllerProvider);
     final profile = state.profile;
-    final linkedAccountsAsync = ref.watch(linkedAccountsProvider);
-    final linkedAccounts =
-        linkedAccountsAsync.asData?.value ?? const <MobileLinkedAccount>[];
+    final hasInternet = ref.watch(
+      networkStatusControllerProvider.select((status) => status.hasInternet),
+    );
+    final linkedAccountsAsync = hasInternet
+        ? ref.watch(linkedAccountsProvider)
+        : null;
+    final linkedAccounts = switch (linkedAccountsAsync) {
+      AsyncData(:final value) => value,
+      _ => _cachedLinkedAccounts ?? const <MobileLinkedAccount>[],
+    };
     final linkedAccountsLoading =
         linkedAccountsAsync is AsyncLoading<List<MobileLinkedAccount>>;
     final linkedAccountsFailed =
         linkedAccountsAsync is AsyncError<List<MobileLinkedAccount>>;
     final accountActionsEnabled =
-        !linkedAccountsLoading && !linkedAccountsFailed && profile != null;
-    final showRetryState = profile != null && !linkedAccountsAsync.hasValue;
+        hasInternet &&
+        !linkedAccountsLoading &&
+        !linkedAccountsFailed &&
+        profile != null;
+    final showOfflineUnavailable =
+        profile != null && !hasInternet && _cachedLinkedAccounts == null;
+    final showRetryState =
+        profile != null &&
+        hasInternet &&
+        linkedAccountsFailed &&
+        _cachedLinkedAccounts == null;
+
+    if (hasInternet) {
+      ref.listen<AsyncValue<List<MobileLinkedAccount>>>(
+        linkedAccountsProvider,
+        (previous, next) {
+          next.whenData((value) {
+            if (!mounted) {
+              return;
+            }
+
+            setState(() {
+              _cachedLinkedAccounts = value;
+            });
+          });
+        },
+      );
+    }
+
+    ref.listen<NetworkStatusState>(networkStatusControllerProvider, (
+      previous,
+      next,
+    ) {
+      if (previous?.hasInternet != false ||
+          !next.hasInternet ||
+          _cachedLinkedAccounts != null) {
+        return;
+      }
+
+      ref.invalidate(linkedAccountsProvider);
+    });
 
     return ProfileScreenBackground(
       child: SafeArea(
         child: ListView(
-          padding: EdgeInsets.fromLTRB(20, 18, 20, bottomInset),
+          padding: EdgeInsets.fromLTRB(20, 18, 20, widget.bottomInset),
           children: [
-            _LinkedDetailHeader(title: title, subtitle: subtitle),
+            _LinkedDetailHeader(title: widget.title, subtitle: widget.subtitle),
             const SizedBox(height: 22),
             if (state.errorMessage != null) ...[
               ProfileGlassCard(
@@ -63,6 +121,20 @@ class ProfileLinkedAccountsSettingsSection extends ConsumerWidget {
             ],
             ProfileSectionLabel(label: text.profileDetailsCurrentStatusSection),
             const SizedBox(height: 8),
+            if (showOfflineUnavailable) ...[
+              PetMagicUnavailableView(
+                kind: AppUnavailableKind.offline,
+                onRetry: () {
+                  if (!ref.read(networkStatusControllerProvider).hasInternet) {
+                    return;
+                  }
+
+                  ref.invalidate(linkedAccountsProvider);
+                },
+                padding: EdgeInsets.fromLTRB(8, 20, 8, widget.bottomInset),
+              ),
+              const SizedBox(height: 12),
+            ],
             if (linkedAccountsLoading) ...[
               ProfileGlassCard(
                 child: Text(
@@ -101,7 +173,7 @@ class ProfileLinkedAccountsSettingsSection extends ConsumerWidget {
               ),
               const SizedBox(height: 12),
             ],
-            if (!showRetryState) ...[
+            if (!showOfflineUnavailable && !showRetryState) ...[
               ProfileGlassCard(
                 padding: EdgeInsets.zero,
                 child: Column(
@@ -471,7 +543,8 @@ class _LinkedAccountEmailRow extends StatelessWidget {
                     ? null
                     : () {
                         context.push(
-                          '${PasswordChangePage.routePath}?email=${Uri.encodeComponent(email!.trim())}',
+                          PasswordChangePage.routePath,
+                          extra: PasswordChangeRouteArgs(email: email!.trim()),
                         );
                       },
                 child: Text(text.profileSettingsPasswordTitle),

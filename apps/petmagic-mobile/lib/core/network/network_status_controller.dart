@@ -232,11 +232,10 @@ class NetworkStatusController extends Notifier<NetworkStatusState> {
         return;
       }
 
-      final nextSeconds =
-          (_currentOfflineProbeInterval.inSeconds * 2).clamp(
-            _offlineProbeInterval.inSeconds,
-            _offlineProbeMaxInterval.inSeconds,
-          );
+      final nextSeconds = (_currentOfflineProbeInterval.inSeconds * 2).clamp(
+        _offlineProbeInterval.inSeconds,
+        _offlineProbeMaxInterval.inSeconds,
+      );
       _currentOfflineProbeInterval = Duration(seconds: nextSeconds);
       _scheduleNextOfflineProbe(_currentOfflineProbeInterval);
     });

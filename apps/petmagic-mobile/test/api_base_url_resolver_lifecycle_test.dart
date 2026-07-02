@@ -108,6 +108,40 @@ void main() {
     },
   );
 
+  test(
+    'debug base URL persistence strips path query and fragment secrets',
+    () async {
+      final previousPreferences = SharedPreferencesAsyncPlatform.instance;
+      SharedPreferencesAsyncPlatform.instance =
+          InMemorySharedPreferencesAsync.empty();
+      addTearDown(() {
+        SharedPreferencesAsyncPlatform.instance = previousPreferences;
+      });
+
+      final preferences = SharedPreferencesAsync();
+      final probedBaseUrls = <String>[];
+      final resolver = ApiBaseUrlResolver(
+        preferences: preferences,
+        baseUrls: const [
+          'http://127.0.0.1:5000/api?token=raw&signature=secret#debug',
+        ],
+        healthProbe: (baseUrl) async {
+          probedBaseUrls.add(baseUrl);
+          return true;
+        },
+      );
+
+      addTearDown(resolver.dispose);
+
+      expect(await resolver.resolveBaseUrl(), 'http://127.0.0.1:5000');
+      expect(probedBaseUrls, ['http://127.0.0.1:5000']);
+      expect(
+        await preferences.getString(persistedBaseUrlKey),
+        'http://127.0.0.1:5000',
+      );
+    },
+  );
+
   test('late health probe completion does not mutate after dispose', () async {
     final previousPreferences = SharedPreferencesAsyncPlatform.instance;
     SharedPreferencesAsyncPlatform.instance =

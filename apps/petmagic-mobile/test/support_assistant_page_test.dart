@@ -16,6 +16,10 @@ void main() {
       'Payment Refund',
     );
     expect(SupportAssistantPage.location('  '), SupportAssistantPage.routePath);
+    expect(
+      SupportAssistantPage.location('Payment\u0000Refund'),
+      SupportAssistantPage.routePath,
+    );
   });
 
   testWidgets('support assistant shows auth gate for guests', (tester) async {

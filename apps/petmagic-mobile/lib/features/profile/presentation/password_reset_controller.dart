@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_password_policy.dart';
 
@@ -59,6 +61,7 @@ class PasswordResetState {
 
 class PasswordResetController extends Notifier<PasswordResetState> {
   static const _genericActionError = 'profile.action_failed';
+  CancelToken? _activeRequestCancelToken;
 
   void _logPasswordResetFailure(
     String stage,
@@ -79,6 +82,11 @@ class PasswordResetController extends Notifier<PasswordResetState> {
 
   @override
   PasswordResetState build() {
+    ref.listen<bool>(
+      networkStatusControllerProvider.select((state) => state.hasInternet),
+      (_, hasInternet) => _handleNetworkStatusChanged(hasInternet),
+    );
+    ref.onDispose(_cancelActiveRequest);
     return const PasswordResetState();
   }
 
@@ -90,6 +98,42 @@ class PasswordResetController extends Notifier<PasswordResetState> {
     }
 
     state = update(state);
+  }
+
+  void _handleNetworkStatusChanged(bool hasInternet) {
+    if (hasInternet) {
+      return;
+    }
+
+    _cancelActiveRequest();
+    _updateStateIfMounted(
+      (state) => state.copyWith(
+        isSaving: false,
+        errorMessage: 'templates.network_unavailable',
+        clearSuccess: true,
+      ),
+    );
+  }
+
+  CancelToken _startRequestCancelToken() {
+    _cancelActiveRequest();
+    final cancelToken = CancelToken();
+    _activeRequestCancelToken = cancelToken;
+    return cancelToken;
+  }
+
+  void _cancelActiveRequest() {
+    final cancelToken = _activeRequestCancelToken;
+    if (cancelToken != null && !cancelToken.isCancelled) {
+      cancelToken.cancel('password_reset_cancelled');
+    }
+    _activeRequestCancelToken = null;
+  }
+
+  void _clearActiveRequest(CancelToken cancelToken) {
+    if (identical(_activeRequestCancelToken, cancelToken)) {
+      _activeRequestCancelToken = null;
+    }
   }
 
   void reset({String email = ''}) {
@@ -134,6 +178,11 @@ class PasswordResetController extends Notifier<PasswordResetState> {
       return false;
     }
 
+    if (!ref.read(networkStatusControllerProvider).hasInternet) {
+      _setFailure('templates.network_unavailable');
+      return false;
+    }
+
     state = state.copyWith(
       isSaving: true,
       clearError: true,
@@ -141,9 +190,13 @@ class PasswordResetController extends Notifier<PasswordResetState> {
     );
 
     final repository = _repository;
+    final cancelToken = _startRequestCancelToken();
     try {
-      await repository.requestPasswordReset(email: state.email);
-      if (!ref.mounted) {
+      await repository.requestPasswordReset(
+        email: state.email,
+        cancelToken: cancelToken,
+      );
+      if (!ref.mounted || cancelToken.isCancelled) {
         return false;
       }
       _updateStateIfMounted(
@@ -154,6 +207,8 @@ class PasswordResetController extends Notifier<PasswordResetState> {
         ),
       );
       return true;
+    } on RequestCancelledException {
+      return false;
     } on AppException catch (error) {
       _setFailure(error.message);
       return false;
@@ -161,6 +216,8 @@ class PasswordResetController extends Notifier<PasswordResetState> {
       _logPasswordResetFailure('request_reset_unknown', error, stackTrace);
       _setFailure(_genericActionError);
       return false;
+    } finally {
+      _clearActiveRequest(cancelToken);
     }
   }
 
@@ -185,6 +242,11 @@ class PasswordResetController extends Notifier<PasswordResetState> {
       return false;
     }
 
+    if (!ref.read(networkStatusControllerProvider).hasInternet) {
+      _setFailure('templates.network_unavailable');
+      return false;
+    }
+
     state = state.copyWith(
       isSaving: true,
       clearError: true,
@@ -192,13 +254,15 @@ class PasswordResetController extends Notifier<PasswordResetState> {
     );
 
     final repository = _repository;
+    final cancelToken = _startRequestCancelToken();
     try {
       await repository.confirmPasswordReset(
         email: state.email,
         code: state.code,
         newPassword: state.newPassword,
+        cancelToken: cancelToken,
       );
-      if (!ref.mounted) {
+      if (!ref.mounted || cancelToken.isCancelled) {
         return false;
       }
       _updateStateIfMounted(
@@ -211,6 +275,8 @@ class PasswordResetController extends Notifier<PasswordResetState> {
         ),
       );
       return true;
+    } on RequestCancelledException {
+      return false;
     } on AppException catch (error) {
       _setFailure(error.message);
       return false;
@@ -218,6 +284,8 @@ class PasswordResetController extends Notifier<PasswordResetState> {
       _logPasswordResetFailure('confirm_reset_unknown', error, stackTrace);
       _setFailure(_genericActionError);
       return false;
+    } finally {
+      _clearActiveRequest(cancelToken);
     }
   }
 

@@ -12,7 +12,9 @@ extension _SupportChatPageMessageActions on _SupportChatPageState {
       body,
       localeTag: localeTag,
       replyToMessageId: _replyToMessage?.messageId,
-      relatedGenerationId: widget.relatedGenerationId,
+      relatedGenerationId: SupportChatPage.normalizeRelatedGenerationIdQuery(
+        widget.relatedGenerationId,
+      ),
     );
     if (!mounted || !wasSent) {
       return;

@@ -1,10 +1,23 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 
 const paywallFeedbackLastShownStorageKeyPrefix =
     'feedback_paywall_last_shown_utc_v2';
 
 String buildPaywallFeedbackLastShownStorageKey(String scopeKey) {
+  return '$paywallFeedbackLastShownStorageKeyPrefix:'
+      '${_paywallFeedbackScopeFingerprint(scopeKey)}';
+}
+
+String buildLegacyPaywallFeedbackLastShownStorageKey(String scopeKey) {
   return '$paywallFeedbackLastShownStorageKeyPrefix:$scopeKey';
+}
+
+String _paywallFeedbackScopeFingerprint(String scopeKey) {
+  final normalized = scopeKey.trim().toLowerCase();
+  return sha256.convert(utf8.encode(normalized)).toString();
 }
 
 class PaywallFeedbackScopeResolver {

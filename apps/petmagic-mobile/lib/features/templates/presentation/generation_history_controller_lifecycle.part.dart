@@ -13,6 +13,9 @@ mixin _GenerationHistoryControllerLifecycle
     _isScreenVisible = visible;
     if (visible) {
       _scheduleLocalArtifactCleanup();
+      if (!_hasInternet) {
+        return;
+      }
       _startAutoRefresh();
       unawaited(_resumeRealtimeIfNeeded());
       return;
@@ -24,9 +27,33 @@ mixin _GenerationHistoryControllerLifecycle
       clearPending: true,
       clearLoadingState: clearLoadingState,
     );
+    _cancelActiveLoadMore('generation_history_hidden');
     _cancelActiveUnreadRefresh('generation_history_hidden');
     unawaited(_galleryStore.cancelActiveDownloads());
     _pauseRealtime();
+  }
+
+  void _handleNetworkStatusChanged(bool hasInternet) {
+    if (_hasInternet == hasInternet) {
+      return;
+    }
+
+    _hasInternet = hasInternet;
+    if (!hasInternet) {
+      _stopAutoRefresh();
+      _cancelActiveLoad('generation_history_offline', clearPending: true);
+      _cancelActiveLoadMore('generation_history_offline');
+      _cancelActiveUnreadRefresh('generation_history_offline');
+      _pauseRealtime();
+      return;
+    }
+
+    if (!_isScreenVisible) {
+      return;
+    }
+
+    _startAutoRefresh();
+    unawaited(_resumeRealtimeIfNeeded());
   }
 
   @override
@@ -49,6 +76,32 @@ mixin _GenerationHistoryControllerLifecycle
   @override
   void _clearActiveLoadCancelToken() {
     _activeLoadCancelToken = null;
+  }
+
+  @override
+  CancelToken _startLoadMoreCancelToken() {
+    _cancelActiveLoadMore('generation_history_load_more_superseded');
+    final cancelToken = CancelToken();
+    _activeLoadMoreCancelToken = cancelToken;
+    return cancelToken;
+  }
+
+  @override
+  void _clearActiveLoadMoreCancelToken() {
+    _activeLoadMoreCancelToken = null;
+  }
+
+  @override
+  void _cancelActiveLoadMore(String reason) {
+    final cancelToken = _activeLoadMoreCancelToken;
+    if (cancelToken != null && !cancelToken.isCancelled) {
+      cancelToken.cancel(reason);
+    }
+    _activeLoadMoreCancelToken = null;
+    _isLoadMoreInFlight = false;
+    if (ref.mounted && state.isLoadingMore) {
+      state = state.copyWith(isLoadingMore: false);
+    }
   }
 
   void _cancelActiveLoad(
@@ -153,7 +206,7 @@ mixin _GenerationHistoryControllerLifecycle
 
   void _scheduleNextAutoRefresh() {
     _autoRefreshTimer?.cancel();
-    if (!ref.mounted || !_isScreenVisible) {
+    if (!ref.mounted || !_isScreenVisible || !_hasInternet) {
       return;
     }
 
@@ -162,7 +215,7 @@ mixin _GenerationHistoryControllerLifecycle
         return;
       }
 
-      if (!_isScreenVisible || _isLoadInFlight) {
+      if (!_isScreenVisible || !_hasInternet || _isLoadInFlight) {
         _scheduleNextAutoRefresh();
         return;
       }
@@ -286,26 +339,57 @@ mixin _GenerationHistoryControllerLifecycle
       return;
     }
 
-    try {
-      final generation = TemplateGenerationDto.fromJson(
-        Map<String, dynamic>.from(event.payload),
-      ).toDomain();
-      unawaited(
-        _mergeExternalGeneration(
-          generation,
-          refreshUnreadBadge: true,
-          requireScreenVisible: true,
-        ),
-      );
-    } catch (error, stackTrace) {
+    final generationId = _readRealtimeGenerationId(event.payload);
+    if (generationId == null) {
       AppLogger.warn(
         feature: 'Templates.GenerationHistory',
         operation: 'realtime_event_parse',
-        message: 'Generation history realtime payload parsing failed',
+        message: 'Generation history realtime payload is missing generation id',
         context: {
           'topic': event.topic,
           'payload_keys': event.payload.keys.take(8).toList(growable: false),
         },
+      );
+      return;
+    }
+
+    unawaited(_refetchRealtimeGeneration(generationId));
+  }
+
+  String? _readRealtimeGenerationId(Map<String, Object?> payload) {
+    final eventType = payload['eventType']?.toString().trim();
+    if (eventType != null &&
+        eventType.isNotEmpty &&
+        eventType != 'generation.status_changed') {
+      return null;
+    }
+
+    final generationId = payload['generationId']?.toString().trim();
+    return generationId == null || generationId.isEmpty ? null : generationId;
+  }
+
+  Future<void> _refetchRealtimeGeneration(String generationId) async {
+    if (!ref.mounted || !_isScreenVisible) {
+      return;
+    }
+
+    try {
+      final generation = await _repository.fetchGeneration(generationId);
+      if (!ref.mounted || !_isScreenVisible) {
+        return;
+      }
+
+      await _mergeExternalGeneration(
+        generation,
+        refreshUnreadBadge: true,
+        requireScreenVisible: true,
+      );
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Templates.GenerationHistory',
+        operation: 'realtime_refetch',
+        message: 'Generation history realtime refetch failed',
+        context: {'generation_id': generationId},
         error: error,
         stackTrace: stackTrace,
       );
@@ -314,7 +398,7 @@ mixin _GenerationHistoryControllerLifecycle
 
   @override
   Future<void> _resumeRealtimeIfNeeded() async {
-    if (!ref.mounted || !_isScreenVisible) {
+    if (!ref.mounted || !_isScreenVisible || !_hasInternet) {
       return;
     }
 
@@ -341,10 +425,12 @@ mixin _GenerationHistoryControllerLifecycle
       _realtimeConnectFuture = nextConnectFuture;
       await nextConnectFuture;
       if (!ref.mounted) {
+        unawaited(realtimeClient.disconnect());
         return;
       }
 
       if (!_isScreenVisible ||
+          !_hasInternet ||
           !identical(_activeRealtimeClient, realtimeClient)) {
         unawaited(realtimeClient.disconnect());
         return;

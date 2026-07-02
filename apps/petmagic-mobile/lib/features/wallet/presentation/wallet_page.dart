@@ -14,6 +14,7 @@ import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/legal_acceptance_gate_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/features/templates/presentation/templates_controller.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/all_transactions_page.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
@@ -37,9 +38,6 @@ part 'widgets/wallet_page_overview_chrome.part.dart';
 part 'widgets/wallet_page_purchase_widgets.part.dart';
 part 'wallet_page_checkout.part.dart';
 part 'wallet_page_helpers.part.dart';
-
-const int _kWalletApproxPhotoCostSpark = 6;
-const int _kWalletApproxVideoCostSpark = 33;
 
 class WalletPage extends ConsumerStatefulWidget {
   const WalletPage({super.key});
@@ -67,13 +65,17 @@ class _WalletPageState extends ConsumerState<WalletPage>
     _walletController = ref.read(walletControllerProvider.notifier);
     _walletController.setWalletPageVisible(true);
     WidgetsBinding.instance.addObserver(this);
-    if (ref.read(appLaunchControllerProvider).isAuthenticated) {
-      _startAutoRefresh();
-      if (_hasHydratedWalletSnapshot(ref.read(walletControllerProvider))) {
+    Future.microtask(() {
+      if (!mounted) {
+        return;
+      }
+      if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
+        _stopAutoRefresh();
         return;
       }
 
-      Future.microtask(() {
+      _startAutoRefresh();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) {
           return;
         }
@@ -81,6 +83,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
           return;
         }
 
+        unawaited(_ensureTemplatePricingLoaded());
         final current = ref.read(walletControllerProvider);
         if (_hasHydratedWalletSnapshot(current)) {
           return;
@@ -88,7 +91,18 @@ class _WalletPageState extends ConsumerState<WalletPage>
 
         _walletController.load();
       });
+    });
+  }
+
+  Future<void> _ensureTemplatePricingLoaded() async {
+    final templatesState = ref.read(templatesControllerProvider);
+    if (templatesState.items.isNotEmpty ||
+        templatesState.isLoading ||
+        templatesState.isRefreshing) {
+      return;
     }
+
+    await ref.read(templatesControllerProvider.notifier).loadInitial();
   }
 
   bool _hasHydratedWalletSnapshot(WalletState state) {
@@ -296,6 +310,9 @@ class _WalletPageState extends ConsumerState<WalletPage>
           highlightedPurchaseOrderId: state.highlightedPurchaseOrderId,
         ),
       ),
+    );
+    final templatePricing = ref.watch(
+      templatesControllerProvider.select(_WalletTemplatePricing.fromState),
     );
     final controller = ref.read(walletControllerProvider.notifier);
     final isAuthenticated = ref.watch(
@@ -539,6 +556,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
                       _PacksSection(
                         packs: state.packs,
                         storeProductPrices: state.storeProductPrices,
+                        templatePricing: templatePricing,
                         isBuying: state.isBuying,
                         onSelect: (pack) => _showPackDetailSheet(
                           context,

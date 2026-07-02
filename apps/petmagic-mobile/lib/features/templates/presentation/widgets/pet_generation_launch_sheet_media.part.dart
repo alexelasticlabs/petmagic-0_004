@@ -58,6 +58,7 @@ class _PetLaunchSelectedPhotoPreview extends StatelessWidget {
               if (imageUrl != null)
                 CachedNetworkImage(
                   imageUrl: imageUrl,
+                  cacheKey: persistentSafeProfileAvatarUrl(imageUrl),
                   fit: BoxFit.cover,
                   memCacheWidth: 760,
                   filterQuality: FilterQuality.medium,
@@ -164,6 +165,7 @@ class _PetLaunchPhotoThumbnail extends StatelessWidget {
               ? _PetLaunchMagicFallback(iconSize: 20)
               : CachedNetworkImage(
                   imageUrl: imageUrl,
+                  cacheKey: persistentSafeProfileAvatarUrl(imageUrl),
                   fit: BoxFit.cover,
                   memCacheWidth: 180,
                   filterQuality: FilterQuality.medium,

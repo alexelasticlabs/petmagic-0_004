@@ -11,6 +11,7 @@ import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
+import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_query.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_controller.dart';
@@ -321,6 +322,51 @@ void main() {
 
       expect(walletController.loadCalls, 1);
       expect(profileController.initializeCalls, 1);
+    },
+  );
+
+  test(
+    'templates controller cancels active feed work when network goes offline',
+    () async {
+      final feedCompleter = Completer<TemplatesFeedPage>();
+      final repository = RandomTemplatesRepository(
+        feedCompleter: feedCompleter,
+      );
+      final networkController = TestTemplatesNetworkStatusController(
+        initialHasInternet: true,
+      );
+      final container = ProviderContainer(
+        overrides: [
+          networkStatusControllerProvider.overrideWith(() => networkController),
+          templatesRepositoryProvider.overrideWithValue(repository),
+          realtimeClientProvider.overrideWith(
+            (ref) => const NoopRealtimeClient(),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(templatesControllerProvider.notifier);
+      unawaited(controller.loadInitial());
+      await Future<void>.delayed(Duration.zero);
+
+      final loadingState = container.read(templatesControllerProvider);
+      expect(loadingState.isLoading || loadingState.isRefreshing, isTrue);
+      expect(repository.cancelPendingFeedRequestCalls, 0);
+      expect(repository.cancelPendingMetadataRequestsCalls, 0);
+
+      networkController.setHasInternet(false);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(container.read(templatesControllerProvider).isLoading, isFalse);
+      expect(repository.cancelPendingFeedRequestCalls, 1);
+      expect(repository.cancelPendingMetadataRequestsCalls, 1);
+      expect(controller.preloadCancellations, 0);
+
+      feedCompleter.complete(
+        TemplatesFeedPage(items: const [], hasMore: false),
+      );
+      await Future<void>.delayed(Duration.zero);
     },
   );
 

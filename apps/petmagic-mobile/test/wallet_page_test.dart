@@ -10,22 +10,41 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/features/templates/presentation/templates_controller.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/all_transactions_page.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 
+import 'widget_test_support.dart';
 import 'wallet_page_test_support.dart';
 
 void main() {
-  test('wallet pack approximation copy uses localizations', () {
+  configureWidgetTestHarness();
+
+  test('wallet pack pricing copy uses backend template pricing source', () {
     final source = File(
       'lib/features/wallet/presentation/widgets/wallet_page_activity_widgets.dart',
     ).readAsStringSync();
+    final pageSource = File(
+      'lib/features/wallet/presentation/wallet_page.dart',
+    ).readAsStringSync();
+    final helperSource = File(
+      'lib/features/wallet/presentation/wallet_page_helpers.part.dart',
+    ).readAsStringSync();
 
-    expect(source, contains('walletApproxPhotosOnly'));
-    expect(source, contains('walletApproxPhotosOrVideos'));
+    expect(source, contains('templatePricing.usageLabel'));
+    expect(pageSource, contains('templatesControllerProvider'));
+    expect(pageSource, isNot(contains('_kWalletApproxPhotoCostSpark')));
+    expect(pageSource, isNot(contains('_kWalletApproxVideoCostSpark')));
+    expect(source, isNot(contains('walletApproxPhotos')));
+    expect(source, isNot(contains('walletApproxVideos')));
+    expect(helperSource, contains('walletApproxGenerationRange'));
+    expect(helperSource, contains('walletApproxGenerations'));
+    expect(helperSource, contains('walletGenerationPricingUnavailable'));
+    expect(helperSource, isNot(contains('walletApproxPhotosOnly')));
+    expect(helperSource, isNot(contains('walletApproxPhotosOrVideos')));
     expect(source, isNot(contains(' или ')));
     expect(source, isNot(contains("'≈ ")));
   });
@@ -60,6 +79,10 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text(text.walletBuySparkTitle), findsWidgets);
+      expect(
+        find.text(text.walletApproxGenerationRange(2, 10)),
+        findsOneWidget,
+      );
 
       expect(find.text(text.walletPackDetailsAction), findsWidgets);
 
@@ -68,6 +91,30 @@ void main() {
 
       expect(find.text(text.premiumPaymentStripe), findsAtLeastNWidgets(1));
       expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'wallet page shows pricing fallback when template feed is unavailable',
+    (tester) async {
+      await pumpWalletPage(
+        tester,
+        repository: FakeWalletRepository(
+          wallet: walletStateFixture,
+          ledger: ledgerItemsFixture,
+          packs: packsFixture,
+          purchases: purchasesFixture,
+        ),
+        templatesController: StaticWalletTemplatesController(items: const []),
+      );
+
+      final walletContext = tester.element(find.byType(WalletPage));
+      final text = AppLocalizations.of(walletContext);
+
+      await tester.drag(find.byType(ListView).first, const Offset(0, -520));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text(text.walletGenerationPricingUnavailable), findsWidgets);
     },
   );
 
@@ -134,6 +181,9 @@ void main() {
           overrides: [
             appLaunchControllerProvider.overrideWith(() => launchController),
             walletControllerProvider.overrideWith(() => walletController),
+            templatesControllerProvider.overrideWith(
+              StaticWalletTemplatesController.new,
+            ),
           ],
           child: MaterialApp.router(
             theme: AppTheme.dark(),
@@ -193,6 +243,9 @@ void main() {
               AuthenticatedWalletAppLaunchController.new,
             ),
             walletControllerProvider.overrideWith(() => walletController),
+            templatesControllerProvider.overrideWith(
+              StaticWalletTemplatesController.new,
+            ),
           ],
           child: MaterialApp.router(
             theme: AppTheme.dark(),
@@ -581,6 +634,43 @@ void main() {
       await tester.pump();
 
       expect(walletController.loadCalls, 1);
+    },
+  );
+
+  testWidgets(
+    'all transactions stays offline without loading and retries on reconnect',
+    (tester) async {
+      final repository = FakeWalletRepository(
+        wallet: walletStateFixture,
+        ledger: ledgerItemsFixture,
+        packs: packsFixture,
+        purchases: purchasesFixture,
+      );
+      final networkController = TestWalletNetworkStatusController(
+        initialHasInternet: false,
+      );
+
+      await pumpAllTransactionsPage(
+        tester,
+        repository: repository,
+        networkStatusController: networkController,
+      );
+
+      final transactionsContext = tester.element(
+        find.byType(AllTransactionsPage),
+      );
+      final text = AppLocalizations.of(transactionsContext);
+
+      expect(repository.walletFetchCount, 0);
+      expect(repository.ledgerFetchCount, 0);
+      expect(find.text(text.appUnavailableOfflineTitle), findsOneWidget);
+
+      networkController.setHasInternet(true);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(repository.walletFetchCount, 1);
+      expect(repository.ledgerFetchCount, 1);
     },
   );
 

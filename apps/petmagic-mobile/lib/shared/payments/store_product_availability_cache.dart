@@ -59,8 +59,8 @@ class StoreProductAvailabilityCache {
   final DateTime Function() _now;
   final Map<String, _StoreProductAvailabilityCacheEntry> _entries =
       <String, _StoreProductAvailabilityCacheEntry>{};
-  final Map<String, Future<StoreProductAvailabilitySnapshot>> _inFlight =
-      <String, Future<StoreProductAvailabilitySnapshot>>{};
+  final Map<String, _StoreProductAvailabilityInFlight> _inFlight =
+      <String, _StoreProductAvailabilityInFlight>{};
 
   Future<StoreProductAvailabilitySnapshot> read(
     Set<String> productIds, {
@@ -96,9 +96,19 @@ class StoreProductAvailabilityCache {
       return Future.value(coveringEntry.snapshot.project(normalizedProductIds));
     }
 
-    final inFlight = _inFlight[cacheKey];
-    if (inFlight != null) {
-      return inFlight;
+    final exactInFlight = _inFlight[cacheKey];
+    if (exactInFlight != null) {
+      return exactInFlight.future;
+    }
+
+    final coveringInFlight = _findCoveringInFlight(
+      normalizedProductIds,
+      scopeKey: normalizedScopeKey,
+    );
+    if (coveringInFlight != null) {
+      return coveringInFlight.future.then(
+        (snapshot) => snapshot.project(normalizedProductIds),
+      );
     }
 
     final future = () async {
@@ -110,9 +120,13 @@ class StoreProductAvailabilityCache {
       );
       return snapshot;
     }();
-    _inFlight[cacheKey] = future;
+    _inFlight[cacheKey] = _StoreProductAvailabilityInFlight(
+      productIds: normalizedProductIds,
+      scopeKey: normalizedScopeKey,
+      future: future,
+    );
     return future.whenComplete(() {
-      if (identical(_inFlight[cacheKey], future)) {
+      if (identical(_inFlight[cacheKey]?.future, future)) {
         _inFlight.remove(cacheKey);
       }
     });
@@ -161,6 +175,24 @@ class StoreProductAvailabilityCache {
     return bestMatch;
   }
 
+  _StoreProductAvailabilityInFlight? _findCoveringInFlight(
+    Set<String> requestedProductIds, {
+    String? scopeKey,
+  }) {
+    _StoreProductAvailabilityInFlight? bestMatch;
+    for (final entry in _inFlight.values) {
+      if (entry.scopeKey != scopeKey || !entry.covers(requestedProductIds)) {
+        continue;
+      }
+
+      if (bestMatch == null ||
+          entry.productIds.length < bestMatch.productIds.length) {
+        bestMatch = entry;
+      }
+    }
+    return bestMatch;
+  }
+
   Set<String> _normalizeProductIds(Set<String> productIds) {
     final normalized = <String>{};
     for (final productId in productIds) {
@@ -194,4 +226,25 @@ class _StoreProductAvailabilityCacheEntry {
 
   final StoreProductAvailabilitySnapshot snapshot;
   final DateTime expiresAt;
+}
+
+class _StoreProductAvailabilityInFlight {
+  const _StoreProductAvailabilityInFlight({
+    required this.productIds,
+    required this.scopeKey,
+    required this.future,
+  });
+
+  final Set<String> productIds;
+  final String? scopeKey;
+  final Future<StoreProductAvailabilitySnapshot> future;
+
+  bool covers(Set<String> requestedProductIds) {
+    for (final productId in requestedProductIds) {
+      if (!productIds.contains(productId)) {
+        return false;
+      }
+    }
+    return true;
+  }
 }

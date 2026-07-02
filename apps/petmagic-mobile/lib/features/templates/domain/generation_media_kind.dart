@@ -1,12 +1,16 @@
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 
 bool isVideoGenerationResult(TemplateGenerationResult generation) {
-  final mediaType = generation.mediaType?.toLowerCase() ?? '';
+  final mediaType = (generation.mediaType ?? generation.galleryMedia.mediaType)
+      .toLowerCase();
   final type = generation.templateType?.toLowerCase() ?? '';
   return mediaType.contains('video') ||
       type.contains('video') ||
       generation.outputVideoDurationSeconds != null ||
-      isLikelyGenerationVideoUrl(generation.outputUrl);
+      generation.galleryMedia.durationSeconds != null ||
+      isLikelyGenerationVideoUrl(
+        generation.outputUrl ?? generation.galleryMedia.resultUrl,
+      );
 }
 
 bool isLikelyGenerationVideoUrl(String? rawUrl) {

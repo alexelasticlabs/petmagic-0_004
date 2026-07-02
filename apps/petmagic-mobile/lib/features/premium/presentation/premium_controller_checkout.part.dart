@@ -28,7 +28,7 @@ mixin _PremiumControllerCheckout
     final cancelToken = _startStatusRefreshCancelToken();
     try {
       final status = await _repository.fetchStatus(cancelToken: cancelToken);
-      if (!ref.mounted) {
+      if (!ref.mounted || cancelToken.isCancelled) {
         return;
       }
       ref.invalidate(premiumSubscriptionSummaryProvider);
@@ -37,6 +37,15 @@ mixin _PremiumControllerCheckout
       );
     } on RequestCancelledException {
       return;
+    } on DioException catch (error) {
+      if (CancelToken.isCancel(error)) {
+        return;
+      }
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          errorMessage: _premiumErrorMessage(error, 'premium.request_failed'),
+        ),
+      );
     } catch (error) {
       _updateStateIfMounted(
         (state) => state.copyWith(
@@ -319,6 +328,17 @@ mixin _PremiumControllerCheckout
     String? stripePlanCode,
     String? stripeExternalSubscriptionId,
   }) async {
+    if (!_hasInternet) {
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          checkoutVerificationState: PremiumCheckoutVerificationState.error,
+          isAwaitingCheckoutVerification: false,
+          checkoutErrorMessage: 'templates.network_unavailable',
+        ),
+      );
+      return;
+    }
+
     if (!state.isAwaitingCheckoutVerification) {
       return;
     }
@@ -361,12 +381,15 @@ mixin _PremiumControllerCheckout
 
     const maxAttempts = 4;
     for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      if (!_hasInternet) {
+        return;
+      }
       if (!_hasAuthenticatedPremiumSession()) {
         _resetCheckoutVerificationForSignedOutSession();
         return;
       }
       await _refreshProfile();
-      if (!ref.mounted) {
+      if (!ref.mounted || !_hasInternet) {
         return;
       }
       if (!_hasAuthenticatedPremiumSession()) {
@@ -375,7 +398,7 @@ mixin _PremiumControllerCheckout
       }
       // Poll subscription status only; paywall config does not need a full reload here.
       await _refreshPremiumStatusSnapshot();
-      if (!ref.mounted) {
+      if (!ref.mounted || !_hasInternet) {
         return;
       }
       if (!_hasAuthenticatedPremiumSession()) {
@@ -413,7 +436,7 @@ mixin _PremiumControllerCheckout
 
       if (attempt < maxAttempts - 1) {
         await Future<void>.delayed(const Duration(seconds: 2));
-        if (!ref.mounted) {
+        if (!ref.mounted || !_hasInternet) {
           return;
         }
       }
@@ -533,12 +556,32 @@ mixin _PremiumControllerCheckout
       return;
     }
 
+    final verificationKey = _storePurchaseVerificationKey(
+      provider: provider,
+      purchase: purchase,
+    );
+    if (verificationKey != null) {
+      if (_storePurchaseVerifiedKeys.contains(verificationKey)) {
+        if (purchase.pendingCompletePurchase) {
+          await _repository.completePurchase(purchase);
+        }
+        return;
+      }
+
+      if (!_storePurchaseVerificationInFlightKeys.add(verificationKey)) {
+        return;
+      }
+    }
+
     try {
       final verified = await _repository.verifyStorePurchase(
         plan: matchedPlan,
         provider: provider,
         purchase: purchase,
       );
+      if (verificationKey != null) {
+        _rememberStorePurchaseVerifiedKey(verificationKey);
+      }
       if (!ref.mounted) {
         return;
       }
@@ -597,6 +640,35 @@ mixin _PremiumControllerCheckout
           errorMessage: _premiumErrorMessage(error, 'premium.checkout_failed'),
         ),
       );
+    } finally {
+      if (verificationKey != null) {
+        _storePurchaseVerificationInFlightKeys.remove(verificationKey);
+      }
+    }
+  }
+
+  String? _storePurchaseVerificationKey({
+    required PremiumPaymentProvider provider,
+    required PurchaseDetails purchase,
+  }) {
+    final purchaseId = purchase.purchaseID?.trim();
+    if (purchaseId != null && purchaseId.isNotEmpty) {
+      return '${provider.value}:${purchase.productID}:purchase:$purchaseId';
+    }
+
+    final transactionDate = purchase.transactionDate?.trim();
+    if (transactionDate != null && transactionDate.isNotEmpty) {
+      return '${provider.value}:${purchase.productID}:transaction:$transactionDate';
+    }
+
+    return null;
+  }
+
+  void _rememberStorePurchaseVerifiedKey(String verificationKey) {
+    _storePurchaseVerifiedKeys.add(verificationKey);
+    while (_storePurchaseVerifiedKeys.length >
+        _PremiumControllerBase._maxStorePurchaseVerificationKeys) {
+      _storePurchaseVerifiedKeys.remove(_storePurchaseVerifiedKeys.first);
     }
   }
 }

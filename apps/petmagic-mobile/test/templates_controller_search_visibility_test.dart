@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_query.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
@@ -359,4 +360,62 @@ void main() {
       expect(realtimeClient.disconnectCalls, 1);
     },
   );
+
+  test(
+    'disconnects realtime client when connect finishes after network loss',
+    () async {
+      final repository = FakeTemplatesControllerRepository();
+      final connectCompleter = Completer<void>();
+      final realtimeClient = FakeTemplatesControllerRealtimeClient(
+        connectCompleter: connectCompleter,
+      );
+      final networkController = _TestNetworkStatusController(true);
+      final container = ProviderContainer(
+        overrides: [
+          templatesRepositoryProvider.overrideWithValue(repository),
+          realtimeClientProvider.overrideWithValue(realtimeClient),
+          networkStatusControllerProvider.overrideWith(() => networkController),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      container.read(templatesControllerProvider);
+      await _waitUntil(() => realtimeClient.connectCalls == 1);
+
+      networkController.setHasInternet(false);
+      await Future<void>.delayed(Duration.zero);
+      expect(realtimeClient.disconnectCalls, 0);
+
+      connectCompleter.complete();
+      await _waitUntil(() => realtimeClient.disconnectCalls == 1);
+    },
+  );
+}
+
+class _TestNetworkStatusController extends NetworkStatusController {
+  _TestNetworkStatusController(this.initialHasInternet);
+
+  final bool initialHasInternet;
+
+  @override
+  NetworkStatusState build() {
+    return NetworkStatusState(hasInternet: initialHasInternet);
+  }
+
+  void setHasInternet(bool value) {
+    state = state.copyWith(hasInternet: value);
+  }
+}
+
+Future<void> _waitUntil(
+  bool Function() condition, {
+  Duration timeout = const Duration(seconds: 2),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (!condition()) {
+    if (DateTime.now().isAfter(deadline)) {
+      throw StateError('Condition was not met before timeout.');
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
 }

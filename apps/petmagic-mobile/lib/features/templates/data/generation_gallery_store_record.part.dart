@@ -20,6 +20,10 @@ class GenerationGalleryMediaRecord {
     this.isDeletedLocally = false,
     this.isDownloadComplete = false,
     this.pendingServerDelete = false,
+    this.materializationFailureCount = 0,
+    this.materializationBackoffUntilUtc,
+    this.materializationFailureCode,
+    this.localBytes = 0,
   });
 
   final String generationId;
@@ -38,6 +42,10 @@ class GenerationGalleryMediaRecord {
   final DateTime lastSyncedAtUtc;
   final int version;
   final bool pendingServerDelete;
+  final int materializationFailureCount;
+  final DateTime? materializationBackoffUntilUtc;
+  final String? materializationFailureCode;
+  final int localBytes;
 
   GenerationGalleryMediaRecord copyWith({
     Object? previewLocalPath = _copyWithUnset,
@@ -47,6 +55,10 @@ class GenerationGalleryMediaRecord {
     DateTime? lastSyncedAtUtc,
     int? version,
     bool? pendingServerDelete,
+    int? materializationFailureCount,
+    Object? materializationBackoffUntilUtc = _copyWithUnset,
+    Object? materializationFailureCode = _copyWithUnset,
+    int? localBytes,
   }) {
     return GenerationGalleryMediaRecord(
       generationId: generationId,
@@ -69,20 +81,29 @@ class GenerationGalleryMediaRecord {
       isDeletedLocally: isDeletedLocally ?? this.isDeletedLocally,
       isDownloadComplete: isDownloadComplete ?? this.isDownloadComplete,
       pendingServerDelete: pendingServerDelete ?? this.pendingServerDelete,
+      materializationFailureCount:
+          materializationFailureCount ?? this.materializationFailureCount,
+      materializationBackoffUntilUtc:
+          identical(materializationBackoffUntilUtc, _copyWithUnset)
+          ? this.materializationBackoffUntilUtc
+          : materializationBackoffUntilUtc as DateTime?,
+      materializationFailureCode:
+          identical(materializationFailureCode, _copyWithUnset)
+          ? this.materializationFailureCode
+          : materializationFailureCode as String?,
+      localBytes: localBytes ?? this.localBytes,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'generationId': generationId,
-      'accountScope': accountScope,
-      'userId': userId,
       'status': status,
       'templateTitle': templateTitle,
       'templateType': templateType,
       'updatedAtUtc': updatedAtUtc.toIso8601String(),
-      'previewRemoteUrl': previewRemoteUrl,
-      'outputRemoteUrl': outputRemoteUrl,
+      'previewRemoteUrl': persistentSafeGenerationMediaUrl(previewRemoteUrl),
+      'outputRemoteUrl': persistentSafeGenerationMediaUrl(outputRemoteUrl),
       'previewLocalPath': previewLocalPath,
       'outputLocalPath': outputLocalPath,
       'isDeletedLocally': isDeletedLocally,
@@ -90,22 +111,36 @@ class GenerationGalleryMediaRecord {
       'lastSyncedAtUtc': lastSyncedAtUtc.toIso8601String(),
       'version': version,
       'pendingServerDelete': pendingServerDelete,
+      'materializationFailureCount': materializationFailureCount,
+      'materializationBackoffUntilUtc': materializationBackoffUntilUtc
+          ?.toIso8601String(),
+      'materializationFailureCode': materializationFailureCode,
+      'localBytes': localBytes,
     };
   }
 
-  factory GenerationGalleryMediaRecord.fromJson(Map<String, dynamic> json) {
+  factory GenerationGalleryMediaRecord.fromJson(
+    Map<String, dynamic> json, {
+    String? accountScope,
+  }) {
+    final resolvedAccountScope =
+        accountScope ?? json['accountScope'] as String? ?? '';
     return GenerationGalleryMediaRecord(
       generationId: json['generationId'] as String? ?? '',
-      accountScope: json['accountScope'] as String? ?? '',
-      userId: json['userId'] as String? ?? '',
+      accountScope: resolvedAccountScope,
+      userId: json['userId'] as String? ?? resolvedAccountScope,
       status: json['status'] as String? ?? '',
       templateTitle: json['templateTitle'] as String?,
       templateType: json['templateType'] as String?,
       updatedAtUtc:
           DateTime.tryParse(json['updatedAtUtc'] as String? ?? '')?.toUtc() ??
           DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
-      previewRemoteUrl: json['previewRemoteUrl'] as String?,
-      outputRemoteUrl: json['outputRemoteUrl'] as String?,
+      previewRemoteUrl: persistentSafeGenerationMediaUrl(
+        json['previewRemoteUrl'] as String?,
+      ),
+      outputRemoteUrl: persistentSafeGenerationMediaUrl(
+        json['outputRemoteUrl'] as String?,
+      ),
       previewLocalPath: json['previewLocalPath'] as String?,
       outputLocalPath: json['outputLocalPath'] as String?,
       isDeletedLocally: json['isDeletedLocally'] as bool? ?? false,
@@ -117,6 +152,13 @@ class GenerationGalleryMediaRecord {
           DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
       version: (json['version'] as num?)?.toInt() ?? 0,
       pendingServerDelete: json['pendingServerDelete'] as bool? ?? false,
+      materializationFailureCount:
+          (json['materializationFailureCount'] as num?)?.toInt() ?? 0,
+      materializationBackoffUntilUtc: DateTime.tryParse(
+        json['materializationBackoffUntilUtc'] as String? ?? '',
+      )?.toUtc(),
+      materializationFailureCode: json['materializationFailureCode'] as String?,
+      localBytes: (json['localBytes'] as num?)?.toInt() ?? 0,
     );
   }
 }

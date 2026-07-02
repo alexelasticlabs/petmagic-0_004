@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_repository.dart';
@@ -439,6 +440,108 @@ void main() {
       expect(repository.createStripeCheckoutCalls, 0);
     },
   );
+
+  testWidgets(
+    'premium page stays offline without loading and retries on reconnect',
+    (tester) async {
+      final repository = _FakePremiumRepository(
+        config: const PremiumPaywallConfigModel(
+          plans: [
+            PremiumPlanModel(
+              planCode: 'monthly',
+              billingInterval: 'month',
+              priceAmount: 14.99,
+              currencyCode: 'USD',
+              tokenAllowance: 500,
+              isPopular: false,
+              sortOrder: 1,
+              stripeCheckoutEnabled: true,
+              googlePlayProductId: 'com.petmagic.app.premium.monthly',
+              appStoreProductId: 'com.petmagic.app.premium.monthly',
+            ),
+          ],
+          paymentMethods: [
+            PremiumPaymentMethodModel(
+              provider: PremiumPaymentProvider.stripe,
+              purchaseChannel: 'external_checkout',
+              platform: 'android',
+              region: '*',
+              isEnabled: true,
+              isSelectedByDefault: true,
+              requiresExternalWarning: false,
+              requiresStoreDisclosure: false,
+              isRecommended: true,
+              bonusTokensPercent: 0,
+            ),
+          ],
+          legalTexts: PremiumLegalTextsModel(
+            storeNotice: 'store',
+            externalCheckoutNotice: 'external',
+            stripeNotice: 'stripe',
+          ),
+          externalPaymentWarningRequired: false,
+          recommendedPlanCode: 'monthly',
+        ),
+        status: const PremiumStatusModel(
+          isPremium: false,
+          canManageBilling: false,
+          status: 'None',
+          cancelAtPeriodEnd: false,
+          monthlyTokenLimit: 0,
+          tokensAvailable: 0,
+          canManageSubscription: false,
+          manageSubscriptionAction: '',
+        ),
+      );
+      final networkController = _TestPremiumNetworkStatusController(false);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _GuestAppLaunchController.new,
+            ),
+            premiumRepositoryProvider.overrideWithValue(repository),
+            premiumRefreshProfileProvider.overrideWithValue(() async {}),
+            networkStatusControllerProvider.overrideWith(
+              () => networkController,
+            ),
+          ],
+          child: MaterialApp.router(
+            theme: AppTheme.dark(),
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            routerConfig: GoRouter(
+              routes: [
+                GoRoute(
+                  path: '/',
+                  builder: (context, state) => const PremiumPage(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 800));
+
+      expect(repository.fetchPaywallConfigCalls, 0);
+      expect(repository.fetchStatusCalls, 0);
+      expect(find.text("You're offline"), findsOneWidget);
+
+      networkController.setHasInternet(true);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 800));
+
+      expect(repository.fetchPaywallConfigCalls, 1);
+      expect(repository.fetchStatusCalls, 0);
+      expect(find.text('Monthly'), findsOneWidget);
+    },
+  );
 }
 
 class _FakePremiumRepository extends PremiumRepository {
@@ -547,5 +650,20 @@ class _AuthenticatedAppLaunchController extends AppLaunchController {
       hasSeenOnboarding: true,
       guestSessionReady: true,
     );
+  }
+}
+
+class _TestPremiumNetworkStatusController extends NetworkStatusController {
+  _TestPremiumNetworkStatusController(this.initialHasInternet);
+
+  final bool initialHasInternet;
+
+  @override
+  NetworkStatusState build() {
+    return NetworkStatusState(hasInternet: initialHasInternet);
+  }
+
+  void setHasInternet(bool value) {
+    state = state.copyWith(hasInternet: value);
   }
 }

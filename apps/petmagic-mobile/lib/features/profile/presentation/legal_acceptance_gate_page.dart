@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
+import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
@@ -10,6 +12,7 @@ import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_m
 import 'package:petmagic_mobile/features/profile/presentation/widgets/legal_document_list_view.dart';
 import 'package:petmagic_mobile/features/startup/presentation/guest_welcome_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_unavailable_view.dart';
 
 class LegalAcceptanceGatePage extends ConsumerStatefulWidget {
   const LegalAcceptanceGatePage({super.key});
@@ -25,16 +28,57 @@ class _LegalAcceptanceGatePageState
     extends ConsumerState<LegalAcceptanceGatePage> {
   bool _accepted = false;
   String? _error;
+  MobileLegalDocuments? _cachedDocuments;
 
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final state = ref.watch(profileControllerProvider);
     final locale = Localizations.localeOf(context).toLanguageTag();
-    final legalDocumentsAsync = ref.watch(
-      currentLegalDocumentsProvider(locale),
+    final hasInternet = ref.watch(
+      networkStatusControllerProvider.select((status) => status.hasInternet),
     );
+    final legalDocumentsProvider = currentLegalDocumentsProvider(locale);
+    final legalDocumentsAsync = hasInternet
+        ? ref.watch(legalDocumentsProvider)
+        : null;
     final profile = state.profile;
+    final documents =
+        switch (legalDocumentsAsync) {
+          AsyncData(:final value) => value,
+          _ => null,
+        } ??
+        _cachedDocuments;
+
+    if (hasInternet) {
+      ref.listen<AsyncValue<MobileLegalDocuments>>(legalDocumentsProvider, (
+        previous,
+        next,
+      ) {
+        next.whenData((value) {
+          if (!mounted) {
+            return;
+          }
+
+          setState(() {
+            _cachedDocuments = value;
+          });
+        });
+      });
+    }
+
+    ref.listen<NetworkStatusState>(networkStatusControllerProvider, (
+      previous,
+      next,
+    ) {
+      if (previous?.hasInternet != false ||
+          !next.hasInternet ||
+          documents != null) {
+        return;
+      }
+
+      ref.invalidate(legalDocumentsProvider);
+    });
 
     return Scaffold(
       appBar: AppBar(
@@ -59,25 +103,35 @@ class _LegalAcceptanceGatePageState
               ),
               const SizedBox(height: 12),
               Expanded(
-                child: switch (legalDocumentsAsync) {
-                  AsyncData(:final value) => LegalDocumentListView(
-                    documents: [value.termsOfUse, value.privacyPolicy],
-                  ),
-                  AsyncError() => Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(text.profileLegalUnavailable),
-                      const SizedBox(height: 10),
-                      OutlinedButton(
-                        onPressed: () => ref.invalidate(
-                          currentLegalDocumentsProvider(locale),
+                child: documents != null
+                    ? LegalDocumentListView(
+                        documents: [
+                          documents.termsOfUse,
+                          documents.privacyPolicy,
+                        ],
+                      )
+                    : !hasInternet
+                    ? PetMagicUnavailableView(
+                        kind: AppUnavailableKind.offline,
+                        onRetry: () {
+                          if (!ref
+                              .read(networkStatusControllerProvider)
+                              .hasInternet) {
+                            return;
+                          }
+
+                          ref.invalidate(legalDocumentsProvider);
+                        },
+                        padding: const EdgeInsets.fromLTRB(28, 36, 28, 24),
+                      )
+                    : switch (legalDocumentsAsync) {
+                        AsyncError() => PetMagicUnavailableView(
+                          kind: AppUnavailableKind.serverUnavailable,
+                          onRetry: () => ref.invalidate(legalDocumentsProvider),
+                          padding: const EdgeInsets.fromLTRB(28, 36, 28, 24),
                         ),
-                        child: Text(text.retryAction),
-                      ),
-                    ],
-                  ),
-                  _ => const Center(child: CircularProgressIndicator()),
-                },
+                        _ => const Center(child: CircularProgressIndicator()),
+                      },
               ),
               if (_error != null) ...[
                 const SizedBox(height: 10),
@@ -98,9 +152,9 @@ class _LegalAcceptanceGatePageState
               ),
               const SizedBox(height: 8),
               FilledButton(
-                onPressed: state.isSaving || !_accepted
+                onPressed: state.isSaving || !_accepted || documents == null
                     ? null
-                    : () => _accept(legalDocumentsAsync.value),
+                    : () => _accept(documents),
                 child: Text(
                   state.isSaving
                       ? text.profileLoadingAction

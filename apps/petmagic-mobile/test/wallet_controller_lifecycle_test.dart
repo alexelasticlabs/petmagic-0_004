@@ -12,12 +12,28 @@ import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
+import 'package:petmagic_mobile/features/wallet/data/wallet_store_purchase_recovery_store.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 import 'wallet_controller_test_source.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  SharedPreferencesAsyncPlatform? previousPreferencesPlatform;
+
+  setUp(() {
+    previousPreferencesPlatform = SharedPreferencesAsyncPlatform.instance;
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.empty();
+  });
+
+  tearDown(() {
+    SharedPreferencesAsyncPlatform.instance = previousPreferencesPlatform;
+  });
 
   test('wallet lifecycle side effects are initialized once outside build', () {
     final source = readWalletControllerLibrarySource();
@@ -110,6 +126,40 @@ void main() {
   });
 
   test(
+    'wallet load cancels in-flight request when network goes offline',
+    () async {
+      final repository = _DelayedWalletRepository();
+      final networkStatusController =
+          _TestWalletLifecycleNetworkStatusController(initialHasInternet: true);
+      final container = _walletTestContainer(
+        repository,
+        networkStatusController: networkStatusController,
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(walletControllerProvider.notifier);
+      final loadFuture = controller.load();
+
+      await repository.fetchWalletStarted.future;
+      expect(repository.fetchWalletCancelToken?.isCancelled, isFalse);
+
+      networkStatusController.setHasInternet(false);
+      await Future<void>.delayed(Duration.zero);
+
+      var state = container.read(walletControllerProvider);
+      expect(repository.fetchWalletCancelToken?.isCancelled, isTrue);
+      expect(state.isLoading, isFalse);
+      expect(state.isRefreshing, isFalse);
+
+      repository.completeFetchWallet();
+      await expectLater(loadFuture, completes);
+
+      state = container.read(walletControllerProvider);
+      expect(state.wallet, isNull);
+    },
+  );
+
+  test(
     'stripe verification completes safely after provider disposal',
     () async {
       final repository = _DelayedWalletRepository();
@@ -119,7 +169,9 @@ void main() {
       final checkout = await controller.buyPack(_pack, _stripeMethod);
       expect(checkout?.orderId, 'order-1');
 
-      final verificationFuture = controller.verifyStripeCheckout('cs_test_123');
+      final verificationFuture = controller.verifyStripeCheckout(
+        'cs_test_validSession123',
+      );
       await repository.verifyStripeStarted.future;
 
       container.dispose();
@@ -138,10 +190,14 @@ void main() {
     final checkout = await controller.buyPack(_pack, _stripeMethod);
     expect(checkout?.orderId, 'order-1');
 
-    final firstVerification = controller.verifyStripeCheckout('cs_test_123');
+    final firstVerification = controller.verifyStripeCheckout(
+      'cs_test_validSession123',
+    );
     await repository.verifyStripeStarted.future;
 
-    final secondVerification = controller.verifyStripeCheckout('cs_test_123');
+    final secondVerification = controller.verifyStripeCheckout(
+      'cs_test_validSession123',
+    );
     await Future<void>.delayed(Duration.zero);
 
     repository.completeVerifyStripe();
@@ -150,6 +206,30 @@ void main() {
 
     expect(repository.verifyStripeCalls, 1);
   });
+
+  test(
+    'stripe verification drops malformed reference before repository call',
+    () async {
+      final repository = _DelayedWalletRepository();
+      final container = _walletTestContainer(repository);
+      addTearDown(container.dispose);
+
+      final controller = container.read(walletControllerProvider.notifier);
+      final checkout = await controller.buyPack(_pack, _stripeMethod);
+      expect(checkout?.orderId, 'order-1');
+
+      final verification = controller.verifyStripeCheckout(
+        'https://evil.test/return?session_id=cs_test_bad',
+      );
+      await repository.verifyStripeStarted.future;
+
+      expect(repository.lastStripeReferenceId, isNull);
+
+      repository.completeVerifyStripe();
+      repository.completeFetchWallet();
+      await verification;
+    },
+  );
 
   test(
     'concurrent checkout status verification shares one in-flight polling loop',
@@ -441,6 +521,47 @@ void main() {
   });
 
   test(
+    'wallet load more cancels in-flight request when network goes offline',
+    () async {
+      final repository = _CancelableLedgerLoadMoreWalletRepository();
+      final networkStatusController =
+          _TestWalletLifecycleNetworkStatusController(initialHasInternet: true);
+      final container = _walletTestContainer(
+        repository,
+        networkStatusController: networkStatusController,
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(walletControllerProvider.notifier);
+      await controller.load();
+
+      final loadMoreFuture = controller.loadMoreLedger();
+      await repository.loadMoreStarted.future;
+
+      expect(repository.loadMoreCancelToken?.isCancelled, isFalse);
+      expect(
+        container.read(walletControllerProvider).isLoadingMoreLedger,
+        isTrue,
+      );
+
+      networkStatusController.setHasInternet(false);
+      await Future<void>.delayed(Duration.zero);
+
+      var state = container.read(walletControllerProvider);
+      expect(repository.loadMoreCancelToken?.isCancelled, isTrue);
+      expect(state.isLoadingMoreLedger, isFalse);
+      expect(state.ledgerLoadMoreErrorMessage, isNull);
+
+      repository.completeLoadMore();
+      await expectLater(loadMoreFuture, completes);
+
+      state = container.read(walletControllerProvider);
+      expect(state.ledger.map((item) => item.entryId), ['entry-1']);
+      expect(state.ledgerHasMore, isTrue);
+    },
+  );
+
+  test(
     'wallet load more skips duplicate ledger entries from overlapping pages',
     () async {
       final repository = _OverlappingLedgerLoadMoreWalletRepository();
@@ -463,6 +584,22 @@ void main() {
       expect(state.ledgerHasMore, isFalse);
     },
   );
+
+  test('wallet load more stops after duplicate-only page', () async {
+    final repository = _DuplicateOnlyLedgerLoadMoreWalletRepository();
+    final container = _walletTestContainer(repository);
+    addTearDown(container.dispose);
+
+    final controller = container.read(walletControllerProvider.notifier);
+    await controller.load();
+    await controller.loadMoreLedger();
+    await controller.loadMoreLedger();
+
+    final state = container.read(walletControllerProvider);
+    expect(repository.ledgerFetchCalls, 2);
+    expect(state.ledger.map((item) => item.entryId), ['entry-1']);
+    expect(state.ledgerHasMore, isFalse);
+  });
 
   test('wallet load more stays idle after sign-out', () async {
     final repository = _OverlappingLedgerLoadMoreWalletRepository();
@@ -536,11 +673,196 @@ void main() {
       expect(source, contains("String _stripeReferenceType(String? value)"));
     },
   );
+
+  test(
+    'store purchase verification deduplicates non-secret purchase updates',
+    () {
+      final source = readWalletControllerLibrarySource();
+      final verifyBody = _methodBody(source, '_verifyStorePurchase');
+
+      expect(
+        source,
+        contains('Set<String> _storePurchaseVerificationInFlightKeys'),
+      );
+      expect(source, contains('Set<String> _storePurchaseVerifiedKeys'));
+      expect(
+        verifyBody,
+        contains('_storePurchaseVerificationInFlightKeys.add'),
+      );
+      expect(verifyBody, contains('_storePurchaseVerifiedKeys.contains'));
+      expect(verifyBody, contains('_rememberStorePurchaseVerifiedKey'));
+      expect(
+        verifyBody,
+        contains('_storePurchaseVerificationInFlightKeys.remove'),
+      );
+      expect(source, contains('_maxStorePurchaseVerificationKeys = 32'));
+      expect(source, contains('_storePurchaseVerifiedKeys.remove'));
+      expect(source, contains('String? _storePurchaseVerificationKey'));
+      expect(source, contains('orderId'));
+      expect(source, contains('provider'));
+      expect(source, contains('purchase.purchaseID'));
+      expect(source, contains('purchase.transactionDate'));
+      expect(source, contains('purchase.productID'));
+      expect(source, isNot(contains('serverVerificationData')));
+      expect(source, isNot(contains('localVerificationData')));
+    },
+  );
+
+  test(
+    'wallet store pending purchase storage survives controller restart',
+    () async {
+      final preferences = SharedPreferencesAsync();
+      final store = WalletStorePurchaseRecoveryStore(
+        preferences: preferences,
+        clock: () => DateTime.utc(2026, 7, 2, 10, 5),
+      );
+      final pending = PendingStoreWalletPurchase(
+        orderId: 'order-store-1',
+        provider: 'google_play',
+        productId: 'com.petmagic.app.tokens.google.pack100',
+        packId: 'pack-100',
+        packCode: 'pack100',
+        createdAtUtc: DateTime.utc(2026, 7, 2, 10),
+      );
+
+      await store.savePendingPurchase(pending);
+
+      final restartedStore = WalletStorePurchaseRecoveryStore(
+        preferences: preferences,
+        clock: () => DateTime.utc(2026, 7, 2, 10, 5),
+      );
+      final restored = await restartedStore.readPendingPurchase();
+
+      expect(restored?.orderId, 'order-store-1');
+      expect(restored?.provider, 'google_play');
+      expect(restored?.productId, 'com.petmagic.app.tokens.google.pack100');
+      expect(restored?.packCode, 'pack100');
+    },
+  );
+
+  test('expired wallet store pending purchase is cleared', () async {
+    final preferences = SharedPreferencesAsync();
+    final store = WalletStorePurchaseRecoveryStore(
+      preferences: preferences,
+      clock: () => DateTime.utc(2026, 7, 20),
+    );
+    await store.savePendingPurchase(
+      PendingStoreWalletPurchase(
+        orderId: 'order-store-expired',
+        provider: 'google_play',
+        productId: 'com.petmagic.app.tokens.google.pack100',
+        packId: 'pack-100',
+        packCode: 'pack100',
+        createdAtUtc: DateTime.utc(2026, 7, 2, 10),
+      ),
+    );
+
+    final restored = await store.readPendingPurchase();
+
+    expect(restored, isNull);
+    expect(
+      await preferences.getString('wallet_pending_store_purchase_v1'),
+      isNull,
+    );
+  });
+
+  test(
+    'pending store purchase recovery restores checkout state and requests store restore once',
+    () async {
+      final repository = _StoreRecoveryWalletRepository(
+        pendingStorePurchase: PendingStoreWalletPurchase(
+          orderId: 'order-store-1',
+          provider: 'google_play',
+          productId: 'com.petmagic.app.tokens.google.pack100',
+          packId: 'pack-100',
+          packCode: 'pack100',
+          createdAtUtc: DateTime.utc(2026, 7, 2, 10),
+        ),
+      );
+      final container = _walletTestContainer(repository);
+      addTearDown(container.dispose);
+
+      final controller = container.read(walletControllerProvider.notifier);
+      await controller.load();
+      await Future<void>.delayed(Duration.zero);
+      controller.setWalletPageVisible(true);
+      await Future<void>.delayed(Duration.zero);
+
+      final state = container.read(walletControllerProvider);
+      expect(state.pendingCheckoutOrderId, 'order-store-1');
+      expect(state.pendingStoreProvider, 'google_play');
+      expect(
+        state.checkoutVerificationState,
+        WalletCheckoutVerificationState.pending,
+      );
+      expect(repository.restoreStorePurchasesCalls, 1);
+    },
+  );
+
+  test(
+    'lost wallet store order falls back to billing validation before completing purchase',
+    () async {
+      final repository = _StoreRecoveryWalletRepository(
+        validationResponse: const StoreBillingValidationModel(
+          provider: 'google_play',
+          productType: 'TokenPack',
+          productId: 'com.petmagic.app.tokens.google.pack100',
+          status: 'already_settled',
+          tokensGranted: false,
+          tokenAmount: 120,
+          isPremium: false,
+        ),
+      );
+      final container = _walletTestContainer(repository);
+      addTearDown(container.dispose);
+
+      container.read(walletControllerProvider);
+      repository.emitPurchase(_storePurchase());
+
+      await repository.validationStarted.future;
+      await Future<void>.delayed(Duration.zero);
+
+      final state = container.read(walletControllerProvider);
+      expect(repository.validateStorePurchaseCalls, 1);
+      expect(repository.completePurchaseCalls, 1);
+      expect(
+        state.checkoutVerificationState,
+        WalletCheckoutVerificationState.succeeded,
+      );
+      expect(state.checkoutGrantedSpark, 120);
+    },
+  );
+
+  test(
+    'store purchase is not completed when backend settlement fails',
+    () async {
+      final repository = _StoreRecoveryWalletRepository(
+        validationError: const AppException('wallet.server_unavailable'),
+      );
+      final container = _walletTestContainer(repository);
+      addTearDown(container.dispose);
+
+      container.read(walletControllerProvider);
+      repository.emitPurchase(_storePurchase());
+
+      await repository.validationStarted.future;
+      await Future<void>.delayed(Duration.zero);
+
+      final state = container.read(walletControllerProvider);
+      expect(repository.validateStorePurchaseCalls, 1);
+      expect(repository.completePurchaseCalls, 0);
+      expect(
+        state.checkoutVerificationState,
+        WalletCheckoutVerificationState.error,
+      );
+      expect(state.errorMessage, 'wallet.server_unavailable');
+    },
+  );
 }
 
 String _methodBody(String source, String methodName) {
   final methodMatch = RegExp(
-    r'(?:@override\s+)?(?:WalletState|void|Future<[^>]+>)\s+' +
+    r'(?:@override\s+)?(?:WalletState|String\?|void|Future<[^>]+>)\s+' +
         methodName +
         r'\s*\([^)]*\)\s*(?:async\s*)?\{',
   ).firstMatch(source);
@@ -604,6 +926,10 @@ class _TestWalletLifecycleNetworkStatusController
   NetworkStatusState build() {
     return NetworkStatusState(hasInternet: initialHasInternet);
   }
+
+  void setHasInternet(bool value) {
+    state = state.copyWith(hasInternet: value);
+  }
 }
 
 class _DelayedWalletRepository extends WalletRepository {
@@ -618,6 +944,7 @@ class _DelayedWalletRepository extends WalletRepository {
   final Completer<void> _verifyStripeCompleter = Completer<void>();
   CancelToken? fetchWalletCancelToken;
   int verifyStripeCalls = 0;
+  String? lastStripeReferenceId;
 
   @override
   Stream<List<PurchaseDetails>> get purchaseUpdates => const Stream.empty();
@@ -692,7 +1019,7 @@ class _DelayedWalletRepository extends WalletRepository {
       orderId: 'order-1',
       paymentProvider: 'stripe',
       checkoutUrl: checkoutUrl,
-      externalPaymentId: 'cs_test_123',
+      externalPaymentId: 'cs_test_validSession123',
       paymentIntentClientSecret: null,
       customerId: null,
       customerEphemeralKeySecret: null,
@@ -707,6 +1034,7 @@ class _DelayedWalletRepository extends WalletRepository {
     String? stripeReferenceId,
   }) async {
     verifyStripeCalls++;
+    lastStripeReferenceId = stripeReferenceId;
     if (!verifyStripeStarted.isCompleted) {
       verifyStripeStarted.complete();
     }
@@ -1324,6 +1652,220 @@ class _OverlappingLedgerLoadMoreWalletRepository extends WalletRepository {
   }
 }
 
+class _DuplicateOnlyLedgerLoadMoreWalletRepository extends WalletRepository {
+  _DuplicateOnlyLedgerLoadMoreWalletRepository()
+    : super(dio: Dio(), sessionStorage: AuthSessionStorage());
+
+  int ledgerFetchCalls = 0;
+
+  @override
+  Stream<List<PurchaseDetails>> get purchaseUpdates => const Stream.empty();
+
+  @override
+  Future<WalletStateModel> fetchWallet({CancelToken? cancelToken}) async {
+    return _wallet();
+  }
+
+  @override
+  Future<OffsetPagedModel<WalletLedgerItem>> fetchLedger({
+    int skip = 0,
+    int take = 20,
+    CancelToken? cancelToken,
+  }) async {
+    ledgerFetchCalls++;
+    return OffsetPagedModel(
+      items: [
+        WalletLedgerItem(
+          entryId: 'entry-1',
+          userId: 'user-1',
+          delta: 5,
+          balanceAfter: 10,
+          source: 'weekly_grant',
+          reason: 'Already loaded page item',
+          createdAtUtc: DateTime.utc(2026, 1, 1, 12),
+        ),
+      ],
+      skip: skip,
+      take: take,
+      hasMore: true,
+    );
+  }
+
+  @override
+  Future<RewardsSummaryModel> fetchRewards({CancelToken? cancelToken}) async {
+    return _emptyRewards();
+  }
+
+  @override
+  Future<WalletCheckoutConfigModel> fetchCheckoutConfig({
+    required Locale locale,
+    CancelToken? cancelToken,
+  }) async {
+    return const WalletCheckoutConfigModel(
+      packs: [],
+      paymentMethods: [],
+      externalPaymentWarningRequired: false,
+    );
+  }
+
+  @override
+  Future<OffsetPagedModel<PurchaseHistoryItem>> fetchPurchases({
+    int skip = 0,
+    int take = 20,
+    CancelToken? cancelToken,
+  }) async {
+    return const OffsetPagedModel(items: [], skip: 0, take: 20, hasMore: false);
+  }
+}
+
+class _StoreRecoveryWalletRepository extends WalletRepository {
+  _StoreRecoveryWalletRepository({
+    this.pendingStorePurchase,
+    this.validationResponse,
+    this.validationError,
+  }) : super(dio: Dio(), sessionStorage: AuthSessionStorage());
+
+  final _streamController = StreamController<List<PurchaseDetails>>.broadcast();
+  PendingStoreWalletPurchase? pendingStorePurchase;
+  final StoreBillingValidationModel? validationResponse;
+  final Object? validationError;
+  final Completer<void> validationStarted = Completer<void>();
+  int restoreStorePurchasesCalls = 0;
+  int validateStorePurchaseCalls = 0;
+  int completePurchaseCalls = 0;
+
+  @override
+  Stream<List<PurchaseDetails>> get purchaseUpdates => _streamController.stream;
+
+  void emitPurchase(PurchaseDetails purchase) {
+    _streamController.add([purchase]);
+  }
+
+  @override
+  Future<WalletStateModel> fetchWallet({CancelToken? cancelToken}) async {
+    return _wallet();
+  }
+
+  @override
+  Future<OffsetPagedModel<WalletLedgerItem>> fetchLedger({
+    int skip = 0,
+    int take = 20,
+    CancelToken? cancelToken,
+  }) async {
+    return const OffsetPagedModel(items: [], skip: 0, take: 20, hasMore: false);
+  }
+
+  @override
+  Future<RewardsSummaryModel> fetchRewards({CancelToken? cancelToken}) async {
+    return _emptyRewards();
+  }
+
+  @override
+  Future<WalletCheckoutConfigModel> fetchCheckoutConfig({
+    required Locale locale,
+    CancelToken? cancelToken,
+  }) async {
+    return const WalletCheckoutConfigModel(
+      packs: [
+        CurrencyPackModel(
+          packId: 'pack-100',
+          code: 'pack100',
+          displayName: 'Pack 100',
+          currencyCode: 'USD',
+          priceAmount: 4.99,
+          grantedSpark: 100,
+          bonusSpark: 20,
+          totalSpark: 120,
+          googlePlayProductId: 'com.petmagic.app.tokens.google.pack100',
+          appStoreProductId: 'com.petmagic.app.tokens.apple.pack100',
+        ),
+      ],
+      paymentMethods: [
+        WalletPaymentMethodModel(
+          provider: 'google_play',
+          purchaseChannel: 'in_app',
+          platform: 'android',
+          region: '*',
+          isEnabled: true,
+          isSelectedByDefault: true,
+          requiresExternalWarning: false,
+          requiresStoreDisclosure: true,
+          isRecommended: true,
+          bonusTokensPercent: 0,
+        ),
+      ],
+      externalPaymentWarningRequired: false,
+    );
+  }
+
+  @override
+  Future<OffsetPagedModel<PurchaseHistoryItem>> fetchPurchases({
+    int skip = 0,
+    int take = 20,
+    CancelToken? cancelToken,
+  }) async {
+    return const OffsetPagedModel(items: [], skip: 0, take: 20, hasMore: false);
+  }
+
+  @override
+  Future<PendingStoreWalletPurchase?> readPendingStorePurchase() async {
+    return pendingStorePurchase;
+  }
+
+  @override
+  Future<void> savePendingStorePurchase(
+    PendingStoreWalletPurchase purchase,
+  ) async {
+    pendingStorePurchase = purchase;
+  }
+
+  @override
+  Future<void> clearPendingStorePurchase({String? orderId}) async {
+    if (orderId == null ||
+        orderId.isEmpty ||
+        pendingStorePurchase?.orderId == orderId) {
+      pendingStorePurchase = null;
+    }
+  }
+
+  @override
+  Future<void> restoreStorePurchases() async {
+    restoreStorePurchasesCalls++;
+  }
+
+  @override
+  Future<StoreBillingValidationModel> validateStorePurchase({
+    required String provider,
+    required PurchaseDetails purchase,
+  }) async {
+    validateStorePurchaseCalls++;
+    if (!validationStarted.isCompleted) {
+      validationStarted.complete();
+    }
+    final error = validationError;
+    if (error != null) {
+      throw error;
+    }
+
+    return validationResponse ??
+        StoreBillingValidationModel(
+          provider: provider,
+          productType: 'TokenPack',
+          productId: purchase.productID,
+          status: 'succeeded',
+          tokensGranted: true,
+          tokenAmount: 120,
+          isPremium: false,
+        );
+  }
+
+  @override
+  Future<void> completePurchase(PurchaseDetails purchase) async {
+    completePurchaseCalls++;
+    purchase.pendingCompletePurchase = false;
+  }
+}
+
 class _MutableWalletLifecycleAppLaunchController extends AppLaunchController {
   _MutableWalletLifecycleAppLaunchController(this._isAuthenticated);
 
@@ -1392,4 +1934,23 @@ WalletStateModel _wallet() {
     isPremium: false,
     updatedAtUtc: DateTime.utc(2026, 1, 1),
   );
+}
+
+PurchaseDetails _storePurchase({
+  String productId = 'com.petmagic.app.tokens.google.pack100',
+  String source = 'google_play',
+}) {
+  final purchase = PurchaseDetails(
+    purchaseID: 'gp-purchase-1',
+    productID: productId,
+    verificationData: PurchaseVerificationData(
+      localVerificationData: 'local-store-data',
+      serverVerificationData: 'gp-token-pack-1',
+      source: source,
+    ),
+    transactionDate: DateTime.utc(2026, 7, 2).millisecondsSinceEpoch.toString(),
+    status: PurchaseStatus.purchased,
+  );
+  purchase.pendingCompletePurchase = true;
+  return purchase;
 }

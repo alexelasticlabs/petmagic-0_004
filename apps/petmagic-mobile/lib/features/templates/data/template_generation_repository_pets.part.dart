@@ -8,39 +8,43 @@ Future<PetPhoto> _uploadPetPhoto(
 }) async {
   OptimizedUploadFile? optimizedPhoto;
   try {
+    final encodedPetId = repository._apiPathSegment(petId);
+    final sourceRawFileName = photo.name.isNotEmpty
+        ? photo.name
+        : photo.path.split(Platform.pathSeparator).last;
+    final sourceFileName = repository._safeSourceImageFileName(
+      sourceRawFileName,
+    );
+    final sourceDeclaredContentType =
+        photo.mimeType ?? repository._resolveImageContentType(sourceFileName);
+
+    await _validatePetPhotoUploadFile(
+      repository,
+      filePath: photo.path,
+      contentType: sourceDeclaredContentType,
+    );
+
     optimizedPhoto = await repository._imageUploadOptimizer.optimizeForPetPhoto(
-      photo,
+      XFile(
+        photo.path,
+        name: sourceFileName,
+        mimeType: sourceDeclaredContentType,
+      ),
       cancelToken: cancelToken,
     );
     final uploadFile = optimizedPhoto.file;
-    final encodedPetId = repository._apiPathSegment(petId);
     final rawFileName = uploadFile.name.isNotEmpty
         ? uploadFile.name
         : uploadFile.path.split(Platform.pathSeparator).last;
     final fileName = repository._safeSourceImageFileName(rawFileName);
     final declaredContentType =
         uploadFile.mimeType ?? repository._resolveImageContentType(fileName);
-    if (!repository._isAllowedImageContentType(declaredContentType) &&
-        !repository._isGenericBinaryContentType(declaredContentType)) {
-      throw const AppException('pets.photo_type_not_allowed');
-    }
 
-    final fileSize = await repository._uploadImageSizeBytes(
-      uploadFile.path,
-      unavailableMessage: 'pets.photo_type_not_allowed',
+    final contentType = await _validatePetPhotoUploadFile(
+      repository,
+      filePath: uploadFile.path,
+      contentType: declaredContentType,
     );
-    if (fileSize <= 0 ||
-        fileSize > TemplateGenerationRepository._maxPetPhotoBytes) {
-      throw const AppException('pets.photo_type_not_allowed');
-    }
-
-    final contentType = await repository._detectSourceImageContentType(
-      uploadFile.path,
-      unavailableMessage: 'pets.photo_type_not_allowed',
-    );
-    if (contentType == null) {
-      throw const AppException('pets.photo_type_not_allowed');
-    }
 
     final response = await repository._authorizedRequest<Map<String, dynamic>>(
       (session) async => repository._dio.post<Map<String, dynamic>>(
@@ -62,6 +66,37 @@ Future<PetPhoto> _uploadPetPhoto(
   } finally {
     await optimizedPhoto?.dispose();
   }
+}
+
+Future<String> _validatePetPhotoUploadFile(
+  TemplateGenerationRepository repository, {
+  required String filePath,
+  required String contentType,
+}) async {
+  if (!repository._isAllowedImageContentType(contentType) &&
+      !repository._isGenericBinaryContentType(contentType)) {
+    throw const AppException('pets.photo_type_not_allowed');
+  }
+
+  final fileSize = await repository._uploadImageSizeBytes(
+    filePath,
+    unavailableMessage: 'pets.photo_type_not_allowed',
+  );
+  if (fileSize <= 0 ||
+      fileSize > TemplateGenerationRepository._maxPetPhotoBytes) {
+    throw const AppException('pets.photo_type_not_allowed');
+  }
+
+  final detectedContentType = await repository._detectSourceImageContentType(
+    filePath,
+    unavailableMessage: 'pets.photo_type_not_allowed',
+  );
+  if (detectedContentType == null ||
+      !repository._isAllowedImageContentType(detectedContentType)) {
+    throw const AppException('pets.photo_type_not_allowed');
+  }
+
+  return detectedContentType;
 }
 
 Future<List<PetPhoto>> _fetchPetPhotos(

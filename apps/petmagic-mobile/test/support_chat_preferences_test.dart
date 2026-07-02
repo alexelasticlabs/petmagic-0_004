@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/preferences/app_preferences_controller.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_realtime_client.dart';
@@ -370,6 +371,59 @@ void main() {
   });
 
   testWidgets(
+    'support chat page shows offline unavailable state and recovers after reconnect',
+    (tester) async {
+      final supportRepository = FakeSupportChatRepository();
+      final networkController = _SupportChatTestNetworkStatusController(false);
+
+      addTearDown(() async {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+      });
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            supportChatRepositoryProvider.overrideWith(
+              (ref) => supportRepository,
+            ),
+            appLaunchControllerProvider.overrideWith(
+              AuthenticatedWidgetAppLaunchController.new,
+            ),
+            supportChatRealtimeClientProvider.overrideWith(
+              (ref) => const FakeSupportChatRealtimeClient(),
+            ),
+            networkStatusControllerProvider.overrideWith(
+              () => networkController,
+            ),
+          ],
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            locale: const Locale('en'),
+            theme: AppTheme.light(),
+            darkTheme: AppTheme.dark(),
+            home: const SupportChatPage(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump();
+
+      expect(supportRepository.getConversationCalls, 0);
+      expect(find.text("You're offline"), findsOneWidget);
+
+      networkController.setHasInternet(true);
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(supportRepository.getConversationCalls, 1);
+      expect(find.text('How can we help today?'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'support chat keeps real admin replies visible even when body matches old system prefixes',
     (tester) async {
       final supportRepository = FakeSupportChatRepository()
@@ -604,4 +658,19 @@ void main() {
       expect(state.locale, const Locale('en', 'US'));
     },
   );
+}
+
+class _SupportChatTestNetworkStatusController extends NetworkStatusController {
+  _SupportChatTestNetworkStatusController(bool hasInternet)
+    : _state = NetworkStatusState(hasInternet: hasInternet);
+
+  NetworkStatusState _state;
+
+  @override
+  NetworkStatusState build() => _state;
+
+  void setHasInternet(bool value) {
+    _state = _state.copyWith(hasInternet: value);
+    state = _state;
+  }
 }

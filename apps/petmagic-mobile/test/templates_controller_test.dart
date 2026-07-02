@@ -65,10 +65,12 @@ void main() {
     () async {
       final repository = FakeTemplatesControllerRepository();
       final realtimeClient = FakeTemplatesControllerRealtimeClient();
+      final networkController = _TestNetworkStatusController(true);
       final container = ProviderContainer(
         overrides: [
           templatesRepositoryProvider.overrideWithValue(repository),
           realtimeClientProvider.overrideWithValue(realtimeClient),
+          networkStatusControllerProvider.overrideWith(() => networkController),
         ],
       );
       addTearDown(container.dispose);

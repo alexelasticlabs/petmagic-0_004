@@ -1,8 +1,20 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 
 void main() {
+  test('support media cache keys strip signed URL secrets', () {
+    final safeUrl = persistentSafeSupportMediaUrl(
+      'https://cdn.petmagic.app/support/attachments/cat.jpg?X-Amz-Signature=secret&token=raw#viewer',
+    );
+
+    expect(safeUrl, 'https://cdn.petmagic.app/support/attachments/cat.jpg');
+    expect(safeUrl, isNot(contains('X-Amz-Signature')));
+    expect(safeUrl, isNot(contains('token=raw')));
+    expect(safeUrl, isNot(contains('viewer')));
+  });
+
   test(
     'network image attachment previews use one bounded image provider',
     () async {
@@ -12,7 +24,9 @@ void main() {
       ).readAsString();
 
       expect(source, contains('ResizeImage.resizeIfNeeded'));
-      expect(source, contains('CachedNetworkImageProvider(imageUrl'));
+      expect(source, contains('CachedNetworkImageProvider('));
+      expect(source, contains('imageUrl,'));
+      expect(source, contains('cacheKey: persistentSafeSupportMediaUrl('));
       expect(source, contains('maxWidth: _previewCacheWidth'));
       expect(source, contains('image: _imageProvider'));
       expect(
@@ -22,6 +36,7 @@ void main() {
         ),
       );
       expect(source, contains('CachedNetworkImage('));
+      expect(source, contains('cacheKey: persistentSafeSupportMediaUrl('));
       expect(source, contains('memCacheWidth: 512'));
       expect(
         source,
@@ -47,6 +62,9 @@ void main() {
     final replySource = await File(
       'lib/features/support/presentation/widgets/support_chat_messages_reply.part.dart',
     ).readAsString();
+    final dialogsSource = await File(
+      'lib/features/support/presentation/widgets/support_chat_dialogs.part.dart',
+    ).readAsString();
 
     expect(
       pageSource,
@@ -71,6 +89,14 @@ void main() {
       expect(source, contains('filterQuality: FilterQuality.medium'));
       expect(source, isNot(contains('cacheWidth: 720')));
     }
+    expect(replySource, contains('parseSafeSupportExternalUri('));
+    expect(composerSource, contains('parseSafeSupportExternalUri('));
+    expect(replySource, contains('cacheKey: persistentSafeSupportMediaUrl('));
+    expect(
+      composerSource,
+      contains('cacheKey: persistentSafeSupportMediaUrl('),
+    );
+    expect(dialogsSource, contains('cacheKey: persistentSafeSupportMediaUrl('));
   });
 
   test('support image previews avoid uncached Image.network widgets', () async {
@@ -104,6 +130,12 @@ void main() {
     final messagesSource = await File(
       'lib/features/support/presentation/widgets/support_chat_messages.part.dart',
     ).readAsString();
+    final replySource = await File(
+      'lib/features/support/presentation/widgets/support_chat_messages_reply.part.dart',
+    ).readAsString();
+    final composerSource = await File(
+      'lib/features/support/presentation/widgets/support_chat_composer.part.dart',
+    ).readAsString();
     final metaSource = await File(
       'lib/features/support/presentation/widgets/support_chat_messages_meta.part.dart',
     ).readAsString();
@@ -121,7 +153,12 @@ void main() {
       ),
     );
     expect(mediaSource, contains('imageUrl: safeUri!.toString()'));
+    expect(mediaSource, contains('cacheKey: persistentSafeSupportMediaUrl('));
     expect(mediaSource, contains('_UnsupportedAttachmentTileBackground('));
+    expect(replySource, contains('final safeUri = canShowImage'));
+    expect(replySource, contains('imageUrl: safeUri.toString()'));
+    expect(composerSource, contains('final safeUri = showImageThumb'));
+    expect(composerSource, contains('imageUrl: safeUri.toString()'));
     expect(
       messagesSource,
       contains(

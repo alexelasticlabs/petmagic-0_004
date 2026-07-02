@@ -199,15 +199,35 @@ class FakeHttpClientAdapter implements HttpClientAdapter {
 }
 
 class FakeImageUploadOptimizer extends ImageUploadOptimizer {
-  const FakeImageUploadOptimizer({this.petPhoto});
+  FakeImageUploadOptimizer({this.petPhoto, this.generationSource});
 
   final File? petPhoto;
+  final File? generationSource;
+  int petPhotoOptimizeCalls = 0;
+  int generationSourceOptimizeCalls = 0;
+
+  @override
+  Future<OptimizedUploadFile> optimizeGenerationSource(
+    XFile source, {
+    CancelToken? cancelToken,
+  }) async {
+    generationSourceOptimizeCalls++;
+    final file = generationSource;
+    if (file == null) {
+      return OptimizedUploadFile.original(source);
+    }
+
+    return OptimizedUploadFile.original(
+      XFile(file.path, name: 'optimized-source.jpg', mimeType: 'image/jpeg'),
+    );
+  }
 
   @override
   Future<OptimizedUploadFile> optimizeForPetPhoto(
     XFile source, {
     CancelToken? cancelToken,
   }) async {
+    petPhotoOptimizeCalls++;
     final file = petPhoto;
     if (file == null) {
       return OptimizedUploadFile.original(source);

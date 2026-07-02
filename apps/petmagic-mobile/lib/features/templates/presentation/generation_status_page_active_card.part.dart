@@ -254,6 +254,7 @@ class _ActivePreviewFrame extends StatelessWidget {
               else if (previewUrl != null)
                 CachedNetworkImage(
                   imageUrl: previewUrl,
+                  cacheKey: persistentSafeGenerationMediaUrl(previewUrl),
                   fit: BoxFit.cover,
                   memCacheWidth: 320,
                   maxWidthDiskCache: 320,

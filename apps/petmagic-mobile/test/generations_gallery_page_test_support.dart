@@ -8,9 +8,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
+import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
+import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
@@ -19,6 +22,7 @@ import 'package:petmagic_mobile/features/templates/presentation/templates_page.d
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
@@ -56,6 +60,8 @@ class GalleryHarness {
     this.authenticated = true,
     this.hasPremiumAccess,
     this.walletController,
+    this.networkStatusController,
+    this.repository,
     Completer<void>? markReadCompleter,
   }) : controller = FakeGalleryGenerationHistoryController(
          items ?? initialState?.items ?? sampleGalleryItems(),
@@ -135,6 +141,8 @@ class GalleryHarness {
   final bool authenticated;
   final bool? hasPremiumAccess;
   final WalletController? walletController;
+  final NetworkStatusController? networkStatusController;
+  final FakeGalleryTemplateGenerationRepository? repository;
 
   Widget app() {
     return ProviderScope(
@@ -153,6 +161,13 @@ class GalleryHarness {
                   : StaticGalleryWalletController(
                       isPremium: hasPremiumAccess!,
                     )),
+        ),
+        if (networkStatusController != null)
+          networkStatusControllerProvider.overrideWith(
+            () => networkStatusController!,
+          ),
+        templateGenerationRepositoryProvider.overrideWithValue(
+          repository ?? FakeGalleryTemplateGenerationRepository(),
         ),
         realtimeClientProvider.overrideWith(
           (ref) => const NoopRealtimeClient(),
@@ -273,6 +288,21 @@ class TrackingGalleryWalletController extends WalletController {
   }
 }
 
+class TestGalleryNetworkStatusController extends NetworkStatusController {
+  TestGalleryNetworkStatusController({required this.initialHasInternet});
+
+  final bool initialHasInternet;
+
+  @override
+  NetworkStatusState build() {
+    return NetworkStatusState(hasInternet: initialHasInternet);
+  }
+
+  void setHasInternet(bool value) {
+    state = state.copyWith(hasInternet: value);
+  }
+}
+
 class FakeGalleryGenerationHistoryController
     extends GenerationHistoryController {
   FakeGalleryGenerationHistoryController(
@@ -287,6 +317,7 @@ class FakeGalleryGenerationHistoryController
   final Completer<void>? _markReadCompleter;
   final List<GenerationHistoryFilter> loadCalls = [];
   final List<GenerationHistoryFilter> refreshCalls = [];
+  int loadMoreCalls = 0;
   final List<String> markReadCalls = [];
   final List<String> deleteGenerationCalls = [];
   final List<bool> screenVisibilityCalls = [];
@@ -326,8 +357,17 @@ class FakeGalleryGenerationHistoryController
       items: filtered,
       unreadCount: filtered.where((item) => item.isUnread).length,
       isLoading: false,
+      hasMore: false,
+      clearNextCursor: true,
+      clearLoadMoreError: true,
       clearError: true,
     );
+  }
+
+  @override
+  Future<void> loadMore() async {
+    loadMoreCalls++;
+    state = state.copyWith(isLoadingMore: false, clearLoadMoreError: true);
   }
 
   @override
@@ -341,39 +381,7 @@ class FakeGalleryGenerationHistoryController
     final updated = [
       for (final item in state.items)
         if (item.generationId == generationId)
-          TemplateGenerationResult(
-            generationId: item.generationId,
-            userId: item.userId,
-            templateId: item.templateId,
-            status: item.status,
-            tokenCost: item.tokenCost,
-            attemptCount: item.attemptCount,
-            createdAtUtc: item.createdAtUtc,
-            updatedAtUtc: item.updatedAtUtc,
-            userMediaExpired: item.userMediaExpired,
-            templateTitle: item.templateTitle,
-            templateType: item.templateType,
-            stage: item.stage,
-            progressPercent: item.progressPercent,
-            estimatedDurationLabel: item.estimatedDurationLabel,
-            sourceImageAsset: item.sourceImageAsset,
-            normalizedImageUrl: item.normalizedImageUrl,
-            referenceMotionUrl: item.referenceMotionUrl,
-            outputUrl: item.outputUrl,
-            usedPreprocessingModel: item.usedPreprocessingModel,
-            usedKlingModel: item.usedKlingModel,
-            outputVideoDurationSeconds: item.outputVideoDurationSeconds,
-            failureCode: item.failureCode,
-            failureMessage: item.failureMessage,
-            startedAtUtc: item.startedAtUtc,
-            preprocessingCompletedAtUtc: item.preprocessingCompletedAtUtc,
-            motionGenerationCompletedAtUtc: item.motionGenerationCompletedAtUtc,
-            mediaImportCompletedAtUtc: item.mediaImportCompletedAtUtc,
-            completedAtUtc: item.completedAtUtc,
-            chargedAtUtc: item.chargedAtUtc,
-            refundedAtUtc: item.refundedAtUtc,
-            isUnread: false,
-          )
+          item.copyWith(isUnread: false)
         else
           item,
     ];
@@ -414,6 +422,60 @@ class FakeGalleryGenerationHistoryController
   }
 }
 
+class FakeGalleryTemplateGenerationRepository
+    extends TemplateGenerationRepository {
+  FakeGalleryTemplateGenerationRepository({
+    this.downloadUrl = 'https://cdn.petmagic.test/fresh-download.jpg',
+    this.shareUrl = 'https://cdn.petmagic.test/fresh-share.jpg',
+    this.downloadFileName = 'fresh-download.jpg',
+    this.shareFileName = 'fresh-share.jpg',
+    this.durableShareUrl = 'https://app.petmagic.test/share/generation/token',
+  }) : super(
+         dio: Dio(),
+         sessionStorage: AuthSessionStorage(),
+         preferences: SharedPreferencesAsync(),
+       );
+
+  final String downloadUrl;
+  final String shareUrl;
+  final String downloadFileName;
+  final String shareFileName;
+  final String durableShareUrl;
+  final downloadCalls = <String>[];
+  final shareCalls = <String>[];
+  CancelToken? downloadCancelToken;
+  CancelToken? shareCancelToken;
+
+  @override
+  Future<GenerationMediaAccessResult> fetchDownloadUrl(
+    String generationId, {
+    CancelToken? cancelToken,
+  }) async {
+    downloadCalls.add(generationId);
+    downloadCancelToken = cancelToken;
+    return GenerationMediaAccessResult(
+      mediaUrl: downloadUrl,
+      hasWatermark: false,
+      fileName: downloadFileName,
+    );
+  }
+
+  @override
+  Future<GenerationMediaAccessResult> fetchShareUrl(
+    String generationId, {
+    CancelToken? cancelToken,
+  }) async {
+    shareCalls.add(generationId);
+    shareCancelToken = cancelToken;
+    return GenerationMediaAccessResult(
+      mediaUrl: shareUrl,
+      hasWatermark: false,
+      fileName: shareFileName,
+      shareUrl: durableShareUrl,
+    );
+  }
+}
+
 class DelayedGalleryGenerationStatusMediaActions
     extends GenerationStatusMediaActions {
   DelayedGalleryGenerationStatusMediaActions({
@@ -435,6 +497,7 @@ class DelayedGalleryGenerationStatusMediaActions
   final sharedLocalPaths = <String?>[];
   final savedFileNames = <String>[];
   final sharedFileNames = <String>[];
+  final sharedTexts = <String?>[];
 
   @override
   Future<bool> saveToGallery({
@@ -465,12 +528,14 @@ class DelayedGalleryGenerationStatusMediaActions
     required String fileName,
     required String title,
     required CancelToken cancelToken,
+    String? shareText,
     String? localPath,
   }) {
     shareCalls++;
     sharedUrls.add(mediaUrl);
     sharedLocalPaths.add(localPath);
     sharedFileNames.add(fileName);
+    sharedTexts.add(shareText);
     shareCancelToken = cancelToken;
     if (!shareStarted.isCompleted) {
       shareStarted.complete();
@@ -585,7 +650,17 @@ TemplateGenerationResult galleryGenerationFixture({
   String? localOutputPath,
   String? petId,
   String? petPhotoId,
+  GalleryMedia? galleryMedia,
 }) {
+  final defaultGalleryMedia =
+      galleryMedia ??
+      _galleryMediaForFixture(
+        status: status,
+        templateType: templateType,
+        outputUrl: outputUrl,
+        outputVideoDurationSeconds: outputVideoDurationSeconds,
+        localOutputPath: localOutputPath,
+      );
   return TemplateGenerationResult(
     generationId: generationId,
     userId: 'user-1',
@@ -609,6 +684,45 @@ TemplateGenerationResult galleryGenerationFixture({
     localOutputPath: localOutputPath,
     petId: petId,
     petPhotoId: petPhotoId,
+    galleryMedia: defaultGalleryMedia,
+  );
+}
+
+GalleryMedia _galleryMediaForFixture({
+  required TemplateGenerationStatus status,
+  required String templateType,
+  required String? outputUrl,
+  required double? outputVideoDurationSeconds,
+  required String? localOutputPath,
+}) {
+  final mediaType = templateType.toLowerCase().contains('video')
+      ? 'video'
+      : 'image';
+  if (status == TemplateGenerationStatus.completed) {
+    final hasActionableMedia =
+        (outputUrl != null && outputUrl.isNotEmpty) ||
+        (localOutputPath != null && localOutputPath.isNotEmpty);
+    return GalleryMedia(
+      state: hasActionableMedia
+          ? GalleryMediaState.resultReady
+          : GalleryMediaState.storageUnavailable,
+      mediaType: mediaType,
+      previewUrl: outputUrl,
+      resultUrl: outputUrl,
+      durationSeconds: outputVideoDurationSeconds,
+      canDownload: hasActionableMedia,
+      canShare: hasActionableMedia,
+    );
+  }
+  if (status == TemplateGenerationStatus.failed ||
+      status == TemplateGenerationStatus.cancelled) {
+    return GalleryMedia(state: GalleryMediaState.failed, mediaType: mediaType);
+  }
+  return GalleryMedia(
+    state: status == TemplateGenerationStatus.queued
+        ? GalleryMediaState.pending
+        : GalleryMediaState.processing,
+    mediaType: mediaType,
   );
 }
 

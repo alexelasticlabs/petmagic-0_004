@@ -867,36 +867,22 @@ class AppLocalizationsDe extends AppLocalizations {
   String get walletViewPremiumAction => 'Premium anzeigen';
 
   @override
-  String get walletWhatYouCanCreateTitle => 'Reicht für ungefähr:';
-
-  @override
-  String walletApproxPhotos(Object count) {
-    return '$count Fotos';
+  String walletApproxGenerations(Object count) {
+    return '≈ $count Generierungen zu aktuellen Vorlagenpreisen';
   }
 
   @override
-  String walletApproxVideos(Object count) {
-    return '$count Videos';
+  String walletApproxGenerationRange(Object fromCount, Object toCount) {
+    return '≈ $fromCount-$toCount Generierungen zu aktuellen Vorlagenpreisen';
   }
 
   @override
-  String walletApproxPhotosOnly(Object photos) {
-    return '≈ $photos';
-  }
+  String get walletApproxGenerationBelowOne =>
+      'Weniger als eine Generierung zu aktuellen Vorlagenpreisen';
 
   @override
-  String walletApproxPhotosOrVideos(Object photos, Object videos) {
-    return '≈ $photos oder $videos';
-  }
-
-  @override
-  String get walletSpendPhotoSubtitle => 'Fotos\nab 10 Spark';
-
-  @override
-  String get walletSpendVideoSubtitle => 'Videos\nab 50 Spark';
-
-  @override
-  String get walletSpendPremiumSubtitle => 'Premium\nab 80 Spark';
+  String get walletGenerationPricingUnavailable =>
+      'Vorlagenpreise werden aus PetMagic geladen.';
 
   @override
   String get walletContactSupportAction => 'Support kontaktieren';
@@ -3742,6 +3728,40 @@ class AppLocalizationsDe extends AppLocalizations {
   String generationStatusShowMoreAction(Object hiddenCount) {
     return 'Mehr anzeigen ($hiddenCount) ▾';
   }
+
+  @override
+  String get generationStatusLoadMoreAction => 'Mehr laden';
+
+  @override
+  String get generationStatusLoadMoreFailed =>
+      'Weitere Ergebnisse konnten nicht geladen werden.';
+
+  @override
+  String get generationStatusMediaPreparingMessage =>
+      'Medien werden vorbereitet...';
+
+  @override
+  String get generationStatusMediaPreviewOnlyMessage =>
+      'Die Vorschau ist verfugbar, wahrend die finale Datei vorbereitet wird.';
+
+  @override
+  String get generationStatusMediaWatermarkPreparingMessage =>
+      'Die saubere Version wird vorbereitet...';
+
+  @override
+  String get generationStatusMediaExpiredMessage =>
+      'Dieses Medium ist abgelaufen.';
+
+  @override
+  String get generationStatusMediaUnavailableMessage =>
+      'Medium ist nicht verfugbar.';
+
+  @override
+  String get generationStatusMediaFailedMessage =>
+      'Medienverarbeitung fehlgeschlagen.';
+
+  @override
+  String get generationStatusMediaHiddenMessage => 'Medium ist ausgeblendet.';
 
   @override
   String get generationStatusCollapseAction => 'Einklappen ▲';

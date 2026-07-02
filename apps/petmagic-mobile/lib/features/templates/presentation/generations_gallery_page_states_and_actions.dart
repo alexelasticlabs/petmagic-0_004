@@ -47,6 +47,55 @@ class _ThumbnailPlaceholder extends StatelessWidget {
   }
 }
 
+class _GalleryMediaStateBanner extends StatelessWidget {
+  const _GalleryMediaStateBanner({
+    required this.generation,
+    required this.message,
+  });
+
+  final TemplateGenerationResult generation;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final isBlocking =
+        generation.galleryMedia.state == GalleryMediaState.expired ||
+        generation.galleryMedia.state == GalleryMediaState.storageUnavailable ||
+        generation.galleryMedia.state == GalleryMediaState.failed;
+    final accent = isBlocking ? colors.danger : colors.gold;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: accent.withValues(alpha: 0.35)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(galleryMediaStateIcon(generation), size: 14, color: accent),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                message,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: colors.textSoft,
+                  fontWeight: FontWeight.w700,
+                  height: 1.2,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _EmptyState extends StatelessWidget {
   const _EmptyState({required this.filter});
 
@@ -345,6 +394,10 @@ Future<void> _showReadyCardActions(
 ) async {
   final colors = context.petMagicColors;
   final isMediaActionInFlight = galleryState._isMediaActionInFlight;
+  final mediaMessage = galleryMediaStateMessage(text, generation);
+  final canDownload =
+      generation.galleryMedia.canDownload && !isMediaActionInFlight;
+  final canShare = generation.galleryMedia.canShare && !isMediaActionInFlight;
 
   await showModalBottomSheet<void>(
     context: context,
@@ -371,6 +424,15 @@ Future<void> _showReadyCardActions(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (generation.galleryMedia.needsExplanation &&
+                        mediaMessage.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                        child: _GalleryMediaStateBanner(
+                          generation: generation,
+                          message: mediaMessage,
+                        ),
+                      ),
                     ListTile(
                       leading: const Icon(Icons.open_in_new_rounded),
                       title: Text(text.generationStatusOpenStatusAction),
@@ -393,7 +455,13 @@ Future<void> _showReadyCardActions(
                     ListTile(
                       leading: const Icon(Icons.download_rounded),
                       title: Text(text.generationStatusSaveAction),
-                      onTap: isMediaActionInFlight
+                      subtitle:
+                          !generation.galleryMedia.canDownload &&
+                              mediaMessage.isNotEmpty
+                          ? Text(mediaMessage)
+                          : null,
+                      enabled: canDownload,
+                      onTap: !canDownload
                           ? null
                           : () {
                               Navigator.of(sheetContext).pop();
@@ -410,7 +478,13 @@ Future<void> _showReadyCardActions(
                     ListTile(
                       leading: const Icon(Icons.share_rounded),
                       title: Text(text.supportChatShareAction),
-                      onTap: isMediaActionInFlight
+                      subtitle:
+                          !generation.galleryMedia.canShare &&
+                              mediaMessage.isNotEmpty
+                          ? Text(mediaMessage)
+                          : null,
+                      enabled: canShare,
+                      onTap: !canShare
                           ? null
                           : () {
                               Navigator.of(sheetContext).pop();
@@ -427,12 +501,25 @@ Future<void> _showReadyCardActions(
                     ListTile(
                       leading: const Icon(Icons.link_rounded),
                       title: Text(text.generationStatusCopyLinkAction),
-                      onTap: () {
-                        Navigator.of(sheetContext).pop();
-                        unawaited(
-                          _copyGenerationLink(context, text, generation),
-                        );
-                      },
+                      subtitle:
+                          !generation.galleryMedia.canShare &&
+                              mediaMessage.isNotEmpty
+                          ? Text(mediaMessage)
+                          : null,
+                      enabled: canShare,
+                      onTap: !canShare
+                          ? null
+                          : () {
+                              Navigator.of(sheetContext).pop();
+                              unawaited(
+                                _copyGenerationLink(
+                                  galleryState,
+                                  text,
+                                  ref,
+                                  generation,
+                                ),
+                              );
+                            },
                     ),
                     ListTile(
                       leading: const Icon(Icons.delete_outline_rounded),
@@ -571,7 +658,6 @@ Future<void> _saveGenerationToGallery(
   }
   final context = galleryState.context;
 
-  final outputUrl = generation.outputUrl;
   final localOutputPath = await usableLocalMediaPath(
     generation.localOutputPath,
   );
@@ -579,7 +665,24 @@ Future<void> _saveGenerationToGallery(
     galleryState._completeMediaAction(mediaActionCancelToken);
     return;
   }
-  final safeOutputUri = parseSafeGenerationMediaUri(outputUrl);
+  final access = await _fetchGenerationMediaAccess(
+    context: context,
+    text: text,
+    ref: ref,
+    generationId: generation.generationId,
+    cancelToken: mediaActionCancelToken,
+    forShare: false,
+  );
+  if (access == null) {
+    galleryState._completeMediaAction(mediaActionCancelToken);
+    return;
+  }
+  if (!context.mounted) {
+    galleryState._completeMediaAction(mediaActionCancelToken);
+    return;
+  }
+
+  final safeOutputUri = parseSafeGenerationMediaUri(access.mediaUrl);
   if (safeOutputUri == null && localOutputPath == null) {
     _notifySoon(context, text.generationStatusResultUnavailableForSave);
     galleryState._completeMediaAction(mediaActionCancelToken);
@@ -587,10 +690,12 @@ Future<void> _saveGenerationToGallery(
   }
   final safeOutputUrl = safeOutputUri?.toString() ?? '';
 
-  final fileName = _buildGenerationFileName(
-    generation,
-    safeOutputUrl.isEmpty ? localOutputPath ?? '' : safeOutputUrl,
-  );
+  final fileName = access.fileName.isEmpty
+      ? _buildGenerationFileName(
+          generation,
+          safeOutputUrl.isEmpty ? localOutputPath ?? '' : safeOutputUrl,
+        )
+      : access.fileName;
   try {
     final wasSaved = await ref
         .read(generationStatusMediaActionsProvider)
@@ -642,7 +747,6 @@ Future<void> _shareGenerationFile(
   }
   final context = galleryState.context;
 
-  final outputUrl = generation.outputUrl;
   final localOutputPath = await usableLocalMediaPath(
     generation.localOutputPath,
   );
@@ -650,25 +754,52 @@ Future<void> _shareGenerationFile(
     galleryState._completeMediaAction(mediaActionCancelToken);
     return;
   }
-  final safeOutputUri = parseSafeGenerationMediaUri(outputUrl);
+  final access = await _fetchGenerationMediaAccess(
+    context: context,
+    text: text,
+    ref: ref,
+    generationId: generation.generationId,
+    cancelToken: mediaActionCancelToken,
+    forShare: true,
+  );
+  if (access == null) {
+    galleryState._completeMediaAction(mediaActionCancelToken);
+    return;
+  }
+  if (!context.mounted) {
+    galleryState._completeMediaAction(mediaActionCancelToken);
+    return;
+  }
+
+  final safeShareUri = parseSafeExternalUri(access.shareUrl);
+  if (safeShareUri == null) {
+    _notifySoon(context, text.generationStatusResultUnavailableForShare);
+    galleryState._completeMediaAction(mediaActionCancelToken);
+    return;
+  }
+  final safeOutputUri = parseSafeGenerationMediaUri(access.mediaUrl);
   if (safeOutputUri == null && localOutputPath == null) {
     _notifySoon(context, text.generationStatusResultUnavailableForShare);
     galleryState._completeMediaAction(mediaActionCancelToken);
     return;
   }
   final safeOutputUrl = safeOutputUri?.toString() ?? '';
+  final fileName = access.fileName.isEmpty
+      ? _buildGenerationFileName(
+          generation,
+          safeOutputUrl.isEmpty ? localOutputPath ?? '' : safeOutputUrl,
+        )
+      : access.fileName;
 
   try {
     await ref
         .read(generationStatusMediaActionsProvider)
         .share(
           mediaUrl: safeOutputUrl,
-          fileName: _buildGenerationFileName(
-            generation,
-            safeOutputUrl.isEmpty ? localOutputPath ?? '' : safeOutputUrl,
-          ),
+          fileName: fileName,
           title: generation.templateTitle ?? text.generationStatusResultTitle,
           cancelToken: mediaActionCancelToken,
+          shareText: safeShareUri.toString(),
           localPath: localOutputPath,
         );
   } on DioException catch (error) {
@@ -689,25 +820,45 @@ Future<void> _shareGenerationFile(
 }
 
 Future<void> _copyGenerationLink(
-  BuildContext context,
+  _GenerationsGalleryPageState galleryState,
   AppLocalizations text,
+  WidgetRef ref,
   TemplateGenerationResult generation,
 ) async {
-  final outputUrl = generation.outputUrl;
-  if (outputUrl == null || outputUrl.isEmpty) {
-    _notifySoon(context, text.generationStatusResultUnavailableForShare);
+  final mediaActionCancelToken = galleryState._startMediaAction();
+  if (mediaActionCancelToken == null) {
+    return;
+  }
+  final context = galleryState.context;
+
+  final access = await _fetchGenerationMediaAccess(
+    context: context,
+    text: text,
+    ref: ref,
+    generationId: generation.generationId,
+    cancelToken: mediaActionCancelToken,
+    forShare: true,
+  );
+  if (access == null) {
+    galleryState._completeMediaAction(mediaActionCancelToken);
+    return;
+  }
+  if (!context.mounted) {
+    galleryState._completeMediaAction(mediaActionCancelToken);
     return;
   }
 
-  final safeUri = parseSafeGenerationMediaUri(outputUrl);
+  final safeUri = parseSafeExternalUri(access.shareUrl);
   if (safeUri == null) {
     _notifySoon(context, text.generationStatusResultUnavailableForShare);
+    galleryState._completeMediaAction(mediaActionCancelToken);
     return;
   }
 
   try {
     await Clipboard.setData(ClipboardData(text: safeUri.toString()));
   } on Object {
+    galleryState._completeMediaAction(mediaActionCancelToken);
     if (!context.mounted) {
       return;
     }
@@ -716,9 +867,54 @@ Future<void> _copyGenerationLink(
   }
 
   if (!context.mounted) {
+    galleryState._completeMediaAction(mediaActionCancelToken);
     return;
   }
+  galleryState._completeMediaAction(mediaActionCancelToken);
   _notifySoon(context, text.generationStatusLinkCopiedMessage);
+}
+
+Future<GenerationMediaAccessResult?> _fetchGenerationMediaAccess({
+  required BuildContext context,
+  required AppLocalizations text,
+  required WidgetRef ref,
+  required String generationId,
+  required CancelToken cancelToken,
+  required bool forShare,
+}) async {
+  try {
+    final repository = ref.read(templateGenerationRepositoryProvider);
+    return forShare
+        ? await repository.fetchShareUrl(generationId, cancelToken: cancelToken)
+        : await repository.fetchDownloadUrl(
+            generationId,
+            cancelToken: cancelToken,
+          );
+  } on DioException catch (error) {
+    if (!context.mounted || CancelToken.isCancel(error)) {
+      return null;
+    }
+
+    _notifySoon(
+      context,
+      forShare
+          ? text.generationStatusShareFailedMessage
+          : text.generationStatusFileSaveFailedMessage,
+    );
+    return null;
+  } on Object {
+    if (!context.mounted) {
+      return null;
+    }
+
+    _notifySoon(
+      context,
+      forShare
+          ? text.generationStatusShareFailedMessage
+          : text.generationStatusFileSaveFailedMessage,
+    );
+    return null;
+  }
 }
 
 Future<void> _deleteGeneration(

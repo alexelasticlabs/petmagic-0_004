@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('ui initState microtasks guard provider reads after disposal', () {
+  test('ui deferred init callbacks guard provider reads after disposal', () {
     final files = {
       'lib/features/premium/presentation/premium_page.dart',
       'lib/features/profile/presentation/password_reset_page.dart',
@@ -16,15 +16,21 @@ void main() {
 
     for (final path in files) {
       final source = File(path).readAsStringSync();
-      final microtasks = _microtaskBodies(source).toList();
+      final deferredCallbacks = [
+        ..._deferredCallbackBodies(source, 'Future.microtask(()'),
+        ..._deferredCallbackBodies(
+          source,
+          'WidgetsBinding.instance.addPostFrameCallback((_)',
+        ),
+      ];
 
-      expect(microtasks, isNotEmpty, reason: path);
-      for (final body in microtasks) {
+      expect(deferredCallbacks, isNotEmpty, reason: path);
+      for (final body in deferredCallbacks) {
         if (!body.contains('ref.read') && !body.contains('_walletController')) {
           continue;
         }
 
-        expect(body, contains('if (!mounted)'), reason: path);
+        expect(body, contains('!mounted'), reason: path);
       }
     }
   });
@@ -67,10 +73,10 @@ void main() {
   });
 }
 
-Iterable<String> _microtaskBodies(String source) sync* {
+Iterable<String> _deferredCallbackBodies(String source, String pattern) sync* {
   var searchFrom = 0;
   while (true) {
-    final start = source.indexOf('Future.microtask(()', searchFrom);
+    final start = source.indexOf(pattern, searchFrom);
     if (start < 0) {
       return;
     }

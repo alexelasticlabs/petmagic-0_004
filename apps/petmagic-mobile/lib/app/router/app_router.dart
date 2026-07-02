@@ -17,6 +17,7 @@ import 'package:petmagic_mobile/features/profile/presentation/profile_settings_p
 import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart';
 import 'package:petmagic_mobile/features/startup/presentation/guest_welcome_page.dart';
 import 'package:petmagic_mobile/features/startup/presentation/startup_loading_page.dart';
+import 'package:petmagic_mobile/features/support/presentation/support_assistant_scenarios.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_assistant_page.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_home_page.dart';
@@ -152,41 +153,64 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AuthEntryPage.routePath,
-        pageBuilder: (context, state) => _buildFadeSlidePage(
-          state: state,
-          child: AuthEntryPage(
-            initialEmail: state.uri.queryParameters['email'],
-            redirectPath: state.uri.queryParameters['redirect'],
-          ),
-        ),
+        pageBuilder: (context, state) {
+          final args = state.extra is AuthEntryRouteArgs
+              ? state.extra! as AuthEntryRouteArgs
+              : null;
+          return _buildFadeSlidePage(
+            state: state,
+            child: AuthEntryPage(
+              initialEmail:
+                  args?.initialEmail ?? state.uri.queryParameters['email'],
+              redirectPath: normalizeAuthRedirectPath(
+                args?.redirectPath ?? state.uri.queryParameters['redirect'],
+              ),
+            ),
+          );
+        },
       ),
       GoRoute(
         path: RegisterEntryPage.routePath,
         pageBuilder: (context, state) => _buildFadeSlidePage(
           state: state,
           child: RegisterEntryPage(
-            redirectPath: state.uri.queryParameters['redirect'],
+            redirectPath: normalizeAuthRedirectPath(
+              state.uri.queryParameters['redirect'],
+            ),
           ),
         ),
       ),
       GoRoute(
         path: PasswordResetPage.routePath,
-        pageBuilder: (context, state) => _buildFadeSlidePage(
-          state: state,
-          child: PasswordResetPage(
-            initialEmail: state.uri.queryParameters['email'],
-          ),
-        ),
+        pageBuilder: (context, state) {
+          final args = state.extra is PasswordResetRouteArgs
+              ? state.extra! as PasswordResetRouteArgs
+              : null;
+          return _buildFadeSlidePage(
+            state: state,
+            child: PasswordResetPage(
+              initialEmail:
+                  args?.initialEmail ?? state.uri.queryParameters['email'],
+            ),
+          );
+        },
       ),
       GoRoute(
         path: EmailVerificationPage.routePath,
-        pageBuilder: (context, state) => _buildFadeSlidePage(
-          state: state,
-          child: EmailVerificationPage(
-            email: state.uri.queryParameters['email'] ?? '',
-            startResendCooldown: state.uri.queryParameters['cooldown'] == '1',
-          ),
-        ),
+        pageBuilder: (context, state) {
+          final args = state.extra is EmailVerificationRouteArgs
+              ? state.extra! as EmailVerificationRouteArgs
+              : null;
+          return _buildFadeSlidePage(
+            state: state,
+            child: EmailVerificationPage(
+              email: args?.email ?? state.uri.queryParameters['email'] ?? '',
+              startResendCooldown:
+                  args?.startResendCooldown ??
+                  state.uri.queryParameters['cooldown'] == '1',
+            ),
+          );
+        },
       ),
       GoRoute(
         path: LegalAcceptanceGatePage.routePath,
@@ -386,12 +410,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
         path: PasswordChangePage.routePath,
-        pageBuilder: (context, state) => _buildFadeSlidePage(
-          state: state,
-          child: PasswordChangePage(
-            email: state.uri.queryParameters['email'] ?? '',
-          ),
-        ),
+        pageBuilder: (context, state) {
+          final args = state.extra is PasswordChangeRouteArgs
+              ? state.extra! as PasswordChangeRouteArgs
+              : null;
+          return _buildFadeSlidePage(
+            state: state,
+            child: PasswordChangePage(
+              email: args?.email ?? state.uri.queryParameters['email'] ?? '',
+            ),
+          );
+        },
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
@@ -435,12 +464,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => _buildFadeSlidePage(
           state: state,
           child: SupportChatPage(
-            initialMessage: state
-                .uri
-                .queryParameters[SupportChatPage.initialMessageQueryParam],
-            relatedGenerationId: state
-                .uri
-                .queryParameters[SupportChatPage.relatedGenerationIdQueryParam],
+            initialMessage: SupportChatPage.normalizeInitialMessageQuery(
+              state.uri.queryParameters[SupportChatPage
+                  .initialMessageQueryParam],
+            ),
+            relatedGenerationId:
+                SupportChatPage.normalizeRelatedGenerationIdQuery(
+                  state.uri.queryParameters[SupportChatPage
+                      .relatedGenerationIdQueryParam],
+                ),
           ),
         ),
       ),
@@ -450,7 +482,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => _buildFadeSlidePage(
           state: state,
           child: SupportAssistantPage(
-            scenario: state.uri.queryParameters['scenario'] ?? 'Other',
+            scenario:
+                normalizeSupportScenarioQuery(
+                  state.uri.queryParameters['scenario'],
+                ) ??
+                'Other',
           ),
         ),
       ),
@@ -460,7 +496,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => _buildFadeSlidePage(
           state: state,
           child: SupportTicketFormPage(
-            scenario: state.uri.queryParameters['scenario'] ?? 'Other',
+            scenario:
+                normalizeSupportScenarioQuery(
+                  state.uri.queryParameters['scenario'],
+                ) ??
+                'Other',
           ),
         ),
       ),

@@ -72,6 +72,42 @@ void main() {
     expect(find.text('Hidden Ready'), findsNothing);
   });
 
+  testWidgets('renders load-more footer and calls controller loadMore', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final harness = GalleryHarness(
+      initialState: GenerationHistoryState(
+        items: sampleGalleryItems(),
+        hasMore: true,
+        nextCursor: 'cursor-2',
+      ),
+    );
+    addTearDown(harness.router.dispose);
+
+    await tester.pumpWidget(harness.app());
+    await tester.pumpAndSettle();
+    final text = galleryText(tester);
+    final galleryScrollable = find
+        .descendant(
+          of: find.byType(CustomScrollView),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+
+    await tester.scrollUntilVisible(
+      find.text(text.generationStatusLoadMoreAction),
+      260,
+      scrollable: galleryScrollable,
+    );
+    await tester.tap(find.text(text.generationStatusLoadMoreAction));
+    await tester.pump();
+
+    expect(harness.controller.loadMoreCalls, 1);
+  });
+
   testWidgets('gallery shows unified auth gate for guests', (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -159,6 +195,36 @@ void main() {
 
     expect(walletController.loadCalls, 1);
   });
+
+  testWidgets(
+    'gallery defers wallet preload while offline and retries on reconnect',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final walletController = TrackingGalleryWalletController();
+      final networkController = TestGalleryNetworkStatusController(
+        initialHasInternet: false,
+      );
+      final harness = GalleryHarness(
+        walletController: walletController,
+        networkStatusController: networkController,
+      );
+      addTearDown(harness.router.dispose);
+
+      await tester.pumpWidget(harness.app());
+      await tester.pump();
+      await tester.pump();
+
+      expect(walletController.loadCalls, 0);
+
+      networkController.setHasInternet(true);
+      await tester.pump();
+      await tester.pump();
+
+      expect(walletController.loadCalls, 1);
+    },
+  );
 
   testWidgets('gallery does not load wallet for guests', (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 900));
@@ -440,7 +506,7 @@ void main() {
       (call) => call.method == 'Clipboard.setData',
     );
     expect(clipboardCall.arguments, {
-      'text': 'https://cdn.petmagic.test/ready-1.jpg',
+      'text': 'https://app.petmagic.test/share/generation/token',
     });
     await tester.pump(const Duration(seconds: 3));
 
@@ -583,9 +649,159 @@ void main() {
     await pumpUntil(tester, () => mediaActions.saveCalls > 0);
 
     expect(mediaActions.saveCalls, 1);
-    expect(mediaActions.savedUrls, ['https://cdn.petmagic.test/ready-1.jpg']);
+    expect(mediaActions.savedUrls, [
+      'https://cdn.petmagic.test/fresh-download.jpg',
+    ]);
     expect(mediaActions.shareCalls, 0);
     await tester.pump(const Duration(seconds: 3));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ready card disables media actions for expired media', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final mediaActions = DelayedGalleryGenerationStatusMediaActions(
+      delayShare: false,
+    );
+    final repository = FakeGalleryTemplateGenerationRepository();
+    final generation = galleryGenerationFixture(
+      generationId: 'g-expired-media',
+      status: TemplateGenerationStatus.completed,
+      templateTitle: 'Expired Media',
+      templateType: 'image',
+      tokenCost: 6,
+      updatedAtUtc: DateTime.utc(2026, 5, 25, 14, 30),
+      galleryMedia: const GalleryMedia(
+        state: GalleryMediaState.expired,
+        mediaType: 'image',
+        previewUrl: null,
+        resultUrl: null,
+        canDownload: false,
+        canShare: false,
+        userMessageKey: 'gallery.media.expired',
+      ),
+    );
+    final harness = GalleryHarness(
+      items: [generation],
+      mediaActions: mediaActions,
+      repository: repository,
+    );
+    addTearDown(harness.router.dispose);
+
+    await tester.pumpWidget(harness.app());
+    await tester.pumpAndSettle();
+    final text = galleryText(tester);
+
+    expect(find.text('Expired Media'), findsOneWidget);
+    expect(find.text(text.generationStatusMediaExpiredMessage), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+    await tester.pumpAndSettle();
+    expect(
+      find.text(text.generationStatusMediaExpiredMessage),
+      findsAtLeastNWidgets(1),
+    );
+
+    await tester.tap(
+      find.text(text.generationStatusSaveAction),
+      warnIfMissed: false,
+    );
+    await tester.tap(
+      find.text(text.supportChatShareAction),
+      warnIfMissed: false,
+    );
+    await tester.tap(
+      find.text(text.generationStatusCopyLinkAction),
+      warnIfMissed: false,
+    );
+    await tester.pump();
+
+    expect(repository.downloadCalls, isEmpty);
+    expect(repository.shareCalls, isEmpty);
+    expect(mediaActions.saveCalls, 0);
+    expect(mediaActions.shareCalls, 0);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ready cards render explicit media availability messages', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final now = DateTime.utc(2026, 5, 25, 14, 30);
+    final harness = GalleryHarness(
+      items: [
+        galleryGenerationFixture(
+          generationId: 'g-preparing-media',
+          status: TemplateGenerationStatus.completed,
+          templateTitle: 'Preparing Media',
+          templateType: 'image',
+          tokenCost: 6,
+          updatedAtUtc: now,
+          galleryMedia: const GalleryMedia(
+            state: GalleryMediaState.watermarkPreparing,
+            mediaType: 'image',
+            canDownload: false,
+            canShare: false,
+            userMessageKey: 'gallery.media.watermarkPreparing',
+          ),
+        ),
+        galleryGenerationFixture(
+          generationId: 'g-unavailable-media',
+          status: TemplateGenerationStatus.completed,
+          templateTitle: 'Unavailable Media',
+          templateType: 'image',
+          tokenCost: 6,
+          updatedAtUtc: now.subtract(const Duration(minutes: 1)),
+          galleryMedia: const GalleryMedia(
+            state: GalleryMediaState.storageUnavailable,
+            mediaType: 'image',
+            canDownload: false,
+            canShare: false,
+            userMessageKey: 'gallery.media.storageUnavailable',
+          ),
+        ),
+        galleryGenerationFixture(
+          generationId: 'g-preview-only',
+          status: TemplateGenerationStatus.completed,
+          templateTitle: 'Preview Only',
+          templateType: 'image',
+          tokenCost: 6,
+          updatedAtUtc: now.subtract(const Duration(minutes: 2)),
+          galleryMedia: const GalleryMedia(
+            state: GalleryMediaState.previewReadyOnly,
+            mediaType: 'image',
+            previewUrl: null,
+            resultUrl: null,
+            canDownload: false,
+            canShare: false,
+            userMessageKey: 'gallery.media.previewReadyOnly',
+          ),
+        ),
+      ],
+    );
+    addTearDown(harness.router.dispose);
+
+    await tester.pumpWidget(harness.app());
+    await tester.pumpAndSettle();
+    final text = galleryText(tester);
+
+    expect(
+      find.text(text.generationStatusMediaWatermarkPreparingMessage),
+      findsOneWidget,
+    );
+    expect(
+      find.text(text.generationStatusMediaUnavailableMessage),
+      findsOneWidget,
+    );
+    expect(
+      find.text(text.generationStatusMediaPreviewOnlyMessage),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -610,6 +826,12 @@ void main() {
     final harness = GalleryHarness(
       items: [generation],
       mediaActions: mediaActions,
+      repository: FakeGalleryTemplateGenerationRepository(
+        downloadUrl: 'https://cdn.petmagic.test/ready-name.jpg',
+        shareUrl: 'https://cdn.petmagic.test/ready-name.jpg',
+        downloadFileName: '',
+        shareFileName: '',
+      ),
     );
     addTearDown(harness.router.dispose);
 
@@ -698,7 +920,9 @@ void main() {
     await tester.tap(find.text(text.generationStatusSaveAction));
     await pumpUntil(tester, () => mediaActions.saveCalls > 0);
 
-    expect(mediaActions.savedUrls, ['']);
+    expect(mediaActions.savedUrls, [
+      'https://cdn.petmagic.test/fresh-download.jpg',
+    ]);
     expect(mediaActions.savedLocalPaths, [localOutput.path]);
 
     await tester.pumpAndSettle();
@@ -707,8 +931,13 @@ void main() {
     await tester.tap(find.text(text.supportChatShareAction));
     await pumpUntil(tester, () => mediaActions.shareCalls > 0);
 
-    expect(mediaActions.sharedUrls, ['']);
+    expect(mediaActions.sharedUrls, [
+      'https://cdn.petmagic.test/fresh-share.jpg',
+    ]);
     expect(mediaActions.sharedLocalPaths, [localOutput.path]);
+    expect(mediaActions.sharedTexts, [
+      'https://app.petmagic.test/share/generation/token',
+    ]);
     await tester.pump(const Duration(seconds: 3));
     expect(tester.takeException(), isNull);
   });
@@ -748,6 +977,10 @@ void main() {
     final harness = GalleryHarness(
       items: [generation],
       mediaActions: mediaActions,
+      repository: FakeGalleryTemplateGenerationRepository(
+        downloadUrl: 'https://cdn.petmagic.test/ready-fallback.jpg',
+        shareUrl: 'https://cdn.petmagic.test/ready-fallback.jpg',
+      ),
     );
     addTearDown(harness.router.dispose);
 

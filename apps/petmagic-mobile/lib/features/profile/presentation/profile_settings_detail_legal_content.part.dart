@@ -11,6 +11,8 @@ class _ProfileSettingsLegalDetailContent extends ConsumerWidget {
     required this.locale,
     required this.localeTag,
     required this.legalDocumentsAsync,
+    required this.documents,
+    required this.hasInternet,
     required this.requiresAcceptance,
   });
 
@@ -22,7 +24,9 @@ class _ProfileSettingsLegalDetailContent extends ConsumerWidget {
   final double bottomInset;
   final Locale locale;
   final String localeTag;
-  final AsyncValue<MobileLegalDocuments> legalDocumentsAsync;
+  final AsyncValue<MobileLegalDocuments>? legalDocumentsAsync;
+  final MobileLegalDocuments? documents;
+  final bool hasInternet;
   final bool requiresAcceptance;
 
   @override
@@ -65,19 +69,13 @@ class _ProfileSettingsLegalDetailContent extends ConsumerWidget {
                   _InfoRow(
                     label: text.profileLegalVersionLabel,
                     value:
-                        _documentFromAsync(
-                          kind,
-                          legalDocumentsAsync,
-                        )?.version ??
+                        _documentFromValueOrNull(kind, documents)?.version ??
                         '—',
                   ),
                   _InfoRow(
                     label: text.profileLegalPublishedLabel,
                     value: _formatDate(
-                      _documentFromAsync(
-                        kind,
-                        legalDocumentsAsync,
-                      )?.publishedAtUtc,
+                      _documentFromValueOrNull(kind, documents)?.publishedAtUtc,
                       locale,
                     ),
                   ),
@@ -105,89 +103,107 @@ class _ProfileSettingsLegalDetailContent extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 32),
-            ...switch (legalDocumentsAsync) {
-              AsyncLoading() => [
-                ProfileGlassCard(
-                  child: Text(
-                    text.profileLegalLoading,
-                    style: TextStyle(
-                      color: colors.textSoft,
-                      fontSize: 15,
-                      height: 1.45,
-                      fontWeight: FontWeight.w600,
+            if (documents == null && !hasInternet) ...[
+              PetMagicUnavailableView(
+                kind: AppUnavailableKind.offline,
+                onRetry: () {
+                  if (!ref.read(networkStatusControllerProvider).hasInternet) {
+                    return;
+                  }
+
+                  ref.invalidate(currentLegalDocumentsProvider(localeTag));
+                },
+                padding: const EdgeInsets.fromLTRB(8, 24, 8, 12),
+              ),
+            ] else
+              ...switch (legalDocumentsAsync) {
+                AsyncLoading() when documents == null => [
+                  ProfileGlassCard(
+                    child: Text(
+                      text.profileLegalLoading,
+                      style: TextStyle(
+                        color: colors.textSoft,
+                        fontSize: 15,
+                        height: 1.45,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                ),
-              ],
-              AsyncError() => [
-                ProfileGlassCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        text.profileLegalUnavailable,
-                        style: TextStyle(
-                          color: colors.danger,
-                          fontSize: 15,
-                          height: 1.45,
-                          fontWeight: FontWeight.w600,
+                ],
+                AsyncError() when documents == null => [
+                  ProfileGlassCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          text.profileLegalUnavailable,
+                          style: TextStyle(
+                            color: colors.danger,
+                            fontSize: 15,
+                            height: 1.45,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextButton(
-                        onPressed: () => ref.invalidate(
-                          currentLegalDocumentsProvider(localeTag),
+                        const SizedBox(height: 12),
+                        TextButton(
+                          onPressed: () => ref.invalidate(
+                            currentLegalDocumentsProvider(localeTag),
+                          ),
+                          child: Text(text.retryAction),
                         ),
-                        child: Text(text.retryAction),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
-              AsyncData(:final value) => [
-                ProfileSectionLabel(label: text.profileLegalDocumentSection),
-                ProfileGlassCard(
-                  padding: EdgeInsets.zero,
-                  child: LegalDocumentListView(
-                    documents: [_documentFromValue(kind, value)],
-                    includeDocumentTitles: false,
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
+                ],
+                _ when documents != null => [
+                  ProfileSectionLabel(label: text.profileLegalDocumentSection),
+                  ProfileGlassCard(
+                    padding: EdgeInsets.zero,
+                    child: LegalDocumentListView(
+                      documents: [_documentFromValue(kind, documents!)],
+                      includeDocumentTitles: false,
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 18),
-                ProfileGlassCard(
-                  child: profile != null && requiresAcceptance
-                      ? SizedBox(
-                          width: double.infinity,
-                          child: FilledButton(
-                            onPressed: state.isSaving
-                                ? null
-                                : () => ref
-                                      .read(profileControllerProvider.notifier)
-                                      .acceptCurrentLegalDocuments(value),
-                            child: Text(
-                              state.isSaving
-                                  ? text.profileLoadingAction
-                                  : text.profileLegalAcceptAction,
+                  const SizedBox(height: 18),
+                  ProfileGlassCard(
+                    child: profile != null && requiresAcceptance
+                        ? SizedBox(
+                            width: double.infinity,
+                            child: FilledButton(
+                              onPressed: state.isSaving
+                                  ? null
+                                  : () => ref
+                                        .read(
+                                          profileControllerProvider.notifier,
+                                        )
+                                        .acceptCurrentLegalDocuments(
+                                          documents!,
+                                        ),
+                              child: Text(
+                                state.isSaving
+                                    ? text.profileLoadingAction
+                                    : text.profileLegalAcceptAction,
+                              ),
+                            ),
+                          )
+                        : Text(
+                            profile == null
+                                ? text.profileLegalAcceptanceGuestHint
+                                : text.profileLegalCurrentAcceptedHint,
+                            style: TextStyle(
+                              color: colors.textSoft,
+                              fontSize: 14,
+                              height: 1.45,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
-                        )
-                      : Text(
-                          profile == null
-                              ? text.profileLegalAcceptanceGuestHint
-                              : text.profileLegalCurrentAcceptedHint,
-                          style: TextStyle(
-                            color: colors.textSoft,
-                            fontSize: 14,
-                            height: 1.45,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                ),
-              ],
-            },
+                  ),
+                ],
+                _ => const <Widget>[],
+              },
           ],
         ),
       ),

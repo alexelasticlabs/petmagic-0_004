@@ -548,6 +548,7 @@ class _PetPhotoNetworkImage extends StatelessWidget {
   Widget build(BuildContext context) {
     return CachedNetworkImage(
       imageUrl: imageUrl,
+      cacheKey: persistentSafeMediaCacheKeyUrl(imageUrl),
       fit: BoxFit.cover,
       memCacheWidth: _petPhotoThumbnailMemCacheWidth,
       maxWidthDiskCache: _petPhotoThumbnailMemCacheWidth,
@@ -560,6 +561,7 @@ class _PetPhotoNetworkImage extends StatelessWidget {
 
         return CachedNetworkImage(
           imageUrl: fallback,
+          cacheKey: persistentSafeMediaCacheKeyUrl(fallback),
           fit: BoxFit.cover,
           memCacheWidth: _petPhotoThumbnailMemCacheWidth,
           maxWidthDiskCache: _petPhotoThumbnailMemCacheWidth,
@@ -723,6 +725,9 @@ class _PetGenerationHistoryTile extends StatelessWidget {
     final safeOutputUrl = parseSafeGenerationMediaUri(
       generation.outputUrl,
     )?.toString();
+    final shareSafeUrl = safeOutputUrl == null
+        ? null
+        : persistentSafeGenerationMediaUrl(safeOutputUrl);
 
     return Card(
       child: ListTile(
@@ -742,10 +747,10 @@ class _PetGenerationHistoryTile extends StatelessWidget {
             ),
             IconButton(
               tooltip: text.petsShareGenerationTooltip,
-              onPressed: safeOutputUrl == null
+              onPressed: shareSafeUrl == null || shareSafeUrl.isEmpty
                   ? null
                   : () => SharePlus.instance.share(
-                      ShareParams(text: safeOutputUrl),
+                      ShareParams(text: shareSafeUrl),
                     ),
               icon: const Icon(Icons.ios_share_rounded),
             ),
@@ -786,6 +791,7 @@ class _PetAvatar extends StatelessWidget {
     return ClipOval(
       child: CachedNetworkImage(
         imageUrl: imageUrl,
+        cacheKey: persistentSafeProfileAvatarUrl(imageUrl),
         width: size,
         height: size,
         fit: BoxFit.cover,

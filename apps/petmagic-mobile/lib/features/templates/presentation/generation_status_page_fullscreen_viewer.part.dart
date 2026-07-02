@@ -189,6 +189,9 @@ class _FullscreenResultViewerState extends State<_FullscreenResultViewer> {
                       maxScale: 4,
                       child: CachedNetworkImage(
                         imageUrl: safeMediaUrl,
+                        cacheKey: persistentSafeGenerationMediaUrl(
+                          safeMediaUrl,
+                        ),
                         fit: BoxFit.contain,
                         memCacheWidth: _resultFullscreenImageCacheWidth,
                         maxWidthDiskCache: _resultFullscreenImageCacheWidth,

@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 
 import 'template_flow_sheets_test_source.dart';
 
@@ -8,6 +9,17 @@ import 'template_media_performance_test_support.dart';
 
 void main() {
   configureTemplateMediaPerformanceHarness();
+
+  test('generation share links strip signed URL secrets', () {
+    final safeUrl = persistentSafeGenerationMediaUrl(
+      'https://cdn.petmagic.test/generated.jpg?X-Amz-Signature=secret&token=raw#viewer',
+    );
+
+    expect(safeUrl, 'https://cdn.petmagic.test/generated.jpg');
+    expect(safeUrl, isNot(contains('X-Amz-Signature')));
+    expect(safeUrl, isNot(contains('token=raw')));
+    expect(safeUrl, isNot(contains('viewer')));
+  });
 
   test('template flow video preview is visibility-gated and cached', () async {
     final sheetSource = await File(
@@ -144,6 +156,7 @@ void main() {
       ),
     );
     expect(source, contains('parseSafeGenerationMediaUri('));
+    expect(source, contains('cacheKey: persistentSafeGenerationMediaUrl('));
     expect(source, contains('filterQuality: FilterQuality.medium'));
     expect(
       source,
@@ -193,10 +206,36 @@ void main() {
       ),
     );
     expect(cardsSource, contains('filterQuality: FilterQuality.medium'));
-    expect(actionsSource, contains('parseSafeGenerationMediaUri(outputUrl)'));
+    expect(
+      actionsSource,
+      contains('parseSafeGenerationMediaUri(access.mediaUrl)'),
+    );
+    expect(actionsSource, contains('.fetchShareUrl('));
+    expect(actionsSource, contains('parseSafeExternalUri(access.shareUrl)'));
     expect(actionsSource, contains('ClipboardData(text: safeUri.toString())'));
+    expect(actionsSource, isNot(contains('ClipboardData(text: shareSafeUrl)')));
     expect(cardsSource, isNot(contains('imageUrl: previewImageUrl!')));
   });
+
+  test(
+    'template result share text does not expose signed media URLs',
+    () async {
+      final source = readTemplateFlowSheetsLibrarySource();
+
+      expect(source, contains('final shareSafeUrl = outputUrl.isEmpty'));
+      expect(source, contains('persistentSafeGenerationMediaUrl(outputUrl)'));
+      expect(
+        source,
+        contains("ShareParams(text: '\${template.title}\\n\$shareSafeUrl')"),
+      );
+      expect(
+        source,
+        isNot(
+          contains("ShareParams(text: '\${template.title}\\n\$outputUrl')"),
+        ),
+      );
+    },
+  );
 
   test(
     'selected local pet photo preview decodes to bounded thumbnail size',

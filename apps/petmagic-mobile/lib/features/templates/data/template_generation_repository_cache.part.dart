@@ -13,6 +13,10 @@ Future<String?> _resolveGenerationCacheScope(
 }
 
 String _generationScopedDataKey(String baseKey, String scope) {
+  return '$baseKey:${_generationCacheScopeFingerprint(scope)}';
+}
+
+String _generationLegacyScopedDataKey(String baseKey, String scope) {
   return '$baseKey:$scope';
 }
 
@@ -20,7 +24,20 @@ String _generationCacheKeyForScope(String scope, String? status) {
   final normalized = (status == null || status.trim().isEmpty)
       ? TemplateGenerationRepository._cacheAllStatusKey
       : status.trim().toLowerCase();
+  return '${TemplateGenerationRepository._generationsCachePrefix}'
+      '${_generationCacheScopeFingerprint(scope)}:$normalized';
+}
+
+String _generationLegacyCacheKeyForScope(String scope, String? status) {
+  final normalized = (status == null || status.trim().isEmpty)
+      ? TemplateGenerationRepository._cacheAllStatusKey
+      : status.trim().toLowerCase();
   return '${TemplateGenerationRepository._generationsCachePrefix}$scope:$normalized';
+}
+
+String _generationCacheScopeFingerprint(String scope) {
+  final normalized = scope.trim().toLowerCase();
+  return sha256.convert(utf8.encode(normalized)).toString();
 }
 
 Future<List<TemplateGenerationResult>?> _readCachedGenerations(
@@ -34,12 +51,17 @@ Future<List<TemplateGenerationResult>?> _readCachedGenerations(
     }
 
     final cacheKey = _generationCacheKeyForScope(scope, status);
+    final legacyCacheKey = _generationLegacyCacheKeyForScope(scope, status);
     if (await _isGenerationCacheKeyExpired(repository, cacheKey)) {
       await _clearGenerationCacheKey(repository, cacheKey);
       return null;
     }
 
-    final raw = await repository._preferences.getString(cacheKey);
+    final raw = await _readGenerationCacheString(
+      repository,
+      dataKey: cacheKey,
+      legacyDataKey: legacyCacheKey,
+    );
     if (raw == null || raw.isEmpty) {
       return null;
     }
@@ -49,11 +71,20 @@ Future<List<TemplateGenerationResult>?> _readCachedGenerations(
       return null;
     }
 
-    return decoded
+    final sanitized = _sanitizePersistentGenerationCacheList(decoded);
+    final sanitizedRaw = jsonEncode(sanitized);
+    if (sanitizedRaw != raw) {
+      await repository._preferences.setString(cacheKey, sanitizedRaw);
+    }
+
+    return sanitized
         .whereType<Map>()
         .map(
           (item) => TemplateGenerationDto.fromJson(
-            Map<String, dynamic>.from(item),
+            _generationCacheItemWithScope(
+              Map<String, dynamic>.from(item),
+              scope,
+            ),
           ).toDomain(),
         )
         .toList(growable: false);
@@ -99,12 +130,20 @@ Future<int?> _readCachedUnreadGenerationCount(
       TemplateGenerationRepository._unreadCountCacheKey,
       scope,
     );
+    final legacyUnreadCountCacheKey = _generationLegacyScopedDataKey(
+      TemplateGenerationRepository._unreadCountCacheKey,
+      scope,
+    );
     if (await _isGenerationCacheKeyExpired(repository, unreadCountCacheKey)) {
       await _clearGenerationCacheKey(repository, unreadCountCacheKey);
       return null;
     }
 
-    return await repository._preferences.getInt(unreadCountCacheKey);
+    return await _readGenerationCacheInt(
+      repository,
+      dataKey: unreadCountCacheKey,
+      legacyDataKey: legacyUnreadCountCacheKey,
+    );
   } on Object {
     return null;
   }
@@ -127,15 +166,28 @@ Future<({String generationId, String correlationId})?> _readActiveGeneration(
       TemplateGenerationRepository._activeGenerationCorrelationIdKey,
       scope,
     );
-    final generationId = await repository._preferences.getString(
-      activeGenerationIdKey,
+    final legacyActiveGenerationIdKey = _generationLegacyScopedDataKey(
+      TemplateGenerationRepository._activeGenerationIdKey,
+      scope,
+    );
+    final legacyActiveGenerationCorrelationIdKey =
+        _generationLegacyScopedDataKey(
+          TemplateGenerationRepository._activeGenerationCorrelationIdKey,
+          scope,
+        );
+    final generationId = await _readGenerationCacheString(
+      repository,
+      dataKey: activeGenerationIdKey,
+      legacyDataKey: legacyActiveGenerationIdKey,
     );
     if (generationId == null || generationId.trim().isEmpty) {
       return null;
     }
 
-    final persistedCorrelationId = await repository._preferences.getString(
-      activeGenerationCorrelationIdKey,
+    final persistedCorrelationId = await _readGenerationCacheString(
+      repository,
+      dataKey: activeGenerationCorrelationIdKey,
+      legacyDataKey: legacyActiveGenerationCorrelationIdKey,
     );
     final normalizedGenerationId = generationId.trim();
     final correlationId =
@@ -175,6 +227,15 @@ Future<void> _rememberActiveGeneration(
       TemplateGenerationRepository._activeGenerationCorrelationIdKey,
       scope,
     );
+    final legacyActiveGenerationIdKey = _generationLegacyScopedDataKey(
+      TemplateGenerationRepository._activeGenerationIdKey,
+      scope,
+    );
+    final legacyActiveGenerationCorrelationIdKey =
+        _generationLegacyScopedDataKey(
+          TemplateGenerationRepository._activeGenerationCorrelationIdKey,
+          scope,
+        );
     final normalizedGenerationId = generationId.trim();
     if (normalizedGenerationId.isEmpty) {
       return;
@@ -192,6 +253,11 @@ Future<void> _rememberActiveGeneration(
     await repository._preferences.setString(
       activeGenerationCorrelationIdKey,
       normalizedCorrelationId,
+    );
+    await _clearGenerationCacheKey(repository, legacyActiveGenerationIdKey);
+    await _clearGenerationCacheKey(
+      repository,
+      legacyActiveGenerationCorrelationIdKey,
     );
   } on Object {
     // Keep generation flow functional even if local persistence fails.
@@ -216,8 +282,19 @@ Future<void> _clearActiveGeneration(
       TemplateGenerationRepository._activeGenerationCorrelationIdKey,
       scope,
     );
-    final current = await repository._preferences.getString(
-      activeGenerationIdKey,
+    final legacyActiveGenerationIdKey = _generationLegacyScopedDataKey(
+      TemplateGenerationRepository._activeGenerationIdKey,
+      scope,
+    );
+    final legacyActiveGenerationCorrelationIdKey =
+        _generationLegacyScopedDataKey(
+          TemplateGenerationRepository._activeGenerationCorrelationIdKey,
+          scope,
+        );
+    final current = await _readGenerationCacheString(
+      repository,
+      dataKey: activeGenerationIdKey,
+      legacyDataKey: legacyActiveGenerationIdKey,
     );
     if (current != null && current != generationId) {
       return;
@@ -225,6 +302,10 @@ Future<void> _clearActiveGeneration(
 
     await repository._preferences.remove(activeGenerationIdKey);
     await repository._preferences.remove(activeGenerationCorrelationIdKey);
+    await repository._preferences.remove(legacyActiveGenerationIdKey);
+    await repository._preferences.remove(
+      legacyActiveGenerationCorrelationIdKey,
+    );
   } on Object {
     // Keep cleanup best-effort.
   }
@@ -257,11 +338,10 @@ Future<void> _clearLocalCache(TemplateGenerationRepository repository) async {
 }
 
 String _buildGenerationCorrelationId(TemplateGenerationRepository repository) {
-  final now = DateTime.now().toUtc().microsecondsSinceEpoch;
-  final suffix = TemplateGenerationRepository._correlationRandom
-      .nextInt(1 << 24)
-      .toRadixString(16);
-  return 'generation-$now-$suffix';
+  return RequestIdentity.createCorrelationId().replaceFirst(
+    'flow-',
+    'generation-',
+  );
 }
 
 Future<List<TemplateGenerationResult>> _fetchGenerations(
@@ -271,19 +351,41 @@ Future<List<TemplateGenerationResult>> _fetchGenerations(
   int? take,
   CancelToken? cancelToken,
 }) async {
+  final page = await _fetchGenerationPage(
+    repository,
+    status: status,
+    cursor: null,
+    skip: skip,
+    take: take,
+    cancelToken: cancelToken,
+  );
+  return page.items;
+}
+
+Future<TemplateGenerationGalleryPage> _fetchGenerationPage(
+  TemplateGenerationRepository repository, {
+  String? status,
+  String? cursor,
+  int? skip,
+  int? take,
+  CancelToken? cancelToken,
+}) async {
   final queryParameters = <String, Object?>{};
   if (status != null && status.isNotEmpty) {
     queryParameters['status'] = status;
   }
-  if (skip != null) {
-    queryParameters['skip'] = skip;
+  if (cursor != null && cursor.isNotEmpty) {
+    queryParameters['cursor'] = cursor;
+  }
+  if (skip != null && cursor == null) {
+    queryParameters['skip'] = skip < 0 ? 0 : skip;
   }
   if (take != null) {
-    queryParameters['take'] = take;
+    queryParameters['take'] = take.clamp(1, 100);
   }
 
-  final response = await repository._authorizedRequest<List<dynamic>>(
-    (session) => repository._dio.get<List<dynamic>>(
+  final response = await repository._authorizedRequest<dynamic>(
+    (session) => repository._dio.get<dynamic>(
       '/api/templates/generations',
       queryParameters: queryParameters,
       options: authenticatedRequestOptions(session.accessToken),
@@ -291,21 +393,45 @@ Future<List<TemplateGenerationResult>> _fetchGenerations(
     ),
   );
 
-  final itemsJson = (response.data ?? const [])
+  final rawData = response.data;
+  if (rawData is List<dynamic>) {
+    final itemsJson = rawData
+        .whereType<Map>()
+        .map(Map<String, Object?>.from)
+        .toList(growable: false);
+
+    await repository._writeCachedGenerations(status: status, items: itemsJson);
+
+    return TemplateGenerationGalleryPage(
+      items: itemsJson
+          .map(
+            (item) => TemplateGenerationDto.fromJson(
+              Map<String, dynamic>.from(item),
+            ).toDomain(),
+          )
+          .toList(growable: false),
+      hasMore: false,
+      unreadCount: 0,
+      appliedFilter: status == null || status.isEmpty ? 'all' : status,
+    );
+  }
+
+  final responseJson = rawData is Map
+      ? Map<String, dynamic>.from(rawData)
+      : <String, dynamic>{};
+  final itemsJson = (responseJson['items'] as List<dynamic>? ?? const [])
       .whereType<Map>()
       .map(Map<String, Object?>.from)
       .toList(growable: false);
 
-  await repository._writeCachedGenerations(status: status, items: itemsJson);
+  if (cursor == null || cursor.isEmpty) {
+    await repository._writeCachedGenerations(status: status, items: itemsJson);
+    await repository._writeCachedUnreadGenerationCount(
+      (responseJson['unreadCount'] as num?)?.toInt() ?? 0,
+    );
+  }
 
-  return itemsJson
-      .whereType<Map>()
-      .map(
-        (item) => TemplateGenerationDto.fromJson(
-          Map<String, dynamic>.from(item),
-        ).toDomain(),
-      )
-      .toList(growable: false);
+  return TemplateGenerationGalleryPageDto.fromJson(responseJson).toDomain();
 }
 
 Future<int> _fetchUnreadGenerationCount(
@@ -359,7 +485,12 @@ Future<void> _upsertCachedGeneration(
           ? null
           : status;
       final key = _generationCacheKeyForScope(scope, cacheStatus);
-      final raw = await repository._preferences.getString(key);
+      final legacyKey = _generationLegacyCacheKeyForScope(scope, cacheStatus);
+      final raw = await _readGenerationCacheString(
+        repository,
+        dataKey: key,
+        legacyDataKey: legacyKey,
+      );
       if (raw == null || raw.isEmpty) {
         continue;
       }
@@ -400,9 +531,13 @@ Future<void> _upsertCachedGeneration(
         return rightUpdated.compareTo(leftUpdated);
       });
 
-      final bounded = updated.take(50).toList(growable: false);
+      final bounded = updated
+          .take(50)
+          .map(_sanitizePersistentGenerationCacheMap)
+          .toList(growable: false);
       await repository._preferences.setString(key, jsonEncode(bounded));
       await _touchGenerationCacheKey(repository, key);
+      await _clearGenerationCacheKey(repository, legacyKey);
     } on Object {
       // Persistent cache updates are best-effort; realtime remains in memory.
     }
@@ -421,8 +556,16 @@ Future<void> _writeCachedGenerationsImpl(
     }
 
     final cacheKey = _generationCacheKeyForScope(scope, status);
-    await repository._preferences.setString(cacheKey, jsonEncode(items));
+    final legacyCacheKey = _generationLegacyCacheKeyForScope(scope, status);
+    final sanitizedItems = items
+        .map(_sanitizePersistentGenerationCacheMap)
+        .toList(growable: false);
+    await repository._preferences.setString(
+      cacheKey,
+      jsonEncode(sanitizedItems),
+    );
     await _touchGenerationCacheKey(repository, cacheKey);
+    await _clearGenerationCacheKey(repository, legacyCacheKey);
   } on Object {
     // Ignore local cache write errors to keep network flow stable.
   }
@@ -442,8 +585,13 @@ Future<void> _writeCachedUnreadGenerationCountImpl(
       TemplateGenerationRepository._unreadCountCacheKey,
       scope,
     );
+    final legacyUnreadCountCacheKey = _generationLegacyScopedDataKey(
+      TemplateGenerationRepository._unreadCountCacheKey,
+      scope,
+    );
     await repository._preferences.setInt(unreadCountCacheKey, count);
     await _touchGenerationCacheKey(repository, unreadCountCacheKey);
+    await _clearGenerationCacheKey(repository, legacyUnreadCountCacheKey);
   } on Object {
     // Ignore local cache write errors to keep network flow stable.
   }
@@ -470,9 +618,8 @@ Map<String, Object?> _generationToCachedJsonImpl(
   TemplateGenerationRepository repository,
   TemplateGenerationResult generation,
 ) {
-  return {
+  return _sanitizePersistentGenerationCacheMap({
     'generationId': generation.generationId,
-    'userId': generation.userId,
     'templateId': generation.templateId,
     'status': generation.status.name,
     'tokenCost': generation.tokenCost,
@@ -523,6 +670,24 @@ Map<String, Object?> _generationToCachedJsonImpl(
         .toIso8601String(),
     'estimatedTotalSeconds': generation.estimatedTotalSeconds,
     'mediaType': generation.mediaType,
+    'media': {
+      'state': generation.galleryMedia.state.name,
+      'mediaType': generation.galleryMedia.mediaType,
+      'previewUrl': generation.galleryMedia.previewUrl,
+      'resultUrl': generation.galleryMedia.resultUrl,
+      'resultExpiresAtUtc': generation.galleryMedia.resultExpiresAtUtc
+          ?.toUtc()
+          .toIso8601String(),
+      'durationSeconds': generation.galleryMedia.durationSeconds,
+      'hasWatermark': generation.galleryMedia.hasWatermark,
+      'canRemoveWatermark': generation.galleryMedia.canRemoveWatermark,
+      'isWatermarkRemoved': generation.galleryMedia.isWatermarkRemoved,
+      'canDownload': generation.galleryMedia.canDownload,
+      'canShare': generation.galleryMedia.canShare,
+      'reasonCode': generation.galleryMedia.reasonCode,
+      'userMessageKey': generation.galleryMedia.userMessageKey,
+      'retryAfterSeconds': generation.galleryMedia.retryAfterSeconds,
+    },
     'tier': generation.tier,
     'queueStatus': generation.queueStatus,
     'canCancel': generation.canCancel,
@@ -541,7 +706,7 @@ Map<String, Object?> _generationToCachedJsonImpl(
     'canCompareBeforeAfter': generation.canCompareBeforeAfter,
     'petId': generation.petId,
     'petPhotoId': generation.petPhotoId,
-  };
+  });
 }
 
 Future<void> _markCachedGenerationReadImpl(
@@ -561,7 +726,17 @@ Future<void> _markCachedGenerationReadImpl(
             ? null
             : status,
       );
-      final raw = await repository._preferences.getString(key);
+      final legacyKey = _generationLegacyCacheKeyForScope(
+        scope,
+        status == TemplateGenerationRepository._cacheAllStatusKey
+            ? null
+            : status,
+      );
+      final raw = await _readGenerationCacheString(
+        repository,
+        dataKey: key,
+        legacyDataKey: legacyKey,
+      );
       if (raw == null || raw.isEmpty) {
         continue;
       }
@@ -588,13 +763,17 @@ Future<void> _markCachedGenerationReadImpl(
             }
 
             changed = true;
-            return {...generation, 'isUnread': false};
+            return _sanitizePersistentGenerationCacheMap({
+              ...generation,
+              'isUnread': false,
+            });
           })
           .toList(growable: false);
 
       if (changed) {
         await repository._preferences.setString(key, jsonEncode(updated));
         await _touchGenerationCacheKey(repository, key);
+        await _clearGenerationCacheKey(repository, legacyKey);
       }
     } on Object {
       // Keep mark-read cache mutation best-effort per bucket.
@@ -626,7 +805,17 @@ Future<void> _removeCachedGenerationImpl(
             ? null
             : status,
       );
-      final raw = await repository._preferences.getString(key);
+      final legacyKey = _generationLegacyCacheKeyForScope(
+        scope,
+        status == TemplateGenerationRepository._cacheAllStatusKey
+            ? null
+            : status,
+      );
+      final raw = await _readGenerationCacheString(
+        repository,
+        dataKey: key,
+        legacyDataKey: legacyKey,
+      );
       if (raw == null || raw.isEmpty) {
         continue;
       }
@@ -647,12 +836,13 @@ Future<void> _removeCachedGenerationImpl(
           }
           continue;
         }
-        updated.add(generation);
+        updated.add(_sanitizePersistentGenerationCacheMap(generation));
       }
 
       if (changed) {
         await repository._preferences.setString(key, jsonEncode(updated));
         await _touchGenerationCacheKey(repository, key);
+        await _clearGenerationCacheKey(repository, legacyKey);
       }
     } on Object {
       // Keep delete cache mutation best-effort per bucket.
@@ -688,6 +878,85 @@ String _generationCacheUpdatedAtKeyForDataKey(String dataKey) {
   }
 
   return '${dataKey}_updated_at_v1';
+}
+
+Future<String?> _readGenerationCacheString(
+  TemplateGenerationRepository repository, {
+  required String dataKey,
+  required String legacyDataKey,
+}) async {
+  final current = await repository._preferences.getString(dataKey);
+  if (current != null) {
+    return current;
+  }
+
+  if (await _isGenerationCacheKeyExpired(repository, legacyDataKey)) {
+    await _clearGenerationCacheKey(repository, legacyDataKey);
+    return null;
+  }
+
+  final legacy = await repository._preferences.getString(legacyDataKey);
+  if (legacy == null) {
+    return null;
+  }
+
+  await repository._preferences.setString(dataKey, legacy);
+  await _migrateGenerationCacheTimestamp(
+    repository,
+    fromDataKey: legacyDataKey,
+    toDataKey: dataKey,
+  );
+  await _clearGenerationCacheKey(repository, legacyDataKey);
+  return legacy;
+}
+
+Future<int?> _readGenerationCacheInt(
+  TemplateGenerationRepository repository, {
+  required String dataKey,
+  required String legacyDataKey,
+}) async {
+  final current = await repository._preferences.getInt(dataKey);
+  if (current != null) {
+    return current;
+  }
+
+  if (await _isGenerationCacheKeyExpired(repository, legacyDataKey)) {
+    await _clearGenerationCacheKey(repository, legacyDataKey);
+    return null;
+  }
+
+  final legacy = await repository._preferences.getInt(legacyDataKey);
+  if (legacy == null) {
+    return null;
+  }
+
+  await repository._preferences.setInt(dataKey, legacy);
+  await _migrateGenerationCacheTimestamp(
+    repository,
+    fromDataKey: legacyDataKey,
+    toDataKey: dataKey,
+  );
+  await _clearGenerationCacheKey(repository, legacyDataKey);
+  return legacy;
+}
+
+Future<void> _migrateGenerationCacheTimestamp(
+  TemplateGenerationRepository repository, {
+  required String fromDataKey,
+  required String toDataKey,
+}) async {
+  final legacyUpdatedAtKey = _generationCacheUpdatedAtKeyForDataKey(
+    fromDataKey,
+  );
+  final updatedAt = await repository._preferences.getString(legacyUpdatedAtKey);
+  if (updatedAt == null || updatedAt.isEmpty) {
+    return;
+  }
+
+  await repository._preferences.setString(
+    _generationCacheUpdatedAtKeyForDataKey(toDataKey),
+    updatedAt,
+  );
 }
 
 Future<void> _touchGenerationCacheKey(
@@ -736,4 +1005,70 @@ Future<void> _clearGenerationCacheKey(
   } on Object {
     // Keep best-effort semantics for cache cleanup.
   }
+}
+
+List<Object?> _sanitizePersistentGenerationCacheList(List<Object?> items) {
+  return items
+      .map((item) => _sanitizePersistentGenerationCacheValue(item))
+      .toList(growable: false);
+}
+
+Map<String, Object?> _sanitizePersistentGenerationCacheMap(Map item) {
+  return Map<String, Object?>.fromEntries(
+    item.entries.where((entry) => entry.key != 'userId').map((entry) {
+      final key = entry.key.toString();
+      return MapEntry(
+        key,
+        _sanitizePersistentGenerationCacheValue(entry.value, key: key),
+      );
+    }),
+  );
+}
+
+Map<String, dynamic> _generationCacheItemWithScope(
+  Map<String, dynamic> item,
+  String scope,
+) {
+  return <String, dynamic>{...item, 'userId': scope};
+}
+
+Object? _sanitizePersistentGenerationCacheValue(Object? value, {String? key}) {
+  if (value == null) {
+    return null;
+  }
+
+  if (value is String && _isPersistentGenerationMediaUrlKey(key)) {
+    return persistentSafeGenerationMediaUrl(value);
+  }
+
+  if (value is String && _isPersistentGenerationMediaFileNameKey(key)) {
+    return persistentSafeMediaFileName(value);
+  }
+
+  if (value is Map) {
+    return _sanitizePersistentGenerationCacheMap(value);
+  }
+
+  if (value is List) {
+    return value
+        .map((item) => _sanitizePersistentGenerationCacheValue(item))
+        .toList(growable: false);
+  }
+
+  return value;
+}
+
+bool _isPersistentGenerationMediaUrlKey(String? key) {
+  final normalized = key?.trim().toLowerCase();
+  if (normalized == null || normalized.isEmpty) {
+    return false;
+  }
+
+  return normalized == 'url' ||
+      normalized.endsWith('url') ||
+      normalized.endsWith('mediaurl');
+}
+
+bool _isPersistentGenerationMediaFileNameKey(String? key) {
+  return key?.trim().toLowerCase() == 'filename';
 }

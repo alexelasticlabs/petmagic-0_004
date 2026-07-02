@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
@@ -109,7 +110,7 @@ void main() {
         find.text(
           'Unable to reach support right now. Please try again in a moment.',
         ),
-        findsNWidgets(2),
+        findsOneWidget,
       );
       expect(find.text('Start the conversation'), findsNothing);
       expect(find.text('Retry'), findsOneWidget);
@@ -239,6 +240,48 @@ void main() {
       expect(repository.getConversationCalls, 0);
     },
   );
+
+  testWidgets(
+    'support home shows offline unavailable state without loading and retries on reconnect',
+    (tester) async {
+      final repository = _CountingSupportChatRepository();
+      final networkController = _TestNetworkStatusController(false);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedAppLaunchController.new,
+            ),
+            supportChatRepositoryProvider.overrideWithValue(repository),
+            networkStatusControllerProvider.overrideWith(
+              () => networkController,
+            ),
+          ],
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            locale: const Locale('en'),
+            theme: AppTheme.light(),
+            home: const SupportHomePage(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump();
+
+      expect(repository.getConversationCalls, 0);
+      expect(find.text("You're offline"), findsOneWidget);
+      expect(find.text('Retry'), findsOneWidget);
+
+      networkController.setHasInternet(true);
+      await tester.pump();
+      await tester.pump();
+
+      expect(repository.getConversationCalls, 1);
+    },
+  );
 }
 
 class _AuthenticatedAppLaunchController extends AppLaunchController {
@@ -292,6 +335,21 @@ class _UnauthenticatedAppLaunchController extends AppLaunchController {
       hasSeenOnboarding: true,
       guestSessionReady: true,
     );
+  }
+}
+
+class _TestNetworkStatusController extends NetworkStatusController {
+  _TestNetworkStatusController(bool hasInternet)
+    : _state = NetworkStatusState(hasInternet: hasInternet);
+
+  NetworkStatusState _state;
+
+  @override
+  NetworkStatusState build() => _state;
+
+  void setHasInternet(bool value) {
+    _state = _state.copyWith(hasInternet: value);
+    state = _state;
   }
 }
 

@@ -101,14 +101,18 @@ class _MessageReplyAttachmentThumbnail extends StatelessWidget {
         attachment.isImage &&
         !attachment.isDeleted &&
         attachment.fileUrl.trim().isNotEmpty;
+    final safeUri = canShowImage
+        ? parseSafeSupportExternalUri(attachment.fileUrl)
+        : null;
     return ClipRRect(
       borderRadius: BorderRadius.circular(7),
       child: SizedBox(
         width: 40,
         height: 40,
-        child: canShowImage
+        child: safeUri != null
             ? CachedNetworkImage(
-                imageUrl: attachment.fileUrl,
+                imageUrl: safeUri.toString(),
+                cacheKey: persistentSafeSupportMediaUrl(safeUri.toString()),
                 fit: BoxFit.cover,
                 memCacheWidth: _supportReplyThumbnailCacheWidth,
                 filterQuality: FilterQuality.medium,

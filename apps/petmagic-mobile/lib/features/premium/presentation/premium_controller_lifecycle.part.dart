@@ -6,6 +6,11 @@ mixin _PremiumControllerLifecycle on _PremiumControllerBase {
   void _ensurePremiumLifecycleStarted() {
     if (!_premiumLifecycleStarted) {
       _premiumLifecycleStarted = true;
+      _hasInternet = ref.read(networkStatusControllerProvider).hasInternet;
+      ref.listen<bool>(
+        networkStatusControllerProvider.select((state) => state.hasInternet),
+        (_, hasInternet) => _handleNetworkStatusChanged(hasInternet),
+      );
       ref.onDispose(() {
         _cancelActiveLoad();
         _cancelActiveStatusRefresh();
@@ -28,6 +33,33 @@ mixin _PremiumControllerLifecycle on _PremiumControllerBase {
 
         unawaited(_handlePurchaseUpdates(purchases));
       },
+    );
+  }
+
+  void _handleNetworkStatusChanged(bool hasInternet) {
+    if (_hasInternet == hasInternet) {
+      return;
+    }
+
+    _hasInternet = hasInternet;
+    if (hasInternet) {
+      return;
+    }
+
+    _cancelActiveLoad();
+    _cancelActiveStatusRefresh();
+    _loadInFlight = null;
+    _updateStateIfMounted(
+      (state) => state.copyWith(
+        isLoading: false,
+        checkoutVerificationState: state.isAwaitingCheckoutVerification
+            ? PremiumCheckoutVerificationState.error
+            : state.checkoutVerificationState,
+        isAwaitingCheckoutVerification: false,
+        checkoutErrorMessage: state.isAwaitingCheckoutVerification
+            ? 'templates.network_unavailable'
+            : state.checkoutErrorMessage,
+      ),
     );
   }
 

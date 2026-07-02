@@ -10,6 +10,16 @@ import 'package:petmagic_mobile/features/templates/data/templates_remote_data_so
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 
 void main() {
+  test('templates feed query clamps page size before request mapping', () {
+    expect(
+      const TemplatesQuery(pageSize: 1000).toQueryParameters()['take'],
+      100,
+    );
+    expect(const TemplatesQuery(pageSize: 0).toQueryParameters()['take'], 1);
+    expect(const TemplatesQuery(pageSize: -20).toQueryParameters()['take'], 1);
+    expect(const TemplatesQuery(pageSize: 1000).cacheKey, contains('|100'));
+  });
+
   test(
     'fetchFeed uses public feed contract instead of catalog metadata',
     () async {

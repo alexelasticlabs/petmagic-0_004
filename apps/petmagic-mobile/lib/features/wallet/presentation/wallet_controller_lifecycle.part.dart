@@ -12,6 +12,10 @@ mixin _WalletControllerLifecycle on _WalletControllerBase {
     final purchaseSubscription = _repository.purchaseUpdates.listen(
       _handlePurchaseUpdates,
     );
+    ref.listen<bool>(
+      networkStatusControllerProvider.select((state) => state.hasInternet),
+      (_, hasInternet) => _handleNetworkStatusChanged(hasInternet),
+    );
     ref.onDispose(() {
       final lifecycleListener = _appLifecycleListener;
       if (lifecycleListener != null) {
@@ -25,6 +29,27 @@ mixin _WalletControllerLifecycle on _WalletControllerBase {
     });
   }
 
+  void _handleNetworkStatusChanged(bool hasInternet) {
+    if (hasInternet) {
+      unawaited(_recoverPendingStorePurchase(requestStoreRestore: true));
+      return;
+    }
+
+    _cancelActiveLoad();
+    _cancelActiveWalletSync();
+    _cancelActiveLedgerLoadMore();
+    _loadInFlight = null;
+    _isWalletSyncInFlight = false;
+    _updateStateIfMounted(
+      (state) => state.copyWith(
+        isLoading: false,
+        isRefreshing: false,
+        isLoadingMoreLedger: false,
+        clearLedgerLoadMoreError: true,
+      ),
+    );
+  }
+
   void _handleAppLifecycleSignal() {
     didChangeAppLifecycleState(AppLifecycleSignal.instance.state);
   }
@@ -32,6 +57,9 @@ mixin _WalletControllerLifecycle on _WalletControllerBase {
   @override
   void setWalletPageVisible(bool visible) {
     _isWalletPageVisible = visible;
+    if (visible && _repositoryInitialized) {
+      unawaited(_recoverPendingStorePurchase(requestStoreRestore: true));
+    }
   }
 
   CancelToken _startLoadCancelToken() {
@@ -106,12 +134,17 @@ mixin _WalletControllerLifecycle on _WalletControllerBase {
   }
 
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state != AppLifecycleState.resumed || _isWalletPageVisible) {
+    if (state != AppLifecycleState.resumed) {
       return;
     }
 
     if (!ref.read(appLaunchControllerProvider).isAuthenticated ||
         !ref.read(networkStatusControllerProvider).hasInternet) {
+      return;
+    }
+
+    unawaited(_recoverPendingStorePurchase(requestStoreRestore: true));
+    if (_isWalletPageVisible) {
       return;
     }
 

@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_gallery_store.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
@@ -40,9 +41,13 @@ class GenerationHistoryState {
     this.filter = GenerationHistoryFilter.all,
     this.unreadCount = 0,
     this.isLoading = false,
+    this.isLoadingMore = false,
     this.syncFailed = false,
     this.showOfflineBanner = false,
     this.isConnectionRecovered = false,
+    this.nextCursor,
+    this.hasMore = false,
+    this.loadMoreError,
     this.lastSyncedAtUtc,
     this.errorMessage,
     this.cachedItemsByFilter = const {},
@@ -52,9 +57,13 @@ class GenerationHistoryState {
   final GenerationHistoryFilter filter;
   final int unreadCount;
   final bool isLoading;
+  final bool isLoadingMore;
   final bool syncFailed;
   final bool showOfflineBanner;
   final bool isConnectionRecovered;
+  final String? nextCursor;
+  final bool hasMore;
+  final String? loadMoreError;
   final DateTime? lastSyncedAtUtc;
   final String? errorMessage;
   final Map<GenerationHistoryFilter, List<TemplateGenerationResult>>
@@ -76,9 +85,15 @@ class GenerationHistoryState {
     GenerationHistoryFilter? filter,
     int? unreadCount,
     bool? isLoading,
+    bool? isLoadingMore,
     bool? syncFailed,
     bool? showOfflineBanner,
     bool? isConnectionRecovered,
+    String? nextCursor,
+    bool clearNextCursor = false,
+    bool? hasMore,
+    String? loadMoreError,
+    bool clearLoadMoreError = false,
     DateTime? lastSyncedAtUtc,
     bool clearLastSyncedAtUtc = false,
     String? errorMessage,
@@ -91,10 +106,16 @@ class GenerationHistoryState {
       filter: filter ?? this.filter,
       unreadCount: unreadCount ?? this.unreadCount,
       isLoading: isLoading ?? this.isLoading,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       syncFailed: syncFailed ?? this.syncFailed,
       showOfflineBanner: showOfflineBanner ?? this.showOfflineBanner,
       isConnectionRecovered:
           isConnectionRecovered ?? this.isConnectionRecovered,
+      nextCursor: clearNextCursor ? null : nextCursor ?? this.nextCursor,
+      hasMore: hasMore ?? this.hasMore,
+      loadMoreError: clearLoadMoreError
+          ? null
+          : loadMoreError ?? this.loadMoreError,
       lastSyncedAtUtc: clearLastSyncedAtUtc
           ? null
           : lastSyncedAtUtc ?? this.lastSyncedAtUtc,
@@ -119,10 +140,13 @@ abstract class _GenerationHistoryControllerBase
   Timer? _offlineBannerTimer;
   Timer? _autoRefreshTimer;
   bool _isScreenVisible = false;
+  bool _hasInternet = true;
   bool _isRealtimeConnected = false;
   bool _isLoadInFlight = false;
+  bool _isLoadMoreInFlight = false;
   bool _hasScheduledLocalArtifactCleanup = false;
   CancelToken? _activeLoadCancelToken;
+  CancelToken? _activeLoadMoreCancelToken;
   CancelToken? _activeUnreadRefreshCancelToken;
   _GenerationHistoryLoadRequest? _pendingLoadRequest;
   Completer<void>? _pendingLoadCompleter;
@@ -131,6 +155,7 @@ abstract class _GenerationHistoryControllerBase
   Set<String> _locallyReadGenerationIds = const {};
   Set<String> _locallyReadUnreadGenerationIds = const {};
   int _autoRefreshFailureStreak = 0;
+  int _loadEpoch = 0;
 
   void setScreenVisible(bool visible, {bool clearLoadingState = true}) =>
       _setScreenVisible(visible, clearLoadingState: clearLoadingState);
@@ -139,6 +164,8 @@ abstract class _GenerationHistoryControllerBase
 
   Future<void> load({GenerationHistoryFilter? filter, bool refresh = false}) =>
       _load(filter: filter, refresh: refresh);
+
+  Future<void> loadMore() => _loadMore();
 
   Future<void> markRead(String generationId) => _markRead(generationId);
 
@@ -166,6 +193,8 @@ abstract class _GenerationHistoryControllerBase
 
   Future<void> _load({GenerationHistoryFilter? filter, bool refresh = false});
 
+  Future<void> _loadMore();
+
   Future<void> _markRead(String generationId);
 
   Future<void> _deleteGeneration(String generationId);
@@ -184,6 +213,12 @@ abstract class _GenerationHistoryControllerBase
   CancelToken _startLoadCancelToken();
 
   void _clearActiveLoadCancelToken();
+
+  CancelToken _startLoadMoreCancelToken();
+
+  void _clearActiveLoadMoreCancelToken();
+
+  void _cancelActiveLoadMore(String reason);
 
   void _drainPendingLoad();
 
@@ -260,6 +295,11 @@ class GenerationHistoryController extends _GenerationHistoryControllerBase
     ref.watch(templateGenerationRepositoryProvider);
     final galleryStore = ref.watch(generationGalleryStoreProvider);
     _activeRealtimeClient = ref.watch(realtimeClientProvider);
+    _hasInternet = ref.read(networkStatusControllerProvider).hasInternet;
+    ref.listen<bool>(
+      networkStatusControllerProvider.select((state) => state.hasInternet),
+      (_, hasInternet) => _handleNetworkStatusChanged(hasInternet),
+    );
     ref.onDispose(() {
       _isScreenVisible = false;
       _offlineBannerTimer?.cancel();
@@ -271,6 +311,7 @@ class GenerationHistoryController extends _GenerationHistoryControllerBase
         clearPending: true,
         clearLoadingState: false,
       );
+      _cancelActiveLoadMore('generation_history_disposed');
       _cancelActiveUnreadRefresh('generation_history_disposed');
       unawaited(galleryStore.cancelActiveDownloads());
       _pauseRealtime();

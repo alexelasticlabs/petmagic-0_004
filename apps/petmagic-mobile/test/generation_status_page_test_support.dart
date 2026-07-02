@@ -140,6 +140,8 @@ class FakeGenerationStatusTemplateGenerationRepository
       mediaUrl: mediaAccessUrl,
       hasWatermark: false,
       fileName: mediaAccessFileName,
+      shareUrl: 'https://app.petmagic.test/share/generation/token',
+      shareToken: 'token',
     );
   }
 
@@ -246,8 +248,12 @@ class DelayedLoadGenerationStatusTemplateGenerationRepository
 }
 
 class FakeGenerationStatusRealtimeClient implements RealtimeClient {
+  FakeGenerationStatusRealtimeClient({Completer<void>? connectCompleter})
+    : _connectCompleter = connectCompleter;
+
   final StreamController<RealtimeEvent> _controller =
       StreamController<RealtimeEvent>.broadcast();
+  final Completer<void>? _connectCompleter;
 
   int connectCalls = 0;
   int disconnectCalls = 0;
@@ -258,6 +264,7 @@ class FakeGenerationStatusRealtimeClient implements RealtimeClient {
   @override
   Future<void> connect() async {
     connectCalls++;
+    await _connectCompleter?.future;
   }
 
   @override
@@ -316,6 +323,7 @@ class DelayedGenerationStatusMediaActions extends GenerationStatusMediaActions {
     required String fileName,
     required String title,
     required CancelToken cancelToken,
+    String? shareText,
     String? localPath,
   }) {
     shareCancelToken = cancelToken;
@@ -334,6 +342,7 @@ class RecordingGenerationStatusMediaActions
   final sharedFileNames = <String>[];
   final savedLocalPaths = <String?>[];
   final sharedLocalPaths = <String?>[];
+  final sharedTexts = <String?>[];
 
   @override
   Future<bool> saveToGallery({
@@ -356,11 +365,13 @@ class RecordingGenerationStatusMediaActions
     required String fileName,
     required String title,
     required CancelToken cancelToken,
+    String? shareText,
     String? localPath,
   }) async {
     shareCalls++;
     sharedFileNames.add(fileName);
     sharedLocalPaths.add(localPath);
+    sharedTexts.add(shareText);
   }
 }
 
@@ -379,8 +390,9 @@ class DelayedGenerationStatusGalleryStore extends GenerationGalleryStore {
 
   @override
   Future<GenerationGalleryMediaRecord?> materializeGenerationMedia(
-    TemplateGenerationResult generation,
-  ) async {
+    TemplateGenerationResult generation, {
+    bool background = false,
+  }) async {
     if (!materializeStarted.isCompleted) {
       materializeStarted.complete();
     }
@@ -404,8 +416,9 @@ class NoopGenerationStatusGalleryStore extends GenerationGalleryStore {
 
   @override
   Future<GenerationGalleryMediaRecord?> materializeGenerationMedia(
-    TemplateGenerationResult generation,
-  ) async {
+    TemplateGenerationResult generation, {
+    bool background = false,
+  }) async {
     return null;
   }
 
@@ -426,8 +439,9 @@ class ImmediateGenerationStatusGalleryStore extends GenerationGalleryStore {
 
   @override
   Future<GenerationGalleryMediaRecord?> materializeGenerationMedia(
-    TemplateGenerationResult generation,
-  ) async {
+    TemplateGenerationResult generation, {
+    bool background = false,
+  }) async {
     return record;
   }
 

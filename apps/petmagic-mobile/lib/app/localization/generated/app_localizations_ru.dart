@@ -860,36 +860,22 @@ class AppLocalizationsRu extends AppLocalizations {
   String get walletViewPremiumAction => 'Посмотреть Premium';
 
   @override
-  String get walletWhatYouCanCreateTitle => 'Хватит примерно на:';
-
-  @override
-  String walletApproxPhotos(Object count) {
-    return '$count фото';
+  String walletApproxGenerations(Object count) {
+    return '≈ $count генераций по текущим ценам шаблонов';
   }
 
   @override
-  String walletApproxVideos(Object count) {
-    return '$count видео';
+  String walletApproxGenerationRange(Object fromCount, Object toCount) {
+    return '≈ $fromCount-$toCount генераций по текущим ценам шаблонов';
   }
 
   @override
-  String walletApproxPhotosOnly(Object photos) {
-    return '≈ $photos';
-  }
+  String get walletApproxGenerationBelowOne =>
+      'Меньше одной генерации по текущим ценам шаблонов';
 
   @override
-  String walletApproxPhotosOrVideos(Object photos, Object videos) {
-    return '≈ $photos или $videos';
-  }
-
-  @override
-  String get walletSpendPhotoSubtitle => 'Фото\nот 10 Spark';
-
-  @override
-  String get walletSpendVideoSubtitle => 'Видео\nот 50 Spark';
-
-  @override
-  String get walletSpendPremiumSubtitle => 'Premium\nот 80 Spark';
+  String get walletGenerationPricingUnavailable =>
+      'Цены шаблонов загружаются из PetMagic.';
 
   @override
   String get walletContactSupportAction => 'Связаться с поддержкой';
@@ -3692,6 +3678,38 @@ class AppLocalizationsRu extends AppLocalizations {
   String generationStatusShowMoreAction(Object hiddenCount) {
     return 'Показать еще ($hiddenCount) ▾';
   }
+
+  @override
+  String get generationStatusLoadMoreAction => 'Загрузить ещё';
+
+  @override
+  String get generationStatusLoadMoreFailed =>
+      'Не удалось загрузить ещё результаты.';
+
+  @override
+  String get generationStatusMediaPreparingMessage => 'Готовим медиа...';
+
+  @override
+  String get generationStatusMediaPreviewOnlyMessage =>
+      'Превью доступно, финальный файл ещё готовится.';
+
+  @override
+  String get generationStatusMediaWatermarkPreparingMessage =>
+      'Готовим версию без водяного знака...';
+
+  @override
+  String get generationStatusMediaExpiredMessage =>
+      'Это медиа больше недоступно.';
+
+  @override
+  String get generationStatusMediaUnavailableMessage => 'Медиа недоступно.';
+
+  @override
+  String get generationStatusMediaFailedMessage =>
+      'Не удалось обработать медиа.';
+
+  @override
+  String get generationStatusMediaHiddenMessage => 'Медиа скрыто.';
 
   @override
   String get generationStatusCollapseAction => 'Свернуть ▲';

@@ -272,6 +272,7 @@ class _RecordingGenerationStatusMediaActions
     required String fileName,
     required String title,
     required CancelToken cancelToken,
+    String? shareText,
     String? localPath,
   }) async {
     shareCalls.add(mediaUrl);

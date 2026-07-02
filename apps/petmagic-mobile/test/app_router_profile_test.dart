@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -32,6 +33,58 @@ import 'widget_test_support.dart';
 
 void main() {
   configureWidgetTestHarness();
+
+  test('profile auth flows keep email out of internal route locations', () {
+    final authEntrySource = File(
+      'lib/features/profile/presentation/auth_entry_page.dart',
+    ).readAsStringSync();
+    final authEntryContentSource = File(
+      'lib/features/profile/presentation/auth_entry_content.part.dart',
+    ).readAsStringSync();
+    final emailVerificationSource = File(
+      'lib/features/profile/presentation/email_verification_page.dart',
+    ).readAsStringSync();
+    final passwordResetSource = File(
+      'lib/features/profile/presentation/password_reset_page.dart',
+    ).readAsStringSync();
+    final profileSettingsSource = File(
+      'lib/features/profile/presentation/profile_settings_page.dart',
+    ).readAsStringSync();
+    final linkedAccountsSource = File(
+      'lib/features/profile/presentation/widgets/profile_linked_accounts_settings_section.dart',
+    ).readAsStringSync();
+
+    expect(authEntrySource, contains('EmailVerificationRouteArgs('));
+    expect(
+      authEntrySource,
+      isNot(contains('EmailVerificationPage.routePath}?email=')),
+    );
+    expect(authEntryContentSource, contains('PasswordResetRouteArgs('));
+    expect(
+      authEntryContentSource,
+      isNot(contains('PasswordResetPage.routePath}\$query')),
+    );
+    expect(emailVerificationSource, contains('AuthEntryRouteArgs('));
+    expect(
+      emailVerificationSource,
+      isNot(contains('AuthEntryPage.routePath}?email=')),
+    );
+    expect(passwordResetSource, contains('AuthEntryRouteArgs('));
+    expect(
+      passwordResetSource,
+      isNot(contains('AuthEntryPage.routePath}\$query')),
+    );
+    expect(profileSettingsSource, contains('PasswordChangeRouteArgs('));
+    expect(
+      profileSettingsSource,
+      isNot(contains('PasswordChangePage.routePath}?email=')),
+    );
+    expect(linkedAccountsSource, contains('PasswordChangeRouteArgs('));
+    expect(
+      linkedAccountsSource,
+      isNot(contains('PasswordChangePage.routePath}?email=')),
+    );
+  });
 
   testWidgets('profile tab shows sign-in gate for guest', (tester) async {
     SharedPreferences.setMockInitialValues(const {onboardingSeenKey: true});
@@ -331,9 +384,10 @@ void main() {
         'Report\n$encodedGenerationId',
       );
       expect(
-        supportUri.queryParameters[SupportChatPage
-            .relatedGenerationIdQueryParam],
-        encodedGenerationId,
+        supportUri.queryParameters.containsKey(
+          SupportChatPage.relatedGenerationIdQueryParam,
+        ),
+        isFalse,
       );
 
       generationRepository.fetchGenerationCalls.clear();

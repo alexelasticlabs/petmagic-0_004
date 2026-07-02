@@ -221,6 +221,63 @@ void main() {
   );
 
   test(
+    'template media cache reuses files when only signed query rotates',
+    () async {
+      await TemplateMediaCache.clearAll();
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      var requestCount = 0;
+      final requestedQueries = <String>[];
+      final subscription = server.listen((request) async {
+        if (request.uri.path == '/signed-preview.mp4') {
+          requestCount += 1;
+          requestedQueries.add(request.uri.query);
+          request.response.headers
+            ..contentType = ContentType('video', 'mp4')
+            ..set(HttpHeaders.cacheControlHeader, 'max-age=3600');
+          const bytes = [0, 0, 0, 24, 102, 116, 121, 112, 109, 112, 52, 50];
+          request.response.contentLength = bytes.length;
+          request.response.add(bytes);
+          await request.response.close();
+          return;
+        }
+
+        request.response.statusCode = HttpStatus.notFound;
+        await request.response.close();
+      });
+      addTearDown(() async {
+        await subscription.cancel();
+        await server.close(force: true);
+        await TemplateMediaCache.clearAll();
+      });
+
+      final baseUrl = 'http://${server.address.host}:${server.port}';
+      final firstUrl =
+          '$baseUrl/signed-preview.mp4?X-Amz-Signature=first&token=raw';
+      final rotatedUrl =
+          '$baseUrl/signed-preview.mp4?X-Amz-Signature=second&token=raw';
+
+      final firstFile = await TemplateMediaCache.fetchPreviewFile(firstUrl);
+      final rotatedFile = await TemplateMediaCache.fetchPreviewFile(rotatedUrl);
+
+      expect(firstFile.path, rotatedFile.path);
+      expect(requestCount, 1);
+      expect(requestedQueries, ['X-Amz-Signature=first&token=raw']);
+      expect(
+        TemplateMediaCache.cacheKeyForMedia(firstUrl),
+        TemplateMediaCache.cacheKeyForMedia(rotatedUrl),
+      );
+      expect(
+        TemplateMediaCache.cacheKeyForMedia(firstUrl),
+        isNot(contains('X-Amz-Signature')),
+      );
+      expect(
+        TemplateMediaCache.cacheKeyForMedia(firstUrl),
+        isNot(contains('token')),
+      );
+    },
+  );
+
+  test(
     'template media cache rejects in-flight downloads after explicit removal',
     () async {
       await TemplateMediaCache.clearAll();

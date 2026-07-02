@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_dto.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_query.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
+import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 final sharedPreferencesProvider = Provider<SharedPreferencesAsync>(
@@ -57,17 +58,24 @@ class TemplatesCacheDataSource {
       return const [];
     }
 
-    return decoded
+    final sanitized = decoded
         .whereType<Map>()
-        .map(
-          (item) => TemplateItemDto.fromJson(Map<String, Object?>.from(item)),
-        )
+        .map(_sanitizePersistentCatalogItemMap)
         .toList(growable: false);
+    final sanitizedRaw = jsonEncode(sanitized);
+    if (sanitizedRaw != raw) {
+      await _preferences.setString(_catalogItemsKey, sanitizedRaw);
+    }
+
+    return sanitized.map(TemplateItemDto.fromJson).toList(growable: false);
   }
 
   Future<void> writeCatalogItems(List<TemplateItemDto> items) async {
+    final sanitizedItems = items
+        .map(_sanitizePersistentCatalogItem)
+        .toList(growable: false);
     final encoded = jsonEncode(
-      items.map((item) => item.toJson()).toList(growable: false),
+      sanitizedItems.map((item) => item.toJson()).toList(growable: false),
     );
     await _preferences.setString(_catalogItemsKey, encoded);
   }
@@ -195,12 +203,14 @@ class TemplatesCacheDataSource {
   }
 
   Iterable<String> _templateMediaUrls(TemplateItemDto? item) sync* {
-    final thumbnailUrl = item?.thumbnailUrl?.trim();
+    final thumbnailUrl = persistentSafeGenerationMediaUrl(item?.thumbnailUrl);
     if (thumbnailUrl != null && thumbnailUrl.isNotEmpty) {
       yield thumbnailUrl;
     }
 
-    final previewUrl = item?.previewAsset?.url.trim();
+    final previewUrl = persistentSafeGenerationMediaUrl(
+      item?.previewAsset?.url,
+    );
     if (previewUrl != null && previewUrl.isNotEmpty) {
       yield previewUrl;
     }
@@ -250,4 +260,59 @@ class TemplatesCacheDataSource {
       (value) => value.toLowerCase().contains(normalizedSearch),
     );
   }
+}
+
+TemplateItemDto _sanitizePersistentCatalogItem(TemplateItemDto item) {
+  return TemplateItemDto.fromJson(
+    _sanitizePersistentCatalogItemMap(item.toJson()),
+  );
+}
+
+Map<String, Object?> _sanitizePersistentCatalogItemMap(Map item) {
+  return Map<String, Object?>.fromEntries(
+    item.entries.map((entry) {
+      final key = entry.key.toString();
+      return MapEntry(
+        key,
+        _sanitizePersistentCatalogValue(entry.value, key: key),
+      );
+    }),
+  );
+}
+
+Object? _sanitizePersistentCatalogValue(Object? value, {String? key}) {
+  if (value == null) {
+    return null;
+  }
+
+  if (value is String && _isPersistentCatalogMediaUrlKey(key)) {
+    return persistentSafeGenerationMediaUrl(value);
+  }
+
+  if (value is String && _isPersistentCatalogMediaFileNameKey(key)) {
+    return persistentSafeMediaFileName(value);
+  }
+
+  if (value is Map) {
+    return _sanitizePersistentCatalogItemMap(value);
+  }
+
+  if (value is List) {
+    return value.map(_sanitizePersistentCatalogValue).toList(growable: false);
+  }
+
+  return value;
+}
+
+bool _isPersistentCatalogMediaUrlKey(String? key) {
+  final normalized = key?.trim().toLowerCase();
+  if (normalized == null || normalized.isEmpty) {
+    return false;
+  }
+
+  return normalized == 'url' || normalized.endsWith('url');
+}
+
+bool _isPersistentCatalogMediaFileNameKey(String? key) {
+  return key?.trim().toLowerCase() == 'filename';
 }

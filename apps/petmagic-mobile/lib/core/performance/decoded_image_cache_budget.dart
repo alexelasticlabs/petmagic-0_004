@@ -43,6 +43,11 @@ class _DecodedImageCacheLifecycleObserverState
   }
 
   @override
+  void didHaveMemoryPressure() {
+    trimDecodedImageCache();
+  }
+
+  @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();

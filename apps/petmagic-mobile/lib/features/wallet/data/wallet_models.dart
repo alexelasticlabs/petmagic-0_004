@@ -342,6 +342,54 @@ class PurchaseHistoryItem {
   }
 }
 
+class StoreBillingValidationModel {
+  const StoreBillingValidationModel({
+    required this.provider,
+    required this.productType,
+    required this.productId,
+    required this.status,
+    required this.tokensGranted,
+    required this.tokenAmount,
+    required this.isPremium,
+    this.expiresAtUtc,
+  });
+
+  final String provider;
+  final String productType;
+  final String productId;
+  final String status;
+  final bool tokensGranted;
+  final int tokenAmount;
+  final bool isPremium;
+  final DateTime? expiresAtUtc;
+
+  bool get isTokenPack => productType.toLowerCase() == 'tokenpack';
+
+  bool get isSettledTokenPack {
+    final normalizedStatus = status.trim().toLowerCase();
+    return isTokenPack &&
+        (tokensGranted ||
+            normalizedStatus == 'succeeded' ||
+            normalizedStatus == 'settled' ||
+            normalizedStatus == 'already_settled');
+  }
+
+  factory StoreBillingValidationModel.fromJson(Map<String, dynamic> json) {
+    return StoreBillingValidationModel(
+      provider: json['provider'] as String? ?? '',
+      productType: json['productType'] as String? ?? '',
+      productId: json['productId'] as String? ?? '',
+      status: json['status'] as String? ?? '',
+      tokensGranted: json['tokensGranted'] as bool? ?? false,
+      tokenAmount: (json['tokenAmount'] as num?)?.toInt() ?? 0,
+      isPremium: json['isPremium'] as bool? ?? false,
+      expiresAtUtc: json['expiresAtUtc'] is String
+          ? DateTime.tryParse(json['expiresAtUtc'] as String)
+          : null,
+    );
+  }
+}
+
 class OffsetPagedModel<T> {
   const OffsetPagedModel({
     required this.items,

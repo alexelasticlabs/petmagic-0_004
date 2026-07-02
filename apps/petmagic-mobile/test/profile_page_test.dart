@@ -486,6 +486,93 @@ void main() {
   });
 
   testWidgets(
+    'profile page defers wallet preload while offline and retries on reconnect',
+    (tester) async {
+      final walletController = _CountingWalletController(
+        initialState: const WalletState(isLoading: false),
+      );
+      final networkController = _TestProfileNetworkStatusController(
+        initialHasInternet: false,
+      );
+
+      final router = GoRouter(
+        initialLocation: ProfilePage.routePath,
+        routes: [
+          GoRoute(
+            path: ProfilePage.routePath,
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: ProfilePage()),
+          ),
+          GoRoute(
+            path: ProfileSettingsPage.routePath,
+            pageBuilder: (context, state) => const NoTransitionPage(
+              child: Scaffold(body: Text('Settings route')),
+            ),
+          ),
+          GoRoute(
+            path: SupportChatPage.routePath,
+            pageBuilder: (context, state) => const NoTransitionPage(
+              child: Scaffold(body: Text('Support route')),
+            ),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedProfileAppLaunchController.new,
+            ),
+            networkStatusControllerProvider.overrideWith(
+              () => networkController,
+            ),
+            profileControllerProvider.overrideWith(_FakeProfileController.new),
+            walletControllerProvider.overrideWith(() => walletController),
+            premiumSubscriptionSummaryProvider.overrideWith(
+              (ref) async => const PremiumSubscriptionSummaryView(
+                isPremium: false,
+                canManageSubscription: false,
+                status: 'inactive',
+                manageSubscriptionAction: '',
+                provider: PremiumSubscriptionProviderView.unknown,
+              ),
+            ),
+          ],
+          child: MaterialApp.router(
+            routerConfig: router,
+            theme: AppTheme.dark(),
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: const [
+              Locale('ru'),
+              Locale('en'),
+              Locale('de'),
+              Locale('es'),
+              Locale('fr'),
+              Locale('it'),
+              Locale('pl'),
+            ],
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+
+      expect(find.text('Pet User'), findsOneWidget);
+      expect(walletController.loadCalls, 0);
+
+      networkController.setHasInternet(true);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+
+      expect(walletController.loadCalls, 1);
+    },
+  );
+
+  testWidgets(
     'profile page retry restores profile and preloads wallet after unavailable state',
     (tester) async {
       final walletController = _CountingWalletController(

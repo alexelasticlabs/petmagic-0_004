@@ -16,6 +16,85 @@ enum TemplateGenerationStatus {
   cancelled,
 }
 
+enum GalleryMediaState {
+  pending,
+  processing,
+  resultReady,
+  previewReadyOnly,
+  watermarkPreparing,
+  expired,
+  storageUnavailable,
+  failed,
+  hidden,
+}
+
+GalleryMediaState galleryMediaStateFromApi(String? value) {
+  return switch ((value ?? '').trim().toLowerCase()) {
+    'resultready' ||
+    'result_ready' ||
+    'result-ready' => GalleryMediaState.resultReady,
+    'previewreadyonly' ||
+    'preview_ready_only' ||
+    'preview-ready-only' => GalleryMediaState.previewReadyOnly,
+    'watermarkpreparing' ||
+    'watermark_preparing' ||
+    'watermark-preparing' => GalleryMediaState.watermarkPreparing,
+    'expired' => GalleryMediaState.expired,
+    'storageunavailable' ||
+    'storage_unavailable' ||
+    'storage-unavailable' => GalleryMediaState.storageUnavailable,
+    'failed' => GalleryMediaState.failed,
+    'hidden' => GalleryMediaState.hidden,
+    'processing' => GalleryMediaState.processing,
+    _ => GalleryMediaState.pending,
+  };
+}
+
+class GalleryMedia {
+  const GalleryMedia({
+    this.state = GalleryMediaState.pending,
+    this.mediaType = 'image',
+    this.previewUrl,
+    this.resultUrl,
+    this.resultExpiresAtUtc,
+    this.durationSeconds,
+    this.hasWatermark = false,
+    this.canRemoveWatermark = false,
+    this.isWatermarkRemoved = false,
+    this.canDownload = false,
+    this.canShare = false,
+    this.reasonCode,
+    this.userMessageKey,
+    this.retryAfterSeconds,
+  });
+
+  final GalleryMediaState state;
+  final String mediaType;
+  final String? previewUrl;
+  final String? resultUrl;
+  final DateTime? resultExpiresAtUtc;
+  final double? durationSeconds;
+  final bool hasWatermark;
+  final bool canRemoveWatermark;
+  final bool isWatermarkRemoved;
+  final bool canDownload;
+  final bool canShare;
+  final String? reasonCode;
+  final String? userMessageKey;
+  final int? retryAfterSeconds;
+
+  bool get hasActionableResult =>
+      state == GalleryMediaState.resultReady && resultUrl != null;
+
+  bool get needsExplanation =>
+      state == GalleryMediaState.previewReadyOnly ||
+      state == GalleryMediaState.watermarkPreparing ||
+      state == GalleryMediaState.expired ||
+      state == GalleryMediaState.storageUnavailable ||
+      state == GalleryMediaState.failed ||
+      state == GalleryMediaState.hidden;
+}
+
 TemplateGenerationStatus templateGenerationStatusFromApi(String value) {
   return switch (value.trim().toLowerCase()) {
     '1' => TemplateGenerationStatus.queued,
@@ -112,6 +191,7 @@ class TemplateGenerationResult {
     this.canCompareBeforeAfter = false,
     this.petId,
     this.petPhotoId,
+    this.galleryMedia = const GalleryMedia(),
   });
 
   final String generationId;
@@ -171,6 +251,7 @@ class TemplateGenerationResult {
   final bool canCompareBeforeAfter;
   final String? petId;
   final String? petPhotoId;
+  final GalleryMedia galleryMedia;
 
   TemplateGenerationResult copyWith({
     String? generationId,
@@ -232,6 +313,7 @@ class TemplateGenerationResult {
     bool? canCompareBeforeAfter,
     String? petId,
     String? petPhotoId,
+    GalleryMedia? galleryMedia,
   }) {
     return TemplateGenerationResult(
       generationId: generationId ?? this.generationId,
@@ -306,6 +388,7 @@ class TemplateGenerationResult {
           canCompareBeforeAfter ?? this.canCompareBeforeAfter,
       petId: petId ?? this.petId,
       petPhotoId: petPhotoId ?? this.petPhotoId,
+      galleryMedia: galleryMedia ?? this.galleryMedia,
     );
   }
 

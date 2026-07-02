@@ -7,11 +7,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_password_policy.dart';
+import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 import 'package:petmagic_mobile/shared/files/temp_media_cleanup.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 
@@ -115,15 +117,23 @@ class ProfileController extends Notifier<ProfileState> {
   final ImagePicker _imagePicker = ImagePicker();
   CancelToken? _activeAvatarUploadCancelToken;
   CancelToken? _activeInitializeCancelToken;
+  CancelToken? _activeAuthCancelToken;
+  CancelToken? _activeProfileMutationCancelToken;
   Future<void>? _initializeInFlight;
 
   ProfileRepository get _repository => ref.read(profileRepositoryProvider);
 
   @override
   ProfileState build() {
+    ref.listen<bool>(
+      networkStatusControllerProvider.select((state) => state.hasInternet),
+      (_, hasInternet) => _handleNetworkStatusChanged(hasInternet),
+    );
     ref.onDispose(() {
       _cancelActiveInitialize();
       _cancelActiveAvatarUpload();
+      _cancelActiveAuthRequest();
+      _cancelActiveProfileMutation();
     });
     return const ProfileState.initial();
   }
@@ -180,6 +190,65 @@ class ProfileController extends Notifier<ProfileState> {
   void _clearActiveInitialize(CancelToken cancelToken) {
     if (identical(_activeInitializeCancelToken, cancelToken)) {
       _activeInitializeCancelToken = null;
+    }
+  }
+
+  void _handleNetworkStatusChanged(bool hasInternet) {
+    if (hasInternet) {
+      return;
+    }
+
+    _cancelActiveAvatarUpload();
+    _cancelActiveAuthRequest();
+    _cancelActiveProfileMutation();
+    _updateStateIfMounted(
+      (state) => state.copyWith(
+        isSaving: false,
+        errorMessage: 'templates.network_unavailable',
+        clearSuccess: true,
+      ),
+    );
+  }
+
+  CancelToken _startAuthRequest() {
+    _cancelActiveAuthRequest();
+    final cancelToken = CancelToken();
+    _activeAuthCancelToken = cancelToken;
+    return cancelToken;
+  }
+
+  void _cancelActiveAuthRequest() {
+    final cancelToken = _activeAuthCancelToken;
+    if (cancelToken != null && !cancelToken.isCancelled) {
+      cancelToken.cancel('profile_auth_cancelled');
+    }
+    _activeAuthCancelToken = null;
+  }
+
+  void _clearActiveAuthRequest(CancelToken cancelToken) {
+    if (identical(_activeAuthCancelToken, cancelToken)) {
+      _activeAuthCancelToken = null;
+    }
+  }
+
+  CancelToken _startProfileMutation() {
+    _cancelActiveProfileMutation();
+    final cancelToken = CancelToken();
+    _activeProfileMutationCancelToken = cancelToken;
+    return cancelToken;
+  }
+
+  void _cancelActiveProfileMutation() {
+    final cancelToken = _activeProfileMutationCancelToken;
+    if (cancelToken != null && !cancelToken.isCancelled) {
+      cancelToken.cancel('profile_mutation_cancelled');
+    }
+    _activeProfileMutationCancelToken = null;
+  }
+
+  void _clearActiveProfileMutation(CancelToken cancelToken) {
+    if (identical(_activeProfileMutationCancelToken, cancelToken)) {
+      _activeProfileMutationCancelToken = null;
     }
   }
 
@@ -350,6 +419,11 @@ class ProfileController extends Notifier<ProfileState> {
       return;
     }
 
+    if (!ref.read(networkStatusControllerProvider).hasInternet) {
+      _setFailure(message: 'templates.network_unavailable');
+      return;
+    }
+
     state = state.copyWith(
       isSaving: true,
       clearError: true,
@@ -357,13 +431,20 @@ class ProfileController extends Notifier<ProfileState> {
     );
 
     final repository = _repository;
+    final authCancelToken = _startAuthRequest();
     try {
-      await repository.login(email: state.email, password: state.password);
-      if (!ref.mounted) {
+      await repository.login(
+        email: state.email,
+        password: state.password,
+        cancelToken: authCancelToken,
+      );
+      if (!ref.mounted || authCancelToken.isCancelled) {
         return;
       }
-      final profile = await repository.fetchProfile();
-      if (!ref.mounted) {
+      final profile = await repository.fetchProfile(
+        cancelToken: authCancelToken,
+      );
+      if (!ref.mounted || authCancelToken.isCancelled) {
         return;
       }
       _updateStateIfMounted(
@@ -382,11 +463,15 @@ class ProfileController extends Notifier<ProfileState> {
           .markSignedInWithLegalStatus(
             requiresLegalAcceptance: profile.legalAcceptance.requiresAcceptance,
           );
+    } on RequestCancelledException {
+      return;
     } on AppException catch (error) {
       _setFailure(message: error.message);
     } catch (error, stackTrace) {
       _logProfileFailure('login_unknown', error, stackTrace);
       _setFailure(message: _genericActionError);
+    } finally {
+      _clearActiveAuthRequest(authCancelToken);
     }
   }
 
@@ -416,6 +501,21 @@ class ProfileController extends Notifier<ProfileState> {
       return;
     }
 
+    if (legalDocuments == null ||
+        legalDocuments.termsOfUse.version.trim().isEmpty ||
+        legalDocuments.privacyPolicy.version.trim().isEmpty) {
+      state = state.copyWith(
+        errorMessage: 'auth.legal_documents_unavailable',
+        clearSuccess: true,
+      );
+      return;
+    }
+
+    if (!ref.read(networkStatusControllerProvider).hasInternet) {
+      _setFailure(message: 'templates.network_unavailable');
+      return;
+    }
+
     state = state.copyWith(
       isSaving: true,
       clearError: true,
@@ -423,6 +523,7 @@ class ProfileController extends Notifier<ProfileState> {
     );
 
     final repository = _repository;
+    final authCancelToken = _startAuthRequest();
     try {
       await repository.register(
         email: state.email,
@@ -430,10 +531,14 @@ class ProfileController extends Notifier<ProfileState> {
         displayName: state.displayName,
         termsOfUseAccepted: termsOfUseAccepted,
         privacyPolicyAccepted: privacyPolicyAccepted,
-        termsOfUseVersion: legalDocuments?.termsOfUse.version ?? '',
-        privacyPolicyVersion: legalDocuments?.privacyPolicy.version ?? '',
+        termsOfUseVersion: legalDocuments.termsOfUse.version,
+        privacyPolicyVersion: legalDocuments.privacyPolicy.version,
         marketingEmailsEnabled: marketingEmailsEnabled,
+        cancelToken: authCancelToken,
       );
+      if (!ref.mounted || authCancelToken.isCancelled) {
+        return;
+      }
       _updateStateIfMounted(
         (state) => state.copyWith(
           isSaving: false,
@@ -444,16 +549,24 @@ class ProfileController extends Notifier<ProfileState> {
           successMessage: 'auth.registration_pending_verification',
         ),
       );
+    } on RequestCancelledException {
+      return;
     } on AppException catch (error) {
       _setFailure(message: error.message);
     } catch (error, stackTrace) {
       _logProfileFailure('register_unknown', error, stackTrace);
       _setFailure(message: _genericActionError);
+    } finally {
+      _clearActiveAuthRequest(authCancelToken);
     }
   }
 
   Future<void> authenticateWithProvider(ExternalAuthProvider provider) async {
     if (state.isSaving) {
+      return;
+    }
+
+    if (!_ensureNetworkForAction()) {
       return;
     }
 
@@ -464,9 +577,13 @@ class ProfileController extends Notifier<ProfileState> {
     );
 
     final externalAuthRepository = ref.read(externalAuthRepositoryProvider);
+    final authCancelToken = _startAuthRequest();
     try {
-      final session = await externalAuthRepository.authenticate(provider);
-      if (!ref.mounted) {
+      final session = await externalAuthRepository.authenticate(
+        provider,
+        cancelToken: authCancelToken,
+      );
+      if (!ref.mounted || authCancelToken.isCancelled) {
         return;
       }
       _updateStateIfMounted(
@@ -486,15 +603,23 @@ class ProfileController extends Notifier<ProfileState> {
             requiresLegalAcceptance:
                 session.user.legalAcceptance.requiresAcceptance,
           );
+    } on RequestCancelledException {
+      return;
     } on AppException catch (error) {
       _setFailure(message: error.message);
     } catch (error, stackTrace) {
       _logProfileFailure('authenticate_provider_unknown', error, stackTrace);
       _setFailure(message: 'auth.external_invalid');
+    } finally {
+      _clearActiveAuthRequest(authCancelToken);
     }
   }
 
   Future<void> linkExternalAccount(ExternalAuthProvider provider) async {
+    if (!_ensureNetworkForAction()) {
+      return;
+    }
+
     state = state.copyWith(
       isSaving: true,
       clearError: true,
@@ -502,22 +627,31 @@ class ProfileController extends Notifier<ProfileState> {
     );
 
     final externalAuthRepository = ref.read(externalAuthRepositoryProvider);
+    final authCancelToken = _startAuthRequest();
     try {
-      await externalAuthRepository.link(provider);
-      if (!ref.mounted) {
+      await externalAuthRepository.link(provider, cancelToken: authCancelToken);
+      if (!ref.mounted || authCancelToken.isCancelled) {
         return;
       }
       ref.invalidate(linkedAccountsProvider);
       _updateStateIfMounted((state) => state.copyWith(isSaving: false));
+    } on RequestCancelledException {
+      return;
     } on AppException catch (error) {
       _setFailure(message: error.message);
     } catch (error, stackTrace) {
       _logProfileFailure('link_external_unknown', error, stackTrace);
       _setFailure(message: 'auth.external_invalid');
+    } finally {
+      _clearActiveAuthRequest(authCancelToken);
     }
   }
 
   Future<void> unlinkExternalAccount(ExternalAuthProvider provider) async {
+    if (!_ensureNetworkForAction()) {
+      return;
+    }
+
     state = state.copyWith(
       isSaving: true,
       clearError: true,
@@ -525,18 +659,26 @@ class ProfileController extends Notifier<ProfileState> {
     );
 
     final repository = _repository;
+    final authCancelToken = _startAuthRequest();
     try {
-      await repository.unlinkLinkedAccount(provider.apiValue);
-      if (!ref.mounted) {
+      await repository.unlinkLinkedAccount(
+        provider.apiValue,
+        cancelToken: authCancelToken,
+      );
+      if (!ref.mounted || authCancelToken.isCancelled) {
         return;
       }
       ref.invalidate(linkedAccountsProvider);
       _updateStateIfMounted((state) => state.copyWith(isSaving: false));
+    } on RequestCancelledException {
+      return;
     } on AppException catch (error) {
       _setFailure(message: error.message);
     } catch (error, stackTrace) {
       _logProfileFailure('unlink_external_unknown', error, stackTrace);
       _setFailure(message: _genericActionError);
+    } finally {
+      _clearActiveAuthRequest(authCancelToken);
     }
   }
 
@@ -586,6 +728,10 @@ class ProfileController extends Notifier<ProfileState> {
   }
 
   Future<void> deleteAccount() async {
+    if (!_ensureNetworkForAction()) {
+      return;
+    }
+
     _cancelActiveInitialize();
     _cancelActiveAvatarUpload();
     state = state.copyWith(
@@ -596,9 +742,10 @@ class ProfileController extends Notifier<ProfileState> {
 
     final repository = _repository;
     final externalAuthRepository = ref.read(externalAuthRepositoryProvider);
+    final mutationCancelToken = _startProfileMutation();
     try {
-      await repository.deleteCurrentAccount();
-      if (!ref.mounted) {
+      await repository.deleteCurrentAccount(cancelToken: mutationCancelToken);
+      if (!ref.mounted || mutationCancelToken.isCancelled) {
         return;
       }
       await _clearExternalAuthSessions(
@@ -606,7 +753,7 @@ class ProfileController extends Notifier<ProfileState> {
         failureStage: 'delete_account_external_cleanup',
       );
 
-      if (!ref.mounted) {
+      if (!ref.mounted || mutationCancelToken.isCancelled) {
         return;
       }
       _updateStateIfMounted(
@@ -619,15 +766,19 @@ class ProfileController extends Notifier<ProfileState> {
           successMessage: 'profile.account_deleted',
         ),
       );
-      if (!ref.mounted) {
+      if (!ref.mounted || mutationCancelToken.isCancelled) {
         return;
       }
       ref.read(appLaunchControllerProvider.notifier).markSignedOut();
+    } on RequestCancelledException {
+      return;
     } on AppException catch (error) {
       _setFailure(message: error.message);
     } catch (error, stackTrace) {
       _logProfileFailure('delete_account_unknown', error, stackTrace);
       _setFailure(message: _genericActionError);
+    } finally {
+      _clearActiveProfileMutation(mutationCancelToken);
     }
   }
 
@@ -659,6 +810,11 @@ class ProfileController extends Notifier<ProfileState> {
   }
 
   Future<void> uploadAvatarFromPath(String filePath) async {
+    if (!_ensureNetworkForAction()) {
+      await _deleteManagedAvatarTempFile(filePath);
+      return;
+    }
+
     final uploadCancelToken = _startAvatarUpload();
     if (uploadCancelToken == null) {
       return;
@@ -697,13 +853,31 @@ class ProfileController extends Notifier<ProfileState> {
             requiresLegalAcceptance: profile.legalAcceptance.requiresAcceptance,
           );
     } on RequestCancelledException {
+      if (!ref.mounted) {
+        return;
+      }
+      final hasInternet = ref.read(networkStatusControllerProvider).hasInternet;
       _updateStateIfMounted(
-        (state) => state.copyWith(isSaving: false, clearError: true),
+        (state) => state.copyWith(
+          isSaving: false,
+          clearError: hasInternet,
+          errorMessage: hasInternet ? null : 'templates.network_unavailable',
+        ),
       );
     } on DioException catch (error, stackTrace) {
       if (CancelToken.isCancel(error)) {
+        if (!ref.mounted) {
+          return;
+        }
+        final hasInternet = ref
+            .read(networkStatusControllerProvider)
+            .hasInternet;
         _updateStateIfMounted(
-          (state) => state.copyWith(isSaving: false, clearError: true),
+          (state) => state.copyWith(
+            isSaving: false,
+            clearError: hasInternet,
+            errorMessage: hasInternet ? null : 'templates.network_unavailable',
+          ),
         );
         return;
       }
@@ -722,32 +896,57 @@ class ProfileController extends Notifier<ProfileState> {
   }
 
   Future<void> removeAvatar() async {
+    if (!_ensureNetworkForAction()) {
+      return;
+    }
+
     state = state.copyWith(
       isSaving: true,
       clearError: true,
       clearSuccess: true,
     );
+    final mutationCancelToken = _startProfileMutation();
     try {
-      final profile = await _repository.removeAvatar();
+      final profile = await _repository.removeAvatar(
+        cancelToken: mutationCancelToken,
+      );
+      if (!ref.mounted || mutationCancelToken.isCancelled) {
+        return;
+      }
       _updateStateIfMounted(
         (state) => state.copyWith(isSaving: false, profile: profile),
       );
+    } on RequestCancelledException {
+      return;
     } on AppException catch (error) {
       _setFailure(message: error.message);
     } catch (error, stackTrace) {
       _logProfileFailure('remove_avatar_unknown', error, stackTrace);
       _setFailure(message: _genericActionError);
+    } finally {
+      _clearActiveProfileMutation(mutationCancelToken);
     }
   }
 
   Future<void> updateCurrentProfile({required String? displayName}) async {
+    if (!_ensureNetworkForAction()) {
+      return;
+    }
+
     state = state.copyWith(
       isSaving: true,
       clearError: true,
       clearSuccess: true,
     );
+    final mutationCancelToken = _startProfileMutation();
     try {
-      final profile = await _repository.updateProfile(displayName: displayName);
+      final profile = await _repository.updateProfile(
+        displayName: displayName,
+        cancelToken: mutationCancelToken,
+      );
+      if (!ref.mounted || mutationCancelToken.isCancelled) {
+        return;
+      }
       _updateStateIfMounted(
         (state) => state.copyWith(
           isSaving: false,
@@ -755,36 +954,62 @@ class ProfileController extends Notifier<ProfileState> {
           displayName: profile.displayName ?? '',
         ),
       );
+    } on RequestCancelledException {
+      return;
     } on AppException catch (error) {
       _setFailure(message: error.message);
     } catch (error, stackTrace) {
       _logProfileFailure('update_profile_unknown', error, stackTrace);
       _setFailure(message: _genericActionError);
+    } finally {
+      _clearActiveProfileMutation(mutationCancelToken);
     }
   }
 
   Future<void> acceptCurrentLegalDocuments(
     MobileLegalDocuments legalDocuments,
   ) async {
+    if (!_ensureNetworkForAction()) {
+      return;
+    }
+
     state = state.copyWith(
       isSaving: true,
       clearError: true,
       clearSuccess: true,
     );
 
+    final mutationCancelToken = _startProfileMutation();
     try {
       final profile = await _repository.acceptCurrentLegalDocuments(
         documents: legalDocuments,
+        cancelToken: mutationCancelToken,
       );
+      if (!ref.mounted || mutationCancelToken.isCancelled) {
+        return;
+      }
       _updateStateIfMounted(
         (state) => state.copyWith(isSaving: false, profile: profile),
       );
+    } on RequestCancelledException {
+      return;
     } on AppException catch (error) {
       _setFailure(message: error.message);
     } catch (error, stackTrace) {
       _logProfileFailure('accept_legal_unknown', error, stackTrace);
       _setFailure(message: _genericActionError);
+    } finally {
+      _clearActiveProfileMutation(mutationCancelToken);
     }
+  }
+
+  bool _ensureNetworkForAction() {
+    if (ref.read(networkStatusControllerProvider).hasInternet) {
+      return true;
+    }
+
+    _setFailure(message: 'templates.network_unavailable');
+    return false;
   }
 
   void _setFailure({
@@ -812,8 +1037,9 @@ class ProfileController extends Notifier<ProfileState> {
       return;
     }
 
+    final cacheKey = persistentSafeProfileAvatarUrl(safeImageUrl);
     try {
-      await CachedNetworkImage.evictFromCache(safeImageUrl);
+      await CachedNetworkImage.evictFromCache(safeImageUrl, cacheKey: cacheKey);
       imageCache.evict(NetworkImage(safeImageUrl));
     } catch (error, stackTrace) {
       _logProfileFailure('avatar_cache_evict_failed', error, stackTrace);

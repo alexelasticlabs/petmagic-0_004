@@ -86,6 +86,9 @@ class ProfileAvatarBadge extends StatelessWidget {
                   child: safeImageUrl != null
                       ? CachedNetworkImage(
                           imageUrl: safeImageUrl,
+                          cacheKey: persistentSafeProfileAvatarUrl(
+                            safeImageUrl,
+                          ),
                           width: size,
                           height: size,
                           fit: BoxFit.cover,

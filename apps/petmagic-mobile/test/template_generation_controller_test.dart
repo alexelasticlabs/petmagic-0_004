@@ -7,15 +7,17 @@ import 'package:dio/dio.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/logging/log_correlation_context.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
-import 'package:petmagic_mobile/shared/files/image_upload_optimizer.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test(
     'maps backend payment required error to balance recovery state',
     () async {
@@ -173,6 +175,38 @@ void main() {
     expect(gate.kind, TemplateGenerationGateKind.premiumRequired);
     expect(gate.isPremium, isFalse);
     expect(repository.startCalls, 0);
+  });
+
+  test('checkGate skips wallet reload while offline', () async {
+    late _FakeWalletController walletController;
+    final container = ProviderContainer(
+      overrides: [
+        templateGenerationRepositoryProvider.overrideWithValue(
+          _FakeTemplateGenerationRepository(),
+        ),
+        walletControllerProvider.overrideWith(() {
+          walletController = _FakeWalletController.withState(
+            const WalletState(isLoading: false),
+          );
+          return walletController;
+        }),
+        networkStatusControllerProvider.overrideWith(
+          () => _TestTemplateNetworkStatusController(false),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(
+      templateGenerationControllerProvider.notifier,
+    );
+
+    final gate = await controller.checkGate(_template(tokenCost: 50));
+
+    expect(walletController.loadCalls, 0);
+    expect(gate.kind, TemplateGenerationGateKind.notEnoughTokens);
+    expect(gate.balance, 0);
+    expect(gate.isPremium, isFalse);
   });
 
   test(
@@ -343,34 +377,14 @@ void main() {
   );
 
   test(
-    'optimizes source image before generation upload and deletes temp file',
+    'passes selected source image to repository for validation and upload',
     () async {
-      final tempDir = await Directory.systemTemp.createTemp(
-        'petmagic-generation-optimizer-test-',
-      );
-      addTearDown(() async {
-        if (await tempDir.exists()) {
-          await tempDir.delete(recursive: true);
-        }
-      });
-
-      final optimizedPath = '${tempDir.path}/optimized-source.jpg';
-      await File(optimizedPath).writeAsBytes(const [1, 2, 3], flush: true);
-      final optimized = OptimizedUploadFile.temporary(
-        XFile(
-          optimizedPath,
-          name: 'optimized-source.jpg',
-          mimeType: 'image/jpeg',
-        ),
-      );
-      final optimizer = _FakeImageUploadOptimizer(optimized);
       final repository = _FakeTemplateGenerationRepository(
         startResult: _generation(status: TemplateGenerationStatus.completed),
       );
       final container = ProviderContainer(
         overrides: [
           templateGenerationRepositoryProvider.overrideWithValue(repository),
-          generationImageUploadOptimizerProvider.overrideWithValue(optimizer),
           walletControllerProvider.overrideWith(
             () => _FakeWalletController(_wallet(balance: 100)),
           ),
@@ -388,11 +402,8 @@ void main() {
       );
 
       expect(generation?.isTerminal, true);
-      expect(optimizer.sources.single.path, 'original-source.png');
-      expect(optimizer.cancelTokens.single, isNotNull);
-      expect(repository.startSourceImages.single.path, optimizedPath);
-      expect(repository.startSourceImages.single.mimeType, 'image/jpeg');
-      expect(await File(optimizedPath).exists(), false);
+      expect(repository.startSourceImages.single.path, 'original-source.png');
+      expect(repository.startCancelTokens.single, isNotNull);
     },
   );
 
@@ -567,6 +578,50 @@ void main() {
   );
 
   test(
+    'active generation restore waits for reconnect before fetching status',
+    () async {
+      final networkStatusController = _TestTemplateNetworkStatusController(
+        false,
+      );
+      final repository = _FakeTemplateGenerationRepository()
+        ..activeGeneration = (
+          generationId: 'generation-1',
+          correlationId: 'generation-restored-offline',
+        );
+      final container = ProviderContainer(
+        overrides: [
+          templateGenerationRepositoryProvider.overrideWithValue(repository),
+          walletControllerProvider.overrideWith(
+            () => _FakeWalletController(_wallet(balance: 100)),
+          ),
+          networkStatusControllerProvider.overrideWith(
+            () => networkStatusController,
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      container.read(templateGenerationControllerProvider);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      expect(repository.fetchCalls, 0);
+      expect(
+        container.read(templateGenerationControllerProvider).isPolling,
+        isFalse,
+      );
+
+      networkStatusController.setHasInternet(true);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      expect(repository.fetchCalls, 1);
+      expect(
+        repository.fetchCorrelationIds.single,
+        'generation-restored-offline',
+      );
+    },
+  );
+
+  test(
     'restored terminal generation clears active marker and stops polling',
     () async {
       final repository = _FakeTemplateGenerationRepository()
@@ -599,6 +654,58 @@ void main() {
       expect(state.isPolling, isFalse);
       expect(state.errorMessage, isNull);
       expect(walletController.loadCalls, 1);
+    },
+  );
+
+  test(
+    'active generation polling pauses offline and resumes on reconnect',
+    () async {
+      final networkStatusController = _TestTemplateNetworkStatusController(
+        true,
+      );
+      final repository = _FakeTemplateGenerationRepository(
+        startResult: _generation(status: TemplateGenerationStatus.queued),
+      );
+      final container = ProviderContainer(
+        overrides: [
+          templateGenerationRepositoryProvider.overrideWithValue(repository),
+          walletControllerProvider.overrideWith(
+            () => _FakeWalletController(_wallet(balance: 100)),
+          ),
+          networkStatusControllerProvider.overrideWith(
+            () => networkStatusController,
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(
+        templateGenerationControllerProvider.notifier,
+      );
+      controller.selectPhoto(XFile('pet.jpg', name: 'pet.jpg'));
+
+      await controller.startGeneration(_template(tokenCost: 50));
+      expect(
+        container.read(templateGenerationControllerProvider).isPolling,
+        true,
+      );
+      expect(repository.fetchCalls, 0);
+
+      networkStatusController.setHasInternet(false);
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        container.read(templateGenerationControllerProvider).isPolling,
+        false,
+      );
+
+      networkStatusController.setHasInternet(true);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      expect(repository.fetchCalls, 1);
+      expect(
+        repository.fetchCorrelationIds.single,
+        repository.startCorrelationIds.single,
+      );
     },
   );
 
@@ -717,6 +824,35 @@ void main() {
       expect(walletController.loadCalls, 0);
     },
   );
+
+  test('completed generation skips wallet refresh while offline', () async {
+    final repository = _FakeTemplateGenerationRepository(
+      startResult: _generation(status: TemplateGenerationStatus.completed),
+    );
+    final walletController = _FakeWalletController(_wallet(balance: 100));
+    final container = ProviderContainer(
+      overrides: [
+        templateGenerationRepositoryProvider.overrideWithValue(repository),
+        walletControllerProvider.overrideWith(() => walletController),
+        networkStatusControllerProvider.overrideWith(
+          () => _TestTemplateNetworkStatusController(false),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(
+      templateGenerationControllerProvider.notifier,
+    );
+    controller.selectPhoto(XFile('pet.jpg', name: 'pet.jpg'));
+
+    final generation = await controller.startGeneration(
+      _template(tokenCost: 50),
+    );
+
+    expect(generation?.status, TemplateGenerationStatus.completed);
+    expect(walletController.loadCalls, 0);
+  });
 }
 
 class _FakeTemplateGenerationRepository
@@ -744,6 +880,7 @@ class _FakeTemplateGenerationRepository
   int clearActiveCalls = 0;
   final List<XFile> startSourceImages = <XFile>[];
   final List<String?> startCorrelationIds = <String?>[];
+  final List<CancelToken?> startCancelTokens = <CancelToken?>[];
   final List<String?> fetchCorrelationIds = <String?>[];
   ({String generationId, String correlationId})? activeGeneration;
 
@@ -761,6 +898,7 @@ class _FakeTemplateGenerationRepository
     }
     startSourceImages.add(sourceImage);
     startCorrelationIds.add(correlationId);
+    startCancelTokens.add(cancelToken);
     final completer = startCompleter;
     if (completer != null) {
       await completer.future;
@@ -912,6 +1050,21 @@ class _FakeTemplateGenerationRepository
     CancelToken? cancelToken,
   }) async {
     return const [];
+  }
+
+  @override
+  Future<TemplateGenerationGalleryPage> fetchGenerationPage({
+    String? status,
+    String? cursor,
+    int? take,
+    CancelToken? cancelToken,
+  }) async {
+    return TemplateGenerationGalleryPage(
+      items: const [],
+      hasMore: false,
+      unreadCount: 0,
+      appliedFilter: status ?? 'all',
+    );
   }
 
   @override
@@ -1164,35 +1317,29 @@ class _FakeTemplateGenerationRepository
   }
 }
 
-class _FakeImageUploadOptimizer extends ImageUploadOptimizer {
-  _FakeImageUploadOptimizer(this.optimized);
-
-  final OptimizedUploadFile optimized;
-  final List<XFile> sources = <XFile>[];
-  final List<CancelToken?> cancelTokens = <CancelToken?>[];
-
-  @override
-  Future<OptimizedUploadFile> optimizeGenerationSource(
-    XFile source, {
-    CancelToken? cancelToken,
-  }) async {
-    sources.add(source);
-    cancelTokens.add(cancelToken);
-    return optimized;
-  }
-}
-
 class _FakeWalletController extends WalletController {
-  _FakeWalletController(this.wallet, {this.loadError});
+  _FakeWalletController(this.wallet, {this.loadError}) : _initialState = null;
 
   final WalletStateModel wallet;
   final Object? loadError;
   int loadCalls = 0;
   final List<String?> loadCorrelationIds = <String?>[];
+  final WalletState? _initialState;
+
+  _FakeWalletController.withState(WalletState initialState)
+    : wallet = const WalletStateModel(
+        userId: '',
+        balance: 0,
+        adRewardsRemainingToday: 0,
+        isPremium: false,
+        updatedAtUtc: null,
+      ),
+      loadError = null,
+      _initialState = initialState;
 
   @override
   WalletState build() {
-    return WalletState(wallet: wallet, isLoading: false);
+    return _initialState ?? WalletState(wallet: wallet, isLoading: false);
   }
 
   @override
@@ -1208,6 +1355,22 @@ class _FakeWalletController extends WalletController {
       isLoading: false,
       isRefreshing: false,
     );
+  }
+}
+
+class _TestTemplateNetworkStatusController extends NetworkStatusController {
+  _TestTemplateNetworkStatusController(bool hasInternet)
+    : _initialHasInternet = hasInternet;
+
+  final bool _initialHasInternet;
+
+  @override
+  NetworkStatusState build() {
+    return NetworkStatusState(hasInternet: _initialHasInternet);
+  }
+
+  void setHasInternet(bool value) {
+    state = state.copyWith(hasInternet: value);
   }
 }
 

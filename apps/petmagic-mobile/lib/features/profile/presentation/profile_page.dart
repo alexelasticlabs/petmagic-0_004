@@ -81,7 +81,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
     final walletState = ref.read(walletControllerProvider);
     if (!profileState.isAuthenticated ||
         profileState.profile == null ||
-        !ref.read(appLaunchControllerProvider).isAuthenticated) {
+        !ref.read(appLaunchControllerProvider).isAuthenticated ||
+        !ref.read(networkStatusControllerProvider).hasInternet) {
       return;
     }
 
@@ -193,9 +194,16 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
     }
 
     final profileState = ref.read(profileControllerProvider);
+    final walletState = ref.read(walletControllerProvider);
     final hasInternet = ref.read(networkStatusControllerProvider).hasInternet;
     if (!hasInternet) {
       return;
+    }
+
+    if (profileState.isAuthenticated &&
+        profileState.profile != null &&
+        _shouldPreloadWalletSnapshot(walletState)) {
+      _preloadWalletIfNeeded();
     }
 
     final unavailableKind =
@@ -262,6 +270,13 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
       }
 
       final profileState = ref.read(profileControllerProvider);
+      final walletState = ref.read(walletControllerProvider);
+      if (profileState.isAuthenticated &&
+          profileState.profile != null &&
+          _shouldPreloadWalletSnapshot(walletState)) {
+        _preloadWalletIfNeeded();
+      }
+
       final currentUnavailableKind =
           !profileState.isLoading && profileState.profile == null
           ? classifyAppUnavailable(

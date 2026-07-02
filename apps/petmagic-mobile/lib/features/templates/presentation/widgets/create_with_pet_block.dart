@@ -10,6 +10,7 @@ import 'package:petmagic_mobile/features/pets/presentation/pet_profile_providers
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/pet_generation_launch_sheet.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
+import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 
 class CreateWithPetBlockSlot extends ConsumerWidget {
@@ -246,6 +247,7 @@ class PetShortcutAvatar extends StatelessWidget {
       return ClipOval(
         child: CachedNetworkImage(
           imageUrl: url,
+          cacheKey: persistentSafeProfileAvatarUrl(url),
           width: size,
           height: size,
           fit: BoxFit.cover,

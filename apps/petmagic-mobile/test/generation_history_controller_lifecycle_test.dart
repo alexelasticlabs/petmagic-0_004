@@ -25,9 +25,18 @@ void main() {
     expect(buildBody, contains('if (!ref.mounted)'));
     expect(buildBody, isNot(contains('_startAutoRefresh();')));
     expect(buildBody, contains('if (!_isScreenVisible)'));
+    expect(buildBody, contains('networkStatusControllerProvider'));
+    expect(
+      buildBody,
+      contains('(_, hasInternet) => _handleNetworkStatusChanged(hasInternet)'),
+    );
     expect(loadBody, contains('if (!ref.mounted)'));
-    expect(autoRefreshBody, contains('if (!ref.mounted || !_isScreenVisible)'));
+    expect(
+      autoRefreshBody,
+      contains('if (!ref.mounted || !_isScreenVisible || !_hasInternet)'),
+    );
     expect(autoRefreshBody, contains('if (!ref.mounted)'));
+    expect(autoRefreshBody, contains('!_hasInternet'));
     expect(offlineBannerBody, contains('if (!ref.mounted)'));
     expect(unreadBody, contains('if (!ref.mounted'));
     expect(unreadBody, contains('!_isScreenVisible'));
@@ -69,8 +78,13 @@ void main() {
     expect(guardAfterTombstoneIndex, lessThan(serverDeleteIndex));
     expect(serverDeleteIndex, lessThan(guardAfterServerDeleteIndex));
     expect(guardAfterServerDeleteIndex, lessThan(clearPendingIndex));
-    expect(realtimeBody, contains('if (!ref.mounted || !_isScreenVisible)'));
+    expect(
+      realtimeBody,
+      contains('if (!ref.mounted || !_isScreenVisible || !_hasInternet)'),
+    );
     expect(realtimeBody, contains('if (!ref.mounted)'));
+    expect(realtimeBody, contains('!_hasInternet'));
+    expect(realtimeBody, contains('unawaited(realtimeClient.disconnect())'));
     expect(eventBody, contains('if (!ref.mounted || !_isScreenVisible)'));
     expect(eventBody, contains("AppLogger.warn("));
     expect(eventBody, contains("feature: 'Templates.GenerationHistory'"));

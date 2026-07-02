@@ -122,8 +122,12 @@ Color statusColor(PetMagicColors colors, TemplateGenerationResult generation) {
 }
 
 String? previewUrl(TemplateGenerationResult generation) {
-  final resultPreview = _safeMediaUrl(generation.resultPreviewUrl);
-  final output = _safeMediaUrl(generation.outputUrl);
+  final resultPreview = _safeMediaUrl(
+    generation.galleryMedia.previewUrl ?? generation.resultPreviewUrl,
+  );
+  final output = _safeMediaUrl(
+    generation.galleryMedia.resultUrl ?? generation.outputUrl,
+  );
   final source = _safeMediaUrl(generation.sourceImageAsset?.url);
   final normalized = _safeMediaUrl(generation.normalizedImageUrl);
   final generationIsVideo = isVideoGeneration(generation);

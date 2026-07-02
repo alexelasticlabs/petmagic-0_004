@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 
+import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http_parser/http_parser.dart';
@@ -12,6 +12,7 @@ import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
 import 'package:petmagic_mobile/core/network/authenticated_request_options.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
+import 'package:petmagic_mobile/core/network/request_identity.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_dtos.dart';
@@ -20,6 +21,7 @@ import 'package:petmagic_mobile/shared/files/file_name_sanitizer.dart';
 import 'package:petmagic_mobile/shared/files/image_upload_optimizer.dart';
 import 'package:petmagic_mobile/shared/files/media_signature.dart';
 import 'package:petmagic_mobile/shared/files/upload_media_policy.dart';
+import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 export 'template_generation_dtos.dart';
@@ -76,8 +78,6 @@ class TemplateGenerationRepository {
     'completed',
     'failed',
   ];
-  static final Random _correlationRandom = Random.secure();
-
   final Dio _dio;
   final AuthSessionStorage _sessionStorage;
   final SharedPreferencesAsync _preferences;
@@ -99,13 +99,69 @@ class TemplateGenerationRepository {
     final fileName = _safeSourceImageFileName(rawFileName);
     final declaredContentType =
         sourceImage.mimeType ?? _resolveImageContentType(fileName);
+    await _validateSourceImageUploadFile(
+      filePath: sourceImage.path,
+      declaredContentType: declaredContentType,
+    );
+
+    OptimizedUploadFile? optimizedSource;
+    try {
+      optimizedSource = await _imageUploadOptimizer.optimizeGenerationSource(
+        XFile(sourceImage.path, name: fileName, mimeType: declaredContentType),
+        cancelToken: cancelToken,
+      );
+      final uploadFile = optimizedSource.file;
+      final uploadRawFileName = uploadFile.name.isNotEmpty
+          ? uploadFile.name
+          : uploadFile.path.split(Platform.pathSeparator).last;
+      final uploadFileName = _safeSourceImageFileName(uploadRawFileName);
+      final uploadDeclaredContentType =
+          uploadFile.mimeType ?? _resolveImageContentType(uploadFileName);
+      final uploadContentType = await _validateSourceImageUploadFile(
+        filePath: uploadFile.path,
+        declaredContentType: uploadDeclaredContentType,
+      );
+
+      final response = await _authorizedRequest<Map<String, dynamic>>(
+        (session) async => _dio.post<Map<String, dynamic>>(
+          '/api/templates/$encodedTemplateId/generations',
+          data: FormData.fromMap({
+            'sourceImage': await MultipartFile.fromFile(
+              uploadFile.path,
+              filename: uploadFileName,
+              contentType: MediaType.parse(uploadContentType),
+            ),
+            if (expectedTemplateVersion != null && expectedTemplateVersion > 0)
+              'expectedTemplateVersion': expectedTemplateVersion,
+          }),
+          options: authenticatedMultipartRequestOptions(
+            session.accessToken,
+            correlationId: correlationId,
+          ),
+          cancelToken: cancelToken,
+        ),
+        retryTransientFailures: false,
+      );
+
+      return TemplateGenerationDto.fromJson(
+        response.data ?? const {},
+      ).toDomain();
+    } finally {
+      await optimizedSource?.dispose();
+    }
+  }
+
+  Future<String> _validateSourceImageUploadFile({
+    required String filePath,
+    required String declaredContentType,
+  }) async {
     if (!_isAllowedImageContentType(declaredContentType) &&
         !_isGenericBinaryContentType(declaredContentType)) {
       throw const AppException('templates.source_image_type_not_allowed');
     }
 
     final fileSize = await _uploadImageSizeBytes(
-      sourceImage.path,
+      filePath,
       unavailableMessage: 'templates.source_image_unavailable',
     );
     if (fileSize <= 0) {
@@ -116,35 +172,14 @@ class TemplateGenerationRepository {
     }
 
     final contentType = await _detectSourceImageContentType(
-      sourceImage.path,
+      filePath,
       unavailableMessage: 'templates.source_image_unavailable',
     );
-    if (contentType == null) {
+    if (contentType == null || !_isAllowedImageContentType(contentType)) {
       throw const AppException('templates.source_image_type_not_allowed');
     }
 
-    final response = await _authorizedRequest<Map<String, dynamic>>(
-      (session) async => _dio.post<Map<String, dynamic>>(
-        '/api/templates/$encodedTemplateId/generations',
-        data: FormData.fromMap({
-          'sourceImage': await MultipartFile.fromFile(
-            sourceImage.path,
-            filename: fileName,
-            contentType: MediaType.parse(contentType),
-          ),
-          if (expectedTemplateVersion != null && expectedTemplateVersion > 0)
-            'expectedTemplateVersion': expectedTemplateVersion,
-        }),
-        options: authenticatedMultipartRequestOptions(
-          session.accessToken,
-          correlationId: correlationId,
-        ),
-        cancelToken: cancelToken,
-      ),
-      retryTransientFailures: false,
-    );
-
-    return TemplateGenerationDto.fromJson(response.data ?? const {}).toDomain();
+    return contentType;
   }
 
   Future<TemplateGenerationResult> fetchGeneration(
@@ -556,6 +591,19 @@ class TemplateGenerationRepository {
     this,
     status: status,
     skip: skip,
+    take: take,
+    cancelToken: cancelToken,
+  );
+
+  Future<TemplateGenerationGalleryPage> fetchGenerationPage({
+    String? status,
+    String? cursor,
+    int? take,
+    CancelToken? cancelToken,
+  }) => _fetchGenerationPage(
+    this,
+    status: status,
+    cursor: cursor,
     take: take,
     cancelToken: cancelToken,
   );

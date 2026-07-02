@@ -28,12 +28,24 @@ void main() {
     expect(refreshBody, contains('if (!ref.mounted)'));
     expect(connectivityBody, contains('if (!ref.mounted)'));
     expect(applyBody, contains('if (!ref.mounted)'));
-    expect(applyBody, contains('_currentOfflineProbeInterval = _offlineProbeInterval;'));
+    expect(
+      applyBody,
+      contains('_currentOfflineProbeInterval = _offlineProbeInterval;'),
+    );
 
-    expect(offlineProbeBody, contains('_scheduleNextOfflineProbe(_currentOfflineProbeInterval);'));
+    expect(
+      offlineProbeBody,
+      contains('_scheduleNextOfflineProbe(_currentOfflineProbeInterval);'),
+    );
     expect(scheduleProbeBody, contains('Timer(delay, () async {'));
-    expect(scheduleProbeBody, contains('if (!ref.mounted || state.hasInternet)'));
-    expect(scheduleProbeBody, contains('_currentOfflineProbeInterval.inSeconds * 2'));
+    expect(
+      scheduleProbeBody,
+      contains('if (!ref.mounted || state.hasInternet)'),
+    );
+    expect(
+      scheduleProbeBody,
+      contains('_currentOfflineProbeInterval.inSeconds * 2'),
+    );
     expect(scheduleProbeBody, contains('_offlineProbeMaxInterval.inSeconds'));
     expect(restoreBannerBody, contains('Timer('));
     expect(restoreBannerBody, contains('if (!ref.mounted)'));

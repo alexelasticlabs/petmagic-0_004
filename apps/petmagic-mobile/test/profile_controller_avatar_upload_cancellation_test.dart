@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
@@ -13,9 +14,11 @@ import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('provider disposal cancels active avatar upload', () async {
     final repository = _CancellableProfileRepository();
-    final container = ProviderContainer(
+    final container = _profileControllerTestContainer(
       overrides: [profileRepositoryProvider.overrideWithValue(repository)],
     );
     final managedTempFile = await _createManagedAvatarTempFile();
@@ -40,7 +43,7 @@ void main() {
 
   test('ignores duplicate avatar upload while one is in flight', () async {
     final repository = _CancellableProfileRepository();
-    final container = ProviderContainer(
+    final container = _profileControllerTestContainer(
       overrides: [profileRepositoryProvider.overrideWithValue(repository)],
     );
 
@@ -58,10 +61,43 @@ void main() {
   });
 
   test(
+    'avatar upload cancels in-flight request when network goes offline',
+    () async {
+      final repository = _CancellableProfileRepository();
+      final networkController = _TestNetworkStatusController(hasInternet: true);
+      final container = _profileControllerTestContainer(
+        networkStatusController: networkController,
+        overrides: [profileRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(profileControllerProvider.notifier);
+      final uploadFuture = controller.uploadAvatarFromPath('/tmp/avatar.jpg');
+
+      final cancelToken = await repository.uploadStarted.future;
+      expect(cancelToken.isCancelled, isFalse);
+
+      networkController.setHasInternet(false);
+      await Future<void>.delayed(Duration.zero);
+
+      final state = container.read(profileControllerProvider);
+      expect(cancelToken.isCancelled, isTrue);
+      expect(state.isSaving, isFalse);
+      expect(state.errorMessage, 'templates.network_unavailable');
+
+      await expectLater(uploadFuture, completes);
+      expect(
+        container.read(profileControllerProvider).errorMessage,
+        'templates.network_unavailable',
+      );
+    },
+  );
+
+  test(
     'successful avatar upload deletes managed temporary crop file',
     () async {
       final repository = _SuccessfulAvatarUploadProfileRepository();
-      final container = ProviderContainer(
+      final container = _profileControllerTestContainer(
         overrides: [profileRepositoryProvider.overrideWithValue(repository)],
       );
       addTearDown(container.dispose);
@@ -84,7 +120,7 @@ void main() {
 
   test('successful avatar upload keeps non-managed source file', () async {
     final repository = _SuccessfulAvatarUploadProfileRepository();
-    final container = ProviderContainer(
+    final container = _profileControllerTestContainer(
       overrides: [profileRepositoryProvider.overrideWithValue(repository)],
     );
     addTearDown(container.dispose);
@@ -112,7 +148,7 @@ void main() {
 
   test('provider disposal ignores delayed avatar removal completion', () async {
     final repository = _DelayedProfileActionRepository();
-    final container = ProviderContainer(
+    final container = _profileControllerTestContainer(
       overrides: [profileRepositoryProvider.overrideWithValue(repository)],
     );
 
@@ -127,10 +163,81 @@ void main() {
   });
 
   test(
+    'profile update cancels in-flight request when network goes offline',
+    () async {
+      final repository = _DelayedProfileMutationRepository();
+      final networkController = _TestNetworkStatusController(hasInternet: true);
+      final container = _profileControllerTestContainer(
+        networkStatusController: networkController,
+        overrides: [profileRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(profileControllerProvider.notifier);
+      final updateFuture = controller.updateCurrentProfile(
+        displayName: 'Late name',
+      );
+      await repository.updateStarted.future;
+
+      expect(repository.updateCancelToken?.isCancelled, isFalse);
+
+      networkController.setHasInternet(false);
+      await Future<void>.delayed(Duration.zero);
+
+      var state = container.read(profileControllerProvider);
+      expect(repository.updateCancelToken?.isCancelled, isTrue);
+      expect(state.isSaving, isFalse);
+      expect(state.errorMessage, 'templates.network_unavailable');
+
+      repository.completeUpdate();
+      await expectLater(updateFuture, completes);
+
+      state = container.read(profileControllerProvider);
+      expect(state.displayName, isNot('Late name'));
+      expect(state.profile?.displayName, isNot('Late name'));
+      expect(state.errorMessage, 'templates.network_unavailable');
+    },
+  );
+
+  test(
+    'avatar removal cancels in-flight request when network goes offline',
+    () async {
+      final repository = _DelayedProfileMutationRepository();
+      final networkController = _TestNetworkStatusController(hasInternet: true);
+      final container = _profileControllerTestContainer(
+        networkStatusController: networkController,
+        overrides: [profileRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(profileControllerProvider.notifier);
+      final removeFuture = controller.removeAvatar();
+      await repository.removeStarted.future;
+
+      expect(repository.removeCancelToken?.isCancelled, isFalse);
+
+      networkController.setHasInternet(false);
+      await Future<void>.delayed(Duration.zero);
+
+      final state = container.read(profileControllerProvider);
+      expect(repository.removeCancelToken?.isCancelled, isTrue);
+      expect(state.isSaving, isFalse);
+      expect(state.errorMessage, 'templates.network_unavailable');
+
+      repository.completeRemove();
+      await expectLater(removeFuture, completes);
+      expect(
+        container.read(profileControllerProvider).errorMessage,
+        'templates.network_unavailable',
+      );
+    },
+  );
+
+  test(
     'provider disposal ignores delayed login before profile fetch',
     () async {
       final repository = _DelayedLoginProfileRepository();
-      final container = ProviderContainer(
+      final container = _profileControllerTestContainer(
         overrides: [profileRepositoryProvider.overrideWithValue(repository)],
       );
 
@@ -149,10 +256,207 @@ void main() {
   );
 
   test(
+    'login cancels in-flight auth request when network goes offline',
+    () async {
+      final repository = _DelayedLoginProfileRepository();
+      final networkController = _TestNetworkStatusController(hasInternet: true);
+      final container = _profileControllerTestContainer(
+        networkStatusController: networkController,
+        overrides: [profileRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(profileControllerProvider.notifier)
+        ..updateEmail('pet@example.com')
+        ..updatePassword('hunter2');
+      final loginFuture = controller.login();
+      await repository.loginStarted.future;
+
+      expect(repository.loginCancelToken?.isCancelled, isFalse);
+
+      networkController.setHasInternet(false);
+      await Future<void>.delayed(Duration.zero);
+
+      var state = container.read(profileControllerProvider);
+      expect(repository.loginCancelToken?.isCancelled, isTrue);
+      expect(state.isSaving, isFalse);
+      expect(state.errorMessage, 'templates.network_unavailable');
+
+      repository.completeLogin();
+      await expectLater(loginFuture, completes);
+
+      state = container.read(profileControllerProvider);
+      expect(repository.fetchProfileCalls, 0);
+      expect(state.profile, isNull);
+    },
+  );
+
+  test(
+    'register cancels in-flight auth request when network goes offline',
+    () async {
+      final repository = _DelayedRegisterProfileRepository();
+      final networkController = _TestNetworkStatusController(hasInternet: true);
+      final container = _profileControllerTestContainer(
+        networkStatusController: networkController,
+        overrides: [profileRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(profileControllerProvider.notifier)
+        ..updateEmail('pet@example.com')
+        ..updatePassword('Password123')
+        ..updateConfirmPassword('Password123');
+      final registerFuture = controller.register(
+        termsOfUseAccepted: true,
+        privacyPolicyAccepted: true,
+        legalDocuments: _legalDocuments(),
+        marketingEmailsEnabled: false,
+      );
+      await repository.registerStarted.future;
+
+      expect(repository.registerCancelToken?.isCancelled, isFalse);
+
+      networkController.setHasInternet(false);
+      await Future<void>.delayed(Duration.zero);
+
+      var state = container.read(profileControllerProvider);
+      expect(repository.registerCancelToken?.isCancelled, isTrue);
+      expect(state.isSaving, isFalse);
+      expect(state.errorMessage, 'templates.network_unavailable');
+
+      repository.completeRegister();
+      await expectLater(registerFuture, completes);
+
+      state = container.read(profileControllerProvider);
+      expect(state.successMessage, isNull);
+      expect(state.profile, isNull);
+    },
+  );
+
+  test(
+    'external authentication ignores delayed success when network goes offline',
+    () async {
+      final externalAuthRepository = _DelayedExternalAuthRepository();
+      final networkController = _TestNetworkStatusController(hasInternet: true);
+      final container = _profileControllerTestContainer(
+        networkStatusController: networkController,
+        overrides: [
+          externalAuthRepositoryProvider.overrideWithValue(
+            externalAuthRepository,
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(profileControllerProvider.notifier);
+      final authFuture = controller.authenticateWithProvider(
+        ExternalAuthProvider.google,
+      );
+      await externalAuthRepository.authenticateStarted.future;
+
+      expect(
+        externalAuthRepository.authenticateCancelToken?.isCancelled,
+        isFalse,
+      );
+
+      networkController.setHasInternet(false);
+      await Future<void>.delayed(Duration.zero);
+
+      var state = container.read(profileControllerProvider);
+      expect(
+        externalAuthRepository.authenticateCancelToken?.isCancelled,
+        isTrue,
+      );
+      expect(state.isSaving, isFalse);
+      expect(state.errorMessage, 'templates.network_unavailable');
+
+      externalAuthRepository.completeAuthenticate();
+      await expectLater(authFuture, completes);
+
+      state = container.read(profileControllerProvider);
+      expect(state.profile, isNull);
+    },
+  );
+
+  test(
+    'external account link ignores delayed success when network goes offline',
+    () async {
+      final externalAuthRepository = _DelayedExternalAuthRepository();
+      final networkController = _TestNetworkStatusController(hasInternet: true);
+      final container = _profileControllerTestContainer(
+        networkStatusController: networkController,
+        overrides: [
+          externalAuthRepositoryProvider.overrideWithValue(
+            externalAuthRepository,
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(profileControllerProvider.notifier);
+      final linkFuture = controller.linkExternalAccount(
+        ExternalAuthProvider.google,
+      );
+      await externalAuthRepository.linkStarted.future;
+
+      expect(externalAuthRepository.linkCancelToken?.isCancelled, isFalse);
+
+      networkController.setHasInternet(false);
+      await Future<void>.delayed(Duration.zero);
+
+      var state = container.read(profileControllerProvider);
+      expect(externalAuthRepository.linkCancelToken?.isCancelled, isTrue);
+      expect(state.isSaving, isFalse);
+      expect(state.errorMessage, 'templates.network_unavailable');
+
+      externalAuthRepository.completeLink();
+      await expectLater(linkFuture, completes);
+
+      state = container.read(profileControllerProvider);
+      expect(state.isSaving, isFalse);
+    },
+  );
+
+  test(
+    'external account unlink cancels in-flight request when network goes offline',
+    () async {
+      final repository = _DelayedUnlinkProfileRepository();
+      final networkController = _TestNetworkStatusController(hasInternet: true);
+      final container = _profileControllerTestContainer(
+        networkStatusController: networkController,
+        overrides: [profileRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(profileControllerProvider.notifier);
+      final unlinkFuture = controller.unlinkExternalAccount(
+        ExternalAuthProvider.google,
+      );
+      await repository.unlinkStarted.future;
+
+      expect(repository.unlinkCancelToken?.isCancelled, isFalse);
+
+      networkController.setHasInternet(false);
+      await Future<void>.delayed(Duration.zero);
+
+      var state = container.read(profileControllerProvider);
+      expect(repository.unlinkCancelToken?.isCancelled, isTrue);
+      expect(state.isSaving, isFalse);
+      expect(state.errorMessage, 'templates.network_unavailable');
+
+      repository.completeUnlink();
+      await expectLater(unlinkFuture, completes);
+
+      state = container.read(profileControllerProvider);
+      expect(state.isSaving, isFalse);
+    },
+  );
+
+  test(
     'concurrent initialize calls share one in-flight profile request',
     () async {
       final repository = _DelayedInitializeProfileRepository();
-      final container = ProviderContainer(
+      final container = _profileControllerTestContainer(
         overrides: [
           appLaunchControllerProvider.overrideWith(
             _AuthenticatedProfileAppLaunchController.new,
@@ -178,7 +482,7 @@ void main() {
 
   test('provider disposal cancels active initialize profile fetch', () async {
     final repository = _CancellableInitializeProfileRepository();
-    final container = ProviderContainer(
+    final container = _profileControllerTestContainer(
       overrides: [profileRepositoryProvider.overrideWithValue(repository)],
     );
 
@@ -198,7 +502,7 @@ void main() {
     () async {
       final repository = _CancellableInitializeProfileRepository();
       final launchController = _MutableProfileAppLaunchController(true);
-      final container = ProviderContainer(
+      final container = _profileControllerTestContainer(
         overrides: [
           appLaunchControllerProvider.overrideWith(() => launchController),
           profileRepositoryProvider.overrideWithValue(repository),
@@ -224,6 +528,73 @@ void main() {
       expect(state.isLoading, isFalse);
       expect(launchState.isAuthenticated, isFalse);
     },
+  );
+
+  test(
+    'profile write actions skip network repositories while offline',
+    () async {
+      final repository = _TrackingProfileWriteRepository();
+      final externalAuthRepository = _TrackingExternalAuthRepository();
+      final container = _profileControllerTestContainer(
+        hasInternet: false,
+        overrides: [
+          profileRepositoryProvider.overrideWithValue(repository),
+          externalAuthRepositoryProvider.overrideWithValue(
+            externalAuthRepository,
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final managedTempFile = await _createManagedAvatarTempFile();
+      addTearDown(() async {
+        if (await managedTempFile.exists()) {
+          await managedTempFile.delete();
+        }
+      });
+
+      final controller = container.read(profileControllerProvider.notifier);
+
+      await controller.authenticateWithProvider(ExternalAuthProvider.google);
+      await controller.linkExternalAccount(ExternalAuthProvider.google);
+      await controller.unlinkExternalAccount(ExternalAuthProvider.google);
+      await controller.deleteAccount();
+      await controller.uploadAvatarFromPath(managedTempFile.path);
+      await controller.removeAvatar();
+      await controller.updateCurrentProfile(displayName: 'New name');
+      await controller.acceptCurrentLegalDocuments(_legalDocuments());
+
+      expect(externalAuthRepository.authenticateCalls, 0);
+      expect(externalAuthRepository.linkCalls, 0);
+      expect(repository.unlinkCalls, 0);
+      expect(repository.deleteAccountCalls, 0);
+      expect(repository.uploadCalls, 0);
+      expect(repository.removeCalls, 0);
+      expect(repository.updateCalls, 0);
+      expect(repository.acceptLegalCalls, 0);
+      expect(await managedTempFile.exists(), isFalse);
+
+      final state = container.read(profileControllerProvider);
+      expect(state.isSaving, isFalse);
+      expect(state.errorMessage, 'templates.network_unavailable');
+    },
+  );
+}
+
+ProviderContainer _profileControllerTestContainer({
+  required List<Object?> overrides,
+  bool hasInternet = true,
+  NetworkStatusController? networkStatusController,
+}) {
+  return ProviderContainer(
+    overrides: [
+      networkStatusControllerProvider.overrideWith(
+        () =>
+            networkStatusController ??
+            _TestNetworkStatusController(hasInternet: hasInternet),
+      ),
+      ...overrides.cast(),
+    ],
   );
 }
 
@@ -259,7 +630,7 @@ class _DelayedProfileActionRepository extends ProfileRepository {
       Completer<MobileUserProfile>();
 
   @override
-  Future<MobileUserProfile> removeAvatar() {
+  Future<MobileUserProfile> removeAvatar({CancelToken? cancelToken}) {
     if (!removeStarted.isCompleted) {
       removeStarted.complete();
     }
@@ -269,6 +640,53 @@ class _DelayedProfileActionRepository extends ProfileRepository {
   void completeRemove() {
     if (!_removeCompleter.isCompleted) {
       _removeCompleter.complete(_profile());
+    }
+  }
+}
+
+class _DelayedProfileMutationRepository extends ProfileRepository {
+  _DelayedProfileMutationRepository()
+    : super(dio: Dio(), sessionStorage: AuthSessionStorage());
+
+  final Completer<void> updateStarted = Completer<void>();
+  final Completer<MobileUserProfile> _updateCompleter =
+      Completer<MobileUserProfile>();
+  final Completer<void> removeStarted = Completer<void>();
+  final Completer<MobileUserProfile> _removeCompleter =
+      Completer<MobileUserProfile>();
+  CancelToken? updateCancelToken;
+  CancelToken? removeCancelToken;
+
+  @override
+  Future<MobileUserProfile> updateProfile({
+    required String? displayName,
+    CancelToken? cancelToken,
+  }) {
+    updateCancelToken = cancelToken;
+    if (!updateStarted.isCompleted) {
+      updateStarted.complete();
+    }
+    return _updateCompleter.future;
+  }
+
+  @override
+  Future<MobileUserProfile> removeAvatar({CancelToken? cancelToken}) {
+    removeCancelToken = cancelToken;
+    if (!removeStarted.isCompleted) {
+      removeStarted.complete();
+    }
+    return _removeCompleter.future;
+  }
+
+  void completeUpdate() {
+    if (!_updateCompleter.isCompleted) {
+      _updateCompleter.complete(_profileWithDisplayName('Late name'));
+    }
+  }
+
+  void completeRemove() {
+    if (!_removeCompleter.isCompleted) {
+      _removeCompleter.complete(_profileWithDisplayName('Removed avatar'));
     }
   }
 }
@@ -295,10 +713,16 @@ class _DelayedLoginProfileRepository extends ProfileRepository {
 
   final Completer<void> loginStarted = Completer<void>();
   final Completer<AuthSession> _loginCompleter = Completer<AuthSession>();
+  CancelToken? loginCancelToken;
   int fetchProfileCalls = 0;
 
   @override
-  Future<AuthSession> login({required String email, required String password}) {
+  Future<AuthSession> login({
+    required String email,
+    required String password,
+    CancelToken? cancelToken,
+  }) {
+    loginCancelToken = cancelToken;
     if (!loginStarted.isCompleted) {
       loginStarted.complete();
     }
@@ -321,6 +745,68 @@ class _DelayedLoginProfileRepository extends ProfileRepository {
           user: _profile(),
         ),
       );
+    }
+  }
+}
+
+class _DelayedRegisterProfileRepository extends ProfileRepository {
+  _DelayedRegisterProfileRepository()
+    : super(dio: Dio(), sessionStorage: AuthSessionStorage());
+
+  final Completer<void> registerStarted = Completer<void>();
+  final Completer<void> _registerCompleter = Completer<void>();
+  CancelToken? registerCancelToken;
+
+  @override
+  Future<void> register({
+    required String email,
+    required String password,
+    required bool termsOfUseAccepted,
+    required bool privacyPolicyAccepted,
+    required String termsOfUseVersion,
+    required String privacyPolicyVersion,
+    required bool marketingEmailsEnabled,
+    String? displayName,
+    CancelToken? cancelToken,
+  }) {
+    registerCancelToken = cancelToken;
+    if (!registerStarted.isCompleted) {
+      registerStarted.complete();
+    }
+    return _registerCompleter.future;
+  }
+
+  void completeRegister() {
+    if (!_registerCompleter.isCompleted) {
+      _registerCompleter.complete();
+    }
+  }
+}
+
+class _DelayedUnlinkProfileRepository extends ProfileRepository {
+  _DelayedUnlinkProfileRepository()
+    : super(dio: Dio(), sessionStorage: AuthSessionStorage());
+
+  final Completer<void> unlinkStarted = Completer<void>();
+  final Completer<List<MobileLinkedAccount>> _unlinkCompleter =
+      Completer<List<MobileLinkedAccount>>();
+  CancelToken? unlinkCancelToken;
+
+  @override
+  Future<List<MobileLinkedAccount>> unlinkLinkedAccount(
+    String provider, {
+    CancelToken? cancelToken,
+  }) {
+    unlinkCancelToken = cancelToken;
+    if (!unlinkStarted.isCompleted) {
+      unlinkStarted.complete();
+    }
+    return _unlinkCompleter.future;
+  }
+
+  void completeUnlink() {
+    if (!_unlinkCompleter.isCompleted) {
+      _unlinkCompleter.complete(const []);
     }
   }
 }
@@ -431,17 +917,188 @@ class _MutableProfileAppLaunchController extends AppLaunchController {
 
 class _NoopExternalAuthRepository implements ExternalAuthRepository {
   @override
-  Future<AuthSession> authenticate(ExternalAuthProvider provider) {
+  Future<AuthSession> authenticate(
+    ExternalAuthProvider provider, {
+    CancelToken? cancelToken,
+  }) {
     throw UnimplementedError();
   }
 
   @override
-  Future<List<MobileLinkedAccount>> link(ExternalAuthProvider provider) async {
+  Future<List<MobileLinkedAccount>> link(
+    ExternalAuthProvider provider, {
+    CancelToken? cancelToken,
+  }) async {
     return const [];
   }
 
   @override
   Future<void> clearSession(ExternalAuthProvider provider) async {}
+}
+
+class _TrackingProfileWriteRepository extends ProfileRepository {
+  _TrackingProfileWriteRepository()
+    : super(dio: Dio(), sessionStorage: AuthSessionStorage());
+
+  int unlinkCalls = 0;
+  int deleteAccountCalls = 0;
+  int uploadCalls = 0;
+  int removeCalls = 0;
+  int updateCalls = 0;
+  int acceptLegalCalls = 0;
+
+  @override
+  Future<List<MobileLinkedAccount>> unlinkLinkedAccount(
+    String provider, {
+    CancelToken? cancelToken,
+  }) async {
+    unlinkCalls++;
+    return const [];
+  }
+
+  @override
+  Future<void> deleteCurrentAccount({CancelToken? cancelToken}) async {
+    deleteAccountCalls++;
+  }
+
+  @override
+  Future<MobileUserProfile> uploadAvatar(
+    String filePath, {
+    CancelToken? cancelToken,
+  }) async {
+    uploadCalls++;
+    return _profile();
+  }
+
+  @override
+  Future<MobileUserProfile> removeAvatar({CancelToken? cancelToken}) async {
+    removeCalls++;
+    return _profile();
+  }
+
+  @override
+  Future<MobileUserProfile> updateProfile({
+    required String? displayName,
+    CancelToken? cancelToken,
+  }) async {
+    updateCalls++;
+    return _profile();
+  }
+
+  @override
+  Future<MobileUserProfile> acceptCurrentLegalDocuments({
+    required MobileLegalDocuments documents,
+    CancelToken? cancelToken,
+  }) async {
+    acceptLegalCalls++;
+    return _profile();
+  }
+}
+
+class _TrackingExternalAuthRepository implements ExternalAuthRepository {
+  int authenticateCalls = 0;
+  int linkCalls = 0;
+  int clearSessionCalls = 0;
+
+  @override
+  Future<AuthSession> authenticate(
+    ExternalAuthProvider provider, {
+    CancelToken? cancelToken,
+  }) async {
+    authenticateCalls++;
+    return AuthSession(
+      accessToken: 'access-token',
+      refreshToken: 'refresh-token',
+      expiresAtUtc: DateTime.utc(2026, 1, 1),
+      user: _profile(),
+    );
+  }
+
+  @override
+  Future<List<MobileLinkedAccount>> link(
+    ExternalAuthProvider provider, {
+    CancelToken? cancelToken,
+  }) async {
+    linkCalls++;
+    return const [];
+  }
+
+  @override
+  Future<void> clearSession(ExternalAuthProvider provider) async {
+    clearSessionCalls++;
+  }
+}
+
+class _DelayedExternalAuthRepository implements ExternalAuthRepository {
+  final Completer<void> authenticateStarted = Completer<void>();
+  final Completer<AuthSession> _authenticateCompleter =
+      Completer<AuthSession>();
+  final Completer<void> linkStarted = Completer<void>();
+  final Completer<List<MobileLinkedAccount>> _linkCompleter =
+      Completer<List<MobileLinkedAccount>>();
+  CancelToken? authenticateCancelToken;
+  CancelToken? linkCancelToken;
+
+  @override
+  Future<AuthSession> authenticate(
+    ExternalAuthProvider provider, {
+    CancelToken? cancelToken,
+  }) {
+    authenticateCancelToken = cancelToken;
+    if (!authenticateStarted.isCompleted) {
+      authenticateStarted.complete();
+    }
+    return _authenticateCompleter.future;
+  }
+
+  @override
+  Future<List<MobileLinkedAccount>> link(
+    ExternalAuthProvider provider, {
+    CancelToken? cancelToken,
+  }) {
+    linkCancelToken = cancelToken;
+    if (!linkStarted.isCompleted) {
+      linkStarted.complete();
+    }
+    return _linkCompleter.future;
+  }
+
+  @override
+  Future<void> clearSession(ExternalAuthProvider provider) async {}
+
+  void completeAuthenticate() {
+    if (!_authenticateCompleter.isCompleted) {
+      _authenticateCompleter.complete(
+        AuthSession(
+          accessToken: 'access-token',
+          refreshToken: 'refresh-token',
+          expiresAtUtc: DateTime.utc(2026, 1, 1),
+          user: _profile(),
+        ),
+      );
+    }
+  }
+
+  void completeLink() {
+    if (!_linkCompleter.isCompleted) {
+      _linkCompleter.complete(const []);
+    }
+  }
+}
+
+class _TestNetworkStatusController extends NetworkStatusController {
+  _TestNetworkStatusController({required this.hasInternet});
+
+  final bool hasInternet;
+
+  @override
+  NetworkStatusState build() {
+    return NetworkStatusState(hasInternet: hasInternet);
+  }
+
+  void setHasInternet(bool value) {
+    state = state.copyWith(hasInternet: value);
+  }
 }
 
 MobileUserProfile _profile() {
@@ -467,6 +1124,53 @@ MobileUserProfile _profile() {
     ),
     roles: ['user'],
     avatar: null,
+  );
+}
+
+MobileUserProfile _profileWithDisplayName(String displayName) {
+  return MobileUserProfile(
+    userId: 'user-1',
+    email: 'pet@example.com',
+    displayName: displayName,
+    isPremium: false,
+    emailConfirmed: true,
+    termsOfUseAccepted: true,
+    privacyPolicyAccepted: true,
+    marketingEmailsEnabled: false,
+    legalAcceptance: const MobileLegalAcceptanceStatus(
+      termsOfUseAccepted: true,
+      termsOfUseAcceptedVersion: '1.0',
+      termsOfUseAcceptedAtUtc: null,
+      privacyPolicyAccepted: true,
+      privacyPolicyAcceptedVersion: '1.0',
+      privacyPolicyAcceptedAtUtc: null,
+      currentTermsOfUseVersion: '1.0',
+      currentPrivacyPolicyVersion: '1.0',
+      requiresAcceptance: false,
+    ),
+    roles: const ['user'],
+    avatar: null,
+  );
+}
+
+MobileLegalDocuments _legalDocuments() {
+  return const MobileLegalDocuments(
+    termsOfUse: MobileLegalDocument(
+      kind: 'terms',
+      title: 'Terms',
+      version: '1.0',
+      publishedAtUtc: null,
+      summary: 'Terms',
+      sections: [],
+    ),
+    privacyPolicy: MobileLegalDocument(
+      kind: 'privacy',
+      title: 'Privacy',
+      version: '1.0',
+      publishedAtUtc: null,
+      summary: 'Privacy',
+      sections: [],
+    ),
   );
 }
 

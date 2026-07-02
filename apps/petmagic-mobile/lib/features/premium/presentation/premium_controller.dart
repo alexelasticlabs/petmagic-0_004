@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_repository.dart';
@@ -126,6 +127,10 @@ class PremiumSubscriptionSummaryView {
 
 final premiumSubscriptionSummaryProvider =
     FutureProvider.autoDispose<PremiumSubscriptionSummaryView>((ref) async {
+      if (!ref.read(networkStatusControllerProvider).hasInternet) {
+        throw const AppException('templates.network_unavailable');
+      }
+
       final link = ref.keepAlive();
       Timer? disposeTimer;
       ref.onCancel(() {
@@ -436,13 +441,18 @@ class PremiumState {
 }
 
 abstract class _PremiumControllerBase extends Notifier<PremiumState> {
+  static const int _maxStorePurchaseVerificationKeys = 32;
+
   late PremiumRepository _repository;
   late PremiumRefreshProfile _refreshProfile;
   Future<void>? _loadInFlight;
   Future<void>? _checkoutVerificationInFlight;
   CancelToken? _activeLoadCancelToken;
   CancelToken? _activeStatusRefreshCancelToken;
+  final Set<String> _storePurchaseVerificationInFlightKeys = <String>{};
+  final Set<String> _storePurchaseVerifiedKeys = <String>{};
   bool _premiumLifecycleStarted = false;
+  bool _hasInternet = true;
 
   Future<void> load({bool refresh = false});
 

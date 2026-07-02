@@ -326,37 +326,52 @@ extension _GenerationStatusPageMediaActions on _GenerationStatusPageState {
       if (!mounted) {
         return;
       }
+      if (localOutputPath != null) {
+        final safeOutputUri = parseSafeGenerationMediaUri(generation.outputUrl);
+        final safeOutputUrl = safeOutputUri?.toString() ?? '';
+        await ref
+            .read(generationStatusMediaActionsProvider)
+            .share(
+              mediaUrl: safeOutputUrl,
+              fileName: _buildOutputFileName(
+                generation,
+                safeOutputUrl.isEmpty ? localOutputPath : safeOutputUrl,
+              ),
+              title:
+                  generation.templateTitle ?? text.generationStatusResultTitle,
+              cancelToken: mediaActionCancelToken,
+              localPath: localOutputPath,
+            );
+        return;
+      }
+
+      final access = await ref
+          .read(templateGenerationRepositoryProvider)
+          .fetchShareUrl(
+            generation.generationId,
+            cancelToken: mediaActionCancelToken,
+          );
+      final safeShareUri = parseSafeExternalUri(access.shareUrl);
+      if (safeShareUri == null) {
+        _showInfo(text.generationStatusResultUnavailableForShare);
+        return;
+      }
       String safeOutputUrl = '';
       String fileName;
-      if (localOutputPath == null) {
-        final access = await ref
-            .read(templateGenerationRepositoryProvider)
-            .fetchShareUrl(
-              generation.generationId,
-              cancelToken: mediaActionCancelToken,
-            );
-        final outputUrl = access.mediaUrl;
-        if (outputUrl.isEmpty) {
-          _showInfo(text.generationStatusResultUnavailableForShare);
-          return;
-        }
-        final safeOutputUri = parseSafeGenerationMediaUri(outputUrl);
-        if (safeOutputUri == null) {
-          _showInfo(text.generationStatusResultUnavailableForShare);
-          return;
-        }
-        safeOutputUrl = safeOutputUri.toString();
-        fileName = access.fileName.isEmpty
-            ? _buildOutputFileName(generation, safeOutputUrl)
-            : access.fileName;
-      } else {
-        final safeOutputUri = parseSafeGenerationMediaUri(generation.outputUrl);
-        safeOutputUrl = safeOutputUri?.toString() ?? '';
-        fileName = _buildOutputFileName(
-          generation,
-          safeOutputUrl.isEmpty ? localOutputPath : safeOutputUrl,
-        );
+      final outputUrl = access.mediaUrl;
+      if (outputUrl.isEmpty) {
+        _showInfo(text.generationStatusResultUnavailableForShare);
+        return;
       }
+      final safeOutputUri = parseSafeGenerationMediaUri(outputUrl);
+      if (safeOutputUri == null) {
+        _showInfo(text.generationStatusResultUnavailableForShare);
+        return;
+      }
+      safeOutputUrl = safeOutputUri.toString();
+      fileName = access.fileName.isEmpty
+          ? _buildOutputFileName(generation, safeOutputUrl)
+          : access.fileName;
 
       await ref
           .read(generationStatusMediaActionsProvider)
@@ -365,6 +380,7 @@ extension _GenerationStatusPageMediaActions on _GenerationStatusPageState {
             fileName: fileName,
             title: generation.templateTitle ?? text.generationStatusResultTitle,
             cancelToken: mediaActionCancelToken,
+            shareText: safeShareUri.toString(),
             localPath: localOutputPath,
           );
     } on DioException catch (error) {
@@ -386,24 +402,45 @@ extension _GenerationStatusPageMediaActions on _GenerationStatusPageState {
 
   Future<void> _copyResultLink(TemplateGenerationResult generation) async {
     final text = AppLocalizations.of(context);
-    final outputUrl = generation.outputUrl;
-    if (outputUrl == null || outputUrl.isEmpty) {
-      _showInfo(text.generationStatusResultUnavailableForShare);
+    final mediaActionCancelToken = _startMediaAction();
+    if (mediaActionCancelToken == null) {
       return;
     }
 
-    final safeUri = parseSafeGenerationMediaUri(outputUrl);
-    if (safeUri == null) {
-      _showInfo(text.generationStatusResultUnavailableForShare);
-      return;
-    }
+    try {
+      final access = await ref
+          .read(templateGenerationRepositoryProvider)
+          .fetchShareUrl(
+            generation.generationId,
+            cancelToken: mediaActionCancelToken,
+          );
+      final safeUri = parseSafeExternalUri(access.shareUrl);
+      if (safeUri == null) {
+        _showInfo(text.generationStatusResultUnavailableForShare);
+        return;
+      }
 
-    await Clipboard.setData(ClipboardData(text: safeUri.toString()));
-    if (!mounted) {
-      return;
-    }
+      await Clipboard.setData(ClipboardData(text: safeUri.toString()));
+      if (!mounted) {
+        return;
+      }
 
-    _showInfo(text.generationStatusLinkCopiedMessage);
+      _showInfo(text.generationStatusLinkCopiedMessage);
+    } on DioException catch (error) {
+      if (!mounted || CancelToken.isCancel(error)) {
+        return;
+      }
+
+      _showInfo(text.generationStatusShareFailedMessage);
+    } on Object {
+      if (!mounted) {
+        return;
+      }
+
+      _showInfo(text.generationStatusShareFailedMessage);
+    } finally {
+      _completeMediaAction(mediaActionCancelToken);
+    }
   }
 
   Future<void> _openCompareViewer(TemplateGenerationResult generation) async {

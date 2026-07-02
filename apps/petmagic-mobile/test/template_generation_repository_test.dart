@@ -40,7 +40,8 @@ void main() {
     final filenameBody = methodBody(source, '_safeSourceImageFileName');
 
     expect(startBody, contains('_safeSourceImageFileName(rawFileName)'));
-    expect(startBody, contains('filename: fileName'));
+    expect(startBody, contains('_safeSourceImageFileName(uploadRawFileName)'));
+    expect(startBody, contains('filename: uploadFileName'));
     expect(filenameBody, contains("replaceAll(r'\\', '/')"));
     expect(filenameBody, contains("split('/')"));
     expect(filenameBody, contains('sanitizeFileName('));
@@ -182,6 +183,55 @@ void main() {
     expect(requests, hasLength(1));
     expect(generation.generationId, 'generation-template-route');
     expect(generation.templateId, templateId);
+  });
+
+  test('uploads generation source from optimized temp payloads', () async {
+    final tempDir = await Directory.systemTemp.createTemp(
+      'petmagic-generation-test-',
+    );
+    addTearDown(() async {
+      if (await tempDir.exists()) {
+        await _safeDeleteTempDir(tempDir);
+      }
+    });
+    final source = await writeTinyJpeg(tempDir, 'source.jpg');
+    final optimized = await writeTinyJpeg(tempDir, 'optimized-source.jpg');
+    String? uploadedFileName;
+    String? uploadedContentType;
+    final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+      ..httpClientAdapter = FakeHttpClientAdapter((options) async {
+        final formData = options.data as FormData;
+        uploadedFileName = formData.files.single.value.filename;
+        uploadedContentType = formData.files.single.value.contentType
+            .toString();
+        return jsonResponse(
+          generationJson(
+            generationId: 'generation-optimized-source',
+            status: 'queued',
+            updatedAtUtc: '2026-06-14T12:01:00Z',
+          ),
+        );
+      });
+    final repository = TemplateGenerationRepository(
+      dio: dio,
+      sessionStorage: TestSessionStorage(sessionFixture()),
+      preferences: SharedPreferencesAsync(),
+      imageUploadOptimizer: FakeImageUploadOptimizer(
+        generationSource: optimized,
+      ),
+    );
+
+    await repository.startGeneration(
+      templateId: 'template-1',
+      sourceImage: XFile(
+        source.path,
+        name: 'source.bin',
+        mimeType: 'image/png',
+      ),
+    );
+
+    expect(uploadedFileName, 'optimized-source.jpg');
+    expect(uploadedContentType, 'image/jpeg');
   });
 
   test('maps canonical mediaUrl generation field to outputUrl', () {
@@ -465,12 +515,41 @@ void main() {
       expect(restored?.generationId, 'generation-1');
       expect(restored?.correlationId, startsWith('generation-'));
 
-      final persistedCorrelationId = await preferences.getString(
-        'templates_active_generation_correlation_id_v1:user-1',
+      expect(
+        await preferences.getString('templates_active_generation_id_v1:user-1'),
+        isNull,
       );
+      final keys = await preferences.getKeys();
+      expect(keys.any((key) => key.contains('user-1')), isFalse);
+      final correlationKey = keys.singleWhere(
+        (key) =>
+            key.startsWith('templates_active_generation_correlation_id_v1:'),
+      );
+      final persistedCorrelationId = await preferences.getString(
+        correlationKey,
+      );
+      expect(correlationKey, isNot(contains('user-1')));
       expect(persistedCorrelationId, restored?.correlationId);
     },
   );
+
+  test('generation correlation ids use shared request identity fallback', () {
+    final repositorySource = File(
+      'lib/features/templates/data/template_generation_repository.dart',
+    ).readAsStringSync();
+    final cacheSource = File(
+      'lib/features/templates/data/template_generation_repository_cache.part.dart',
+    ).readAsStringSync();
+    final controllerSource = File(
+      'lib/features/templates/presentation/template_generation_controller.dart',
+    ).readAsStringSync();
+
+    expect(repositorySource, contains('request_identity.dart'));
+    expect(cacheSource, contains('RequestIdentity.createCorrelationId()'));
+    expect(controllerSource, contains('RequestIdentity.createCorrelationId()'));
+    expect(repositorySource, isNot(contains('Random.secure()')));
+    expect(controllerSource, isNot(contains('Random.secure()')));
+  });
 
   test(
     'rejects missing source image without exposing local file path',
@@ -561,6 +640,63 @@ void main() {
 
     expect(didAttemptUpload, isFalse);
   });
+
+  test(
+    'rejects spoofed generation source before optimizer can replace payload',
+    () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'petmagic-generation-test-',
+      );
+      addTearDown(() async {
+        if (await tempDir.exists()) {
+          await _safeDeleteTempDir(tempDir);
+        }
+      });
+      final source = File('${tempDir.path}/source.jpg');
+      await source.writeAsBytes('%PDF-1.7 not an image'.codeUnits, flush: true);
+      final optimized = await writeTinyJpeg(tempDir, 'optimized-source.jpg');
+      final optimizer = FakeImageUploadOptimizer(generationSource: optimized);
+      var didAttemptUpload = false;
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+        ..httpClientAdapter = FakeHttpClientAdapter((options) async {
+          didAttemptUpload = true;
+          return jsonResponse(
+            generationJson(
+              generationId: 'generation-spoofed-source',
+              status: 'queued',
+              updatedAtUtc: '2026-06-14T12:01:00Z',
+            ),
+          );
+        });
+      final repository = TemplateGenerationRepository(
+        dio: dio,
+        sessionStorage: TestSessionStorage(sessionFixture()),
+        preferences: SharedPreferencesAsync(),
+        imageUploadOptimizer: optimizer,
+      );
+
+      await expectLater(
+        repository.startGeneration(
+          templateId: 'template-1',
+          sourceImage: XFile(
+            source.path,
+            name: 'source.jpg',
+            mimeType: 'image/jpeg',
+          ),
+        ),
+        throwsA(
+          isA<AppException>().having(
+            (error) => error.message,
+            'message',
+            'templates.source_image_type_not_allowed',
+          ),
+        ),
+      );
+
+      expect(didAttemptUpload, isFalse);
+      expect(optimizer.generationSourceOptimizeCalls, 0);
+    },
+  );
 
   test('rejects spoofed pet photo content before upload', () async {
     final tempDir = await Directory.systemTemp.createTemp(
@@ -853,8 +989,7 @@ void main() {
         await _safeDeleteTempDir(tempDir);
       }
     });
-    final source = File('${tempDir.path}/source.bin');
-    await source.writeAsBytes('%PDF-1.7 not an image'.codeUnits, flush: true);
+    final source = await writeTinyJpeg(tempDir, 'source.jpg');
     final optimized = await writeTinyJpeg(tempDir, 'optimized.jpg');
 
     String? uploadedFileName;
@@ -882,6 +1017,53 @@ void main() {
     expect(uploadedFileName, 'optimized.jpg');
     expect(uploadedContentType, 'image/jpeg');
   });
+
+  test(
+    'rejects spoofed pet photo before optimizer can replace payload',
+    () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'petmagic-pet-photo-test-',
+      );
+      addTearDown(() async {
+        if (await tempDir.exists()) {
+          await _safeDeleteTempDir(tempDir);
+        }
+      });
+      final source = File('${tempDir.path}/source.jpg');
+      await source.writeAsBytes('%PDF-1.7 not an image'.codeUnits, flush: true);
+      final optimized = await writeTinyJpeg(tempDir, 'optimized.jpg');
+      final optimizer = FakeImageUploadOptimizer(petPhoto: optimized);
+      var didAttemptUpload = false;
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+        ..httpClientAdapter = FakeHttpClientAdapter((options) async {
+          didAttemptUpload = true;
+          return jsonResponse(petPhotoJson());
+        });
+      final repository = TemplateGenerationRepository(
+        dio: dio,
+        sessionStorage: TestSessionStorage(sessionFixture()),
+        preferences: SharedPreferencesAsync(),
+        imageUploadOptimizer: optimizer,
+      );
+
+      await expectLater(
+        repository.uploadPetPhoto(
+          petId: 'pet-1',
+          photo: XFile(source.path, name: 'source.jpg', mimeType: 'image/jpeg'),
+        ),
+        throwsA(
+          isA<AppException>().having(
+            (error) => error.message,
+            'message',
+            'pets.photo_type_not_allowed',
+          ),
+        ),
+      );
+
+      expect(didAttemptUpload, isFalse);
+      expect(optimizer.petPhotoOptimizeCalls, 0);
+    },
+  );
 
   test('keeps pet photo CRUD request contracts stable', () async {
     final requests = <RequestOptions>[];
@@ -1096,10 +1278,19 @@ void main() {
           ),
           5 => jsonResponse({'watermarkRemoved': true, 'creditsSpent': 1}),
           6 || 7 || 10 || 11 => ResponseBody.fromString('', 204),
-          8 || 9 => jsonResponse({
-            'mediaUrl': 'https://cdn.petmagic.test/generated.jpg',
+          8 => jsonResponse({
+            'signedMediaUrl': 'https://cdn.petmagic.test/generated.jpg',
             'hasWatermark': false,
             'fileName': 'generated.jpg',
+            'contentType': 'image/png',
+          }),
+          9 => jsonResponse({
+            'shareUrl': 'https://app.petmagic.test/share/generation/token',
+            'shareToken': 'token',
+            'signedMediaUrl': 'https://cdn.petmagic.test/generated.jpg',
+            'hasWatermark': false,
+            'fileName': 'generated.jpg',
+            'contentType': 'image/png',
           }),
           _ => fail('Unexpected request ${options.method} ${options.path}'),
         };
@@ -1137,6 +1328,9 @@ void main() {
     expect(similar.generationId, nextGenerationId);
     expect(watermark.watermarkRemoved, isTrue);
     expect(download.mediaUrl, 'https://cdn.petmagic.test/generated.jpg');
+    expect(share.mediaUrl, 'https://cdn.petmagic.test/generated.jpg');
+    expect(share.shareUrl, 'https://app.petmagic.test/share/generation/token');
+    expect(share.shareToken, 'token');
     expect(share.fileName, 'generated.jpg');
     expect(
       requests.map((request) => '${request.method} ${request.path}').toList(),

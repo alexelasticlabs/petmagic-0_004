@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
@@ -70,6 +71,141 @@ void main() {
     expect(repository.analyticsEvents, ['template_selected']);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'result-input page stays offline without loading and retries on reconnect',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final repository = _ResultInputRepository();
+      final networkController = _TestGenerationResultNetworkStatusController(
+        false,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            templateGenerationRepositoryProvider.overrideWithValue(repository),
+            walletControllerProvider.overrideWith(_FundedWalletController.new),
+            networkStatusControllerProvider.overrideWith(
+              () => networkController,
+            ),
+          ],
+          child: const _ResultInputTestApp(
+            generationId: 'parent/1?source=ready',
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+
+      expect(repository.fetchGenerationCalls, 0);
+      expect(repository.fetchCompatibleTemplatesCalls, 0);
+      expect(find.text("You're offline"), findsOneWidget);
+
+      networkController.setHasInternet(true);
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(repository.fetchGenerationCalls, 1);
+      expect(repository.fetchCompatibleTemplatesCalls, 1);
+      expect(find.text('Magic motion'), findsOneWidget);
+    },
+  );
+
+  testWidgets('cancels in-flight result-input load when network goes offline', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final loadCompleter = Completer<void>();
+    final repository = _ResultInputRepository(loadCompleter: loadCompleter);
+    final networkController = _TestGenerationResultNetworkStatusController(
+      true,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          templateGenerationRepositoryProvider.overrideWithValue(repository),
+          walletControllerProvider.overrideWith(_FundedWalletController.new),
+          networkStatusControllerProvider.overrideWith(() => networkController),
+        ],
+        child: const _ResultInputTestApp(generationId: 'parent/1?source=ready'),
+      ),
+    );
+
+    await repository.loadStarted.future;
+    expect(repository.fetchGenerationCancelToken?.isCancelled, isFalse);
+    expect(
+      repository.fetchCompatibleTemplatesCancelToken?.isCancelled,
+      isFalse,
+    );
+
+    networkController.setHasInternet(false);
+    await tester.pump();
+
+    expect(repository.fetchGenerationCancelToken?.isCancelled, isTrue);
+    expect(repository.fetchCompatibleTemplatesCancelToken?.isCancelled, isTrue);
+    expect(find.text("You're offline"), findsOneWidget);
+
+    loadCompleter.complete();
+    await tester.pump();
+
+    expect(find.text('Magic motion'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'cancels result-input generation start when network goes offline',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      SharedPreferences.setMockInitialValues(const {});
+      final repository = _ResultInputRepository();
+      final networkController = _TestGenerationResultNetworkStatusController(
+        true,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            templateGenerationRepositoryProvider.overrideWithValue(repository),
+            walletControllerProvider.overrideWith(_FundedWalletController.new),
+            networkStatusControllerProvider.overrideWith(
+              () => networkController,
+            ),
+          ],
+          child: const _ResultInputTestApp(
+            generationId: 'parent/1?source=ready',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Magic motion'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Start'));
+      await tester.pump();
+
+      await repository.startStarted.future;
+      expect(repository.startCancelToken?.isCancelled, isFalse);
+
+      networkController.setHasInternet(false);
+      await tester.pump();
+
+      expect(repository.startCancelToken?.isCancelled, isTrue);
+
+      repository.completeStart();
+      await tester.pump();
+
+      expect(repository.rememberedGenerationIds, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 class _ResultInputTestApp extends StatelessWidget {
@@ -114,19 +250,25 @@ class _FundedWalletController extends WalletController {
 }
 
 class _ResultInputRepository extends TemplateGenerationRepository {
-  _ResultInputRepository()
+  _ResultInputRepository({this.loadCompleter})
     : super(
         dio: Dio(),
         sessionStorage: AuthSessionStorage(),
         preferences: SharedPreferencesAsync(),
       );
 
+  final Completer<void>? loadCompleter;
   final Completer<void> startStarted = Completer<void>();
+  final Completer<void> loadStarted = Completer<void>();
   final Completer<void> _startCompleter = Completer<void>();
   final List<String> analyticsEvents = <String>[];
   final List<String> rememberedGenerationIds = <String>[];
 
+  int fetchGenerationCalls = 0;
+  int fetchCompatibleTemplatesCalls = 0;
   int startCalls = 0;
+  CancelToken? fetchGenerationCancelToken;
+  CancelToken? fetchCompatibleTemplatesCancelToken;
   CancelToken? startCancelToken;
 
   void completeStart() {
@@ -141,6 +283,18 @@ class _ResultInputRepository extends TemplateGenerationRepository {
     String? correlationId,
     CancelToken? cancelToken,
   }) async {
+    fetchGenerationCalls++;
+    fetchGenerationCancelToken = cancelToken;
+    if (!loadStarted.isCompleted) {
+      loadStarted.complete();
+    }
+    await loadCompleter?.future;
+    if (cancelToken?.isCancelled ?? false) {
+      throw DioException(
+        requestOptions: RequestOptions(path: '/api/templates/generations'),
+        type: DioExceptionType.cancel,
+      );
+    }
     return _generation(
       generationId: generationId,
       status: TemplateGenerationStatus.completed,
@@ -152,6 +306,20 @@ class _ResultInputRepository extends TemplateGenerationRepository {
     String resultId, {
     CancelToken? cancelToken,
   }) async {
+    fetchCompatibleTemplatesCalls++;
+    fetchCompatibleTemplatesCancelToken = cancelToken;
+    if (!loadStarted.isCompleted) {
+      loadStarted.complete();
+    }
+    await loadCompleter?.future;
+    if (cancelToken?.isCancelled ?? false) {
+      throw DioException(
+        requestOptions: RequestOptions(
+          path: '/api/templates/generations/compatible',
+        ),
+        type: DioExceptionType.cancel,
+      );
+    }
     return const CompatibleGenerationTemplates(
       resultId: 'parent/1?source=ready',
       inputMediaType: TemplateType.image,
@@ -215,6 +383,22 @@ class _ResultInputRepository extends TemplateGenerationRepository {
     String? correlationId,
   }) async {
     rememberedGenerationIds.add(generationId);
+  }
+}
+
+class _TestGenerationResultNetworkStatusController
+    extends NetworkStatusController {
+  _TestGenerationResultNetworkStatusController(this.initialHasInternet);
+
+  final bool initialHasInternet;
+
+  @override
+  NetworkStatusState build() {
+    return NetworkStatusState(hasInternet: initialHasInternet);
+  }
+
+  void setHasInternet(bool value) {
+    state = state.copyWith(hasInternet: value);
   }
 }
 

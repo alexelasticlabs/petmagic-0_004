@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_repository.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
@@ -17,7 +18,12 @@ void main() {
     () async {
       final repository = _CancellablePremiumStatusRepository();
       final container = ProviderContainer(
-        overrides: [premiumRepositoryProvider.overrideWithValue(repository)],
+        overrides: [
+          premiumRepositoryProvider.overrideWithValue(repository),
+          networkStatusControllerProvider.overrideWith(
+            () => _TestNetworkStatusController(initialHasInternet: true),
+          ),
+        ],
       );
 
       final future = container.read(premiumSubscriptionSummaryProvider.future);
@@ -36,7 +42,12 @@ void main() {
     () async {
       final repository = _CountingPremiumStatusRepository();
       final container = ProviderContainer(
-        overrides: [premiumRepositoryProvider.overrideWithValue(repository)],
+        overrides: [
+          premiumRepositoryProvider.overrideWithValue(repository),
+          networkStatusControllerProvider.overrideWith(
+            () => _TestNetworkStatusController(initialHasInternet: true),
+          ),
+        ],
       );
       addTearDown(container.dispose);
 
@@ -60,7 +71,12 @@ void main() {
   test('linked accounts provider cancels request on dispose', () async {
     final repository = _CancellableProfileProviderRepository();
     final container = ProviderContainer(
-      overrides: [profileRepositoryProvider.overrideWithValue(repository)],
+      overrides: [
+        profileRepositoryProvider.overrideWithValue(repository),
+        networkStatusControllerProvider.overrideWith(
+          () => _TestNetworkStatusController(initialHasInternet: true),
+        ),
+      ],
     );
 
     final future = container.read(linkedAccountsProvider.future);
@@ -78,7 +94,12 @@ void main() {
     () async {
       final repository = _CountingProfileProviderRepository();
       final container = ProviderContainer(
-        overrides: [profileRepositoryProvider.overrideWithValue(repository)],
+        overrides: [
+          profileRepositoryProvider.overrideWithValue(repository),
+          networkStatusControllerProvider.overrideWith(
+            () => _TestNetworkStatusController(initialHasInternet: true),
+          ),
+        ],
       );
       addTearDown(container.dispose);
 
@@ -102,7 +123,12 @@ void main() {
   test('current legal documents provider cancels request on dispose', () async {
     final repository = _CancellableProfileProviderRepository();
     final container = ProviderContainer(
-      overrides: [profileRepositoryProvider.overrideWithValue(repository)],
+      overrides: [
+        profileRepositoryProvider.overrideWithValue(repository),
+        networkStatusControllerProvider.overrideWith(
+          () => _TestNetworkStatusController(initialHasInternet: true),
+        ),
+      ],
     );
 
     final future = container.read(currentLegalDocumentsProvider('en').future);
@@ -208,5 +234,16 @@ class _CountingProfileProviderRepository extends ProfileRepository {
         canDisconnect: true,
       ),
     ];
+  }
+}
+
+class _TestNetworkStatusController extends NetworkStatusController {
+  _TestNetworkStatusController({required this.initialHasInternet});
+
+  final bool initialHasInternet;
+
+  @override
+  NetworkStatusState build() {
+    return NetworkStatusState(hasInternet: initialHasInternet);
   }
 }

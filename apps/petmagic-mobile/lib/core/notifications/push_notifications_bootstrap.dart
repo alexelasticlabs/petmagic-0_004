@@ -37,6 +37,9 @@ class _PushNotificationsBootstrapState
   static final Object _disposedLinkReadSentinel = Object();
   final AppLinks _appLinks = AppLinks();
   final Completer<void> _disposed = Completer<void>();
+  static final RegExp _stripeCheckoutSessionIdPattern = RegExp(
+    r'^cs_(test|live)_[A-Za-z0-9_]{8,255}$',
+  );
   NotificationCoordinator? _coordinator;
   ProviderSubscription<AppLaunchState>? _launchSubscription;
   StreamSubscription<Uri>? _deepLinkSubscription;
@@ -288,14 +291,24 @@ class _PushNotificationsBootstrapState
   }
 
   void _queueCheckoutVerification({String? sessionId}) {
-    final normalizedSessionId = sessionId?.trim();
-    _pendingCheckoutSessionId = normalizedSessionId?.isNotEmpty == true
-        ? normalizedSessionId
-        : null;
+    _pendingCheckoutSessionId = _normalizeStripeCheckoutSessionId(sessionId);
     _pendingCheckoutVerificationRequested = true;
     _flushPendingCheckoutVerificationIfReady(
       ref.read(appLaunchControllerProvider),
     );
+  }
+
+  String? _normalizeStripeCheckoutSessionId(String? sessionId) {
+    final normalizedSessionId = sessionId?.trim();
+    if (normalizedSessionId == null || normalizedSessionId.isEmpty) {
+      return null;
+    }
+
+    if (!_stripeCheckoutSessionIdPattern.hasMatch(normalizedSessionId)) {
+      return null;
+    }
+
+    return normalizedSessionId;
   }
 
   void _clearPendingCheckoutVerification() {
@@ -342,7 +355,12 @@ class _PushNotificationsBootstrapState
   }
 
   String _authRedirectRoute(String route) {
-    return '${AuthEntryPage.routePath}?redirect=${Uri.encodeQueryComponent(route)}';
+    final redirectPath = normalizeAuthRedirectPath(route);
+    if (redirectPath == null) {
+      return AuthEntryPage.routePath;
+    }
+
+    return '${AuthEntryPage.routePath}?redirect=${Uri.encodeQueryComponent(redirectPath)}';
   }
 
   bool _isSupportRoute(String route) {

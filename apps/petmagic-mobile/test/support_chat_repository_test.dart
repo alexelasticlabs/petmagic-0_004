@@ -196,8 +196,7 @@ void main() {
   });
 
   test('uploads support images from optimized temp payloads', () async {
-    final source = File('${tempDir.path}/source.bin');
-    await source.writeAsBytes('%PDF-1.7 not an image'.codeUnits, flush: true);
+    final source = await _createJpegFile(tempDir, 'source.jpg');
     final optimizedFile = await _createJpegFile(tempDir, 'optimized.jpg');
 
     String? uploadedFileName;
@@ -238,6 +237,180 @@ void main() {
 
     expect(uploadedFileName, 'optimized.jpg');
     expect(uploadedContentType, 'image/jpeg');
+  });
+
+  test(
+    'rejects spoofed attachment before optimizer can replace payload',
+    () async {
+      final source = File('${tempDir.path}/source.jpg');
+      await source.writeAsBytes('%PDF-1.7 not an image'.codeUnits, flush: true);
+      final optimizedFile = await _createJpegFile(tempDir, 'optimized.jpg');
+      final optimizer = _FakeImageUploadOptimizer(supportImage: optimizedFile);
+      var didAttemptUpload = false;
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+        ..interceptors.add(
+          InterceptorsWrapper(
+            onRequest: (options, handler) {
+              didAttemptUpload = true;
+              handler.reject(DioException(requestOptions: options));
+            },
+          ),
+        );
+      final repository = SupportChatRepository(
+        dio: dio,
+        sessionStorage: _SessionStorage(_session()),
+        imageUploadOptimizer: optimizer,
+      );
+
+      await expectLater(
+        repository.sendAttachment(
+          conversationId: 'conversation-1',
+          filePath: source.path,
+          fileName: 'source.jpg',
+          contentType: 'image/jpeg',
+          localeTag: 'en',
+        ),
+        throwsA(
+          isA<AppException>().having(
+            (error) => error.message,
+            'message',
+            'support.attachment_content_type_not_allowed',
+          ),
+        ),
+      );
+
+      expect(didAttemptUpload, isFalse);
+      expect(optimizer.supportOptimizeCalls, 0);
+    },
+  );
+
+  test(
+    'encodes conversation and message IDs before using them as path segments',
+    () async {
+      final file = await _createJpegFile(tempDir, 'retry.jpg');
+      const conversationId = 'conversation/../admin?x=1#frag';
+      const messageId = 'message/../root?debug=true#frag';
+      final encodedConversationId = Uri.encodeComponent(conversationId);
+      final encodedMessageId = Uri.encodeComponent(messageId);
+      final paths = <String>[];
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+        ..interceptors.add(
+          InterceptorsWrapper(
+            onRequest: (options, handler) {
+              paths.add(options.path);
+              expect(
+                options.headers[HttpHeaders.authorizationHeader],
+                'Bearer access-token',
+              );
+              expect(options.path, isNot(contains(conversationId)));
+              expect(options.path, isNot(contains(messageId)));
+              handler.resolve(
+                Response<Map<String, dynamic>>(
+                  requestOptions: options,
+                  statusCode: 200,
+                  data: options.path.endsWith('/read')
+                      ? const <String, dynamic>{}
+                      : options.path.endsWith('/messages') ||
+                            options.path.endsWith('/attachments') ||
+                            options.path.endsWith('/messages/attachments') ||
+                            options.path.endsWith('/attachment/retry')
+                      ? _supportMessageJson()
+                      : _supportConversationJson(),
+                ),
+              );
+            },
+          ),
+        );
+      final repository = SupportChatRepository(
+        dio: dio,
+        sessionStorage: _SessionStorage(_session()),
+      );
+
+      await repository.sendMessage(
+        conversationId: conversationId,
+        body: 'Need help',
+        localeTag: 'en',
+      );
+      await repository.sendAttachment(
+        conversationId: conversationId,
+        filePath: file.path,
+        fileName: 'retry.jpg',
+        contentType: 'image/jpeg',
+        localeTag: 'en',
+      );
+      await repository.sendAttachments(
+        conversationId: conversationId,
+        attachments: [
+          SupportChatUploadAttachment(
+            filePath: file.path,
+            fileName: 'retry.jpg',
+            contentType: 'image/jpeg',
+          ),
+        ],
+        localeTag: 'en',
+      );
+      await repository.retryAttachment(
+        conversationId: conversationId,
+        messageId: messageId,
+        filePath: file.path,
+        fileName: 'retry.jpg',
+        contentType: 'image/jpeg',
+      );
+      await repository.markConversationRead(conversationId);
+      await repository.resolveConversation(conversationId);
+      await repository.reopenConversation(conversationId);
+      await repository.closeConversation(conversationId);
+      await repository.submitFeedback(
+        conversationId: conversationId,
+        rating: 5,
+      );
+
+      expect(paths, [
+        '/api/support/conversation/$encodedConversationId/messages',
+        '/api/support/conversation/$encodedConversationId/attachments',
+        '/api/support/conversation/$encodedConversationId/messages/attachments',
+        '/api/support/conversation/$encodedConversationId/messages/$encodedMessageId/attachment/retry',
+        '/api/support/conversation/$encodedConversationId/read',
+        '/api/support/conversation/$encodedConversationId/resolve',
+        '/api/support/conversation/$encodedConversationId/reopen',
+        '/api/support/conversation/$encodedConversationId/close',
+        '/api/support/conversation/$encodedConversationId/feedback',
+      ]);
+    },
+  );
+
+  test('conversation history page size is clamped before request', () async {
+    final requests = <RequestOptions>[];
+    final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+      ..interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            requests.add(options);
+            expect(
+              options.headers[HttpHeaders.authorizationHeader],
+              'Bearer access-token',
+            );
+            handler.resolve(
+              Response<Map<String, dynamic>>(
+                requestOptions: options,
+                statusCode: 200,
+                data: _supportConversationJson(),
+              ),
+            );
+          },
+        ),
+      );
+    final repository = SupportChatRepository(
+      dio: dio,
+      sessionStorage: _SessionStorage(_session()),
+    );
+
+    await repository.getConversation(take: 1000);
+    await repository.getConversation(take: 0);
+
+    expect(requests, hasLength(2));
+    expect(requests[0].queryParameters['take'], 100);
+    expect(requests[1].queryParameters['take'], 1);
   });
 
   test(
@@ -344,6 +517,20 @@ Map<String, dynamic> _supportMessageJson() {
   };
 }
 
+Map<String, dynamic> _supportConversationJson() {
+  return {
+    'conversationId': 'conversation-1',
+    'status': 'Open',
+    'priority': 'Normal',
+    'source': 'MobileChat',
+    'createdAtUtc': DateTime.now().toUtc().toIso8601String(),
+    'updatedAtUtc': DateTime.now().toUtc().toIso8601String(),
+    'messages': const <Map<String, dynamic>>[],
+    'adminUnreadCount': 0,
+    'userUnreadCount': 0,
+  };
+}
+
 class _SessionStorage extends AuthSessionStorage {
   _SessionStorage(this._session);
 
@@ -354,15 +541,17 @@ class _SessionStorage extends AuthSessionStorage {
 }
 
 class _FakeImageUploadOptimizer extends ImageUploadOptimizer {
-  const _FakeImageUploadOptimizer({this.supportImage});
+  _FakeImageUploadOptimizer({this.supportImage});
 
   final File? supportImage;
+  int supportOptimizeCalls = 0;
 
   @override
   Future<OptimizedUploadFile> optimizeForSupportImage(
     XFile source, {
     CancelToken? cancelToken,
   }) async {
+    supportOptimizeCalls++;
     final file = supportImage;
     if (file == null) {
       return OptimizedUploadFile.original(source);

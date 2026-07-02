@@ -107,6 +107,96 @@ void main() {
   );
 
   test(
+    'store product availability cache reuses in-flight superset for subset lookups',
+    () async {
+      final completer = Completer<StoreProductAvailabilitySnapshot>();
+      var loadCalls = 0;
+      final cache = StoreProductAvailabilityCache();
+
+      Future<StoreProductAvailabilitySnapshot> loader(Set<String> productIds) {
+        loadCalls++;
+        return completer.future;
+      }
+
+      final firstFuture = cache.read(
+        {'premium.month', 'premium.year'},
+        scopeKey: 'google_play',
+        loader: loader,
+      );
+      final secondFuture = cache.read(
+        {'premium.month'},
+        scopeKey: 'google_play',
+        loader: loader,
+      );
+
+      expect(loadCalls, 1);
+
+      completer.complete(
+        const StoreProductAvailabilitySnapshot(
+          isAvailable: true,
+          productIds: {'premium.month', 'premium.year'},
+          productPrices: {
+            'premium.month': r'$14.99',
+            'premium.year': r'$99.99',
+          },
+        ),
+      );
+
+      final results = await Future.wait([firstFuture, secondFuture]);
+      expect(results[0].productIds, {'premium.month', 'premium.year'});
+      expect(results[1].productIds, {'premium.month'});
+      expect(results[1].productPrices, {'premium.month': r'$14.99'});
+    },
+  );
+
+  test(
+    'store product availability cache does not share in-flight lookups across scopes',
+    () async {
+      final firstCompleter = Completer<StoreProductAvailabilitySnapshot>();
+      final secondCompleter = Completer<StoreProductAvailabilitySnapshot>();
+      var loadCalls = 0;
+      final cache = StoreProductAvailabilityCache();
+
+      Future<StoreProductAvailabilitySnapshot> loader(Set<String> productIds) {
+        loadCalls++;
+        return loadCalls == 1 ? firstCompleter.future : secondCompleter.future;
+      }
+
+      final firstFuture = cache.read(
+        {'premium.month', 'premium.year'},
+        scopeKey: 'google_play',
+        loader: loader,
+      );
+      final secondFuture = cache.read(
+        {'premium.month'},
+        scopeKey: 'app_store',
+        loader: loader,
+      );
+
+      expect(loadCalls, 2);
+
+      firstCompleter.complete(
+        const StoreProductAvailabilitySnapshot(
+          isAvailable: true,
+          productIds: {'premium.month', 'premium.year'},
+          productPrices: {'premium.month': r'$14.99'},
+        ),
+      );
+      secondCompleter.complete(
+        const StoreProductAvailabilitySnapshot(
+          isAvailable: true,
+          productIds: {'premium.month'},
+          productPrices: {'premium.month': r'$15.99'},
+        ),
+      );
+
+      final results = await Future.wait([firstFuture, secondFuture]);
+      expect(results[0].productPrices['premium.month'], r'$14.99');
+      expect(results[1].productPrices['premium.month'], r'$15.99');
+    },
+  );
+
+  test(
     'store product availability cache isolates entries by scope key',
     () async {
       var loadCalls = 0;

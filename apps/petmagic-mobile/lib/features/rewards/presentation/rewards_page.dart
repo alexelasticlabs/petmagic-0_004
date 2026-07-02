@@ -93,6 +93,16 @@ class _RewardsPageState extends ConsumerState<RewardsPage>
         state.rewards != null;
   }
 
+  Future<void> _loadRewardsIfOnline({bool refresh = false}) async {
+    if (!mounted ||
+        !ref.read(appLaunchControllerProvider).isAuthenticated ||
+        !ref.read(networkStatusControllerProvider).hasInternet) {
+      return;
+    }
+
+    await ref.read(walletControllerProvider.notifier).load(refresh: refresh);
+  }
+
   void _scheduleInitialLoadIfNeeded() {
     final snapshot = ref.read(walletControllerProvider);
     if (_hasHydratedRewardsSnapshot(snapshot)) {
@@ -112,7 +122,7 @@ class _RewardsPageState extends ConsumerState<RewardsPage>
         return;
       }
 
-      ref.read(walletControllerProvider.notifier).load();
+      unawaited(_loadRewardsIfOnline());
     });
   }
 
@@ -164,6 +174,8 @@ class _RewardsPageState extends ConsumerState<RewardsPage>
               kPetMagicBottomContentInsetCompact;
     final rewards = state.rewards;
     final isPremiumUser = state.wallet?.isPremium == true;
+    final showOfflineUnavailable =
+        !_hasHydratedRewardsSnapshot(state) && !hasInternet;
     final unavailableKind = state.wallet == null && !state.isInitialLoading
         ? classifyAppUnavailable(
             raw: state.errorMessage,
@@ -241,23 +253,27 @@ class _RewardsPageState extends ConsumerState<RewardsPage>
       }
 
       final walletState = ref.read(walletControllerProvider);
-      final currentUnavailableKind =
-          walletState.wallet == null && !walletState.isInitialLoading
-          ? classifyAppUnavailable(
-              raw: walletState.errorMessage,
-              hasInternet: next.hasInternet,
-            )
-          : null;
-      if (currentUnavailableKind == null) {
+      if (_hasHydratedRewardsSnapshot(walletState)) {
         return;
       }
 
-      unawaited(controller.load(refresh: true));
+      unawaited(_loadRewardsIfOnline(refresh: true));
     });
 
     return _RewardsBackdrop(
       child: SafeArea(
-        child: state.isInitialLoading
+        child: showOfflineUnavailable
+            ? PetMagicUnavailableView(
+                kind: AppUnavailableKind.offline,
+                onRetry: () => unawaited(_loadRewardsIfOnline(refresh: true)),
+                padding: EdgeInsets.fromLTRB(
+                  28,
+                  36,
+                  28,
+                  bottomNavInset + keyboardInset,
+                ),
+              )
+            : state.isInitialLoading
             ? Center(
                 child: CircularProgressIndicator.adaptive(
                   valueColor: AlwaysStoppedAnimation<Color>(colors.accent),
@@ -266,7 +282,7 @@ class _RewardsPageState extends ConsumerState<RewardsPage>
             : unavailableKind != null
             ? PetMagicUnavailableView(
                 kind: unavailableKind,
-                onRetry: () => unawaited(controller.load(refresh: true)),
+                onRetry: () => unawaited(_loadRewardsIfOnline(refresh: true)),
                 padding: EdgeInsets.fromLTRB(
                   28,
                   36,
@@ -277,7 +293,7 @@ class _RewardsPageState extends ConsumerState<RewardsPage>
             : RefreshIndicator.adaptive(
                 onRefresh: () async {
                   await PetMagicHaptics.medium();
-                  await controller.load(refresh: true);
+                  await _loadRewardsIfOnline(refresh: true);
                 },
                 color: colors.accent,
                 backgroundColor: colors.surfaceStrong,

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
@@ -568,6 +570,65 @@ void main() {
     },
   );
 
+  testWidgets(
+    'generation status disconnects realtime when connect finishes after network loss',
+    (tester) async {
+      final connectCompleter = Completer<void>();
+      final repository = FakeGenerationStatusTemplateGenerationRepository(
+        generationStatusFixture(
+          status: TemplateGenerationStatus.queued,
+          queuePosition: 2,
+          estimatedWaitSeconds: 480,
+          canCancel: true,
+        ),
+      );
+      final realtimeClient = FakeGenerationStatusRealtimeClient(
+        connectCompleter: connectCompleter,
+      );
+      final networkStatusController =
+          _GenerationStatusNetworkStatusController();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            templateGenerationRepositoryProvider.overrideWithValue(repository),
+            realtimeClientProvider.overrideWithValue(realtimeClient),
+            networkStatusControllerProvider.overrideWith(
+              () => networkStatusController,
+            ),
+            generationHistoryControllerProvider.overrideWith(
+              IdleGenerationStatusHistoryController.new,
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            locale: const Locale('en'),
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const GenerationStatusPage(generationId: 'generation-1'),
+          ),
+        ),
+      );
+
+      await _pumpUntil(tester, () => realtimeClient.connectCalls == 1);
+
+      networkStatusController.setHasInternet(false);
+      await tester.pump();
+      expect(realtimeClient.disconnectCalls, 0);
+
+      connectCompleter.complete();
+      await tester.pump();
+      await tester.pump();
+
+      expect(realtimeClient.disconnectCalls, 1);
+    },
+  );
+
   testWidgets('generation status failed action preserves pet context', (
     tester,
   ) async {
@@ -727,7 +788,10 @@ void main() {
     );
     expect(pageSource, contains('parseSafeGenerationMediaUri(mediaUrl)'));
     expect(pageSource, contains('parseSafeGenerationMediaUri(outputUrl)'));
+    expect(pageSource, contains('.fetchShareUrl('));
+    expect(pageSource, contains('parseSafeExternalUri(access.shareUrl)'));
     expect(pageSource, contains('ClipboardData(text: safeUri.toString())'));
+    expect(pageSource, isNot(contains('ClipboardData(text: shareSafeUrl)')));
     expect(sectionsSource, contains('parseSafeGenerationMediaUri(url)'));
     expect(sectionsSource, contains('parseSafeGenerationMediaUri(outputUrl)'));
     expect(fullscreenSource, contains('parseSafeGenerationMediaUri(mediaUrl)'));
@@ -773,6 +837,65 @@ void main() {
       expect(lifecycleGuardBody, contains('AppLifecycleState.resumed'));
       expect(source, contains('_isPageActive = false;'));
       expect(source, contains('_cancelActiveLocalMediaDownloads();'));
+    },
+  );
+
+  test(
+    'generation status pauses offline polling and restores on reconnect',
+    () {
+      final source = generationStatusLibrarySource;
+      final pageSource = generationStatusPageSource;
+      final schedulePollBody = methodBody(source, 'void _scheduleNextPoll');
+      final resumeRealtimeBody = methodBody(
+        source,
+        'Future<void> _resumeRealtimeIfNeeded',
+      );
+      final lifecycleBody = methodBody(
+        pageSource,
+        'void didChangeAppLifecycleState',
+      );
+      final activateBody = methodBody(pageSource, 'void activate');
+
+      expect(
+        schedulePollBody,
+        contains(
+          'if (!ref.read(networkStatusControllerProvider).hasInternet) {',
+        ),
+      );
+      expect(
+        resumeRealtimeBody,
+        contains(
+          'if (!ref.read(networkStatusControllerProvider).hasInternet) {',
+        ),
+      );
+      expect(
+        lifecycleBody,
+        contains(
+          'if (!ref.read(networkStatusControllerProvider).hasInternet) {',
+        ),
+      );
+      expect(
+        activateBody,
+        contains(
+          'if (!ref.read(networkStatusControllerProvider).hasInternet) {',
+        ),
+      );
+      expect(
+        pageSource,
+        contains(
+          'ref.listen<NetworkStatusState>(networkStatusControllerProvider, (',
+        ),
+      );
+      expect(
+        pageSource,
+        contains(
+          'if (!_isPageActive || previous?.hasInternet == next.hasInternet) {',
+        ),
+      );
+      expect(pageSource, contains('if (!next.hasInternet) {'));
+      expect(pageSource, contains('_pauseRealtime();'));
+      expect(pageSource, contains('_stopPolling();'));
+      expect(resumeRealtimeBody, contains('!identical(_activeRealtimeClient'));
     },
   );
 
@@ -896,4 +1019,29 @@ void main() {
     expect(cancelToken.isCancelled, isTrue);
     await tester.pump();
   });
+}
+
+Future<void> _pumpUntil(
+  WidgetTester tester,
+  bool Function() condition, {
+  Duration timeout = const Duration(seconds: 2),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (!condition()) {
+    if (DateTime.now().isAfter(deadline)) {
+      fail('Condition was not met before timeout');
+    }
+    await tester.pump(const Duration(milliseconds: 10));
+  }
+}
+
+class _GenerationStatusNetworkStatusController extends NetworkStatusController {
+  @override
+  NetworkStatusState build() {
+    return const NetworkStatusState();
+  }
+
+  void setHasInternet(bool value) {
+    state = state.copyWith(hasInternet: value);
+  }
 }

@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
@@ -42,6 +43,13 @@ class AuthEntryPage extends StatelessWidget {
   }
 }
 
+class AuthEntryRouteArgs {
+  const AuthEntryRouteArgs({this.initialEmail, this.redirectPath});
+
+  final String? initialEmail;
+  final String? redirectPath;
+}
+
 class RegisterEntryPage extends StatelessWidget {
   const RegisterEntryPage({super.key, this.redirectPath});
 
@@ -52,6 +60,29 @@ class RegisterEntryPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return _AuthFlowPage(mode: _AuthMode.signUp, redirectPath: redirectPath);
   }
+}
+
+const int maxAuthRedirectPathLength = 1024;
+final RegExp _authRedirectControlPattern = RegExp(r'[\x00-\x1F\x7F]');
+
+String? normalizeAuthRedirectPath(String? redirectPath) {
+  final normalized = redirectPath?.trim();
+  if (normalized == null ||
+      normalized.isEmpty ||
+      normalized.length > maxAuthRedirectPathLength ||
+      !normalized.startsWith('/') ||
+      normalized.startsWith('//') ||
+      normalized.contains(r'\') ||
+      _authRedirectControlPattern.hasMatch(normalized)) {
+    return null;
+  }
+
+  final uri = Uri.tryParse(normalized);
+  if (uri == null || uri.hasScheme || uri.hasAuthority) {
+    return null;
+  }
+
+  return normalized;
 }
 
 enum _AuthMode { signIn, signUp }
@@ -166,9 +197,12 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
     final isShortViewport = viewport.height <= 700;
     final isCompactViewport = viewport.height <= 760;
     final locale = Localizations.localeOf(context).toLanguageTag();
-    final legalDocumentsAsync = ref.watch(
-      currentLegalDocumentsProvider(locale),
+    final hasInternet = ref.watch(
+      networkStatusControllerProvider.select((status) => status.hasInternet),
     );
+    final legalDocumentsAsync = _isSignUp && hasInternet
+        ? ref.watch(currentLegalDocumentsProvider(locale))
+        : null;
     final compactLayout = _isSignUp || isCompactViewport;
 
     final title = _isSignUp ? text.authRegisterTitle : text.authEntryTitle;
@@ -348,6 +382,13 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
         legalDocuments = null;
       }
 
+      if (legalDocuments == null) {
+        setState(() {
+          _consentErrorMessage = 'auth.legal_documents_unavailable';
+        });
+        return;
+      }
+
       await controller.register(
         termsOfUseAccepted: _acceptedTerms,
         privacyPolicyAccepted: _acceptedTerms,
@@ -369,14 +410,19 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
               'auth.registration_pending_verification') {
         final email = nextState.email.trim();
         router.go(
-          '${EmailVerificationPage.routePath}?email=${Uri.encodeQueryComponent(email)}&cooldown=1',
+          EmailVerificationPage.routePath,
+          extra: EmailVerificationRouteArgs(
+            email: email,
+            startResendCooldown: true,
+          ),
         );
       } else if (!_isSignUp &&
           normalizeProfileFeedbackKey(nextState.errorMessage) ==
               'auth.email_not_confirmed') {
         final email = nextState.email.trim();
         router.go(
-          '${EmailVerificationPage.routePath}?email=${Uri.encodeQueryComponent(email)}',
+          EmailVerificationPage.routePath,
+          extra: EmailVerificationRouteArgs(email: email),
         );
       }
       return;
@@ -438,23 +484,13 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
   }
 
   String _resolvePostAuthRoute() {
-    final redirectPath = widget.redirectPath?.trim();
-    if (redirectPath == null || redirectPath.isEmpty) {
-      return TemplatesPage.routePath;
-    }
-
-    if (!redirectPath.startsWith('/')) {
-      return TemplatesPage.routePath;
-    }
-
-    return redirectPath;
+    return normalizeAuthRedirectPath(widget.redirectPath) ??
+        TemplatesPage.routePath;
   }
 
   String _redirectQuery() {
-    final redirectPath = widget.redirectPath?.trim();
-    if (redirectPath == null ||
-        redirectPath.isEmpty ||
-        !redirectPath.startsWith('/')) {
+    final redirectPath = normalizeAuthRedirectPath(widget.redirectPath);
+    if (redirectPath == null) {
       return '';
     }
 

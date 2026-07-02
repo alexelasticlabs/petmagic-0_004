@@ -187,6 +187,23 @@ void main() {
           'https://cdn.petmagic.app/video-thumb.jpg',
         );
 
+        final videoWithGalleryMediaPreview = _generation(
+          templateType: 'Video',
+          galleryMedia: const GalleryMedia(
+            state: GalleryMediaState.resultReady,
+            mediaType: 'video',
+            previewUrl: 'https://cdn.petmagic.app/gallery-video-thumb.jpg',
+            resultUrl: 'https://cdn.petmagic.app/result.mp4',
+          ),
+          resultPreviewUrl: 'https://cdn.petmagic.app/legacy-video-thumb.jpg',
+          sourceImageAsset: _asset('https://cdn.petmagic.app/source.jpg'),
+          outputUrl: 'https://cdn.petmagic.app/result.mp4',
+        );
+        expect(
+          previewUrl(videoWithGalleryMediaPreview),
+          'https://cdn.petmagic.app/gallery-video-thumb.jpg',
+        );
+
         final videoWithSource = _generation(
           templateType: 'Video',
           sourceImageAsset: _asset('https://cdn.petmagic.app/source.jpg'),
@@ -340,6 +357,7 @@ TemplateGenerationResult _generation({
   double? outputVideoDurationSeconds,
   String? failureCode,
   String? failureMessage,
+  GalleryMedia galleryMedia = const GalleryMedia(),
 }) {
   final now = DateTime.utc(2026, 6, 15, 12);
   return TemplateGenerationResult(
@@ -363,6 +381,7 @@ TemplateGenerationResult _generation({
     outputVideoDurationSeconds: outputVideoDurationSeconds,
     failureCode: failureCode,
     failureMessage: failureMessage,
+    galleryMedia: galleryMedia,
   );
 }
 

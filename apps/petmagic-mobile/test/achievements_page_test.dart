@@ -109,15 +109,16 @@ void main() {
       final text = AppLocalizations.of(context);
 
       expect(find.text(text.appUnavailableOfflineTitle), findsOneWidget);
-      final initialFetchCalls = repository.fetchCalls;
-      expect(initialFetchCalls, greaterThan(0));
+      expect(repository.fetchCalls, 0);
+      expect(repository.summaryFetchCalls, 0);
 
-      repository.failUntilCall = initialFetchCalls;
+      repository.failUntilCall = repository.fetchCalls;
       networkController.setHasInternet(true);
       await tester.pump();
       await tester.pumpAndSettle();
 
-      expect(repository.fetchCalls, greaterThan(initialFetchCalls));
+      expect(repository.fetchCalls, 1);
+      expect(repository.summaryFetchCalls, 1);
       expect(find.text(text.appUnavailableOfflineTitle), findsNothing);
       expect(find.text(text.achievementFirstMagic), findsOneWidget);
     },
@@ -132,22 +133,24 @@ void main() {
       await _pumpPage(tester, repository, networkOverride: networkController);
       await tester.pumpAndSettle();
 
-      final initialFetchCalls = repository.fetchCalls;
-      expect(initialFetchCalls, greaterThan(0));
+      expect(repository.fetchCalls, 0);
+      expect(repository.summaryFetchCalls, 0);
 
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
       await tester.pump();
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pump();
 
-      expect(repository.fetchCalls, initialFetchCalls);
+      expect(repository.fetchCalls, 0);
+      expect(repository.summaryFetchCalls, 0);
 
-      repository.failUntilCall = initialFetchCalls;
+      repository.failUntilCall = repository.fetchCalls;
       networkController.setHasInternet(true);
       await tester.pump();
       await tester.pumpAndSettle();
 
-      expect(repository.fetchCalls, greaterThan(initialFetchCalls));
+      expect(repository.fetchCalls, 1);
+      expect(repository.summaryFetchCalls, 1);
       expect(tester.takeException(), isNull);
     },
   );
@@ -281,6 +284,18 @@ void main() {
       expect(
         providersSource,
         contains("cancelToken.cancel('achievements_provider_disposed');"),
+      );
+      expect(
+        providersSource,
+        contains(
+          "if (!ref.read(networkStatusControllerProvider).hasInternet) {",
+        ),
+      );
+      expect(
+        providersSource,
+        contains(
+          "throw const AppException('gamification.network_unavailable');",
+        ),
       );
     },
   );

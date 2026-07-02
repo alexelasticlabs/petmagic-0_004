@@ -18,6 +18,10 @@ class AppConfig {
 
   static const productionApiBaseUrl = 'https://api.petmagic.app';
   static const _productionApiHosts = {'api.petmagic.app'};
+  static const androidPackageName = String.fromEnvironment(
+    'PETMAGIC_ANDROID_PACKAGE_NAME',
+    defaultValue: 'com.petmagic.app',
+  );
 
   static const configuredApiBaseUrl = String.fromEnvironment('API_BASE_URL');
   static const appVersion = String.fromEnvironment(
@@ -44,6 +48,10 @@ class AppConfig {
   static const mediaCacheMaxBytes = int.fromEnvironment(
     'PETMAGIC_MEDIA_CACHE_MAX_BYTES',
     defaultValue: 120 * 1024 * 1024,
+  );
+  static const previewVideoCacheMaxBytes = int.fromEnvironment(
+    'PETMAGIC_PREVIEW_VIDEO_CACHE_MAX_BYTES',
+    defaultValue: 400 * 1024 * 1024,
   );
   static const mediaCacheStalePeriodHours = int.fromEnvironment(
     'PETMAGIC_MEDIA_CACHE_STALE_HOURS',
@@ -94,6 +102,14 @@ class AppConfig {
     }
 
     return mediaCacheMaxBytes;
+  }
+
+  static int get previewVideoCacheMaxBytesSafe {
+    if (previewVideoCacheMaxBytes <= 0) {
+      return 400 * 1024 * 1024;
+    }
+
+    return previewVideoCacheMaxBytes;
   }
 
   static int get decodedImageCacheMaxObjectsSafe {

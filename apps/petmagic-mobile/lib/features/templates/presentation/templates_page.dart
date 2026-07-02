@@ -10,6 +10,8 @@ import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/permissions/media_permission_feedback.dart';
+import 'package:petmagic_mobile/core/performance/decoded_image_cache_budget.dart';
+import 'package:petmagic_mobile/core/performance/template_media_cache.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/pets/presentation/pet_profile_providers.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
@@ -145,7 +147,10 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
   }
 
   late final WidgetsBindingObserver _lifecycleObserver =
-      _TemplatesLifecycleObserver(onStateChanged: _handleLifecycleState);
+      _TemplatesLifecycleObserver(
+        onStateChanged: _handleLifecycleState,
+        onMemoryPressure: _handleMemoryPressure,
+      );
 
   void _handleLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
@@ -174,6 +179,27 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
           .disposeAll(reason: 'templates_app_background');
       _templatesController.setScreenVisible(false);
     });
+  }
+
+  void _handleMemoryPressure() {
+    trimDecodedImageCache();
+    ref
+        .read(templateFeedPlaybackManagerProvider)
+        .disposeAll(reason: 'templates_memory_pressure');
+    unawaited(
+      TemplateMediaCache.clearAll().catchError((
+        Object error,
+        StackTrace stackTrace,
+      ) {
+        AppLogger.warn(
+          feature: 'Templates',
+          operation: 'memory_pressure_cache_trim',
+          message: 'Template media cache trim failed after memory pressure.',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }),
+    );
   }
 
   void _handleScreenBecameVisible({required bool fromAppResume}) {

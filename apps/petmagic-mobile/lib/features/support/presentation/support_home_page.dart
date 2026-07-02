@@ -6,6 +6,8 @@ import 'package:dio/dio.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
 import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
@@ -14,6 +16,7 @@ import 'package:petmagic_mobile/features/profile/presentation/profile_surface_wi
 import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_unavailable_view.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 
@@ -39,6 +42,7 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
   CancelToken? _conversationLoadCancelToken;
   ProviderSubscription<AppLaunchState>? _launchSubscription;
   bool _hasRequestedInitialConversationLoad = false;
+  bool _hasResolvedConversationSnapshot = false;
   bool _wasAuthenticated = false;
 
   @override
@@ -85,6 +89,7 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
   void _resetConversationState() {
     _cancelConversationLoad();
     _hasRequestedInitialConversationLoad = false;
+    _hasResolvedConversationSnapshot = false;
     if (!mounted) {
       return;
     }
@@ -98,6 +103,10 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
 
   Future<void> _loadConversation() async {
     if (!mounted || !ref.read(appLaunchControllerProvider).isAuthenticated) {
+      return;
+    }
+
+    if (!ref.read(networkStatusControllerProvider).hasInternet) {
       return;
     }
 
@@ -124,6 +133,7 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
 
       setState(() {
         _conversation = conversation;
+        _hasResolvedConversationSnapshot = true;
       });
     } on AppException catch (error) {
       if (!mounted || loadCancelToken.isCancelled) {
@@ -134,6 +144,7 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
       setState(() {
         _conversation = null;
         _conversationError = isNotFound ? null : error.message;
+        _hasResolvedConversationSnapshot = isNotFound;
       });
     } on Object {
       if (!mounted || loadCancelToken.isCancelled) {
@@ -199,6 +210,21 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
     return text.supportChatUnavailableError;
   }
 
+  AppUnavailableKind? _conversationUnavailableKind(bool hasInternet) {
+    if (_conversation != null || _isLoadingConversation) {
+      return null;
+    }
+
+    if (!hasInternet && !_hasResolvedConversationSnapshot) {
+      return AppUnavailableKind.offline;
+    }
+
+    return classifyAppUnavailable(
+      raw: _conversationError,
+      hasInternet: hasInternet,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isAuthenticated = ref.watch(
@@ -206,6 +232,9 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
     );
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final hasInternet = ref.watch(
+      networkStatusControllerProvider.select((status) => status.hasInternet),
+    );
 
     if (!isAuthenticated) {
       return ProfileScreenBackground(
@@ -232,6 +261,22 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
         hasConversation &&
         ((_tab == _SupportHomeTab.active && !conversationIsArchived) ||
             (_tab == _SupportHomeTab.archive && conversationIsArchived));
+    final unavailableKind = _conversationUnavailableKind(hasInternet);
+
+    ref.listen<NetworkStatusState>(networkStatusControllerProvider, (
+      previous,
+      next,
+    ) {
+      if (previous?.hasInternet != false || !next.hasInternet) {
+        return;
+      }
+
+      if (_conversationUnavailableKind(false) == null) {
+        return;
+      }
+
+      unawaited(_loadConversation());
+    });
 
     return ProfileScreenBackground(
       child: Scaffold(
@@ -283,31 +328,20 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
                     child: CircularProgressIndicator(color: colors.accent),
                   ),
                 )
-              else if (_conversationError != null)
-                ProfileGlassCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        text.supportChatUnavailableError,
-                        style: TextStyle(
-                          color: colors.textStrong,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
+              else if (unavailableKind != null)
+                PetMagicUnavailableView(
+                  kind: unavailableKind,
+                  onRetry: () => unawaited(_loadConversation()),
+                  footer: _conversationError == null
+                      ? null
+                      : Text(
+                          _mapConversationError(text, _conversationError!),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: colors.textSoft,
+                            fontSize: 14,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _mapConversationError(text, _conversationError!),
-                        style: TextStyle(color: colors.textSoft, fontSize: 14),
-                      ),
-                      const SizedBox(height: 12),
-                      TextButton(
-                        onPressed: _loadConversation,
-                        child: Text(text.retryAction),
-                      ),
-                    ],
-                  ),
                 )
               else if (shouldShowConversation)
                 _ConversationCard(
@@ -517,9 +551,8 @@ class _TopicCard extends StatelessWidget {
       child: ProfileGlassCard(
         padding: EdgeInsets.zero,
         child: InkWell(
-          onTap: () => context.push(
-            '${SupportAssistantPage.routePath}?scenario=${Uri.encodeComponent(topic.scenario)}',
-          ),
+          onTap: () =>
+              context.push(SupportAssistantPage.location(topic.scenario)),
           borderRadius: BorderRadius.circular(24),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),

@@ -32,6 +32,8 @@ void configureWidgetTestHarness() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() {
     VisibilityDetectorController.instance.updateInterval = Duration.zero;
+  });
+  setUp(() {
     SharedPreferencesAsyncPlatform.instance =
         InMemorySharedPreferencesAsync.empty();
   });
@@ -540,6 +542,7 @@ class FakeProfileRepository extends ProfileRepository {
   Future<AuthSession> login({
     required String email,
     required String password,
+    CancelToken? cancelToken,
   }) async {
     final session = AuthSession(
       accessToken: 'access-token',
@@ -573,6 +576,7 @@ class FakeProfileRepository extends ProfileRepository {
     required String privacyPolicyVersion,
     required bool marketingEmailsEnabled,
     String? displayName,
+    CancelToken? cancelToken,
   }) async {
     lastTermsOfUseAccepted = termsOfUseAccepted;
     lastMarketingEmailsEnabled = marketingEmailsEnabled;
@@ -646,6 +650,7 @@ class FakeProfileRepository extends ProfileRepository {
   @override
   Future<MobileUserProfile> acceptCurrentLegalDocuments({
     required MobileLegalDocuments documents,
+    CancelToken? cancelToken,
   }) async {
     final session = storedSession;
     if (session == null) {
@@ -692,7 +697,10 @@ class FakeProfileRepository extends ProfileRepository {
   }
 
   @override
-  Future<void> requestPasswordReset({required String email}) async {
+  Future<void> requestPasswordReset({
+    required String email,
+    CancelToken? cancelToken,
+  }) async {
     passwordResetRequestedFor = email;
   }
 
@@ -701,6 +709,7 @@ class FakeProfileRepository extends ProfileRepository {
     required String email,
     required String code,
     required String newPassword,
+    CancelToken? cancelToken,
   }) async {
     passwordResetConfirmedFor = email;
   }
@@ -718,7 +727,10 @@ class UnavailableLegalDocumentsProfileRepository extends FakeProfileRepository {
 
 class FakeExternalAuthRepository implements ExternalAuthRepository {
   @override
-  Future<AuthSession> authenticate(ExternalAuthProvider provider) async {
+  Future<AuthSession> authenticate(
+    ExternalAuthProvider provider, {
+    CancelToken? cancelToken,
+  }) async {
     return AuthSession(
       accessToken: 'external-access-token',
       refreshToken: 'external-refresh-token',
@@ -744,7 +756,10 @@ class FakeExternalAuthRepository implements ExternalAuthRepository {
   }
 
   @override
-  Future<List<MobileLinkedAccount>> link(ExternalAuthProvider provider) async {
+  Future<List<MobileLinkedAccount>> link(
+    ExternalAuthProvider provider, {
+    CancelToken? cancelToken,
+  }) async {
     return const [];
   }
 
@@ -767,12 +782,18 @@ class FailingExternalAuthRepository implements ExternalAuthRepository {
   final AppException error;
 
   @override
-  Future<AuthSession> authenticate(ExternalAuthProvider provider) async {
+  Future<AuthSession> authenticate(
+    ExternalAuthProvider provider, {
+    CancelToken? cancelToken,
+  }) async {
     throw error;
   }
 
   @override
-  Future<List<MobileLinkedAccount>> link(ExternalAuthProvider provider) async {
+  Future<List<MobileLinkedAccount>> link(
+    ExternalAuthProvider provider, {
+    CancelToken? cancelToken,
+  }) async {
     throw error;
   }
 
@@ -784,12 +805,18 @@ class FailingExternalAuthRepository implements ExternalAuthRepository {
 
 class ThrowingExternalAuthRepository implements ExternalAuthRepository {
   @override
-  Future<AuthSession> authenticate(ExternalAuthProvider provider) async {
+  Future<AuthSession> authenticate(
+    ExternalAuthProvider provider, {
+    CancelToken? cancelToken,
+  }) async {
     throw Exception('google sign-in failed unexpectedly');
   }
 
   @override
-  Future<List<MobileLinkedAccount>> link(ExternalAuthProvider provider) async {
+  Future<List<MobileLinkedAccount>> link(
+    ExternalAuthProvider provider, {
+    CancelToken? cancelToken,
+  }) async {
     throw Exception('external account link failed unexpectedly');
   }
 

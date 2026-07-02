@@ -303,7 +303,7 @@ void main() {
     },
   );
 
-  testWidgets('ready card media actions reject unsafe output URLs', (
+  testWidgets('ready card media actions use fresh backend access URLs', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 900));
@@ -319,7 +319,16 @@ void main() {
           .setMockMethodCallHandler(SystemChannels.platform, null);
     });
 
-    final mediaActions = DelayedGalleryGenerationStatusMediaActions();
+    final mediaActions = DelayedGalleryGenerationStatusMediaActions(
+      delayShare: false,
+    );
+    final repository = FakeGalleryTemplateGenerationRepository(
+      downloadUrl: 'https://cdn.petmagic.test/fresh-download.jpg?sig=download',
+      shareUrl: 'https://cdn.petmagic.test/fresh-share.jpg?sig=share',
+      downloadFileName: 'fresh-download.jpg',
+      shareFileName: 'fresh-share.jpg',
+      durableShareUrl: 'https://app.petmagic.test/share/generation/g-ready',
+    );
     final harness = GalleryHarness(
       items: [
         galleryGenerationFixture(
@@ -333,6 +342,7 @@ void main() {
         ),
       ],
       mediaActions: mediaActions,
+      repository: repository,
     );
     addTearDown(harness.router.dispose);
 
@@ -345,8 +355,12 @@ void main() {
     await tester.tap(find.text(text.generationStatusSaveAction));
     await tester.pump();
 
-    expect(mediaActions.saveCalls, 0);
-    expect(mediaActions.savedUrls, isEmpty);
+    expect(repository.downloadCalls, ['g-ready-unsafe']);
+    expect(mediaActions.saveCalls, 1);
+    expect(mediaActions.savedUrls, [
+      'https://cdn.petmagic.test/fresh-download.jpg?sig=download',
+    ]);
+    expect(mediaActions.savedFileNames, ['fresh-download.jpg']);
     await tester.pump(const Duration(seconds: 3));
 
     await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
@@ -354,8 +368,15 @@ void main() {
     await tester.tap(find.text(text.supportChatShareAction));
     await tester.pump();
 
-    expect(mediaActions.shareCalls, 0);
-    expect(mediaActions.sharedUrls, isEmpty);
+    expect(repository.shareCalls, ['g-ready-unsafe']);
+    expect(mediaActions.shareCalls, 1);
+    expect(mediaActions.sharedUrls, [
+      'https://cdn.petmagic.test/fresh-share.jpg?sig=share',
+    ]);
+    expect(mediaActions.sharedFileNames, ['fresh-share.jpg']);
+    expect(mediaActions.sharedTexts, [
+      'https://app.petmagic.test/share/generation/g-ready',
+    ]);
     await tester.pump(const Duration(seconds: 3));
 
     await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
@@ -363,6 +384,91 @@ void main() {
     await tester.tap(find.text(text.generationStatusCopyLinkAction));
     await tester.pump();
 
+    expect(
+      platformCalls
+          .where((call) => call.method == 'Clipboard.setData')
+          .map((call) => call.arguments)
+          .toList(),
+      [
+        {'text': 'https://app.petmagic.test/share/generation/g-ready'},
+      ],
+    );
+    expect(repository.shareCalls, ['g-ready-unsafe', 'g-ready-unsafe']);
+    await tester.pump(const Duration(seconds: 3));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ready card media actions handle unavailable fresh access', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final platformCalls = <MethodCall>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+          platformCalls.add(call);
+          return null;
+        });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null);
+    });
+
+    final mediaActions = DelayedGalleryGenerationStatusMediaActions(
+      delayShare: false,
+    );
+    final repository = FakeGalleryTemplateGenerationRepository(
+      downloadUrl: '',
+      shareUrl: '',
+      downloadFileName: '',
+      shareFileName: '',
+      durableShareUrl: '',
+    );
+    final harness = GalleryHarness(
+      items: [
+        galleryGenerationFixture(
+          generationId: 'g-ready-not-ready',
+          status: TemplateGenerationStatus.completed,
+          templateTitle: 'Not Ready',
+          templateType: 'image',
+          tokenCost: 6,
+          outputUrl: 'https://cdn.petmagic.test/stale.jpg?signature=old',
+          updatedAtUtc: DateTime.utc(2026, 5, 25, 14, 30),
+        ),
+      ],
+      mediaActions: mediaActions,
+      repository: repository,
+    );
+    addTearDown(harness.router.dispose);
+
+    await tester.pumpWidget(harness.app());
+    await tester.pumpAndSettle();
+    final text = galleryText(tester);
+
+    await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(text.generationStatusSaveAction));
+    await tester.pump();
+
+    expect(repository.downloadCalls, ['g-ready-not-ready']);
+    expect(mediaActions.saveCalls, 0);
+    await tester.pump(const Duration(seconds: 3));
+
+    await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(text.supportChatShareAction));
+    await tester.pump();
+
+    expect(repository.shareCalls, ['g-ready-not-ready']);
+    expect(mediaActions.shareCalls, 0);
+    await tester.pump(const Duration(seconds: 3));
+
+    await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(text.generationStatusCopyLinkAction));
+    await tester.pump();
+
+    expect(repository.shareCalls, ['g-ready-not-ready', 'g-ready-not-ready']);
     expect(
       platformCalls.where((call) => call.method == 'Clipboard.setData'),
       isEmpty,

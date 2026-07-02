@@ -1,14 +1,19 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
+import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
+import 'package:petmagic_mobile/features/premium/data/premium_repository.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/subscription_management_page.dart';
+import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 
 void main() {
@@ -170,7 +175,8 @@ void main() {
         ),
       );
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
 
       expect(find.byType(ProtectedAuthGate), findsOneWidget);
       expect(summaryReads, 0);
@@ -392,6 +398,50 @@ void main() {
       expect(find.text('PetMagic Premium'), findsWidgets);
     },
   );
+
+  testWidgets(
+    'subscription management stays offline without loading and retries on reconnect',
+    (tester) async {
+      final repository = _CountingSubscriptionManagementRepository();
+      final networkController = _TestSubscriptionNetworkStatusController(
+        initialHasInternet: false,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedAppLaunchController.new,
+            ),
+            premiumRepositoryProvider.overrideWithValue(repository),
+            networkStatusControllerProvider.overrideWith(
+              () => networkController,
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: const [Locale('en')],
+            home: const SubscriptionManagementPage(),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.text("You're offline"), findsOneWidget);
+      expect(repository.fetchStatusCalls, 0);
+
+      networkController.setHasInternet(true);
+      await tester.pump();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+
+      expect(find.text("You're offline"), findsNothing);
+      expect(repository.fetchStatusCalls, 1);
+      expect(find.text('PetMagic Premium'), findsWidgets);
+    },
+  );
 }
 
 class _DelayedRestorePremiumController extends PremiumController {
@@ -455,5 +505,45 @@ class _FailingRestorePremiumController extends PremiumController {
   @override
   Future<void> restorePurchases() async {
     throw StateError('store restore failed');
+  }
+}
+
+class _CountingSubscriptionManagementRepository extends PremiumRepository {
+  _CountingSubscriptionManagementRepository()
+    : super(dio: Dio(), sessionStorage: AuthSessionStorage());
+
+  int fetchStatusCalls = 0;
+
+  @override
+  Future<PremiumStatusModel> fetchStatus({CancelToken? cancelToken}) async {
+    fetchStatusCalls++;
+    return const PremiumStatusModel(
+      isPremium: true,
+      canManageBilling: true,
+      paymentProvider: 'stripe',
+      purchaseChannel: 'external_checkout',
+      status: 'Active',
+      cancelAtPeriodEnd: false,
+      monthlyTokenLimit: 500,
+      tokensAvailable: 240,
+      canManageSubscription: true,
+      manageSubscriptionAction: 'StripeCustomerPortal',
+      planName: 'PetMagic Premium',
+    );
+  }
+}
+
+class _TestSubscriptionNetworkStatusController extends NetworkStatusController {
+  _TestSubscriptionNetworkStatusController({required this.initialHasInternet});
+
+  final bool initialHasInternet;
+
+  @override
+  NetworkStatusState build() {
+    return NetworkStatusState(hasInternet: initialHasInternet);
+  }
+
+  void setHasInternet(bool value) {
+    state = state.copyWith(hasInternet: value);
   }
 }

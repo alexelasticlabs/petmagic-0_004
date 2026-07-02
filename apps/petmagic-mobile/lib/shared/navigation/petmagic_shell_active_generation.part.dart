@@ -107,6 +107,9 @@ class _ActiveGenerationBanner extends StatelessWidget {
                                 )
                               : CachedNetworkImage(
                                   imageUrl: previewUrl,
+                                  cacheKey: persistentSafeGenerationMediaUrl(
+                                    previewUrl,
+                                  ),
                                   fit: BoxFit.cover,
                                   memCacheWidth:
                                       _activeGenerationThumbnailCacheWidth,

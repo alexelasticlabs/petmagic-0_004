@@ -217,7 +217,11 @@ class TemplateFeedPlaybackManager extends ChangeNotifier {
 
     if (feedScopeKey != null && feedScopeKey != _feedScopeKey) {
       _feedScopeKey = feedScopeKey;
-      _mediaPreloadQueue?.cancelAll(reason: 'feed_scope_changed');
+      // Release every playback grant from the previous scope (filters/feed kind
+      // switch). Cards observe the notification, dispose their controllers
+      // immediately, and re-register through visibility callbacks, so stale
+      // players never keep running off-screen after a scope change.
+      disposeAll(reason: 'feed_scope_changed');
     }
 
     final nextFeedKind = feedKind ?? _feedKind;

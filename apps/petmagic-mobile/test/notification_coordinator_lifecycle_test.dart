@@ -212,6 +212,10 @@ void main() {
     final initialLinkBody = _methodBody(source, '_handleInitialLinkOnce');
     final flushPendingBody = _methodBody(source, '_flushPendingRouteIfReady');
     final queueCheckoutBody = _methodBody(source, '_queueCheckoutVerification');
+    final normalizeCheckoutBody = _methodBody(
+      source,
+      '_normalizeStripeCheckoutSessionId',
+    );
     final clearCheckoutBody = _methodBody(
       source,
       '_clearPendingCheckoutVerification',
@@ -262,8 +266,22 @@ void main() {
     );
     expect(
       queueCheckoutBody,
+      contains(
+        '_pendingCheckoutSessionId = _normalizeStripeCheckoutSessionId(sessionId);',
+      ),
+    );
+    expect(
+      queueCheckoutBody,
       contains('_flushPendingCheckoutVerificationIfReady('),
     );
+    expect(source, contains('_stripeCheckoutSessionIdPattern'));
+    expect(
+      normalizeCheckoutBody,
+      contains(
+        '!_stripeCheckoutSessionIdPattern.hasMatch(normalizedSessionId)',
+      ),
+    );
+    expect(normalizeCheckoutBody, contains('return null;'));
     expect(clearCheckoutBody, contains('_pendingCheckoutSessionId = null;'));
     expect(
       clearCheckoutBody,
@@ -361,6 +379,8 @@ void main() {
           'await _registrationCache.writeLastCompletedRegistrationKey(registrationKey)',
         ),
       );
+      expect(registrarSource, contains('sha256.convert'));
+      expect(cacheSource, contains('pushTokenRegistrationFingerprintPrefix'));
       expect(
         registrarSource,
         contains('Future<String?> readRegisteredToken()'),
@@ -382,8 +402,9 @@ void main() {
       );
       expect(
         cacheSource,
-        contains('clearLastCompletedRegistrationKeyForToken'),
+        isNot(contains('clearLastCompletedRegistrationKeyForToken')),
       );
+      expect(cacheSource, contains('!value.startsWith'));
     },
   );
 }

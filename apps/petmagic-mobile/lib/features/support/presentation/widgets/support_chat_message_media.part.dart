@@ -234,7 +234,11 @@ class _NetworkImageAttachmentPreviewState
     return ResizeImage.resizeIfNeeded(
       _previewCacheWidth,
       null,
-      CachedNetworkImageProvider(imageUrl, maxWidth: _previewCacheWidth),
+      CachedNetworkImageProvider(
+        imageUrl,
+        cacheKey: persistentSafeSupportMediaUrl(imageUrl),
+        maxWidth: _previewCacheWidth,
+      ),
     );
   }
 

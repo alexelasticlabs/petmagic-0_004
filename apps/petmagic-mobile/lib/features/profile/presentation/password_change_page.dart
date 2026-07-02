@@ -23,6 +23,12 @@ class PasswordChangePage extends ConsumerStatefulWidget {
   ConsumerState<PasswordChangePage> createState() => _PasswordChangePageState();
 }
 
+class PasswordChangeRouteArgs {
+  const PasswordChangeRouteArgs({required this.email});
+
+  final String email;
+}
+
 class _PasswordChangePageState extends ConsumerState<PasswordChangePage> {
   final _codeController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -108,18 +114,16 @@ class _PasswordChangePageState extends ConsumerState<PasswordChangePage> {
     );
     final text = AppLocalizations.of(context);
     if (!isAuthenticated) {
-      final redirectPath = widget.email.trim().isEmpty
-          ? PasswordChangePage.routePath
-          : '${PasswordChangePage.routePath}?email=${Uri.encodeQueryComponent(widget.email.trim())}';
-
       return ProfileScreenBackground(
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.only(bottom: 20),
             child: ProtectedAuthGate(
               subtitle: text.authRequiredMessage,
-              onSignIn: () =>
-                  showAuthRequiredSheet(context, redirectPath: redirectPath),
+              onSignIn: () => showAuthRequiredSheet(
+                context,
+                redirectPath: PasswordChangePage.routePath,
+              ),
             ),
           ),
         ),

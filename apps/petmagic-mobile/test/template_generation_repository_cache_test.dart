@@ -92,6 +92,228 @@ void main() {
     },
   );
 
+  test(
+    'generation cache strips signed media URL query before persistence',
+    () async {
+      final preferences = SharedPreferencesAsync();
+      const signedOutputUrl =
+          'https://cdn.petmagic.test/generated.jpg?X-Amz-Signature=secret&token=raw#fragment';
+      final signedPreviewUrl =
+          'https://cdn.petmagic.test/generated-preview.jpg?signature=preview-secret';
+      final signedInputUrl =
+          'https://cdn.petmagic.test/input.jpg?X-Goog-Signature=input-secret';
+      final responseJson =
+          generationJson(
+              generationId: 'generation-signed',
+              status: 'completed',
+              updatedAtUtc: '2026-06-14T12:00:00Z',
+            )
+            ..['outputUrl'] = signedOutputUrl
+            ..['resultPreviewUrl'] = signedPreviewUrl
+            ..['sourceImageAsset'] = {
+              'url': signedInputUrl,
+              'fileName': 'input.jpg',
+              'contentType': 'image/jpeg',
+            };
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+        ..httpClientAdapter = FakeHttpClientAdapter((options) async {
+          expect(options.path, '/api/templates/generations');
+          return jsonResponse([responseJson]);
+        });
+      final repository = TemplateGenerationRepository(
+        dio: dio,
+        sessionStorage: TestSessionStorage(sessionFixture()),
+        preferences: preferences,
+      );
+
+      final live = await repository.fetchGenerations(status: 'completed');
+      final keys = await preferences.getKeys();
+      final cacheKey = keys.singleWhere(
+        (key) =>
+            key.startsWith('templates_generations_v1:') &&
+            key.endsWith(':completed'),
+      );
+      final raw = await preferences.getString(cacheKey);
+      final cached = await repository.readCachedGenerations(
+        status: 'completed',
+      );
+
+      expect(live.single.outputUrl, signedOutputUrl);
+      expect(cacheKey, isNot(contains('user-1')));
+      expect(
+        await preferences.getString(
+          'templates_generations_v1:user-1:completed',
+        ),
+        isNull,
+      );
+      expect(raw, isNotNull);
+      expect(raw, isNot(contains('user-1')));
+      expect(raw, isNot(contains('"userId"')));
+      expect(raw, isNot(contains('X-Amz-Signature')));
+      expect(raw, isNot(contains('token=raw')));
+      expect(raw, isNot(contains('preview-secret')));
+      expect(raw, isNot(contains('input-secret')));
+      expect(
+        cached?.single.outputUrl,
+        'https://cdn.petmagic.test/generated.jpg',
+      );
+      expect(cached?.single.userId, 'user-1');
+      expect(
+        cached?.single.resultPreviewUrl,
+        'https://cdn.petmagic.test/generated-preview.jpg',
+      );
+      expect(
+        cached?.single.sourceImageAsset?.url,
+        'https://cdn.petmagic.test/input.jpg',
+      );
+    },
+  );
+
+  test(
+    'fetchGenerationPage parses cursor page and caches first page',
+    () async {
+      final preferences = SharedPreferencesAsync();
+      final responseJson = {
+        'items': [
+          generationJson(
+            generationId: 'generation-page-1',
+            status: 'completed',
+            updatedAtUtc: '2026-06-14T12:00:00Z',
+          ),
+        ],
+        'nextCursor': 'cursor-2',
+        'hasMore': true,
+        'serverTimeUtc': '2026-07-02T12:00:00Z',
+        'unreadCount': 5,
+        'appliedFilter': 'completed',
+      };
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+        ..httpClientAdapter = FakeHttpClientAdapter((options) async {
+          expect(options.path, '/api/templates/generations');
+          expect(options.queryParameters['status'], 'completed');
+          expect(options.queryParameters['take'], 50);
+          return jsonResponse(responseJson);
+        });
+      final repository = TemplateGenerationRepository(
+        dio: dio,
+        sessionStorage: TestSessionStorage(sessionFixture()),
+        preferences: preferences,
+      );
+
+      final page = await repository.fetchGenerationPage(
+        status: 'completed',
+        take: 50,
+      );
+      final cached = await repository.readCachedGenerations(
+        status: 'completed',
+      );
+      final cachedUnread = await repository.readCachedUnreadGenerationCount();
+
+      expect(page.items.single.generationId, 'generation-page-1');
+      expect(page.nextCursor, 'cursor-2');
+      expect(page.hasMore, isTrue);
+      expect(page.unreadCount, 5);
+      expect(page.appliedFilter, 'completed');
+      expect(cached?.single.generationId, 'generation-page-1');
+      expect(cachedUnread, 5);
+    },
+  );
+
+  test('fetchGenerations clamps legacy offset pagination query', () async {
+    final preferences = SharedPreferencesAsync();
+    final requests = <RequestOptions>[];
+    final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+      ..httpClientAdapter = FakeHttpClientAdapter((options) async {
+        requests.add(options);
+        expect(options.path, '/api/templates/generations');
+        return jsonResponse([
+          generationJson(
+            generationId: 'generation-clamped',
+            status: 'completed',
+            updatedAtUtc: '2026-06-14T12:00:00Z',
+          ),
+        ]);
+      });
+    final repository = TemplateGenerationRepository(
+      dio: dio,
+      sessionStorage: TestSessionStorage(sessionFixture()),
+      preferences: preferences,
+    );
+
+    final items = await repository.fetchGenerations(
+      status: 'completed',
+      skip: -10,
+      take: 1000,
+    );
+
+    expect(items.single.generationId, 'generation-clamped');
+    expect(requests.single.queryParameters, {
+      'status': 'completed',
+      'skip': 0,
+      'take': 100,
+    });
+  });
+
+  test('fetchGenerationPage parses explicit gallery media state', () async {
+    final preferences = SharedPreferencesAsync();
+    final responseJson = {
+      'items': [
+        generationJson(
+            generationId: 'generation-explicit-media',
+            status: 'completed',
+            updatedAtUtc: '2026-06-14T12:00:00Z',
+          )
+          ..['media'] = {
+            'state': 'expired',
+            'mediaType': 'video',
+            'previewUrl': 'https://cdn.petmagic.test/preview.webp',
+            'resultUrl': null,
+            'resultExpiresAtUtc': null,
+            'durationSeconds': 4.5,
+            'hasWatermark': true,
+            'canRemoveWatermark': true,
+            'isWatermarkRemoved': false,
+            'canDownload': false,
+            'canShare': false,
+            'reasonCode': 'media_expired',
+            'userMessageKey': 'gallery.media.expired',
+            'retryAfterSeconds': null,
+          },
+      ],
+      'nextCursor': null,
+      'hasMore': false,
+      'serverTimeUtc': '2026-07-02T12:00:00Z',
+      'unreadCount': 1,
+      'appliedFilter': 'completed',
+    };
+    final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+      ..httpClientAdapter = FakeHttpClientAdapter((options) async {
+        expect(options.path, '/api/templates/generations');
+        return jsonResponse(responseJson);
+      });
+    final repository = TemplateGenerationRepository(
+      dio: dio,
+      sessionStorage: TestSessionStorage(sessionFixture()),
+      preferences: preferences,
+    );
+
+    final page = await repository.fetchGenerationPage(status: 'completed');
+    final item = page.items.single;
+    final cached = await repository.readCachedGenerations(status: 'completed');
+
+    expect(item.galleryMedia.state, GalleryMediaState.expired);
+    expect(item.galleryMedia.mediaType, 'video');
+    expect(
+      item.galleryMedia.previewUrl,
+      'https://cdn.petmagic.test/preview.webp',
+    );
+    expect(item.galleryMedia.canDownload, isFalse);
+    expect(item.galleryMedia.canShare, isFalse);
+    expect(item.userMediaExpired, isTrue);
+    expect(cached?.single.galleryMedia.state, GalleryMediaState.expired);
+    expect(cached?.single.galleryMedia.userMessageKey, 'gallery.media.expired');
+  });
+
   test('forwards pet photo cancel tokens to every HTTP request', () async {
     final tempDir = await Directory.systemTemp.createTemp(
       'petmagic-pet-photo-test-',

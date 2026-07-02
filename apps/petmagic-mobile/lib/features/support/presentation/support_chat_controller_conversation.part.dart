@@ -155,6 +155,18 @@ mixin _SupportChatControllerConversationMixin
       return;
     }
 
+    if (!_hasLoadedConversationSnapshot && state.conversation == null) {
+      unawaited(() async {
+        await initialize();
+        if (!ref.mounted) {
+          return;
+        }
+        await _resumeRealtimeIfNeeded();
+        _resumePendingRealtimeRefreshIfNeeded();
+      }());
+      return;
+    }
+
     unawaited(_resumeRealtimeIfNeeded());
     _resumePendingRealtimeRefreshIfNeeded();
   }
@@ -191,6 +203,27 @@ mixin _SupportChatControllerConversationMixin
   }
 
   Future<void> _loadConversation({required bool refresh}) async {
+    if (!_hasInternet) {
+      if (state.conversation == null) {
+        _updateStateIfMounted(
+          (state) => state.copyWith(
+            isLoading: false,
+            isRefreshing: false,
+            errorMessage: 'network.unavailable',
+          ),
+        );
+      } else {
+        _updateStateIfMounted(
+          (state) => state.copyWith(
+            isLoading: false,
+            isRefreshing: false,
+            clearError: true,
+          ),
+        );
+      }
+      return;
+    }
+
     final inFlight = _conversationLoadInFlight;
     if (inFlight != null) {
       await inFlight;
@@ -392,10 +425,11 @@ mixin _SupportChatControllerConversationMixin
       final existingById = {
         for (final message in conversation.messages) message.messageId: message,
       };
+      final newOlderMessages = chunk.messages
+          .where((message) => !existingById.containsKey(message.messageId))
+          .toList(growable: false);
       final merged = <SupportChatMessage>[
-        ...chunk.messages.where(
-          (message) => !existingById.containsKey(message.messageId),
-        ),
+        ...newOlderMessages,
         ...conversation.messages,
       ]..sort((a, b) => a.createdAtUtc.compareTo(b.createdAtUtc));
 
@@ -403,7 +437,8 @@ mixin _SupportChatControllerConversationMixin
         (state) => state.copyWith(
           isLoadingOlder: false,
           conversation: conversation.copyWith(
-            hasOlderMessages: chunk.hasOlderMessages,
+            hasOlderMessages:
+                chunk.hasOlderMessages && newOlderMessages.isNotEmpty,
             oldestLoadedMessageCreatedAtUtc:
                 chunk.oldestLoadedMessageCreatedAtUtc,
             messages: merged,
@@ -488,7 +523,8 @@ mixin _SupportChatControllerConversationMixin
       final nextConnect = _realtimeClient.connect();
       _realtimeConnectInFlight = nextConnect;
       await nextConnect;
-      if (!ref.mounted || !_started || !_isScreenVisible) {
+      if (!ref.mounted || !_started || !_isScreenVisible || !_hasInternet) {
+        unawaited(_realtimeClient.disconnect());
         _pauseRealtime();
         return;
       }

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
 
 part 'premium_stripe_checkout_page_helpers.part.dart';
@@ -20,7 +22,7 @@ class PremiumStripeCheckoutSubmitResult {
 typedef PremiumStripeCheckoutSubmit =
     Future<PremiumStripeCheckoutSubmitResult> Function();
 
-class PremiumStripeCheckoutPage extends StatefulWidget {
+class PremiumStripeCheckoutPage extends ConsumerStatefulWidget {
   const PremiumStripeCheckoutPage({
     super.key,
     required this.plan,
@@ -35,11 +37,12 @@ class PremiumStripeCheckoutPage extends StatefulWidget {
   final VoidCallback onChooseAnotherMethod;
 
   @override
-  State<PremiumStripeCheckoutPage> createState() =>
+  ConsumerState<PremiumStripeCheckoutPage> createState() =>
       _PremiumStripeCheckoutPageState();
 }
 
-class _PremiumStripeCheckoutPageState extends State<PremiumStripeCheckoutPage> {
+class _PremiumStripeCheckoutPageState
+    extends ConsumerState<PremiumStripeCheckoutPage> {
   bool _isSubmitting = false;
   PremiumStripeCheckoutSubmitResult? _result;
 
@@ -52,6 +55,10 @@ class _PremiumStripeCheckoutPageState extends State<PremiumStripeCheckoutPage> {
     ).format(widget.plan.priceAmount);
     final periodLabel = _planPeriodLabel(text, widget.plan);
     final planLabel = _planTitle(text, widget.plan);
+    final hasInternet = ref.watch(
+      networkStatusControllerProvider.select((status) => status.hasInternet),
+    );
+    final canSubmit = !_isSubmitting && hasInternet;
 
     return Scaffold(
       appBar: AppBar(
@@ -120,7 +127,7 @@ class _PremiumStripeCheckoutPageState extends State<PremiumStripeCheckoutPage> {
               height: 54,
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: _isSubmitting ? null : _submit,
+                onPressed: canSubmit ? _submit : null,
                 style: FilledButton.styleFrom(
                   backgroundColor: colors.accent,
                   shape: RoundedRectangleBorder(
@@ -154,7 +161,7 @@ class _PremiumStripeCheckoutPageState extends State<PremiumStripeCheckoutPage> {
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: _isSubmitting ? null : _submit,
+                      onPressed: canSubmit ? _submit : null,
                       child: Text(text.walletRetryAction),
                     ),
                   ),
@@ -181,6 +188,16 @@ class _PremiumStripeCheckoutPageState extends State<PremiumStripeCheckoutPage> {
 
   Future<void> _submit() async {
     if (_isSubmitting) {
+      return;
+    }
+
+    if (!ref.read(networkStatusControllerProvider).hasInternet) {
+      setState(() {
+        _result = PremiumStripeCheckoutSubmitResult(
+          status: PremiumStripeCheckoutActionStatus.failed,
+          message: AppLocalizations.of(context).globalOfflineBannerMessage,
+        );
+      });
       return;
     }
 

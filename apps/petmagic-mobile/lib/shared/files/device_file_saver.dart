@@ -173,8 +173,8 @@ Future<bool> saveBytesToDevice({
   }
 
   final tempFile = TempMediaCleanup.createScopedTempFile(safeFileName);
-  await tempFile.writeAsBytes(bytes, flush: true);
   try {
+    await tempFile.writeAsBytes(bytes, flush: true);
     final result = await SharePlus.instance.share(
       ShareParams(files: [XFile(tempFile.path, name: safeFileName)]),
     );

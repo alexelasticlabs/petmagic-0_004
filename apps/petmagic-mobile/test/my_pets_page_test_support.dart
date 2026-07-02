@@ -96,10 +96,11 @@ Future<void> pumpMyPets(
         appPermissionCoordinatorProvider.overrideWithValue(
           permissionCoordinator ?? FakeAppPermissionCoordinator(),
         ),
-        if (networkStatusController != null)
-          networkStatusControllerProvider.overrideWith(
-            () => networkStatusController,
-          ),
+        networkStatusControllerProvider.overrideWith(
+          () =>
+              networkStatusController ??
+              TestMyPetsNetworkStatusController(initialHasInternet: true),
+        ),
       ],
       child: MaterialApp.router(
         theme: AppTheme.light(),

@@ -862,36 +862,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get walletViewPremiumAction => 'View Premium';
 
   @override
-  String get walletWhatYouCanCreateTitle => 'Enough for approximately:';
-
-  @override
-  String walletApproxPhotos(Object count) {
-    return '$count photos';
+  String walletApproxGenerations(Object count) {
+    return '≈ $count generations at current template prices';
   }
 
   @override
-  String walletApproxVideos(Object count) {
-    return '$count videos';
+  String walletApproxGenerationRange(Object fromCount, Object toCount) {
+    return '≈ $fromCount-$toCount generations at current template prices';
   }
 
   @override
-  String walletApproxPhotosOnly(Object photos) {
-    return '≈ $photos';
-  }
+  String get walletApproxGenerationBelowOne =>
+      'Less than one generation at current template prices';
 
   @override
-  String walletApproxPhotosOrVideos(Object photos, Object videos) {
-    return '≈ $photos or $videos';
-  }
-
-  @override
-  String get walletSpendPhotoSubtitle => 'Photos\nfrom 10 Spark';
-
-  @override
-  String get walletSpendVideoSubtitle => 'Videos\nfrom 50 Spark';
-
-  @override
-  String get walletSpendPremiumSubtitle => 'Premium\nfrom 80 Spark';
+  String get walletGenerationPricingUnavailable =>
+      'Template prices are loading from PetMagic.';
 
   @override
   String get walletContactSupportAction => 'Contact support';
@@ -3683,6 +3669,35 @@ class AppLocalizationsEn extends AppLocalizations {
   String generationStatusShowMoreAction(Object hiddenCount) {
     return 'Show more ($hiddenCount) ▾';
   }
+
+  @override
+  String get generationStatusLoadMoreAction => 'Load more';
+
+  @override
+  String get generationStatusLoadMoreFailed => 'Could not load more results.';
+
+  @override
+  String get generationStatusMediaPreparingMessage => 'Preparing media...';
+
+  @override
+  String get generationStatusMediaPreviewOnlyMessage =>
+      'Preview is available while the final file is being prepared.';
+
+  @override
+  String get generationStatusMediaWatermarkPreparingMessage =>
+      'Preparing the clean version...';
+
+  @override
+  String get generationStatusMediaExpiredMessage => 'This media has expired.';
+
+  @override
+  String get generationStatusMediaUnavailableMessage => 'Media is unavailable.';
+
+  @override
+  String get generationStatusMediaFailedMessage => 'Media processing failed.';
+
+  @override
+  String get generationStatusMediaHiddenMessage => 'Media is hidden.';
 
   @override
   String get generationStatusCollapseAction => 'Collapse ▲';

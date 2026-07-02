@@ -1,5 +1,8 @@
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 
+const int minTemplatesQueryPageSize = 1;
+const int maxTemplatesQueryPageSize = 100;
+
 class TemplatesQuery {
   const TemplatesQuery({
     this.type,
@@ -44,8 +47,11 @@ class TemplatesQuery {
     type?.apiValue ?? 'all',
     category?.trim().toLowerCase() ?? 'all',
     search?.trim().toLowerCase() ?? '',
-    pageSize.toString(),
+    normalizedPageSize.toString(),
   ].join('|');
+
+  int get normalizedPageSize =>
+      pageSize.clamp(minTemplatesQueryPageSize, maxTemplatesQueryPageSize);
 
   Map<String, Object?> toQueryParameters() {
     return {
@@ -54,7 +60,7 @@ class TemplatesQuery {
         'category': category!.trim(),
       if (search != null && search!.trim().isNotEmpty) 'search': search!.trim(),
       if (cursor != null && cursor!.trim().isNotEmpty) 'cursor': cursor!.trim(),
-      'take': pageSize,
+      'take': normalizedPageSize,
     };
   }
 }

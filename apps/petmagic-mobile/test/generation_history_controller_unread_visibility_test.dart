@@ -19,7 +19,16 @@ void main() {
         stage: 'generating',
         progressPercent: 70,
       );
-      final repository = FakeTemplateGenerationRepository();
+      final completed = active.copyWith(
+        status: TemplateGenerationStatus.completed,
+        stage: 'finalizing',
+        progressPercent: 100,
+        outputUrl: 'https://cdn.petmagic.app/result.jpg',
+        completedAtUtc: DateTime.utc(2026, 6, 14, 12, 3),
+      );
+      final repository = FakeTemplateGenerationRepository(
+        remoteById: {'generation-active': completed},
+      );
       final realtimeClient = FakeRealtimeClient();
       final store = FakeGenerationGalleryStore()
         ..deletedGenerationIds.add('generation-active');
@@ -38,15 +47,7 @@ void main() {
       realtimeClient.emit(
         RealtimeEvent(
           topic: RealtimeTopics.templatesGenerationStatusChanged,
-          payload: generationFixturePayload(
-            active.copyWith(
-              status: TemplateGenerationStatus.completed,
-              stage: 'finalizing',
-              progressPercent: 100,
-              outputUrl: 'https://cdn.petmagic.app/result.jpg',
-              completedAtUtc: DateTime.utc(2026, 6, 14, 12, 3),
-            ),
-          ),
+          payload: generationRealtimePayload(generationId: 'generation-active'),
         ),
       );
       await Future<void>.delayed(Duration.zero);
@@ -91,14 +92,7 @@ void main() {
       realtimeClient.emit(
         RealtimeEvent(
           topic: RealtimeTopics.templatesGenerationStatusChanged,
-          payload: generationFixturePayload(
-            generationFixture(
-              generationId: 'generation-hidden',
-              status: TemplateGenerationStatus.completed,
-              outputUrl: 'https://cdn.petmagic.app/result.jpg',
-              completedAtUtc: DateTime.utc(2026, 6, 14, 12, 3),
-            ),
-          ),
+          payload: generationRealtimePayload(generationId: 'generation-hidden'),
         ),
       );
       await Future<void>.delayed(Duration.zero);
@@ -273,12 +267,7 @@ void main() {
       realtimeClient.emit(
         RealtimeEvent(
           topic: RealtimeTopics.templatesGenerationStatusChanged,
-          payload: generationFixturePayload(
-            ready.copyWith(
-              updatedAtUtc: ready.updatedAtUtc.add(const Duration(seconds: 2)),
-              isUnread: true,
-            ),
-          ),
+          payload: generationRealtimePayload(generationId: 'generation-ready'),
         ),
       );
       await Future<void>.delayed(Duration.zero);

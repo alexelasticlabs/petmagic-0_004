@@ -243,6 +243,7 @@ class _MessageMediaGroupTile extends StatelessWidget {
               else if (attachment.isImage)
                 CachedNetworkImage(
                   imageUrl: safeUri!.toString(),
+                  cacheKey: persistentSafeSupportMediaUrl(safeUri.toString()),
                   fit: BoxFit.cover,
                   memCacheWidth: 512,
                   placeholder: (context, url) {

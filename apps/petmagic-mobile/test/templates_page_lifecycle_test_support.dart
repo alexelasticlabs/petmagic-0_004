@@ -429,15 +429,19 @@ class RandomTemplatesRepository implements TemplatesRepository {
     this.templateDetailsById = const {},
     this.throwOnRandom = false,
     this.randomTemplateCompleter,
+    this.feedCompleter,
   });
 
   final List<TemplateItem> items;
   final Map<String, TemplateItem> templateDetailsById;
   final bool throwOnRandom;
   final Completer<TemplateItem?>? randomTemplateCompleter;
+  final Completer<TemplatesFeedPage>? feedCompleter;
   int readSyncedCatalogItemsCalls = 0;
   int fetchRandomTemplateCalls = 0;
+  int cancelPendingFeedRequestCalls = 0;
   int cancelPendingRandomTemplateRequestCalls = 0;
+  int cancelPendingMetadataRequestsCalls = 0;
   int fetchTemplateCalls = 0;
   TemplateRandomMode? lastRandomMode;
   String? lastRandomCategory;
@@ -463,11 +467,18 @@ class RandomTemplatesRepository implements TemplatesRepository {
 
   @override
   Future<TemplatesFeedPage> fetchFeed(TemplatesQuery query) async {
+    final delayedResult = feedCompleter;
+    if (delayedResult != null) {
+      return delayedResult.future;
+    }
+
     return TemplatesFeedPage(items: items, hasMore: false);
   }
 
   @override
-  void cancelPendingFeedRequest() {}
+  void cancelPendingFeedRequest() {
+    cancelPendingFeedRequestCalls++;
+  }
 
   @override
   void cancelPendingRandomTemplateRequest() {
@@ -475,7 +486,9 @@ class RandomTemplatesRepository implements TemplatesRepository {
   }
 
   @override
-  void cancelPendingMetadataRequests() {}
+  void cancelPendingMetadataRequests() {
+    cancelPendingMetadataRequestsCalls++;
+  }
 
   @override
   Future<TemplateItem> fetchTemplate(

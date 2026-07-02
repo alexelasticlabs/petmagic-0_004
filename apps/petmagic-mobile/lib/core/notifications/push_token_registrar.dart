@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/notifications/push_token_registration_cache.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
@@ -26,6 +28,7 @@ final class PushTokenRegistrar {
   static final Map<String, Future<bool>> _inFlightUnregistrations =
       <String, Future<bool>>{};
   static String? _lastCompletedRegistrationKey;
+  static String? _lastCompletedRegistrationToken;
 
   final TemplateGenerationRepository _templateRepository;
   final SupportChatRepository _supportRepository;
@@ -99,13 +102,14 @@ final class PushTokenRegistrar {
 
   Future<void> invalidatePersistedToken(String token) async {
     _invalidateTokenInMemory(token);
-    await _registrationCache.clearLastCompletedRegistrationKeyForToken(token);
+    await _registrationCache.clear();
   }
 
   static Future<void> clearRegistrationState({
     PushTokenRegistrationCache? registrationCache,
   }) async {
     _lastCompletedRegistrationKey = null;
+    _lastCompletedRegistrationToken = null;
     _inFlightRegistrations.clear();
     _inFlightUnregistrations.clear();
     await (registrationCache ?? SharedPreferencesPushTokenRegistrationCache())
@@ -144,18 +148,7 @@ final class PushTokenRegistrar {
   }
 
   Future<String?> readRegisteredToken() async {
-    final registrationKey = await _readLastCompletedRegistrationKey();
-    if (registrationKey == null || registrationKey.isEmpty) {
-      return null;
-    }
-
-    final separatorIndex = registrationKey.indexOf('|');
-    if (separatorIndex <= 0) {
-      return null;
-    }
-
-    final token = registrationKey.substring(0, separatorIndex).trim();
-    return token.isEmpty ? null : token;
+    return _nonEmpty(_lastCompletedRegistrationToken);
   }
 
   static void _invalidateTokenInMemory(String token) {
@@ -164,13 +157,12 @@ final class PushTokenRegistrar {
       return;
     }
 
-    final currentKey = _lastCompletedRegistrationKey;
-    if (currentKey != null && currentKey.startsWith('$normalizedToken|')) {
+    if (_lastCompletedRegistrationToken == normalizedToken) {
+      final currentKey = _lastCompletedRegistrationKey;
       _lastCompletedRegistrationKey = null;
+      _lastCompletedRegistrationToken = null;
+      _inFlightRegistrations.removeWhere((key, _) => key == currentKey);
     }
-    _inFlightRegistrations.removeWhere(
-      (key, _) => key.startsWith('$normalizedToken|'),
-    );
     _inFlightUnregistrations.remove(normalizedToken);
   }
 
@@ -238,6 +230,7 @@ final class PushTokenRegistrar {
     }
 
     _lastCompletedRegistrationKey = registrationKey;
+    _lastCompletedRegistrationToken = token;
     await _registrationCache.writeLastCompletedRegistrationKey(registrationKey);
     return true;
   }
@@ -297,14 +290,15 @@ final class PushTokenRegistrar {
     String? appVersion,
     String? deviceId,
   }) {
-    return [
+    final payload = jsonEncode([
       token,
       accountScope,
       platform.trim(),
       locale.trim(),
       _nonEmpty(appVersion) ?? AppConfig.appVersion,
       _nonEmpty(deviceId) ?? '',
-    ].join('|');
+    ]);
+    return '$pushTokenRegistrationFingerprintPrefix${sha256.convert(utf8.encode(payload))}';
   }
 
   static String _normalizePlatform(String platform) {

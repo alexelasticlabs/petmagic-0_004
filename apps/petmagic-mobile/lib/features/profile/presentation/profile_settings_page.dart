@@ -92,7 +92,8 @@ class ProfileSettingsPage extends ConsumerWidget {
         }
 
         context.push(
-          '${PasswordChangePage.routePath}?email=${Uri.encodeComponent(email)}',
+          PasswordChangePage.routePath,
+          extra: PasswordChangeRouteArgs(email: email),
         );
       },
       onOpenNotifications: () => context.push(

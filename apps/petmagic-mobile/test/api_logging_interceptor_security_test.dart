@@ -36,7 +36,9 @@ void main() {
     expect(source, contains('_isSensitiveFieldName'));
     expect(source, contains("'password'"));
     expect(source, contains("'token'"));
+    expect(source, contains("'jwt'"));
     expect(source, contains("'secret'"));
+    expect(source, contains("'credential'"));
     expect(source, contains("'authorization'"));
     expect(source, contains("'email'"));
     expect(source, contains("'phone'"));
@@ -63,6 +65,30 @@ void main() {
         source,
         isNot(contains("_problemString(response?.data, 'detail')")),
       );
+    },
+  );
+
+  test(
+    'API logging uses RequestIdentity secure default unless random is injected',
+    () {
+      final source = File(
+        'lib/core/network/api_logging_interceptor.dart',
+      ).readAsStringSync();
+
+      expect(
+        source,
+        contains('ApiLoggingInterceptor({Random? random}) : _random = random;'),
+      );
+      expect(source, contains('final Random? _random;'));
+      expect(
+        source,
+        contains('RequestIdentity.createRequestId(random: _random)'),
+      );
+      expect(
+        source,
+        contains('RequestIdentity.createCorrelationId(random: _random)'),
+      );
+      expect(source, isNot(contains('random ?? Random()')));
     },
   );
 }

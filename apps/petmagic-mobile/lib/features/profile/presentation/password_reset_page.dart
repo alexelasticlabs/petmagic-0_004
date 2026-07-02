@@ -20,6 +20,12 @@ class PasswordResetPage extends ConsumerStatefulWidget {
   ConsumerState<PasswordResetPage> createState() => _PasswordResetPageState();
 }
 
+class PasswordResetRouteArgs {
+  const PasswordResetRouteArgs({this.initialEmail});
+
+  final String? initialEmail;
+}
+
 class _PasswordResetPageState extends ConsumerState<PasswordResetPage> {
   final _emailController = TextEditingController();
   final _codeController = TextEditingController();
@@ -335,10 +341,10 @@ class _PasswordResetPageState extends ConsumerState<PasswordResetPage> {
 
   void _goToAuth() {
     final email = ref.read(passwordResetControllerProvider).email.trim();
-    final query = email.isEmpty
-        ? ''
-        : '?email=${Uri.encodeQueryComponent(email)}';
-    _router?.go('${AuthEntryPage.routePath}$query');
+    _router?.go(
+      AuthEntryPage.routePath,
+      extra: email.isEmpty ? null : AuthEntryRouteArgs(initialEmail: email),
+    );
   }
 
   void _syncControllers(PasswordResetState state) {

@@ -21,6 +21,8 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
     }
 
     _isLoadInFlight = true;
+    final loadEpoch = ++_loadEpoch;
+    _cancelActiveLoadMore('generation_history_initial_load_started');
     try {
       await _resumeRealtimeIfNeeded();
       if (!ref.mounted) {
@@ -48,6 +50,9 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
           filter: nextFilter,
           items: localizedCachedItems,
           isLoading: false,
+          clearNextCursor: true,
+          hasMore: false,
+          clearLoadMoreError: true,
           clearError: true,
         );
         return;
@@ -76,7 +81,11 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
         items: localizedSeedItems,
         filter: nextFilter,
         isLoading: true,
+        isLoadingMore: false,
         syncFailed: false,
+        clearNextCursor: true,
+        hasMore: false,
+        clearLoadMoreError: true,
         clearError: true,
       );
 
@@ -109,26 +118,27 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
           return;
         }
 
-        final remoteItems = await _repository.fetchGenerations(
+        final page = await _repository.fetchGenerationPage(
           status: nextFilter.apiStatus,
           take: 50,
           cancelToken: loadCancelToken,
         );
+        final remoteItems = page.items;
         final items = _decorateWithLocalMedia(
           remoteItems,
           deletedGenerationIds,
           localReadyRecords,
         );
-        final unreadCount = await _fetchUnreadGenerationCountBestEffort(
-          loadCancelToken,
-        );
+        final unreadCount = page.serverTimeUtc == null
+            ? await _fetchUnreadGenerationCountBestEffort(loadCancelToken)
+            : page.unreadCount;
         _reconcileLocallyReadIds(remoteItems);
         _locallyDeletedUnreadGenerationIds =
             await _loadDeletedUnreadGenerationIds(
               deletedGenerationIds: deletedGenerationIds,
               remoteItems: remoteItems,
             );
-        if (!ref.mounted) {
+        if (!ref.mounted || loadEpoch != _loadEpoch) {
           return;
         }
 
@@ -139,7 +149,9 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
           return;
         }
 
-        if (loadCancelToken.isCancelled) {
+        if (loadCancelToken.isCancelled ||
+            nextFilter != state.filter ||
+            loadEpoch != _loadEpoch) {
           _completeCancelledLoad();
           return;
         }
@@ -153,9 +165,14 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
           items: items,
           unreadCount: visibleUnreadCount,
           isLoading: false,
+          isLoadingMore: false,
           syncFailed: false,
           showOfflineBanner: wasOfflineBeforeLoad && items.isNotEmpty,
           isConnectionRecovered: wasOfflineBeforeLoad && items.isNotEmpty,
+          nextCursor: page.nextCursor,
+          clearNextCursor: page.nextCursor == null,
+          hasMore: page.hasMore,
+          clearLoadMoreError: true,
           lastSyncedAtUtc: nowUtc,
           cachedItemsByFilter: updatedCache,
           clearError: true,
@@ -195,6 +212,108 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
       _clearActiveLoadCancelToken();
       _isLoadInFlight = false;
       _drainPendingLoad();
+    }
+  }
+
+  @override
+  Future<void> _loadMore() async {
+    if (!ref.mounted ||
+        !_isScreenVisible ||
+        _isLoadInFlight ||
+        _isLoadMoreInFlight ||
+        state.isLoading ||
+        !state.hasMore ||
+        state.nextCursor == null) {
+      return;
+    }
+
+    _isLoadMoreInFlight = true;
+    final requestFilter = state.filter;
+    final requestCursor = state.nextCursor!;
+    final requestEpoch = _loadEpoch;
+    final loadCancelToken = _startLoadMoreCancelToken();
+    state = state.copyWith(isLoadingMore: true, clearLoadMoreError: true);
+
+    try {
+      final deletedGenerationIds = await _galleryStore
+          .loadDeletedGenerationIds();
+      final localReadyRecords = await _galleryStore.loadLocalReadyItems();
+      _locallyDeletedGenerationIds = Set<String>.from(deletedGenerationIds);
+
+      if (!ref.mounted || loadCancelToken.isCancelled) {
+        return;
+      }
+
+      final page = await _repository.fetchGenerationPage(
+        status: requestFilter.apiStatus,
+        cursor: requestCursor,
+        take: 50,
+        cancelToken: loadCancelToken,
+      );
+      if (!ref.mounted ||
+          loadCancelToken.isCancelled ||
+          requestEpoch != _loadEpoch ||
+          requestFilter != state.filter ||
+          requestCursor != state.nextCursor) {
+        return;
+      }
+
+      final decoratedItems = _decorateWithLocalMedia(
+        page.items,
+        deletedGenerationIds,
+        localReadyRecords,
+      );
+      final mergedItems = _appendUniqueGenerationItems(
+        state.items,
+        decoratedItems,
+      );
+      _reconcileLocallyReadIds(page.items);
+      final updatedCache =
+          Map<GenerationHistoryFilter, List<TemplateGenerationResult>>.from(
+            state.cachedItemsByFilter,
+          )..[requestFilter] = mergedItems;
+      final visibleUnreadCount = page.serverTimeUtc == null
+          ? state.unreadCount
+          : _visibleUnreadCount(page.unreadCount);
+      final hasAdvancedCursor =
+          page.nextCursor != null && page.nextCursor != requestCursor;
+      final hasMore = page.hasMore && hasAdvancedCursor;
+
+      state = state.copyWith(
+        items: mergedItems,
+        unreadCount: visibleUnreadCount,
+        isLoadingMore: false,
+        syncFailed: false,
+        nextCursor: hasMore ? page.nextCursor : null,
+        clearNextCursor: !hasMore,
+        hasMore: hasMore,
+        cachedItemsByFilter: updatedCache,
+        clearLoadMoreError: true,
+      );
+      unawaited(_syncCompletedMedia(decoratedItems));
+    } catch (error) {
+      if (_isCancelledRequest(error) || loadCancelToken.isCancelled) {
+        return;
+      }
+      if (!ref.mounted ||
+          requestEpoch != _loadEpoch ||
+          requestFilter != state.filter ||
+          requestCursor != state.nextCursor) {
+        return;
+      }
+
+      state = state.copyWith(
+        isLoadingMore: false,
+        loadMoreError: _historyLoadErrorMessage(error),
+      );
+    } finally {
+      if (identical(_activeLoadMoreCancelToken, loadCancelToken)) {
+        _clearActiveLoadMoreCancelToken();
+      }
+      _isLoadMoreInFlight = false;
+      if (ref.mounted && state.isLoadingMore) {
+        state = state.copyWith(isLoadingMore: false);
+      }
     }
   }
 
@@ -345,6 +464,14 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
     }
 
     final decoratedGeneration = decoratedItems.single;
+    final currentGeneration = _findGeneration(decoratedGeneration.generationId);
+    if (currentGeneration != null &&
+        decoratedGeneration.updatedAtUtc.isBefore(
+          currentGeneration.updatedAtUtc,
+        )) {
+      return;
+    }
+
     _upsertGeneration(decoratedGeneration);
     unawaited(_repository.upsertCachedGeneration(decoratedGeneration));
     if (decoratedGeneration.isCompleted) {
@@ -393,6 +520,7 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
 
       final localRecord = await _galleryStore.materializeGenerationMedia(
         generation,
+        background: true,
       );
       if (!ref.mounted ||
           !_isScreenVisible ||
@@ -430,4 +558,20 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
       cachedItemsByFilter: updatedCache,
     );
   }
+}
+
+List<TemplateGenerationResult> _appendUniqueGenerationItems(
+  List<TemplateGenerationResult> current,
+  List<TemplateGenerationResult> nextPage,
+) {
+  if (nextPage.isEmpty) {
+    return current;
+  }
+
+  final seenIds = current.map((item) => item.generationId).toSet();
+  return [
+    ...current,
+    for (final item in nextPage)
+      if (seenIds.add(item.generationId)) item,
+  ];
 }

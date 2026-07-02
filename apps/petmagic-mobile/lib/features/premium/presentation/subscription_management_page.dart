@@ -5,7 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
@@ -15,6 +18,7 @@ import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_requi
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_unavailable_view.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -64,41 +68,90 @@ class _SubscriptionManagementPageState
     }
 
     final summaryAsync = ref.watch(premiumSubscriptionSummaryProvider);
+    final hasInternet = ref.watch(
+      networkStatusControllerProvider.select((status) => status.hasInternet),
+    );
+    final showOfflineUnavailable = summaryAsync.asData == null && !hasInternet;
+    final unavailableKind = classifyAppUnavailable(
+      raw: _subscriptionManagementErrorMessage(summaryAsync.asError?.error),
+      hasInternet: hasInternet,
+    );
+
+    ref.listen<NetworkStatusState>(networkStatusControllerProvider, (
+      previous,
+      next,
+    ) {
+      if (previous?.hasInternet != false || !next.hasInternet) {
+        return;
+      }
+
+      final currentSummary = ref.read(premiumSubscriptionSummaryProvider);
+      if (classifyAppUnavailable(
+            raw: _subscriptionManagementErrorMessage(
+              currentSummary.asError?.error,
+            ),
+            hasInternet: next.hasInternet,
+          ) ==
+          null) {
+        return;
+      }
+
+      ref.invalidate(premiumSubscriptionSummaryProvider);
+    });
 
     return Scaffold(
       appBar: AppBar(title: Text(text.profileSubscriptionTitle)),
       body: SafeArea(
-        child: summaryAsync.when(
-          loading: () =>
-              const Center(child: CircularProgressIndicator.adaptive()),
-          error: (_, _) => Center(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(text.premiumManageFailed, textAlign: TextAlign.center),
-                  const SizedBox(height: 14),
-                  FilledButton.icon(
-                    onPressed: () =>
-                        ref.invalidate(premiumSubscriptionSummaryProvider),
-                    icon: const Icon(Icons.refresh_rounded),
-                    label: Text(text.retryAction),
-                  ),
-                ],
+        child: showOfflineUnavailable
+            ? PetMagicUnavailableView(
+                kind: AppUnavailableKind.offline,
+                onRetry: () =>
+                    ref.invalidate(premiumSubscriptionSummaryProvider),
+                padding: const EdgeInsets.all(20),
+              )
+            : summaryAsync.when(
+                loading: () =>
+                    const Center(child: CircularProgressIndicator.adaptive()),
+                error: (_, _) => unavailableKind != null
+                    ? PetMagicUnavailableView(
+                        kind: unavailableKind,
+                        onRetry: () =>
+                            ref.invalidate(premiumSubscriptionSummaryProvider),
+                        padding: const EdgeInsets.all(20),
+                      )
+                    : Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                text.premiumManageFailed,
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 14),
+                              FilledButton.icon(
+                                onPressed: () => ref.invalidate(
+                                  premiumSubscriptionSummaryProvider,
+                                ),
+                                icon: const Icon(Icons.refresh_rounded),
+                                label: Text(text.retryAction),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                data: (summary) => _SubscriptionContent(
+                  summary: summary,
+                  isProcessing: _isProcessing,
+                  onManage: () =>
+                      _openManageTarget(summary.manageSubscriptionAction),
+                  onRestore: _restorePurchases,
+                  onChangePayment: () =>
+                      _openManageTarget(summary.manageSubscriptionAction),
+                  onCancel: _cancelAtPeriodEnd,
+                ),
               ),
-            ),
-          ),
-          data: (summary) => _SubscriptionContent(
-            summary: summary,
-            isProcessing: _isProcessing,
-            onManage: () => _openManageTarget(summary.manageSubscriptionAction),
-            onRestore: _restorePurchases,
-            onChangePayment: () =>
-                _openManageTarget(summary.manageSubscriptionAction),
-            onCancel: _cancelAtPeriodEnd,
-          ),
-        ),
       ),
     );
   }
@@ -306,4 +359,22 @@ class _SubscriptionManagementPageState
       stackTrace: stackTrace,
     );
   }
+}
+
+String? _subscriptionManagementErrorMessage(Object? error) {
+  if (error == null) {
+    return null;
+  }
+
+  if (error is AppException) {
+    final message = error.message.trim();
+    return message.isEmpty ? 'premium.request_failed' : message;
+  }
+
+  if (error is String) {
+    final message = error.trim();
+    return message.isEmpty ? 'premium.request_failed' : message;
+  }
+
+  return null;
 }

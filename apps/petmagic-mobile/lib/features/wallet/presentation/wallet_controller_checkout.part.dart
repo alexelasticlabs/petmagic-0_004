@@ -11,6 +11,7 @@ mixin _WalletControllerCheckout
       return null;
     }
 
+    String? durableStorePendingOrderId;
     if (!paymentMethod.isEnabled) {
       _updateStateIfMounted(
         (state) => state.copyWith(errorMessage: 'wallet.payment_unavailable'),
@@ -62,6 +63,25 @@ mixin _WalletControllerCheckout
           );
           return null;
         }
+
+        final durablePending = await _repository.readPendingStorePurchase();
+        if (!ref.mounted) {
+          return null;
+        }
+        if (durablePending != null) {
+          _updateStateIfMounted(
+            (state) => state.copyWith(
+              isBuying: false,
+              pendingCheckoutOrderId: durablePending.orderId,
+              pendingStoreProvider: durablePending.provider,
+              checkoutVerificationState:
+                  WalletCheckoutVerificationState.pending,
+              clearCheckoutError: true,
+            ),
+          );
+          unawaited(_recoverPendingStorePurchase(requestStoreRestore: true));
+          return null;
+        }
       }
 
       final checkout = await _repository.createPurchase(
@@ -74,6 +94,21 @@ mixin _WalletControllerCheckout
       }
 
       if (paymentMethod.isStoreNative) {
+        final productId = pack.productIdForProvider(paymentMethod.provider)!;
+        final pendingPurchase = PendingStoreWalletPurchase(
+          orderId: checkout.orderId,
+          provider: paymentMethod.provider,
+          productId: productId,
+          packId: pack.packId,
+          packCode: pack.code,
+          createdAtUtc: DateTime.now().toUtc(),
+        );
+        await _repository.savePendingStorePurchase(pendingPurchase);
+        durableStorePendingOrderId = checkout.orderId;
+        if (!ref.mounted) {
+          return null;
+        }
+
         _updateStateIfMounted(
           (state) => state.copyWith(
             pendingCheckoutOrderId: checkout.orderId,
@@ -157,6 +192,11 @@ mixin _WalletControllerCheckout
       );
       return checkout;
     } catch (error) {
+      if (durableStorePendingOrderId != null) {
+        await _repository.clearPendingStorePurchase(
+          orderId: durableStorePendingOrderId,
+        );
+      }
       AppLogger.error(
         feature: 'Wallet.Checkout',
         operation: 'checkout_failed',
@@ -410,7 +450,9 @@ mixin _WalletControllerCheckout
     );
 
     const maxAttempts = 5;
-    final normalizedReference = stripeReferenceId?.trim();
+    final normalizedReference = _normalizeStripeCheckoutReferenceId(
+      stripeReferenceId,
+    );
 
     for (var attempt = 0; attempt < maxAttempts; attempt++) {
       if (!ref.mounted) {
@@ -496,6 +538,15 @@ mixin _WalletControllerCheckout
   }
 
   @override
+  Future<void> restoreStorePurchases() async {
+    if (!_hasAuthenticatedWalletSession()) {
+      return;
+    }
+
+    await _recoverPendingStorePurchase(requestStoreRestore: true);
+  }
+
+  @override
   Future<void> _handlePurchaseUpdates(List<PurchaseDetails> purchases) async {
     for (final purchase in purchases) {
       if (!ref.mounted) {
@@ -549,42 +600,59 @@ mixin _WalletControllerCheckout
   }
 
   Future<void> _verifyStorePurchase(PurchaseDetails purchase) async {
-    final pendingOrderId = state.pendingCheckoutOrderId;
-    final provider = state.pendingStoreProvider;
-    if (pendingOrderId == null ||
-        pendingOrderId.isEmpty ||
-        provider == null ||
-        provider.isEmpty) {
-      if (purchase.pendingCompletePurchase) {
-        await _repository.completePurchase(purchase);
-      }
+    final durablePending = await _repository.readPendingStorePurchase();
+    if (!ref.mounted) {
       return;
     }
-
-    WalletPaymentMethodModel? paymentMethod;
-    for (final method in state.paymentMethods) {
-      if (method.provider == provider) {
-        paymentMethod = method;
-        break;
-      }
-    }
-
-    if (paymentMethod == null) {
-      if (purchase.pendingCompletePurchase) {
-        await _repository.completePurchase(purchase);
-        if (!ref.mounted) {
-          return;
-        }
-      }
+    final provider = _providerForStorePurchase(purchase, durablePending);
+    if (provider == null || provider.isEmpty) {
       _updateStateIfMounted(
         (state) => state.copyWith(
           isBuying: false,
-          checkoutVerificationState: WalletCheckoutVerificationState.error,
+          checkoutVerificationState: WalletCheckoutVerificationState.pending,
           checkoutErrorMessage: 'wallet.payment_unavailable',
           errorMessage: 'wallet.payment_unavailable',
         ),
       );
       return;
+    }
+
+    final pendingOrderId = _pendingOrderIdForStorePurchase(
+      purchase,
+      durablePending,
+    );
+
+    final paymentMethod = _paymentMethodForProvider(provider);
+
+    if ((pendingOrderId == null || pendingOrderId.isEmpty) &&
+        durablePending != null) {
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          pendingCheckoutOrderId: durablePending.orderId,
+          pendingStoreProvider: durablePending.provider,
+          isBuying: false,
+          checkoutVerificationState: WalletCheckoutVerificationState.pending,
+          clearCheckoutError: true,
+        ),
+      );
+    }
+
+    final verificationKey = _storePurchaseVerificationKey(
+      orderId: pendingOrderId ?? 'recover',
+      provider: provider,
+      purchase: purchase,
+    );
+    if (verificationKey != null) {
+      if (_storePurchaseVerifiedKeys.contains(verificationKey)) {
+        if (purchase.pendingCompletePurchase) {
+          await _repository.completePurchase(purchase);
+        }
+        return;
+      }
+
+      if (!_storePurchaseVerificationInFlightKeys.add(verificationKey)) {
+        return;
+      }
     }
 
     try {
@@ -595,31 +663,87 @@ mixin _WalletControllerCheckout
         ),
       );
 
-      final verified = await _repository.verifyStorePurchase(
-        orderId: pendingOrderId,
-        paymentMethod: paymentMethod,
+      if (pendingOrderId != null &&
+          pendingOrderId.isNotEmpty &&
+          paymentMethod != null) {
+        final verified = await _repository.verifyStorePurchase(
+          orderId: pendingOrderId,
+          paymentMethod: paymentMethod,
+          purchase: purchase,
+        );
+        if (!ref.mounted) {
+          return;
+        }
+        if (verified.status == 'succeeded') {
+          if (verificationKey != null) {
+            _rememberStorePurchaseVerifiedKey(verificationKey);
+          }
+          if (purchase.pendingCompletePurchase) {
+            await _repository.completePurchase(purchase);
+            if (!ref.mounted) {
+              return;
+            }
+          }
+          await _repository.clearPendingStorePurchase(orderId: pendingOrderId);
+          if (!ref.mounted) {
+            return;
+          }
+          await load(refresh: true);
+          _updateStateIfMounted(
+            (state) => state.copyWith(
+              isBuying: false,
+              checkoutVerificationState:
+                  WalletCheckoutVerificationState.succeeded,
+              checkoutGrantedSpark: verified.sparkToGrant,
+              highlightedPurchaseOrderId: verified.orderId,
+              clearPendingCheckout: true,
+              clearPendingStoreProvider: true,
+              clearCheckoutError: true,
+            ),
+          );
+          return;
+        }
+
+        _updateStateIfMounted(
+          (state) => state.copyWith(
+            isBuying: false,
+            checkoutVerificationState: WalletCheckoutVerificationState.pending,
+            clearCheckoutError: true,
+          ),
+        );
+        await verifyCheckoutStatus();
+        return;
+      }
+
+      final validation = await _repository.validateStorePurchase(
+        provider: provider,
         purchase: purchase,
       );
       if (!ref.mounted) {
         return;
       }
-
-      if (purchase.pendingCompletePurchase) {
-        await _repository.completePurchase(purchase);
+      if (validation.isSettledTokenPack) {
+        if (verificationKey != null) {
+          _rememberStorePurchaseVerifiedKey(verificationKey);
+        }
+        if (purchase.pendingCompletePurchase) {
+          await _repository.completePurchase(purchase);
+          if (!ref.mounted) {
+            return;
+          }
+        }
+        await _repository.clearPendingStorePurchase(orderId: pendingOrderId);
         if (!ref.mounted) {
           return;
         }
-      }
-
-      if (verified.status == 'succeeded') {
         await load(refresh: true);
         _updateStateIfMounted(
           (state) => state.copyWith(
             isBuying: false,
             checkoutVerificationState:
                 WalletCheckoutVerificationState.succeeded,
-            checkoutGrantedSpark: verified.sparkToGrant,
-            highlightedPurchaseOrderId: verified.orderId,
+            checkoutGrantedSpark: validation.tokenAmount,
+            highlightedPurchaseOrderId: pendingOrderId,
             clearPendingCheckout: true,
             clearPendingStoreProvider: true,
             clearCheckoutError: true,
@@ -635,14 +759,7 @@ mixin _WalletControllerCheckout
           clearCheckoutError: true,
         ),
       );
-      await verifyCheckoutStatus();
     } catch (error) {
-      if (purchase.pendingCompletePurchase) {
-        await _repository.completePurchase(purchase);
-        if (!ref.mounted) {
-          return;
-        }
-      }
       _updateStateIfMounted(
         (state) => state.copyWith(
           isBuying: false,
@@ -651,6 +768,181 @@ mixin _WalletControllerCheckout
           errorMessage: _errorMessage(error),
         ),
       );
+    } finally {
+      if (verificationKey != null) {
+        _storePurchaseVerificationInFlightKeys.remove(verificationKey);
+      }
+    }
+  }
+
+  @override
+  Future<void> _recoverPendingStorePurchase({
+    required bool requestStoreRestore,
+  }) async {
+    final inFlight = _storePurchaseRecoveryInFlight;
+    if (inFlight != null) {
+      await inFlight;
+      return;
+    }
+
+    final operation = _performPendingStorePurchaseRecovery(
+      requestStoreRestore: requestStoreRestore,
+    );
+    _storePurchaseRecoveryInFlight = operation;
+    try {
+      await operation;
+    } finally {
+      if (identical(_storePurchaseRecoveryInFlight, operation)) {
+        _storePurchaseRecoveryInFlight = null;
+      }
+    }
+  }
+
+  Future<void> _performPendingStorePurchaseRecovery({
+    required bool requestStoreRestore,
+  }) async {
+    if (!_hasAuthenticatedWalletSession() ||
+        !ref.read(networkStatusControllerProvider).hasInternet) {
+      return;
+    }
+
+    final pending = await _repository.readPendingStorePurchase();
+    if (!ref.mounted || pending == null) {
+      return;
+    }
+
+    _updateStateIfMounted(
+      (state) => state.copyWith(
+        pendingCheckoutOrderId: pending.orderId,
+        pendingStoreProvider: pending.provider,
+        checkoutVerificationState: WalletCheckoutVerificationState.pending,
+        clearCheckoutError: true,
+      ),
+    );
+
+    if (!requestStoreRestore || _storePurchaseRestoreRequestedThisSession) {
+      return;
+    }
+
+    try {
+      await _repository.restoreStorePurchases();
+      _storePurchaseRestoreRequestedThisSession = true;
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Wallet.Checkout',
+        operation: 'store_purchase_restore_failed',
+        message: 'Store purchase restore failed during wallet recovery',
+        context: {
+          'provider': pending.provider,
+          'order_id': pending.orderId,
+          'product_id': pending.productId,
+        },
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  String? _pendingOrderIdForStorePurchase(
+    PurchaseDetails purchase,
+    PendingStoreWalletPurchase? durablePending,
+  ) {
+    final stateOrderId = state.pendingCheckoutOrderId?.trim();
+    if (stateOrderId != null && stateOrderId.isNotEmpty) {
+      return stateOrderId;
+    }
+
+    if (durablePending == null) {
+      return null;
+    }
+
+    final pendingProductId = durablePending.productId.trim();
+    if (pendingProductId.isNotEmpty && pendingProductId != purchase.productID) {
+      return null;
+    }
+
+    final orderId = durablePending.orderId.trim();
+    return orderId.isEmpty ? null : orderId;
+  }
+
+  String? _providerForStorePurchase(
+    PurchaseDetails purchase,
+    PendingStoreWalletPurchase? durablePending,
+  ) {
+    if (durablePending != null) {
+      final pendingProductId = durablePending.productId.trim();
+      final pendingProvider = durablePending.provider.trim();
+      if (pendingProvider.isNotEmpty &&
+          (pendingProductId.isEmpty ||
+              pendingProductId == purchase.productID)) {
+        return pendingProvider;
+      }
+    }
+
+    final stateProvider = state.pendingStoreProvider?.trim();
+    if (stateProvider != null && stateProvider.isNotEmpty) {
+      return stateProvider;
+    }
+
+    for (final method in state.paymentMethods) {
+      if (!method.isStoreNative) {
+        continue;
+      }
+
+      final hasMatchingPack = state.packs.any((pack) {
+        return pack.productIdForProvider(method.provider) == purchase.productID;
+      });
+      if (hasMatchingPack) {
+        return method.provider;
+      }
+    }
+
+    final source = purchase.verificationData.source.toLowerCase();
+    if (source.contains('google')) {
+      return 'google_play';
+    }
+    if (source.contains('app_store') ||
+        source.contains('storekit') ||
+        source.contains('sk_payment_queue')) {
+      return 'app_store';
+    }
+
+    return null;
+  }
+
+  WalletPaymentMethodModel? _paymentMethodForProvider(String provider) {
+    final normalized = provider.trim().toLowerCase();
+    for (final method in state.paymentMethods) {
+      if (method.provider.trim().toLowerCase() == normalized) {
+        return method;
+      }
+    }
+    return null;
+  }
+
+  String? _storePurchaseVerificationKey({
+    required String orderId,
+    required String provider,
+    required PurchaseDetails purchase,
+  }) {
+    final purchaseId = purchase.purchaseID?.trim();
+    if (purchaseId != null && purchaseId.isNotEmpty) {
+      return '$orderId:$provider:${purchase.productID}:purchase:$purchaseId';
+    }
+
+    final transactionDate = purchase.transactionDate?.trim();
+    if (transactionDate != null && transactionDate.isNotEmpty) {
+      return '$orderId:$provider:${purchase.productID}:transaction:$transactionDate';
+    }
+
+    return null;
+  }
+
+  void _rememberStorePurchaseVerifiedKey(String verificationKey) {
+    _storePurchaseVerifiedKeys.add(verificationKey);
+    while (_storePurchaseVerifiedKeys.length >
+        _WalletControllerBase._maxStorePurchaseVerificationKeys) {
+      _storePurchaseVerifiedKeys.remove(_storePurchaseVerifiedKeys.first);
     }
   }
 }

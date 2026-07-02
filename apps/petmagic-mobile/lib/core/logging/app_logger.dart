@@ -311,6 +311,10 @@ class AppLogger {
 
     return normalizedKey.contains('authorization') ||
         normalizedKey.contains('token') ||
+        normalizedKey.contains('jwt') ||
+        normalizedKey.contains('cookie') ||
+        normalizedKey.contains('credential') ||
+        normalizedKey.contains('signature') ||
         normalizedKey.contains('secret') ||
         normalizedKey.contains('verificationdata') ||
         normalizedKey.contains('password') ||
@@ -506,7 +510,7 @@ class AppLogger {
 
     masked = masked.replaceAllMapped(
       RegExp(
-        r'''(["']?)(access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|api[_-]?key|payment[_-]?intent[_-]?client[_-]?secret|payment[_-]?intent[_-]?id|setup[_-]?intent[_-]?id|client[_-]?secret|secret|password|receipt|signed[_-]?url|card[_-]?number|cvc|cvv|auth[_-]?ticket|external[_-]?auth[_-]?ticket|ticket|session[_-]?id|checkout[_-]?session[_-]?id|stripe[_-]?session[_-]?id|purchase[_-]?token|purchase[_-]?id|server[_-]?verification[_-]?data|local[_-]?verification[_-]?data|verification[_-]?data|signed[_-]?transaction[_-]?info|external[_-]?payment[_-]?id|external[_-]?subscription[_-]?id|subscription[_-]?id|customer[_-]?id)\1(\s*[:=]\s*)(["']?)[^,}\]\s"']+\4''',
+        r'''(["']?)(access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|jwt|api[_-]?key|credential|signature|payment[_-]?intent[_-]?client[_-]?secret|payment[_-]?intent[_-]?id|setup[_-]?intent[_-]?id|client[_-]?secret|secret|password|receipt|signed[_-]?url|card[_-]?number|cvc|cvv|auth[_-]?ticket|external[_-]?auth[_-]?ticket|ticket|session[_-]?id|checkout[_-]?session[_-]?id|stripe[_-]?session[_-]?id|purchase[_-]?token|purchase[_-]?id|server[_-]?verification[_-]?data|local[_-]?verification[_-]?data|verification[_-]?data|signed[_-]?transaction[_-]?info|external[_-]?payment[_-]?id|external[_-]?subscription[_-]?id|subscription[_-]?id|customer[_-]?id)\1(\s*[:=]\s*)(["']?)[^,}\]\s"']+\4''',
         caseSensitive: false,
       ),
       (match) {

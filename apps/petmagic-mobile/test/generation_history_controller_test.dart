@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_gallery_store.dart';
+import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
 import 'generation_history_controller_test_support.dart';
@@ -48,17 +49,19 @@ void main() {
         'generation-ready',
       ]);
 
+      final fetchCallsBeforeCachedFilter = List.of(repository.fetchCalls);
       await controller.load(filter: GenerationHistoryFilter.all);
       expect(harness.state.filter, GenerationHistoryFilter.all);
       expect(harness.state.items.map((item) => item.generationId), [
         'generation-active',
         'generation-ready',
       ]);
+      expect(repository.fetchCalls, fetchCallsBeforeCachedFilter);
       expect(repository.fetchCalls, [
         (status: null, take: 50),
         (status: 'completed', take: 50),
       ]);
-      expect(repository.fetchUnreadCountCalls, 2);
+      expect(repository.fetchUnreadCountCalls, 0);
     },
   );
 
@@ -120,6 +123,14 @@ void main() {
     final repository = FakeTemplateGenerationRepository(
       remoteByStatus: {
         null: [ready],
+      },
+      remotePagesByCursor: {
+        generationHistoryPageKey(null, null): TemplateGenerationGalleryPage(
+          items: [ready],
+          hasMore: false,
+          unreadCount: 0,
+          appliedFilter: 'all',
+        ),
       },
       unreadCountError: const AppException('templates.unread_count_failed'),
     );
@@ -238,10 +249,7 @@ void main() {
       (status: null, take: 50),
     ]);
     expect(repository.fetchCancelTokens.last?.isCancelled, isFalse);
-    expect(
-      repository.fetchUnreadCountCalls,
-      greaterThan(unreadCallsBeforeCancellation),
-    );
+    expect(repository.fetchUnreadCountCalls, unreadCallsBeforeCancellation);
     expect(harness.state.syncFailed, isFalse);
     expect(harness.state.errorMessage, isNull);
     expect(harness.state.isLoading, isFalse);
@@ -261,6 +269,14 @@ void main() {
       final repository = FakeTemplateGenerationRepository(
         remoteByStatus: {
           null: [ready],
+        },
+        remotePagesByCursor: {
+          generationHistoryPageKey(null, null): TemplateGenerationGalleryPage(
+            items: [ready],
+            hasMore: false,
+            unreadCount: 1,
+            appliedFilter: 'all',
+          ),
         },
         unreadCount: 1,
         unreadCountCompleter: unreadCompleter,
@@ -497,12 +513,20 @@ void main() {
       stage: 'generating',
       progressPercent: 70,
     );
+    final completed = active.copyWith(
+      status: TemplateGenerationStatus.completed,
+      stage: 'finalizing',
+      progressPercent: 100,
+      outputUrl: 'https://cdn.petmagic.app/result.jpg',
+      completedAtUtc: DateTime.utc(2026, 6, 14, 12, 3),
+    );
     final repository = FakeTemplateGenerationRepository(
       remoteByStatus: {
         null: [active],
         'active': [active],
         'completed': const <TemplateGenerationResult>[],
       },
+      remoteById: {'generation-active': completed},
       unreadCount: 1,
     );
     final realtimeClient = FakeRealtimeClient();
@@ -529,15 +553,7 @@ void main() {
     realtimeClient.emit(
       RealtimeEvent(
         topic: RealtimeTopics.templatesGenerationStatusChanged,
-        payload: generationFixturePayload(
-          active.copyWith(
-            status: TemplateGenerationStatus.completed,
-            stage: 'finalizing',
-            progressPercent: 100,
-            outputUrl: 'https://cdn.petmagic.app/result.jpg',
-            completedAtUtc: DateTime.utc(2026, 6, 14, 12, 3),
-          ),
-        ),
+        payload: generationRealtimePayload(generationId: 'generation-active'),
       ),
     );
     await Future<void>.delayed(Duration.zero);
@@ -568,12 +584,96 @@ void main() {
     expect(readyCached.single.localOutputPath, updated.localOutputPath);
     expect(readyCached.single.isLocalMediaReady, isTrue);
     expect(store.materializedGenerationIds, ['generation-active']);
+    expect(repository.fetchGenerationCalls, ['generation-active']);
     expect(repository.cachedUpserts.map((item) => item.generationId), [
       'generation-active',
     ]);
     expect(harness.state.unreadCount, 0);
     expect(realtimeClient.connectCalls, 1);
   });
+
+  test('realtime ignores stale refetched generation', () async {
+    final current = generationFixture(
+      generationId: 'generation-ready',
+      status: TemplateGenerationStatus.completed,
+      stage: 'completed',
+      progressPercent: 100,
+      outputUrl: 'https://cdn.petmagic.app/result.jpg',
+      completedAtUtc: DateTime.utc(2026, 6, 14, 12, 5),
+    );
+    final stale = generationFixture(
+      generationId: 'generation-ready',
+      status: TemplateGenerationStatus.generating,
+      stage: 'generating',
+      progressPercent: 40,
+    );
+    final repository = FakeTemplateGenerationRepository(
+      remoteByStatus: {
+        null: [current],
+      },
+      remoteById: {'generation-ready': stale},
+    );
+    final realtimeClient = FakeRealtimeClient();
+    final harness = GenerationHistoryControllerHarness(
+      repository: repository,
+      realtimeClient: realtimeClient,
+    );
+    addTearDown(harness.dispose);
+
+    final controller = harness.controller;
+    controller.setScreenVisible(true);
+    await controller.load();
+
+    realtimeClient.emit(
+      RealtimeEvent(
+        topic: RealtimeTopics.templatesGenerationStatusChanged,
+        payload: generationRealtimePayload(generationId: 'generation-ready'),
+      ),
+    );
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(repository.fetchGenerationCalls, ['generation-ready']);
+    expect(
+      harness.state.items.single.status,
+      TemplateGenerationStatus.completed,
+    );
+    expect(harness.state.items.single.progressPercent, 100);
+    expect(repository.cachedUpserts, isEmpty);
+  });
+
+  test(
+    'realtime disconnects when connect completes after network loss',
+    () async {
+      final connectCompleter = Completer<void>();
+      final realtimeClient = FakeRealtimeClient(
+        connectCompleter: connectCompleter,
+      );
+      final networkStatusController =
+          FakeGenerationHistoryNetworkStatusController();
+      final harness = GenerationHistoryControllerHarness(
+        repository: FakeTemplateGenerationRepository(),
+        realtimeClient: realtimeClient,
+        networkStatusController: networkStatusController,
+      );
+      addTearDown(harness.dispose);
+
+      harness.controller.setScreenVisible(true);
+
+      expect(realtimeClient.connectCalls, 1);
+
+      networkStatusController.setHasInternet(false);
+      await Future<void>.delayed(Duration.zero);
+      expect(realtimeClient.disconnectCalls, 0);
+
+      connectCompleter.complete();
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(realtimeClient.disconnectCalls, 1);
+    },
+  );
 
   test(
     'mergeFetchedGeneration updates history state from status refresh',
@@ -899,10 +999,18 @@ void main() {
       stage: 'generating',
       progressPercent: 70,
     );
+    final completed = active.copyWith(
+      status: TemplateGenerationStatus.completed,
+      stage: 'finalizing',
+      progressPercent: 100,
+      outputUrl: 'https://cdn.petmagic.app/result.jpg',
+      completedAtUtc: DateTime.utc(2026, 6, 14, 12, 3),
+    );
     final repository = FakeTemplateGenerationRepository(
       remoteByStatus: {
         null: [active],
       },
+      remoteById: {'generation-active': completed},
     );
     final realtimeClient = FakeRealtimeClient();
     final store = FakeGenerationGalleryStore();
@@ -921,15 +1029,7 @@ void main() {
     realtimeClient.emit(
       RealtimeEvent(
         topic: RealtimeTopics.templatesGenerationStatusChanged,
-        payload: generationFixturePayload(
-          active.copyWith(
-            status: TemplateGenerationStatus.completed,
-            stage: 'finalizing',
-            progressPercent: 100,
-            outputUrl: 'https://cdn.petmagic.app/result.jpg',
-            completedAtUtc: DateTime.utc(2026, 6, 14, 12, 3),
-          ),
-        ),
+        payload: generationRealtimePayload(generationId: 'generation-active'),
       ),
     );
     await Future<void>.delayed(Duration.zero);

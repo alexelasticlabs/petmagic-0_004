@@ -32,6 +32,27 @@ void main() {
     );
   });
 
+  test('support chat route sanitizes query context before persistence', () {
+    final uri = Uri.parse(
+      SupportChatPage.routeFor(
+        initialMessage: List.filled(600, 'x').join(),
+        relatedGenerationId: '../generation?admin=true',
+      ),
+    );
+
+    expect(uri.path, SupportChatPage.routePath);
+    expect(
+      uri.queryParameters[SupportChatPage.initialMessageQueryParam],
+      hasLength(SupportChatPage.maxInitialMessageQueryLength),
+    );
+    expect(
+      uri.queryParameters.containsKey(
+        SupportChatPage.relatedGenerationIdQueryParam,
+      ),
+      isFalse,
+    );
+  });
+
   testWidgets('support chat shows auth gate for guests without loading chat', (
     tester,
   ) async {

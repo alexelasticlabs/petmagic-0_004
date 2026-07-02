@@ -13,13 +13,18 @@ import 'package:petmagic_mobile/core/network/dio_provider.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
+import 'package:petmagic_mobile/features/wallet/data/wallet_store_purchase_recovery_store.dart';
 import 'package:petmagic_mobile/shared/payments/store_product_availability_cache.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 final walletRepositoryProvider = Provider<WalletRepository>((ref) {
   return WalletRepository(
     dio: ref.watch(dioProvider),
     sessionStorage: ref.watch(authSessionStorageProvider),
     authSessionCoordinator: ref.watch(authSessionCoordinatorProvider),
+    storePurchaseRecoveryStore: ref.watch(
+      walletStorePurchaseRecoveryStoreProvider,
+    ),
   );
 });
 
@@ -29,15 +34,22 @@ class WalletRepository {
     required AuthSessionStorage sessionStorage,
     AuthSessionCoordinator? authSessionCoordinator,
     InAppPurchase? inAppPurchase,
+    WalletStorePurchaseRecoveryStore? storePurchaseRecoveryStore,
   }) : _dio = dio,
        _authSessionCoordinator =
            authSessionCoordinator ??
            AuthSessionCoordinator(dio: dio, sessionStorage: sessionStorage),
-       _inAppPurchaseOverride = inAppPurchase;
+       _inAppPurchaseOverride = inAppPurchase,
+       _storePurchaseRecoveryStore =
+           storePurchaseRecoveryStore ??
+           WalletStorePurchaseRecoveryStore(
+             preferences: SharedPreferencesAsync(),
+           );
 
   final Dio _dio;
   final AuthSessionCoordinator _authSessionCoordinator;
   final InAppPurchase? _inAppPurchaseOverride;
+  final WalletStorePurchaseRecoveryStore _storePurchaseRecoveryStore;
 
   InAppPurchase get _inAppPurchase =>
       _inAppPurchaseOverride ?? InAppPurchase.instance;
@@ -62,10 +74,11 @@ class WalletRepository {
     int take = 20,
     CancelToken? cancelToken,
   }) async {
+    final pagination = _walletOffsetPaginationQuery(skip: skip, take: take);
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.get<Map<String, dynamic>>(
         '/api/economy/wallet/ledger',
-        queryParameters: {'skip': skip, 'take': take},
+        queryParameters: pagination,
         options: authenticatedRequestOptions(session.accessToken),
         cancelToken: cancelToken,
       ),
@@ -131,10 +144,11 @@ class WalletRepository {
     int take = 20,
     CancelToken? cancelToken,
   }) async {
+    final pagination = _walletOffsetPaginationQuery(skip: skip, take: take);
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.get<Map<String, dynamic>>(
         '/api/economy/purchases',
-        queryParameters: {'skip': skip, 'take': take},
+        queryParameters: pagination,
         options: authenticatedRequestOptions(session.accessToken),
         cancelToken: cancelToken,
       ),
@@ -150,9 +164,10 @@ class WalletRepository {
     String orderId, {
     CancelToken? cancelToken,
   }) async {
+    final encodedOrderId = _walletPathSegment(orderId);
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.get<Map<String, dynamic>>(
-        '/api/economy/purchases/$orderId',
+        '/api/economy/purchases/$encodedOrderId',
         options: authenticatedRequestOptions(session.accessToken),
         cancelToken: cancelToken,
       ),
@@ -298,9 +313,10 @@ class WalletRepository {
     required WalletPaymentMethodModel paymentMethod,
     required PurchaseDetails purchase,
   }) async {
+    final encodedOrderId = _walletPathSegment(orderId);
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
-        '/api/economy/purchases/$orderId/verify-store',
+        '/api/economy/purchases/$encodedOrderId/verify-store',
         data: {
           'paymentProvider': paymentMethod.provider,
           'productId': purchase.productID,
@@ -317,6 +333,62 @@ class WalletRepository {
     );
 
     return PurchaseHistoryItem.fromJson(response.data ?? const {});
+  }
+
+  Future<StoreBillingValidationModel> validateStorePurchase({
+    required String provider,
+    required PurchaseDetails purchase,
+  }) async {
+    final normalizedProvider = provider.trim().toLowerCase();
+    final serverVerificationData = purchase
+        .verificationData
+        .serverVerificationData
+        .trim();
+    if (serverVerificationData.isEmpty) {
+      throw const AppException('wallet.payment_unavailable');
+    }
+
+    final response = await _authorizedRequest<Map<String, dynamic>>((session) {
+      if (normalizedProvider == 'google_play') {
+        return _dio.post<Map<String, dynamic>>(
+          '/api/billing/google/validate',
+          data: {
+            'purchaseToken': serverVerificationData,
+            'productId': purchase.productID,
+            'packageName': AppConfig.androidPackageName,
+          },
+          options: authenticatedRequestOptions(session.accessToken),
+        );
+      }
+
+      if (normalizedProvider == 'app_store') {
+        return _dio.post<Map<String, dynamic>>(
+          '/api/billing/apple/validate',
+          data: {'signedTransactionInfo': serverVerificationData},
+          options: authenticatedRequestOptions(session.accessToken),
+        );
+      }
+
+      throw const AppException('wallet.payment_unavailable');
+    }, retryTransientFailures: false);
+
+    return StoreBillingValidationModel.fromJson(response.data ?? const {});
+  }
+
+  Future<void> savePendingStorePurchase(PendingStoreWalletPurchase purchase) {
+    return _storePurchaseRecoveryStore.savePendingPurchase(purchase);
+  }
+
+  Future<PendingStoreWalletPurchase?> readPendingStorePurchase() {
+    return _storePurchaseRecoveryStore.readPendingPurchase();
+  }
+
+  Future<void> clearPendingStorePurchase({String? orderId}) {
+    return _storePurchaseRecoveryStore.clearPendingPurchase(orderId: orderId);
+  }
+
+  Future<void> restoreStorePurchases() {
+    return _inAppPurchase.restorePurchases();
   }
 
   Future<void> completePurchase(PurchaseDetails purchase) {
@@ -371,9 +443,10 @@ class WalletRepository {
       payload['stripeReferenceId'] = normalizedReference;
     }
 
+    final encodedOrderId = _walletPathSegment(orderId);
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
-        '/api/economy/purchases/$orderId/verify-stripe',
+        '/api/economy/purchases/$encodedOrderId/verify-stripe',
         data: payload,
         options: authenticatedRequestOptions(session.accessToken),
       ),
@@ -463,4 +536,15 @@ class WalletRepository {
 
     return NetworkErrorMapper.fallback(error, fallbackMessage: fallbackMessage);
   }
+}
+
+String _walletPathSegment(String value) {
+  return Uri.encodeComponent(value.trim());
+}
+
+Map<String, int> _walletOffsetPaginationQuery({
+  required int skip,
+  required int take,
+}) {
+  return {'skip': skip < 0 ? 0 : skip, 'take': take.clamp(1, 100)};
 }

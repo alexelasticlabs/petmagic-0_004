@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_stripe_checkout_page.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
@@ -133,27 +135,104 @@ void main() {
       expect(find.byType(CircularProgressIndicator), findsNothing);
     },
   );
+
+  testWidgets('wallet Stripe checkout does not submit while offline', (
+    tester,
+  ) async {
+    var submitCount = 0;
+
+    await tester.pumpWidget(
+      _TestApp(
+        hasInternet: false,
+        child: WalletStripeCheckoutPage(
+          pack: _walletPack,
+          paymentMethodLabel: 'Stripe',
+          onChooseAnotherMethod: () {},
+          onSubmit: () async {
+            submitCount += 1;
+            return const WalletStripeCheckoutSubmitResult(
+              status: WalletStripeCheckoutActionStatus.success,
+            );
+          },
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(FilledButton).first);
+    await tester.pump();
+
+    expect(submitCount, 0);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+  });
+
+  testWidgets('premium Stripe checkout does not submit while offline', (
+    tester,
+  ) async {
+    var submitCount = 0;
+
+    await tester.pumpWidget(
+      _TestApp(
+        hasInternet: false,
+        child: PremiumStripeCheckoutPage(
+          plan: _premiumPlan,
+          paymentMethodLabel: 'Stripe',
+          onChooseAnotherMethod: () {},
+          onSubmit: () async {
+            submitCount += 1;
+            return const PremiumStripeCheckoutSubmitResult(
+              status: PremiumStripeCheckoutActionStatus.success,
+            );
+          },
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(FilledButton).first);
+    await tester.pump();
+
+    expect(submitCount, 0);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+  });
 }
 
 class _TestApp extends StatelessWidget {
-  const _TestApp({required this.child});
+  const _TestApp({required this.child, this.hasInternet = true});
 
   final Widget child;
+  final bool hasInternet;
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      theme: AppTheme.dark(),
-      locale: const Locale('en'),
-      localizationsDelegates: const [
-        AppLocalizations.delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
+    return ProviderScope(
+      overrides: [
+        networkStatusControllerProvider.overrideWith(
+          () => _TestNetworkStatusController(hasInternet: hasInternet),
+        ),
       ],
-      supportedLocales: AppLocalizations.supportedLocales,
-      home: child,
+      child: MaterialApp(
+        theme: AppTheme.dark(),
+        locale: const Locale('en'),
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: child,
+      ),
     );
+  }
+}
+
+class _TestNetworkStatusController extends NetworkStatusController {
+  _TestNetworkStatusController({required this.hasInternet});
+
+  final bool hasInternet;
+
+  @override
+  NetworkStatusState build() {
+    return NetworkStatusState(hasInternet: hasInternet);
   }
 }
 

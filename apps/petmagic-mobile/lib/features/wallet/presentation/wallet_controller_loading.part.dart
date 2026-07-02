@@ -44,7 +44,7 @@ mixin _WalletControllerLoading
 
     try {
       final wallet = await _repository.fetchWallet(cancelToken: cancelToken);
-      if (!ref.mounted) {
+      if (!ref.mounted || cancelToken.isCancelled) {
         return;
       }
 
@@ -117,7 +117,7 @@ mixin _WalletControllerLoading
         }(),
       ]);
 
-      if (!ref.mounted) {
+      if (!ref.mounted || cancelToken.isCancelled) {
         return;
       }
 
@@ -128,6 +128,9 @@ mixin _WalletControllerLoading
         );
         paymentMethods = availability.paymentMethods;
         storeProductPrices = availability.productPrices;
+      }
+      if (!ref.mounted || cancelToken.isCancelled) {
+        return;
       }
 
       _updateStateIfMounted(
@@ -146,6 +149,7 @@ mixin _WalletControllerLoading
           errorMessage: softError,
         ),
       );
+      unawaited(_recoverPendingStorePurchase(requestStoreRestore: true));
     } catch (error) {
       if (_isRequestCancelled(error)) {
         return;
@@ -263,17 +267,19 @@ mixin _WalletControllerLoading
         take: _WalletControllerBase.walletLedgerPageSize,
         cancelToken: loadMoreCancelToken,
       );
-      if (!ref.mounted) {
+      if (!ref.mounted || loadMoreCancelToken.isCancelled) {
         return;
       }
 
+      final mergedLedger = _appendUniqueLedgerPage(
+        existingLedger: state.ledger,
+        nextPage: page.items,
+      );
+      final didAppendLedgerItems = mergedLedger.length > state.ledger.length;
       _updateStateIfMounted(
         (state) => state.copyWith(
-          ledger: _appendUniqueLedgerPage(
-            existingLedger: state.ledger,
-            nextPage: page.items,
-          ),
-          ledgerHasMore: page.hasMore,
+          ledger: mergedLedger,
+          ledgerHasMore: page.hasMore && didAppendLedgerItems,
           isLoadingMoreLedger: false,
           clearLedgerLoadMoreError: true,
         ),
@@ -361,7 +367,7 @@ mixin _WalletControllerLoading
       final nextWallet = await _repository.fetchWallet(
         cancelToken: syncCancelToken,
       );
-      if (!ref.mounted) {
+      if (!ref.mounted || syncCancelToken.isCancelled) {
         return;
       }
 
@@ -389,6 +395,9 @@ mixin _WalletControllerLoading
           take: _WalletControllerBase.walletLedgerPageSize,
           cancelToken: syncCancelToken,
         );
+        if (!ref.mounted || syncCancelToken.isCancelled) {
+          return;
+        }
       } catch (error, stackTrace) {
         if (_isRequestCancelled(error)) {
           return;
@@ -396,6 +405,9 @@ mixin _WalletControllerLoading
         _logWalletLoadFailure('sync_fetch_ledger', error, stackTrace);
       }
 
+      if (!ref.mounted || syncCancelToken.isCancelled) {
+        return;
+      }
       _updateStateIfMounted(
         (state) => state.copyWith(
           wallet: nextWallet,

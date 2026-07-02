@@ -19,12 +19,12 @@ class SupportAssistantPage extends ConsumerWidget {
   final String scenario;
 
   static String location(String scenario) {
-    final trimmedScenario = scenario.trim();
-    if (trimmedScenario.isEmpty) {
+    final normalizedScenario = normalizeSupportScenarioQuery(scenario);
+    if (normalizedScenario == null) {
       return routePath;
     }
 
-    return '$routePath?$scenarioQueryParam=${Uri.encodeQueryComponent(trimmedScenario)}';
+    return '$routePath?$scenarioQueryParam=${Uri.encodeQueryComponent(normalizedScenario)}';
   }
 
   @override

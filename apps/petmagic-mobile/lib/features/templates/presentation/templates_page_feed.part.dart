@@ -202,13 +202,22 @@ String _templateOfTheDayDateValue(TemplateOfTheDayItem featured) {
 }
 
 class _TemplatesLifecycleObserver with WidgetsBindingObserver {
-  _TemplatesLifecycleObserver({required this.onStateChanged});
+  _TemplatesLifecycleObserver({
+    required this.onStateChanged,
+    required this.onMemoryPressure,
+  });
 
   final ValueChanged<AppLifecycleState> onStateChanged;
+  final VoidCallback onMemoryPressure;
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     onStateChanged(state);
+  }
+
+  @override
+  void didHaveMemoryPressure() {
+    onMemoryPressure();
   }
 }
 

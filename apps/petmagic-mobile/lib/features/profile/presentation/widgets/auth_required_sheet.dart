@@ -140,11 +140,10 @@ Future<void> showAuthRequiredSheet(
 }
 
 String _buildAuthRedirectQuery(String? redirectPath) {
-  if (redirectPath == null ||
-      redirectPath.isEmpty ||
-      !redirectPath.startsWith('/')) {
+  final normalizedRedirectPath = normalizeAuthRedirectPath(redirectPath);
+  if (normalizedRedirectPath == null) {
     return '';
   }
 
-  return '?redirect=${Uri.encodeQueryComponent(redirectPath)}';
+  return '?redirect=${Uri.encodeQueryComponent(normalizedRedirectPath)}';
 }

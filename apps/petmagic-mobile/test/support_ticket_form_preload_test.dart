@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/permissions/app_permission_coordinator.dart';
 import 'package:petmagic_mobile/core/permissions/media_permission_feedback.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
@@ -39,6 +40,10 @@ void main() {
     );
     expect(
       SupportTicketFormPage.location('  '),
+      SupportTicketFormPage.routePath,
+    );
+    expect(
+      SupportTicketFormPage.location('generation_failed\u0000admin'),
       SupportTicketFormPage.routePath,
     );
   });
@@ -145,6 +150,56 @@ void main() {
       expect(_preloadTracker.started, isEmpty);
 
       launchController.setAuthenticated(true);
+      await tester.pump();
+
+      expect(
+        _preloadTracker.started,
+        containsAll(['generation', 'wallet', 'premium']),
+      );
+
+      _preloadTracker.completeAll();
+      await tester.pump();
+    },
+  );
+
+  testWidgets(
+    'support ticket context preload waits for reconnect when opened offline',
+    (tester) async {
+      final networkController = _TestNetworkStatusController(false);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedAppLaunchController.new,
+            ),
+            networkStatusControllerProvider.overrideWith(
+              () => networkController,
+            ),
+            generationHistoryControllerProvider.overrideWith(
+              _TrackedGenerationHistoryController.new,
+            ),
+            walletControllerProvider.overrideWith(_TrackedWalletController.new),
+            premiumControllerProvider.overrideWith(
+              _TrackedPremiumController.new,
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const SupportTicketFormPage(scenario: 'generation_failed'),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(_preloadTracker.started, isEmpty);
+
+      networkController.setHasInternet(true);
       await tester.pump();
 
       expect(
@@ -469,6 +524,21 @@ class _UnauthenticatedAppLaunchController extends AppLaunchController {
       hasSeenOnboarding: true,
       guestSessionReady: true,
     );
+  }
+}
+
+class _TestNetworkStatusController extends NetworkStatusController {
+  _TestNetworkStatusController(bool hasInternet)
+    : _state = NetworkStatusState(hasInternet: hasInternet);
+
+  NetworkStatusState _state;
+
+  @override
+  NetworkStatusState build() => _state;
+
+  void setHasInternet(bool value) {
+    _state = _state.copyWith(hasInternet: value);
+    state = _state;
   }
 }
 

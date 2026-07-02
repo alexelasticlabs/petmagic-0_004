@@ -303,8 +303,9 @@ Future<void> _evictPetMediaUrl(String? rawUrl) async {
     return;
   }
 
+  final cacheKey = persistentSafeMediaCacheKeyUrl(imageUrl);
   try {
-    await CachedNetworkImage.evictFromCache(imageUrl);
+    await CachedNetworkImage.evictFromCache(imageUrl, cacheKey: cacheKey);
   } on Object {
     // Provider invalidation still refreshes metadata; image-cache eviction is best-effort.
   }

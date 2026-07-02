@@ -11,6 +11,8 @@ import 'package:petmagic_mobile/features/templates/presentation/templates_contro
 import 'templates_controller_test_support.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('loads template of the day without blocking feed state', () async {
     final today = DateTime.utc(2026, 6, 14);
     final repository = FakeTemplatesControllerRepository(

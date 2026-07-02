@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 
 part 'wallet_stripe_checkout_page_sections.part.dart';
@@ -19,7 +21,7 @@ class WalletStripeCheckoutSubmitResult {
 typedef WalletStripeCheckoutSubmit =
     Future<WalletStripeCheckoutSubmitResult> Function();
 
-class WalletStripeCheckoutPage extends StatefulWidget {
+class WalletStripeCheckoutPage extends ConsumerStatefulWidget {
   const WalletStripeCheckoutPage({
     super.key,
     required this.pack,
@@ -34,11 +36,12 @@ class WalletStripeCheckoutPage extends StatefulWidget {
   final VoidCallback onChooseAnotherMethod;
 
   @override
-  State<WalletStripeCheckoutPage> createState() =>
+  ConsumerState<WalletStripeCheckoutPage> createState() =>
       _WalletStripeCheckoutPageState();
 }
 
-class _WalletStripeCheckoutPageState extends State<WalletStripeCheckoutPage> {
+class _WalletStripeCheckoutPageState
+    extends ConsumerState<WalletStripeCheckoutPage> {
   bool _isSubmitting = false;
   WalletStripeCheckoutSubmitResult? _result;
 
@@ -49,6 +52,10 @@ class _WalletStripeCheckoutPageState extends State<WalletStripeCheckoutPage> {
     final price = NumberFormat.simpleCurrency(
       name: widget.pack.currencyCode,
     ).format(widget.pack.priceAmount);
+    final hasInternet = ref.watch(
+      networkStatusControllerProvider.select((status) => status.hasInternet),
+    );
+    final canSubmit = !_isSubmitting && hasInternet;
 
     return Scaffold(
       appBar: AppBar(
@@ -108,7 +115,7 @@ class _WalletStripeCheckoutPageState extends State<WalletStripeCheckoutPage> {
               height: 54,
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: _isSubmitting ? null : _submit,
+                onPressed: canSubmit ? _submit : null,
                 style: FilledButton.styleFrom(
                   backgroundColor: context.petMagicColors.accent,
                   shape: RoundedRectangleBorder(
@@ -142,7 +149,7 @@ class _WalletStripeCheckoutPageState extends State<WalletStripeCheckoutPage> {
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: _isSubmitting ? null : _submit,
+                      onPressed: canSubmit ? _submit : null,
                       child: Text(text.walletRetryAction),
                     ),
                   ),
@@ -169,6 +176,16 @@ class _WalletStripeCheckoutPageState extends State<WalletStripeCheckoutPage> {
 
   Future<void> _submit() async {
     if (_isSubmitting) {
+      return;
+    }
+
+    if (!ref.read(networkStatusControllerProvider).hasInternet) {
+      setState(() {
+        _result = WalletStripeCheckoutSubmitResult(
+          status: WalletStripeCheckoutActionStatus.failed,
+          message: AppLocalizations.of(context).globalOfflineBannerMessage,
+        );
+      });
       return;
     }
 

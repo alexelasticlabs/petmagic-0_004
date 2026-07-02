@@ -7,6 +7,7 @@ import 'package:petmagic_mobile/features/templates/data/templates_dto.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_query.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_remote_data_source.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
+import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 
 final templatesRepositoryProvider = Provider<TemplatesRepository>((ref) {
   return DefaultTemplatesRepository(
@@ -451,12 +452,12 @@ class DefaultTemplatesRepository implements TemplatesRepository {
   }
 
   static Iterable<String> _templateMediaUrls(TemplateItemDto item) sync* {
-    final thumbnailUrl = item.thumbnailUrl?.trim();
+    final thumbnailUrl = persistentSafeGenerationMediaUrl(item.thumbnailUrl);
     if (thumbnailUrl != null && thumbnailUrl.isNotEmpty) {
       yield thumbnailUrl;
     }
 
-    final previewUrl = item.previewAsset?.url.trim();
+    final previewUrl = persistentSafeGenerationMediaUrl(item.previewAsset?.url);
     if (previewUrl != null && previewUrl.isNotEmpty) {
       yield previewUrl;
     }

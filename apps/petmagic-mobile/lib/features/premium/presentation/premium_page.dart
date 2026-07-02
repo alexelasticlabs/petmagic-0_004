@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations_en.dart';
+import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
 import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/performance/performance_guard.dart';
@@ -27,6 +28,7 @@ import 'package:petmagic_mobile/shared/payments/payment_method_sheet.dart';
 import 'package:petmagic_mobile/shared/payments/stripe_paymentsheet_coordinator.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_unavailable_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 part 'premium_page_background.part.dart';
@@ -80,6 +82,31 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
         state.status != null;
   }
 
+  Future<void> _loadPremiumIfOnline({bool refresh = false}) async {
+    if (!mounted || !ref.read(networkStatusControllerProvider).hasInternet) {
+      return;
+    }
+
+    await ref.read(premiumControllerProvider.notifier).load(refresh: refresh);
+  }
+
+  Future<void> _resumePremiumCheckoutSyncIfOnline() async {
+    if (!mounted ||
+        !ref.read(appLaunchControllerProvider).isAuthenticated ||
+        !ref.read(networkStatusControllerProvider).hasInternet) {
+      return;
+    }
+
+    _shouldReloadOnResume = false;
+    final controller = ref.read(premiumControllerProvider.notifier);
+    if (ref.read(premiumControllerProvider).isAwaitingCheckoutVerification) {
+      await controller.verifyCheckoutStatus();
+      return;
+    }
+
+    await controller.load(refresh: true);
+  }
+
   void _initializePremiumPage() {
     WidgetsBinding.instance.addObserver(this);
     if (_hasHydratedPremiumSnapshot(ref.read(premiumControllerProvider))) {
@@ -95,7 +122,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
         return;
       }
 
-      ref.read(premiumControllerProvider.notifier).load();
+      unawaited(_loadPremiumIfOnline());
     });
   }
 
@@ -105,21 +132,15 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
 
   void _handlePremiumPageLifecycleChange(AppLifecycleState appState) {
     if (appState == AppLifecycleState.resumed && _shouldReloadOnResume) {
-      _shouldReloadOnResume = false;
       if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
+        _shouldReloadOnResume = false;
         return;
       }
       if (!ref.read(networkStatusControllerProvider).hasInternet) {
         return;
       }
 
-      final controller = ref.read(premiumControllerProvider.notifier);
-      if (ref.read(premiumControllerProvider).isAwaitingCheckoutVerification) {
-        unawaited(controller.verifyCheckoutStatus());
-        return;
-      }
-
-      unawaited(controller.load(refresh: true));
+      unawaited(_resumePremiumCheckoutSyncIfOnline());
     }
   }
 
@@ -171,8 +192,21 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
     }
 
     final lastShownKey = buildPaywallFeedbackLastShownStorageKey(scopeKey);
+    final legacyLastShownKey = buildLegacyPaywallFeedbackLastShownStorageKey(
+      scopeKey,
+    );
     final now = DateTime.now().toUtc();
-    final lastShownRaw = await preferences.getString(lastShownKey);
+    var lastShownRaw = await preferences.getString(lastShownKey);
+    final shouldMigrateLegacy =
+        (lastShownRaw == null || lastShownRaw.isEmpty) &&
+        legacyLastShownKey != lastShownKey;
+    if (shouldMigrateLegacy) {
+      lastShownRaw = await preferences.getString(legacyLastShownKey);
+      if (lastShownRaw != null && lastShownRaw.isNotEmpty) {
+        await preferences.setString(lastShownKey, lastShownRaw);
+        await preferences.remove(legacyLastShownKey);
+      }
+    }
     final lastShown = lastShownRaw == null
         ? null
         : DateTime.tryParse(lastShownRaw)?.toUtc();
@@ -502,11 +536,24 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
 
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(premiumControllerProvider);
     final isLoading = ref.watch(
       premiumControllerProvider.select((state) => state.isLoading),
     );
     final controller = ref.read(premiumControllerProvider.notifier);
+    final hasInternet = ref.watch(
+      networkStatusControllerProvider.select((status) => status.hasInternet),
+    );
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final showOfflineUnavailable =
+        !_hasHydratedPremiumSnapshot(state) && !hasInternet;
+    final unavailableKind =
+        !_hasHydratedPremiumSnapshot(state) && !state.isInitialLoading
+        ? classifyAppUnavailable(
+            raw: state.errorMessage,
+            hasInternet: hasInternet,
+          )
+        : null;
 
     final bg = isDark ? _kDarkBg : _kLightBg;
     final accent = isDark ? _kDarkAccent : _kLightAccent;
@@ -528,6 +575,32 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
 
       controller.consumeExternalUrl();
       _openExternalUrl(externalUrl);
+    });
+
+    ref.listen<NetworkStatusState>(networkStatusControllerProvider, (
+      previous,
+      next,
+    ) {
+      if (previous?.hasInternet != false || !next.hasInternet) {
+        return;
+      }
+
+      final premiumState = ref.read(premiumControllerProvider);
+      final isAuthenticated = ref
+          .read(appLaunchControllerProvider)
+          .isAuthenticated;
+      if ((_shouldReloadOnResume ||
+              premiumState.isAwaitingCheckoutVerification) &&
+          isAuthenticated) {
+        unawaited(_resumePremiumCheckoutSyncIfOnline());
+        return;
+      }
+
+      if (_hasHydratedPremiumSnapshot(premiumState)) {
+        return;
+      }
+
+      unawaited(_loadPremiumIfOnline(refresh: true));
     });
 
     ref.listen(premiumControllerProvider, (previous, next) {
@@ -580,7 +653,27 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
               duration: const Duration(milliseconds: 320),
               switchInCurve: Curves.easeOutCubic,
               switchOutCurve: Curves.easeInCubic,
-              child: isLoading
+              child: showOfflineUnavailable
+                  ? SafeArea(
+                      key: const ValueKey('premium-offline'),
+                      child: PetMagicUnavailableView(
+                        kind: AppUnavailableKind.offline,
+                        onRetry: () =>
+                            unawaited(_loadPremiumIfOnline(refresh: true)),
+                        padding: const EdgeInsets.fromLTRB(28, 36, 28, 36),
+                      ),
+                    )
+                  : unavailableKind != null
+                  ? SafeArea(
+                      key: const ValueKey('premium-unavailable'),
+                      child: PetMagicUnavailableView(
+                        kind: unavailableKind,
+                        onRetry: () =>
+                            unawaited(_loadPremiumIfOnline(refresh: true)),
+                        padding: const EdgeInsets.fromLTRB(28, 36, 28, 36),
+                      ),
+                    )
+                  : isLoading
                   ? Center(
                       key: const ValueKey('premium-loading'),
                       child: CircularProgressIndicator(color: accent),

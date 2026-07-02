@@ -10,23 +10,26 @@ import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
+import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/mappers/generations_gallery_mappers.dart';
 import 'package:petmagic_mobile/features/templates/presentation/mappers/generation_status_mappers.dart'
-    show statusTitle;
+    show galleryMediaStateIcon, galleryMediaStateMessage, statusTitle;
 import 'package:petmagic_mobile/features/templates/presentation/mappers/template_error_key_mapper.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
 import 'package:petmagic_mobile/shared/files/file_name_sanitizer.dart';
 import 'package:petmagic_mobile/shared/files/media_share_save.dart';
+import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/motion.dart';
@@ -67,8 +70,11 @@ class _GalleryPageViewState {
     required this.filter,
     required this.unreadCount,
     required this.isLoading,
+    required this.isLoadingMore,
+    required this.hasMore,
     required this.shouldShowOfflineBanner,
     required this.isConnectionRecovered,
+    required this.loadMoreError,
     required this.lastSyncedAtUtc,
     required this.errorMessage,
     required this.cachedItemsByFilter,
@@ -80,8 +86,11 @@ class _GalleryPageViewState {
       filter: state.filter,
       unreadCount: state.unreadCount,
       isLoading: state.isLoading,
+      isLoadingMore: state.isLoadingMore,
+      hasMore: state.hasMore,
       shouldShowOfflineBanner: state.shouldShowOfflineBanner,
       isConnectionRecovered: state.isConnectionRecovered,
+      loadMoreError: state.loadMoreError,
       lastSyncedAtUtc: state.lastSyncedAtUtc,
       errorMessage: state.errorMessage,
       cachedItemsByFilter: state.cachedItemsByFilter,
@@ -92,8 +101,11 @@ class _GalleryPageViewState {
   final GenerationHistoryFilter filter;
   final int unreadCount;
   final bool isLoading;
+  final bool isLoadingMore;
+  final bool hasMore;
   final bool shouldShowOfflineBanner;
   final bool isConnectionRecovered;
+  final String? loadMoreError;
   final DateTime? lastSyncedAtUtc;
   final String? errorMessage;
   final Map<GenerationHistoryFilter, List<TemplateGenerationResult>>
@@ -106,8 +118,11 @@ class _GalleryPageViewState {
         filter == other.filter &&
         unreadCount == other.unreadCount &&
         isLoading == other.isLoading &&
+        isLoadingMore == other.isLoadingMore &&
+        hasMore == other.hasMore &&
         shouldShowOfflineBanner == other.shouldShowOfflineBanner &&
         isConnectionRecovered == other.isConnectionRecovered &&
+        loadMoreError == other.loadMoreError &&
         lastSyncedAtUtc == other.lastSyncedAtUtc &&
         errorMessage == other.errorMessage &&
         identical(cachedItemsByFilter, other.cachedItemsByFilter);
@@ -119,8 +134,11 @@ class _GalleryPageViewState {
     filter,
     unreadCount,
     isLoading,
+    isLoadingMore,
+    hasMore,
     shouldShowOfflineBanner,
     isConnectionRecovered,
+    loadMoreError,
     lastSyncedAtUtc,
     errorMessage,
     identityHashCode(cachedItemsByFilter),
@@ -192,6 +210,17 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<NetworkStatusState>(networkStatusControllerProvider, (
+      previous,
+      next,
+    ) {
+      if (previous?.hasInternet != false || !next.hasInternet) {
+        return;
+      }
+
+      _maybeLoadWalletForAuthenticatedUser();
+    });
+
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final state = ref.watch(
@@ -451,14 +480,14 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
         );
         slivers.add(_failedListSliver(failedItems));
       }
-      slivers.add(SliverToBoxAdapter(child: SizedBox(height: bottomInset)));
+      slivers.add(_paginationFooterSliver(state, bottomInset));
       return slivers;
     }
 
     if (state.filter == GenerationHistoryFilter.ready) {
       return [
         SliverPadding(
-          padding: EdgeInsets.fromLTRB(18, 8, 18, bottomInset),
+          padding: const EdgeInsets.fromLTRB(18, 8, 18, 10),
           sliver: SliverGrid.builder(
             itemCount: filteredItems.length,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -473,6 +502,7 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
             ),
           ),
         ),
+        _paginationFooterSliver(state, bottomInset),
       ];
     }
 
@@ -483,7 +513,7 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
           sliver: const SliverToBoxAdapter(child: _ActiveInfoCard()),
         ),
         SliverPadding(
-          padding: EdgeInsets.fromLTRB(18, 0, 18, bottomInset),
+          padding: const EdgeInsets.fromLTRB(18, 0, 18, 10),
           sliver: SliverList.separated(
             itemCount: filteredItems.length,
             separatorBuilder: (context, index) => const SizedBox(height: 12),
@@ -491,13 +521,14 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
                 _ActiveCard(generation: filteredItems[index]),
           ),
         ),
+        _paginationFooterSliver(state, bottomInset),
       ];
     }
 
     if (state.filter == GenerationHistoryFilter.failed) {
       return [
         SliverPadding(
-          padding: EdgeInsets.fromLTRB(18, 8, 18, bottomInset),
+          padding: const EdgeInsets.fromLTRB(18, 8, 18, 10),
           sliver: SliverList.separated(
             itemCount: filteredItems.length,
             separatorBuilder: (context, index) => const SizedBox(height: 12),
@@ -505,12 +536,13 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
                 _FailedCard(generation: filteredItems[index]),
           ),
         ),
+        _paginationFooterSliver(state, bottomInset),
       ];
     }
 
     return [
       SliverPadding(
-        padding: EdgeInsets.fromLTRB(18, 8, 18, bottomInset),
+        padding: const EdgeInsets.fromLTRB(18, 8, 18, 10),
         sliver: SliverList.separated(
           itemCount: filteredItems.length,
           separatorBuilder: (context, index) => const SizedBox(height: 12),
@@ -523,6 +555,7 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
           },
         ),
       ),
+      _paginationFooterSliver(state, bottomInset),
     ];
   }
 
@@ -633,6 +666,7 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
     final launchState = ref.read(appLaunchControllerProvider);
     final walletState = ref.read(walletControllerProvider);
     if (!launchState.isAuthenticated ||
+        !ref.read(networkStatusControllerProvider).hasInternet ||
         walletState.isLoading ||
         walletState.isRefreshing ||
         walletState.hasCompletedFullLoad) {
@@ -710,6 +744,27 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _paginationFooterSliver(
+    _GalleryPageViewState state,
+    double bottomInset,
+  ) {
+    final shouldShowFooter =
+        state.hasMore || state.isLoadingMore || state.loadMoreError != null;
+    if (!shouldShowFooter) {
+      return SliverToBoxAdapter(child: SizedBox(height: bottomInset));
+    }
+
+    return SliverPadding(
+      padding: EdgeInsets.fromLTRB(18, 4, 18, bottomInset),
+      sliver: SliverToBoxAdapter(
+        child: _GalleryLoadMoreFooter(
+          isLoading: state.isLoadingMore,
+          hasError: state.loadMoreError != null,
+        ),
       ),
     );
   }

@@ -64,11 +64,24 @@ void main() {
   );
 
   test('paywall feedback storage keys stay isolated by scope', () {
-    expect(
-      buildPaywallFeedbackLastShownStorageKey('user-a'),
-      isNot(buildPaywallFeedbackLastShownStorageKey('user-b')),
-    );
+    final userAKey = buildPaywallFeedbackLastShownStorageKey('user-a');
+    final userBKey = buildPaywallFeedbackLastShownStorageKey('user-b');
+
+    expect(userAKey, isNot(userBKey));
+    expect(userAKey, isNot(contains('user-a')));
+    expect(userBKey, isNot(contains('user-b')));
+    expect(userAKey, startsWith('$paywallFeedbackLastShownStorageKeyPrefix:'));
   });
+
+  test(
+    'paywall feedback legacy storage key remains available for migration',
+    () {
+      expect(
+        buildLegacyPaywallFeedbackLastShownStorageKey('user-a'),
+        '$paywallFeedbackLastShownStorageKeyPrefix:user-a',
+      );
+    },
+  );
 }
 
 class _FakeAuthSessionStorage extends AuthSessionStorage {

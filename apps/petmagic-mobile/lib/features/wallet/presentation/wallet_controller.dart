@@ -11,6 +11,7 @@ import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
+import 'package:petmagic_mobile/features/wallet/data/wallet_store_purchase_recovery_store.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/mappers/wallet_error_key_mapper.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 
@@ -197,17 +198,22 @@ class WalletState {
 
 abstract class _WalletControllerBase extends Notifier<WalletState> {
   static const int walletLedgerPageSize = 24;
+  static const int _maxStorePurchaseVerificationKeys = 32;
 
   late final WalletRepository _repository;
   bool _repositoryInitialized = false;
   Future<void>? _loadInFlight;
   Future<void>? _checkoutVerificationInFlight;
+  Future<void>? _storePurchaseRecoveryInFlight;
   CancelToken? _activeLoadCancelToken;
   CancelToken? _activeWalletSyncCancelToken;
   CancelToken? _activeLedgerLoadMoreCancelToken;
+  final Set<String> _storePurchaseVerificationInFlightKeys = <String>{};
+  final Set<String> _storePurchaseVerifiedKeys = <String>{};
   bool _isWalletSyncInFlight = false;
   bool _walletLifecycleStarted = false;
   bool _isWalletPageVisible = false;
+  bool _storePurchaseRestoreRequestedThisSession = false;
   VoidCallback? _appLifecycleListener;
 
   bool _hasAuthenticatedWalletSession() {
@@ -242,6 +248,12 @@ abstract class _WalletControllerBase extends Notifier<WalletState> {
   Future<void> verifyCheckoutStatus();
 
   Future<void> verifyStripeCheckout(String? stripeReferenceId);
+
+  Future<void> restoreStorePurchases();
+
+  Future<void> _recoverPendingStorePurchase({
+    required bool requestStoreRestore,
+  });
 
   Future<void> _handlePurchaseUpdates(List<PurchaseDetails> purchases);
 }

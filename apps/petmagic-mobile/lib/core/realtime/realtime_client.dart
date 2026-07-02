@@ -2,10 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/api_base_url_resolver.dart';
 import 'package:petmagic_mobile/core/network/request_identity.dart';
+import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 
 abstract final class RealtimeTopics {
   static const templatesFeedInvalidated = 'templates.feed.invalidated';
@@ -99,16 +101,19 @@ class PollingRealtimeClient implements RealtimeClient {
 class ServerSentEventsRealtimeClient implements RealtimeClient {
   ServerSentEventsRealtimeClient({
     required ApiBaseUrlResolver apiBaseUrlResolver,
+    required AuthSessionStorage sessionStorage,
     HttpClient? httpClient,
     this.reconnectDelay = const Duration(seconds: 3),
     Duration connectionTimeout = const Duration(seconds: 8),
   }) : _apiBaseUrlResolver = apiBaseUrlResolver,
+       _sessionStorage = sessionStorage,
        _httpClient = httpClient,
        _connectionTimeout = connectionTimeout {
     _httpClient?.connectionTimeout = connectionTimeout;
   }
 
   final ApiBaseUrlResolver _apiBaseUrlResolver;
+  final AuthSessionStorage _sessionStorage;
   HttpClient? _httpClient;
   final Duration reconnectDelay;
   final Duration _connectionTimeout;
@@ -192,13 +197,22 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
     final requestId = RequestIdentity.createRequestId();
     final correlationId = RequestIdentity.createCorrelationId();
     try {
-      final httpClient = _httpClient ??=
-          (HttpClient()..connectionTimeout = _connectionTimeout);
+      final accessToken = await _readAccessToken();
+      if (accessToken.isEmpty) {
+        return false;
+      }
+
+      final httpClient = _httpClient ??= (HttpClient()
+        ..connectionTimeout = _connectionTimeout);
       final request = await httpClient.getUrl(
-        Uri.parse('$baseUrl/api/templates/events'),
+        Uri.parse('$baseUrl/api/templates/generations/events'),
       );
       request.headers.set(HttpHeaders.acceptHeader, 'text/event-stream');
       request.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');
+      request.headers.set(
+        HttpHeaders.authorizationHeader,
+        'Bearer $accessToken',
+      );
       request.headers.set('X-PetMagic-Client', 'mobile-flutter');
       request.headers.set('X-Request-ID', requestId);
       request.headers.set('X-Correlation-ID', correlationId);
@@ -228,6 +242,11 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
       await _apiBaseUrlResolver.invalidate(baseUrl);
       return false;
     }
+  }
+
+  Future<String> _readAccessToken() async {
+    final session = await _sessionStorage.read();
+    return session?.accessToken ?? '';
   }
 
   Future<void> _consumeResponse(HttpClientResponse response) async {
@@ -347,12 +366,79 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
   bool get _isStopping => _stopSignal?.isCompleted ?? true;
 }
 
+class LifecycleAwareRealtimeClient
+    with WidgetsBindingObserver
+    implements RealtimeClient {
+  LifecycleAwareRealtimeClient(this._delegate) {
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  final RealtimeClient _delegate;
+  int _connectionHolders = 0;
+  bool _isForeground = true;
+
+  @override
+  Stream<RealtimeEvent> get events => _delegate.events;
+
+  @override
+  Future<void> connect() async {
+    _connectionHolders++;
+    if (_connectionHolders > 1 || !_isForeground) {
+      return;
+    }
+
+    await _delegate.connect();
+  }
+
+  @override
+  Future<void> disconnect() async {
+    if (_connectionHolders == 0) {
+      return;
+    }
+
+    _connectionHolders--;
+    if (_connectionHolders > 0 || !_isForeground) {
+      return;
+    }
+
+    await _delegate.disconnect();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final nextIsForeground = state == AppLifecycleState.resumed;
+    if (nextIsForeground == _isForeground) {
+      return;
+    }
+
+    _isForeground = nextIsForeground;
+    if (_connectionHolders == 0) {
+      return;
+    }
+
+    if (_isForeground) {
+      unawaited(_delegate.connect());
+    } else {
+      unawaited(_delegate.disconnect());
+    }
+  }
+
+  Future<void> dispose() async {
+    WidgetsBinding.instance.removeObserver(this);
+    _connectionHolders = 0;
+    await _delegate.disconnect();
+  }
+}
+
 final realtimeClientProvider = Provider<RealtimeClient>((ref) {
-  final client = ServerSentEventsRealtimeClient(
-    apiBaseUrlResolver: ref.watch(apiBaseUrlResolverProvider),
+  final client = LifecycleAwareRealtimeClient(
+    ServerSentEventsRealtimeClient(
+      apiBaseUrlResolver: ref.watch(apiBaseUrlResolverProvider),
+      sessionStorage: ref.watch(authSessionStorageProvider),
+    ),
   );
   ref.onDispose(() {
-    unawaited(client.disconnect());
+    unawaited(client.dispose());
   });
   return client;
 });

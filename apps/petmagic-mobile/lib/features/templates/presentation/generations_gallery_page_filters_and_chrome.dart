@@ -216,6 +216,64 @@ class _ShowMoreButton extends StatelessWidget {
   }
 }
 
+class _GalleryLoadMoreFooter extends ConsumerWidget {
+  const _GalleryLoadMoreFooter({
+    required this.isLoading,
+    required this.hasError,
+  });
+
+  final bool isLoading;
+  final bool hasError;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+
+    if (isLoading) {
+      return SizedBox(
+        height: 48,
+        child: Center(
+          child: SizedBox.square(
+            dimension: 22,
+            child: CircularProgressIndicator.adaptive(
+              strokeWidth: 2.4,
+              valueColor: AlwaysStoppedAnimation<Color>(colors.accent),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final button = OutlinedButton.icon(
+      onPressed: () =>
+          ref.read(generationHistoryControllerProvider.notifier).loadMore(),
+      icon: Icon(hasError ? Icons.refresh_rounded : Icons.expand_more_rounded),
+      label: Text(
+        hasError ? text.retryAction : text.generationStatusLoadMoreAction,
+      ),
+    );
+    if (!hasError) {
+      return button;
+    }
+
+    return Column(
+      children: [
+        Text(
+          text.generationStatusLoadMoreFailed,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+            color: colors.textSoft,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        button,
+      ],
+    );
+  }
+}
+
 class _ActiveInfoCard extends StatelessWidget {
   const _ActiveInfoCard();
 

@@ -20,6 +20,11 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
       return;
     }
 
+    if (!ref.read(networkStatusControllerProvider).hasInternet) {
+      _stopPolling();
+      return;
+    }
+
     final lifecycle = WidgetsBinding.instance.lifecycleState;
     if (lifecycle != null && lifecycle != AppLifecycleState.resumed) {
       _stopPolling();
@@ -27,9 +32,29 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
     }
 
     _stopPolling();
-    _pollTimer = Timer(_generationPollInterval(_generation), () {
+    _pollTimer = Timer(_nextPollDelay(), () {
       unawaited(_handlePollTick());
     });
+  }
+
+  /// Base poll interval with exponential error backoff (up to [_maxPollBackoff])
+  /// and random jitter, so degraded backends see decaying, desynchronized load
+  /// instead of a fixed-rate hammering from every client in the generation flow.
+  Duration _nextPollDelay() {
+    final base = _generationPollInterval(_generation);
+    var delaySeconds = base.inSeconds;
+    if (_consecutivePollFailures > 0) {
+      final exponent = math.min(_consecutivePollFailures, 5);
+      delaySeconds = math.min(
+        base.inSeconds * (1 << exponent),
+        _maxPollBackoff.inSeconds,
+      );
+    }
+
+    return Duration(
+      seconds: delaySeconds,
+      milliseconds: _pollJitterRandom.nextInt(1000),
+    );
   }
 
   Future<void> _handlePollTick() async {
@@ -115,14 +140,17 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
       }
 
       final generation = _reuseCurrentLocalMedia(fetchedGeneration);
+      _consecutivePollFailures = 0;
       _applyGenerationSnapshot(generation);
     } on DioException catch (error) {
       if (CancelToken.isCancel(error)) {
         return;
       }
 
+      _consecutivePollFailures++;
       await _showCachedOrMappedLoadError(repository, error);
     } catch (error) {
+      _consecutivePollFailures++;
       await _showCachedOrMappedLoadError(repository, error);
     } finally {
       _completeLoadRequest(loadCancelToken);
@@ -212,6 +240,10 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
       return;
     }
 
+    if (!ref.read(networkStatusControllerProvider).hasInternet) {
+      return;
+    }
+
     final realtimeClient = _activeRealtimeClient;
     if (realtimeClient == null) {
       return;
@@ -235,7 +267,10 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
       nextConnectFuture = realtimeClient.connect();
       _realtimeConnectFuture = nextConnectFuture;
       await nextConnectFuture;
-      if (!mounted || !_isPageActive) {
+      if (!mounted ||
+          !_isPageActive ||
+          !ref.read(networkStatusControllerProvider).hasInternet ||
+          !identical(_activeRealtimeClient, realtimeClient)) {
         unawaited(realtimeClient.disconnect());
         return;
       }
@@ -514,6 +549,9 @@ String _mapStatusLoadError(Object error) {
 
   return 'templates.generation_failed';
 }
+
+const Duration _maxPollBackoff = Duration(seconds: 30);
+final math.Random _pollJitterRandom = math.Random();
 
 String _statusLoadErrorText(AppLocalizations text, String raw) {
   final authMessage = mapCommonAuthFeedbackMessage(text, raw);

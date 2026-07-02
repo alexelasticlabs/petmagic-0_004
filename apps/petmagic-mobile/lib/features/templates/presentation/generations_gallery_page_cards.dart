@@ -82,6 +82,9 @@ class _ActiveCard extends ConsumerWidget {
                                 ? _ThumbnailPlaceholder(generation: generation)
                                 : CachedNetworkImage(
                                     imageUrl: safePreviewImageUrl!,
+                                    cacheKey: persistentSafeGenerationMediaUrl(
+                                      safePreviewImageUrl.toString(),
+                                    ),
                                     fit: BoxFit.cover,
                                     memCacheWidth:
                                         _generationGalleryThumbnailCacheWidth,
@@ -231,6 +234,7 @@ class _ReadyGridCard extends ConsumerWidget {
     )?.toString();
     final canRenderPreview = canRenderImagePreview(safePreviewImageUrl);
     final localPreviewFile = _localMediaFile(generation.localPreviewPath);
+    final mediaMessage = galleryMediaStateMessage(text, generation);
 
     void openGeneration() {
       if (generation.isUnread) {
@@ -284,6 +288,9 @@ class _ReadyGridCard extends ConsumerWidget {
                               ? _ThumbnailPlaceholder(generation: generation)
                               : CachedNetworkImage(
                                   imageUrl: safePreviewImageUrl!,
+                                  cacheKey: persistentSafeGenerationMediaUrl(
+                                    safePreviewImageUrl.toString(),
+                                  ),
                                   fit: BoxFit.cover,
                                   memCacheWidth:
                                       _generationGalleryThumbnailCacheWidth,
@@ -361,6 +368,14 @@ class _ReadyGridCard extends ConsumerWidget {
                                     fontWeight: FontWeight.w600,
                                   ),
                             ),
+                            if (generation.galleryMedia.needsExplanation &&
+                                mediaMessage.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              _GalleryMediaStateBanner(
+                                generation: generation,
+                                message: mediaMessage,
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -477,6 +492,10 @@ class _FailedCard extends ConsumerWidget {
                                     )
                                   : CachedNetworkImage(
                                       imageUrl: safePreviewImageUrl!,
+                                      cacheKey:
+                                          persistentSafeGenerationMediaUrl(
+                                            safePreviewImageUrl.toString(),
+                                          ),
                                       fit: BoxFit.cover,
                                       memCacheWidth:
                                           _generationGalleryThumbnailCacheWidth,

@@ -19,8 +19,11 @@ import 'package:petmagic_mobile/shared/notifications/petmagic_notification_cente
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 
 import 'wallet_page_test_support.dart';
+import 'widget_test_support.dart';
 
 void main() {
+  configureWidgetTestHarness();
+
   testWidgets('wallet auto refresh does not reschedule after page disposal', (
     tester,
   ) async {
@@ -285,6 +288,41 @@ void main() {
   );
 
   testWidgets(
+    'rewards page stays offline without loading and retries on reconnect',
+    (tester) async {
+      final repository = FakeWalletRepository(
+        wallet: walletStateFixture,
+        ledger: ledgerItemsFixture,
+        packs: packsFixture,
+        purchases: purchasesFixture,
+      );
+      final networkController = TestWalletNetworkStatusController(
+        initialHasInternet: false,
+      );
+
+      await pumpRewardsPage(
+        tester,
+        repository: repository,
+        networkStatusController: networkController,
+      );
+
+      final rewardsContext = tester.element(find.byType(RewardsPage));
+      final text = AppLocalizations.of(rewardsContext);
+
+      expect(repository.walletFetchCount, 0);
+      expect(repository.ledgerFetchCount, 0);
+      expect(find.text(text.appUnavailableOfflineTitle), findsOneWidget);
+
+      networkController.setHasInternet(true);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(repository.walletFetchCount, 1);
+      expect(repository.ledgerFetchCount, 1);
+    },
+  );
+
+  testWidgets(
     'rewards page shows legal acceptance action for legal gate errors',
     (tester) async {
       await pumpRewardsPage(
@@ -333,7 +371,7 @@ void main() {
     );
     expect(
       source,
-      contains('      unawaited(controller.load(refresh: true));'),
+      contains('      unawaited(_loadRewardsIfOnline(refresh: true));'),
     );
   });
 

@@ -68,10 +68,25 @@ Future<void> _galleryMarkDeletedLocally(
   }
 }
 
+class _GalleryMaterializeFileResult {
+  const _GalleryMaterializeFileResult({
+    this.file,
+    this.downloadedBytes = 0,
+    this.failureCode,
+    this.shouldBackoff = false,
+  });
+
+  final File? file;
+  final int downloadedBytes;
+  final String? failureCode;
+  final bool shouldBackoff;
+}
+
 Future<GenerationGalleryMediaRecord?> _galleryMaterializeGenerationMedia(
   GenerationGalleryStore store,
-  TemplateGenerationResult generation,
-) async {
+  TemplateGenerationResult generation, {
+  required bool background,
+}) async {
   if (!generation.isCompleted) {
     return null;
   }
@@ -94,6 +109,7 @@ Future<GenerationGalleryMediaRecord?> _galleryMaterializeGenerationMedia(
     generation,
     accountScopeOverride: accountScope,
     downloadKey: downloadKey,
+    background: background,
   );
   store._inFlightDownloads[downloadKey] = future;
   try {
@@ -110,6 +126,7 @@ _galleryMaterializeGenerationMediaInternal(
   TemplateGenerationResult generation, {
   required String? accountScopeOverride,
   required String downloadKey,
+  required bool background,
 }) async {
   final baseEntry = await _galleryUpsertReadyItem(
     store,
@@ -118,6 +135,19 @@ _galleryMaterializeGenerationMediaInternal(
   );
   if (baseEntry.isDeletedLocally) {
     return baseEntry;
+  }
+
+  if (background && _galleryIsMaterializationBackoffActive(store, baseEntry)) {
+    return baseEntry;
+  }
+
+  if (background &&
+      !_galleryCanStartBackgroundMaterialization(store, baseEntry)) {
+    return _galleryMarkMaterializationSkipped(
+      store,
+      baseEntry,
+      'background_session_cap_exceeded',
+    );
   }
 
   final generationDirectory = await _galleryEnsureGenerationDirectory(
@@ -139,6 +169,10 @@ _galleryMaterializeGenerationMediaInternal(
   var previewLocalPath = baseEntry.previewLocalPath;
   var outputLocalPath = baseEntry.outputLocalPath;
   var isDownloadComplete = true;
+  var downloadedBytes = 0;
+  final failureCode = <String>{};
+  var shouldBackoff = false;
+  final isVideo = isVideoGenerationResult(generation);
 
   try {
     final previewUrl = baseEntry.previewRemoteUrl;
@@ -150,57 +184,81 @@ _galleryMaterializeGenerationMediaInternal(
         _gallerySafeMediaUriEquals(previewUrl, outputUrl);
 
     if (canReuseOutputAsPreview) {
-      final outputFile = await _galleryMaterializeRemoteFile(
+      final outputResult = await _galleryMaterializeRemoteFile(
         store,
         remoteUrl: outputUrl,
         targetDirectory: generationDirectory,
         prefix: 'result',
         fallbackExtension: 'jpg',
         cancelToken: cancelToken,
+        background: background,
       );
-      outputLocalPath = outputFile?.path;
-      previewLocalPath = outputFile?.path;
-      if (outputFile == null) {
+      _galleryApplyMaterializeResult(outputResult, failureCode);
+      downloadedBytes += outputResult.downloadedBytes;
+      outputLocalPath = outputResult.file?.path;
+      previewLocalPath = outputResult.file?.path;
+      if (outputResult.file == null) {
         isDownloadComplete = false;
+        shouldBackoff = shouldBackoff || outputResult.shouldBackoff;
       } else {
         await _galleryDeleteStaleFilesForPrefix(
           generationDirectory,
           'preview',
-          outputFile,
+          outputResult.file!,
         );
       }
     } else {
       if (previewUrl != null) {
-        final previewFile = await _galleryMaterializeRemoteFile(
+        final previewResult = await _galleryMaterializeRemoteFile(
           store,
           remoteUrl: previewUrl,
           targetDirectory: generationDirectory,
           prefix: 'preview',
           fallbackExtension: 'jpg',
           cancelToken: cancelToken,
+          background: background,
         );
-        previewLocalPath = previewFile?.path;
-        if (previewFile == null) {
+        _galleryApplyMaterializeResult(previewResult, failureCode);
+        downloadedBytes += previewResult.downloadedBytes;
+        previewLocalPath = previewResult.file?.path;
+        if (previewResult.file == null) {
           isDownloadComplete = false;
+          shouldBackoff = shouldBackoff || previewResult.shouldBackoff;
         }
       }
 
       if (outputUrl != null) {
-        final outputFile = await _galleryMaterializeRemoteFile(
-          store,
-          remoteUrl: outputUrl,
-          targetDirectory: generationDirectory,
-          prefix: 'result',
-          fallbackExtension:
-              isVideoGenerationResult(generation) ||
-                  isLikelyGenerationVideoUrl(outputUrl)
-              ? 'mp4'
-              : 'jpg',
-          cancelToken: cancelToken,
-        );
-        outputLocalPath = outputFile?.path;
-        if (outputFile == null) {
+        final shouldSkipBackgroundVideoOutput =
+            background &&
+            (isVideo || isLikelyGenerationVideoUrl(outputUrl)) &&
+            store._backgroundVideoOutputsThisSession >=
+                store._maxBackgroundVideoOutputsPerSession;
+        if (shouldSkipBackgroundVideoOutput) {
           isDownloadComplete = false;
+          failureCode.add('background_video_output_skipped');
+        } else {
+          if (background &&
+              (isVideo || isLikelyGenerationVideoUrl(outputUrl))) {
+            store._backgroundVideoOutputsThisSession++;
+          }
+          final outputResult = await _galleryMaterializeRemoteFile(
+            store,
+            remoteUrl: outputUrl,
+            targetDirectory: generationDirectory,
+            prefix: 'result',
+            fallbackExtension: isVideo || isLikelyGenerationVideoUrl(outputUrl)
+                ? 'mp4'
+                : 'jpg',
+            cancelToken: cancelToken,
+            background: background,
+          );
+          _galleryApplyMaterializeResult(outputResult, failureCode);
+          downloadedBytes += outputResult.downloadedBytes;
+          outputLocalPath = outputResult.file?.path;
+          if (outputResult.file == null) {
+            isDownloadComplete = false;
+            shouldBackoff = shouldBackoff || outputResult.shouldBackoff;
+          }
         }
       } else {
         isDownloadComplete = false;
@@ -214,6 +272,8 @@ _galleryMaterializeGenerationMediaInternal(
         error,
         StackTrace.current,
       );
+      failureCode.add(_galleryDioFailureCode(error));
+      shouldBackoff = true;
     }
     isDownloadComplete = false;
   } on Object catch (error, stackTrace) {
@@ -223,9 +283,43 @@ _galleryMaterializeGenerationMediaInternal(
       error,
       stackTrace,
     );
+    failureCode.add('materialization_failed');
+    shouldBackoff = true;
     isDownloadComplete = false;
   }
 
+  if (background) {
+    store._backgroundBytesThisSession += downloadedBytes;
+  }
+
+  final localBytes = await _galleryCalculateLocalBytes([
+    previewLocalPath,
+    outputLocalPath,
+  ]);
+  final nowUtc = _galleryNowUtc(store);
+  final complete =
+      isDownloadComplete &&
+      _galleryIsValidLocalFile(previewLocalPath, allowMissing: true) &&
+      _galleryIsValidLocalFile(outputLocalPath);
+  final nextFailureCount = complete || !shouldBackoff
+      ? (complete ? 0 : baseEntry.materializationFailureCount)
+      : math.min(
+          baseEntry.materializationFailureCount + 1,
+          store._maxMaterializationRetryCount,
+        );
+  final backoffUntil = complete || !shouldBackoff
+      ? null
+      : nowUtc.add(_galleryMaterializationBackoff(store, nextFailureCount));
+  final latestEntries = await _galleryReadEntriesForScope(
+    store,
+    baseEntry.accountScope,
+  );
+  final latestEntry = _galleryFindEntry(latestEntries, generation.generationId);
+  if (latestEntry?.isDeletedLocally == true) {
+    await _galleryDeleteLocalPath(previewLocalPath);
+    await _galleryDeleteLocalPath(outputLocalPath);
+    return latestEntry;
+  }
   final refreshed = await _galleryUpdateEntry(
     store,
     baseEntry.accountScope,
@@ -233,28 +327,119 @@ _galleryMaterializeGenerationMediaInternal(
     (entry) => entry.copyWith(
       previewLocalPath: previewLocalPath,
       outputLocalPath: outputLocalPath,
-      isDownloadComplete:
-          isDownloadComplete &&
-          _galleryIsValidLocalFile(previewLocalPath, allowMissing: true) &&
-          _galleryIsValidLocalFile(outputLocalPath),
-      lastSyncedAtUtc: DateTime.now().toUtc(),
+      isDownloadComplete: complete,
+      lastSyncedAtUtc: nowUtc,
       version: entry.version + 1,
+      materializationFailureCount: nextFailureCount,
+      materializationBackoffUntilUtc: backoffUntil,
+      materializationFailureCode: failureCode.isEmpty
+          ? null
+          : failureCode.join(','),
+      localBytes: localBytes,
     ),
   );
   return refreshed;
 }
 
-Future<File?> _galleryMaterializeRemoteFile(
+bool _galleryIsMaterializationBackoffActive(
+  GenerationGalleryStore store,
+  GenerationGalleryMediaRecord entry,
+) {
+  final until = entry.materializationBackoffUntilUtc;
+  return until != null && until.isAfter(_galleryNowUtc(store));
+}
+
+bool _galleryCanStartBackgroundMaterialization(
+  GenerationGalleryStore store,
+  GenerationGalleryMediaRecord entry,
+) {
+  if (entry.isDownloadComplete &&
+      _galleryIsValidLocalFile(entry.previewLocalPath, allowMissing: true) &&
+      _galleryIsValidLocalFile(entry.outputLocalPath)) {
+    return true;
+  }
+  if (store._backgroundMaterializationsThisSession >=
+      store._maxBackgroundMaterializationsPerSession) {
+    return false;
+  }
+  store._backgroundMaterializationsThisSession++;
+  return true;
+}
+
+Future<GenerationGalleryMediaRecord?> _galleryMarkMaterializationSkipped(
+  GenerationGalleryStore store,
+  GenerationGalleryMediaRecord entry,
+  String reasonCode,
+) {
+  return _galleryUpdateEntry(
+    store,
+    entry.accountScope,
+    entry.generationId,
+    (current) => current.copyWith(
+      isDownloadComplete: false,
+      lastSyncedAtUtc: _galleryNowUtc(store),
+      version: current.version + 1,
+      materializationFailureCode: reasonCode,
+    ),
+  );
+}
+
+void _galleryApplyMaterializeResult(
+  _GalleryMaterializeFileResult result,
+  Set<String> failureCode,
+) {
+  if (result.failureCode != null) {
+    failureCode.add(result.failureCode!);
+  }
+}
+
+Duration _galleryMaterializationBackoff(
+  GenerationGalleryStore store,
+  int failureCount,
+) {
+  final exponent = math.max(0, failureCount - 1);
+  final multiplier = math.pow(2, exponent).toInt();
+  return store._materializationRetryBaseBackoff * multiplier;
+}
+
+String _galleryDioFailureCode(DioException error) {
+  final statusCode = error.response?.statusCode ?? 0;
+  return switch (statusCode) {
+    401 || 403 => 'signed_url_unavailable',
+    404 => 'storage_unavailable',
+    408 || 429 || >= 500 => 'network_retryable',
+    _ => 'network_error',
+  };
+}
+
+DateTime _galleryNowUtc(GenerationGalleryStore store) {
+  return store._clock().toUtc();
+}
+
+Future<_GalleryMaterializeFileResult> _galleryMaterializeRemoteFile(
   GenerationGalleryStore store, {
   required String remoteUrl,
   required Directory targetDirectory,
   required String prefix,
   required String fallbackExtension,
   required CancelToken cancelToken,
+  required bool background,
 }) async {
   final safeUri = parseSafeGenerationMediaUri(remoteUrl);
   if (safeUri == null) {
-    return null;
+    return const _GalleryMaterializeFileResult(
+      failureCode: 'unsafe_url',
+      shouldBackoff: false,
+    );
+  }
+
+  final remainingBackgroundBytes =
+      store._maxBackgroundBytesPerSession - store._backgroundBytesThisSession;
+  if (background && remainingBackgroundBytes <= 0) {
+    return const _GalleryMaterializeFileResult(
+      failureCode: 'background_byte_budget_exceeded',
+      shouldBackoff: false,
+    );
   }
 
   final extension = extensionFromUrl(safeUri.toString()).trim().isEmpty
@@ -274,7 +459,7 @@ Future<File?> _galleryMaterializeRemoteFile(
       prefix,
       targetFile,
     );
-    return targetFile;
+    return _GalleryMaterializeFileResult(file: targetFile);
   }
 
   final tempFile = File('${targetFile.path}.part');
@@ -290,11 +475,37 @@ Future<File?> _galleryMaterializeRemoteFile(
     options: Options(responseType: ResponseType.bytes),
   );
 
+  final downloadedBytes = await _galleryFileSize(tempFile);
+  if (background && downloadedBytes > store._maxBackgroundFileBytes) {
+    if (await tempFile.exists()) {
+      await tempFile.delete();
+    }
+    return _GalleryMaterializeFileResult(
+      downloadedBytes: downloadedBytes,
+      failureCode: 'background_file_too_large',
+      shouldBackoff: false,
+    );
+  }
+  if (background && downloadedBytes > remainingBackgroundBytes) {
+    if (await tempFile.exists()) {
+      await tempFile.delete();
+    }
+    return _GalleryMaterializeFileResult(
+      downloadedBytes: downloadedBytes,
+      failureCode: 'background_byte_budget_exceeded',
+      shouldBackoff: false,
+    );
+  }
+
   if (!await _galleryHasUsableFile(tempFile)) {
     if (await tempFile.exists()) {
       await tempFile.delete();
     }
-    return null;
+    return _GalleryMaterializeFileResult(
+      downloadedBytes: downloadedBytes,
+      failureCode: downloadedBytes <= 0 ? 'empty_download' : 'invalid_media',
+      shouldBackoff: true,
+    );
   }
 
   if (await targetFile.exists()) {
@@ -302,7 +513,10 @@ Future<File?> _galleryMaterializeRemoteFile(
   }
   await tempFile.rename(targetFile.path);
   await _galleryDeleteStaleFilesForPrefix(targetDirectory, prefix, targetFile);
-  return targetFile;
+  return _GalleryMaterializeFileResult(
+    file: targetFile,
+    downloadedBytes: downloadedBytes,
+  );
 }
 
 Future<void> _galleryDeleteStaleFilesForPrefix(
@@ -310,24 +524,28 @@ Future<void> _galleryDeleteStaleFilesForPrefix(
   String prefix,
   File retainedFile,
 ) async {
-  if (!await targetDirectory.exists()) {
-    return;
-  }
-
-  final retainedPath = retainedFile.path;
-  await for (final entity in targetDirectory.list()) {
-    if (entity is! File || entity.path == retainedPath) {
-      continue;
+  try {
+    if (!await targetDirectory.exists()) {
+      return;
     }
 
-    final fileName = _basename(entity.path);
-    final isLegacyFile = fileName.startsWith('$prefix.');
-    final isStampedFile = fileName.startsWith('${prefix}_');
-    if (!isLegacyFile && !isStampedFile) {
-      continue;
-    }
+    final retainedPath = retainedFile.path;
+    await for (final entity in targetDirectory.list()) {
+      if (entity is! File || entity.path == retainedPath) {
+        continue;
+      }
 
-    await entity.delete();
+      final fileName = _basename(entity.path);
+      final isLegacyFile = fileName.startsWith('$prefix.');
+      final isStampedFile = fileName.startsWith('${prefix}_');
+      if (!isLegacyFile && !isStampedFile) {
+        continue;
+      }
+
+      await entity.delete();
+    }
+  } on Object {
+    // Local cache cleanup is best effort.
   }
 }
 
@@ -335,23 +553,27 @@ Future<void> _galleryDeleteFilesForPrefix(
   Directory targetDirectory,
   String prefix,
 ) async {
-  if (!await targetDirectory.exists()) {
-    return;
-  }
-
-  await for (final entity in targetDirectory.list()) {
-    if (entity is! File) {
-      continue;
+  try {
+    if (!await targetDirectory.exists()) {
+      return;
     }
 
-    final fileName = _basename(entity.path);
-    final isLegacyFile = fileName.startsWith('$prefix.');
-    final isStampedFile = fileName.startsWith('${prefix}_');
-    if (!isLegacyFile && !isStampedFile) {
-      continue;
-    }
+    await for (final entity in targetDirectory.list()) {
+      if (entity is! File) {
+        continue;
+      }
 
-    await entity.delete();
+      final fileName = _basename(entity.path);
+      final isLegacyFile = fileName.startsWith('$prefix.');
+      final isStampedFile = fileName.startsWith('${prefix}_');
+      if (!isLegacyFile && !isStampedFile) {
+        continue;
+      }
+
+      await entity.delete();
+    }
+  } on Object {
+    // Local cache cleanup is best effort.
   }
 }
 
@@ -369,6 +591,31 @@ Future<bool> _galleryHasUsableFile(File file) async {
   } on Object {
     return false;
   }
+}
+
+Future<int> _galleryFileSize(File file) async {
+  try {
+    if (!await file.exists()) {
+      return 0;
+    }
+    final stat = await file.stat();
+    return stat.type == FileSystemEntityType.file ? stat.size : 0;
+  } on Object {
+    return 0;
+  }
+}
+
+Future<int> _galleryCalculateLocalBytes(Iterable<String?> paths) async {
+  var total = 0;
+  final seen = <String>{};
+  for (final path in paths) {
+    final normalized = path?.trim();
+    if (normalized == null || normalized.isEmpty || !seen.add(normalized)) {
+      continue;
+    }
+    total += await _galleryFileSize(File(normalized));
+  }
+  return total;
 }
 
 bool _galleryIsValidLocalFile(String? path, {bool allowMissing = false}) {
@@ -394,11 +641,9 @@ bool _galleryIsValidLocalFile(String? path, {bool allowMissing = false}) {
 }
 
 bool _gallerySafeMediaUriEquals(String left, String right) {
-  final leftUri = parseSafeGenerationMediaUri(left);
-  final rightUri = parseSafeGenerationMediaUri(right);
-  return leftUri != null &&
-      rightUri != null &&
-      leftUri.toString() == rightUri.toString();
+  final leftSafe = persistentSafeGenerationMediaUrl(left);
+  final rightSafe = persistentSafeGenerationMediaUrl(right);
+  return leftSafe != null && rightSafe != null && leftSafe == rightSafe;
 }
 
 bool _gallerySafeNullableMediaUriEquals(String? left, String? right) {
@@ -417,7 +662,7 @@ Future<Directory> _galleryEnsureGenerationDirectory(
   String generationId,
 ) async {
   final root = await store._rootDirectoryResolver();
-  final scopeSegment = _safePathSegment(accountScope, fallback: 'account');
+  final scopeSegment = _galleryScopeStorageSegment(accountScope);
   final generationSegment = _safePathSegment(
     generationId,
     fallback: 'generation',
@@ -437,7 +682,7 @@ Future<void> _galleryDeleteGenerationDirectory(
   String generationId,
 ) async {
   final root = await store._rootDirectoryResolver();
-  final scopeSegment = _safePathSegment(accountScope, fallback: 'account');
+  final scopeSegment = _galleryScopeStorageSegment(accountScope);
   final generationSegment = _safePathSegment(
     generationId,
     fallback: 'generation',
@@ -457,10 +702,21 @@ Future<void> _galleryDeleteScopeDirectory(
   String accountScope,
 ) async {
   final root = await store._rootDirectoryResolver();
-  final scopeSegment = _safePathSegment(accountScope, fallback: 'account');
+  final scopeSegment = _galleryScopeStorageSegment(accountScope);
   final directory = Directory(
     '${root.path}${Platform.pathSeparator}'
     '${GenerationGalleryStore._generationScopeRoot}${Platform.pathSeparator}$scopeSegment',
+  );
+  if (await directory.exists()) {
+    await directory.delete(recursive: true);
+  }
+}
+
+Future<void> _galleryDeleteRootDirectory(GenerationGalleryStore store) async {
+  final root = await store._rootDirectoryResolver();
+  final directory = Directory(
+    '${root.path}${Platform.pathSeparator}'
+    '${GenerationGalleryStore._generationScopeRoot}',
   );
   if (await directory.exists()) {
     await directory.delete(recursive: true);
@@ -471,20 +727,42 @@ Future<void> _galleryCleanupScopeArtifacts(
   GenerationGalleryStore store,
   String accountScope,
 ) async {
+  final entries = await _galleryReadEntriesForScope(store, accountScope);
+  await _galleryCleanupScopeArtifactsForKnownIds(
+    store,
+    accountScope,
+    entries.map((entry) => entry.generationId).toSet(),
+  );
+}
+
+Future<void> _galleryCleanupScopeArtifactsForKnownIds(
+  GenerationGalleryStore store,
+  String accountScope,
+  Set<String> knownGenerationIds,
+) async {
   final root = await store._rootDirectoryResolver();
+  final scopeSegment = _galleryScopeStorageSegment(accountScope);
   final scopeDirectory = Directory(
     '${root.path}${Platform.pathSeparator}'
     '${GenerationGalleryStore._generationScopeRoot}${Platform.pathSeparator}'
-    '${_safePathSegment(accountScope, fallback: 'account')}',
+    '$scopeSegment',
   );
   if (!await scopeDirectory.exists()) {
     return;
   }
 
-  final entries = await _galleryReadEntriesForScope(store, accountScope);
-  final knownIds = entries
+  final knownIds = knownGenerationIds
       .map(
-        (entry) => _safePathSegment(entry.generationId, fallback: 'generation'),
+        (generationId) =>
+            _safePathSegment(generationId, fallback: 'generation'),
+      )
+      .toSet();
+  final activeIds = store._downloadCancelTokens.keys
+      .where((downloadKey) => downloadKey.startsWith('$accountScope\u{1F}'))
+      .map((downloadKey) => downloadKey.substring(accountScope.length + 1))
+      .map(
+        (generationId) =>
+            _safePathSegment(generationId, fallback: 'generation'),
       )
       .toSet();
   await for (final entity in scopeDirectory.list()) {
@@ -502,6 +780,10 @@ Future<void> _galleryCleanupScopeArtifacts(
       continue;
     }
 
+    if (activeIds.contains(generationId)) {
+      continue;
+    }
+
     if (!knownIds.contains(generationId)) {
       await entity.delete(recursive: true);
       continue;
@@ -511,17 +793,40 @@ Future<void> _galleryCleanupScopeArtifacts(
   }
 }
 
+Future<void> _galleryDeleteLocalPath(String? path) async {
+  final normalized = path?.trim();
+  if (normalized == null || normalized.isEmpty) {
+    return;
+  }
+  try {
+    final file = File(normalized);
+    if (await file.exists()) {
+      await file.delete();
+    }
+    final partFile = File('$normalized.part');
+    if (await partFile.exists()) {
+      await partFile.delete();
+    }
+  } on Object {
+    // Local cache cleanup is best effort; stale artifacts will be retried later.
+  }
+}
+
 Future<void> _galleryCleanupGenerationArtifacts(
   Directory generationDirectory,
 ) async {
-  if (!await generationDirectory.exists()) {
-    return;
-  }
-
-  await for (final entity in generationDirectory.list()) {
-    if (entity is File && entity.path.endsWith('.part')) {
-      await entity.delete();
+  try {
+    if (!await generationDirectory.exists()) {
+      return;
     }
+
+    await for (final entity in generationDirectory.list()) {
+      if (entity is File && entity.path.endsWith('.part')) {
+        await entity.delete();
+      }
+    }
+  } on Object {
+    // Cache cleanup is best effort; materialization can recreate safe files.
   }
 }
 
@@ -532,8 +837,8 @@ Future<void> _galleryCancelActiveDownloads(GenerationGalleryStore store) async {
   }
 }
 
-void _galleryCancelDownload(GenerationGalleryStore store, String generationId) {
-  final token = store._downloadCancelTokens.remove(generationId);
+void _galleryCancelDownload(GenerationGalleryStore store, String downloadKey) {
+  final token = store._downloadCancelTokens.remove(downloadKey);
   if (token != null && !token.isCancelled) {
     token.cancel('gallery_cleanup');
   }

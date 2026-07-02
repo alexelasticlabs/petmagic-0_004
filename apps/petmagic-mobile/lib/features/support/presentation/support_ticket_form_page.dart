@@ -8,6 +8,7 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/permissions/media_permission_feedback.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
@@ -38,12 +39,12 @@ class SupportTicketFormPage extends ConsumerStatefulWidget {
   final List<XFile> initialAttachments;
 
   static String location(String scenario) {
-    final trimmedScenario = scenario.trim();
-    if (trimmedScenario.isEmpty) {
+    final normalizedScenario = normalizeSupportScenarioQuery(scenario);
+    if (normalizedScenario == null) {
       return routePath;
     }
 
-    return '$routePath?$scenarioQueryParam=${Uri.encodeQueryComponent(trimmedScenario)}';
+    return '$routePath?$scenarioQueryParam=${Uri.encodeQueryComponent(normalizedScenario)}';
   }
 
   @override
@@ -155,6 +156,21 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
     );
     final text = AppLocalizations.of(context);
     final scenarioData = buildSupportAssistantScenario(widget.scenario, text);
+
+    ref.listen<NetworkStatusState>(networkStatusControllerProvider, (
+      previous,
+      next,
+    ) {
+      if (previous?.hasInternet != false || !next.hasInternet) {
+        return;
+      }
+      if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
+        return;
+      }
+
+      unawaited(_preloadSupportContext());
+    });
+
     if (!isAuthenticated) {
       return ProfileScreenBackground(
         child: SafeArea(
@@ -461,6 +477,14 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
       return;
     }
 
+    if (!ref.read(networkStatusControllerProvider).hasInternet) {
+      _showToast(
+        text.globalOfflineBannerMessage,
+        tone: PetMagicToastTone.warning,
+      );
+      return;
+    }
+
     setState(() {
       _isSubmitting = true;
     });
@@ -599,6 +623,10 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
     }
 
     if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
+      return;
+    }
+
+    if (!ref.read(networkStatusControllerProvider).hasInternet) {
       return;
     }
 

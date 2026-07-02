@@ -170,15 +170,19 @@ class _ReplyAttachmentLeading extends StatelessWidget {
         attachment.isImage &&
         !attachment.isDeleted &&
         attachment.fileUrl.trim().isNotEmpty;
+    final safeUri = showImageThumb
+        ? parseSafeSupportExternalUri(attachment.fileUrl)
+        : null;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(8),
       child: SizedBox(
         width: 40,
         height: 40,
-        child: showImageThumb
+        child: safeUri != null
             ? CachedNetworkImage(
-                imageUrl: attachment.fileUrl,
+                imageUrl: safeUri.toString(),
+                cacheKey: persistentSafeSupportMediaUrl(safeUri.toString()),
                 fit: BoxFit.cover,
                 memCacheWidth: _supportReplyThumbnailCacheWidth,
                 maxWidthDiskCache: _supportReplyThumbnailCacheWidth,

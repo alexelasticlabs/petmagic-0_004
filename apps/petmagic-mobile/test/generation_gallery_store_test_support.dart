@@ -1,7 +1,9 @@
 import 'dart:io';
+import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:crypto/crypto.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_gallery_store.dart';
@@ -76,6 +78,14 @@ GenerationGalleryStore buildGenerationGalleryStore(
   SharedPreferencesAsync? preferences,
   AuthSession? session,
   bool useDefaultSession = true,
+  int maxBackgroundMaterializationsPerSession = 12,
+  int maxBackgroundVideoOutputsPerSession = 0,
+  int maxBackgroundBytesPerSession = 64 * 1024 * 1024,
+  int maxBackgroundFileBytes = 32 * 1024 * 1024,
+  int maxGalleryCacheBytesPerScope = 256 * 1024 * 1024,
+  int maxMaterializationRetryCount = 3,
+  Duration materializationRetryBaseBackoff = const Duration(minutes: 15),
+  DateTime Function()? clock,
 }) {
   return GenerationGalleryStore(
     dio: dio ?? Dio(),
@@ -84,6 +94,15 @@ GenerationGalleryStore buildGenerationGalleryStore(
       useDefaultSession ? (session ?? sessionForUser()) : session,
     ),
     rootDirectoryResolver: () async => rootDirectory,
+    maxBackgroundMaterializationsPerSession:
+        maxBackgroundMaterializationsPerSession,
+    maxBackgroundVideoOutputsPerSession: maxBackgroundVideoOutputsPerSession,
+    maxBackgroundBytesPerSession: maxBackgroundBytesPerSession,
+    maxBackgroundFileBytes: maxBackgroundFileBytes,
+    maxGalleryCacheBytesPerScope: maxGalleryCacheBytesPerScope,
+    maxMaterializationRetryCount: maxMaterializationRetryCount,
+    materializationRetryBaseBackoff: materializationRetryBaseBackoff,
+    clock: clock,
   );
 }
 
@@ -92,10 +111,13 @@ Directory generationDirectoryForTest(
   String accountScope,
   String generationId,
 ) {
+  final scopeSegment = sha256
+      .convert(utf8.encode(accountScope.trim().toLowerCase()))
+      .toString();
   return Directory(
     '${rootDirectory.path}${Platform.pathSeparator}'
     'generation_gallery${Platform.pathSeparator}'
-    '$accountScope${Platform.pathSeparator}$generationId',
+    'scope_$scopeSegment${Platform.pathSeparator}$generationId',
   );
 }
 

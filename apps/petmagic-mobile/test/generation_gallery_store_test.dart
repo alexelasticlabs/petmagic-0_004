@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:petmagic_mobile/features/templates/data/generation_gallery_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'generation_gallery_store_test_support.dart';
@@ -153,6 +155,58 @@ void main() {
       expect(await File(record.previewLocalPath!).readAsBytes(), _tinyJpegOne);
       expect(await File(record.outputLocalPath!).readAsBytes(), _tinyJpegTwo);
       expect(requestCountsByPath, {'/thumb.jpg': 1, '/result.jpg': 1});
+    },
+  );
+
+  test(
+    'materializeGenerationMedia keeps signed URL secrets out of persisted records',
+    () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'petmagic-generation-gallery-store-test-',
+      );
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final requestedQueries = <String>[];
+      late final StreamSubscription<HttpRequest> subscription;
+      subscription = server.listen((request) async {
+        requestedQueries.add(request.uri.query);
+        request.response.headers.contentType = ContentType('image', 'jpeg');
+        request.response.add(_tinyJpegOne);
+        await request.response.close();
+      });
+
+      addTearDown(() async {
+        await subscription.cancel();
+        await server.close(force: true);
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+
+      final preferences = SharedPreferencesAsync();
+      final store = _store(tempDir, preferences: preferences);
+      final baseUrl = 'http://${server.address.address}:${server.port}';
+      final signedOutputUrl =
+          '$baseUrl/result.jpg?X-Amz-Signature=secret&token=raw#fragment';
+
+      final record = await store.materializeGenerationMedia(
+        _completedGeneration(outputUrl: signedOutputUrl),
+      );
+      final keys = await preferences.getKeys();
+      final cacheKey = keys.singleWhere(
+        (key) => key.startsWith('generation_gallery_entries_v2:'),
+      );
+      final raw = await preferences.getString(cacheKey);
+      final persisted = await store.readLocalRecord(record!.generationId);
+
+      expect(requestedQueries.single, contains('X-Amz-Signature=secret'));
+      expect(record.isDownloadComplete, isTrue);
+      expect(cacheKey, isNot(contains('user-1')));
+      expect(raw, isNotNull);
+      expect(raw, isNot(contains('X-Amz-Signature')));
+      expect(raw, isNot(contains('token=raw')));
+      expect(raw, isNot(contains('fragment')));
+      expect(persisted?.outputRemoteUrl, '$baseUrl/result.jpg');
+      expect(persisted?.previewRemoteUrl, '$baseUrl/result.jpg');
     },
   );
 
@@ -359,13 +413,27 @@ void main() {
 
       expect(userOneRecord.accountScope, 'user-1');
       expect(userTwoRecord.accountScope, 'user-2');
-      expect(userOneRecord.outputLocalPath, contains('user-1'));
-      expect(userTwoRecord.outputLocalPath, contains('user-2'));
+      expect(userOneRecord.outputLocalPath, isNot(contains('user-1')));
+      expect(userTwoRecord.outputLocalPath, isNot(contains('user-2')));
       expect(userOneRecord.previewLocalPath, userOneRecord.outputLocalPath);
       expect(userTwoRecord.previewLocalPath, userTwoRecord.outputLocalPath);
       expect(
         userOneRecord.outputLocalPath,
         isNot(userTwoRecord.outputLocalPath),
+      );
+      final preferenceKeys = await preferences.getKeys();
+      expect(preferenceKeys.any((key) => key.contains('user-1')), isFalse);
+      expect(preferenceKeys.any((key) => key.contains('user-2')), isFalse);
+      for (final key in preferenceKeys) {
+        final raw = await preferences.getString(key);
+        expect(raw, isNot(contains('user-1')));
+        expect(raw, isNot(contains('user-2')));
+      }
+      expect(
+        preferenceKeys.where(
+          (key) => key.startsWith('generation_gallery_entries_v2:'),
+        ),
+        hasLength(2),
       );
       expect(requestCount, greaterThanOrEqualTo(2));
 
@@ -377,6 +445,85 @@ void main() {
       expect(
         (await userTwoStore.readLocalRecord('shared-generation'))?.accountScope,
         'user-2',
+      );
+    },
+  );
+
+  test(
+    'materializeGenerationMedia does not resurrect locally deleted records',
+    () async {
+      final source = await File(
+        'lib/features/templates/data/generation_gallery_store_storage.part.dart',
+      ).readAsString();
+      final body = _extractFunctionBody(
+        source,
+        'Future<GenerationGalleryMediaRecord?>\n_galleryMaterializeGenerationMediaInternal(',
+      );
+
+      expect(body, contains('latestEntry?.isDeletedLocally == true'));
+      expect(
+        body,
+        contains('await _galleryDeleteLocalPath(previewLocalPath);'),
+      );
+      expect(body, contains('await _galleryDeleteLocalPath(outputLocalPath);'));
+      expect(body, contains('return latestEntry;'));
+    },
+  );
+
+  test(
+    'loadLocalReadyItems migrates legacy raw user scope preference key',
+    () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'petmagic-generation-gallery-store-test-',
+      );
+      addTearDown(() async {
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+
+      final preferences = SharedPreferencesAsync();
+      const legacyScope = 'legacy-user-1';
+      final record = GenerationGalleryMediaRecord(
+        generationId: 'legacy-generation',
+        accountScope: legacyScope,
+        userId: legacyScope,
+        status: 'completed',
+        templateTitle: 'Legacy',
+        templateType: 'image',
+        updatedAtUtc: DateTime.utc(2035),
+        lastSyncedAtUtc: DateTime.utc(2035),
+        version: 1,
+        isDownloadComplete: true,
+      );
+      await preferences.setString(
+        'generation_gallery_entries_v1:$legacyScope',
+        jsonEncode([record.toJson()]),
+      );
+
+      final store = _store(
+        tempDir,
+        preferences: preferences,
+        session: _sessionForUser(legacyScope),
+      );
+
+      final items = await store.loadLocalReadyItems();
+
+      expect(
+        items.map((item) => item.generationId),
+        contains('legacy-generation'),
+      );
+      expect(
+        await preferences.getString(
+          'generation_gallery_entries_v1:$legacyScope',
+        ),
+        isNull,
+      );
+      final keys = await preferences.getKeys();
+      expect(keys.any((key) => key.contains(legacyScope)), isFalse);
+      expect(
+        keys.where((key) => key.startsWith('generation_gallery_entries_v2:')),
+        hasLength(1),
       );
     },
   );
@@ -734,4 +881,305 @@ void main() {
         .toList();
     expect(files, isEmpty);
   });
+
+  test('background materialization respects per-session item cap', () async {
+    final tempDir = await Directory.systemTemp.createTemp(
+      'petmagic-generation-gallery-store-test-',
+    );
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    var requestCount = 0;
+    late final StreamSubscription<HttpRequest> subscription;
+    subscription = server.listen((request) async {
+      requestCount++;
+      request.response.headers.contentType = ContentType('image', 'jpeg');
+      request.response.add(_tinyJpegOne);
+      await request.response.close();
+    });
+
+    addTearDown(() async {
+      await subscription.cancel();
+      await server.close(force: true);
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+
+    final store = _store(tempDir, maxBackgroundMaterializationsPerSession: 1);
+    final baseUrl = 'http://${server.address.address}:${server.port}';
+
+    final first = await store.materializeGenerationMedia(
+      _completedGeneration(
+        generationId: 'generation-1',
+        outputUrl: '$baseUrl/one.jpg',
+      ),
+      background: true,
+    );
+    final second = await store.materializeGenerationMedia(
+      _completedGeneration(
+        generationId: 'generation-2',
+        outputUrl: '$baseUrl/two.jpg',
+      ),
+      background: true,
+    );
+
+    expect(first, isNotNull);
+    expect(first!.isDownloadComplete, isTrue);
+    expect(second, isNotNull);
+    expect(second!.isDownloadComplete, isFalse);
+    expect(
+      second.materializationFailureCode,
+      'background_session_cap_exceeded',
+    );
+    expect(second.outputLocalPath, isNull);
+    expect(requestCount, 1);
+  });
+
+  test('background materialization respects file byte budget', () async {
+    final tempDir = await Directory.systemTemp.createTemp(
+      'petmagic-generation-gallery-store-test-',
+    );
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    var requestCount = 0;
+    late final StreamSubscription<HttpRequest> subscription;
+    subscription = server.listen((request) async {
+      requestCount++;
+      request.response.headers.contentType = ContentType('image', 'jpeg');
+      request.response.add(_tinyJpegOne);
+      await request.response.close();
+    });
+
+    addTearDown(() async {
+      await subscription.cancel();
+      await server.close(force: true);
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+
+    final store = _store(tempDir, maxBackgroundFileBytes: 4);
+    final outputUrl =
+        'http://${server.address.address}:${server.port}/oversize.jpg';
+
+    final record = await store.materializeGenerationMedia(
+      _completedGeneration(outputUrl: outputUrl),
+      background: true,
+    );
+
+    expect(record, isNotNull);
+    expect(record!.isDownloadComplete, isFalse);
+    expect(record.previewLocalPath, isNull);
+    expect(record.outputLocalPath, isNull);
+    expect(record.materializationFailureCode, 'background_file_too_large');
+    expect(record.localBytes, 0);
+    expect(requestCount, 1);
+    final files = await tempDir
+        .list(recursive: true)
+        .where((entity) => entity is File)
+        .toList();
+    expect(files, isEmpty);
+  });
+
+  test('background materialization backs off failed files', () async {
+    final tempDir = await Directory.systemTemp.createTemp(
+      'petmagic-generation-gallery-store-test-',
+    );
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    var requestCount = 0;
+    late final StreamSubscription<HttpRequest> subscription;
+    subscription = server.listen((request) async {
+      requestCount++;
+      request.response.statusCode = HttpStatus.notFound;
+      await request.response.close();
+    });
+
+    addTearDown(() async {
+      await subscription.cancel();
+      await server.close(force: true);
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+
+    final nowUtc = DateTime.utc(2035, 1, 1, 12);
+    final store = _store(tempDir, clock: () => nowUtc);
+    final generation = _completedGeneration(
+      outputUrl: 'http://${server.address.address}:${server.port}/missing.jpg',
+    );
+
+    final first = await store.materializeGenerationMedia(
+      generation,
+      background: true,
+    );
+    final second = await store.materializeGenerationMedia(
+      generation,
+      background: true,
+    );
+
+    expect(first, isNotNull);
+    expect(first!.isDownloadComplete, isFalse);
+    expect(first.materializationFailureCode, 'storage_unavailable');
+    expect(first.materializationFailureCount, 1);
+    expect(
+      first.materializationBackoffUntilUtc,
+      nowUtc.add(Duration(minutes: 15)),
+    );
+    expect(second, isNotNull);
+    expect(
+      second!.materializationBackoffUntilUtc,
+      first.materializationBackoffUntilUtc,
+    );
+    expect(requestCount, 1);
+  });
+
+  test(
+    'background materialization caches video preview without full output',
+    () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'petmagic-generation-gallery-store-test-',
+      );
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final requestPaths = <String>[];
+      late final StreamSubscription<HttpRequest> subscription;
+      subscription = server.listen((request) async {
+        requestPaths.add(request.uri.path);
+        if (request.uri.path.endsWith('.mp4')) {
+          request.response.headers.contentType = ContentType('video', 'mp4');
+          request.response.add(_tinyMp4);
+        } else {
+          request.response.headers.contentType = ContentType('image', 'jpeg');
+          request.response.add(_tinyJpegOne);
+        }
+        await request.response.close();
+      });
+
+      addTearDown(() async {
+        await subscription.cancel();
+        await server.close(force: true);
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+
+      final store = _store(tempDir);
+      final baseUrl = 'http://${server.address.address}:${server.port}';
+
+      final record = await store.materializeGenerationMedia(
+        _completedGeneration(
+          templateType: 'video',
+          resultPreviewUrl: '$baseUrl/preview.jpg',
+          outputUrl: '$baseUrl/result.mp4',
+        ),
+        background: true,
+      );
+
+      expect(record, isNotNull);
+      expect(record!.isDownloadComplete, isFalse);
+      expect(record.previewLocalPath, isNotNull);
+      expect(record.outputLocalPath, isNull);
+      expect(
+        record.materializationFailureCode,
+        'background_video_output_skipped',
+      );
+      expect(requestPaths, ['/preview.jpg']);
+    },
+  );
+
+  test('gallery cache prune removes old local media by byte quota', () async {
+    final tempDir = await Directory.systemTemp.createTemp(
+      'petmagic-generation-gallery-store-test-',
+    );
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    late final StreamSubscription<HttpRequest> subscription;
+    subscription = server.listen((request) async {
+      request.response.headers.contentType = ContentType('image', 'jpeg');
+      request.response.add(_tinyJpegOne);
+      await request.response.close();
+    });
+
+    addTearDown(() async {
+      await subscription.cancel();
+      await server.close(force: true);
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+
+    final store = _store(tempDir, maxGalleryCacheBytesPerScope: 20);
+    final baseUrl = 'http://${server.address.address}:${server.port}';
+    final older = await store.materializeGenerationMedia(
+      _completedGeneration(
+        generationId: 'older-generation',
+        updatedAtUtc: DateTime.utc(2035, 1, 1, 10),
+        outputUrl: '$baseUrl/older.jpg',
+      ),
+    );
+    final olderOutputPath = older!.outputLocalPath;
+
+    final newer = await store.materializeGenerationMedia(
+      _completedGeneration(
+        generationId: 'newer-generation',
+        updatedAtUtc: DateTime.utc(2035, 1, 1, 11),
+        outputUrl: '$baseUrl/newer.jpg',
+      ),
+    );
+
+    final prunedOlder = await store.readLocalRecord('older-generation');
+    final retainedNewer = await store.readLocalRecord('newer-generation');
+
+    expect(newer, isNotNull);
+    expect(prunedOlder, isNotNull);
+    expect(prunedOlder!.isDownloadComplete, isFalse);
+    expect(prunedOlder.outputLocalPath, isNull);
+    expect(prunedOlder.materializationFailureCode, 'cache_byte_pruned');
+    expect(retainedNewer, isNotNull);
+    expect(retainedNewer!.isDownloadComplete, isTrue);
+    expect(retainedNewer.outputLocalPath, isNotNull);
+    expect(await File(olderOutputPath!).exists(), isFalse);
+  });
+}
+
+String _extractFunctionBody(String source, String signature) {
+  final start = source.indexOf(signature);
+  if (start < 0) {
+    fail('Function signature was not found: $signature');
+  }
+
+  var parenDepth = 0;
+  var openBrace = -1;
+  for (var index = start; index < source.length; index++) {
+    final char = source[index];
+    if (char == '(') {
+      parenDepth++;
+      continue;
+    }
+    if (char == ')') {
+      parenDepth--;
+      continue;
+    }
+    if (char == '{' && parenDepth == 0) {
+      openBrace = index;
+      break;
+    }
+  }
+  if (openBrace < 0) {
+    fail('Function body was not found: $signature');
+  }
+
+  var depth = 0;
+  for (var index = openBrace; index < source.length; index++) {
+    final char = source[index];
+    if (char == '{') {
+      depth++;
+      continue;
+    }
+    if (char != '}') {
+      continue;
+    }
+    depth--;
+    if (depth == 0) {
+      return source.substring(openBrace, index + 1);
+    }
+  }
+
+  fail('Function body was not closed: $signature');
 }

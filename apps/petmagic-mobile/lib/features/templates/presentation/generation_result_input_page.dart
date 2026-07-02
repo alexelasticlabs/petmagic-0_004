@@ -7,17 +7,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
+import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_unavailable_view.dart';
 
 part 'generation_result_input_page_chrome.part.dart';
 
@@ -54,7 +58,7 @@ class _GenerationResultInputPageState
   @override
   void initState() {
     super.initState();
-    unawaited(_load());
+    unawaited(_loadIfOnline());
   }
 
   @override
@@ -62,6 +66,19 @@ class _GenerationResultInputPageState
     _cancelToken?.cancel('generation_result_input_disposed');
     _startCancelToken?.cancel('generation_result_input_start_disposed');
     super.dispose();
+  }
+
+  void _cancelActiveWorkForOffline() {
+    _cancelToken?.cancel('generation_result_input_offline');
+    _cancelToken = null;
+    _startCancelToken?.cancel('generation_result_input_start_offline');
+    _startCancelToken = null;
+    if (_isLoading || _isStarting) {
+      setState(() {
+        _isLoading = false;
+        _isStarting = false;
+      });
+    }
   }
 
   Future<void> _load() async {
@@ -112,6 +129,22 @@ class _GenerationResultInputPageState
     }
   }
 
+  Future<void> _loadIfOnline() async {
+    if (!mounted) {
+      return;
+    }
+    if (!ref.read(networkStatusControllerProvider).hasInternet) {
+      if (_parent == null && _compatible == null && _isLoading) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+
+    await _load();
+  }
+
   _GenerationResultInputCopy get _copy =>
       _GenerationResultInputCopy.forLocale(AppLocalizations.of(context));
 
@@ -136,6 +169,30 @@ class _GenerationResultInputPageState
     final copy = _copy;
     final parent = _parent;
     final visibleTemplates = _visibleTemplates;
+    final hasInternet = ref.watch(
+      networkStatusControllerProvider.select((status) => status.hasInternet),
+    );
+    final showOfflineUnavailable =
+        parent == null && _compatible == null && !_isLoading && !hasInternet;
+
+    ref.listen<NetworkStatusState>(networkStatusControllerProvider, (
+      previous,
+      next,
+    ) {
+      if (previous?.hasInternet == next.hasInternet) {
+        return;
+      }
+      if (!next.hasInternet) {
+        _cancelActiveWorkForOffline();
+        return;
+      }
+      if (_parent != null && _compatible != null) {
+        return;
+      }
+
+      unawaited(_loadIfOnline());
+    });
+
     return DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -151,7 +208,7 @@ class _GenerationResultInputPageState
             color: colors.accent,
             onRefresh: () async {
               await PetMagicHaptics.medium();
-              await _load();
+              await _loadIfOnline();
             },
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(
@@ -187,8 +244,17 @@ class _GenerationResultInputPageState
                 const SizedBox(height: 12),
                 if (_isLoading)
                   const _ResultInputLoadingCard()
+                else if (showOfflineUnavailable)
+                  PetMagicUnavailableView(
+                    kind: AppUnavailableKind.offline,
+                    onRetry: () => unawaited(_loadIfOnline()),
+                    padding: EdgeInsets.zero,
+                  )
                 else if (_error != null)
-                  _ResultInputErrorCard(message: _error!, onRetry: _load)
+                  _ResultInputErrorCard(
+                    message: _error!,
+                    onRetry: _loadIfOnline,
+                  )
                 else if (parent != null) ...[
                   _ParentPreviewCard(generation: parent, copy: copy),
                   const SizedBox(height: 14),
@@ -199,7 +265,10 @@ class _GenerationResultInputPageState
                   ),
                   const SizedBox(height: 12),
                   if (visibleTemplates.isEmpty)
-                    _ResultInputErrorCard(message: copy.empty, onRetry: _load)
+                    _ResultInputErrorCard(
+                      message: copy.empty,
+                      onRetry: _loadIfOnline,
+                    )
                   else
                     ...visibleTemplates.map(
                       (template) => Padding(
@@ -368,6 +437,9 @@ class _ParentPreviewCard extends StatelessWidget {
                       )
                     : CachedNetworkImage(
                         imageUrl: mediaUrl.toString(),
+                        cacheKey: persistentSafeGenerationMediaUrl(
+                          mediaUrl.toString(),
+                        ),
                         fit: BoxFit.cover,
                         memCacheWidth: _parentPreviewCacheWidth,
                         maxWidthDiskCache: _parentPreviewCacheWidth,
@@ -444,6 +516,9 @@ class _CompatibleTemplateTile extends StatelessWidget {
                         )
                       : CachedNetworkImage(
                           imageUrl: safeThumb.toString(),
+                          cacheKey: persistentSafeGenerationMediaUrl(
+                            safeThumb.toString(),
+                          ),
                           fit: BoxFit.cover,
                           memCacheWidth: _compatibleTemplateThumbnailCacheWidth,
                           maxWidthDiskCache:

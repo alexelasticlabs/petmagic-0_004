@@ -10,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:image_picker_platform_interface/image_picker_platform_interface.dart'
     as image_picker_platform;
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/features/pets/presentation/my_pets_page.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
@@ -24,7 +25,20 @@ void main() {
     final source = petsPageCombinedSource;
 
     expect(source, contains('Future<void> _evictPetPhotoMedia'));
-    expect(source, contains('CachedNetworkImage.evictFromCache(imageUrl)'));
+    expect(
+      source,
+      contains('final cacheKey = persistentSafeMediaCacheKeyUrl(imageUrl);'),
+    );
+    expect(
+      source,
+      contains(
+        'CachedNetworkImage.evictFromCache(imageUrl, cacheKey: cacheKey)',
+      ),
+    );
+    expect(
+      source,
+      isNot(contains('CachedNetworkImage.evictFromCache(imageUrl);')),
+    );
     expect(source, contains('currentAvatarUrl: pet.avatarUrl'));
     expect(source, contains('currentAvatarUrl: widget.currentAvatarUrl'));
     expect(
@@ -57,6 +71,32 @@ void main() {
         '  if (cancelToken.isCancelled)',
       ),
     );
+  });
+
+  test('pet media network images use persistent-safe cache keys', () {
+    final source = petsPageCombinedSource;
+
+    expect(
+      source,
+      contains('cacheKey: persistentSafeMediaCacheKeyUrl(imageUrl)'),
+    );
+    expect(
+      source,
+      contains('cacheKey: persistentSafeMediaCacheKeyUrl(fallback)'),
+    );
+    expect(
+      source,
+      contains('cacheKey: persistentSafeProfileAvatarUrl(imageUrl)'),
+    );
+  });
+
+  test('pet generation share text uses persistent-safe media URLs', () {
+    final source = petsPageCombinedSource;
+
+    expect(source, contains('final shareSafeUrl = safeOutputUrl == null'));
+    expect(source, contains('persistentSafeGenerationMediaUrl(safeOutputUrl)'));
+    expect(source, contains('ShareParams(text: shareSafeUrl)'));
+    expect(source, isNot(contains('ShareParams(text: safeOutputUrl)')));
   });
 
   test('pet form step widgets stay in a dedicated part file', () {
@@ -364,6 +404,9 @@ void main() {
     final container = ProviderContainer(
       overrides: [
         templateGenerationRepositoryProvider.overrideWithValue(repository),
+        networkStatusControllerProvider.overrideWith(
+          () => TestMyPetsNetworkStatusController(initialHasInternet: true),
+        ),
       ],
     );
     addTearDown(container.dispose);
@@ -418,6 +461,86 @@ void main() {
     await Future.wait([petsRefresh, photosRefresh, generationsRefresh]);
     expect(generationsRefreshCompleted, isTrue);
   });
+
+  test(
+    'pet gallery providers stay offline without repository fetches until reconnect',
+    () async {
+      final repository = FakePetRepository(
+        pets: [
+          PetProfile(
+            id: 'pet-1',
+            name: 'Bella',
+            type: 'dog',
+            photosCount: 1,
+            generationsCount: 1,
+            createdAtUtc: DateTime.utc(2026),
+            updatedAtUtc: DateTime.utc(2026),
+          ),
+        ],
+      );
+      final networkController = TestMyPetsNetworkStatusController(
+        initialHasInternet: false,
+      );
+      final container = ProviderContainer(
+        overrides: [
+          templateGenerationRepositoryProvider.overrideWithValue(repository),
+          networkStatusControllerProvider.overrideWith(() => networkController),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await expectLater(
+        container.read(petsProvider.future),
+        throwsA(
+          isA<AppException>().having(
+            (error) => error.message,
+            'message',
+            'templates.network_unavailable',
+          ),
+        ),
+      );
+      await expectLater(
+        container.read(petPhotosProvider('pet-1').future),
+        throwsA(
+          isA<AppException>().having(
+            (error) => error.message,
+            'message',
+            'templates.network_unavailable',
+          ),
+        ),
+      );
+      await expectLater(
+        container.read(petGenerationsProvider('pet-1').future),
+        throwsA(
+          isA<AppException>().having(
+            (error) => error.message,
+            'message',
+            'templates.network_unavailable',
+          ),
+        ),
+      );
+
+      expect(repository.petsFetchCount, 0);
+      expect(repository.petPhotoFetchCount, 0);
+      expect(repository.petGenerationFetchCount, 0);
+
+      networkController.setHasInternet(true);
+      container
+        ..invalidate(petsProvider)
+        ..invalidate(petPhotosProvider('pet-1'))
+        ..invalidate(petGenerationsProvider('pet-1'));
+
+      await Future.wait([
+        container.read(petsProvider.future),
+        container.read(petPhotosProvider('pet-1').future),
+        container.read(petGenerationsProvider('pet-1').future),
+      ]);
+
+      expect(repository.petsFetchCount, 1);
+      expect(repository.petPhotoFetchCount, 1);
+      expect(repository.petGenerationFetchCount, 1);
+    },
+  );
 
   testWidgets('My Pets shows auth gate for guests without fetching pets', (
     tester,
@@ -505,20 +628,22 @@ void main() {
         networkStatusController: networkController,
       );
 
-      expect(repository.petsFetchCount, 1);
+      expect(find.text("You're offline"), findsOneWidget);
+      expect(repository.petsFetchCount, 0);
 
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
       await tester.pump();
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pump();
 
-      expect(repository.petsFetchCount, 1);
+      expect(repository.petsFetchCount, 0);
 
       networkController.setHasInternet(true);
       await tester.pump();
-      await tester.pump();
+      await tester.pumpAndSettle();
 
-      expect(repository.petsFetchCount, 2);
+      expect(find.text("You're offline"), findsNothing);
+      expect(repository.petsFetchCount, 1);
       expect(tester.takeException(), isNull);
     },
   );

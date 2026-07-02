@@ -31,7 +31,22 @@ void main() {
     );
     expect(
       lifecycleBody,
-      contains('unawaited(controller.verifyCheckoutStatus());'),
+      contains('unawaited(_resumePremiumCheckoutSyncIfOnline());'),
+    );
+    expect(pageSource, contains('unawaited(_loadPremiumIfOnline());'));
+    expect(
+      pageSource,
+      contains(
+        'ref.listen<NetworkStatusState>(networkStatusControllerProvider, (',
+      ),
+    );
+    expect(
+      pageSource,
+      contains('unawaited(_loadPremiumIfOnline(refresh: true));'),
+    );
+    expect(
+      pageSource,
+      contains('unawaited(_resumePremiumCheckoutSyncIfOnline());'),
     );
   });
 }

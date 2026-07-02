@@ -81,6 +81,68 @@ class CompatibleGenerationTemplatesDto {
   );
 }
 
+class TemplateGenerationGalleryPage {
+  const TemplateGenerationGalleryPage({
+    required this.items,
+    required this.hasMore,
+    required this.unreadCount,
+    required this.appliedFilter,
+    this.nextCursor,
+    this.serverTimeUtc,
+  });
+
+  final List<TemplateGenerationResult> items;
+  final String? nextCursor;
+  final bool hasMore;
+  final DateTime? serverTimeUtc;
+  final int unreadCount;
+  final String appliedFilter;
+}
+
+class TemplateGenerationGalleryPageDto {
+  const TemplateGenerationGalleryPageDto({
+    required this.items,
+    required this.hasMore,
+    required this.unreadCount,
+    required this.appliedFilter,
+    this.nextCursor,
+    this.serverTimeUtc,
+  });
+
+  final List<TemplateGenerationDto> items;
+  final String? nextCursor;
+  final bool hasMore;
+  final DateTime? serverTimeUtc;
+  final int unreadCount;
+  final String appliedFilter;
+
+  factory TemplateGenerationGalleryPageDto.fromJson(Map<String, dynamic> json) {
+    return TemplateGenerationGalleryPageDto(
+      items: (json['items'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map(
+            (item) =>
+                TemplateGenerationDto.fromJson(Map<String, dynamic>.from(item)),
+          )
+          .toList(growable: false),
+      nextCursor: json['nextCursor'] as String?,
+      hasMore: json['hasMore'] as bool? ?? false,
+      serverTimeUtc: DateTime.tryParse(json['serverTimeUtc'] as String? ?? ''),
+      unreadCount: (json['unreadCount'] as num?)?.toInt() ?? 0,
+      appliedFilter: json['appliedFilter'] as String? ?? 'all',
+    );
+  }
+
+  TemplateGenerationGalleryPage toDomain() => TemplateGenerationGalleryPage(
+    items: items.map((item) => item.toDomain()).toList(growable: false),
+    nextCursor: nextCursor,
+    hasMore: hasMore,
+    serverTimeUtc: serverTimeUtc,
+    unreadCount: unreadCount,
+    appliedFilter: appliedFilter,
+  );
+}
+
 class PetProfile {
   const PetProfile({
     required this.id,
@@ -196,6 +258,87 @@ class PetPhoto {
   }
 }
 
+class GalleryMediaDto {
+  const GalleryMediaDto({
+    required this.state,
+    required this.mediaType,
+    this.previewUrl,
+    this.resultUrl,
+    this.resultExpiresAtUtc,
+    this.durationSeconds,
+    this.hasWatermark = false,
+    this.canRemoveWatermark = false,
+    this.isWatermarkRemoved = false,
+    this.canDownload = false,
+    this.canShare = false,
+    this.reasonCode,
+    this.userMessageKey,
+    this.retryAfterSeconds,
+  });
+
+  final GalleryMediaState state;
+  final String mediaType;
+  final String? previewUrl;
+  final String? resultUrl;
+  final DateTime? resultExpiresAtUtc;
+  final double? durationSeconds;
+  final bool hasWatermark;
+  final bool canRemoveWatermark;
+  final bool isWatermarkRemoved;
+  final bool canDownload;
+  final bool canShare;
+  final String? reasonCode;
+  final String? userMessageKey;
+  final int? retryAfterSeconds;
+
+  factory GalleryMediaDto.fromJson(Map<String, dynamic> json) {
+    return GalleryMediaDto(
+      state: galleryMediaStateFromApi(json['state'] as String?),
+      mediaType: json['mediaType'] as String? ?? 'image',
+      previewUrl: json['previewUrl'] as String?,
+      resultUrl:
+          (json['resultUrl'] as String?) ??
+          (json['signedMediaUrl'] as String?) ??
+          (json['mediaUrl'] as String?),
+      resultExpiresAtUtc: _dateTime(json['resultExpiresAtUtc']),
+      durationSeconds: (json['durationSeconds'] as num?)?.toDouble(),
+      hasWatermark: json['hasWatermark'] as bool? ?? false,
+      canRemoveWatermark: json['canRemoveWatermark'] as bool? ?? false,
+      isWatermarkRemoved: json['isWatermarkRemoved'] as bool? ?? false,
+      canDownload: json['canDownload'] as bool? ?? false,
+      canShare: json['canShare'] as bool? ?? false,
+      reasonCode: json['reasonCode'] as String?,
+      userMessageKey: json['userMessageKey'] as String?,
+      retryAfterSeconds: (json['retryAfterSeconds'] as num?)?.toInt(),
+    );
+  }
+
+  GalleryMedia toDomain() => GalleryMedia(
+    state: state,
+    mediaType: mediaType,
+    previewUrl: previewUrl,
+    resultUrl: resultUrl,
+    resultExpiresAtUtc: resultExpiresAtUtc,
+    durationSeconds: durationSeconds,
+    hasWatermark: hasWatermark,
+    canRemoveWatermark: canRemoveWatermark,
+    isWatermarkRemoved: isWatermarkRemoved,
+    canDownload: canDownload,
+    canShare: canShare,
+    reasonCode: reasonCode,
+    userMessageKey: userMessageKey,
+    retryAfterSeconds: retryAfterSeconds,
+  );
+
+  static DateTime? _dateTime(Object? value) {
+    if (value is! String || value.isEmpty) {
+      return null;
+    }
+
+    return DateTime.tryParse(value)?.toUtc();
+  }
+}
+
 class TemplateGenerationDto {
   const TemplateGenerationDto({
     required this.generationId,
@@ -252,6 +395,7 @@ class TemplateGenerationDto {
     this.canCompareBeforeAfter = false,
     this.petId,
     this.petPhotoId,
+    this.media,
   });
 
   final String generationId;
@@ -308,9 +452,14 @@ class TemplateGenerationDto {
   final bool canCompareBeforeAfter;
   final String? petId;
   final String? petPhotoId;
+  final GalleryMediaDto? media;
 
   factory TemplateGenerationDto.fromJson(Map<String, dynamic> json) {
     final rawSourceImageAsset = json['sourceImageAsset'];
+    final rawMedia = json['media'];
+    final media = rawMedia is Map
+        ? GalleryMediaDto.fromJson(Map<String, dynamic>.from(rawMedia))
+        : null;
 
     return TemplateGenerationDto(
       generationId: json['generationId'] as String? ?? '',
@@ -326,7 +475,9 @@ class TemplateGenerationDto {
       normalizedImageUrl: json['normalizedImageUrl'] as String?,
       referenceMotionUrl: json['referenceMotionUrl'] as String?,
       outputUrl:
-          (json['outputUrl'] as String?) ?? (json['mediaUrl'] as String?),
+          (json['outputUrl'] as String?) ??
+          (json['mediaUrl'] as String?) ??
+          media?.resultUrl,
       attemptCount: (json['attemptCount'] as num?)?.toInt() ?? 0,
       usedPreprocessingModel: json['usedPreprocessingModel'] as String?,
       usedKlingModel: json['usedKlingModel'] as String?,
@@ -352,7 +503,9 @@ class TemplateGenerationDto {
       estimatedDurationLabel: json['estimatedDurationLabel'] as String?,
       chargedAtUtc: _dateTime(json['chargedAtUtc']),
       refundedAtUtc: _dateTime(json['refundedAtUtc']),
-      userMediaExpired: json['userMediaExpired'] as bool? ?? false,
+      userMediaExpired:
+          media?.state == GalleryMediaState.expired ||
+          (json['userMediaExpired'] as bool? ?? false),
       isUnread: json['isUnread'] as bool? ?? false,
       queuePosition: (json['queuePosition'] as num?)?.toInt(),
       estimatedWaitSeconds: (json['estimatedWaitSeconds'] as num?)?.toInt(),
@@ -360,13 +513,20 @@ class TemplateGenerationDto {
         json['estimatedCompletionAtUtc'] ?? json['estimatedCompletionAt'],
       ),
       estimatedTotalSeconds: (json['estimatedTotalSeconds'] as num?)?.toInt(),
-      mediaType: _string(json['mediaType']),
+      mediaType: _string(json['mediaType'] ?? media?.mediaType),
       tier: _string(json['tier'] ?? json['priorityTier'] ?? json['userTier']),
       queueStatus: _string(json['queueStatus'] ?? json['queueState']),
       canCancel: json['canCancel'] as bool?,
-      hasWatermark: json['hasWatermark'] as bool? ?? false,
-      canRemoveWatermark: json['canRemoveWatermark'] as bool? ?? false,
-      isWatermarkRemoved: json['isWatermarkRemoved'] as bool? ?? false,
+      hasWatermark:
+          json['hasWatermark'] as bool? ?? media?.hasWatermark ?? false,
+      canRemoveWatermark:
+          json['canRemoveWatermark'] as bool? ??
+          media?.canRemoveWatermark ??
+          false,
+      isWatermarkRemoved:
+          json['isWatermarkRemoved'] as bool? ??
+          media?.isWatermarkRemoved ??
+          false,
       removeWatermarkCostCredits:
           (json['removeWatermarkCostCredits'] as num?)?.toInt() ?? 1,
       userPlan: json['userPlan'] as String? ?? 'free',
@@ -377,10 +537,12 @@ class TemplateGenerationDto {
       inputMediaAssetId: json['inputMediaAssetId'] as String?,
       resultMediaAssetId: json['resultMediaAssetId'] as String?,
       inputPreviewUrl: json['inputPreviewUrl'] as String?,
-      resultPreviewUrl: json['resultPreviewUrl'] as String?,
+      resultPreviewUrl:
+          json['resultPreviewUrl'] as String? ?? media?.previewUrl,
       canCompareBeforeAfter: json['canCompareBeforeAfter'] as bool? ?? false,
       petId: json['petId'] as String?,
       petPhotoId: json['petPhotoId'] as String?,
+      media: media,
     );
   }
 
@@ -440,7 +602,42 @@ class TemplateGenerationDto {
       canCompareBeforeAfter: canCompareBeforeAfter,
       petId: petId,
       petPhotoId: petPhotoId,
+      galleryMedia:
+          media?.toDomain() ??
+          GalleryMedia(
+            state: _legacyGalleryMediaState(),
+            mediaType: mediaType ?? 'image',
+            previewUrl: resultPreviewUrl ?? outputUrl,
+            resultUrl: outputUrl,
+            durationSeconds: outputVideoDurationSeconds,
+            hasWatermark: hasWatermark,
+            canRemoveWatermark: canRemoveWatermark,
+            isWatermarkRemoved: isWatermarkRemoved,
+            canDownload: outputUrl != null && outputUrl!.isNotEmpty,
+            canShare: outputUrl != null && outputUrl!.isNotEmpty,
+          ),
     );
+  }
+
+  GalleryMediaState _legacyGalleryMediaState() {
+    final parsedStatus = templateGenerationStatusFromApi(status);
+    if (userMediaExpired) {
+      return GalleryMediaState.expired;
+    }
+    if (parsedStatus == TemplateGenerationStatus.failed ||
+        parsedStatus == TemplateGenerationStatus.cancelled) {
+      return GalleryMediaState.failed;
+    }
+    if (parsedStatus != TemplateGenerationStatus.completed) {
+      return parsedStatus == TemplateGenerationStatus.queued ||
+              parsedStatus == TemplateGenerationStatus.submittingToProvider ||
+              parsedStatus == TemplateGenerationStatus.providerQueued
+          ? GalleryMediaState.pending
+          : GalleryMediaState.processing;
+    }
+    return outputUrl == null || outputUrl!.isEmpty
+        ? GalleryMediaState.storageUnavailable
+        : GalleryMediaState.resultReady;
   }
 
   static DateTime? _dateTime(Object? value) {
@@ -526,17 +723,36 @@ class GenerationMediaAccessResult {
     required this.mediaUrl,
     required this.hasWatermark,
     required this.fileName,
-  });
+    String? signedMediaUrl,
+    this.shareUrl = '',
+    this.shareToken = '',
+    this.expiresAtUtc,
+    this.contentType,
+  }) : signedMediaUrl = signedMediaUrl ?? mediaUrl;
 
   final String mediaUrl;
+  final String signedMediaUrl;
   final bool hasWatermark;
   final String fileName;
+  final String shareUrl;
+  final String shareToken;
+  final DateTime? expiresAtUtc;
+  final String? contentType;
 
   factory GenerationMediaAccessResult.fromJson(Map<String, dynamic> json) {
+    final signedMediaUrl =
+        (json['signedMediaUrl'] as String?) ??
+        (json['mediaUrl'] as String?) ??
+        '';
     return GenerationMediaAccessResult(
-      mediaUrl: json['mediaUrl'] as String? ?? '',
+      mediaUrl: signedMediaUrl,
+      signedMediaUrl: signedMediaUrl,
       hasWatermark: json['hasWatermark'] as bool? ?? false,
       fileName: json['fileName'] as String? ?? 'petmagic-result',
+      shareUrl: json['shareUrl'] as String? ?? '',
+      shareToken: json['shareToken'] as String? ?? '',
+      expiresAtUtc: TemplateGenerationDto._dateTime(json['expiresAtUtc']),
+      contentType: json['contentType'] as String?,
     );
   }
 }

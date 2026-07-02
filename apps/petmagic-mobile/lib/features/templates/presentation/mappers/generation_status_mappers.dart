@@ -81,6 +81,40 @@ String failureReasonMessage(
   return text.generationStatusFailureTechnicalHint;
 }
 
+String galleryMediaStateMessage(
+  AppLocalizations text,
+  TemplateGenerationResult generation,
+) {
+  return switch (generation.galleryMedia.state) {
+    GalleryMediaState.pending ||
+    GalleryMediaState.processing => text.generationStatusMediaPreparingMessage,
+    GalleryMediaState.previewReadyOnly =>
+      text.generationStatusMediaPreviewOnlyMessage,
+    GalleryMediaState.watermarkPreparing =>
+      text.generationStatusMediaWatermarkPreparingMessage,
+    GalleryMediaState.expired => text.generationStatusMediaExpiredMessage,
+    GalleryMediaState.storageUnavailable =>
+      text.generationStatusMediaUnavailableMessage,
+    GalleryMediaState.failed => text.generationStatusMediaFailedMessage,
+    GalleryMediaState.hidden => text.generationStatusMediaHiddenMessage,
+    GalleryMediaState.resultReady => '',
+  };
+}
+
+IconData galleryMediaStateIcon(TemplateGenerationResult generation) {
+  return switch (generation.galleryMedia.state) {
+    GalleryMediaState.pending ||
+    GalleryMediaState.processing ||
+    GalleryMediaState.watermarkPreparing => Icons.hourglass_empty_rounded,
+    GalleryMediaState.previewReadyOnly => Icons.image_outlined,
+    GalleryMediaState.expired => Icons.event_busy_rounded,
+    GalleryMediaState.storageUnavailable => Icons.cloud_off_rounded,
+    GalleryMediaState.failed => Icons.error_outline_rounded,
+    GalleryMediaState.hidden => Icons.visibility_off_outlined,
+    GalleryMediaState.resultReady => Icons.check_circle_rounded,
+  };
+}
+
 String statusTitle(AppLocalizations text, TemplateGenerationResult generation) {
   if (generation.isCompleted) {
     return text.generationStatusStatusCompleted;

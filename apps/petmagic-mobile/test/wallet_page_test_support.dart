@@ -12,7 +12,9 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart';
+import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
+import 'package:petmagic_mobile/features/templates/presentation/templates_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
@@ -34,6 +36,30 @@ class IdleWalletGenerationHistoryController
   @override
   GenerationHistoryState build() {
     return const GenerationHistoryState();
+  }
+}
+
+class StaticWalletTemplatesController extends TemplatesController {
+  StaticWalletTemplatesController({
+    this.items = walletTemplatePricingFixtures,
+    this.errorMessage,
+  });
+
+  final List<TemplateItem> items;
+  final String? errorMessage;
+  int loadInitialCalls = 0;
+
+  @override
+  TemplatesState build() {
+    return TemplatesState(items: items, errorMessage: errorMessage);
+  }
+
+  @override
+  Future<void> loadInitial({
+    bool forceRefresh = false,
+    int? knownCatalogVersion,
+  }) async {
+    loadInitialCalls++;
   }
 }
 
@@ -67,6 +93,7 @@ Future<void> pumpAllTransactionsPage(
   WidgetTester tester, {
   required WalletRepository repository,
   bool authenticated = true,
+  NetworkStatusController? networkStatusController,
 }) async {
   addTearDown(() => PetMagicNotificationCenter.instance.clearQueue());
 
@@ -79,6 +106,10 @@ Future<void> pumpAllTransactionsPage(
               : UnauthenticatedWalletAppLaunchController.new,
         ),
         walletRepositoryProvider.overrideWithValue(repository),
+        if (networkStatusController != null)
+          networkStatusControllerProvider.overrideWith(
+            () => networkStatusController,
+          ),
       ],
       child: MaterialApp.router(
         theme: AppTheme.dark(),
@@ -116,6 +147,7 @@ Future<void> pumpWalletPage(
   required WalletRepository repository,
   bool authenticated = true,
   NetworkStatusController? networkStatusController,
+  StaticWalletTemplatesController? templatesController,
 }) async {
   addTearDown(() => PetMagicNotificationCenter.instance.clearQueue());
 
@@ -128,6 +160,9 @@ Future<void> pumpWalletPage(
               : UnauthenticatedWalletAppLaunchController.new,
         ),
         walletRepositoryProvider.overrideWithValue(repository),
+        templatesControllerProvider.overrideWith(
+          () => templatesController ?? StaticWalletTemplatesController(),
+        ),
         if (networkStatusController != null)
           networkStatusControllerProvider.overrideWith(
             () => networkStatusController,
@@ -522,6 +557,31 @@ const walletStateFixture = WalletStateModel(
   updatedAtUtc: null,
   nextWeeklyGrantAtUtc: null,
 );
+
+const walletTemplatePricingFixtures = [
+  TemplateItem(
+    templateId: 'photo-template',
+    templateType: TemplateType.image,
+    title: 'Backend Photo',
+    shortDescription: 'Photo template from backend feed',
+    petPhotoRequirements: [],
+    category: 'Photo',
+    tags: [],
+    isPremium: false,
+    tokenCost: 10,
+  ),
+  TemplateItem(
+    templateId: 'video-template',
+    templateType: TemplateType.video,
+    title: 'Backend Video',
+    shortDescription: 'Video template from backend feed',
+    petPhotoRequirements: [],
+    category: 'Video',
+    tags: [],
+    isPremium: true,
+    tokenCost: 50,
+  ),
+];
 
 const ledgerItemsFixture = [
   WalletLedgerItem(

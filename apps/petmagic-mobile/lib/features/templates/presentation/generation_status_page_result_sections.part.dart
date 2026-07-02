@@ -67,6 +67,7 @@ class _ResultCardState extends State<_ResultCard> {
       }
       provider = CachedNetworkImageProvider(
         safeUri.toString(),
+        cacheKey: persistentSafeGenerationMediaUrl(safeUri.toString()),
         maxWidth: _aspectRatioProbeCacheWidth,
       );
     }
@@ -153,6 +154,9 @@ class _ResultCardState extends State<_ResultCard> {
                                   )
                                 : CachedNetworkImage(
                                     imageUrl: safeMediaUrl,
+                                    cacheKey: persistentSafeGenerationMediaUrl(
+                                      safeMediaUrl,
+                                    ),
                                     fit: BoxFit.cover,
                                     memCacheWidth: _resultCardImageCacheWidth,
                                     maxWidthDiskCache:

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
@@ -12,6 +13,7 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
@@ -30,6 +32,7 @@ import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
 import 'package:petmagic_mobile/shared/files/file_name_sanitizer.dart';
 import 'package:petmagic_mobile/shared/files/media_share_save.dart';
+import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
@@ -96,6 +99,7 @@ class GenerationStatusMediaActions {
     required String fileName,
     required String title,
     required CancelToken cancelToken,
+    String? shareText,
     String? localPath,
   }) async {
     final usableLocalPath = await usableLocalMediaPath(localPath);
@@ -104,6 +108,7 @@ class GenerationStatusMediaActions {
         filePath: usableLocalPath,
         fileName: fileName,
         title: title,
+        text: shareText,
         cancelToken: cancelToken,
       );
       return;
@@ -118,6 +123,7 @@ class GenerationStatusMediaActions {
       mediaUrl: safeUri.toString(),
       fileName: fileName,
       title: title,
+      text: shareText,
       cancelToken: cancelToken,
     );
   }
@@ -145,6 +151,7 @@ class GenerationStatusPage extends ConsumerStatefulWidget {
 class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
     with WidgetsBindingObserver {
   Timer? _pollTimer;
+  int _consecutivePollFailures = 0;
   TemplateGenerationResult? _generation;
   bool _isLoading = true;
   bool _isSubmittingFeedback = false;
@@ -191,6 +198,11 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _isPageActive = true;
+      if (!ref.read(networkStatusControllerProvider).hasInternet) {
+        _pauseRealtime();
+        _stopPolling();
+        return;
+      }
       unawaited(_resumeRealtimeIfNeeded());
       _startPolling();
       unawaited(_load(silent: true));
@@ -230,6 +242,11 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
   void activate() {
     super.activate();
     _isPageActive = true;
+    if (!ref.read(networkStatusControllerProvider).hasInternet) {
+      _pauseRealtime();
+      _stopPolling();
+      return;
+    }
     unawaited(_resumeRealtimeIfNeeded());
     _startPolling();
     unawaited(_load(silent: true));
@@ -237,6 +254,25 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<NetworkStatusState>(networkStatusControllerProvider, (
+      previous,
+      next,
+    ) {
+      if (!_isPageActive || previous?.hasInternet == next.hasInternet) {
+        return;
+      }
+
+      if (!next.hasInternet) {
+        _pauseRealtime();
+        _stopPolling();
+        return;
+      }
+
+      unawaited(_resumeRealtimeIfNeeded());
+      _startPolling();
+      unawaited(_load(silent: true));
+    });
+
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final generation = _generation;

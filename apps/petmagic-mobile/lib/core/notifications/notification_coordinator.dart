@@ -99,10 +99,7 @@ class NotificationCoordinator {
     try {
       final permissionAllowed = await _notificationsAllowed();
       if (!permissionAllowed) {
-        final persistedToken = await _pushTokenRegistrar.readRegisteredToken();
-        if (_lastRegisteredToken != null || persistedToken != null) {
-          await _unregisterCurrentToken(markSessionInactive: false);
-        }
+        await _unregisterCurrentToken(markSessionInactive: false);
         return;
       }
 
@@ -137,7 +134,9 @@ class NotificationCoordinator {
     }
 
     final token =
-        _lastRegisteredToken ?? await _pushTokenRegistrar.readRegisteredToken();
+        _lastRegisteredToken ??
+        await _pushTokenRegistrar.readRegisteredToken() ??
+        await _readCurrentFirebaseToken();
     if (token == null || token.isEmpty) {
       return;
     }
@@ -155,6 +154,16 @@ class NotificationCoordinator {
     } else {
       _lastRegisteredToken = token;
     }
+  }
+
+  Future<String?> _readCurrentFirebaseToken() async {
+    if (!_firebaseReady) {
+      return null;
+    }
+
+    final token = await FirebaseMessaging.instance.getToken();
+    final normalized = token?.trim();
+    return normalized == null || normalized.isEmpty ? null : normalized;
   }
 
   void handleForegroundMessage(RemoteMessage message) {

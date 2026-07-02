@@ -48,10 +48,12 @@ class _BeforeAfterCompareViewerState extends State<_BeforeAfterCompareViewer> {
     super.initState();
     _beforeProvider = CachedNetworkImageProvider(
       widget.beforeUrl,
+      cacheKey: persistentSafeGenerationMediaUrl(widget.beforeUrl),
       maxWidth: _beforeAfterCompareImageCacheWidth,
     );
     _afterProvider = CachedNetworkImageProvider(
       widget.afterUrl,
+      cacheKey: persistentSafeGenerationMediaUrl(widget.afterUrl),
       maxWidth: _beforeAfterCompareImageCacheWidth,
     );
     _attachBeforeListener();

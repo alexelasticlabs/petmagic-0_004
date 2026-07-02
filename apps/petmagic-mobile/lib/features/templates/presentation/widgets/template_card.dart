@@ -91,13 +91,17 @@ class TemplateCard extends StatefulWidget {
 }
 
 class _TemplateCardState extends State<TemplateCard> {
-  static const Duration _disposeDelay = Duration(milliseconds: 900);
+  // Long enough to survive a quick scroll direction flip without recreating the
+  // codec, short enough that a fast scroll cannot stack extra live controllers
+  // on top of the playback budget while their disposal is pending.
+  static const Duration _disposeDelay = Duration(milliseconds: 400);
 
   VideoPlayerController? _videoController;
   Timer? _disposeTimer;
   Timer? _featuredCountdownTimer;
   bool _isPreviewActive = false;
   bool _isPressed = false;
+  bool _disposed = false;
   bool _videoLoadFailed = false;
   bool _videoControllerInitInFlight = false;
   double _lastVisibleFraction = 0;
@@ -146,6 +150,7 @@ class _TemplateCardState extends State<TemplateCard> {
 
   @override
   void dispose() {
+    _disposed = true;
     _disposeTimer?.cancel();
     _featuredCountdownTimer?.cancel();
     AppLifecycleSignal.instance.removeListener(_appLifecycleListener);
@@ -160,7 +165,7 @@ class _TemplateCardState extends State<TemplateCard> {
   }
 
   void _handleAppLifecycleChanged() {
-    if (!mounted) {
+    if (!mounted || _disposed) {
       return;
     }
 
@@ -380,7 +385,7 @@ class _TemplateCardState extends State<TemplateCard> {
   }
 
   void _handleVisibility(VisibilityInfo info) {
-    if (!mounted) {
+    if (!mounted || _disposed) {
       return;
     }
 
@@ -430,6 +435,10 @@ class _TemplateCardState extends State<TemplateCard> {
   }
 
   void _resumeVisiblePreviewAfterAppResume() {
+    if (_disposed) {
+      return;
+    }
+
     if (!TickerMode.valuesOf(context).enabled ||
         _lastVisibleFraction <=
             TemplateFeedPlaybackManager.videoEligibilityVisibilityFraction) {
@@ -456,7 +465,7 @@ class _TemplateCardState extends State<TemplateCard> {
   }
 
   void _handlePlaybackManagerChanged() {
-    if (!mounted) {
+    if (!mounted || _disposed) {
       return;
     }
 
@@ -464,6 +473,10 @@ class _TemplateCardState extends State<TemplateCard> {
   }
 
   void _syncWithPlaybackManager() {
+    if (_disposed) {
+      return;
+    }
+
     final manager = widget.playbackManager;
     final snapshot = manager?.snapshotFor(_playbackCardId);
     final shouldPlay =
@@ -544,12 +557,16 @@ class _TemplateCardState extends State<TemplateCard> {
         },
       );
     }
-    if (mounted) {
+    if (mounted && !_disposed) {
       setState(() {});
     }
   }
 
   Future<void> _ensureVideoController() async {
+    if (_disposed) {
+      return;
+    }
+
     final snapshot = widget.playbackManager?.snapshotFor(_playbackCardId);
     if (snapshot?.displayLevel != TemplateFeedDisplayLevel.videoPreview) {
       await _syncPlaybackState();
@@ -619,7 +636,9 @@ class _TemplateCardState extends State<TemplateCard> {
         return;
       }
       _videoController = controller;
-      setState(() {});
+      if (!_disposed && mounted) {
+        setState(() {});
+      }
       _videoLoadFailed = false;
       await _syncPlaybackState();
     } catch (error, stackTrace) {
@@ -666,6 +685,10 @@ class _TemplateCardState extends State<TemplateCard> {
   }
 
   void _retryPreviewLoad() {
+    if (_disposed) {
+      return;
+    }
+
     _disposeTimer?.cancel();
     _videoControllerRequestVersion++;
     _videoControllerInitInFlight = false;
@@ -692,7 +715,8 @@ class _TemplateCardState extends State<TemplateCard> {
     required String templateId,
     required String previewUrl,
   }) {
-    if (!mounted ||
+    if (_disposed ||
+        !mounted ||
         requestVersion != _videoControllerRequestVersion ||
         widget.template.templateId != templateId ||
         widget.playbackManager?.snapshotFor(_playbackCardId).displayLevel !=

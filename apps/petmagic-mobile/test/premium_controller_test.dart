@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_repository.dart';
@@ -410,6 +411,64 @@ void main() {
     await expectLater(loadFuture, completes);
   });
 
+  test(
+    'premium load cancels in-flight request when network goes offline',
+    () async {
+      final repository = _DelayedPremiumRepository(
+        config: _paywallConfig(
+          methods: const [
+            PremiumPaymentMethodModel(
+              provider: PremiumPaymentProvider.stripe,
+              purchaseChannel: 'external_checkout',
+              platform: 'android',
+              region: '*',
+              isEnabled: true,
+              isSelectedByDefault: true,
+              requiresExternalWarning: false,
+              requiresStoreDisclosure: false,
+              isRecommended: true,
+              bonusTokensPercent: 0,
+            ),
+          ],
+        ),
+        status: _status(provider: 'stripe', canManageSubscription: false),
+      );
+      final networkController = _TestPremiumNetworkStatusController(true);
+
+      final container = ProviderContainer(
+        overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedAppLaunchController.new,
+          ),
+          networkStatusControllerProvider.overrideWith(() => networkController),
+          premiumRepositoryProvider.overrideWithValue(repository),
+          premiumRefreshProfileProvider.overrideWithValue(() async {}),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(premiumControllerProvider.notifier);
+      final loadFuture = controller.load();
+      await repository.fetchPaywallStarted.future;
+
+      expect(repository.paywallCancelToken?.isCancelled, isFalse);
+
+      networkController.setHasInternet(false);
+      await Future<void>.delayed(Duration.zero);
+
+      var state = container.read(premiumControllerProvider);
+      expect(repository.paywallCancelToken?.isCancelled, isTrue);
+      expect(state.isLoading, isFalse);
+
+      repository.completePaywallConfig();
+      await expectLater(loadFuture, completes);
+
+      state = container.read(premiumControllerProvider);
+      expect(state.plans, isEmpty);
+      expect(state.status, isNull);
+    },
+  );
+
   test('concurrent premium loads share one in-flight request', () async {
     final repository = _DelayedPremiumRepository(
       config: _paywallConfig(
@@ -659,6 +718,67 @@ void main() {
   );
 
   test(
+    'checkout status refresh cancels active subscription status request when network goes offline',
+    () async {
+      final repository = _DelayedVerificationStatusPremiumRepository(
+        config: _paywallConfig(
+          methods: const [
+            PremiumPaymentMethodModel(
+              provider: PremiumPaymentProvider.stripe,
+              purchaseChannel: 'external_checkout',
+              platform: 'android',
+              region: '*',
+              isEnabled: true,
+              isSelectedByDefault: true,
+              requiresExternalWarning: false,
+              requiresStoreDisclosure: false,
+              isRecommended: true,
+              bonusTokensPercent: 0,
+            ),
+          ],
+        ),
+        status: _status(provider: 'stripe', canManageSubscription: false),
+      );
+      final networkController = _TestPremiumNetworkStatusController(true);
+
+      final container = ProviderContainer(
+        overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedAppLaunchController.new,
+          ),
+          networkStatusControllerProvider.overrideWith(() => networkController),
+          premiumRepositoryProvider.overrideWithValue(repository),
+          premiumRefreshProfileProvider.overrideWithValue(() async {}),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(premiumControllerProvider.notifier);
+      await controller.load();
+      controller.markCheckoutOpened(wasPremiumBeforeCheckout: false);
+
+      final verificationFuture = controller.verifyCheckoutStatus();
+      final cancelToken = await repository.statusRefreshStarted.future;
+      expect(cancelToken.isCancelled, isFalse);
+
+      networkController.setHasInternet(false);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(cancelToken.isCancelled, isTrue);
+      final state = container.read(premiumControllerProvider);
+      expect(
+        state.checkoutVerificationState,
+        PremiumCheckoutVerificationState.error,
+      );
+      expect(state.isAwaitingCheckoutVerification, isFalse);
+      expect(state.checkoutErrorMessage, 'templates.network_unavailable');
+
+      repository.completeStatusRefresh();
+      await expectLater(verificationFuture, completes);
+    },
+  );
+
+  test(
     'checkout verification refreshes status without reloading paywall',
     () async {
       var refreshCalls = 0;
@@ -873,11 +993,44 @@ void main() {
       contains('ref.invalidate(premiumSubscriptionSummaryProvider);'),
     );
   });
+
+  test(
+    'store purchase verification deduplicates non-secret purchase updates',
+    () {
+      final source = readPremiumControllerLibrarySource();
+      final verifyBody = _premiumMethodBody(source, '_verifyStorePurchase');
+
+      expect(
+        source,
+        contains('Set<String> _storePurchaseVerificationInFlightKeys'),
+      );
+      expect(source, contains('Set<String> _storePurchaseVerifiedKeys'));
+      expect(
+        verifyBody,
+        contains('_storePurchaseVerificationInFlightKeys.add'),
+      );
+      expect(verifyBody, contains('_storePurchaseVerifiedKeys.contains'));
+      expect(verifyBody, contains('_rememberStorePurchaseVerifiedKey'));
+      expect(
+        verifyBody,
+        contains('_storePurchaseVerificationInFlightKeys.remove'),
+      );
+      expect(source, contains('_maxStorePurchaseVerificationKeys = 32'));
+      expect(source, contains('_storePurchaseVerifiedKeys.remove'));
+      expect(source, contains('String? _storePurchaseVerificationKey'));
+      expect(source, contains('purchase.purchaseID'));
+      expect(source, contains('purchase.transactionDate'));
+      expect(source, contains('provider.value'));
+      expect(source, contains('purchase.productID'));
+      expect(source, isNot(contains('serverVerificationData')));
+      expect(source, isNot(contains('localVerificationData')));
+    },
+  );
 }
 
 String _premiumMethodBody(String source, String methodName) {
   final methodMatch = RegExp(
-    r'(?:@override\s+)?(?:void|Future<[^>]+>)\s+' +
+    r'(?:@override\s+)?(?:String\?|void|Future<[^>]+>)\s+' +
         methodName +
         r'\s*\([^)]*\)\s*(?:async\s*)?\{',
   ).firstMatch(source);
@@ -1179,6 +1332,21 @@ class _DelayedVerificationStatusPremiumRepository
     if (!_statusRefresh.isCompleted) {
       _statusRefresh.complete(status);
     }
+  }
+}
+
+class _TestPremiumNetworkStatusController extends NetworkStatusController {
+  _TestPremiumNetworkStatusController(this.initialHasInternet);
+
+  final bool initialHasInternet;
+
+  @override
+  NetworkStatusState build() {
+    return NetworkStatusState(hasInternet: initialHasInternet);
+  }
+
+  void setHasInternet(bool value) {
+    state = state.copyWith(hasInternet: value);
   }
 }
 

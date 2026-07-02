@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 
 typedef _RememberedFilesByUrl = LinkedHashMap<String, _RememberedCacheFile>;
 typedef _InvalidationCountsByUrl = LinkedHashMap<String, int>;
@@ -15,7 +16,10 @@ class TemplateMediaCache {
   TemplateMediaCache._();
 
   static const int _maxThumbnailFileReferences = 300;
-  static const int _maxPreviewFileReferences = 80;
+  // Sized so a long feed session does not evict-and-redownload the same preview
+  // videos: ~250 clips at 1-2 MB each stays inside the dedicated byte budget
+  // (AppConfig.previewVideoCacheMaxBytes) which remains the hard disk cap.
+  static const int _maxPreviewFileReferences = 250;
   static const int _maxBlockedThumbnailCacheUrls = _maxThumbnailFileReferences;
   static const int _maxBlockedPreviewCacheUrls = _maxPreviewFileReferences;
   static bool _isThumbnailBudgetCleanupRunning = false;
@@ -45,7 +49,7 @@ class TemplateMediaCache {
     Config(
       'templateThumbnailCache',
       stalePeriod: AppConfig.mediaCacheStalePeriod,
-      maxNrOfCacheObjects: 300,
+      maxNrOfCacheObjects: _maxThumbnailFileReferences,
       repo: JsonCacheInfoRepository(databaseName: 'templateThumbnailCache'),
       fileService: HttpFileService(),
     ),
@@ -55,14 +59,14 @@ class TemplateMediaCache {
     Config(
       'templatePreviewVideoCache',
       stalePeriod: AppConfig.mediaCacheStalePeriod,
-      maxNrOfCacheObjects: 80,
+      maxNrOfCacheObjects: _maxPreviewFileReferences,
       repo: JsonCacheInfoRepository(databaseName: 'templatePreviewVideoCache'),
       fileService: HttpFileService(),
     ),
   );
 
   static String cacheKeyForMedia(String url, {int? mediaVersion}) {
-    final normalized = url.trim();
+    final normalized = persistentSafeMediaCacheKeyUrl(url);
     if (mediaVersion == null || mediaVersion <= 0) {
       return normalized;
     }
@@ -584,7 +588,7 @@ class TemplateMediaCache {
       try {
         await _trimCacheDirectory(
           previewCacheDirectory,
-          maxBytes: AppConfig.mediaCacheMaxBytesSafe,
+          maxBytes: AppConfig.previewVideoCacheMaxBytesSafe,
           statStage: 'preview_budget_stat_file',
           deleteStage: 'preview_budget_delete_file',
         );

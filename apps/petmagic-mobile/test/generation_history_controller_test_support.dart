@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_gallery_store.dart';
@@ -27,13 +28,18 @@ class GenerationHistoryControllerHarness {
     required FakeTemplateGenerationRepository repository,
     FakeGenerationGalleryStore? store,
     FakeRealtimeClient? realtimeClient,
+    FakeGenerationHistoryNetworkStatusController? networkStatusController,
   }) {
     final resolvedStore = store ?? FakeGenerationGalleryStore();
     final resolvedRealtimeClient = realtimeClient ?? FakeRealtimeClient();
+    final resolvedNetworkStatusController =
+        networkStatusController ??
+        FakeGenerationHistoryNetworkStatusController();
     return GenerationHistoryControllerHarness._(
       repository: repository,
       store: resolvedStore,
       realtimeClient: resolvedRealtimeClient,
+      networkStatusController: resolvedNetworkStatusController,
     );
   }
 
@@ -41,17 +47,22 @@ class GenerationHistoryControllerHarness {
     required FakeTemplateGenerationRepository repository,
     required this.store,
     required this.realtimeClient,
+    required this.networkStatusController,
   }) : container = ProviderContainer(
          overrides: [
            templateGenerationRepositoryProvider.overrideWithValue(repository),
            generationGalleryStoreProvider.overrideWithValue(store),
            realtimeClientProvider.overrideWithValue(realtimeClient),
+           networkStatusControllerProvider.overrideWith(
+             () => networkStatusController,
+           ),
          ],
        );
 
   final ProviderContainer container;
   final FakeGenerationGalleryStore store;
   final FakeRealtimeClient realtimeClient;
+  final FakeGenerationHistoryNetworkStatusController networkStatusController;
 
   GenerationHistoryController get controller =>
       container.read(generationHistoryControllerProvider.notifier);
@@ -65,9 +76,23 @@ class GenerationHistoryControllerHarness {
   }
 }
 
+class FakeGenerationHistoryNetworkStatusController
+    extends NetworkStatusController {
+  @override
+  NetworkStatusState build() {
+    return const NetworkStatusState();
+  }
+
+  void setHasInternet(bool value) {
+    state = state.copyWith(hasInternet: value);
+  }
+}
+
 class FakeTemplateGenerationRepository extends TemplateGenerationRepository {
   FakeTemplateGenerationRepository({
     Map<String?, List<TemplateGenerationResult>> remoteByStatus = const {},
+    Map<String, TemplateGenerationResult> remoteById = const {},
+    Map<String, TemplateGenerationGalleryPage> remotePagesByCursor = const {},
     Map<String?, List<TemplateGenerationResult>> persistedByStatus = const {},
     this.fetchCompletersByStatus = const {},
     this.fetchError,
@@ -81,6 +106,10 @@ class FakeTemplateGenerationRepository extends TemplateGenerationRepository {
   }) : remoteByStatus = Map<String?, List<TemplateGenerationResult>>.from(
          remoteByStatus,
        ),
+       remoteById = Map<String, TemplateGenerationResult>.from(remoteById),
+       remotePagesByCursor = Map<String, TemplateGenerationGalleryPage>.from(
+         remotePagesByCursor,
+       ),
        persistedByStatus = Map<String?, List<TemplateGenerationResult>>.from(
          persistedByStatus,
        ),
@@ -91,9 +120,13 @@ class FakeTemplateGenerationRepository extends TemplateGenerationRepository {
        );
 
   final Map<String?, List<TemplateGenerationResult>> remoteByStatus;
+  final Map<String, TemplateGenerationResult> remoteById;
+  final Map<String, TemplateGenerationGalleryPage> remotePagesByCursor;
   final Map<String?, List<TemplateGenerationResult>> persistedByStatus;
   final Map<String?, Completer<void>> fetchCompletersByStatus;
   final List<({String? status, int? take})> fetchCalls = [];
+  final List<String> fetchGenerationCalls = [];
+  final List<({String? status, String? cursor, int? take})> fetchPageCalls = [];
   final List<CancelToken?> fetchCancelTokens = [];
   final List<CancelToken?> fetchUnreadCancelTokens = [];
   final List<CancelToken?> deleteCancelTokens = [];
@@ -122,6 +155,47 @@ class FakeTemplateGenerationRepository extends TemplateGenerationRepository {
   Future<int?> readCachedUnreadGenerationCount() async => null;
 
   @override
+  Future<TemplateGenerationResult> fetchGeneration(
+    String generationId, {
+    String? correlationId,
+    CancelToken? cancelToken,
+  }) async {
+    fetchGenerationCalls.add(generationId);
+    if (cancelToken?.isCancelled == true) {
+      throw DioException(
+        requestOptions: RequestOptions(
+          path: '/api/templates/generations/$generationId',
+        ),
+        type: DioExceptionType.cancel,
+      );
+    }
+
+    final direct = remoteById[generationId];
+    if (direct != null) {
+      return direct;
+    }
+
+    for (final items in remoteByStatus.values) {
+      for (final item in items) {
+        if (item.generationId == generationId) {
+          return item;
+        }
+      }
+    }
+
+    final requestOptions = RequestOptions(
+      path: '/api/templates/generations/$generationId',
+    );
+    throw DioException(
+      requestOptions: requestOptions,
+      response: Response<void>(
+        requestOptions: requestOptions,
+        statusCode: HttpStatus.notFound,
+      ),
+    );
+  }
+
+  @override
   Future<List<TemplateGenerationResult>> fetchGenerations({
     String? status,
     int? skip,
@@ -145,6 +219,46 @@ class FakeTemplateGenerationRepository extends TemplateGenerationRepository {
       throw error;
     }
     return remoteByStatus[status] ?? const [];
+  }
+
+  @override
+  Future<TemplateGenerationGalleryPage> fetchGenerationPage({
+    String? status,
+    String? cursor,
+    int? take,
+    CancelToken? cancelToken,
+  }) async {
+    fetchCalls.add((status: status, take: take));
+    fetchPageCalls.add((status: status, cursor: cursor, take: take));
+    fetchCancelTokens.add(cancelToken);
+    final completer = fetchCompletersByStatus[status];
+    if (completer != null && !completer.isCompleted) {
+      await completer.future;
+    }
+    if (cancelToken?.isCancelled == true) {
+      throw DioException(
+        requestOptions: RequestOptions(path: '/api/templates/generations'),
+        type: DioExceptionType.cancel,
+      );
+    }
+    final error = fetchError;
+    if (error != null) {
+      throw error;
+    }
+
+    final page = remotePagesByCursor[_pageKey(status, cursor)];
+    if (page != null) {
+      return page;
+    }
+
+    final items = remoteByStatus[status] ?? const <TemplateGenerationResult>[];
+    return TemplateGenerationGalleryPage(
+      items: items,
+      hasMore: false,
+      serverTimeUtc: DateTime.utc(2026, 1),
+      unreadCount: unreadCount,
+      appliedFilter: status ?? 'all',
+    );
   }
 
   @override
@@ -288,8 +402,9 @@ class FakeGenerationGalleryStore extends GenerationGalleryStore {
 
   @override
   Future<GenerationGalleryMediaRecord?> materializeGenerationMedia(
-    TemplateGenerationResult generation,
-  ) async {
+    TemplateGenerationResult generation, {
+    bool background = false,
+  }) async {
     materializedGenerationIds.add(generation.generationId);
     final completer = materializeCompleter;
     if (completer != null) {
@@ -352,6 +467,12 @@ class FakeRealtimeClient implements RealtimeClient {
   }
 }
 
+String generationHistoryPageKey(String? status, String? cursor) =>
+    '${status ?? 'all'}|${cursor ?? ''}';
+
+String _pageKey(String? status, String? cursor) =>
+    generationHistoryPageKey(status, cursor);
+
 TemplateGenerationResult generationFixture({
   required String generationId,
   required TemplateGenerationStatus status,
@@ -401,5 +522,18 @@ Map<String, Object?> generationFixturePayload(
     'outputUrl': generation.outputUrl,
     'completedAtUtc': generation.completedAtUtc?.toIso8601String(),
     'isUnread': generation.isUnread,
+  };
+}
+
+Map<String, Object?> generationRealtimePayload({
+  required String generationId,
+  String status = 'Completed',
+}) {
+  return {
+    'eventType': 'generation.status_changed',
+    'generationId': generationId,
+    'status': status,
+    'occurredAtUtc': DateTime.utc(2026, 6, 14, 12, 3).toIso8601String(),
+    'requiresRefetch': true,
   };
 }

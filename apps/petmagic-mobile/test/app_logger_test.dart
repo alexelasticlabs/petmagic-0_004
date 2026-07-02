@@ -12,6 +12,11 @@ void main() {
       'paymentIntentId': 'pi_3Nabc123',
       'customerId': 'cus_123456789',
       'externalSubscriptionId': 'sub_123456789',
+      'cookie': 'raw-cookie-secret',
+      'setCookie': 'raw-set-cookie-secret',
+      'jwt': 'eyJhbGciOi.raw.payload',
+      'credential': 'raw-credential',
+      'requestSignature': 'raw-signature',
       'purchaseToken': 'gp-token-123456789',
       'receipt': 'store-receipt',
       'authTicket': 'external-auth-ticket',
@@ -28,6 +33,11 @@ void main() {
     expect(sanitized['paymentIntentId'], '***');
     expect(sanitized['customerId'], '***');
     expect(sanitized['externalSubscriptionId'], '***');
+    expect(sanitized['cookie'], '***');
+    expect(sanitized['setCookie'], '***');
+    expect(sanitized['jwt'], '***');
+    expect(sanitized['credential'], '***');
+    expect(sanitized['requestSignature'], '***');
     expect(sanitized['purchaseToken'], '***');
     expect(sanitized['receipt'], '***');
     expect(sanitized['authTicket'], '***');
@@ -42,6 +52,11 @@ void main() {
     expect(sanitized.toString(), isNot(contains('pi_3Nabc123')));
     expect(sanitized.toString(), isNot(contains('cus_123456789')));
     expect(sanitized.toString(), isNot(contains('sub_123456789')));
+    expect(sanitized.toString(), isNot(contains('raw-cookie-secret')));
+    expect(sanitized.toString(), isNot(contains('raw-set-cookie-secret')));
+    expect(sanitized.toString(), isNot(contains('eyJhbGciOi.raw.payload')));
+    expect(sanitized.toString(), isNot(contains('raw-credential')));
+    expect(sanitized.toString(), isNot(contains('raw-signature')));
     expect(sanitized.toString(), isNot(contains('gp-token-123456789')));
   });
 
@@ -99,7 +114,8 @@ void main() {
       'message':
           'Authorization: Bearer abc.def user pet.parent@example.com '
           'url https://cdn.petmagic.ai/file.jpg?signature=secret '
-          'key sk_live_123456789 phone +1 (555) 123-4567',
+          'key sk_live_123456789 phone +1 (555) 123-4567 '
+          'credential=raw-credential signature=raw-signature',
     });
 
     final message = sanitized['message'] as String;
@@ -108,6 +124,8 @@ void main() {
     expect(message, contains('https://cdn.petmagic.ai/file.jpg?***'));
     expect(message, isNot(contains('abc.def')));
     expect(message, isNot(contains('sk_live_123456789')));
+    expect(message, isNot(contains('raw-credential')));
+    expect(message, isNot(contains('raw-signature')));
     expect(message, isNot(contains('555')));
   });
 

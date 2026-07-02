@@ -50,6 +50,11 @@ void main() {
       expect(templateRepository.registerCalls, 1);
       expect(supportRepository.registerCalls, 1);
       expect(walletRepository.registerCalls, 1);
+      final persistedKey = await cache.readLastCompletedRegistrationKey();
+      expect(persistedKey, startsWith(pushTokenRegistrationFingerprintPrefix));
+      expect(persistedKey, isNot(contains('device-token')));
+      expect(persistedKey, isNot(contains('user-1')));
+      expect(persistedKey, isNot(contains('device-1')));
 
       await registrar.registerToken(
         token: 'device-token',
@@ -76,6 +81,38 @@ void main() {
       expect(walletRepository.registerCalls, 2);
     },
   );
+
+  test('registration cache clears legacy raw token keys on read', () async {
+    final preferences = SharedPreferencesAsync();
+    final cache = SharedPreferencesPushTokenRegistrationCache(
+      preferences: preferences,
+    );
+    await preferences.setString(
+      'petmagic_mobile_push_token_last_registration_key_v1',
+      'raw-device-token|user-1|android|en-US|1.0.0|device-1',
+    );
+
+    expect(await cache.readLastCompletedRegistrationKey(), isNull);
+    expect(
+      await preferences.getString(
+        'petmagic_mobile_push_token_last_registration_key_v1',
+      ),
+      isNull,
+    );
+  });
+
+  test('registration cache rejects new raw token keys on write', () async {
+    final cache = SharedPreferencesPushTokenRegistrationCache(
+      preferences: SharedPreferencesAsync(),
+    );
+
+    expect(
+      () => cache.writeLastCompletedRegistrationKey(
+        'raw-device-token|user-1|android|en-US|1.0.0|device-1',
+      ),
+      throwsArgumentError,
+    );
+  });
 
   test('registration dedupe is isolated by signed-in account scope', () async {
     final cache = SharedPreferencesPushTokenRegistrationCache(

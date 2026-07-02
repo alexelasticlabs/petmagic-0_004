@@ -26,6 +26,8 @@ import 'package:shared_preferences_platform_interface/shared_preferences_async_p
 import 'my_pets_page_test_support.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   setUp(() {
     SharedPreferences.setMockInitialValues(const <String, Object>{});
     SharedPreferencesAsyncPlatform.instance =
@@ -250,7 +252,7 @@ void main() {
         preferences: SharedPreferencesAsync(),
       );
       await registrationCache.writeLastCompletedRegistrationKey(
-        'push-token|user-1|android|en_US|1.0.0|device-1',
+        '${pushTokenRegistrationFingerprintPrefix}test-registration-fingerprint',
       );
 
       final container = ProviderContainer(

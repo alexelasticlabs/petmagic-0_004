@@ -659,6 +659,9 @@ class _GenerationResultView extends StatelessWidget {
     final colors = context.petMagicColors;
     final outputUrl =
         parseSafeGenerationMediaUri(generation.outputUrl)?.toString() ?? '';
+    final shareSafeUrl = outputUrl.isEmpty
+        ? ''
+        : persistentSafeGenerationMediaUrl(outputUrl) ?? '';
 
     return Column(
       key: const ValueKey('generation-result'),
@@ -696,6 +699,7 @@ class _GenerationResultView extends StatelessWidget {
                     ? _NetworkVideoPreview(url: outputUrl)
                     : CachedNetworkImage(
                         imageUrl: outputUrl,
+                        cacheKey: persistentSafeGenerationMediaUrl(outputUrl),
                         fit: BoxFit.cover,
                         width: double.infinity,
                         memCacheWidth: resultCacheWidth,
@@ -717,10 +721,10 @@ class _GenerationResultView extends StatelessWidget {
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: outputUrl.isEmpty
+                onPressed: shareSafeUrl.isEmpty
                     ? null
                     : () => SharePlus.instance.share(
-                        ShareParams(text: '${template.title}\n$outputUrl'),
+                        ShareParams(text: '${template.title}\n$shareSafeUrl'),
                       ),
                 icon: const Icon(Icons.ios_share_rounded),
                 label: Text(text.supportChatShareAction),

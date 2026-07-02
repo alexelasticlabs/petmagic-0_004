@@ -123,6 +123,20 @@ void main() {
     expect(source, contains('await _validateAvatarForUpload('));
     expect(source, contains('authenticatedMultipartRequestOptions'));
   });
+
+  test('avatar upload optimizes payload and disposes temporary file', () {
+    final source = File(
+      'lib/features/profile/data/profile_repository.dart',
+    ).readAsStringSync();
+
+    expect(
+      source,
+      contains('final ImageUploadOptimizer _imageUploadOptimizer;'),
+    );
+    expect(source, contains('OptimizedUploadFile? optimizedAvatar;'));
+    expect(source, contains('await _imageUploadOptimizer.optimizeForAvatar('));
+    expect(source, contains('await optimizedAvatar?.dispose();'));
+  });
 }
 
 Future<File> _createFile(

@@ -43,6 +43,35 @@ void main() {
   );
 
   test(
+    'direct cached network images use explicit persistent-safe keys',
+    () async {
+      final dartFiles = await Directory('lib')
+          .list(recursive: true)
+          .where((entity) => entity is File && entity.path.endsWith('.dart'))
+          .cast<File>()
+          .toList();
+
+      expect(dartFiles, isNotEmpty);
+
+      for (final file in dartFiles) {
+        final source = await file.readAsString();
+        for (final callName in const [
+          'CachedNetworkImage(',
+          'CachedNetworkImageProvider(',
+        ]) {
+          for (final call in _extractCalls(source, callName)) {
+            expect(
+              call,
+              contains('cacheKey:'),
+              reason: '${file.path} has $callName without a stable cacheKey.',
+            );
+          }
+        }
+      }
+    },
+  );
+
+  test(
     'template card fallback image path remains cached and bounded',
     () async {
       final source = await File(
@@ -126,6 +155,7 @@ void main() {
     ).readAsString();
 
     expect(source, contains('const int _petShortcutAvatarCacheWidth = 64;'));
+    expect(source, contains('cacheKey: persistentSafeProfileAvatarUrl(url)'));
     expect(source, contains('memCacheWidth: _petShortcutAvatarCacheWidth'));
     expect(source, contains('maxWidthDiskCache: _petShortcutAvatarCacheWidth'));
     expect(source, contains('filterQuality: FilterQuality.medium'));
@@ -253,8 +283,24 @@ void main() {
             .join('\n');
 
     expect(source, contains('stalePeriod: AppConfig.mediaCacheStalePeriod'));
-    expect(source, contains('maxNrOfCacheObjects: 300'));
-    expect(source, contains('maxNrOfCacheObjects: 80'));
+    expect(
+      source,
+      contains('maxNrOfCacheObjects: _maxThumbnailFileReferences'),
+    );
+    expect(source, contains('maxNrOfCacheObjects: _maxPreviewFileReferences'));
+    expect(source, contains('_maxThumbnailFileReferences = 300'));
+    expect(
+      source,
+      contains('_maxPreviewFileReferences = 250'),
+      reason:
+          'Preview video cache must stay large enough that a long feed '
+          'session does not keep re-downloading the same videos.',
+    );
+    expect(
+      source,
+      contains('AppConfig.previewVideoCacheMaxBytesSafe'),
+      reason: 'Preview cache needs its own byte budget, distinct from images.',
+    );
     expect(
       source,
       contains(
@@ -285,7 +331,6 @@ void main() {
       contains('!rememberedFile.validTill.isAfter(DateTime.now())'),
     );
     expect(source, contains('!cachedFile.validTill.isAfter(DateTime.now())'));
-    expect(source, contains('_maxThumbnailFileReferences = 300'));
     expect(
       source,
       contains('_maxBlockedThumbnailCacheUrls = _maxThumbnailFileReferences'),
@@ -328,4 +373,38 @@ void main() {
     expect(budgetSource, contains('trimDecodedImageCache();'));
     expect(appSource, contains('DecodedImageCacheLifecycleObserver('));
   });
+}
+
+Iterable<String> _extractCalls(String source, String callName) sync* {
+  var searchStart = 0;
+  while (true) {
+    final start = source.indexOf(callName, searchStart);
+    if (start < 0) {
+      return;
+    }
+
+    final openParen = source.indexOf('(', start);
+    if (openParen < 0) {
+      return;
+    }
+
+    var depth = 0;
+    for (var i = openParen; i < source.length; i++) {
+      final char = source[i];
+      if (char == '(') {
+        depth++;
+      } else if (char == ')') {
+        depth--;
+        if (depth == 0) {
+          yield source.substring(start, i + 1);
+          searchStart = i + 1;
+          break;
+        }
+      }
+    }
+
+    if (searchStart <= start) {
+      return;
+    }
+  }
 }

@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_avatar_cropper_page.dart';
@@ -17,6 +19,7 @@ import 'package:petmagic_mobile/features/profile/presentation/widgets/profile_se
 import 'package:petmagic_mobile/features/profile/presentation/widgets/legal_document_list_view.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_unavailable_view.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 
@@ -415,24 +418,16 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
 
     if (kind == ProfileSettingsDetailKind.terms ||
         kind == ProfileSettingsDetailKind.privacy) {
-      final locale = Localizations.localeOf(context);
-      final localeTag = locale.toLanguageTag();
-      final legalDocumentsAsync = ref.watch(
-        currentLegalDocumentsProvider(localeTag),
-      );
       final requiresAcceptance =
           profile?.legalAcceptance.requiresAcceptance == true;
 
-      return _ProfileSettingsLegalDetailContent(
+      return _ProfileSettingsLegalDetailRoute(
         kind: kind,
         title: title,
         subtitle: subtitle,
         state: state,
         profile: profile,
         bottomInset: bottomInset,
-        locale: locale,
-        localeTag: localeTag,
-        legalDocumentsAsync: legalDocumentsAsync,
         requiresAcceptance: requiresAcceptance,
       );
     }
@@ -522,6 +517,99 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
   }
 }
 
+class _ProfileSettingsLegalDetailRoute extends ConsumerStatefulWidget {
+  const _ProfileSettingsLegalDetailRoute({
+    required this.kind,
+    required this.title,
+    required this.subtitle,
+    required this.state,
+    required this.profile,
+    required this.bottomInset,
+    required this.requiresAcceptance,
+  });
+
+  final ProfileSettingsDetailKind kind;
+  final String title;
+  final String subtitle;
+  final ProfileState state;
+  final MobileUserProfile? profile;
+  final double bottomInset;
+  final bool requiresAcceptance;
+
+  @override
+  ConsumerState<_ProfileSettingsLegalDetailRoute> createState() =>
+      _ProfileSettingsLegalDetailRouteState();
+}
+
+class _ProfileSettingsLegalDetailRouteState
+    extends ConsumerState<_ProfileSettingsLegalDetailRoute> {
+  MobileLegalDocuments? _cachedDocuments;
+
+  @override
+  Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
+    final localeTag = locale.toLanguageTag();
+    final hasInternet = ref.watch(
+      networkStatusControllerProvider.select((status) => status.hasInternet),
+    );
+    final legalDocumentsProvider = currentLegalDocumentsProvider(localeTag);
+    final legalDocumentsAsync = hasInternet
+        ? ref.watch(legalDocumentsProvider)
+        : null;
+    final documents =
+        switch (legalDocumentsAsync) {
+          AsyncData(:final value) => value,
+          _ => null,
+        } ??
+        _cachedDocuments;
+
+    if (hasInternet) {
+      ref.listen<AsyncValue<MobileLegalDocuments>>(legalDocumentsProvider, (
+        previous,
+        next,
+      ) {
+        next.whenData((value) {
+          if (!mounted) {
+            return;
+          }
+
+          setState(() {
+            _cachedDocuments = value;
+          });
+        });
+      });
+    }
+
+    ref.listen<NetworkStatusState>(networkStatusControllerProvider, (
+      previous,
+      next,
+    ) {
+      if (previous?.hasInternet != false ||
+          !next.hasInternet ||
+          documents != null) {
+        return;
+      }
+
+      ref.invalidate(legalDocumentsProvider);
+    });
+
+    return _ProfileSettingsLegalDetailContent(
+      kind: widget.kind,
+      title: widget.title,
+      subtitle: widget.subtitle,
+      state: widget.state,
+      profile: widget.profile,
+      bottomInset: widget.bottomInset,
+      locale: locale,
+      localeTag: localeTag,
+      legalDocumentsAsync: legalDocumentsAsync,
+      documents: documents,
+      hasInternet: hasInternet,
+      requiresAcceptance: widget.requiresAcceptance,
+    );
+  }
+}
+
 bool _profileSettingsDetailRequiresAuth(ProfileSettingsDetailKind kind) {
   return switch (kind) {
     ProfileSettingsDetailKind.linkedAccounts ||
@@ -534,14 +622,15 @@ bool _profileSettingsDetailRequiresAuth(ProfileSettingsDetailKind kind) {
   };
 }
 
-MobileLegalDocument? _documentFromAsync(
+MobileLegalDocument? _documentFromValueOrNull(
   ProfileSettingsDetailKind kind,
-  AsyncValue<MobileLegalDocuments> value,
+  MobileLegalDocuments? value,
 ) {
-  return switch (value) {
-    AsyncData(:final value) => _documentFromValue(kind, value),
-    _ => null,
-  };
+  if (value == null) {
+    return null;
+  }
+
+  return _documentFromValue(kind, value);
 }
 
 MobileLegalDocument _documentFromValue(

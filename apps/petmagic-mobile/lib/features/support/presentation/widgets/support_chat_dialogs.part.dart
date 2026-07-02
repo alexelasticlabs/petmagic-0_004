@@ -131,6 +131,7 @@ class _SupportImagePreviewDialogState
                   child: Center(
                     child: CachedNetworkImage(
                       imageUrl: widget.imageUrl,
+                      cacheKey: persistentSafeSupportMediaUrl(widget.imageUrl),
                       fit: BoxFit.contain,
                       placeholder: (context, url) {
                         return const SizedBox.shrink();

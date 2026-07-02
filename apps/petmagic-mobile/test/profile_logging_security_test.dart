@@ -1,8 +1,20 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 
 void main() {
+  test('profile avatar cache keys strip signed URL secrets', () {
+    final safeUrl = persistentSafeProfileAvatarUrl(
+      'https://cdn.petmagic.app/profile/avatars/cat.jpg?X-Amz-Signature=secret&token=raw#viewer',
+    );
+
+    expect(safeUrl, 'https://cdn.petmagic.app/profile/avatars/cat.jpg');
+    expect(safeUrl, isNot(contains('X-Amz-Signature')));
+    expect(safeUrl, isNot(contains('token=raw')));
+    expect(safeUrl, isNot(contains('viewer')));
+  });
+
   test('profile avatar rendering checks URLs before network image use', () {
     final hostSource = File(
       'lib/features/profile/presentation/profile_surface_widgets.dart',
@@ -29,6 +41,7 @@ void main() {
     expect(identitySource, contains('class ProfileAvatarBadge'));
     expect(source, contains('parseSafeProfileAvatarUri(imageUrl)'));
     expect(source, contains('imageUrl: safeImageUrl'));
+    expect(source, contains('cacheKey: persistentSafeProfileAvatarUrl('));
     expect(source, isNot(contains('imageUrl: imageUrl!')));
   });
 
@@ -39,7 +52,17 @@ void main() {
     final evictBody = _methodBody(source, 'Future<void> _evictAvatarCache');
 
     expect(evictBody, contains('parseSafeProfileAvatarUri(imageUrl)'));
-    expect(evictBody, contains('evictFromCache(safeImageUrl)'));
+    expect(
+      evictBody,
+      contains(
+        'final cacheKey = persistentSafeProfileAvatarUrl(safeImageUrl);',
+      ),
+    );
+    expect(
+      evictBody,
+      contains('evictFromCache(safeImageUrl, cacheKey: cacheKey)'),
+    );
+    expect(evictBody, isNot(contains('evictFromCache(safeImageUrl);')));
     expect(evictBody, contains('NetworkImage(safeImageUrl)'));
     expect(evictBody, isNot(contains('NetworkImage(imageUrl)')));
     expect(evictBody, contains("'avatar_cache_evict_failed'"));

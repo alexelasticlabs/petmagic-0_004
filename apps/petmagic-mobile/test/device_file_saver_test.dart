@@ -377,7 +377,7 @@ void main() {
       expect(source, contains("operation: 'save_remote_to_gallery'"));
       expect(source, contains("operation: 'save_local_to_gallery'"));
       expect(source, contains("operation: 'validate_local_media_path'"));
-      expect(source, isNot(contains('} catch (_) {')));
+      expect(source, isNot(contains('} catch (_) {\n    return')));
     },
   );
 
@@ -407,15 +407,23 @@ void main() {
     final source = await File(
       'lib/shared/files/device_file_saver.dart',
     ).readAsString();
-
-    expect(source, contains('Future<bool> saveBytesToDevice({'));
-    expect(source, contains('finally {'));
-    expect(
+    final method = _extractMethodBody(
       source,
+      'Future<bool> saveBytesToDevice({',
+    );
+
+    expect(method, contains('try {'));
+    expect(
+      method,
+      contains('await tempFile.writeAsBytes(bytes, flush: true);'),
+    );
+    expect(method, contains('finally {'));
+    expect(
+      method,
       contains('await TempMediaCleanup.deleteIfExists(tempFile);'),
     );
     expect(
-      source,
+      method,
       isNot(
         contains(
           'if (await tempFile.exists()) {\n      await tempFile.delete();\n    }',
@@ -423,10 +431,77 @@ void main() {
       ),
     );
     expect(
-      source,
+      method,
       contains('TempMediaCleanup.createScopedTempFile(safeFileName)'),
     );
   });
+
+  test(
+    'cacheRemoteMediaFile deletes partial temp files when disk write fails',
+    () async {
+      final source = await File(
+        'lib/shared/files/media_share_save.dart',
+      ).readAsString();
+      final method = _extractMethodBody(
+        source,
+        'Future<File> cacheRemoteMediaFile({',
+      );
+
+      expect(method, contains('try {'));
+      expect(
+        method,
+        contains('await tempFile.writeAsBytes(bytes, flush: true);'),
+      );
+      expect(method, contains('} catch (error, stackTrace) {'));
+      expect(method, contains("feature: 'Files.MediaShare'"));
+      expect(method, contains("operation: 'cache_remote_media_file'"));
+      expect(method, contains('error: error'));
+      expect(method, contains('stackTrace: stackTrace'));
+      expect(
+        method,
+        contains('await TempMediaCleanup.deleteIfExists(tempFile);'),
+      );
+      expect(method, contains('rethrow;'));
+    },
+  );
+
+  test('shareRemoteMediaFile uses a sanitized share filename', () async {
+    final source = await File(
+      'lib/shared/files/media_share_save.dart',
+    ).readAsString();
+    final method = _extractMethodBody(
+      source,
+      'Future<void> shareRemoteMediaFile({',
+    );
+
+    expect(
+      method,
+      contains('XFile(tempFile.path, name: _safeMediaFileName(fileName))'),
+    );
+    expect(method, isNot(contains('files: [XFile(tempFile.path)]')));
+  });
+
+  test(
+    'saveRemoteMediaToGallery deletes temp cache after success or failure',
+    () async {
+      final source = await File(
+        'lib/shared/files/media_share_save.dart',
+      ).readAsString();
+      final method = _extractMethodBody(
+        source,
+        'Future<bool> saveRemoteMediaToGallery({',
+      );
+
+      expect(method, contains('try {'));
+      expect(method, contains('catch (error, stackTrace)'));
+      expect(method, contains('finally {'));
+      expect(
+        method,
+        contains('await TempMediaCleanup.deleteIfExists(tempFile);'),
+      );
+      expect(method, isNot(contains('TempMediaCleanup.scheduleTtlSweep();')));
+    },
+  );
 }
 
 String _extractMethodBody(String source, String signature) {

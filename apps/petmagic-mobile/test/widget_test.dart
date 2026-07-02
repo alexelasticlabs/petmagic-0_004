@@ -252,7 +252,7 @@ void main() {
     );
   });
 
-  testWidgets('sign up can continue when legal documents are unavailable', (
+  testWidgets('sign up stays blocked when legal documents are unavailable', (
     tester,
   ) async {
     final profileRepository = UnavailableLegalDocumentsProfileRepository();
@@ -303,10 +303,12 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle();
 
-    expect(profileRepository.lastTermsOfUseAccepted, isTrue);
-    expect(profileRepository.lastTermsOfUseVersion, '');
-    expect(profileRepository.lastPrivacyPolicyVersion, '');
-    expect(find.text('Verify email'), findsOneWidget);
+    expect(profileRepository.lastTermsOfUseAccepted, isNull);
+    expect(profileRepository.lastTermsOfUseVersion, isNull);
+    expect(profileRepository.lastPrivacyPolicyVersion, isNull);
+    expect(find.text(text.authLegalUnavailable), findsOneWidget);
+    expect(find.text('Create your account'), findsOneWidget);
+    expect(find.text('Verify email'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

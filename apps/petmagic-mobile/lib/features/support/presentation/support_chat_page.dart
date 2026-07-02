@@ -12,7 +12,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
 import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';
 import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 import 'package:petmagic_mobile/core/permissions/app_permission_coordinator.dart';
@@ -28,9 +30,11 @@ import 'package:petmagic_mobile/features/support/presentation/support_chat_contr
 import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
 import 'package:petmagic_mobile/shared/files/file_name_sanitizer.dart';
 import 'package:petmagic_mobile/shared/files/media_share_save.dart';
+import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 import 'package:petmagic_mobile/shared/files/upload_media_policy.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_unavailable_view.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
@@ -73,6 +77,11 @@ class SupportChatPage extends ConsumerStatefulWidget {
   static const routePath = '/profile/support/chat';
   static const initialMessageQueryParam = 'initialMessage';
   static const relatedGenerationIdQueryParam = 'relatedGenerationId';
+  static const int maxInitialMessageQueryLength = 500;
+  static const int maxRelatedGenerationIdQueryLength = 128;
+  static final RegExp _relatedGenerationIdPattern = RegExp(
+    r'^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$',
+  );
 
   final String? initialMessage;
   final String? relatedGenerationId;
@@ -82,12 +91,16 @@ class SupportChatPage extends ConsumerStatefulWidget {
     String? relatedGenerationId,
   }) {
     final queryParameters = <String, String>{};
-    final normalizedInitialMessage = initialMessage?.trim();
+    final normalizedInitialMessage = normalizeInitialMessageQuery(
+      initialMessage,
+    );
     if (normalizedInitialMessage != null &&
         normalizedInitialMessage.isNotEmpty) {
       queryParameters[initialMessageQueryParam] = normalizedInitialMessage;
     }
-    final normalizedGenerationId = relatedGenerationId?.trim();
+    final normalizedGenerationId = normalizeRelatedGenerationIdQuery(
+      relatedGenerationId,
+    );
     if (normalizedGenerationId != null && normalizedGenerationId.isNotEmpty) {
       queryParameters[relatedGenerationIdQueryParam] = normalizedGenerationId;
     }
@@ -96,6 +109,31 @@ class SupportChatPage extends ConsumerStatefulWidget {
       path: routePath,
       queryParameters: queryParameters.isEmpty ? null : queryParameters,
     ).toString();
+  }
+
+  static String? normalizeInitialMessageQuery(String? value) {
+    final normalized = value?.trim();
+    if (normalized == null || normalized.isEmpty) {
+      return null;
+    }
+
+    return normalized.length <= maxInitialMessageQueryLength
+        ? normalized
+        : normalized.substring(0, maxInitialMessageQueryLength);
+  }
+
+  static String? normalizeRelatedGenerationIdQuery(String? value) {
+    final normalized = value?.trim();
+    if (normalized == null || normalized.isEmpty) {
+      return null;
+    }
+
+    if (normalized.length > maxRelatedGenerationIdQueryLength ||
+        !_relatedGenerationIdPattern.hasMatch(normalized)) {
+      return null;
+    }
+
+    return normalized;
   }
 
   @override
@@ -180,7 +218,9 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
     WidgetsBinding.instance.addObserver(this);
     _messageController.addListener(_handleComposerChanged);
     _messageFocusNode.addListener(_handleComposerFocusChanged);
-    _applyInitialMessage(widget.initialMessage);
+    _applyInitialMessage(
+      SupportChatPage.normalizeInitialMessageQuery(widget.initialMessage),
+    );
     _ensureControllerStarted();
   }
 
@@ -188,7 +228,10 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
   void didUpdateWidget(covariant SupportChatPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.initialMessage != oldWidget.initialMessage) {
-      _applyInitialMessage(widget.initialMessage, notify: true);
+      _applyInitialMessage(
+        SupportChatPage.normalizeInitialMessageQuery(widget.initialMessage),
+        notify: true,
+      );
     }
   }
 
@@ -522,7 +565,10 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
                 context,
                 redirectPath: SupportChatPage.routeFor(
                   initialMessage: widget.initialMessage,
-                  relatedGenerationId: widget.relatedGenerationId,
+                  relatedGenerationId:
+                      SupportChatPage.normalizeRelatedGenerationIdQuery(
+                        widget.relatedGenerationId,
+                      ),
                 ),
               ),
             ),
@@ -533,6 +579,15 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
 
     _ensureControllerStarted();
     final state = ref.watch(supportChatControllerProvider);
+    final hasInternet = ref.watch(
+      networkStatusControllerProvider.select((status) => status.hasInternet),
+    );
+    final unavailableKind = state.conversation == null
+        ? classifyAppUnavailable(
+            raw: state.errorMessage,
+            hasInternet: hasInternet,
+          )
+        : null;
 
     ref.listen<SupportChatState>(supportChatControllerProvider, (
       previous,
@@ -644,6 +699,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
                         scrollController: _scrollController,
                         isWaitingForInitialConversation:
                             isWaitingForInitialConversation,
+                        unavailableKind: unavailableKind,
                         showLoadingFallback: _showLoadingFallback,
                         loadingFallbackMessageCode: _loadingFallbackMessageCode,
                         onRefresh: _controller.refresh,

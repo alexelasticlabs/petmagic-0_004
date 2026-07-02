@@ -9,9 +9,9 @@ import 'package:petmagic_mobile/core/network/network_utils.dart';
 import 'package:petmagic_mobile/core/network/request_identity.dart';
 
 class ApiLoggingInterceptor extends Interceptor {
-  ApiLoggingInterceptor({Random? random}) : _random = random ?? Random();
+  ApiLoggingInterceptor({Random? random}) : _random = random;
 
-  final Random _random;
+  final Random? _random;
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
@@ -205,7 +205,9 @@ class ApiLoggingInterceptor extends Interceptor {
     final normalized = lower.replaceAll(RegExp(r'[^a-z0-9]'), '');
     return lower.contains('password') ||
         lower.contains('token') ||
+        lower.contains('jwt') ||
         lower.contains('secret') ||
+        lower.contains('credential') ||
         lower.contains('authorization') ||
         lower.contains('email') ||
         lower.contains('phone') ||

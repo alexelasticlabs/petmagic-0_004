@@ -4,14 +4,17 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http_parser/http_parser.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
 import 'package:petmagic_mobile/core/network/authenticated_request_options.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
+import 'package:petmagic_mobile/shared/files/image_upload_optimizer.dart';
 import 'package:petmagic_mobile/shared/files/media_signature.dart';
 import 'package:petmagic_mobile/shared/files/upload_media_policy.dart';
 
@@ -20,6 +23,7 @@ final profileRepositoryProvider = Provider<ProfileRepository>((ref) {
     dio: ref.watch(dioProvider),
     sessionStorage: ref.watch(authSessionStorageProvider),
     authSessionCoordinator: ref.watch(authSessionCoordinatorProvider),
+    imageUploadOptimizer: const ImageUploadOptimizer(),
   );
 });
 
@@ -27,6 +31,10 @@ const _profileProviderCacheTtl = Duration(minutes: 5);
 
 final currentLegalDocumentsProvider =
     FutureProvider.family<MobileLegalDocuments, String>((ref, locale) {
+      if (!ref.read(networkStatusControllerProvider).hasInternet) {
+        throw const AppException('templates.network_unavailable');
+      }
+
       final cancelToken = CancelToken();
       ref.onDispose(() {
         if (!cancelToken.isCancelled) {
@@ -40,6 +48,10 @@ final currentLegalDocumentsProvider =
 
 final linkedAccountsProvider =
     FutureProvider.autoDispose<List<MobileLinkedAccount>>((ref) {
+      if (!ref.read(networkStatusControllerProvider).hasInternet) {
+        throw const AppException('templates.network_unavailable');
+      }
+
       final link = ref.keepAlive();
       Timer? disposeTimer;
       ref.onCancel(() {
@@ -67,14 +79,18 @@ class ProfileRepository {
     required Dio dio,
     required AuthSessionStorage sessionStorage,
     AuthSessionCoordinator? authSessionCoordinator,
+    ImageUploadOptimizer? imageUploadOptimizer,
   }) : _dio = dio,
        _sessionStorage = sessionStorage,
+       _imageUploadOptimizer =
+           imageUploadOptimizer ?? const ImageUploadOptimizer(),
        _authSessionCoordinator =
            authSessionCoordinator ??
            AuthSessionCoordinator(dio: dio, sessionStorage: sessionStorage);
 
   final Dio _dio;
   final AuthSessionStorage _sessionStorage;
+  final ImageUploadOptimizer _imageUploadOptimizer;
   final AuthSessionCoordinator _authSessionCoordinator;
 
   static const _maxAvatarBytes = UploadMediaPolicy.avatarMaxBytes;
@@ -90,6 +106,7 @@ class ProfileRepository {
     required String privacyPolicyVersion,
     required bool marketingEmailsEnabled,
     String? displayName,
+    CancelToken? cancelToken,
   }) async {
     try {
       await _dio.post<Map<String, dynamic>>(
@@ -107,6 +124,7 @@ class ProfileRepository {
               : displayName!.trim(),
         },
         options: anonymousRequestOptions(),
+        cancelToken: cancelToken,
       );
 
       return;
@@ -121,11 +139,13 @@ class ProfileRepository {
   Future<AuthSession> login({
     required String email,
     required String password,
+    CancelToken? cancelToken,
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         '/api/auth/login',
         data: {'email': email.trim(), 'password': password},
+        cancelToken: cancelToken,
       );
 
       final session = AuthSession.fromJson(response.data ?? const {});
@@ -136,11 +156,15 @@ class ProfileRepository {
     }
   }
 
-  Future<void> requestPasswordReset({required String email}) async {
+  Future<void> requestPasswordReset({
+    required String email,
+    CancelToken? cancelToken,
+  }) async {
     try {
       await _dio.post<void>(
         '/api/auth/password-reset/request',
         data: {'email': email.trim()},
+        cancelToken: cancelToken,
       );
     } on DioException catch (error) {
       throw _mapDioException(
@@ -154,6 +178,7 @@ class ProfileRepository {
     required String email,
     required String code,
     required String newPassword,
+    CancelToken? cancelToken,
   }) async {
     try {
       await _dio.post<void>(
@@ -163,6 +188,7 @@ class ProfileRepository {
           'code': code.trim(),
           'newPassword': newPassword,
         },
+        cancelToken: cancelToken,
       );
     } on DioException catch (error) {
       throw _mapDioException(
@@ -172,12 +198,15 @@ class ProfileRepository {
     }
   }
 
-  Future<void> requestCurrentPasswordChangeCode() async {
+  Future<void> requestCurrentPasswordChangeCode({
+    CancelToken? cancelToken,
+  }) async {
     try {
       await _authorizedRequest<void>(
         (session) => _dio.post<void>(
           '/api/auth/me/password-change/request',
           options: authenticatedRequestOptions(session.accessToken),
+          cancelToken: cancelToken,
         ),
         retryTransientFailures: false,
       );
@@ -192,6 +221,7 @@ class ProfileRepository {
   Future<void> confirmCurrentPasswordChange({
     required String code,
     required String newPassword,
+    CancelToken? cancelToken,
   }) async {
     try {
       await _authorizedRequest<void>(
@@ -203,6 +233,7 @@ class ProfileRepository {
             'refreshToken': session.refreshToken,
           },
           options: authenticatedRequestOptions(session.accessToken),
+          cancelToken: cancelToken,
         ),
         retryTransientFailures: false,
       );
@@ -214,11 +245,15 @@ class ProfileRepository {
     }
   }
 
-  Future<void> resendEmailVerificationCode({required String email}) async {
+  Future<void> resendEmailVerificationCode({
+    required String email,
+    CancelToken? cancelToken,
+  }) async {
     try {
       await _dio.post<void>(
         '/api/auth/resend-email-verification-code',
         data: {'email': email.trim()},
+        cancelToken: cancelToken,
       );
     } on DioException catch (error) {
       throw _mapDioException(
@@ -231,11 +266,13 @@ class ProfileRepository {
   Future<AuthSession> verifyEmailCode({
     required String email,
     required String code,
+    CancelToken? cancelToken,
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         '/api/auth/verify-email-code',
         data: {'email': email.trim(), 'code': code.trim()},
+        cancelToken: cancelToken,
       );
       final session = AuthSession.fromJson(response.data ?? const {});
       await _sessionStorage.save(session);
@@ -275,12 +312,13 @@ class ProfileRepository {
     }
   }
 
-  Future<void> deleteCurrentAccount() async {
+  Future<void> deleteCurrentAccount({CancelToken? cancelToken}) async {
     try {
       await _authorizedRequest<void>(
         (session) => _dio.delete<void>(
           '/api/auth/me',
           options: authenticatedRequestOptions(session.accessToken),
+          cancelToken: cancelToken,
         ),
         retryTransientFailures: false,
       );
@@ -307,6 +345,7 @@ class ProfileRepository {
 
   Future<MobileUserProfile> updateProfile({
     required String? displayName,
+    CancelToken? cancelToken,
   }) async {
     try {
       final response = await _authorizedRequest<Map<String, dynamic>>(
@@ -318,6 +357,7 @@ class ProfileRepository {
                 : displayName!.trim(),
           },
           options: authenticatedRequestOptions(session.accessToken),
+          cancelToken: cancelToken,
         ),
         retryTransientFailures: false,
       );
@@ -369,6 +409,7 @@ class ProfileRepository {
 
   Future<MobileUserProfile> acceptCurrentLegalDocuments({
     required MobileLegalDocuments documents,
+    CancelToken? cancelToken,
   }) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
@@ -378,6 +419,7 @@ class ProfileRepository {
           'privacyPolicyVersion': documents.privacyPolicy.version,
         },
         options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
       ),
       retryTransientFailures: false,
     );
@@ -393,37 +435,51 @@ class ProfileRepository {
   }) async {
     final fileName = filePath.split(Platform.pathSeparator).last;
     final mediaType = _resolveMediaType(fileName);
-    final uploadMediaType = await _validateAvatarForUpload(
-      filePath: filePath,
-      mediaType: mediaType,
-    );
-
-    final response = await _authorizedRequest<Map<String, dynamic>>(
-      (session) async => _dio.put<Map<String, dynamic>>(
-        '/api/auth/me/avatar',
-        data: FormData.fromMap({
-          'file': await MultipartFile.fromFile(
-            filePath,
-            filename: fileName,
-            contentType: uploadMediaType,
-          ),
-        }),
+    OptimizedUploadFile? optimizedAvatar;
+    try {
+      optimizedAvatar = await _imageUploadOptimizer.optimizeForAvatar(
+        XFile(filePath, name: fileName, mimeType: mediaType.toString()),
         cancelToken: cancelToken,
-        options: authenticatedMultipartRequestOptions(session.accessToken),
-      ),
-      retryTransientFailures: false,
-    );
+      );
+      final uploadFile = optimizedAvatar.file;
+      final uploadFileName = uploadFile.name.isNotEmpty
+          ? uploadFile.name
+          : uploadFile.path.split(Platform.pathSeparator).last;
+      final uploadMediaType = await _validateAvatarForUpload(
+        filePath: uploadFile.path,
+        mediaType: _resolveMediaType(uploadFileName),
+      );
 
-    final profile = MobileUserProfile.fromJson(response.data ?? const {});
-    await _replaceStoredUser(profile);
-    return profile;
+      final response = await _authorizedRequest<Map<String, dynamic>>(
+        (session) async => _dio.put<Map<String, dynamic>>(
+          '/api/auth/me/avatar',
+          data: FormData.fromMap({
+            'file': await MultipartFile.fromFile(
+              uploadFile.path,
+              filename: uploadFileName,
+              contentType: uploadMediaType,
+            ),
+          }),
+          cancelToken: cancelToken,
+          options: authenticatedMultipartRequestOptions(session.accessToken),
+        ),
+        retryTransientFailures: false,
+      );
+
+      final profile = MobileUserProfile.fromJson(response.data ?? const {});
+      await _replaceStoredUser(profile);
+      return profile;
+    } finally {
+      await optimizedAvatar?.dispose();
+    }
   }
 
-  Future<MobileUserProfile> removeAvatar() async {
+  Future<MobileUserProfile> removeAvatar({CancelToken? cancelToken}) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.delete<Map<String, dynamic>>(
         '/api/auth/me/avatar',
         options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
       ),
       retryTransientFailures: false,
     );
@@ -433,11 +489,15 @@ class ProfileRepository {
     return profile;
   }
 
-  Future<List<MobileLinkedAccount>> unlinkLinkedAccount(String provider) async {
+  Future<List<MobileLinkedAccount>> unlinkLinkedAccount(
+    String provider, {
+    CancelToken? cancelToken,
+  }) async {
     final response = await _authorizedRequest<List<dynamic>>(
       (session) => _dio.delete<List<dynamic>>(
         '/api/auth/me/linked-accounts/${Uri.encodeComponent(provider)}',
         options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
       ),
       retryTransientFailures: false,
     );
