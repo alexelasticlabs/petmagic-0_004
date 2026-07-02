@@ -779,8 +779,15 @@
   font-weight: 600;
 }
 
+.accessPillGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
 .freePill,
-.premiumPill {
+.premiumPill,
+.qaOnlyPill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -802,6 +809,12 @@
   border: 1px solid color-mix(in srgb, var(--warning) 28%, transparent);
   background: color-mix(in srgb, var(--warning) 20%, var(--surface-2));
   color: var(--warning);
+}
+
+.qaOnlyPill {
+  border: 1px solid color-mix(in srgb, var(--danger) 24%, transparent);
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface-2));
+  color: var(--danger);
 }
 
 .numericCell {
@@ -1090,4 +1103,3 @@
     flex-basis: 1.66rem;
   }
 }
-

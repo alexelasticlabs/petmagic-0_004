@@ -174,9 +174,14 @@ export function TemplatesCatalogListTable({
                   </td>
                   <td data-label={text.categoryLabel}>{safeTemplateCategory}</td>
                   <td data-label={copy.accessLabel}>
-                    <span className={template.isPremium ? styles.premiumPill : styles.freePill}>
-                      {getTemplateAccessLabel(template.isPremium, text)}
-                    </span>
+                    <div className={styles.accessPillGroup}>
+                      <span className={template.isPremium ? styles.premiumPill : styles.freePill}>
+                        {getTemplateAccessLabel(template.isPremium, text)}
+                      </span>
+                      {template.isQaOnly ? (
+                        <span className={styles.qaOnlyPill}>{copy.qaOnlyLabel}</span>
+                      ) : null}
+                    </div>
                   </td>
                   <td data-label={text.statusLabel}>
                     <AdminStatusBadge

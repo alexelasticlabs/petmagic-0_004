@@ -351,6 +351,10 @@ function TemplateProfileCard({
             value={formatDateTime(template.createdAtUtc, locale)}
           />
           <SummaryRow
+            label={text.publishedLabel}
+            value={template.publishedAtUtc ? formatDateTime(template.publishedAtUtc, locale) : "-"}
+          />
+          <SummaryRow
             label={text.updatedLabel}
             value={formatDateTime(template.updatedAtUtc, locale)}
           />

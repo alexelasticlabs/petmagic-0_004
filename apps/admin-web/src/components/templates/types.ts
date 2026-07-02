@@ -8,6 +8,7 @@ export type TemplateFormState = {
   promoBadgeMode: string;
   tags: string;
   isPremium: boolean;
+  isQaOnly: boolean;
   tokenCost: string;
   supportsGenerationResultInput: boolean;
   requiredInputMediaType: "Image" | "Video";

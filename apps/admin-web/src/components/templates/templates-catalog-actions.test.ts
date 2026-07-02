@@ -8,6 +8,7 @@ const catalogContentPath = fileURLToPath(
   new URL("./templates-catalog-view.content.ts", import.meta.url)
 );
 const catalogCssPath = fileURLToPath(new URL("./templates-catalog.module.css", import.meta.url));
+const templatesApiClientPath = fileURLToPath(new URL("../../lib/api-client.templates.ts", import.meta.url));
 
 describe("templates catalog actions", () => {
   it("confirms archive changes and sanitizes backend action errors", () => {
@@ -218,5 +219,18 @@ describe("templates catalog actions", () => {
     expect(source).not.toContain("setActionError(text.errorDeletingTemplate);");
     expect(source).not.toContain("error,\n      });");
     expect(source).not.toContain("templateId,\n        status,\n        error");
+  });
+
+  it("does not expose bulk template status changes before SSE batching is implemented", () => {
+    const catalogSource = readTemplatesCatalogViewLibrarySource();
+    const apiClientSource = readFileSync(templatesApiClientPath, "utf8");
+
+    expect(catalogSource).not.toContain("bulk");
+    expect(catalogSource).not.toContain("selectedTemplateIds");
+    expect(catalogSource).not.toContain("Promise.all(templates.map");
+    expect(apiClientSource).toContain("export async function changeTemplateStatus(");
+    expect(apiClientSource).toContain("`/api/admin/templates/${encodedTemplateId}/status`");
+    expect(apiClientSource).not.toContain("/api/admin/templates/bulk");
+    expect(apiClientSource).not.toContain("changeTemplateStatuses");
   });
 });

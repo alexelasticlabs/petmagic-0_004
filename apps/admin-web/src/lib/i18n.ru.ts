@@ -390,6 +390,8 @@ export const ruDictionary: Dictionary = {
   noFileSelected: "Файл не выбран",
   accessLabel: "Доступ",
   freeLabel: "Free",
+  qaOnlyLabel: "Только QA",
+  editorQaOnlyHint: "Скрыто из production feed; доступно только в non-production QA mode.",
   clearAsset: "Очистить",
   videoTemplateCreatePageTitle: "Создать новый шаблон",
   videoTemplateCreatePageHint: "Создайте шаблон для генерации видео в формате TikTok (9:16).",

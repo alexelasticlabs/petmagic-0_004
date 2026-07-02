@@ -83,7 +83,8 @@ describe("template form numeric hardening", () => {
     expect(source).toContain("category: normalizeTemplateText(form.category, TEMPLATE_CATEGORY_MAX_LENGTH)");
     expect(source).toContain("imageModel: normalizeTemplateText(form.imageModel, TEMPLATE_MODEL_MAX_LENGTH)");
     expect(source).toContain("imagePrompt: normalizeTemplateText(form.imagePrompt, TEMPLATE_PROMPT_MAX_LENGTH)");
-    expect(source).toContain("preprocessingPrompt: normalizeTemplateText(form.preprocessingPrompt, TEMPLATE_PROMPT_MAX_LENGTH)");
+    expect(source).toContain("preprocessingPrompt: normalizeTemplateText(");
+    expect(source).toContain("form.preprocessingPrompt");
     expect(source).toContain("klingPrompt: normalizeTemplateText(form.klingPrompt, TEMPLATE_PROMPT_MAX_LENGTH)");
     expect(source).toContain("normalizeTemplateText(tag, TEMPLATE_TAG_MAX_LENGTH)");
     expect(source).toContain(".slice(0, TEMPLATE_TAG_MAX_COUNT)");
@@ -192,6 +193,29 @@ describe("template form numeric hardening", () => {
     expect(controllerSource).not.toContain("fileName:");
     expect(controllerSource).not.toContain("contentType: file.type,\n        error");
   });
+
+  it("keeps active publication blocked in the editor until required media is present", () => {
+    const controllerSource = readFileSync(editorControllerPath, "utf8");
+
+    expect(controllerSource).toContain("function getActivationReadinessError(");
+    expect(controllerSource).toContain('if (targetStatus !== "Active")');
+    expect(controllerSource).toContain("const activationReadinessError = getActivationReadinessError(");
+    expect(controllerSource).toContain(
+      'if (activationReadinessError) {\n        setToast({ type: "error", message: activationReadinessError });\n        return;\n      }'
+    );
+    expect(controllerSource.indexOf("const activationReadinessError = getActivationReadinessError(")).toBeLessThan(
+      controllerSource.indexOf("await saveTemplateMutation.mutateAsync")
+    );
+    expect(controllerSource).toContain("missingLabels.push(text.previewAssetTitle)");
+    expect(controllerSource).toContain("missingLabels.push(text.petPhotoRequirementsLabel)");
+    expect(controllerSource).toContain("missingLabels.push(text.referenceMotionTitle)");
+    expect(controllerSource).toContain("missingLabels.push(text.referenceDurationLabel)");
+    expect(controllerSource).toContain("missingLabels.push(text.imageModelLabel)");
+    expect(controllerSource).toContain("missingLabels.push(text.imagePromptLabel)");
+    expect(controllerSource).toContain(
+      "return `${text.activationRequirementsMissing} ${missingLabels.join(\", \")}.`;"
+    );
+  });
 });
 
 describe("template media asset payload hardening", () => {
@@ -201,6 +225,8 @@ describe("template media asset payload hardening", () => {
 
     expect(initialImageForm.previewUrlSource).toBe("none");
     expect(initialImageForm.referenceUrlSource).toBe("none");
+    expect(initialImageForm.isQaOnly).toBe(false);
+    expect(formFromTemplate.isQaOnly).toBe(false);
     expect(formFromTemplate.previewUrl).toContain("X-Amz-Signature=preview-secret");
     expect(formFromTemplate.referenceUrl).toContain("X-Amz-Signature=reference-secret");
     expect(formFromTemplate.previewUrlSource).toBe("persisted");
@@ -213,9 +239,14 @@ describe("template media asset payload hardening", () => {
     expect(source).toContain("function buildTemplateAsset(");
     expect(source).toContain('if (source === "none") {');
     expect(source).toContain("return undefined;");
-    expect(source).toContain("previewAsset: buildTemplateAsset(");
+    expect(source).toContain("const previewAsset = buildTemplateAsset(");
+    expect(source).toContain("previewAsset,");
+    expect(source).toContain("thumbnailAsset: previewAsset");
+    expect(source).toContain("feedLoopLowAsset: previewAsset");
+    expect(source).toContain("detailPreviewAsset: previewAsset");
     expect(source).toContain("referenceMotionAsset: buildTemplateAsset(");
     expect(source).toContain("url: url.trim()");
+    expect(source).toContain("isQaOnly: form.isQaOnly");
   });
 });
 
@@ -230,6 +261,7 @@ function createTemplate(): AdminTemplate {
     status: "Draft",
     promoBadgeMode: "Auto",
     isPremium: false,
+    isQaOnly: false,
     tokenCost: 60,
     supportsGenerationResultInput: true,
     requiredInputMediaType: "Image",

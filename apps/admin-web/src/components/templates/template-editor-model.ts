@@ -275,6 +275,7 @@ function resolveEffectivePromoBadge(
 
   return resolveAutoPromoBadge({
     createdAtUtc: selectedTemplate?.createdAtUtc,
+    publishedAtUtc: selectedTemplate?.publishedAtUtc,
     updatedAtUtc: selectedTemplate?.updatedAtUtc,
     status: selectedTemplate?.status,
     isPremium: form.isPremium,

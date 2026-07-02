@@ -384,6 +384,8 @@ export const enDictionary: Dictionary = {
   noFileSelected: "No file selected",
   accessLabel: "Access",
   freeLabel: "Free",
+  qaOnlyLabel: "QA only",
+  editorQaOnlyHint: "Hide from production feeds; visible only in non-production QA mode.",
   clearAsset: "Clear",
   videoTemplateCreatePageTitle: "Create new template",
   videoTemplateCreatePageHint:

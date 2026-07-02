@@ -7,6 +7,7 @@ export const FUNNY_PROMO_BADGE_KEYWORDS = ["funny", "meme", "viral", "dance", "l
 
 type AutoPromoBadgeContext = {
   createdAtUtc?: string | null;
+  publishedAtUtc?: string | null;
   updatedAtUtc?: string | null;
   status?: TemplateStatus;
   isPremium: boolean;
@@ -19,7 +20,11 @@ export function resolveAutoPromoBadge(
   context: AutoPromoBadgeContext
 ): Exclude<TemplatePromoBadgeMode, "Auto"> | undefined {
   const now = context.now ?? Date.now();
-  const createdAt = context.createdAtUtc ? new Date(context.createdAtUtc).getTime() : now;
+  const createdAt = context.publishedAtUtc
+    ? new Date(context.publishedAtUtc).getTime()
+    : context.createdAtUtc
+      ? new Date(context.createdAtUtc).getTime()
+      : now;
   const updatedAt = context.updatedAtUtc ? new Date(context.updatedAtUtc).getTime() : now;
 
   if (createdAt >= now - NEW_PROMO_BADGE_DAYS * 24 * 60 * 60 * 1000) {

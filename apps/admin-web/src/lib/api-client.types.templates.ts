@@ -1,43 +1,16 @@
 export type TemplateType = "Image" | "Video";
 
-
 export type TemplateStatus = "Draft" | "Active" | "Archived";
 
-
 export type TemplateGenerationJobStatus =
-
-  | "Queued"
-
-  | "Processing"
-
-  | "Completed"
-
-  | "Failed"
-
-  | "Cancelled"
-
-  | "Retrying";
+  "Queued" | "Processing" | "Completed" | "Failed" | "Cancelled" | "Retrying";
 
 export type AdminGenerationStatus =
-
-  | "Pending"
-
-  | "Running"
-
-  | "Completed"
-
-  | "Failed"
-
-  | "Cancelled"
-
-  | "Retrying";
-
+  "Pending" | "Running" | "Completed" | "Failed" | "Cancelled" | "Retrying";
 
 export type TemplatePromoBadgeMode = "Auto" | "New" | "Trending" | "Popular" | "Funny";
 
-
 export type TemplateAssetInput = {
-
   url: string;
 
   fileName: string;
@@ -47,12 +20,9 @@ export type TemplateAssetInput = {
   fileSizeBytes?: number;
 
   durationSeconds?: number;
-
 };
-
 
 export type TemplateAsset = {
-
   url: string;
 
   fileName: string;
@@ -62,15 +32,11 @@ export type TemplateAsset = {
   fileSizeBytes?: number;
 
   durationSeconds?: number;
-
 };
-
 
 export type TemplateAssetKind = "Preview" | "ReferenceMotion";
 
-
 export type AdminTemplateListItem = {
-
   templateId: string;
 
   templateType: TemplateType;
@@ -91,11 +57,23 @@ export type AdminTemplateListItem = {
 
   isPremium: boolean;
 
+  isQaOnly: boolean;
+
   tokenCost: number;
 
   tags: string[];
 
   previewAsset?: TemplateAsset;
+
+  thumbnailAsset?: TemplateAsset;
+
+  animatedPreviewAsset?: TemplateAsset;
+
+  feedLoopLowAsset?: TemplateAsset;
+
+  feedLoopMediumAsset?: TemplateAsset;
+
+  detailPreviewAsset?: TemplateAsset;
 
   musicDescription?: string;
 
@@ -104,6 +82,8 @@ export type AdminTemplateListItem = {
   characterOrientation?: string;
 
   createdAtUtc: string;
+
+  publishedAtUtc?: string | null;
 
   updatedAtUtc: string;
 
@@ -118,12 +98,9 @@ export type AdminTemplateListItem = {
   supportsGenerateSimilar?: boolean;
 
   defaultVariationStrength?: "low" | "medium" | "high" | string;
-
 };
 
-
 export type AdminTemplateCatalogPage = {
-
   items: AdminTemplateListItem[];
 
   skip: number;
@@ -133,12 +110,9 @@ export type AdminTemplateCatalogPage = {
   totalCount: number;
 
   hasMore: boolean;
-
 };
 
-
 export type AdminTemplateOfTheDay = {
-
   id: string;
 
   templateId: string;
@@ -176,12 +150,9 @@ export type AdminTemplateOfTheDay = {
   updatedAtUtc: string;
 
   createdByAdminId?: string | null;
-
 };
 
-
 export type AdminTemplateOfTheDaySchedule = {
-
   items: AdminTemplateOfTheDay[];
 
   skip: number;
@@ -189,12 +160,9 @@ export type AdminTemplateOfTheDaySchedule = {
   take: number;
 
   totalCount: number;
-
 };
 
-
 export type AdminTemplateOfTheDaySettings = {
-
   autoModeEnabled: boolean;
 
   allowedTypes: "both" | "image" | "video";
@@ -204,12 +172,9 @@ export type AdminTemplateOfTheDaySettings = {
   updatedAtUtc: string;
 
   updatedByAdminId?: string | null;
-
 };
 
-
 export type TemplateOfTheDayPayload = {
-
   templateId: string;
 
   startDate: string;
@@ -227,34 +192,25 @@ export type TemplateOfTheDayPayload = {
   subtitleOverride?: string | null;
 
   badgeTextOverride?: string | null;
-
 };
 
-
 export type TemplateOfTheDayAutoPickPayload = {
-
   date: string;
 
   allowedTypes?: "both" | "image" | "video";
 
   excludeRecentDays?: number;
-
 };
 
-
 export type TemplateOfTheDaySettingsPayload = {
-
   autoModeEnabled: boolean;
 
   allowedTypes?: "both" | "image" | "video";
 
   excludeRecentDays?: number;
-
 };
 
-
 export type AdminTemplateCategory = {
-
   categoryId: string;
 
   name: string;
@@ -280,12 +236,9 @@ export type AdminTemplateCategory = {
   createdAtUtc: string;
 
   updatedAtUtc: string;
-
 };
 
-
 export type AdminTemplate = {
-
   templateId: string;
 
   templateType: TemplateType;
@@ -306,11 +259,23 @@ export type AdminTemplate = {
 
   isPremium: boolean;
 
+  isQaOnly: boolean;
+
   tokenCost: number;
 
   tags: string[];
 
   previewAsset?: TemplateAsset;
+
+  thumbnailAsset?: TemplateAsset;
+
+  animatedPreviewAsset?: TemplateAsset;
+
+  feedLoopLowAsset?: TemplateAsset;
+
+  feedLoopMediumAsset?: TemplateAsset;
+
+  detailPreviewAsset?: TemplateAsset;
 
   musicDescription?: string;
 
@@ -338,6 +303,8 @@ export type AdminTemplate = {
 
   createdAtUtc: string;
 
+  publishedAtUtc?: string | null;
+
   updatedAtUtc: string;
 
   supportsGenerationResultInput?: boolean;
@@ -349,12 +316,9 @@ export type AdminTemplate = {
   supportsGenerateSimilar?: boolean;
 
   defaultVariationStrength?: "low" | "medium" | "high" | string;
-
 };
 
-
 export type AdminTemplateStatistics = {
-
   templateId: string;
 
   totalRuns: number;
@@ -382,12 +346,9 @@ export type AdminTemplateStatistics = {
   lastCompletedAtUtc?: string | null;
 
   averageGenerationSeconds?: number | null;
-
 };
 
-
 export type AdminTemplateTrendPoint = {
-
   dateUtc: string;
 
   totalRuns: number;
@@ -407,12 +368,9 @@ export type AdminTemplateTrendPoint = {
   totalProviderCostUsd: number;
 
   averageGenerationSeconds?: number | null;
-
 };
 
-
 export type AdminTemplateRecentGeneration = {
-
   generationId: string;
 
   userId: string;
@@ -440,23 +398,17 @@ export type AdminTemplateRecentGeneration = {
   startedAtUtc?: string | null;
 
   completedAtUtc?: string | null;
-
 };
 
-
 export type AdminTemplateFailureBreakdownItem = {
-
   failureCode: string;
 
   count: number;
 
   lastOccurredAtUtc?: string | null;
-
 };
 
-
 export type AdminTemplateAnalyticsDimension = {
-
   key: string;
 
   label: string;
@@ -464,12 +416,9 @@ export type AdminTemplateAnalyticsDimension = {
   count: number;
 
   sharePercent: number;
-
 };
 
-
 export type AdminTemplateEventAnalytics = {
-
   totalViews: number;
 
   totalVideoViews: number;
@@ -481,12 +430,9 @@ export type AdminTemplateEventAnalytics = {
   devices: AdminTemplateAnalyticsDimension[];
 
   geography: AdminTemplateAnalyticsDimension[];
-
 };
 
-
 export type AdminTemplateFeedbackItem = {
-
   eventId: string;
 
   eventType: string;
@@ -504,15 +450,11 @@ export type AdminTemplateFeedbackItem = {
   generationId?: string | null;
 
   createdAtUtc: string;
-
 };
-
 
 export type AdminModerationStatus = "pending" | "approved" | "rejected";
 
-
 export type AdminModerationQueueItem = {
-
   eventId: string;
 
   templateId: string;
@@ -542,12 +484,9 @@ export type AdminModerationQueueItem = {
   createdAtUtc: string;
 
   moderatedAtUtc?: string | null;
-
 };
 
-
 export type AdminModerationQueuePage = {
-
   items: AdminModerationQueueItem[];
 
   skip: number;
@@ -559,12 +498,9 @@ export type AdminModerationQueuePage = {
   hasMore: boolean;
 
   generatedAtUtc: string;
-
 };
 
-
 export type AdminModerationQueueQuery = {
-
   status?: AdminModerationStatus | "all";
 
   search?: string;
@@ -572,23 +508,17 @@ export type AdminModerationQueueQuery = {
   skip?: number;
 
   take?: number;
-
 };
 
-
 export type AdminTemplateFeedbackQuery = {
-
   take?: number;
 
   type?: "complaint" | "feedback";
 
   search?: string;
-
 };
 
-
 export type AdminTemplatesAnalyticsFeedbackItem = {
-
   eventId: string;
 
   templateId: string;
@@ -612,12 +542,9 @@ export type AdminTemplatesAnalyticsFeedbackItem = {
   generationId?: string | null;
 
   createdAtUtc: string;
-
 };
 
-
 export type AdminTemplatesAnalyticsQuery = {
-
   periodDays?: number;
 
   templateType?: TemplateType | "All";
@@ -631,12 +558,9 @@ export type AdminTemplatesAnalyticsQuery = {
   sort?: "views" | "starts" | "conversion" | "cost" | "tokens" | "updated";
 
   take?: number;
-
 };
 
-
 export type AdminTemplatesAnalyticsSummary = {
-
   totalTemplates: number;
 
   videoTemplates: number;
@@ -664,12 +588,9 @@ export type AdminTemplatesAnalyticsSummary = {
   totalProviderCostUsd: number;
 
   totalComplaints: number;
-
 };
 
-
 export type AdminTemplatesAnalyticsTrendPoint = {
-
   dateUtc: string;
 
   totalViews: number;
@@ -683,12 +604,9 @@ export type AdminTemplatesAnalyticsTrendPoint = {
   totalTokenCost: number;
 
   totalProviderCostUsd: number;
-
 };
 
-
 export type AdminTemplatesAnalyticsTemplateRow = {
-
   templateId: string;
 
   templateType: TemplateType;
@@ -720,12 +638,9 @@ export type AdminTemplatesAnalyticsTemplateRow = {
   totalProviderCostUsd: number;
 
   updatedAtUtc: string;
-
 };
 
-
 export type AdminTemplatesAnalyticsBreakdown = {
-
   key: string;
 
   label: string;
@@ -743,12 +658,9 @@ export type AdminTemplatesAnalyticsBreakdown = {
   totalTokenCost: number;
 
   totalProviderCostUsd: number;
-
 };
 
-
 export type AdminTemplatesAnalyticsFunnel = {
-
   views: number;
 
   generationStarts: number;
@@ -758,12 +670,9 @@ export type AdminTemplatesAnalyticsFunnel = {
   failedGenerations: number;
 
   complaints: number;
-
 };
 
-
 export type AdminTemplatesAnalyticsOverview = {
-
   summary: AdminTemplatesAnalyticsSummary;
 
   trendPoints: AdminTemplatesAnalyticsTrendPoint[];
@@ -789,12 +698,9 @@ export type AdminTemplatesAnalyticsOverview = {
   availableCategories: string[];
 
   generatedAtUtc: string;
-
 };
 
-
 export type AdminTemplateGenerationDashboardMetrics = {
-
   totalJobs: number;
 
   generationsToday: number;
@@ -822,12 +728,9 @@ export type AdminTemplateGenerationDashboardMetrics = {
   retryingJobs: number;
 
   generatedAtUtc: string;
-
 };
 
-
 export type AdminTemplateGenerationListItem = {
-
   generationId: string;
 
   userId: string;
@@ -915,12 +818,9 @@ export type AdminTemplateGenerationListItem = {
   petId?: string | null;
 
   petPhotoId?: string | null;
-
 };
 
-
 export type AdminTemplateGenerationsQuery = {
-
   status?: AdminGenerationStatus | "All";
 
   provider?: string;
@@ -932,12 +832,9 @@ export type AdminTemplateGenerationsQuery = {
   skip?: number;
 
   take?: number;
-
 };
 
-
 export type AdminTemplateGenerationsPage = {
-
   items: AdminTemplateGenerationListItem[];
 
   totalCount: number;
@@ -949,12 +846,9 @@ export type AdminTemplateGenerationsPage = {
   hasMore: boolean;
 
   generatedAtUtc: string;
-
 };
 
-
 export type AdminWatermarkSettings = {
-
   enabled: boolean;
 
   text: string;
@@ -976,12 +870,9 @@ export type AdminWatermarkSettings = {
   previewImageUrl: string;
 
   previewVideoFrameUrl: string;
-
 };
 
-
 export type RemoveGenerationWatermarkResponse = {
-
   watermarkRemoved: boolean;
 
   creditsSpent: number;
@@ -989,12 +880,9 @@ export type RemoveGenerationWatermarkResponse = {
   remainingCredits?: number | null;
 
   mediaUrl?: string | null;
-
 };
 
-
 export type AdminTemplateTestRun = {
-
   generationId: string;
 
   userId: string;
@@ -1050,12 +938,9 @@ export type AdminTemplateTestRun = {
   completedAtUtc?: string | null;
 
   userMediaExpired: boolean;
-
 };
 
-
 export type ImageTemplatePayload = {
-
   title: string;
 
   shortDescription: string;
@@ -1072,9 +957,21 @@ export type ImageTemplatePayload = {
 
   isPremium: boolean;
 
+  isQaOnly?: boolean;
+
   tokenCost: number;
 
   previewAsset?: TemplateAssetInput;
+
+  thumbnailAsset?: TemplateAssetInput;
+
+  animatedPreviewAsset?: TemplateAssetInput;
+
+  feedLoopLowAsset?: TemplateAssetInput;
+
+  feedLoopMediumAsset?: TemplateAssetInput;
+
+  detailPreviewAsset?: TemplateAssetInput;
 
   imageModel: string;
 
@@ -1089,12 +986,9 @@ export type ImageTemplatePayload = {
   supportsGenerateSimilar?: boolean;
 
   defaultVariationStrength?: "low" | "medium" | "high" | string;
-
 };
 
-
 export type VideoTemplatePayload = {
-
   title: string;
 
   shortDescription: string;
@@ -1111,11 +1005,23 @@ export type VideoTemplatePayload = {
 
   isPremium: boolean;
 
+  isQaOnly?: boolean;
+
   tokenCost: number;
 
   musicDescription: string;
 
   previewAsset?: TemplateAssetInput;
+
+  thumbnailAsset?: TemplateAssetInput;
+
+  animatedPreviewAsset?: TemplateAssetInput;
+
+  feedLoopLowAsset?: TemplateAssetInput;
+
+  feedLoopMediumAsset?: TemplateAssetInput;
+
+  detailPreviewAsset?: TemplateAssetInput;
 
   referenceMotionAsset?: TemplateAssetInput;
 
@@ -1138,12 +1044,8 @@ export type VideoTemplatePayload = {
   supportsGenerateSimilar?: boolean;
 
   defaultVariationStrength?: "low" | "medium" | "high" | string;
-
 };
 
-
 export type TemplateCategoryPayload = {
-
   name: string;
-
 };

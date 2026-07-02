@@ -108,6 +108,7 @@ export function sanitizeTemplateForAnalyticsExport(
     promoBadgeMode: template.promoBadgeMode,
     effectivePromoBadge: template.effectivePromoBadge,
     isPremium: template.isPremium,
+    isQaOnly: template.isQaOnly,
     tokenCost: template.tokenCost,
     supportsGenerationResultInput: template.supportsGenerationResultInput,
     requiredInputMediaType: template.requiredInputMediaType,

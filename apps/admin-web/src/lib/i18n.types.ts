@@ -363,6 +363,8 @@ export type Dictionary = {
   noFileSelected: string;
   accessLabel: string;
   freeLabel: string;
+  qaOnlyLabel: string;
+  editorQaOnlyHint: string;
   clearAsset: string;
   videoTemplateCreatePageTitle: string;
   videoTemplateCreatePageHint: string;

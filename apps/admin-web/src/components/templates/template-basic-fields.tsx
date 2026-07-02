@@ -251,6 +251,26 @@ export function TemplateBasicFields({
         </div>
       </div>
 
+      <div className={styles.accessGroup} role="group" aria-label={text.qaOnlyLabel}>
+        <span className={styles.accessLabel}>{text.qaOnlyLabel}</span>
+        <div className={styles.accessOptions}>
+          <button
+            type="button"
+            className={joinClassNames(
+              styles.accessOption,
+              form.isQaOnly ? styles.accessOptionActive : null
+            )}
+            aria-pressed={form.isQaOnly}
+            onClick={() => setForm((current) => ({ ...current, isQaOnly: !current.isQaOnly }))}
+          >
+            <span className={styles.accessOptionTitle}>
+              {form.isQaOnly ? text.qaOnlyLabel : text.editorVisibleToUsersHint}
+            </span>
+            <span className={styles.accessOptionHint}>{text.editorQaOnlyHint}</span>
+          </button>
+        </div>
+      </div>
+
       <div className={styles.split}>
         <label className={styles.fieldBlock}>
           <span className={styles.fieldHeader}>

@@ -69,6 +69,7 @@ export function createInitialTemplateForm(templateType: TemplateType): TemplateF
     promoBadgeMode: "Auto",
     tags: "",
     isPremium: false,
+    isQaOnly: false,
     tokenCost: templateType === "Video" ? "60" : "20",
     supportsGenerationResultInput: false,
     requiredInputMediaType: "Image",
@@ -105,6 +106,7 @@ export function createFormFromTemplate(template: AdminTemplate): TemplateFormSta
     promoBadgeMode: template.promoBadgeMode,
     tags: template.tags.join(", "),
     isPremium: template.isPremium,
+    isQaOnly: template.isQaOnly,
     tokenCost: template.tokenCost.toString(),
     supportsGenerationResultInput: template.supportsGenerationResultInput ?? false,
     requiredInputMediaType: template.requiredInputMediaType ?? "Image",
@@ -139,6 +141,14 @@ export async function saveImageTemplateFromForm(
   form: TemplateFormState,
   status: TemplateStatus
 ): Promise<AdminTemplate> {
+  const previewAsset = buildTemplateAsset(
+    form.previewUrlSource,
+    form.previewUrl,
+    form.previewFileName,
+    form.previewContentType,
+    form.previewFileSizeBytes,
+    form.previewDurationSeconds
+  );
   const payload: ImageTemplatePayload = {
     title: normalizeTemplateText(form.title, TEMPLATE_TITLE_MAX_LENGTH),
     shortDescription: normalizeTemplateText(
@@ -151,15 +161,12 @@ export async function saveImageTemplateFromForm(
     promoBadgeMode: form.promoBadgeMode as TemplatePromoBadgeMode,
     tags: normalizeTags(form.tags),
     isPremium: form.isPremium,
+    isQaOnly: form.isQaOnly,
     tokenCost: parseNumber(form.tokenCost),
-    previewAsset: buildTemplateAsset(
-      form.previewUrlSource,
-      form.previewUrl,
-      form.previewFileName,
-      form.previewContentType,
-      form.previewFileSizeBytes,
-      form.previewDurationSeconds
-    ),
+    previewAsset,
+    thumbnailAsset: previewAsset,
+    feedLoopLowAsset: previewAsset,
+    detailPreviewAsset: previewAsset,
     imageModel: normalizeTemplateText(form.imageModel, TEMPLATE_MODEL_MAX_LENGTH),
     imagePrompt: normalizeTemplateText(form.imagePrompt, TEMPLATE_PROMPT_MAX_LENGTH),
     supportsGenerationResultInput: form.supportsGenerationResultInput,
@@ -175,6 +182,14 @@ export async function saveVideoTemplateFromForm(
   form: TemplateFormState,
   status: TemplateStatus
 ): Promise<AdminTemplate> {
+  const previewAsset = buildTemplateAsset(
+    form.previewUrlSource,
+    form.previewUrl,
+    form.previewFileName,
+    form.previewContentType,
+    form.previewFileSizeBytes,
+    form.previewDurationSeconds
+  );
   const payload: VideoTemplatePayload = {
     title: normalizeTemplateText(form.title, TEMPLATE_TITLE_MAX_LENGTH),
     shortDescription: normalizeTemplateText(
@@ -187,19 +202,16 @@ export async function saveVideoTemplateFromForm(
     promoBadgeMode: form.promoBadgeMode as TemplatePromoBadgeMode,
     tags: normalizeTags(form.tags),
     isPremium: form.isPremium,
+    isQaOnly: form.isQaOnly,
     tokenCost: parseNumber(form.tokenCost),
     musicDescription: normalizeTemplateText(
       form.musicDescription,
       TEMPLATE_MUSIC_DESCRIPTION_MAX_LENGTH
     ),
-    previewAsset: buildTemplateAsset(
-      form.previewUrlSource,
-      form.previewUrl,
-      form.previewFileName,
-      form.previewContentType,
-      form.previewFileSizeBytes,
-      form.previewDurationSeconds
-    ),
+    previewAsset,
+    thumbnailAsset: previewAsset,
+    feedLoopLowAsset: previewAsset,
+    detailPreviewAsset: previewAsset,
     referenceMotionAsset: buildTemplateAsset(
       form.referenceUrlSource,
       form.referenceUrl,
@@ -209,7 +221,10 @@ export async function saveVideoTemplateFromForm(
       form.referenceDurationSeconds
     ),
     preprocessingModel: normalizeTemplateText(form.preprocessingModel, TEMPLATE_MODEL_MAX_LENGTH),
-    preprocessingPrompt: normalizeTemplateText(form.preprocessingPrompt, TEMPLATE_PROMPT_MAX_LENGTH),
+    preprocessingPrompt: normalizeTemplateText(
+      form.preprocessingPrompt,
+      TEMPLATE_PROMPT_MAX_LENGTH
+    ),
     klingModel: normalizeTemplateText(form.klingModel, TEMPLATE_MODEL_MAX_LENGTH),
     klingPrompt: normalizeTemplateText(form.klingPrompt, TEMPLATE_PROMPT_MAX_LENGTH),
     keepOriginalSound: form.keepOriginalSound,

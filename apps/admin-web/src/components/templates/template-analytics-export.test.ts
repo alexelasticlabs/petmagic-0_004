@@ -64,6 +64,7 @@ describe("template analytics export", () => {
       status: "Active",
       promoBadgeMode: "Auto",
       isPremium: true,
+      isQaOnly: false,
       tokenCost: 60,
       supportsGenerationResultInput: true,
       requiredInputMediaType: "Image",
