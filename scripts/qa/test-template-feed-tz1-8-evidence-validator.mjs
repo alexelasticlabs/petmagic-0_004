@@ -16,13 +16,22 @@ try {
   await assertLatencyRegressionEvidenceFails();
   await assertIncompleteSseActionLabelsFail();
   await assertMissingAdminScenarioEvidenceFails();
+  await assertMissingAdminLoadProbeEvidenceFails();
+  await assertRejectedAdminLoadProbeEvidenceFails();
+  await assertReversedAdminLoadProbeMetadataFails();
+  await assertMismatchedAdminLoadProbeEvidenceFails();
   await assertMissingAdminSnapshotArtifactFails();
   await assertAdminSnapshotArtifactMustBeAcceptedSseFails();
   await assertScopedAdminReportPathFailsWhenSelectedReportIsInvalid();
   await assertScopedSnapshotRunIdsPassWhenArtifactsMatch();
   await assertScopedSnapshotRunIdsFailWhenArtifactsAreStale();
   await assertSnapshotRunnerMetadataIsRequired();
+  await assertSnapshotRunnerMetadataChronologyIsRequired();
   await assertSnapshotMeasurementStructureIsRequired();
+  await assertSnapshotMeasurementConsistencyIsRequired();
+  await assertSnapshotComparisonMatchesRawSamples();
+  await assertSnapshotChronologyIsRequired();
+  await assertSnapshotLabelsAreRequired();
   console.log('template feed TZ1-8 evidence validator self-test passed');
 } catch (error) {
   console.error(error.stack || String(error));
@@ -120,6 +129,79 @@ async function assertMissingAdminScenarioEvidenceFails() {
     `missing admin scenario evidence should fail, got exit 0\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
   );
   assert(result.stdout.includes('[FAIL] admin.manual_qa_report_complete'), 'missing admin scenario evidence failure');
+}
+
+async function assertMissingAdminLoadProbeEvidenceFails() {
+  const root = createTempRepoRoot('missing-admin-load-probe-evidence');
+  writeCommonArtifacts(root);
+  writeLatencyArtifact(root);
+  writeSseArtifact(root);
+  writeAdminQaReport(root, {
+    scenarioEvidence: {
+      categoryRename: 'category rename screenshot attached without feed-load probe summary',
+    },
+  });
+
+  const result = await runValidator(root);
+  assert(
+    result.code !== 0,
+    `admin QA without accepted feed-load probe summary should fail, got exit 0\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+  );
+  assert(result.stdout.includes('[FAIL] admin.manual_qa_report_complete'), 'missing load-probe linked admin failure');
+  assert(result.stdout.includes('missing an accepted feed-load probe summary'), 'missing diagnostic load-probe rejection reason');
+}
+
+async function assertRejectedAdminLoadProbeEvidenceFails() {
+  const root = createTempRepoRoot('rejected-admin-load-probe-evidence');
+  writeCommonArtifacts(root);
+  writeFeedLoadProbeArtifact(root, { failed: 1, maxErrors: 0 });
+  writeLatencyArtifact(root);
+  writeSseArtifact(root);
+  writeAdminQaReport(root);
+
+  const result = await runValidator(root);
+  assert(
+    result.code !== 0,
+    `admin QA with failed feed-load probe should fail, got exit 0\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+  );
+  assert(result.stdout.includes('[FAIL] admin.manual_qa_report_complete'), 'missing rejected load-probe linked admin failure');
+}
+
+async function assertReversedAdminLoadProbeMetadataFails() {
+  const root = createTempRepoRoot('reversed-admin-load-probe-metadata');
+  writeCommonArtifacts(root);
+  writeFeedLoadProbeArtifact(root, { reverseMetadataTimes: true });
+  writeLatencyArtifact(root);
+  writeSseArtifact(root);
+  writeAdminQaReport(root);
+
+  const result = await runValidator(root);
+  assert(
+    result.code !== 0,
+    `admin QA with reversed feed-load probe metadata should fail, got exit 0\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+  );
+  assert(result.stdout.includes('[FAIL] admin.manual_qa_report_complete'), 'missing reversed load-probe metadata admin failure');
+}
+
+async function assertMismatchedAdminLoadProbeEvidenceFails() {
+  const root = createTempRepoRoot('mismatched-admin-load-probe-evidence');
+  writeCommonArtifacts(root);
+  writeFeedLoadProbeArtifact(root, { runId: 'stale-rename-load-probe' });
+  writeLatencyArtifact(root);
+  writeSseArtifact(root);
+  writeAdminQaReport(root, {
+    scenarioEvidence: {
+      categoryRename: 'artifacts/template-feed-load-probes/stale-rename-load-probe/summary.md plus category rename screenshot attached',
+    },
+  });
+
+  const result = await runValidator(root);
+  assert(
+    result.code !== 0,
+    `admin QA with load-probe summary that differs from integrated SSE probe should fail, got exit 0\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+  );
+  assert(result.stdout.includes('[FAIL] admin.manual_qa_report_complete'), 'missing mismatched load-probe linked admin failure');
+  assert(result.stdout.includes('does not match the integrated SSE snapshot'), 'missing diagnostic integrated-probe mismatch reason');
 }
 
 async function assertMissingAdminSnapshotArtifactFails() {
@@ -231,6 +313,23 @@ async function assertSnapshotRunnerMetadataIsRequired() {
   assert(result.stdout.includes('[FAIL] admin.manual_qa_report_complete'), 'missing metadata linked admin failure');
 }
 
+async function assertSnapshotRunnerMetadataChronologyIsRequired() {
+  const root = createTempRepoRoot('reversed-snapshot-runner-metadata');
+  writeCommonArtifacts(root);
+  writeLatencyArtifact(root, { reverseMetadataTimes: true });
+  writeSseArtifact(root, { reverseMetadataTimes: true });
+  writeAdminQaReport(root);
+
+  const result = await runValidator(root);
+  assert(
+    result.code !== 0,
+    `snapshot artifacts with finishedAtUtc before startedAtUtc should fail, got exit 0\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+  );
+  assert(result.stdout.includes('[FAIL] staging.feed_latency_before_after_artifact'), 'missing reversed runner metadata latency failure');
+  assert(result.stdout.includes('[FAIL] staging.sse_full_invalidation_admin_window_artifact'), 'missing reversed runner metadata SSE failure');
+  assert(result.stdout.includes('[FAIL] admin.manual_qa_report_complete'), 'missing reversed runner metadata linked admin failure');
+}
+
 async function assertSnapshotMeasurementStructureIsRequired() {
   const root = createTempRepoRoot('missing-snapshot-measurements');
   writeCommonArtifacts(root);
@@ -248,6 +347,74 @@ async function assertSnapshotMeasurementStructureIsRequired() {
   assert(result.stdout.includes('[FAIL] admin.manual_qa_report_complete'), 'missing measurement linked admin failure');
 }
 
+async function assertSnapshotMeasurementConsistencyIsRequired() {
+  const root = createTempRepoRoot('inconsistent-snapshot-measurements');
+  writeCommonArtifacts(root);
+  writeLatencyArtifact(root, { inconsistentMeasurements: true });
+  writeSseArtifact(root, { inconsistentMeasurements: true });
+  writeAdminQaReport(root);
+
+  const result = await runValidator(root);
+  assert(
+    result.code !== 0,
+    `snapshot artifacts with inconsistent measurements should fail, got exit 0\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+  );
+  assert(result.stdout.includes('[FAIL] staging.feed_latency_before_after_artifact'), 'missing inconsistent latency failure');
+  assert(result.stdout.includes('[FAIL] staging.sse_full_invalidation_admin_window_artifact'), 'missing inconsistent SSE failure');
+  assert(result.stdout.includes('[FAIL] admin.manual_qa_report_complete'), 'missing inconsistent linked admin failure');
+}
+
+async function assertSnapshotComparisonMatchesRawSamples() {
+  const root = createTempRepoRoot('mismatched-snapshot-comparison');
+  writeCommonArtifacts(root);
+  writeLatencyArtifact(root, { mismatchedComparison: true });
+  writeSseArtifact(root, { mismatchedComparison: true });
+  writeAdminQaReport(root);
+
+  const result = await runValidator(root);
+  assert(
+    result.code !== 0,
+    `snapshot artifacts with mismatched comparison fields should fail, got exit 0\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+  );
+  assert(result.stdout.includes('[FAIL] staging.feed_latency_before_after_artifact'), 'missing mismatched latency comparison failure');
+  assert(result.stdout.includes('[FAIL] staging.sse_full_invalidation_admin_window_artifact'), 'missing mismatched SSE window failure');
+  assert(result.stdout.includes('[FAIL] admin.manual_qa_report_complete'), 'missing mismatched linked admin failure');
+}
+
+async function assertSnapshotChronologyIsRequired() {
+  const root = createTempRepoRoot('reversed-snapshot-times');
+  writeCommonArtifacts(root);
+  writeLatencyArtifact(root, { reverseTimes: true });
+  writeSseArtifact(root, { reverseTimes: true });
+  writeAdminQaReport(root);
+
+  const result = await runValidator(root);
+  assert(
+    result.code !== 0,
+    `snapshot artifacts with after timestamps before before timestamps should fail, got exit 0\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+  );
+  assert(result.stdout.includes('[FAIL] staging.feed_latency_before_after_artifact'), 'missing reversed-time latency failure');
+  assert(result.stdout.includes('[FAIL] staging.sse_full_invalidation_admin_window_artifact'), 'missing reversed-time SSE failure');
+  assert(result.stdout.includes('[FAIL] admin.manual_qa_report_complete'), 'missing reversed-time linked admin failure');
+}
+
+async function assertSnapshotLabelsAreRequired() {
+  const root = createTempRepoRoot('wrong-snapshot-labels');
+  writeCommonArtifacts(root);
+  writeLatencyArtifact(root, { wrongLabels: true });
+  writeSseArtifact(root, { wrongLabels: true });
+  writeAdminQaReport(root);
+
+  const result = await runValidator(root);
+  assert(
+    result.code !== 0,
+    `snapshot artifacts with wrong before/after labels should fail, got exit 0\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+  );
+  assert(result.stdout.includes('[FAIL] staging.feed_latency_before_after_artifact'), 'missing wrong-label latency failure');
+  assert(result.stdout.includes('[FAIL] staging.sse_full_invalidation_admin_window_artifact'), 'missing wrong-label SSE failure');
+  assert(result.stdout.includes('[FAIL] admin.manual_qa_report_complete'), 'missing wrong-label linked admin failure');
+}
+
 function createTempRepoRoot(label) {
   const root = mkdtempSync(join(tmpdir(), `template-feed-evidence-${label}-`));
   mkdirSync(join(root, 'artifacts'), { recursive: true });
@@ -256,6 +423,7 @@ function createTempRepoRoot(label) {
 
 function writeCommonArtifacts(root) {
   writeFollowupEvidence(root, 'Done');
+  writeFeedLoadProbeArtifact(root);
   writeFileSync(
     join(root, 'artifacts', 'templates-feed-tz1-8-long-scroll-500-2026-07-02.md'),
     [
@@ -271,6 +439,7 @@ function writeCommonArtifacts(root) {
 
 function writePendingCommonArtifacts(root) {
   writeFollowupEvidence(root, 'Pending');
+  writeFeedLoadProbeArtifact(root);
   writeFileSync(
     join(root, 'artifacts', 'templates-feed-tz1-8-long-scroll-500-2026-07-02.md'),
     [
@@ -310,12 +479,18 @@ function writeLatencyArtifact(
     runId = 'latency-run',
     includeMetadata = true,
     includeMeasurements = true,
+    inconsistentMeasurements = false,
+    mismatchedComparison = false,
+    reverseMetadataTimes = false,
+    reverseTimes = false,
+    wrongLabels = false,
   } = {}
 ) {
   const dir = join(root, 'artifacts', 'template-feed-staging-snapshots', 'latency');
   mkdirSync(dir, { recursive: true });
   writeJson(join(dir, 'evidence.json'), {
     ...(includeMetadata ? snapshotMetadata(runId) : {}),
+    ...(includeMetadata && reverseMetadataTimes ? reversedSnapshotMetadataTimes() : {}),
     runId,
     mode: 'latency',
     checks: [
@@ -326,24 +501,26 @@ function writeLatencyArtifact(
     latency: {
       ...(includeMeasurements ? {
         before: {
-        timeUtc: '2026-07-02T11:55:00.000Z',
+        label: wrongLabels ? 'current' : 'before',
+        timeUtc: reverseTimes ? '2026-07-02T12:05:00.000Z' : '2026-07-02T11:55:00.000Z',
         p95: [{ metric: { route: '/api/templates/feed', method: 'GET' }, value: 0.21 }],
         p99: [{ metric: { route: '/api/templates/feed', method: 'GET' }, value: 0.34 }],
       },
       after: {
-        timeUtc: '2026-07-02T12:05:00.000Z',
+        label: wrongLabels ? 'current' : 'after',
+        timeUtc: reverseTimes ? '2026-07-02T11:55:00.000Z' : '2026-07-02T12:05:00.000Z',
         p95: [{ metric: { route: '/api/templates/feed', method: 'GET' }, value: noMaterialRegression ? 0.2 : 0.31 }],
         p99: [{ metric: { route: '/api/templates/feed', method: 'GET' }, value: noMaterialRegression ? 0.32 : 0.44 }],
       },
       } : {}),
       comparison: {
-        beforeP95: 0.21,
+        beforeP95: mismatchedComparison ? 0.99 : 0.21,
         afterP95: noMaterialRegression ? 0.2 : 0.31,
         beforeP99: 0.34,
         afterP99: noMaterialRegression ? 0.32 : 0.44,
         ...(includeMeasurements ? {
-          p95DeltaSeconds: noMaterialRegression ? -0.01 : 0.1,
-          p99DeltaSeconds: noMaterialRegression ? -0.02 : 0.1,
+          p95DeltaSeconds: inconsistentMeasurements ? 0 : (noMaterialRegression ? -0.01 : 0.1),
+          p99DeltaSeconds: inconsistentMeasurements ? 0 : (noMaterialRegression ? -0.02 : 0.1),
         } : {}),
       },
     },
@@ -357,12 +534,19 @@ function writeSseArtifact(
     runId = 'sse-run',
     includeMetadata = true,
     includeMeasurements = true,
+    inconsistentMeasurements = false,
+    mismatchedComparison = false,
+    reverseMetadataTimes = false,
+    reverseTimes = false,
+    wrongLabels = false,
+    feedLoadProbeSummaryPath = 'artifacts/template-feed-load-probes/rename-load-probe/summary.md',
   } = {}
 ) {
   const dir = join(root, 'artifacts', 'template-feed-staging-snapshots', 'sse');
   mkdirSync(dir, { recursive: true });
   writeJson(join(dir, 'evidence.json'), {
     ...(includeMetadata ? snapshotMetadata(runId) : {}),
+    ...(includeMetadata && reverseMetadataTimes ? reversedSnapshotMetadataTimes() : {}),
     runId,
     mode: 'sse',
     actionLabels,
@@ -374,18 +558,29 @@ function writeSseArtifact(
     sseFullInvalidations: {
       ...(includeMeasurements ? {
         before: {
-        timeUtc: '2026-07-02T12:00:00.000Z',
-        total: 7,
+        label: wrongLabels ? 'current' : 'before',
+        timeUtc: reverseTimes ? '2026-07-02T12:03:00.000Z' : '2026-07-02T12:00:00.000Z',
+        total: inconsistentMeasurements ? 6 : 7,
         windowIncrease: 0,
       },
       after: {
-        timeUtc: '2026-07-02T12:03:00.000Z',
+        label: wrongLabels ? 'current' : 'after',
+        timeUtc: reverseTimes ? '2026-07-02T12:00:00.000Z' : '2026-07-02T12:03:00.000Z',
         total: 7,
         windowIncrease: 0,
       },
       } : {}),
       deltaTotal: 0,
-      ...(includeMeasurements ? { windowIncreaseAfter: 0 } : {}),
+      ...(includeMeasurements ? { windowIncreaseAfter: mismatchedComparison ? 2 : 0 } : {}),
+      ...(feedLoadProbeSummaryPath ? {
+        feedLoadProbe: {
+          runId: 'rename-load-probe',
+          artifactDir: 'artifacts/template-feed-load-probes/rename-load-probe',
+          summaryPath: feedLoadProbeSummaryPath,
+          evidencePath: 'artifacts/template-feed-load-probes/rename-load-probe/evidence.json',
+          exitCode: 0,
+        },
+      } : {}),
     },
   });
   writeFileSync(join(dir, 'summary.md'), '# SSE snapshot\n\nDelta total: 0\n');
@@ -400,6 +595,61 @@ function snapshotMetadata(runId) {
   };
 }
 
+function reversedSnapshotMetadataTimes() {
+  return {
+    startedAtUtc: '2026-07-02T12:00:05.000Z',
+    finishedAtUtc: '2026-07-02T12:00:00.000Z',
+  };
+}
+
+function writeFeedLoadProbeArtifact(
+  root,
+  {
+    runId = 'rename-load-probe',
+    failed = 0,
+    maxErrors = 0,
+    reverseMetadataTimes = false,
+  } = {}
+) {
+  const dir = join(root, 'artifacts', 'template-feed-load-probes', runId);
+  mkdirSync(dir, { recursive: true });
+  writeJson(join(dir, 'evidence.json'), {
+    runId,
+    apiBase: 'https://api.staging.example.test',
+    path: '/api/templates/feed?take=20',
+    url: 'https://api.staging.example.test/api/templates/feed?...',
+    startedAtUtc: reverseMetadataTimes ? '2026-07-02T12:03:00.000Z' : '2026-07-02T12:00:00.000Z',
+    finishedAtUtc: reverseMetadataTimes ? '2026-07-02T12:00:00.000Z' : '2026-07-02T12:03:00.000Z',
+    durationSeconds: 180,
+    concurrency: 4,
+    intervalMs: 250,
+    timeoutMs: 10000,
+    maxErrors,
+    bearerAuthConfigured: false,
+    extraHeaderNames: [],
+    requests: {
+      total: 32,
+      ok: 32 - failed,
+      failed,
+      statuses: failed > 0 ? { 200: 32 - failed, 500: failed } : { 200: 32 },
+    },
+    latencyMs: {
+      min: 20,
+      p50: 25,
+      p95: 40,
+      p99: 45,
+      max: 50,
+    },
+    itemCounts: {
+      min: 20,
+      max: 20,
+    },
+    failedSamples: [],
+    samples: [],
+  });
+  writeFileSync(join(dir, 'summary.md'), '# Template Feed Load Probe\n\nFailed requests: 0\n');
+}
+
 function writeAdminQaReport(
   root,
   {
@@ -410,7 +660,7 @@ function writeAdminQaReport(
   } = {}
 ) {
   const evidence = {
-    categoryRename: 'feed-load log and category rename screenshot attached',
+    categoryRename: 'artifacts/template-feed-load-probes/rename-load-probe/summary.md plus category rename screenshot attached',
     bulkStatus: 'no bulk template status operation exists',
     activateWithoutMedia: 'UI validation screenshot and unchanged status response attached',
     archiveCategory: 'admin archive action plus public feed response attached',

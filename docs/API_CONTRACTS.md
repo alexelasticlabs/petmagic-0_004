@@ -16,6 +16,22 @@ Compatibility rules:
 - HTTP 429 rate-limit responses use title/code `RATE_LIMIT_EXCEEDED`, include `Retry-After` when the limiter provides it, and must include `correlationId` and `traceId`.
 - Production 5xx responses must not expose exception messages, stack traces, secrets, provider payloads, tokens, or raw request bodies.
 
+## Legacy Stripe Compatibility Routes
+
+Current compatibility routes:
+
+- `POST /api/payments/stripe/token-purchase`
+- `POST /api/payments/stripe/subscription`
+- `POST /api/payments/stripe/customer-portal`
+- `GET /api/payments/stripe/diagnostics`
+- `GET /api/economy/premium/stripe-diagnostics`
+
+Compatibility rules:
+
+- New mobile/admin code must use `/api/economy/purchases/create`, `/api/economy/purchases/{orderId}/verify-stripe`, premium plan/status endpoints, and admin economy endpoints instead of adding new calls to the legacy route group.
+- Legacy diagnostics routes must remain `AdminOnly`; they must never expose Stripe secrets, webhook secrets, raw provider payloads, or unrestricted user data.
+- These routes are kept only for migration compatibility while startup smoke tests still assert their presence. Removal requires a usage search across mobile/admin/backend tests, updating startup smoke tests, and documenting the migration window in this file.
+
 ## Public Templates Feed
 
 Endpoint: `GET /api/templates/feed`

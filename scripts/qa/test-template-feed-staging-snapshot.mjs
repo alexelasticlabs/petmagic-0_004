@@ -42,6 +42,9 @@ server.listen(0, '127.0.0.1', async () => {
     await assertLatencyRegressionFailsAcceptance(prometheusBaseUrl);
     await assertLatencyDiscoveryRunFailsAcceptance(prometheusBaseUrl);
     await assertSseAcceptanceRun(prometheusBaseUrl);
+    await withFeedApiServer(async feedApiBaseUrl => {
+      await assertSseAcceptanceRunWithFeedLoadProbe(prometheusBaseUrl, feedApiBaseUrl);
+    });
     await assertSseDiscoveryRunFailsAcceptance(prometheusBaseUrl);
 
     console.log('template feed staging snapshot self-test passed');
@@ -140,6 +143,28 @@ async function assertSseAcceptanceRun(prometheusBaseUrl) {
   assertCheck(result.evidence, 'sse_full_invalidation_delta_zero_during_admin_window', true);
 }
 
+async function assertSseAcceptanceRunWithFeedLoadProbe(prometheusBaseUrl, feedApiBaseUrl) {
+  const loadProbeArtifactDir = mkdtempSync(join(tmpdir(), 'template-feed-load-probe-integrated-'));
+  const result = await runSnapshot('sse-feed-load', ['--mode=sse'], {
+    STAGING_PROMETHEUS_BASE_URL: prometheusBaseUrl,
+    TEMPLATE_FEED_SNAPSHOT_WAIT_SECONDS: '1',
+    TEMPLATE_FEED_LOAD_PROBE_API_BASE: feedApiBaseUrl,
+    TEMPLATE_FEED_LOAD_PROBE_ARTIFACT_DIR: loadProbeArtifactDir,
+    TEMPLATE_FEED_LOAD_PROBE_RUN_ID: 'self-test-sse-feed-load',
+    TEMPLATE_FEED_LOAD_PROBE_DURATION_SECONDS: '1',
+    TEMPLATE_FEED_LOAD_PROBE_CONCURRENCY: '1',
+    TEMPLATE_FEED_LOAD_PROBE_INTERVAL_MS: '25',
+  });
+
+  assertExitCode(result, 0);
+  assertCheck(result.evidence, 'sse.admin_action_window_configured', true);
+  assertCheck(result.evidence, 'sse_full_invalidation_delta_zero_during_admin_window', true);
+  assertCheck(result.evidence, 'sse.feed_load_probe_completed', true);
+  assert(result.evidence.sseFullInvalidations.feedLoadProbe?.exitCode === 0, 'missing successful feed-load probe result');
+  const loadProbeEvidence = JSON.parse(readFileSync(join(loadProbeArtifactDir, 'evidence.json'), 'utf8'));
+  assert(loadProbeEvidence.requests.ok > 0, 'integrated load probe did not record successful feed requests');
+}
+
 async function assertSseDiscoveryRunFailsAcceptance(prometheusBaseUrl) {
   const result = await runSnapshot('sse-zero-wait', ['--mode=sse'], {
     STAGING_PROMETHEUS_BASE_URL: prometheusBaseUrl,
@@ -147,6 +172,32 @@ async function assertSseDiscoveryRunFailsAcceptance(prometheusBaseUrl) {
 
   assertNonZeroExitCode(result);
   assertCheck(result.evidence, 'sse.admin_action_window_configured', false);
+}
+
+function withFeedApiServer(callback) {
+  const feedServer = createServer((_request, response) => {
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({
+      items: [{ id: 'template-1' }, { id: 'template-2' }],
+      nextCursor: 'cursor-2',
+      hasMore: true,
+    }));
+  });
+
+  return new Promise((resolvePromise, reject) => {
+    feedServer.on('error', reject);
+    feedServer.listen(0, '127.0.0.1', async () => {
+      try {
+        const port = feedServer.address().port;
+        await callback(`http://127.0.0.1:${port}`);
+        resolvePromise();
+      } catch (error) {
+        reject(error);
+      } finally {
+        feedServer.close();
+      }
+    });
+  });
 }
 
 async function runSnapshot(label, args, envOverrides) {

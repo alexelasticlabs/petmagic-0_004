@@ -2,6 +2,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { spawn } from 'node:child_process';
 
 if (process.argv.includes('--help') || process.argv.includes('-h')) {
   printHelp();
@@ -39,6 +40,15 @@ const maxP99RegressionSeconds = nonNegativeNumberEnv('TEMPLATE_FEED_MAX_P99_REGR
 const allowCurrentLatencyOnly = boolEnv('TEMPLATE_FEED_ALLOW_CURRENT_LATENCY_ONLY', false);
 const allowZeroWaitSseOnly = boolEnv('TEMPLATE_FEED_ALLOW_ZERO_WAIT_SSE', false);
 const actionLabels = parseList(process.env.TEMPLATE_FEED_ADMIN_ACTION_LABELS || 'text_update,media_update,category_rename');
+const feedLoadProbeApiBase = process.env.TEMPLATE_FEED_LOAD_PROBE_API_BASE || '';
+const feedLoadProbeRunId = process.env.TEMPLATE_FEED_LOAD_PROBE_RUN_ID || `${runId}-rename-load`;
+const feedLoadProbeArtifactDir = process.env.TEMPLATE_FEED_LOAD_PROBE_ARTIFACT_DIR || join('artifacts', 'template-feed-load-probes', feedLoadProbeRunId);
+const feedLoadProbePath = process.env.TEMPLATE_FEED_LOAD_PROBE_PATH || '/api/templates/feed?take=20';
+const feedLoadProbeDurationSeconds = intEnv('TEMPLATE_FEED_LOAD_PROBE_DURATION_SECONDS', waitSeconds);
+const feedLoadProbeConcurrency = intEnv('TEMPLATE_FEED_LOAD_PROBE_CONCURRENCY', 4);
+const feedLoadProbeIntervalMs = intEnv('TEMPLATE_FEED_LOAD_PROBE_INTERVAL_MS', 250);
+const feedLoadProbeTimeoutMs = intEnv('TEMPLATE_FEED_LOAD_PROBE_TIMEOUT_MS', 10000);
+const feedLoadProbeMaxErrors = intEnv('TEMPLATE_FEED_LOAD_PROBE_MAX_ERRORS', 0);
 
 const checks = [];
 const evidence = {
@@ -164,8 +174,17 @@ async function collectSseSnapshots() {
   if (waitSeconds > 0) {
     console.log('');
     console.log(`Perform the staging admin actions now: ${actionLabels.join(', ') || 'text update, media update, category rename, status update if available'}`);
+    const feedLoadProbe = feedLoadProbeApiBase ? startFeedLoadProbe() : null;
     console.log(`Waiting ${waitSeconds}s before the after snapshot...`);
     await delay(waitSeconds * 1000);
+    if (feedLoadProbe) {
+      const result = await feedLoadProbe;
+      evidence.sseFullInvalidations.feedLoadProbe = result;
+      addCheck(
+        'sse.feed_load_probe_completed',
+        result.exitCode === 0,
+        `exitCode=${result.exitCode}, summary=${result.summaryPath}`);
+    }
   }
 
   const after = await querySseSnapshot('after');
@@ -326,6 +345,62 @@ function addCheck(name, ok, detail) {
   console.log(`[${check.ok ? 'ok' : 'fail'}] ${name}: ${detail}`);
 }
 
+function startFeedLoadProbe() {
+  console.log(`[${runId}] starting feed load probe ${feedLoadProbeRunId}`);
+  const args = [
+    'scripts/qa/run-template-feed-load-probe.mjs',
+    `--api-base=${feedLoadProbeApiBase}`,
+    `--path=${feedLoadProbePath}`,
+    `--duration-seconds=${Math.max(1, feedLoadProbeDurationSeconds)}`,
+    `--concurrency=${Math.max(1, feedLoadProbeConcurrency)}`,
+    `--interval-ms=${Math.max(0, feedLoadProbeIntervalMs)}`,
+    `--timeout-ms=${Math.max(1, feedLoadProbeTimeoutMs)}`,
+    `--max-errors=${Math.max(0, feedLoadProbeMaxErrors)}`,
+    `--run-id=${feedLoadProbeRunId}`,
+    `--artifact-dir=${feedLoadProbeArtifactDir}`,
+  ];
+
+  return runChildProcess(process.execPath, args).then(result => ({
+    runId: feedLoadProbeRunId,
+    artifactDir: feedLoadProbeArtifactDir.replaceAll('\\', '/'),
+    summaryPath: join(feedLoadProbeArtifactDir, 'summary.md').replaceAll('\\', '/'),
+    evidencePath: join(feedLoadProbeArtifactDir, 'evidence.json').replaceAll('\\', '/'),
+    exitCode: result.exitCode,
+    stdoutTail: tail(result.stdout, 2000),
+    stderrTail: tail(result.stderr, 2000),
+  }));
+}
+
+function runChildProcess(command, args) {
+  return new Promise(resolvePromise => {
+    const child = spawn(command, args, {
+      cwd: process.cwd(),
+      env: process.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', chunk => {
+      stdout += chunk;
+    });
+    child.stderr.on('data', chunk => {
+      stderr += chunk;
+    });
+    child.on('error', error => {
+      stderr += error.stack || String(error);
+    });
+    child.on('close', code => {
+      resolvePromise({ exitCode: code ?? 1, stdout, stderr });
+    });
+  });
+}
+
+function tail(value, maxLength) {
+  const text = String(value || '');
+  return text.length > maxLength ? text.slice(text.length - maxLength) : text;
+}
+
 function hasFailedChecks() {
   return checks.some(check => !check.ok);
 }
@@ -373,6 +448,8 @@ function renderSummary() {
     `After total: ${formatNumber(evidence.sseFullInvalidations.after?.total)}`,
     `Delta total: ${formatNumber(evidence.sseFullInvalidations.deltaTotal)}`,
     `After window increase: ${formatNumber(evidence.sseFullInvalidations.windowIncreaseAfter)}`,
+    `Feed load probe summary: ${evidence.sseFullInvalidations.feedLoadProbe?.summaryPath || 'not configured'}`,
+    `Feed load probe exit code: ${evidence.sseFullInvalidations.feedLoadProbe?.exitCode ?? 'n/a'}`,
     ''
   ];
 
@@ -562,10 +639,16 @@ Optional environment:
   TEMPLATE_FEED_SNAPSHOT_WAIT_SECONDS     If >0, capture SSE before, wait while operator performs admin actions, capture after.
   TEMPLATE_FEED_ALLOW_ZERO_WAIT_SSE       Set true only for SSE metric discovery without admin action window.
   TEMPLATE_FEED_ADMIN_ACTION_LABELS       Comma-separated labels for the actions performed during the wait window.
+  TEMPLATE_FEED_LOAD_PROBE_API_BASE       Optional staging API base URL; when set during SSE mode, runs feed-load probe during the wait window.
+  TEMPLATE_FEED_LOAD_PROBE_PATH           Optional feed path. Default: /api/templates/feed?take=20.
+  TEMPLATE_FEED_LOAD_PROBE_DURATION_SECONDS Optional probe duration. Default: wait seconds.
+  TEMPLATE_FEED_LOAD_PROBE_CONCURRENCY    Optional probe concurrency. Default: 4.
+  TEMPLATE_FEED_LOAD_PROBE_MAX_ERRORS     Optional accepted feed probe failures. Default: 0.
 
 Examples:
   node scripts/qa/run-template-feed-staging-snapshot.mjs --mode=latency
   TEMPLATE_FEED_BEFORE_AT_UTC=2026-07-02T10:00:00Z TEMPLATE_FEED_AFTER_AT_UTC=2026-07-02T11:00:00Z node scripts/qa/run-template-feed-staging-snapshot.mjs --mode=latency
   TEMPLATE_FEED_SNAPSHOT_WAIT_SECONDS=180 TEMPLATE_FEED_ADMIN_ACTION_LABELS=text_update,media_update,category_rename node scripts/qa/run-template-feed-staging-snapshot.mjs --mode=sse
+  TEMPLATE_FEED_LOAD_PROBE_API_BASE=https://staging-api.example TEMPLATE_FEED_SNAPSHOT_WAIT_SECONDS=180 node scripts/qa/run-template-feed-staging-snapshot.mjs --mode=sse
 `);
 }

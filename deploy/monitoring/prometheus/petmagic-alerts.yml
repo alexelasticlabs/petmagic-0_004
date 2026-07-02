@@ -400,3 +400,65 @@ groups:
         annotations:
           summary: "Stripe webhook processing failures detected"
           description: "Stripe webhook failures occurred in the last 5 minutes. Check signature config, payload parsing, and downstream database writes."
+
+      - alert: PetMagicWalletBalanceNegativePrevented
+        expr: increase(wallet_balance_negative_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          service: petmagic-economy
+        annotations:
+          summary: "Wallet non-negative CHECK constraint fired"
+          description: "A wallet mutation was rejected by the CK_economy_wallets_Balance_NonNegative constraint. The Serializable spend path should have prevented this; investigate the calling operation/source tags for a concurrency bug."
+
+      - alert: PetMagicWebhookDuplicateStorm
+        expr: sum by (provider) (increase(stripe_webhook_duplicate_total[15m])) > 10
+        for: 0m
+        labels:
+          severity: warning
+          service: petmagic-economy
+        annotations:
+          summary: "Elevated duplicate payment webhook deliveries"
+          description: "More than 10 duplicate webhook deliveries from {{ $labels.provider }} in 15 minutes. Occasional duplicates are normal; a storm usually means our endpoint is answering non-2xx and the provider keeps retrying."
+
+      - alert: PetMagicSandboxReceiptInProduction
+        expr: increase(store_receipt_sandbox_in_prod_total[10m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          service: petmagic-economy
+        annotations:
+          summary: "Sandbox store receipt rejected in production (fraud signal)"
+          description: "A sandbox App Store receipt or environment-mismatched signed transaction was submitted against production. Review the user account and consider blocking repeated offenders."
+
+      - alert: PetMagicRefundsPendingBacklog
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (
+              rate(refunds_pending_bucket{exhausted="false"}[5m])
+            )
+          ) > 5
+        for: 10m
+        labels:
+          severity: warning
+          service: petmagic-generation-worker
+        annotations:
+          summary: "Generation refunds are backing up"
+          description: "More than 5 charged failed/cancelled generations have been awaiting refund for 10 minutes. Check billing availability and the refund retry loop."
+
+      - alert: PetMagicRefundsRetryExhausted
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (
+              rate(refunds_pending_bucket{exhausted="true"}[5m])
+            )
+          ) > 0
+        for: 5m
+        labels:
+          severity: critical
+          service: petmagic-generation-worker
+        annotations:
+          summary: "Generation refunds exhausted automatic retries"
+          description: "At least one charged generation exceeded MaxRefundAttempts and will never be refunded automatically. Use the admin refund endpoint to settle it manually."

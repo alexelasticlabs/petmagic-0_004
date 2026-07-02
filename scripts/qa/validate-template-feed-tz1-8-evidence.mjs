@@ -112,34 +112,85 @@ function checkAdminQaReport() {
   const reports = scopedReportPath
     ? [resolve(repoRoot, scopedReportPath)]
     : findFiles(artifactsRoot, /^templates-feed-tz1-8-admin-qa-report(?!\.template).*\.md$/);
-  const accepted = reports.find(file => {
-    if (!isAllowedAdminQaReportPath(file) || !existsSync(file)) {
-      return false;
-    }
-
-    const text = readFileSync(file, 'utf8');
-    return !/\bTODO\b/i.test(text)
-      && !/\bFAIL\b/i.test(text)
-      && hasFilledMetadata(text, 'Admin URL')
-      && hasFilledMetadata(text, 'API build/health')
-      && hasFilledMetadata(text, 'Operator')
-      && hasFilledMetadata(text, 'Date/time UTC')
-      && hasFilledMetadata(text, 'Staging snapshot artifact')
-      && hasAcceptedSseSnapshotMetadataPath(text, 'Staging snapshot artifact')
-      && hasScenarioResultWithEvidence(text, 'Category rename under feed load', 'PASS')
-      && hasScenarioResultWithEvidence(text, 'Bulk status update', 'PASS', 'N/A')
-      && hasScenarioResultWithEvidence(text, 'Activate without required media through UI', 'PASS')
-      && hasScenarioResultWithEvidence(text, 'Archive category with public templates', 'PASS');
-  });
+  const reportResults = reports.map(file => ({
+    file,
+    reason: getAdminQaReportRejectionReason(file),
+  }));
+  const accepted = reportResults.find(result => !result.reason)?.file;
 
   addCheck(
     'admin.manual_qa_report_complete',
     Boolean(accepted),
     accepted
       ? relativeArtifactPath(accepted)
-      : scopedReportPath
-        ? `configured TEMPLATE_FEED_ADMIN_QA_REPORT_PATH is not an accepted completed report: ${scopedReportPath}`
-        : 'missing completed artifacts/templates-feed-tz1-8-admin-qa-report*.md with filled metadata, accepted SSE snapshot artifact path, and required PASS/N/A scenario evidence');
+      : formatAdminQaReportFailure(scopedReportPath, reportResults));
+}
+
+function getAdminQaReportRejectionReason(file) {
+  if (!isAllowedAdminQaReportPath(file)) {
+    return 'report path is outside artifacts/templates-feed-tz1-8-admin-qa-report*.md';
+  }
+
+  if (!existsSync(file)) {
+    return 'report file does not exist';
+  }
+
+  const text = readFileSync(file, 'utf8');
+  if (/\bTODO\b/i.test(text)) {
+    return 'report still contains TODO';
+  }
+
+  if (/\bFAIL\b/i.test(text)) {
+    return 'report contains FAIL';
+  }
+
+  const missingMetadata = [
+    'Admin URL',
+    'API build/health',
+    'Operator',
+    'Date/time UTC',
+    'Staging snapshot artifact',
+  ].filter(label => !hasFilledMetadata(text, label));
+  if (missingMetadata.length > 0) {
+    return `missing metadata: ${missingMetadata.join(', ')}`;
+  }
+
+  const acceptedSseEvidence = getAcceptedSseSnapshotMetadataEvidence(text, 'Staging snapshot artifact');
+  if (!acceptedSseEvidence) {
+    return 'staging snapshot artifact path is missing, stale, not accepted SSE evidence, or does not match TEMPLATE_FEED_REQUIRED_SSE_RUN_ID';
+  }
+
+  if (!hasCategoryRenameLoadProbeEvidence(text, acceptedSseEvidence)) {
+    return 'category rename row is missing PASS evidence, missing an accepted feed-load probe summary, or references a probe that does not match the integrated SSE snapshot';
+  }
+
+  if (!hasScenarioResultWithEvidence(text, 'Bulk status update', 'PASS', 'N/A')) {
+    return 'bulk status update row is missing PASS/N/A with concrete evidence';
+  }
+
+  if (!hasScenarioResultWithEvidence(text, 'Activate without required media through UI', 'PASS')) {
+    return 'activate without required media row is missing PASS with concrete evidence';
+  }
+
+  if (!hasScenarioResultWithEvidence(text, 'Archive category with public templates', 'PASS')) {
+    return 'archive category row is missing PASS with concrete evidence';
+  }
+
+  return '';
+}
+
+function formatAdminQaReportFailure(scopedReportPath, reportResults) {
+  if (scopedReportPath) {
+    const scopedResult = reportResults[0];
+    return `configured TEMPLATE_FEED_ADMIN_QA_REPORT_PATH is not accepted: ${scopedReportPath}; reason: ${scopedResult?.reason || 'unknown'}`;
+  }
+
+  if (reportResults.length === 0) {
+    return 'missing completed artifacts/templates-feed-tz1-8-admin-qa-report*.md with filled metadata, accepted SSE snapshot artifact path, accepted feed-load probe evidence, and required PASS/N/A scenario evidence';
+  }
+
+  const firstRejected = reportResults[0];
+  return `checked ${reportResults.length} report(s); first rejected ${relativeArtifactPath(firstRejected.file)}: ${firstRejected.reason}`;
 }
 
 function findStagingEvidenceFiles() {
@@ -210,21 +261,36 @@ function hasLatencyMeasurementStructure(evidence) {
   const comparison = evidence?.latency?.comparison;
   return isIsoDateString(evidence?.latency?.before?.timeUtc)
     && isIsoDateString(evidence?.latency?.after?.timeUtc)
-    && Array.isArray(evidence?.latency?.before?.p95)
-    && Array.isArray(evidence?.latency?.before?.p99)
-    && Array.isArray(evidence?.latency?.after?.p95)
-    && Array.isArray(evidence?.latency?.after?.p99)
+    && evidence.latency.before.label === 'before'
+    && evidence.latency.after.label === 'after'
+    && isBeforeOrSame(evidence.latency.before.timeUtc, evidence.latency.after.timeUtc)
+    && hasMetricSamples(evidence?.latency?.before?.p95)
+    && hasMetricSamples(evidence?.latency?.before?.p99)
+    && hasMetricSamples(evidence?.latency?.after?.p95)
+    && hasMetricSamples(evidence?.latency?.after?.p99)
     && Number.isFinite(comparison?.p95DeltaSeconds)
-    && Number.isFinite(comparison?.p99DeltaSeconds);
+    && Number.isFinite(comparison?.p99DeltaSeconds)
+    && numbersClose(comparison.beforeP95, maxMetricValue(evidence.latency.before.p95))
+    && numbersClose(comparison.afterP95, maxMetricValue(evidence.latency.after.p95))
+    && numbersClose(comparison.beforeP99, maxMetricValue(evidence.latency.before.p99))
+    && numbersClose(comparison.afterP99, maxMetricValue(evidence.latency.after.p99))
+    && numbersClose(comparison.p95DeltaSeconds, comparison.afterP95 - comparison.beforeP95)
+    && numbersClose(comparison.p99DeltaSeconds, comparison.afterP99 - comparison.beforeP99);
 }
 
 function hasSseMeasurementStructure(evidence) {
   const invalidations = evidence?.sseFullInvalidations;
   return isIsoDateString(invalidations?.before?.timeUtc)
     && isIsoDateString(invalidations?.after?.timeUtc)
+    && invalidations.before.label === 'before'
+    && invalidations.after.label === 'after'
+    && isBeforeOrSame(invalidations.before.timeUtc, invalidations.after.timeUtc)
     && Number.isFinite(invalidations?.before?.total)
     && Number.isFinite(invalidations?.after?.total)
-    && Number.isFinite(invalidations?.windowIncreaseAfter);
+    && Number.isFinite(invalidations?.windowIncreaseAfter)
+    && Number.isFinite(invalidations?.deltaTotal)
+    && numbersClose(invalidations.deltaTotal, invalidations.after.total - invalidations.before.total)
+    && numbersClose(invalidations.windowIncreaseAfter, invalidations.after.windowIncrease);
 }
 
 function hasSnapshotRunnerMetadata(evidence) {
@@ -232,9 +298,27 @@ function hasSnapshotRunnerMetadata(evidence) {
     && evidence.runId.trim().length > 0
     && isIsoDateString(evidence.startedAtUtc)
     && isIsoDateString(evidence.finishedAtUtc)
+    && isBeforeOrSame(evidence.startedAtUtc, evidence.finishedAtUtc)
     && typeof evidence.prometheusBaseUrl === 'string'
     && evidence.prometheusBaseUrl.trim().length > 0
     && evidence.prometheusBaseUrl !== 'invalid';
+}
+
+function hasMetricSamples(items) {
+  return Array.isArray(items)
+    && items.length > 0
+    && items.every(item => Number.isFinite(item?.value));
+}
+
+function maxMetricValue(items) {
+  const values = (items || []).map(item => item.value).filter(Number.isFinite);
+  return values.length === 0 ? Number.NaN : Math.max(...values);
+}
+
+function numbersClose(left, right) {
+  return Number.isFinite(left)
+    && Number.isFinite(right)
+    && Math.abs(left - right) < 0.000001;
 }
 
 function isIsoDateString(value) {
@@ -244,6 +328,14 @@ function isIsoDateString(value) {
 
   const timestamp = Date.parse(value);
   return Number.isFinite(timestamp) && value.includes('T');
+}
+
+function isBeforeOrSame(before, after) {
+  const beforeTimestamp = Date.parse(before);
+  const afterTimestamp = Date.parse(after);
+  return Number.isFinite(beforeTimestamp)
+    && Number.isFinite(afterTimestamp)
+    && beforeTimestamp <= afterTimestamp;
 }
 
 function matchesRequiredRunId(evidence, envName) {
@@ -264,13 +356,81 @@ function hasRequiredActionLabels(evidence, requiredLabels) {
 }
 
 function hasScenarioResultWithEvidence(text, scenario, ...allowedResults) {
+  return isFilledEvidenceValue(getScenarioEvidence(text, scenario, ...allowedResults));
+}
+
+function getScenarioEvidence(text, scenario, ...allowedResults) {
   const escaped = escapeRegExp(scenario);
   const row = text.match(new RegExp(`^\\|\\s*${escaped}\\s*\\|\\s*(${allowedResults.join('|')})\\s*\\|\\s*([^|\\r\\n]*)\\|?\\s*$`, 'im'));
   if (!row) {
+    return '';
+  }
+
+  return row[2].trim();
+}
+
+function hasCategoryRenameLoadProbeEvidence(text, acceptedSseEvidence) {
+  const evidence = getScenarioEvidence(text, 'Category rename under feed load', 'PASS');
+  if (!isFilledEvidenceValue(evidence)) {
     return false;
   }
 
-  return isFilledEvidenceValue(row[2]);
+  const expectedSummaryPath = acceptedSseEvidence?.sseFullInvalidations?.feedLoadProbe?.summaryPath;
+  if (typeof expectedSummaryPath === 'string' && expectedSummaryPath.trim()) {
+    return hasAcceptedLoadProbeSummaryPath(evidence, expectedSummaryPath);
+  }
+
+  return hasAcceptedLoadProbeSummaryPath(evidence);
+}
+
+function hasAcceptedLoadProbeSummaryPath(value, expectedSummaryPath = '') {
+  const match = String(value || '').match(/artifacts[\\/]+template-feed-load-probes[\\/]+[^`|\]\s]+[\\/]+summary\.md/i);
+  if (!match) {
+    return false;
+  }
+
+  const cleaned = match[0].replaceAll('\\', '/');
+  if (expectedSummaryPath && cleaned !== expectedSummaryPath.replaceAll('\\', '/')) {
+    return false;
+  }
+
+  const resolved = resolve(repoRoot, cleaned);
+  const relativePath = relative(repoRoot, resolved).replaceAll('\\', '/');
+  if (relativePath.startsWith('..')
+    || !relativePath.startsWith('artifacts/template-feed-load-probes/')
+    || !existsSync(resolved)) {
+    return false;
+  }
+
+  const evidencePath = resolve(resolved, '..', 'evidence.json');
+  return isAcceptedLoadProbeEvidence(readJson(evidencePath));
+}
+
+function isAcceptedLoadProbeEvidence(evidence) {
+  const total = evidence?.requests?.total;
+  const ok = evidence?.requests?.ok;
+  const failed = evidence?.requests?.failed;
+  const maxErrors = evidence?.maxErrors;
+  return typeof evidence?.runId === 'string'
+    && evidence.runId.trim().length > 0
+    && isIsoDateString(evidence.startedAtUtc)
+    && isIsoDateString(evidence.finishedAtUtc)
+    && isBeforeOrSame(evidence.startedAtUtc, evidence.finishedAtUtc)
+    && typeof evidence?.apiBase === 'string'
+    && evidence.apiBase.trim().length > 0
+    && evidence.apiBase !== 'invalid'
+    && Number.isInteger(total)
+    && Number.isInteger(ok)
+    && Number.isInteger(failed)
+    && Number.isInteger(maxErrors)
+    && total > 0
+    && ok > 0
+    && total === ok + failed
+    && failed <= maxErrors
+    && Number.isInteger(evidence?.concurrency)
+    && evidence.concurrency > 0
+    && Number.isInteger(evidence?.durationSeconds)
+    && evidence.durationSeconds > 0;
 }
 
 function hasFilledMetadata(text, label) {
@@ -288,10 +448,10 @@ function getMetadataValue(text, label) {
   return isFilledEvidenceValue(value) ? value : '';
 }
 
-function hasAcceptedSseSnapshotMetadataPath(text, label) {
+function getAcceptedSseSnapshotMetadataEvidence(text, label) {
   const value = getMetadataValue(text, label);
   if (!value) {
-    return false;
+    return null;
   }
 
   const cleaned = value.replace(/^`|`$/g, '');
@@ -300,13 +460,17 @@ function hasAcceptedSseSnapshotMetadataPath(text, label) {
   if (relativePath.startsWith('..')
     || !relativePath.startsWith('artifacts/template-feed-staging-snapshots/')
     || !existsSync(resolved)) {
-    return false;
+    return null;
   }
 
   const evidencePath = resolve(resolved, '..', 'evidence.json');
   const evidence = readJson(evidencePath);
-  return isAcceptedSseEvidence(evidence)
-    && matchesRequiredRunId(evidence, 'TEMPLATE_FEED_REQUIRED_SSE_RUN_ID');
+  if (!isAcceptedSseEvidence(evidence)
+    || !matchesRequiredRunId(evidence, 'TEMPLATE_FEED_REQUIRED_SSE_RUN_ID')) {
+    return null;
+  }
+
+  return evidence;
 }
 
 function isFilledEvidenceValue(value) {

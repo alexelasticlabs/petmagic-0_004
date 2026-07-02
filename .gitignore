@@ -74,13 +74,7 @@ __pycache__/
 temp/
 tmp/
 .tmp/
-artifacts/load/
-artifacts/mobile-template-feed/
-artifacts/query-plans/
-artifacts/local-generation-scheduler-smoke/
-artifacts/staging-generation-scheduler-smoke/
-artifacts/watermark-*.json
-artifacts/watermark-*.env
+artifacts/
 
 # Docker Compose volumes
 postgres_data/

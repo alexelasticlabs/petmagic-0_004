@@ -17,6 +17,7 @@ TEMPLATE_FEED_MAX_P95_REGRESSION_SECONDS=0
 TEMPLATE_FEED_MAX_P99_REGRESSION_SECONDS=0
 TEMPLATE_FEED_SSE_WINDOW=15m
 TEMPLATE_FEED_ADMIN_ACTION_LABELS=text_update,media_update,category_rename
+TEMPLATE_FEED_ADMIN_QA_REPORT_PATH=
 ```
 
 The feed route label comes from ASP.NET endpoint display names, not necessarily the raw URL path. Keep `TEMPLATE_FEED_ROUTE_REGEX` broad enough to match the deployed label. If the regex does not match, `scripts/qa/run-template-feed-staging-snapshot.mjs` writes the top `request_duration_seconds_count` route candidates into the artifact so the operator can correct the regex and rerun.
@@ -29,12 +30,29 @@ Before collecting real staging evidence, run the local self-test:
 node scripts/qa/test-template-feed-staging-snapshot.mjs
 node scripts/qa/test-template-feed-tz1-8-evidence-validator.mjs
 node scripts/qa/test-template-feed-long-scroll-promoter.mjs
+node scripts/qa/test-template-feed-load-probe.mjs
+node scripts/qa/test-template-feed-admin-qa-report-draft.mjs
 node scripts/qa/test-template-feed-release-gate.mjs
 powershell -ExecutionPolicy Bypass -File scripts/qa/run-template-feed-tz1-8-release-gate.ps1 -PreflightOnly
 ```
 
-Expected result: the mock Prometheus latency/SSE scenarios, evidence validator fixtures, long-scroll artifact promoter fixtures, and release-gate skip-mode guard pass, while missing before/after timestamps, zero-wait SSE runs, and skip-mode without required run ids fail acceptance as intended.
+Expected result: the mock Prometheus latency/SSE scenarios, integrated SSE-window feed-load probe fixture, evidence validator fixtures, long-scroll artifact promoter fixtures, feed-load probe fixtures, Admin QA draft generator fixtures, and release-gate skip-mode guard pass, while missing before/after timestamps, zero-wait SSE runs, draft Admin QA reports, and skip-mode without required run ids fail acceptance as intended.
 The full `run-template-feed-tz1-8-release-gate.ps1 -PreflightOnly` path also runs `test-template-feed-release-gate.mjs`; the nested release-gate invocation suppresses that one self-test to avoid recursion.
+The full preflight also runs focused backend template guard tests and Admin template guard tests. Use `-SkipBackendGuardTests` or `-SkipAdminGuardTests` only when those suites have already passed in the same release run and the matching logs are attached to the release evidence.
+Pass `-ReleaseGateArtifactDir artifacts/template-feed-release-gate/<run>` to write a machine-readable `summary.json` with every release-gate step status, exit code, and duration. `TEMPLATE_FEED_RELEASE_GATE_ARTIFACT_DIR` can be used instead when invoking from CI.
+
+Before running the full staging collection, validate that the local env file, latency timestamps, SSE wait window, optional mobile artifact path, and Admin QA report/draft parameters are present:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/qa/run-template-feed-tz1-8-release-gate.ps1 `
+  -EnvFile .env.staging.local `
+  -RunId template-feed-tz1-8-<date> `
+  -ValidateStagingInputsOnly `
+  -AdminQaReportPath artifacts/templates-feed-tz1-8-admin-qa-report-<date>.md `
+  -ReleaseGateArtifactDir artifacts/template-feed-release-gate/template-feed-tz1-8-<date>-inputs
+```
+
+This mode does not run self-tests, staging snapshots, or validators. It only fails fast on missing release inputs and writes a `summary.json` readiness artifact. It also validates that `STAGING_PROMETHEUS_BASE_URL` is an absolute `http`/`https` URL, that `TEMPLATE_FEED_BEFORE_AT_UTC` and `TEMPLATE_FEED_AFTER_AT_UTC` are UTC timestamps, and that the after timestamp is later than the before timestamp. If feed-load probing is enabled through `-FeedLoadApiBase` or `TEMPLATE_FEED_LOAD_PROBE_API_BASE`, the URL must also be absolute `http`/`https` and `-FeedLoadProbeConcurrency` must be greater than zero. `-AdminQaReportPath` has priority, but the gate also accepts `TEMPLATE_FEED_ADMIN_QA_REPORT_PATH` from `.env.staging.local` so CI can keep the final validator and release gate pointed at the same report. The effective report path must match `artifacts/templates-feed-tz1-8-admin-qa-report*.md` and must not be the `.template.md` file; this mirrors the final evidence validator. If the Admin QA report does not exist yet and the operator wants the gate to create a draft after the SSE snapshot, pass the same `-CreateAdminQaDraftIfMissing`, `-AdminQaDraftAdminUrl`, `-AdminQaDraftApiHealth`, and `-AdminQaDraftOperator` parameters used for the full run; `-AdminQaDraftAdminUrl` must be an absolute `http`/`https` URL.
 
 After collecting staging/Admin evidence, run the release gate:
 
@@ -193,7 +211,49 @@ Related metrics artifact:
 ```
 
 Use `artifacts/templates-feed-tz1-8-admin-qa-report.template.md` as the report skeleton and save the completed run as `artifacts/templates-feed-tz1-8-admin-qa-report-<date>.md`.
-All Environment fields in the completed report must be filled. The release validator rejects reports that only contain PASS rows without Admin URL, API build/health, operator, UTC time, an existing accepted SSE snapshot summary under `artifacts/template-feed-staging-snapshots/`, and concrete Evidence cells for every scenario.
+For the category rename load scenario, run the feed-load probe in a separate terminal while performing the Admin rename:
+
+```powershell
+node scripts/qa/run-template-feed-load-probe.mjs `
+  --api-base=https://<staging-api-host> `
+  --duration-seconds=180 `
+  --concurrency=4 `
+  --interval-ms=250 `
+  --run-id=template-feed-tz1-8-<date>-rename-load
+```
+
+Attach `artifacts/template-feed-load-probes/template-feed-tz1-8-<date>-rename-load/summary.md` to the `Category rename under feed load` evidence cell, together with the category id, Admin action evidence, and the matching realtime/SSE evidence. The probe exits non-zero when failed feed requests exceed `--max-errors`.
+The final release validator requires this evidence cell to include a valid `artifacts/template-feed-load-probes/.../summary.md` path whose sibling `evidence.json` records at least one successful feed request and no more failures than `maxErrors`. When the linked SSE snapshot contains an integrated feed-load probe result, the Admin QA row must reference that same probe summary path; a stale probe from another run is rejected.
+Alternatively, pass `-FeedLoadApiBase https://<staging-api-host>` to the full release gate. During the SSE wait window it starts the same probe automatically and writes `artifacts/template-feed-load-probes/<run>-rename-load/summary.md`.
+After the SSE snapshot is accepted, this command can prefill the report metadata and linked snapshot path. If the SSE snapshot contains an integrated feed-load probe result, the `Category rename under feed load` evidence cell is also prefilled with the probe summary path while the result remains `TODO`:
+
+```powershell
+node scripts/qa/create-template-feed-admin-qa-report-draft.mjs `
+  --sse-run-id=template-feed-tz1-8-<date>-sse `
+  --admin-url=https://<staging-admin-host> `
+  --api-health="<GET /health build/process evidence>" `
+  --operator="<operator>" `
+  --output=artifacts/templates-feed-tz1-8-admin-qa-report-<date>.md
+```
+
+The generated file intentionally keeps every manual scenario as `TODO`; it is a draft, not release evidence.
+The full release gate can also create this draft for you when `-AdminQaReportPath` does not exist yet:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/qa/run-template-feed-tz1-8-release-gate.ps1 `
+  -EnvFile .env.staging.local `
+  -RunId template-feed-tz1-8-<date> `
+  -AdminQaReportPath artifacts/templates-feed-tz1-8-admin-qa-report-<date>.md `
+  -FeedLoadApiBase https://<staging-api-host> `
+  -CreateAdminQaDraftIfMissing `
+  -AdminQaDraftAdminUrl https://<staging-admin-host> `
+  -AdminQaDraftApiHealth "<GET /health build/process evidence>" `
+  -AdminQaDraftOperator "<operator>" `
+  -SseWaitSeconds 180
+```
+
+This mode writes the draft and then exits non-zero on purpose. Fill the manual rows, then rerun the gate without expecting the draft to satisfy release acceptance.
+All Environment fields in the completed report must be filled. The release validator rejects reports that only contain PASS rows without Admin URL, API build/health, operator, UTC time, an existing accepted SSE snapshot summary under `artifacts/template-feed-staging-snapshots/`, an accepted feed-load probe summary for category rename, and concrete Evidence cells for every scenario.
 
 Full release-gate run after staging metrics and Admin QA are ready:
 
@@ -202,6 +262,7 @@ powershell -ExecutionPolicy Bypass -File scripts/qa/run-template-feed-tz1-8-rele
   -EnvFile .env.staging.local `
   -RunId template-feed-tz1-8-<date> `
   -AdminQaReportPath artifacts/templates-feed-tz1-8-admin-qa-report-<date>.md `
+  -FeedLoadApiBase https://<staging-api-host> `
   -MobileLongScrollRunDir artifacts/mobile-template-feed/tz1-8-long-scroll-500-low-memory-<date> `
   -MobileLongScrollSignoff low-memory-emulator `
   -MobileLongScrollDeviceLabel "Pixel_3a_API_35 low-memory emulator" `
@@ -209,6 +270,6 @@ powershell -ExecutionPolicy Bypass -File scripts/qa/run-template-feed-tz1-8-rele
 ```
 
 During the SSE wait window, perform the admin actions listed above. The script then runs the final evidence validator and exits non-zero unless Task 4/6/8 artifacts are present and valid.
-The release gate also scopes `TEMPLATE_FEED_REQUIRED_LATENCY_RUN_ID` and `TEMPLATE_FEED_REQUIRED_SSE_RUN_ID` to the current `RunId` snapshots. When `-AdminQaReportPath` is provided, it scopes `TEMPLATE_FEED_ADMIN_QA_REPORT_PATH` to that exact report, so stale latency/SSE/Admin artifacts elsewhere under `artifacts/` cannot satisfy Task 4/6/8 by accident.
+The release gate also scopes `TEMPLATE_FEED_REQUIRED_LATENCY_RUN_ID` and `TEMPLATE_FEED_REQUIRED_SSE_RUN_ID` to the current `RunId` snapshots. When `-AdminQaReportPath` is provided, it has priority over `TEMPLATE_FEED_ADMIN_QA_REPORT_PATH`; either way, the gate scopes `TEMPLATE_FEED_ADMIN_QA_REPORT_PATH` to the effective report before running the final validator, so stale latency/SSE/Admin artifacts elsewhere under `artifacts/` cannot satisfy Task 4/6/8 by accident.
 If reusing previously collected staging snapshots with `-SkipLatency` or `-SkipSse`, set `TEMPLATE_FEED_REQUIRED_LATENCY_RUN_ID` and/or `TEMPLATE_FEED_REQUIRED_SSE_RUN_ID` to the exact accepted snapshot run ids before running the gate. The script rejects skip-mode validation without those variables.
-Accepted staging snapshot `evidence.json` files must include runner metadata (`runId`, `startedAtUtc`, `finishedAtUtc`, anonymized `prometheusBaseUrl`) plus measurement data (`latency.before/after`, latency deltas, `sseFullInvalidations.before/after`, and window increase) in addition to passing checks, so handcrafted check-only JSON is not accepted as release evidence.
+Accepted staging snapshot `evidence.json` files must include runner metadata (`runId`, chronological `startedAtUtc`/`finishedAtUtc`, anonymized `prometheusBaseUrl`) plus consistent measurement data (`latency.before/after` with labels `before`/`after`, chronological before/after timestamps, non-empty p95/p99 samples, comparison values matching raw sample maxima, latency deltas matching after-before, `sseFullInvalidations.before/after` with labels `before`/`after`, delta matching after-before, and window increase matching the after snapshot) in addition to passing checks, so handcrafted check-only JSON is not accepted as release evidence.

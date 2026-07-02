@@ -29,6 +29,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.api
+    restart: unless-stopped
+    mem_limit: "${BACKEND_MEMORY_LIMIT:-768m}"
+    cpus: "${BACKEND_CPUS:-1.0}"
     environment:
       ASPNETCORE_ENVIRONMENT: "${ASPNETCORE_ENVIRONMENT:-Production}"
       ASPNETCORE_HTTP_PORTS: 5000
@@ -71,16 +74,17 @@ services:
       Identity__AvatarStorage__PublicBaseUrl: "${BACKEND_PUBLIC_BASE_URL:?BACKEND_PUBLIC_BASE_URL is required for public backend media URLs}"
       SupportChat__AttachmentStorage__PublicBaseUrl: "${BACKEND_PUBLIC_BASE_URL:?BACKEND_PUBLIC_BASE_URL is required for public support attachment URLs}"
       Templates__PublicBaseUrl: "${BACKEND_PUBLIC_BASE_URL:?BACKEND_PUBLIC_BASE_URL is required for public template media URLs}"
-      Templates__AiProvider: "${TEMPLATES_AI_PROVIDER:-Fake}"
+      Templates__StorageProvider: "${TEMPLATES_STORAGE_PROVIDER:?Set TEMPLATES_STORAGE_PROVIDER to R2 or Local explicitly}"
+      Templates__AiProvider: "${TEMPLATES_AI_PROVIDER:?Set TEMPLATES_AI_PROVIDER to Fal or Fake explicitly}"
       Templates__Watermark__Enabled: "${TEMPLATES_WATERMARK_ENABLED:-false}"
-      PETMAGIC_LOCAL_SMOKE_FAST_FAKE_COMPLETION: "${PETMAGIC_LOCAL_SMOKE_FAST_FAKE_COMPLETION:-true}"
+      PETMAGIC_LOCAL_SMOKE_FAST_FAKE_COMPLETION: "${PETMAGIC_LOCAL_SMOKE_FAST_FAKE_COMPLETION:?Set PETMAGIC_LOCAL_SMOKE_FAST_FAKE_COMPLETION to false for production or true only for local smoke}"
       Templates__GenerationWorkerEnabled: "false"
       Templates__GlobalMaxConcurrentGenerations: "${GENERATION_GLOBAL_MAX_CONCURRENT:-3}"
       Templates__ImageReservedConcurrentGenerations: "${GENERATION_IMAGE_RESERVED_CONCURRENT:-0}"
       Templates__ImageMaxConcurrentGenerations: "${GENERATION_IMAGE_MAX_CONCURRENT:-2}"
       Templates__ImageProtectedConcurrentGenerations: "${GENERATION_IMAGE_PROTECTED_CONCURRENT:-0}"
       Templates__VideoReservedConcurrentGenerations: "${GENERATION_VIDEO_RESERVED_CONCURRENT:-0}"
-      Templates__VideoMaxConcurrentGenerations: "${GENERATION_VIDEO_MAX_CONCURRENT:-1}"
+      Templates__VideoMaxConcurrentGenerations: "${GENERATION_VIDEO_MAX_CONCURRENT:-4}"
       Templates__VideoBorrowMaxConcurrentGenerations: "${GENERATION_VIDEO_BORROW_MAX_CONCURRENT:-0}"
       Templates__EnableElasticLaneBorrowing: "${GENERATION_ENABLE_ELASTIC_LANE_BORROWING:-false}"
       Templates__AllowVideoBorrowWhenImageQueueEmpty: "${GENERATION_ALLOW_VIDEO_BORROW_WHEN_IMAGE_QUEUE_EMPTY:-true}"
@@ -122,7 +126,7 @@ services:
       RateLimiting__Webhooks__PermitLimit: "${RATE_LIMIT_WEBHOOKS_PERMIT:-120}"
       RateLimiting__AuthRegister__PermitLimit: "${RATE_LIMIT_AUTH_REGISTER_PERMIT:-8}"
       RateLimiting__AuthPasswordReset__PermitLimit: "${RATE_LIMIT_AUTH_PASSWORD_RESET_PERMIT:-10}"
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://localhost:4317
+      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}"
       AllowedHosts: "*"
     ports:
       - "${BACKEND_HOST_PORT:-5001}:5000"
@@ -149,6 +153,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.generation-worker
+    restart: unless-stopped
+    mem_limit: "${GENERATION_WORKER_MEMORY_LIMIT:-768m}"
+    cpus: "${GENERATION_WORKER_CPUS:-1.0}"
     environment:
       ASPNETCORE_ENVIRONMENT: "${ASPNETCORE_ENVIRONMENT:-Production}"
       DOTNET_ENVIRONMENT: "${DOTNET_ENVIRONMENT:-${ASPNETCORE_ENVIRONMENT:-Production}}"
@@ -161,9 +168,10 @@ services:
       R2_BUCKET_NAME: "${R2_BUCKET_NAME:-}"
       R2_PUBLIC_URL: "${R2_PUBLIC_URL:-}"
       Templates__PublicBaseUrl: "${BACKEND_PUBLIC_BASE_URL:?BACKEND_PUBLIC_BASE_URL is required for public template media URLs}"
-      Templates__AiProvider: "${TEMPLATES_AI_PROVIDER:-Fake}"
+      Templates__StorageProvider: "${TEMPLATES_STORAGE_PROVIDER:?Set TEMPLATES_STORAGE_PROVIDER to R2 or Local explicitly}"
+      Templates__AiProvider: "${TEMPLATES_AI_PROVIDER:?Set TEMPLATES_AI_PROVIDER to Fal or Fake explicitly}"
       Templates__Watermark__Enabled: "${TEMPLATES_WATERMARK_ENABLED:-false}"
-      PETMAGIC_LOCAL_SMOKE_FAST_FAKE_COMPLETION: "${PETMAGIC_LOCAL_SMOKE_FAST_FAKE_COMPLETION:-true}"
+      PETMAGIC_LOCAL_SMOKE_FAST_FAKE_COMPLETION: "${PETMAGIC_LOCAL_SMOKE_FAST_FAKE_COMPLETION:?Set PETMAGIC_LOCAL_SMOKE_FAST_FAKE_COMPLETION to false for production or true only for local smoke}"
       Templates__GenerationWorkerEnabled: "true"
       Templates__MediaCleanupWorkerEnabled: "false"
       Templates__MaxConcurrentJobsPerWorker: "${GENERATION_WORKER_MAX_CONCURRENT_JOBS:-1}"
@@ -173,7 +181,7 @@ services:
       Templates__ImageMaxConcurrentGenerations: "${GENERATION_IMAGE_MAX_CONCURRENT:-2}"
       Templates__ImageProtectedConcurrentGenerations: "${GENERATION_IMAGE_PROTECTED_CONCURRENT:-0}"
       Templates__VideoReservedConcurrentGenerations: "${GENERATION_VIDEO_RESERVED_CONCURRENT:-0}"
-      Templates__VideoMaxConcurrentGenerations: "${GENERATION_VIDEO_MAX_CONCURRENT:-1}"
+      Templates__VideoMaxConcurrentGenerations: "${GENERATION_VIDEO_MAX_CONCURRENT:-4}"
       Templates__VideoBorrowMaxConcurrentGenerations: "${GENERATION_VIDEO_BORROW_MAX_CONCURRENT:-0}"
       Templates__EnableElasticLaneBorrowing: "${GENERATION_ENABLE_ELASTIC_LANE_BORROWING:-false}"
       Templates__AllowVideoBorrowWhenImageQueueEmpty: "${GENERATION_ALLOW_VIDEO_BORROW_WHEN_IMAGE_QUEUE_EMPTY:-true}"
@@ -190,7 +198,7 @@ services:
       Templates__MaxAiProviderRequestsPerMinute: "${GENERATION_PROVIDER_MAX_RPM:-60}"
       Templates__MaxGenerationAttempts: "${GENERATION_MAX_ATTEMPTS:-3}"
       Templates__RefundRetryDelayMilliseconds: "${GENERATION_REFUND_RETRY_DELAY_MS:-5000}"
-      Templates__JobLockTimeoutMilliseconds: "${GENERATION_JOB_LOCK_TIMEOUT_MS:-900000}"
+      Templates__JobLockTimeoutMilliseconds: "${GENERATION_JOB_LOCK_TIMEOUT_MS:-300000}"
       Templates__OrphanQueuedJobTimeoutMilliseconds: "${GENERATION_ORPHAN_QUEUED_TIMEOUT_MS:-120000}"
       Templates__QueueMaxSize: "${GENERATION_QUEUE_MAX_SIZE:-1000}"
       Templates__EstimatedVideoGenerationSeconds: "${GENERATION_ESTIMATED_VIDEO_SECONDS:-420}"
@@ -205,9 +213,15 @@ services:
       Templates__QueuePriorityAgingIntervalSeconds: "${GENERATION_PRIORITY_AGING_INTERVAL_SECONDS:-60}"
       Templates__QueuePriorityAgingBoost: "${GENERATION_PRIORITY_AGING_BOOST:-500}"
       Templates__CancelQueuedGenerationEnabled: "${GENERATION_CANCEL_QUEUED_ENABLED:-true}"
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://localhost:4317
+      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}"
     volumes:
       - backend_template_media:/app/wwwroot/templates-media
+    healthcheck:
+      test: [ "CMD-SHELL", "test -r /proc/1/cmdline && tr '\\0' ' ' </proc/1/cmdline | grep -q 'PetMagic.Host.GenerationWorker.dll'" ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     depends_on:
       postgres:
         condition: service_healthy
@@ -237,8 +251,92 @@ services:
     networks:
       - petmagic-network
 
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.111.0
+    command: ["--config=/etc/otelcol/config.yaml"]
+    restart: unless-stopped
+    volumes:
+      - ./deploy/monitoring/otel-collector/config.yaml:/etc/otelcol/config.yaml:ro
+    depends_on:
+      - tempo
+    networks:
+      - petmagic-network
+
+  tempo:
+    image: grafana/tempo:2.6.1
+    command: ["-config.file=/etc/tempo/tempo.yml"]
+    restart: unless-stopped
+    volumes:
+      - ./deploy/monitoring/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
+      - tempo_data:/var/tempo
+    ports:
+      - "${TEMPO_HOST_PORT:-3200}:3200"
+    networks:
+      - petmagic-network
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=15d"
+    restart: unless-stopped
+    volumes:
+      - ./deploy/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/monitoring/prometheus/petmagic-alerts.yml:/etc/prometheus/rules/petmagic-alerts.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "${PROMETHEUS_HOST_PORT:-9090}:9090"
+    depends_on:
+      - otel-collector
+      - alertmanager
+    networks:
+      - petmagic-network
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--config.expand-env"
+      - "--storage.path=/alertmanager"
+    restart: unless-stopped
+    environment:
+      ALERTMANAGER_WEBHOOK_URL: "${ALERTMANAGER_WEBHOOK_URL:?Set ALERTMANAGER_WEBHOOK_URL in .env}"
+    volumes:
+      - ./deploy/monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    ports:
+      - "${ALERTMANAGER_HOST_PORT:-9093}:9093"
+    networks:
+      - petmagic-network
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: "${GRAFANA_ADMIN_USER:-admin}"
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env}"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./deploy/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "${GRAFANA_HOST_PORT:-3001}:3000"
+    depends_on:
+      - prometheus
+      - tempo
+    networks:
+      - petmagic-network
+
 volumes:
   postgres_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  alertmanager_data:
+    driver: local
+  tempo_data:
+    driver: local
+  grafana_data:
     driver: local
   backend_data_protection:
     driver: local
