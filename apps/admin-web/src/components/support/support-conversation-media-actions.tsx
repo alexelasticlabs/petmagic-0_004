@@ -16,7 +16,11 @@ import type {
 } from "@/components/support/support-conversation-page.types";
 import { getSupportConversationCopy } from "@/components/support/support-conversation.content";
 import sharedStyles from "@/components/support/support-page.module.css";
-import { SupportSecureMedia } from "@/components/support/support-secure-media";
+import {
+  getBlockedUnsafeSupportMediaUrlDetails,
+  isUnsafeSupportMediaUrl,
+  SupportSecureMedia,
+} from "@/components/support/support-secure-media";
 import type { AdminSupportConversation } from "@/lib/api-client";
 import { clientLogger } from "@/lib/client-logger";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
@@ -110,6 +114,15 @@ export function useSupportConversationMediaActions({
     action: "download" | "share" | "open",
     signal: AbortSignal
   ): Promise<Blob | null> {
+    if (isUnsafeSupportMediaUrl(image.attachmentFileUrl)) {
+      clientLogger.warn(`support.fullscreen_${action}_blocked`, {
+        messageId: formatSupportLogText(image.messageId),
+        mediaType: formatSupportLogText(image.mediaType),
+        ...getBlockedUnsafeSupportMediaUrlDetails(image.attachmentFileUrl),
+      });
+      return null;
+    }
+
     try {
       const response = await fetchWithTimeout(image.attachmentFileUrl, {
         credentials: "include",
@@ -333,6 +346,15 @@ export function useSupportConversationMediaActions({
     const controller = new AbortController();
     attachmentActionAbortControllerRef.current = controller;
     try {
+      if (isUnsafeSupportMediaUrl(attachment.fileUrl)) {
+        clientLogger.warn("support.attachment_download_blocked", {
+          messageId: formatSupportLogText(message.messageId),
+          mimeType: formatSupportLogText(attachment.mimeType),
+          ...getBlockedUnsafeSupportMediaUrlDetails(attachment.fileUrl),
+        });
+        return;
+      }
+
       const response = await fetchWithTimeout(attachment.fileUrl, {
         credentials: "include",
         signal: controller.signal,

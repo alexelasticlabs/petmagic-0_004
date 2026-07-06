@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_realtime_client.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
@@ -129,6 +130,13 @@ class SupportChatController extends _SupportChatControllerBase
     _activeRepository = ref.read(supportChatRepositoryProvider);
     _activeRealtimeClient = ref.read(supportChatRealtimeClientProvider);
     _hasInternet = ref.read(networkStatusControllerProvider).hasInternet;
+    _canUsePrivateSupportApi = _isLaunchAuthorized(
+      ref.read(appLaunchControllerProvider),
+    );
+    ref.listen<AppLaunchState>(
+      appLaunchControllerProvider,
+      (_, next) => _handleAuthStatusChanged(next),
+    );
     ref.listen<bool>(
       networkStatusControllerProvider.select((state) => state.hasInternet),
       (_, hasInternet) => _handleNetworkStatusChanged(hasInternet),

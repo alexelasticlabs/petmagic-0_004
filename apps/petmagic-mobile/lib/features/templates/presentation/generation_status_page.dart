@@ -16,6 +16,7 @@ import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_gallery_store.dart';
@@ -160,6 +161,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
   bool _isRemovingWatermark = false;
   bool _isGeneratingSimilar = false;
   bool _isCancellingGeneration = false;
+  bool _canUsePrivateStatusApi = true;
   String? _errorMessage;
   bool _isPollInFlight = false;
   bool _isPageActive = true;
@@ -194,7 +196,16 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
     super.initState();
     _activeGalleryStore = ref.read(generationGalleryStoreProvider);
     _activeRealtimeClient = ref.read(realtimeClientProvider);
+    _canUsePrivateStatusApi = _isLaunchAuthorized(
+      ref.read(appLaunchControllerProvider),
+    );
     WidgetsBinding.instance.addObserver(this);
+    if (!_canUsePrivateStatusApi) {
+      _isLoading = false;
+      _errorMessage = 'auth.sign_in_required';
+      return;
+    }
+
     unawaited(_load());
     unawaited(_resumeRealtimeIfNeeded());
     _startPolling();
@@ -202,6 +213,14 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!_canUsePrivateStatusApi) {
+      _pauseRealtime();
+      _stopPolling();
+      _cancelActiveLoad();
+      _cancelActiveLocalMediaDownloads();
+      return;
+    }
+
     if (state == AppLifecycleState.resumed) {
       _isPageActive = true;
       if (!ref.read(networkStatusControllerProvider).hasInternet) {
@@ -252,6 +271,12 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
   void activate() {
     super.activate();
     _isPageActive = true;
+    if (!_canUsePrivateStatusApi) {
+      _pauseRealtime();
+      _stopPolling();
+      return;
+    }
+
     if (!ref.read(networkStatusControllerProvider).hasInternet) {
       _pauseRealtime();
       _stopPolling();
@@ -264,11 +289,17 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AppLaunchState>(
+      appLaunchControllerProvider,
+      (previous, next) => _handleLaunchStateChanged(previous, next),
+    );
     ref.listen<NetworkStatusState>(networkStatusControllerProvider, (
       previous,
       next,
     ) {
-      if (!_isPageActive || previous?.hasInternet == next.hasInternet) {
+      if (!_isPageActive ||
+          !_canUsePrivateStatusApi ||
+          previous?.hasInternet == next.hasInternet) {
         return;
       }
 
@@ -556,5 +587,55 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
         ),
       ),
     );
+  }
+
+  bool _isLaunchAuthorized(AppLaunchState state) {
+    return state.isLoading || state.isAuthenticated;
+  }
+
+  void _handleLaunchStateChanged(
+    AppLaunchState? previous,
+    AppLaunchState launchState,
+  ) {
+    final wasAuthenticated = previous?.isAuthenticated == true;
+    final canUsePrivateApi = _isLaunchAuthorized(launchState);
+    if (!wasAuthenticated && !launchState.isAuthenticated) {
+      return;
+    }
+
+    if (_canUsePrivateStatusApi == canUsePrivateApi) {
+      return;
+    }
+
+    _canUsePrivateStatusApi = canUsePrivateApi;
+    if (!canUsePrivateApi) {
+      _pauseRealtime();
+      _stopPolling();
+      _cancelActiveLoad();
+      _cancelActiveMediaAction();
+      _cancelActiveGenerationCancel();
+      _cancelActiveLocalMediaDownloads();
+      _setPageState(() {
+        _generation = null;
+        _isLoading = false;
+        _isSubmittingFeedback = false;
+        _isDeleting = false;
+        _isMediaActionInFlight = false;
+        _isRemovingWatermark = false;
+        _isGeneratingSimilar = false;
+        _isCancellingGeneration = false;
+        _errorMessage = 'auth.sign_in_required';
+      });
+      return;
+    }
+
+    if (!_isPageActive ||
+        !ref.read(networkStatusControllerProvider).hasInternet) {
+      return;
+    }
+
+    unawaited(_load());
+    unawaited(_resumeRealtimeIfNeeded());
+    _startPolling();
   }
 }

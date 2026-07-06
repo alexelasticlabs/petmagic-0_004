@@ -36,6 +36,65 @@ void main() {
     },
   );
 
+  test(
+    'gamification providers clear personal cache and skip private requests after sign out',
+    () async {
+      final repository = _ControlledAchievementsRepository(failUntilCall: 0);
+      final launchController = _MutableAppLaunchController(true);
+      final container = ProviderContainer(
+        overrides: [
+          appLaunchControllerProvider.overrideWith(() => launchController),
+          gamificationRepositoryProvider.overrideWithValue(repository),
+        ],
+      );
+      final achievementsSubscription = container
+          .listen<AsyncValue<List<AchievementModel>>>(
+            achievementsProvider,
+            (_, _) {},
+            fireImmediately: true,
+          );
+      final summarySubscription = container
+          .listen<AsyncValue<GamificationSummaryModel>>(
+            gamificationSummaryProvider,
+            (_, _) {},
+            fireImmediately: true,
+          );
+      addTearDown(() {
+        achievementsSubscription.close();
+        summarySubscription.close();
+        container.dispose();
+      });
+
+      await container.read(achievementsProvider.future);
+      await container.read(gamificationSummaryProvider.future);
+
+      expect(repository.fetchCalls, 1);
+      expect(repository.summaryFetchCalls, 1);
+
+      launchController.setAuthenticated(false);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        achievementsSubscription.read().error,
+        isA<AppException>().having(
+          (error) => error.message,
+          'message',
+          'auth.session_expired',
+        ),
+      );
+      expect(
+        summarySubscription.read().error,
+        isA<AppException>().having(
+          (error) => error.message,
+          'message',
+          'auth.session_expired',
+        ),
+      );
+      expect(repository.fetchCalls, 1);
+      expect(repository.summaryFetchCalls, 1);
+    },
+  );
+
   testWidgets(
     'achievements page avoids redundant reload on first authenticated open',
     (tester) async {
@@ -339,6 +398,14 @@ void main() {
       expect(providersSource, contains('final link = ref.keepAlive();'));
       expect(
         providersSource,
+        contains('ref.watch(_canLoadPrivateGamificationProvider)'),
+      );
+      expect(
+        providersSource,
+        contains("throw const AppException('auth.session_expired');"),
+      );
+      expect(
+        providersSource,
         contains(
           "disposeTimer = Timer(_gamificationProviderCacheTtl, link.close);",
         ),
@@ -572,6 +639,34 @@ class _GuestAppLaunchController extends AppLaunchController {
       requiresLegalAcceptance: false,
       hasSeenOnboarding: true,
       guestSessionReady: true,
+    );
+  }
+}
+
+class _MutableAppLaunchController extends AppLaunchController {
+  _MutableAppLaunchController(this._isAuthenticated);
+
+  bool _isAuthenticated;
+
+  @override
+  AppLaunchState build() {
+    return AppLaunchState(
+      isLoading: false,
+      isAuthenticated: _isAuthenticated,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: _isAuthenticated,
+    );
+  }
+
+  void setAuthenticated(bool value) {
+    _isAuthenticated = value;
+    state = state.copyWith(
+      isLoading: false,
+      isAuthenticated: value,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: value,
     );
   }
 }

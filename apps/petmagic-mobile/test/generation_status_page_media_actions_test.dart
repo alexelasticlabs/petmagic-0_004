@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_gallery_store.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
@@ -29,6 +30,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedGenerationStatusAppLaunchController.new,
+          ),
           templateGenerationRepositoryProvider.overrideWithValue(
             FakeGenerationStatusTemplateGenerationRepository(generation),
           ),
@@ -86,6 +90,9 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedGenerationStatusAppLaunchController.new,
+            ),
             templateGenerationRepositoryProvider.overrideWithValue(repository),
             realtimeClientProvider.overrideWithValue(
               const NoopRealtimeClient(),
@@ -174,6 +181,9 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedGenerationStatusAppLaunchController.new,
+            ),
             templateGenerationRepositoryProvider.overrideWithValue(repository),
             realtimeClientProvider.overrideWithValue(
               const NoopRealtimeClient(),
@@ -259,6 +269,9 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedGenerationStatusAppLaunchController.new,
+            ),
             templateGenerationRepositoryProvider.overrideWithValue(repository),
             realtimeClientProvider.overrideWithValue(
               const NoopRealtimeClient(),
@@ -328,6 +341,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedGenerationStatusAppLaunchController.new,
+          ),
           templateGenerationRepositoryProvider.overrideWithValue(
             FakeGenerationStatusTemplateGenerationRepository(
               generationStatusFixture(),
@@ -386,6 +402,9 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedGenerationStatusAppLaunchController.new,
+            ),
             templateGenerationRepositoryProvider.overrideWithValue(repository),
             realtimeClientProvider.overrideWithValue(
               const NoopRealtimeClient(),
@@ -453,4 +472,18 @@ void main() {
       }
     },
   );
+}
+
+class _AuthenticatedGenerationStatusAppLaunchController
+    extends AppLaunchController {
+  @override
+  AppLaunchState build() {
+    return const AppLaunchState(
+      isLoading: false,
+      isAuthenticated: true,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: true,
+    );
+  }
 }

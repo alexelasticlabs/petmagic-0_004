@@ -131,6 +131,10 @@ class ProfileController extends Notifier<ProfileState> {
 
   @override
   ProfileState build() {
+    ref.listen<AppLaunchState>(
+      appLaunchControllerProvider,
+      _handleLaunchStateChanged,
+    );
     ref.listen<bool>(
       networkStatusControllerProvider.select((state) => state.hasInternet),
       (_, hasInternet) => _handleNetworkStatusChanged(hasInternet),
@@ -142,6 +146,34 @@ class ProfileController extends Notifier<ProfileState> {
       _cancelActiveProfileMutation();
     });
     return const ProfileState.initial();
+  }
+
+  void _handleLaunchStateChanged(
+    AppLaunchState? previous,
+    AppLaunchState next,
+  ) {
+    if (next.isLoading || next.isAuthenticated) {
+      return;
+    }
+
+    if (previous?.isAuthenticated != true) {
+      return;
+    }
+
+    _cancelActiveInitialize();
+    _cancelActiveAvatarUpload();
+    _cancelActiveAuthRequest();
+    _cancelActiveProfileMutation();
+    _updateStateIfMounted(
+      (state) => state.copyWith(
+        isLoading: false,
+        isSaving: false,
+        password: '',
+        confirmPassword: '',
+        clearProfile: true,
+        clearError: true,
+      ),
+    );
   }
 
   void _updateStateIfMounted(

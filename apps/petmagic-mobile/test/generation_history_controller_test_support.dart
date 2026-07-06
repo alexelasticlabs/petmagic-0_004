@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_gallery_store.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
@@ -29,6 +30,7 @@ class GenerationHistoryControllerHarness {
     FakeGenerationGalleryStore? store,
     FakeRealtimeClient? realtimeClient,
     FakeGenerationHistoryNetworkStatusController? networkStatusController,
+    bool authenticated = true,
   }) {
     final resolvedStore = store ?? FakeGenerationGalleryStore();
     final resolvedRealtimeClient = realtimeClient ?? FakeRealtimeClient();
@@ -40,6 +42,9 @@ class GenerationHistoryControllerHarness {
       store: resolvedStore,
       realtimeClient: resolvedRealtimeClient,
       networkStatusController: resolvedNetworkStatusController,
+      appLaunchController: FakeGenerationHistoryAppLaunchController(
+        authenticated,
+      ),
     );
   }
 
@@ -48,8 +53,10 @@ class GenerationHistoryControllerHarness {
     required this.store,
     required this.realtimeClient,
     required this.networkStatusController,
+    required this.appLaunchController,
   }) : container = ProviderContainer(
          overrides: [
+           appLaunchControllerProvider.overrideWith(() => appLaunchController),
            templateGenerationRepositoryProvider.overrideWithValue(repository),
            generationGalleryStoreProvider.overrideWithValue(store),
            realtimeClientProvider.overrideWithValue(realtimeClient),
@@ -63,6 +70,7 @@ class GenerationHistoryControllerHarness {
   final FakeGenerationGalleryStore store;
   final FakeRealtimeClient realtimeClient;
   final FakeGenerationHistoryNetworkStatusController networkStatusController;
+  final FakeGenerationHistoryAppLaunchController appLaunchController;
 
   GenerationHistoryController get controller =>
       container.read(generationHistoryControllerProvider.notifier);
@@ -73,6 +81,34 @@ class GenerationHistoryControllerHarness {
   void dispose() {
     container.dispose();
     realtimeClient.dispose();
+  }
+}
+
+class FakeGenerationHistoryAppLaunchController extends AppLaunchController {
+  FakeGenerationHistoryAppLaunchController(this._isAuthenticated);
+
+  bool _isAuthenticated;
+
+  @override
+  AppLaunchState build() {
+    return AppLaunchState(
+      isLoading: false,
+      isAuthenticated: _isAuthenticated,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: _isAuthenticated,
+    );
+  }
+
+  void setAuthenticated(bool value) {
+    _isAuthenticated = value;
+    state = state.copyWith(
+      isLoading: false,
+      isAuthenticated: value,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: value,
+    );
   }
 }
 

@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 
 using NSec.Cryptography;
 using PetMagic.BuildingBlocks.Observability;
+using PetMagic.BuildingBlocks.Security;
 
 namespace PetMagic.Modules.Templates.Api;
 
@@ -95,17 +96,25 @@ internal sealed class FalWebhookSignatureVerifier(
         }
 
         var jwksUrl = configuration["Templates:Fal:WebhookJwksUrl"] ?? "https://rest.fal.ai/.well-known/jwks.json";
+        if (!TryCreateAllowedJwksUri(jwksUrl, out var jwksUri))
+        {
+            logger.LogWarning(
+                "fal webhook JWKS fetch blocked due to unsafe configured URL. JwksUrl={JwksUrl}",
+                SafeJwksUrlLogValue(jwksUrl));
+            return [];
+        }
+
         try
         {
             using var response = await httpClientFactory
                 .CreateClient(HttpClientName)
-                .GetAsync(jwksUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+                .GetAsync(jwksUri, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 logger.LogWarning(
                     "fal webhook JWKS fetch failed. StatusCode={StatusCode} JwksUrl={JwksUrl}",
                     response.StatusCode,
-                    SafeLogValues.SanitizeText(jwksUrl));
+                    SafeJwksUrlLogValue(jwksUrl));
                 return [];
             }
 
@@ -144,7 +153,7 @@ internal sealed class FalWebhookSignatureVerifier(
             logger.LogWarning(
                 "fal webhook JWKS fetch failed. ExceptionType={ExceptionType} JwksUrl={JwksUrl}",
                 SafeLogValues.ExceptionType(exception),
-                SafeLogValues.SanitizeText(jwksUrl));
+                SafeJwksUrlLogValue(jwksUrl));
             return [];
         }
     }
@@ -161,6 +170,37 @@ internal sealed class FalWebhookSignatureVerifier(
         {
             return false;
         }
+    }
+
+    private static bool TryCreateAllowedJwksUri(string jwksUrl, out Uri jwksUri)
+    {
+        jwksUri = null!;
+        if (!Uri.TryCreate(jwksUrl, UriKind.Absolute, out var uri)
+            || !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+            || !string.IsNullOrEmpty(uri.UserInfo)
+            || !string.IsNullOrEmpty(uri.Query)
+            || !string.IsNullOrEmpty(uri.Fragment)
+            || SafeNetworkTargetPolicy.IsPrivateNetworkTarget(uri))
+        {
+            return false;
+        }
+
+        jwksUri = uri;
+        return true;
+    }
+
+    private static string SafeJwksUrlLogValue(string jwksUrl)
+    {
+        if (!Uri.TryCreate(jwksUrl, UriKind.Absolute, out var uri))
+        {
+            return "[invalid-url]";
+        }
+
+        var host = uri.Host.Contains(':', StringComparison.Ordinal) && !uri.Host.StartsWith("[", StringComparison.Ordinal)
+            ? $"[{uri.Host}]"
+            : uri.Host;
+        var port = uri.IsDefaultPort ? string.Empty : $":{uri.Port}";
+        return SafeLogValues.SanitizeText($"{uri.Scheme}://{host}{port}/***");
     }
 
     private static bool TryDecodeBase64Url(string? value, out byte[] bytes)

@@ -43,6 +43,8 @@ public sealed class HttpGeneratedMediaImporterTests
     [InlineData("https://10.0.0.5/generated.png")]
     [InlineData("https://192.168.1.10/generated.png")]
     [InlineData("https://[::1]/generated.png")]
+    [InlineData("https://[fc00::1]/generated.png")]
+    [InlineData("https://[fd00::1]/generated.png")]
     public async Task ImportImageAsync_ShouldRejectPrivateNetworkUrlWithoutSendingRequest(string url)
     {
         var handler = new RecordingHandler("image/png", [1, 2, 3]);

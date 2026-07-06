@@ -16,6 +16,12 @@ describe("support attachment sharing", () => {
     expect(source).toContain("URL.createObjectURL(blob)");
     expect(source).toContain("fetchWithTimeout(image.attachmentFileUrl");
     expect(source).toContain("fetchWithTimeout(attachment.fileUrl");
+    expect(source).toContain("isUnsafeSupportMediaUrl(image.attachmentFileUrl)");
+    expect(source).toContain("isUnsafeSupportMediaUrl(attachment.fileUrl)");
+    expect(source).toContain("support.fullscreen_${action}_blocked");
+    expect(source).toContain("support.attachment_download_blocked");
+    expect(source).toContain("getBlockedUnsafeSupportMediaUrlDetails(image.attachmentFileUrl)");
+    expect(source).toContain("getBlockedUnsafeSupportMediaUrlDetails(attachment.fileUrl)");
     expect(source).toContain("function getSupportActionErrorDetails(error: unknown)");
     expect(source).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
     expect(source).toContain("function formatSupportLogText(");
@@ -34,6 +40,8 @@ describe("support attachment sharing", () => {
     expect(source).not.toContain("mediaType: image.mediaType,\n        error");
     expect(source).not.toContain("mimeType: attachment.mimeType,\n        error");
     expect(source).not.toContain("messageId: currentFullscreenImage.messageId,\n        error");
+    expect(source).not.toContain('support.fullscreen_${action}_blocked", { url');
+    expect(source).not.toContain('support.attachment_download_blocked", { url');
   });
 
   it("aborts manual attachment fetches and guards fullscreen double actions", () => {

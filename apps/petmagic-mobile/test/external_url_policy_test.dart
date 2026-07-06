@@ -17,6 +17,30 @@ void main() {
       expect(uri.host, 'petmagic.app');
     });
 
+    test('rejects private and local https urls before external handoff', () {
+      for (final host in const [
+        'localhost',
+        '127.0.0.1',
+        '0.0.0.0',
+        '10.0.0.42',
+        '100.64.0.1',
+        '169.254.169.254',
+        '192.168.1.25',
+        '[::1]',
+        '[::]',
+        '[fd00::1]',
+        '[fe80::1]',
+        '[::ffff:127.0.0.1]',
+        '[::ffff:10.0.0.5]',
+      ]) {
+        expect(
+          parseSafeExternalUri('https://$host/media/template.mp4'),
+          isNull,
+          reason: host,
+        );
+      }
+    });
+
     test('enforces https allowlist when provided', () {
       final allowedHosts = premiumExternalAllowedHosts();
       expect(

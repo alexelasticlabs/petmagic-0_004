@@ -32,15 +32,14 @@ void main() {
     expect(buildBody, isNot(contains('_startAutoRefresh();')));
     expect(buildBody, contains('if (!_isScreenVisible)'));
     expect(buildBody, contains('networkStatusControllerProvider'));
+    expect(buildBody, contains('appLaunchControllerProvider'));
+    expect(buildBody, contains('_handleAuthStatusChanged'));
     expect(
       buildBody,
       contains('(_, hasInternet) => _handleNetworkStatusChanged(hasInternet)'),
     );
-    expect(loadBody, contains('if (!ref.mounted)'));
-    expect(
-      autoRefreshBody,
-      contains('if (!ref.mounted || !_isScreenVisible || !_hasInternet)'),
-    );
+    expect(loadBody, contains('!ref.mounted || !_isAuthenticated'));
+    expect(autoRefreshBody, contains('!_isAuthenticated'));
     expect(autoRefreshBody, contains('if (!ref.mounted)'));
     expect(autoRefreshBody, contains('!_hasInternet'));
     expect(offlineBannerBody, contains('if (!ref.mounted)'));
@@ -57,19 +56,19 @@ void main() {
       ),
       isNot(contains('state =')),
     );
-    expect(deleteBody, contains('if (!ref.mounted)'));
+    expect(deleteBody, contains('!ref.mounted || !_isAuthenticated'));
     final markDeletedIndex = deleteBody.indexOf(
       'await _galleryStore.markDeletedLocally',
     );
     final guardAfterTombstoneIndex = deleteBody.indexOf(
-      'if (!ref.mounted)',
+      '!ref.mounted || !_isAuthenticated',
       markDeletedIndex,
     );
     final serverDeleteIndex = deleteBody.indexOf(
       'await _repository.deleteGeneration',
     );
     final guardAfterServerDeleteIndex = deleteBody.indexOf(
-      'if (!ref.mounted)',
+      '!ref.mounted || !_isAuthenticated',
       serverDeleteIndex,
     );
     final clearPendingIndex = deleteBody.indexOf(
@@ -84,22 +83,16 @@ void main() {
     expect(guardAfterTombstoneIndex, lessThan(serverDeleteIndex));
     expect(serverDeleteIndex, lessThan(guardAfterServerDeleteIndex));
     expect(guardAfterServerDeleteIndex, lessThan(clearPendingIndex));
-    expect(
-      realtimeBody,
-      contains('if (!ref.mounted || !_isScreenVisible || !_hasInternet)'),
-    );
+    expect(realtimeBody, contains('!_isAuthenticated'));
     expect(realtimeBody, contains('if (!ref.mounted)'));
     expect(realtimeBody, contains('!_hasInternet'));
     expect(realtimeBody, contains('unawaited(realtimeClient.disconnect())'));
-    expect(eventBody, contains('if (!ref.mounted || !_isScreenVisible)'));
+    expect(eventBody, contains('!_isAuthenticated'));
     expect(eventBody, contains("AppLogger.warn("));
     expect(eventBody, contains("feature: 'Templates.GenerationHistory'"));
     expect(eventBody, contains("operation: 'realtime_event_parse'"));
     expect(eventBody, isNot(contains('} catch (_) {}')));
-    expect(
-      refetchBody,
-      contains('if (!ref.mounted || !_isScreenVisible || !_hasInternet)'),
-    );
+    expect(refetchBody, contains('!_isAuthenticated'));
     expect(
       refetchBody,
       contains(

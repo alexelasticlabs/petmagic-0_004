@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -17,6 +16,7 @@ internal static class TemplateLocalizationTranslator
     private const string NewlineToken = "___PM_NL___";
     private const string SegmentSeparator = "___PM_SEG_BREAK___";
     private const int TranslationResponseMaxChars = 64 * 1024;
+    private static readonly Uri TranslationEndpoint = new("https://translate.googleapis.com/translate_a/single");
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public static async Task<string?> GenerateAsync(
@@ -211,27 +211,20 @@ internal static class TemplateLocalizationTranslator
         HttpClient httpClient,
         CancellationToken cancellationToken)
     {
-        var protectedText = ProtectText(text);
-        var query = string.Create(
-            CultureInfo.InvariantCulture,
-            $"client=gtx&sl={sourceLocale}&tl={targetLocale}&dt=t&q={Uri.EscapeDataString(protectedText.Text)}");
-        var requestUri = new Uri($"https://translate.googleapis.com/translate_a/single?{query}");
-
         try
         {
-            using var response = await httpClient.GetAsync(
-                requestUri,
-                HttpCompletionOption.ResponseHeadersRead,
+            var protectedText = ProtectText(text);
+            var responseBody = await SendTranslationRequestAsync(
+                targetLocale,
+                protectedText.Text,
+                sourceLocale,
+                httpClient,
                 cancellationToken);
-            if (!response.IsSuccessStatusCode)
+            if (responseBody is null)
             {
                 return null;
             }
 
-            var responseBody = await SafeHttpContentReader.ReadRawStringPrefixAsync(
-                response.Content,
-                cancellationToken,
-                TranslationResponseMaxChars);
             using var document = JsonDocument.Parse(responseBody);
 
             if (document.RootElement.ValueKind != JsonValueKind.Array || document.RootElement.GetArrayLength() == 0)
@@ -309,26 +302,19 @@ internal static class TemplateLocalizationTranslator
         HttpClient httpClient,
         CancellationToken cancellationToken)
     {
-        var query = string.Create(
-            CultureInfo.InvariantCulture,
-            $"client=gtx&sl={sourceLocale}&tl={targetLocale}&dt=t&q={Uri.EscapeDataString(text)}");
-        var requestUri = new Uri($"https://translate.googleapis.com/translate_a/single?{query}");
-
         try
         {
-            using var response = await httpClient.GetAsync(
-                requestUri,
-                HttpCompletionOption.ResponseHeadersRead,
+            var responseBody = await SendTranslationRequestAsync(
+                targetLocale,
+                text,
+                sourceLocale,
+                httpClient,
                 cancellationToken);
-            if (!response.IsSuccessStatusCode)
+            if (responseBody is null)
             {
                 return null;
             }
 
-            var responseBody = await SafeHttpContentReader.ReadRawStringPrefixAsync(
-                response.Content,
-                cancellationToken,
-                TranslationResponseMaxChars);
             using var document = JsonDocument.Parse(responseBody);
 
             if (document.RootElement.ValueKind != JsonValueKind.Array || document.RootElement.GetArrayLength() == 0)
@@ -357,6 +343,39 @@ internal static class TemplateLocalizationTranslator
         {
             return null;
         }
+    }
+
+    private static async Task<string?> SendTranslationRequestAsync(
+        string targetLocale,
+        string text,
+        string sourceLocale,
+        HttpClient httpClient,
+        CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, TranslationEndpoint)
+        {
+            Content = new FormUrlEncodedContent([
+                new KeyValuePair<string, string>("client", "gtx"),
+                new KeyValuePair<string, string>("sl", sourceLocale),
+                new KeyValuePair<string, string>("tl", targetLocale),
+                new KeyValuePair<string, string>("dt", "t"),
+                new KeyValuePair<string, string>("q", text)
+            ])
+        };
+
+        using var response = await httpClient.SendAsync(
+            request,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        return await SafeHttpContentReader.ReadRawStringPrefixAsync(
+            response.Content,
+            cancellationToken,
+            TranslationResponseMaxChars);
     }
 
     private static ProtectedText ProtectText(string text)

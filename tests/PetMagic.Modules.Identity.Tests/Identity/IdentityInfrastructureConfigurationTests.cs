@@ -156,6 +156,33 @@ public sealed class IdentityInfrastructureConfigurationTests
         Assert.Contains("Apple external auth configuration is incomplete", exception.Message);
     }
 
+    [Theory]
+    [InlineData("ExternalAuth:Apple:AuthorizationEndpoint", "http://appleid.apple.com/auth/authorize", "must use HTTPS")]
+    [InlineData("ExternalAuth:Apple:AuthorizationEndpoint", "https://localhost/auth/authorize", "must not point to a local or private network host")]
+    [InlineData("ExternalAuth:Apple:AuthorizationEndpoint", "https://[fc00::1]/auth/authorize", "must not point to a local or private network host")]
+    [InlineData("ExternalAuth:Apple:TokenEndpoint", "https://user:secret@appleid.apple.com/auth/token", "must not contain credentials")]
+    [InlineData("ExternalAuth:Apple:TokenEndpoint", "https://appleid.apple.com/auth/token?client_secret=leak", "must not contain credentials")]
+    public void AddIdentityInfrastructure_ShouldRejectUnsafeAppleExternalAuthEndpoints(
+        string setting,
+        string endpoint,
+        string expectedMessage)
+    {
+        var services = CreateServices();
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["ExternalAuth:Apple:ClientId"] = "com.petmagic.app",
+            ["ExternalAuth:Apple:ClientSecret"] = "apple-client-secret",
+            ["ExternalAuth:Apple:AuthorizationEndpoint"] = "https://appleid.apple.com/auth/authorize",
+            ["ExternalAuth:Apple:TokenEndpoint"] = "https://appleid.apple.com/auth/token",
+            [setting] = endpoint
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => services.AddIdentityInfrastructure(configuration));
+
+        Assert.Contains(setting, exception.Message);
+        Assert.Contains(expectedMessage, exception.Message);
+    }
+
     [Fact]
     public void AddIdentityInfrastructure_ShouldRejectBootstrapAdminPassword_InProduction()
     {
@@ -354,6 +381,34 @@ public sealed class IdentityInfrastructureConfigurationTests
 
         Assert.Equal(
             "Email dispatch worker is enabled but SMTP configuration is incomplete.",
+            exception.Message);
+    }
+
+    [Fact]
+    public void AddIdentityInfrastructure_ShouldRejectSmtpWithoutTls_InProduction()
+    {
+        var environment = new TestHostEnvironment(Directory.GetCurrentDirectory())
+        {
+            EnvironmentName = Environments.Production
+        };
+        var services = CreateServices(environment);
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["BootstrapAdmin:Email"] = "",
+            ["BootstrapAdmin:Password"] = "",
+            ["Email:Host"] = "smtp.petmagic.app",
+            ["Email:Port"] = "25",
+            ["Email:UseSsl"] = "false",
+            ["Email:FromAddress"] = "no-reply@petmagic.app",
+            ["Email:Username"] = "smtp-user",
+            ["Email:Password"] = "smtp-password"
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => services.AddIdentityInfrastructure(configuration, environment));
+
+        Assert.Equal(
+            "Email:UseSsl must be enabled outside development when the email dispatch worker is enabled.",
             exception.Message);
     }
 

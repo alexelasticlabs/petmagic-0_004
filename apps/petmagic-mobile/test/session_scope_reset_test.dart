@@ -6,6 +6,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
+import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/notifications/push_token_registration_cache.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/core/startup/session_scope_reset.dart';
@@ -154,15 +155,6 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      await Future.wait([
-        container.read(petsProvider.future),
-        container.read(petPhotosProvider('pet-1').future),
-        container.read(petGenerationsProvider('pet-1').future),
-      ]);
-      expect(repository.petsFetchCount, 1);
-      expect(repository.petPhotoFetchCount, 1);
-      expect(repository.petGenerationFetchCount, 1);
-
       container.read(sessionScopeResetProvider);
       await _waitForLaunchState(
         container,
@@ -170,14 +162,39 @@ void main() {
       );
       await _flushMicrotasks();
 
-      await Future.wait([
-        container.read(petsProvider.future),
-        container.read(petPhotosProvider('pet-1').future),
-        container.read(petGenerationsProvider('pet-1').future),
-      ]);
-      expect(repository.petsFetchCount, 2);
-      expect(repository.petPhotoFetchCount, 2);
-      expect(repository.petGenerationFetchCount, 2);
+      final petsSubscription = container.listen<AsyncValue<List<PetProfile>>>(
+        petsProvider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      final photosSubscription = container.listen<AsyncValue<List<PetPhoto>>>(
+        petPhotosProvider('pet-1'),
+        (_, _) {},
+        fireImmediately: true,
+      );
+      final generationsSubscription = container
+          .listen<AsyncValue<List<TemplateGenerationResult>>>(
+            petGenerationsProvider('pet-1'),
+            (_, _) {},
+            fireImmediately: true,
+          );
+      await _flushMicrotasks();
+
+      expect(petsSubscription.read().error, _sessionExpiredExceptionMatcher());
+      expect(
+        photosSubscription.read().error,
+        _sessionExpiredExceptionMatcher(),
+      );
+      expect(
+        generationsSubscription.read().error,
+        _sessionExpiredExceptionMatcher(),
+      );
+      petsSubscription.close();
+      photosSubscription.close();
+      generationsSubscription.close();
+      expect(repository.petsFetchCount, 0);
+      expect(repository.petPhotoFetchCount, 0);
+      expect(repository.petGenerationFetchCount, 0);
     },
   );
 
@@ -197,13 +214,6 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      await Future.wait([
-        container.read(gamificationSummaryProvider.future),
-        container.read(achievementsProvider.future),
-      ]);
-      expect(repository.summaryFetchCount, 1);
-      expect(repository.achievementsFetchCount, 1);
-
       container.read(sessionScopeResetProvider);
       await _waitForLaunchState(
         container,
@@ -211,12 +221,32 @@ void main() {
       );
       await _flushMicrotasks();
 
-      await Future.wait([
-        container.read(gamificationSummaryProvider.future),
-        container.read(achievementsProvider.future),
-      ]);
-      expect(repository.summaryFetchCount, 2);
-      expect(repository.achievementsFetchCount, 2);
+      final summarySubscription = container
+          .listen<AsyncValue<GamificationSummaryModel>>(
+            gamificationSummaryProvider,
+            (_, _) {},
+            fireImmediately: true,
+          );
+      final achievementsSubscription = container
+          .listen<AsyncValue<List<AchievementModel>>>(
+            achievementsProvider,
+            (_, _) {},
+            fireImmediately: true,
+          );
+      await _flushMicrotasks();
+
+      expect(
+        summarySubscription.read().error,
+        _sessionExpiredExceptionMatcher(),
+      );
+      expect(
+        achievementsSubscription.read().error,
+        _sessionExpiredExceptionMatcher(),
+      );
+      summarySubscription.close();
+      achievementsSubscription.close();
+      expect(repository.summaryFetchCount, 0);
+      expect(repository.achievementsFetchCount, 0);
     },
   );
 
@@ -453,6 +483,14 @@ Future<void> _flushMicrotasks() async {
   for (var i = 0; i < 3; i++) {
     await Future<void>.delayed(Duration.zero);
   }
+}
+
+Matcher _sessionExpiredExceptionMatcher() {
+  return isA<AppException>().having(
+    (error) => error.message,
+    'message',
+    'auth.session_expired',
+  );
 }
 
 class _SignedOutAuthSessionStorage extends AuthSessionStorage {

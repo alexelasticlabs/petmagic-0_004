@@ -12,17 +12,13 @@ export function isAdminLocalDevelopmentHost(hostname: string): boolean {
 
 export function isLocalOrPrivateAdminRemoteHost(hostname: string): boolean {
   const normalized = normalizeHostname(hostname);
-  const isIpv6Literal = normalized.includes(":");
 
   return (
     isAdminLocalDevelopmentHost(normalized) ||
     normalized === "::" ||
     normalized === "0.0.0.0" ||
     isPrivateIpv4Host(normalized) ||
-    (isIpv6Literal &&
-      (normalized.startsWith("fc") ||
-        normalized.startsWith("fd") ||
-        normalized.startsWith("fe80:")))
+    isPrivateIpv6Host(normalized)
   );
 }
 
@@ -60,6 +56,10 @@ function isPrivateIpv4Host(hostname: string): boolean {
     return false;
   }
 
+  return isPrivateIpv4Bytes(bytes);
+}
+
+function isPrivateIpv4Bytes(bytes: readonly number[]): boolean {
   const [first, second] = bytes;
   return (
     first === 10 ||
@@ -70,4 +70,57 @@ function isPrivateIpv4Host(hostname: string): boolean {
     (first === 100 && second >= 64 && second <= 127) ||
     first >= 224
   );
+}
+
+function isPrivateIpv6Host(hostname: string): boolean {
+  if (!hostname.includes(":")) {
+    return false;
+  }
+
+  if (hostname.startsWith("fc") || hostname.startsWith("fd") || hostname.startsWith("fe80:")) {
+    return true;
+  }
+
+  const mappedIpv4Bytes = parseIpv4MappedIpv6Bytes(hostname);
+  return mappedIpv4Bytes ? isPrivateIpv4Bytes(mappedIpv4Bytes) : false;
+}
+
+function parseIpv4MappedIpv6Bytes(hostname: string): readonly number[] | null {
+  const prefix = "::ffff:";
+  if (!hostname.startsWith(prefix)) {
+    return null;
+  }
+
+  const mapped = hostname.slice(prefix.length);
+  if (mapped.includes(".")) {
+    const parts = mapped.split(".");
+    if (parts.length !== 4) {
+      return null;
+    }
+
+    const bytes = parts.map((part) => (/^\d{1,3}$/.test(part) ? Number(part) : Number.NaN));
+    return bytes.some((value) => !Number.isInteger(value) || value < 0 || value > 255)
+      ? null
+      : bytes;
+  }
+
+  const groups = mapped.split(":");
+  if (groups.length !== 2) {
+    return null;
+  }
+
+  const words = groups.map((group) => {
+    if (!/^[0-9a-f]{1,4}$/.test(group)) {
+      return Number.NaN;
+    }
+
+    return Number.parseInt(group, 16);
+  });
+
+  if (words.some((value) => !Number.isInteger(value) || value < 0 || value > 0xffff)) {
+    return null;
+  }
+
+  const [high, low] = words;
+  return [high >> 8, high & 0xff, low >> 8, low & 0xff];
 }

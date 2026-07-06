@@ -240,7 +240,9 @@ class _WalletPageState extends ConsumerState<WalletPage>
   }
 
   void _scheduleNextAutoRefresh() {
-    if (!mounted || !ref.read(networkStatusControllerProvider).hasInternet) {
+    if (!mounted ||
+        !ref.read(appLaunchControllerProvider).isAuthenticated ||
+        !ref.read(networkStatusControllerProvider).hasInternet) {
       _stopAutoRefresh();
       return;
     }
@@ -248,6 +250,11 @@ class _WalletPageState extends ConsumerState<WalletPage>
     _stopAutoRefresh();
     _autoRefreshTimer = Timer(_currentAutoRefreshInterval(), () {
       if (!mounted) {
+        return;
+      }
+
+      if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
+        _stopAutoRefresh();
         return;
       }
 
@@ -288,6 +295,13 @@ class _WalletPageState extends ConsumerState<WalletPage>
   }
 
   Future<void> _refreshVisibleWalletData({bool forceRefresh = false}) async {
+    if (!mounted ||
+        !ref.read(appLaunchControllerProvider).isAuthenticated ||
+        !ref.read(networkStatusControllerProvider).hasInternet) {
+      _stopAutoRefresh();
+      return;
+    }
+
     final controller = ref.read(walletControllerProvider.notifier);
     final state = ref.read(walletControllerProvider);
     // Background refresh only needs the lightweight balance snapshot once the

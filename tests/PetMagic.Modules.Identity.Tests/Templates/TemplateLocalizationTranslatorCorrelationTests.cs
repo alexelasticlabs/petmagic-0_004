@@ -31,9 +31,13 @@ public sealed class TemplateLocalizationTranslatorCorrelationTests
         Assert.Single(recordingHandler.Requests);
         Assert.All(recordingHandler.Requests, request =>
         {
+            Assert.Equal(HttpMethod.Post, request.Method);
             Assert.Equal("translate.googleapis.com", request.RequestUri?.Host);
-            Assert.True(request.Headers.TryGetValues(CorrelationContext.HeaderName, out var values));
+            Assert.Equal("/translate_a/single", request.RequestUri?.AbsolutePath);
+            Assert.DoesNotContain("q=", request.RequestUri?.Query ?? string.Empty, StringComparison.Ordinal);
+            Assert.True(request.Headers.TryGetValue(CorrelationContext.HeaderName, out var values));
             Assert.Equal("template-localization-correlation-test", Assert.Single(values));
+            Assert.Contains("q=Cozy+Portrait", request.Body, StringComparison.Ordinal);
         });
     }
 
@@ -52,42 +56,55 @@ public sealed class TemplateLocalizationTranslatorCorrelationTests
 
     private sealed class RecordingHandler : HttpMessageHandler
     {
-        public List<HttpRequestMessage> Requests { get; } = [];
+        public List<RecordedRequest> Requests { get; } = [];
 
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            Requests.Add(CloneRequest(request));
-            var translatedPayload = ExtractQueryValue(request.RequestUri, "q");
-            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            var body = request.Content is null
+                ? string.Empty
+                : await request.Content.ReadAsStringAsync(cancellationToken);
+            Requests.Add(CloneRequest(request, body));
+            var translatedPayload = ExtractFormValue(body, "q");
+            return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
             {
                 Content = new StringContent($"""[[["{translatedPayload}","source",null,null,3]]]""")
-            });
+            };
         }
 
-        private static HttpRequestMessage CloneRequest(HttpRequestMessage request)
+        private static RecordedRequest CloneRequest(HttpRequestMessage request, string body)
         {
-            var clone = new HttpRequestMessage(request.Method, request.RequestUri);
+            var clone = new RecordedRequest(request.Method, request.RequestUri, body);
             foreach (var header in request.Headers)
             {
-                clone.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                clone.Headers[header.Key] = header.Value.ToArray();
             }
 
             return clone;
         }
 
-        private static string ExtractQueryValue(Uri? requestUri, string key)
+        private static string ExtractFormValue(string body, string key)
         {
-            var query = requestUri?.Query ?? string.Empty;
-            foreach (var segment in query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
+            foreach (var segment in body.Split('&', StringSplitOptions.RemoveEmptyEntries))
             {
                 var parts = segment.Split('=', 2);
                 if (parts.Length == 2 && string.Equals(parts[0], key, StringComparison.Ordinal))
                 {
-                    return Uri.UnescapeDataString(parts[1]);
+                    return Uri.UnescapeDataString(parts[1].Replace('+', ' '));
                 }
             }
 
             return "translated";
         }
+    }
+
+    private sealed class RecordedRequest(HttpMethod method, Uri? requestUri, string body)
+    {
+        public HttpMethod Method { get; } = method;
+
+        public Uri? RequestUri { get; } = requestUri;
+
+        public string Body { get; } = body;
+
+        public Dictionary<string, string[]> Headers { get; } = new(StringComparer.OrdinalIgnoreCase);
     }
 }

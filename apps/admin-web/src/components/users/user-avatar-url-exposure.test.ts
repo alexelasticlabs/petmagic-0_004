@@ -71,6 +71,8 @@ describe("user avatar URL exposure", () => {
     expect(resolveUserMediaUrl("https://10.0.0.5/avatar.jpg")).toBeNull();
     expect(resolveUserMediaUrl("https://169.254.169.254/avatar.jpg")).toBeNull();
     expect(resolveUserMediaUrl("https://[::]/avatar.jpg")).toBeNull();
+    expect(resolveUserMediaUrl("https://[::ffff:127.0.0.1]/avatar.jpg")).toBeNull();
+    expect(resolveUserMediaUrl("https://[::ffff:10.0.0.5]/avatar.jpg")).toBeNull();
     expect(resolveUserMediaUrl("https://[fd00::1]/avatar.jpg")).toBeNull();
     expect(resolveUserMediaUrl("https://cdn.example.com/avatar.jpg")).toBeNull();
   });

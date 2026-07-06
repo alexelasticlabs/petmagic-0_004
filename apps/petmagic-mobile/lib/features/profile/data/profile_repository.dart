@@ -12,6 +12,7 @@ import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
 import 'package:petmagic_mobile/core/network/authenticated_request_options.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/shared/files/image_upload_optimizer.dart';
@@ -48,6 +49,12 @@ final currentLegalDocumentsProvider =
 
 final linkedAccountsProvider =
     FutureProvider.autoDispose<List<MobileLinkedAccount>>((ref) {
+      if (!ref.watch(
+        appLaunchControllerProvider.select((state) => state.isAuthenticated),
+      )) {
+        throw const AppException('auth.session_expired');
+      }
+
       if (!ref.read(networkStatusControllerProvider).hasInternet) {
         throw const AppException('templates.network_unavailable');
       }

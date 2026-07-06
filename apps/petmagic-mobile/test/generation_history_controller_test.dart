@@ -44,6 +44,90 @@ void main() {
   );
 
   test(
+    'generation history controller stops realtime and private requests after sign out',
+    () async {
+      final ready = generationFixture(
+        generationId: 'generation-ready',
+        status: TemplateGenerationStatus.completed,
+      );
+      final repository = FakeTemplateGenerationRepository(
+        remoteByStatus: {
+          null: [ready],
+        },
+      );
+      final realtimeClient = FakeRealtimeClient();
+      final harness = GenerationHistoryControllerHarness(
+        repository: repository,
+        realtimeClient: realtimeClient,
+      );
+      addTearDown(harness.dispose);
+
+      final controller = harness.controller;
+
+      controller.setScreenVisible(true);
+      await controller.load();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(repository.fetchPageCalls, hasLength(1));
+      expect(realtimeClient.connectCalls, 1);
+
+      harness.appLaunchController.setAuthenticated(false);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(realtimeClient.disconnectCalls, 1);
+      expect(harness.state.items, isEmpty);
+
+      await controller.load(refresh: true);
+      await controller.loadMore();
+      await controller.markRead('generation-ready');
+      await controller.deleteGeneration('generation-ready');
+
+      expect(
+        repository.fetchPageCalls,
+        hasLength(1),
+        reason: 'history refresh must not call private API after sign out',
+      );
+      expect(repository.markReadCalls, isEmpty);
+      expect(repository.deleteGenerationCalls, isEmpty);
+      expect(realtimeClient.connectCalls, 1);
+    },
+  );
+
+  test(
+    'generation history controller stays idle for explicit unauthenticated app state',
+    () async {
+      final repository = FakeTemplateGenerationRepository(
+        remoteByStatus: {
+          null: [
+            generationFixture(
+              generationId: 'generation-ready',
+              status: TemplateGenerationStatus.completed,
+            ),
+          ],
+        },
+      );
+      final harness = GenerationHistoryControllerHarness(
+        repository: repository,
+        authenticated: false,
+      );
+      addTearDown(harness.dispose);
+
+      final controller = harness.controller;
+
+      controller.setScreenVisible(true);
+      await controller.load();
+      await controller.refreshUnreadCount();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(repository.fetchPageCalls, isEmpty);
+      expect(repository.fetchUnreadCountCalls, 0);
+      expect(harness.store.cleanupCurrentAccountArtifactsCalls, 0);
+      expect(harness.realtimeClient.connectCalls, 0);
+      expect(harness.state.isLoading, isFalse);
+    },
+  );
+
+  test(
     'loads remote history by filter and reuses in-memory filter cache',
     () async {
       final active = generationFixture(

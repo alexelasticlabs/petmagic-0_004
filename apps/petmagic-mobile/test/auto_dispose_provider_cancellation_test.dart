@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_repository.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
@@ -19,6 +20,9 @@ void main() {
       final repository = _CancellablePremiumStatusRepository();
       final container = ProviderContainer(
         overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedAppLaunchController.new,
+          ),
           premiumRepositoryProvider.overrideWithValue(repository),
           networkStatusControllerProvider.overrideWith(
             () => _TestNetworkStatusController(initialHasInternet: true),
@@ -43,6 +47,9 @@ void main() {
       final repository = _CountingPremiumStatusRepository();
       final container = ProviderContainer(
         overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedAppLaunchController.new,
+          ),
           premiumRepositoryProvider.overrideWithValue(repository),
           networkStatusControllerProvider.overrideWith(
             () => _TestNetworkStatusController(initialHasInternet: true),
@@ -68,10 +75,51 @@ void main() {
     },
   );
 
+  test(
+    'premium subscription summary skips private status fetch after sign out',
+    () async {
+      final repository = _CountingPremiumStatusRepository();
+      final container = ProviderContainer(
+        overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _UnauthenticatedAppLaunchController.new,
+          ),
+          premiumRepositoryProvider.overrideWithValue(repository),
+          networkStatusControllerProvider.overrideWith(
+            () => _TestNetworkStatusController(initialHasInternet: true),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final subscription = container
+          .listen<AsyncValue<PremiumSubscriptionSummaryView>>(
+            premiumSubscriptionSummaryProvider,
+            (_, _) {},
+            fireImmediately: true,
+          );
+      addTearDown(subscription.close);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        subscription.read().error,
+        isA<AppException>().having(
+          (error) => error.message,
+          'message',
+          'auth.session_expired',
+        ),
+      );
+      expect(repository.fetchStatusCalls, 0);
+    },
+  );
+
   test('linked accounts provider cancels request on dispose', () async {
     final repository = _CancellableProfileProviderRepository();
     final container = ProviderContainer(
       overrides: [
+        appLaunchControllerProvider.overrideWith(
+          _AuthenticatedAppLaunchController.new,
+        ),
         profileRepositoryProvider.overrideWithValue(repository),
         networkStatusControllerProvider.overrideWith(
           () => _TestNetworkStatusController(initialHasInternet: true),
@@ -95,6 +143,9 @@ void main() {
       final repository = _CountingProfileProviderRepository();
       final container = ProviderContainer(
         overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedAppLaunchController.new,
+          ),
           profileRepositoryProvider.overrideWithValue(repository),
           networkStatusControllerProvider.overrideWith(
             () => _TestNetworkStatusController(initialHasInternet: true),
@@ -119,6 +170,41 @@ void main() {
       expect(repository.linkedAccountsFetchCount, 1);
     },
   );
+
+  test('linked accounts provider skips private fetch after sign out', () async {
+    final repository = _CountingProfileProviderRepository();
+    final container = ProviderContainer(
+      overrides: [
+        appLaunchControllerProvider.overrideWith(
+          _UnauthenticatedAppLaunchController.new,
+        ),
+        profileRepositoryProvider.overrideWithValue(repository),
+        networkStatusControllerProvider.overrideWith(
+          () => _TestNetworkStatusController(initialHasInternet: true),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final subscription = container
+        .listen<AsyncValue<List<MobileLinkedAccount>>>(
+          linkedAccountsProvider,
+          (_, _) {},
+          fireImmediately: true,
+        );
+    addTearDown(subscription.close);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(
+      subscription.read().error,
+      isA<AppException>().having(
+        (error) => error.message,
+        'message',
+        'auth.session_expired',
+      ),
+    );
+    expect(repository.linkedAccountsFetchCount, 0);
+  });
 
   test('current legal documents provider cancels request on dispose', () async {
     final repository = _CancellableProfileProviderRepository();
@@ -245,5 +331,31 @@ class _TestNetworkStatusController extends NetworkStatusController {
   @override
   NetworkStatusState build() {
     return NetworkStatusState(hasInternet: initialHasInternet);
+  }
+}
+
+class _AuthenticatedAppLaunchController extends AppLaunchController {
+  @override
+  AppLaunchState build() {
+    return const AppLaunchState(
+      isLoading: false,
+      isAuthenticated: true,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: true,
+    );
+  }
+}
+
+class _UnauthenticatedAppLaunchController extends AppLaunchController {
+  @override
+  AppLaunchState build() {
+    return const AppLaunchState(
+      isLoading: false,
+      isAuthenticated: false,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: true,
+    );
   }
 }

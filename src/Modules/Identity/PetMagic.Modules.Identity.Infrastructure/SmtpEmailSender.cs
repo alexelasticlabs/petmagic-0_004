@@ -76,9 +76,9 @@ internal sealed class SmtpEmailSender(EmailOptions options, ILogger<SmtpEmailSen
             return SecureSocketOptions.None;
         }
 
-        // Auto supports STARTTLS and implicit TLS without forcing the repo to
-        // encode provider-specific transport behavior in config.
-        return SecureSocketOptions.Auto;
+        return options.Port == 465
+            ? SecureSocketOptions.SslOnConnect
+            : SecureSocketOptions.StartTls;
     }
 
     private static string StripHtml(string html)

@@ -127,6 +127,12 @@ class PremiumSubscriptionSummaryView {
 
 final premiumSubscriptionSummaryProvider =
     FutureProvider.autoDispose<PremiumSubscriptionSummaryView>((ref) async {
+      if (!ref.watch(
+        appLaunchControllerProvider.select((state) => state.isAuthenticated),
+      )) {
+        throw const AppException('auth.session_expired');
+      }
+
       if (!ref.read(networkStatusControllerProvider).hasInternet) {
         throw const AppException('templates.network_unavailable');
       }

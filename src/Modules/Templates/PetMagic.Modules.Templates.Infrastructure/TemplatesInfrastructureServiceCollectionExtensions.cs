@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
+using PetMagic.BuildingBlocks.Security;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
@@ -81,6 +82,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
                 "it",
                 "pl"
             ]),
+            LocalizationBackfillEnabled = ParseBool(section["LocalizationBackfillEnabled"], false),
             PreviewMaxFileSizeBytes = ParseLong(section["PreviewMaxFileSizeBytes"], 25 * 1024 * 1024),
             ReferenceMotionMaxFileSizeBytes = ParseLong(section["ReferenceMotionMaxFileSizeBytes"], 100 * 1024 * 1024),
             SeedSampleTemplates = ParseBool(section["SeedSampleTemplates"], false),
@@ -238,12 +240,24 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             {
                 AllowAutoRedirect = false
             });
-        services.AddHttpClient(FalProviderHealthService.HttpClientName, ConfigureExternalHttpClient);
+        services.AddHttpClient(FalProviderHealthService.HttpClientName, ConfigureExternalHttpClient)
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                AllowAutoRedirect = false
+            });
         services.AddScoped<ITemplateAiProviderHealthService, FalProviderHealthService>();
         services.AddScoped<ITemplatePushTokenService, TemplatePushTokenService>();
-        services.AddHttpClient(TemplateLocalizationTranslator.HttpClientName, ConfigureExternalHttpClient);
+        services.AddHttpClient(TemplateLocalizationTranslator.HttpClientName, ConfigureExternalHttpClient)
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                AllowAutoRedirect = false
+            });
         services.AddScoped<NoopTemplateGenerationPushNotificationSender>();
-        services.AddHttpClient<FcmTemplateGenerationPushNotificationSender>(ConfigureExternalHttpClient);
+        services.AddHttpClient<FcmTemplateGenerationPushNotificationSender>(ConfigureExternalHttpClient)
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                AllowAutoRedirect = false
+            });
         services.AddScoped<ITemplateGenerationPushNotificationSender>(serviceProvider =>
         {
             var pushOptions = serviceProvider.GetRequiredService<TemplatesOptions>().FirebasePush;
@@ -382,6 +396,11 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         IHttpClientFactory httpClientFactory,
         CancellationToken cancellationToken)
     {
+        if (!options.LocalizationBackfillEnabled)
+        {
+            return;
+        }
+
         var templates = await dbContext.TemplateItems
             .Where(template => template.DeletedAtUtc == null && string.IsNullOrWhiteSpace(template.LocalizedTextsJson))
             .ToArrayAsync(cancellationToken);
@@ -471,7 +490,11 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             }
 
             services.AddHttpClient(FalQueueClient.HttpClientName, client =>
-                client.Timeout = TimeSpan.FromSeconds(Math.Max(30, options.Fal.StartTimeoutSeconds + 30)));
+                client.Timeout = TimeSpan.FromSeconds(Math.Max(30, options.Fal.StartTimeoutSeconds + 30)))
+                .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+                {
+                    AllowAutoRedirect = false
+                });
             services.AddScoped<FalQueueClient>();
             services.AddScoped<IImagePreprocessor, FalImagePreprocessor>();
             services.AddScoped<IImageGenerator, FalImageGenerator>();
@@ -589,6 +612,23 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         if (IsProvider(options.AiProvider, TemplateAiProviders.Fal))
         {
             ValidateProductionPublicBaseUrl(options.Fal.QueueBaseUrl, "Templates:Fal:QueueBaseUrl");
+            if (!string.IsNullOrWhiteSpace(options.Fal.WebhookUrl))
+            {
+                ValidateProductionPublicBaseUrl(options.Fal.WebhookUrl, "Templates:Fal:WebhookUrl");
+            }
+        }
+
+        if (options.FirebasePush.Enabled && !options.FirebasePush.IsConfigured)
+        {
+            throw new InvalidOperationException(
+                "Templates Firebase push is enabled but Firebase project id or service account configuration is missing.");
+        }
+
+        if (options.FirebasePush.Enabled
+            && !FirebaseProjectIdPolicy.IsSafeProjectId(options.FirebasePush.ProjectId))
+        {
+            throw new InvalidOperationException(
+                "Templates:FirebasePush:ProjectId must be a Firebase project id, not a URL or path, in Production.");
         }
 
         if (!services.Any(descriptor => descriptor.ServiceType == typeof(IEconomyService)))

@@ -33,6 +33,7 @@ public sealed class TemplatesInfrastructureConfigurationTests
         Assert.Equal(TemplateAiProviders.Fake, options.AiProvider);
         Assert.Equal(string.Empty, options.PublicBaseUrl);
         Assert.False(options.SeedSampleTemplates);
+        Assert.False(options.LocalizationBackfillEnabled);
         Assert.True(options.GenerationWorkerEnabled);
         Assert.Equal(1_000, options.GenerationWorkerPollIntervalMilliseconds);
         Assert.Equal(1_000, options.RealtimePollingIntervalMilliseconds);
@@ -97,6 +98,38 @@ public sealed class TemplatesInfrastructureConfigurationTests
         Assert.Equal("FakeGeneratedMediaImporter", generatedMediaImporter.GetType().Name);
         Assert.Contains(hostedServices, service => service.GetType().Name == "TemplateGenerationWorker");
         Assert.Contains(hostedServices, service => service.GetType().Name == "TemplateMediaCleanupWorker");
+    }
+
+    [Fact]
+    public void AddTemplatesInfrastructure_ShouldUseExplicitLocalizationBackfillFlag()
+    {
+        var services = CreateServices();
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["Templates:LocalizationBackfillEnabled"] = "true"
+        });
+
+        services.AddTemplatesInfrastructure(configuration);
+
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<TemplatesOptions>();
+
+        Assert.True(options.LocalizationBackfillEnabled);
+    }
+
+    [Fact]
+    public void EnsureTemplatesSeedDataAsync_ShouldNotBackfillLocalizationsUnlessExplicitlyEnabled()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Infrastructure",
+            "TemplatesInfrastructureServiceCollectionExtensions.cs"));
+
+        Assert.Contains("if (!options.LocalizationBackfillEnabled)", source, StringComparison.Ordinal);
+        Assert.Contains("BackfillTemplateLocalizationsAsync(dbContext, options, httpClientFactory", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -337,8 +370,8 @@ public sealed class TemplatesInfrastructureConfigurationTests
         Assert.Contains("HttpGeneratedMediaImporter.HttpClientName", source, StringComparison.Ordinal);
         Assert.Contains(".ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler", source, StringComparison.Ordinal);
         Assert.True(
-            source.Split("AllowAutoRedirect = false", StringSplitOptions.None).Length >= 3,
-            "Template content health and generated media import HTTP clients must both disable automatic redirects.");
+            source.Split("AllowAutoRedirect = false", StringSplitOptions.None).Length >= 7,
+            "Template media, FCM, Fal, and localization HTTP clients must disable automatic redirects.");
     }
 
     [Fact]
@@ -348,16 +381,20 @@ public sealed class TemplatesInfrastructureConfigurationTests
         var policySource = File.ReadAllText(Path.Combine(
             root,
             "src",
-            "Modules",
-            "Templates",
-            "PetMagic.Modules.Templates.Infrastructure",
+            "BuildingBlocks",
+            "PetMagic.BuildingBlocks",
+            "Security",
             "SafeNetworkTargetPolicy.cs"));
 
         Assert.Contains("IsPrivateNetworkTarget", policySource, StringComparison.Ordinal);
         Assert.Contains("IsPrivateNetworkAddress", policySource, StringComparison.Ordinal);
+        Assert.Contains("IsIPv6UniqueLocalAddress", policySource, StringComparison.Ordinal);
 
         foreach (var relativePath in new[]
         {
+            Path.Combine("src", "Host", "PetMagic.Host.Api", "Security", "HostApiProductionConfigurationValidator.cs"),
+            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Api", "FalWebhookSignatureVerifier.cs"),
+            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "TemplatesInfrastructureServiceCollectionExtensions.cs"),
             Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "TemplateContentHealthCheck.cs"),
             Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "HttpGeneratedMediaImporter.cs")
         })
@@ -404,7 +441,9 @@ public sealed class TemplatesInfrastructureConfigurationTests
             "FalWebhookSignatureVerifier.cs"));
 
         Assert.Contains("JwksUrl={JwksUrl}", source, StringComparison.Ordinal);
-        Assert.Contains("SafeLogValues.SanitizeText(jwksUrl)", source, StringComparison.Ordinal);
+        Assert.Contains("SafeJwksUrlLogValue(jwksUrl)", source, StringComparison.Ordinal);
+        Assert.Contains("uri.Scheme}://{host}{port}/***", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("SafeLogValues.SanitizeText(jwksUrl)", source, StringComparison.Ordinal);
         Assert.DoesNotContain("JwksUrl={jwksUrl}", source, StringComparison.Ordinal);
     }
 
@@ -936,6 +975,77 @@ public sealed class TemplatesInfrastructureConfigurationTests
         Assert.Contains("Templates:Fal:QueueBaseUrl", exception.Message);
     }
 
+    [Theory]
+    [InlineData("http://api.petmagic.app/api/templates/webhooks/fal")]
+    [InlineData("https://localhost:5000/api/templates/webhooks/fal")]
+    [InlineData("https://10.0.0.5/api/templates/webhooks/fal")]
+    [InlineData("https://169.254.169.254/api/templates/webhooks/fal")]
+    [InlineData("https://user:secret@api.petmagic.app/api/templates/webhooks/fal")]
+    [InlineData("https://api.petmagic.app/api/templates/webhooks/fal?token=secret")]
+    [InlineData("https://api.petmagic.app/api/templates/webhooks/fal#secret")]
+    public void AddTemplatesInfrastructure_ShouldRejectUnsafeFalWebhookUrl_InProduction(string webhookUrl)
+    {
+        var services = CreateServices();
+        services.AddScoped<IEconomyService>(_ => throw new NotSupportedException("Test stub"));
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["Templates:PublicBaseUrl"] = "https://cdn.petmagic.app/templates",
+            ["Templates:StorageProvider"] = TemplateStorageProviders.R2,
+            ["Templates:AiProvider"] = TemplateAiProviders.Fal,
+            ["Templates:R2:AccountId"] = "test-account",
+            ["Templates:R2:AccessKey"] = "test-access-key",
+            ["Templates:R2:SecretKey"] = "test-secret-key",
+            ["Templates:R2:BucketName"] = "petmagic-test",
+            ["Templates:R2:PublicBaseUrl"] = "https://cdn.petmagic.app/r2",
+            ["Templates:Fal:ApiKey"] = "test-fal-key",
+            ["Templates:Fal:QueueBaseUrl"] = "https://queue.fal.run",
+            ["Templates:Fal:WebhookUrl"] = webhookUrl
+        });
+        var environment = new TestHostEnvironment(Directory.GetCurrentDirectory())
+        {
+            EnvironmentName = Environments.Production
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(() => services.AddTemplatesInfrastructure(configuration, environment));
+
+        Assert.Contains("Templates:Fal:WebhookUrl", exception.Message);
+    }
+
+    [Theory]
+    [InlineData("https://fcm.googleapis.com/v1/projects/petmagic")]
+    [InlineData("petmagic/production")]
+    [InlineData("petmagic@example")]
+    [InlineData("petmagic production")]
+    public void AddTemplatesInfrastructure_ShouldRejectUnsafeFirebaseProjectId_InProduction(string projectId)
+    {
+        var services = CreateServices();
+        services.AddScoped<IEconomyService>(_ => throw new NotSupportedException("Test stub"));
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["Templates:PublicBaseUrl"] = "https://cdn.petmagic.app/templates",
+            ["Templates:StorageProvider"] = TemplateStorageProviders.R2,
+            ["Templates:AiProvider"] = TemplateAiProviders.Fal,
+            ["Templates:R2:AccountId"] = "test-account",
+            ["Templates:R2:AccessKey"] = "test-access-key",
+            ["Templates:R2:SecretKey"] = "test-secret-key",
+            ["Templates:R2:BucketName"] = "petmagic-test",
+            ["Templates:R2:PublicBaseUrl"] = "https://cdn.petmagic.app/r2",
+            ["Templates:Fal:ApiKey"] = "test-fal-key",
+            ["Templates:Fal:QueueBaseUrl"] = "https://queue.fal.run",
+            ["Templates:FirebasePush:Enabled"] = "true",
+            ["Templates:FirebasePush:ProjectId"] = projectId,
+            ["Templates:FirebasePush:ServiceAccountJson"] = """{"type":"service_account"}"""
+        });
+        var environment = new TestHostEnvironment(Directory.GetCurrentDirectory())
+        {
+            EnvironmentName = Environments.Production
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(() => services.AddTemplatesInfrastructure(configuration, environment));
+
+        Assert.Contains("Templates:FirebasePush:ProjectId", exception.Message);
+    }
+
     [Fact]
     public void AddTemplatesInfrastructure_ShouldAllowHttpsPublicBaseUrls_InProduction()
     {
@@ -951,7 +1061,11 @@ public sealed class TemplatesInfrastructureConfigurationTests
             ["Templates:R2:SecretKey"] = "test-secret-key",
             ["Templates:R2:BucketName"] = "petmagic-test",
             ["Templates:R2:PublicBaseUrl"] = "https://cdn.petmagic.app/r2",
-            ["Templates:Fal:ApiKey"] = "test-fal-key"
+            ["Templates:Fal:ApiKey"] = "test-fal-key",
+            ["Templates:Fal:WebhookUrl"] = "https://api.petmagic.app/api/templates/webhooks/fal",
+            ["Templates:FirebasePush:Enabled"] = "true",
+            ["Templates:FirebasePush:ProjectId"] = "petmagic-prod-123",
+            ["Templates:FirebasePush:ServiceAccountJson"] = """{"type":"service_account"}"""
         });
         var environment = new TestHostEnvironment(Directory.GetCurrentDirectory())
         {

@@ -3,6 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 
 import { DownloadIcon, ImageIcon, PlayCircleIcon } from "@/components/admin/admin-icons";
+import {
+  getBlockedUnsafeTemplateMediaUrlDetails,
+  isUnsafeTemplateMediaUrl,
+} from "@/components/templates/template-secure-media";
 import { getTemplateTestErrorDetails } from "@/components/templates/template-test-page.helpers";
 import styles from "@/components/templates/template-test-page.module.css";
 import { clientLogger } from "@/lib/client-logger";
@@ -41,6 +45,15 @@ export function TemplateTestMediaActions({
     signal: AbortSignal
   ): Promise<Blob | null> {
     if (!previewUrl) {
+      return null;
+    }
+
+    if (isUnsafeTemplateMediaUrl(previewUrl)) {
+      clientLogger.warn("templates.media_preview_fetch_blocked", {
+        action,
+        mediaType,
+        ...getBlockedUnsafeTemplateMediaUrlDetails(previewUrl),
+      });
       return null;
     }
 

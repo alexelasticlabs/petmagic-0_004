@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
+using PetMagic.BuildingBlocks.Security;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Infrastructure.Data;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
@@ -141,7 +142,11 @@ public static class EconomyInfrastructureServiceCollectionExtensions
         services.AddSingleton<IStoreWebhookSecurityValidator, StoreWebhookSecurityValidator>();
         services.AddHttpClient(StripePaymentGateway.HttpClientName, ConfigureExternalHttpClient);
         services.AddHttpClient(StoreSubscriptionVerifier.HttpClientName, ConfigureExternalHttpClient);
-        services.AddHttpClient(FcmEconomyPushNotificationSender.HttpClientName, ConfigureExternalHttpClient);
+        services.AddHttpClient(FcmEconomyPushNotificationSender.HttpClientName, ConfigureExternalHttpClient)
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                AllowAutoRedirect = false
+            });
         services.AddSingleton<IPaymentGateway>(serviceProvider =>
             new StripePaymentGateway(
                 economyOptions,
@@ -236,6 +241,19 @@ public static class EconomyInfrastructureServiceCollectionExtensions
             throw new InvalidOperationException("Stripe webhook secret must use the whsec_ prefix in Production.");
         }
 
+        ValidateProductionStripeRedirectUrl(
+            options.StripeCheckoutSuccessUrl,
+            "Economy:StripeCheckoutSuccessUrl",
+            allowCheckoutSessionPlaceholder: true);
+        ValidateProductionStripeRedirectUrl(
+            options.StripeCheckoutCancelUrl,
+            "Economy:StripeCheckoutCancelUrl",
+            allowCheckoutSessionPlaceholder: false);
+        ValidateProductionStripeRedirectUrl(
+            options.StripeBillingPortalReturnUrl,
+            "Economy:StripeBillingPortalReturnUrl",
+            allowCheckoutSessionPlaceholder: false);
+
         RequireProductionSecret(options.AppStoreSharedSecret, "App Store shared secret", "APP_STORE_SHARED_SECRET");
         RequireProductionSecret(options.AppStoreBundleId, "App Store bundle id", "Economy:AppStoreBundleId");
 
@@ -244,6 +262,8 @@ public static class EconomyInfrastructureServiceCollectionExtensions
         RequireProductionSecret(options.GooglePlayPrivateKeyPem, "Google Play private key", "GOOGLE_PLAY_PRIVATE_KEY_PEM");
         RequireProductionSecret(options.GooglePlayPubSubAudience, "Google Play Pub/Sub audience", "GOOGLE_PLAY_PUBSUB_AUDIENCE");
         RequireProductionSecret(options.GooglePlayPubSubExpectedEmail, "Google Play Pub/Sub expected email", "GOOGLE_PLAY_PUBSUB_EXPECTED_EMAIL");
+        ValidateProductionPublicHttpsUrl(options.GooglePlayPubSubAudience, "Economy:GooglePlayPubSubAudience");
+        ValidateProductionEmailAddress(options.GooglePlayPubSubExpectedEmail, "Economy:GooglePlayPubSubExpectedEmail");
 
         if (!options.GooglePlayPrivateKeyPem.Contains("BEGIN PRIVATE KEY", StringComparison.Ordinal))
         {
@@ -258,6 +278,99 @@ public static class EconomyInfrastructureServiceCollectionExtensions
         if (options.FirebasePushEnabled)
         {
             RequireProductionSecret(options.FirebaseProjectId, "Firebase project id", "ECONOMY_FIREBASE_PROJECT_ID or FIREBASE_PROJECT_ID");
+            ValidateProductionFirebaseProjectId(options.FirebaseProjectId, "Economy:FirebaseProjectId");
+        }
+    }
+
+    private static void ValidateProductionStripeRedirectUrl(
+        string? redirectUrl,
+        string settingName,
+        bool allowCheckoutSessionPlaceholder)
+    {
+        if (string.IsNullOrWhiteSpace(redirectUrl))
+        {
+            throw new InvalidOperationException($"{settingName} must be configured in Production.");
+        }
+
+        if (!Uri.TryCreate(redirectUrl, UriKind.Absolute, out var uri))
+        {
+            throw new InvalidOperationException($"{settingName} must be an absolute HTTPS URL in Production.");
+        }
+
+        if (!string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"{settingName} must use HTTPS in Production.");
+        }
+
+        if (!string.IsNullOrEmpty(uri.UserInfo) || !string.IsNullOrEmpty(uri.Fragment))
+        {
+            throw new InvalidOperationException($"{settingName} must not contain credentials or fragments in Production.");
+        }
+
+        if (!allowCheckoutSessionPlaceholder && !string.IsNullOrEmpty(uri.Query))
+        {
+            throw new InvalidOperationException($"{settingName} must not contain query strings in Production.");
+        }
+
+        var decodedQuery = Uri.UnescapeDataString(uri.Query);
+        if (allowCheckoutSessionPlaceholder
+            && !string.Equals(decodedQuery, "?session_id={CHECKOUT_SESSION_ID}", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException($"{settingName} must contain only session_id={{CHECKOUT_SESSION_ID}} as the query string in Production.");
+        }
+
+        if (SafeNetworkTargetPolicy.IsPrivateNetworkTarget(uri))
+        {
+            throw new InvalidOperationException($"{settingName} must not point to a local or private network host in Production.");
+        }
+    }
+
+    private static void ValidateProductionPublicHttpsUrl(string value, string settingName)
+    {
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri))
+        {
+            throw new InvalidOperationException($"{settingName} must be an absolute HTTPS URL in Production.");
+        }
+
+        if (!string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"{settingName} must use HTTPS in Production.");
+        }
+
+        if (!string.IsNullOrEmpty(uri.UserInfo)
+            || !string.IsNullOrEmpty(uri.Query)
+            || !string.IsNullOrEmpty(uri.Fragment))
+        {
+            throw new InvalidOperationException($"{settingName} must not contain credentials, query strings, or fragments in Production.");
+        }
+
+        if (SafeNetworkTargetPolicy.IsPrivateNetworkTarget(uri))
+        {
+            throw new InvalidOperationException($"{settingName} must not point to a local or private network host in Production.");
+        }
+    }
+
+    private static void ValidateProductionEmailAddress(string value, string settingName)
+    {
+        try
+        {
+            var parsed = new System.Net.Mail.MailAddress(value);
+            if (!string.Equals(parsed.Address, value.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                throw new FormatException();
+            }
+        }
+        catch (FormatException)
+        {
+            throw new InvalidOperationException($"{settingName} must be a valid email address in Production.");
+        }
+    }
+
+    private static void ValidateProductionFirebaseProjectId(string value, string settingName)
+    {
+        if (!FirebaseProjectIdPolicy.IsSafeProjectId(value))
+        {
+            throw new InvalidOperationException($"{settingName} must be a Firebase project id, not a URL or path, in Production.");
         }
     }
 

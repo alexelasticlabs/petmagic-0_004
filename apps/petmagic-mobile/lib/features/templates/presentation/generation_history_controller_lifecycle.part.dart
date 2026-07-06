@@ -11,6 +11,11 @@ mixin _GenerationHistoryControllerLifecycle
     }
 
     _isScreenVisible = visible;
+    if (!_isAuthenticated) {
+      _stopPrivateGenerationActivity(clearPrivateState: false);
+      return;
+    }
+
     if (visible) {
       _scheduleLocalArtifactCleanup();
       if (!_hasInternet) {
@@ -33,6 +38,51 @@ mixin _GenerationHistoryControllerLifecycle
     _pauseRealtime();
   }
 
+  void _handleAuthStatusChanged(bool isAuthenticated) {
+    if (_isAuthenticated == isAuthenticated) {
+      return;
+    }
+
+    _isAuthenticated = isAuthenticated;
+    if (!isAuthenticated) {
+      _stopPrivateGenerationActivity();
+      return;
+    }
+
+    if (_isScreenVisible && _hasInternet) {
+      _startAutoRefresh();
+      unawaited(_resumeRealtimeIfNeeded());
+    }
+  }
+
+  void _stopPrivateGenerationActivity({bool clearPrivateState = true}) {
+    _stopAutoRefresh();
+    _cancelActiveLoad(
+      'generation_history_signed_out',
+      clearPending: true,
+      clearLoadingState: false,
+    );
+    _cancelActiveLoadMore('generation_history_signed_out');
+    _cancelActiveUnreadRefresh('generation_history_signed_out');
+    _cancelActiveRealtimeRefetches('generation_history_signed_out');
+    unawaited(_galleryStore.cancelActiveDownloads());
+    _pauseRealtime();
+    _offlineBannerTimer?.cancel();
+    _offlineBannerTimer = null;
+    _isLoadInFlight = false;
+    _isLoadMoreInFlight = false;
+    _pendingLoadRequest = null;
+    final pendingCompleter = _pendingLoadCompleter;
+    _pendingLoadCompleter = null;
+    if (pendingCompleter != null && !pendingCompleter.isCompleted) {
+      pendingCompleter.complete();
+    }
+
+    if (clearPrivateState && ref.mounted) {
+      state = const GenerationHistoryState();
+    }
+  }
+
   void _handleNetworkStatusChanged(bool hasInternet) {
     if (_hasInternet == hasInternet) {
       return;
@@ -48,7 +98,7 @@ mixin _GenerationHistoryControllerLifecycle
       return;
     }
 
-    if (!_isScreenVisible) {
+    if (!_isScreenVisible || !_isAuthenticated) {
       return;
     }
 
@@ -208,7 +258,10 @@ mixin _GenerationHistoryControllerLifecycle
 
   void _scheduleNextAutoRefresh() {
     _autoRefreshTimer?.cancel();
-    if (!ref.mounted || !_isScreenVisible || !_hasInternet) {
+    if (!ref.mounted ||
+        !_isAuthenticated ||
+        !_isScreenVisible ||
+        !_hasInternet) {
       return;
     }
 
@@ -217,7 +270,10 @@ mixin _GenerationHistoryControllerLifecycle
         return;
       }
 
-      if (!_isScreenVisible || !_hasInternet || _isLoadInFlight) {
+      if (!_isAuthenticated ||
+          !_isScreenVisible ||
+          !_hasInternet ||
+          _isLoadInFlight) {
         _scheduleNextAutoRefresh();
         return;
       }
@@ -288,7 +344,10 @@ mixin _GenerationHistoryControllerLifecycle
 
   @override
   Future<void> _refreshUnreadCount() async {
-    if (!ref.mounted || !_isScreenVisible || _isLoadInFlight) {
+    if (!ref.mounted ||
+        !_isAuthenticated ||
+        !_isScreenVisible ||
+        _isLoadInFlight) {
       return;
     }
 
@@ -297,7 +356,10 @@ mixin _GenerationHistoryControllerLifecycle
       final unreadCount = await _repository.fetchUnreadGenerationCount(
         cancelToken: cancelToken,
       );
-      if (!ref.mounted || !_isScreenVisible || cancelToken.isCancelled) {
+      if (!ref.mounted ||
+          !_isAuthenticated ||
+          !_isScreenVisible ||
+          cancelToken.isCancelled) {
         return;
       }
 
@@ -319,6 +381,10 @@ mixin _GenerationHistoryControllerLifecycle
   Future<int?> _fetchUnreadGenerationCountBestEffort(
     CancelToken cancelToken,
   ) async {
+    if (!_isAuthenticated) {
+      return null;
+    }
+
     try {
       return await _repository.fetchUnreadGenerationCount(
         cancelToken: cancelToken,
@@ -332,7 +398,7 @@ mixin _GenerationHistoryControllerLifecycle
   }
 
   void _handleRealtimeEvent(RealtimeEvent event) {
-    if (!ref.mounted || !_isScreenVisible) {
+    if (!ref.mounted || !_isAuthenticated || !_isScreenVisible) {
       return;
     }
 
@@ -383,7 +449,10 @@ mixin _GenerationHistoryControllerLifecycle
   }
 
   Future<void> _refetchRealtimeGeneration(String generationId) async {
-    if (!ref.mounted || !_isScreenVisible || !_hasInternet) {
+    if (!ref.mounted ||
+        !_isAuthenticated ||
+        !_isScreenVisible ||
+        !_hasInternet) {
       return;
     }
 
@@ -399,6 +468,7 @@ mixin _GenerationHistoryControllerLifecycle
         cancelToken: cancelToken,
       );
       if (!ref.mounted ||
+          !_isAuthenticated ||
           !_isScreenVisible ||
           !_hasInternet ||
           cancelToken.isCancelled) {
@@ -444,7 +514,10 @@ mixin _GenerationHistoryControllerLifecycle
 
   @override
   Future<void> _resumeRealtimeIfNeeded() async {
-    if (!ref.mounted || !_isScreenVisible || !_hasInternet) {
+    if (!ref.mounted ||
+        !_isAuthenticated ||
+        !_isScreenVisible ||
+        !_hasInternet) {
       return;
     }
 
@@ -476,6 +549,7 @@ mixin _GenerationHistoryControllerLifecycle
       }
 
       if (!_isScreenVisible ||
+          !_isAuthenticated ||
           !_hasInternet ||
           !identical(_activeRealtimeClient, realtimeClient)) {
         unawaited(realtimeClient.disconnect());

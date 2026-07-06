@@ -44,7 +44,7 @@ function getSupportMediaErrorDetails(error: unknown) {
   };
 }
 
-function getBlockedUnsafeSupportMediaUrlDetails(url: string) {
+export function getBlockedUnsafeSupportMediaUrlDetails(url: string) {
   return {
     rawLength: url.length,
     startsWithSlash: url.startsWith("/"),

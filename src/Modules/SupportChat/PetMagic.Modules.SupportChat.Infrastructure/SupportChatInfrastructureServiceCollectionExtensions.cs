@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 using PetMagic.BuildingBlocks.Images;
+using PetMagic.BuildingBlocks.Security;
 using PetMagic.Modules.SupportChat.Application.Abstractions;
 using PetMagic.Modules.SupportChat.Infrastructure.Data;
 using PetMagic.Modules.SupportChat.Infrastructure.Entities;
@@ -40,7 +41,11 @@ public static class SupportChatInfrastructureServiceCollectionExtensions
         services.AddScoped<ISupportPushTokenService, SupportPushTokenService>();
         services.AddScoped<NoopSupportChatPushNotificationSender>();
         services.AddHttpClient<FcmSupportChatPushNotificationSender>(client =>
-            client.Timeout = PushHttpClientTimeout);
+            client.Timeout = PushHttpClientTimeout)
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                AllowAutoRedirect = false
+            });
         services.AddScoped<ISupportChatPushNotificationSender>(serviceProvider =>
         {
             var options = serviceProvider.GetRequiredService<SupportChatPushOptions>();
@@ -157,13 +162,22 @@ public static class SupportChatInfrastructureServiceCollectionExtensions
 
     private static void ValidateProductionPushConfiguration(SupportChatPushOptions options, bool isProduction)
     {
-        if (!isProduction || !options.Enabled || options.IsConfigured)
+        if (!isProduction || !options.Enabled)
         {
             return;
         }
 
-        throw new InvalidOperationException(
-            "SupportChat Firebase push is enabled but Firebase project id or service account configuration is missing.");
+        if (!options.IsConfigured)
+        {
+            throw new InvalidOperationException(
+                "SupportChat Firebase push is enabled but Firebase project id or service account configuration is missing.");
+        }
+
+        if (!FirebaseProjectIdPolicy.IsSafeProjectId(options.ProjectId))
+        {
+            throw new InvalidOperationException(
+                "SupportChat:FirebasePush:ProjectId must be a Firebase project id, not a URL or path, in Production.");
+        }
     }
 
     private static string? ReadValue(IConfigurationSection section, string key, string environmentVariable)

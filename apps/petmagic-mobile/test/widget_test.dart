@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:io' show Platform;
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,6 +10,7 @@ import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
+import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
@@ -666,6 +669,52 @@ void main() {
     );
   });
 
+  test('profile mutation is cancelled when app launch signs out', () async {
+    SharedPreferences.setMockInitialValues(const {onboardingSeenKey: true});
+
+    final profileRepository = DelayedProfileMutationRepository();
+    final appLaunchController = MutableAuthenticatedWidgetAppLaunchController();
+    final container = ProviderContainer(
+      overrides: [
+        profileRepositoryProvider.overrideWith((ref) => profileRepository),
+        externalAuthRepositoryProvider.overrideWith(
+          (ref) => FakeExternalAuthRepository(),
+        ),
+        authSessionStorageProvider.overrideWith(
+          (ref) => TestAuthSessionStorage(),
+        ),
+        appLaunchControllerProvider.overrideWith(() => appLaunchController),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(profileControllerProvider.notifier);
+    controller
+      ..updateEmail('pet@example.com')
+      ..updatePassword('Password123');
+    await controller.login();
+
+    final mutation = controller.updateCurrentProfile(
+      displayName: 'Signed Out Pet',
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    expect(profileRepository.updateProfileCalls, 1);
+    expect(profileRepository.updateCancelToken?.isCancelled, isFalse);
+
+    appLaunchController.markSignedOutForTest();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(profileRepository.updateCancelToken?.isCancelled, isTrue);
+    expect(container.read(profileControllerProvider).isAuthenticated, isFalse);
+    expect(container.read(profileControllerProvider).isSaving, isFalse);
+
+    profileRepository.completeUpdate();
+    await mutation;
+
+    expect(container.read(profileControllerProvider).isAuthenticated, isFalse);
+  });
+
   testWidgets('opens templates directly for authenticated user', (
     tester,
   ) async {
@@ -749,4 +798,61 @@ void _expectFullyVisible(WidgetTester tester, Finder finder) {
     isTrue,
     reason: 'Widget extends beyond the viewport width',
   );
+}
+
+class MutableAuthenticatedWidgetAppLaunchController
+    extends AppLaunchController {
+  @override
+  AppLaunchState build() {
+    return const AppLaunchState(
+      isLoading: false,
+      isAuthenticated: true,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: true,
+    );
+  }
+
+  void markSignedOutForTest() {
+    state = const AppLaunchState(
+      isLoading: false,
+      isAuthenticated: false,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: true,
+    );
+  }
+}
+
+class DelayedProfileMutationRepository extends FakeProfileRepository {
+  int updateProfileCalls = 0;
+  CancelToken? updateCancelToken;
+  final Completer<MobileUserProfile> _updateCompleter =
+      Completer<MobileUserProfile>();
+
+  @override
+  Future<MobileUserProfile> updateProfile({
+    required String? displayName,
+    CancelToken? cancelToken,
+  }) {
+    updateProfileCalls++;
+    updateCancelToken = cancelToken;
+    return _updateCompleter.future;
+  }
+
+  void completeUpdate() {
+    if (_updateCompleter.isCompleted) {
+      return;
+    }
+
+    final profile = storedSession?.user;
+    if (profile == null) {
+      _updateCompleter.completeError(
+        const AppException('Unauthorized', statusCode: 401),
+      );
+      return;
+    }
+
+    _updateCompleter.complete(profile);
+  }
 }

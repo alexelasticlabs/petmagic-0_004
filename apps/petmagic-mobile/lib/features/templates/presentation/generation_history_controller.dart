@@ -6,6 +6,7 @@ import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_gallery_store.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/generation_media_kind.dart';
@@ -141,6 +142,7 @@ abstract class _GenerationHistoryControllerBase
   Timer? _autoRefreshTimer;
   bool _isScreenVisible = false;
   bool _hasInternet = true;
+  bool _isAuthenticated = false;
   bool _isRealtimeConnected = false;
   bool _isLoadInFlight = false;
   bool _isLoadMoreInFlight = false;
@@ -297,6 +299,11 @@ class GenerationHistoryController extends _GenerationHistoryControllerBase
     final galleryStore = ref.read(generationGalleryStoreProvider);
     _activeRealtimeClient = ref.read(realtimeClientProvider);
     _hasInternet = ref.read(networkStatusControllerProvider).hasInternet;
+    _isAuthenticated = ref.read(appLaunchControllerProvider).isAuthenticated;
+    ref.listen<bool>(
+      appLaunchControllerProvider.select((state) => state.isAuthenticated),
+      (_, isAuthenticated) => _handleAuthStatusChanged(isAuthenticated),
+    );
     ref.listen<bool>(
       networkStatusControllerProvider.select((state) => state.hasInternet),
       (_, hasInternet) => _handleNetworkStatusChanged(hasInternet),

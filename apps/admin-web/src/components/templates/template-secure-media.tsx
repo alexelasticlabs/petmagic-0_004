@@ -52,7 +52,7 @@ function formatTemplateMediaLogText(value: string | null | undefined, maxLength 
   return value ? sanitizeSensitiveText(value, maxLength) : undefined;
 }
 
-function getBlockedUnsafeTemplateMediaUrlDetails(url: string) {
+export function getBlockedUnsafeTemplateMediaUrlDetails(url: string) {
   return {
     rawLength: url.length,
     startsWithSlash: url.startsWith("/"),

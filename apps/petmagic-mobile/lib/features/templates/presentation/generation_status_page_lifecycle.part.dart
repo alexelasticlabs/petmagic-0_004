@@ -2,7 +2,7 @@ part of 'generation_status_page.dart';
 
 extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
   void _startPolling() {
-    if (_pollTimer != null) {
+    if (!_canUsePrivateStatusApi || _pollTimer != null) {
       return;
     }
 
@@ -15,7 +15,9 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
   }
 
   void _scheduleNextPoll() {
-    if (!mounted || _generation?.isTerminal == true) {
+    if (!mounted ||
+        !_canUsePrivateStatusApi ||
+        _generation?.isTerminal == true) {
       _stopPolling();
       return;
     }
@@ -60,7 +62,20 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
   Future<void> _handlePollTick() async {
     _pollTimer = null;
 
-    if (!mounted || _generation?.isTerminal == true) {
+    if (!mounted ||
+        !_canUsePrivateStatusApi ||
+        _generation?.isTerminal == true) {
+      return;
+    }
+
+    if (!ref.read(networkStatusControllerProvider).hasInternet) {
+      _stopPolling();
+      return;
+    }
+
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    if (lifecycle != null && lifecycle != AppLifecycleState.resumed) {
+      _stopPolling();
       return;
     }
 
@@ -137,7 +152,7 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
   }
 
   bool _canApplyLocalMediaSync() {
-    if (!mounted || !_isPageActive) {
+    if (!mounted || !_canUsePrivateStatusApi || !_isPageActive) {
       return false;
     }
 
@@ -147,6 +162,17 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
   }
 
   Future<void> _load({bool silent = false}) async {
+    if (!_canUsePrivateStatusApi) {
+      _cancelActiveLoad();
+      if (!silent) {
+        _setPageState(() {
+          _isLoading = false;
+          _errorMessage = 'auth.sign_in_required';
+        });
+      }
+      return;
+    }
+
     if (!silent) {
       _setPageState(() {
         _isLoading = true;
@@ -162,7 +188,10 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
         widget.generationId,
         cancelToken: loadCancelToken,
       );
-      if (!mounted || loadCancelToken.isCancelled || _isMediaActionInFlight) {
+      if (!mounted ||
+          !_canUsePrivateStatusApi ||
+          loadCancelToken.isCancelled ||
+          _isMediaActionInFlight) {
         return;
       }
 
@@ -185,7 +214,7 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
   }
 
   void _applyGenerationSnapshot(TemplateGenerationResult generation) {
-    if (!mounted) {
+    if (!mounted || !_canUsePrivateStatusApi) {
       return;
     }
 
@@ -229,7 +258,10 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
   }
 
   void _handleRealtimeEvent(RealtimeEvent event) {
-    if (!mounted || !_isPageActive || _isMediaActionInFlight) {
+    if (!mounted ||
+        !_canUsePrivateStatusApi ||
+        !_isPageActive ||
+        _isMediaActionInFlight) {
       return;
     }
 
@@ -263,7 +295,7 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
   }
 
   Future<void> _resumeRealtimeIfNeeded() async {
-    if (!mounted || !_isPageActive) {
+    if (!mounted || !_canUsePrivateStatusApi || !_isPageActive) {
       return;
     }
 
@@ -295,6 +327,7 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
       _realtimeConnectFuture = nextConnectFuture;
       await nextConnectFuture;
       if (!mounted ||
+          !_canUsePrivateStatusApi ||
           !_isPageActive ||
           !ref.read(networkStatusControllerProvider).hasInternet ||
           !identical(_activeRealtimeClient, realtimeClient)) {
@@ -334,10 +367,14 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
     TemplateGenerationRepository repository,
     Object error,
   ) async {
+    if (!_canUsePrivateStatusApi) {
+      return;
+    }
+
     final cachedGeneration = await repository.readCachedGeneration(
       widget.generationId,
     );
-    if (!mounted) {
+    if (!mounted || !_canUsePrivateStatusApi) {
       return;
     }
 
@@ -345,7 +382,7 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
         ? null
         : _reuseCurrentLocalMedia(cachedGeneration);
 
-    if (!mounted) {
+    if (!mounted || !_canUsePrivateStatusApi) {
       return;
     }
 
@@ -430,6 +467,10 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
   Future<void> _confirmAndCancelQueuedGeneration(
     TemplateGenerationResult generation,
   ) async {
+    if (!_canUsePrivateStatusApi) {
+      return;
+    }
+
     if (!generation.canCancelQueued) {
       _showGenerationAlreadyStartedMessage();
       return;
@@ -466,6 +507,10 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
   Future<void> _cancelQueuedGeneration(
     TemplateGenerationResult generation,
   ) async {
+    if (!_canUsePrivateStatusApi) {
+      return;
+    }
+
     final text = AppLocalizations.of(context);
     final current = _generation;
     if (current == null ||

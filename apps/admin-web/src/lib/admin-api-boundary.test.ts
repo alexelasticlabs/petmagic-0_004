@@ -10,6 +10,7 @@ const packageJsonPath = join(appRoot, "package.json");
 
 const forbiddenPackages = [
   "@aws-sdk/client-rds-data",
+  "@upstash/redis",
   "@mikro-orm/core",
   "@mikro-orm/mongodb",
   "@mikro-orm/postgresql",
@@ -22,6 +23,7 @@ const forbiddenPackages = [
   "better-sqlite3",
   "drizzle-kit",
   "drizzle-orm",
+  "ioredis",
   "kysely",
   "knex",
   "mariadb",
@@ -61,7 +63,8 @@ const forbiddenSourcePatterns = [
   /from\s+["'][^"']*(?:backend[\\/]src|src[\\/]Host|src[\\/]Modules|PetMagic\.(?:Application|Host|Infrastructure|Modules))[^"']*["']/,
   /require\(\s*["'][^"']*(?:backend[\\/]src|src[\\/]Host|src[\\/]Modules|PetMagic\.(?:Application|Host|Infrastructure|Modules))[^"']*["']\s*\)/,
   /\bsql\s*`(?:\s|--|\/\*|select|insert|update|delete)/i,
-  /from\s+["'](?:@aws-sdk\/client-rds-data|@neondatabase\/serverless|@planetscale\/database|@prisma\/client|@supabase\/supabase-js|@vercel\/postgres|better-sqlite3|drizzle-orm|kysely|knex|mongodb|mysql2?|pg|postgres|sequelize|slonik|sqlite3?|typeorm)["']/,
+  /from\s+["'](?:@aws-sdk\/client-rds-data|@neondatabase\/serverless|@planetscale\/database|@prisma\/client|@supabase\/supabase-js|@upstash\/redis|@vercel\/postgres|better-sqlite3|drizzle-orm|ioredis|kysely|knex|mongodb|mysql2?|pg|postgres|redis|sequelize|slonik|sqlite3?|typeorm)["']/,
+  /require\(\s*["'](?:@aws-sdk\/client-rds-data|@neondatabase\/serverless|@planetscale\/database|@prisma\/client|@supabase\/supabase-js|@upstash\/redis|@vercel\/postgres|better-sqlite3|drizzle-orm|ioredis|kysely|knex|mongodb|mysql2?|pg|postgres|redis|sequelize|slonik|sqlite3?|typeorm)["']\s*\)/,
 ];
 
 function listSourceFiles(directory: string): string[] {

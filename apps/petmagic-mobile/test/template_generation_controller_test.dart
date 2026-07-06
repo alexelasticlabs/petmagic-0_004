@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/logging/log_correlation_context.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
@@ -60,6 +61,7 @@ void main() {
       late _FakeWalletController walletController;
       final container = ProviderContainer(
         overrides: [
+          _authenticatedLaunchOverride(),
           templateGenerationRepositoryProvider.overrideWithValue(repository),
           walletControllerProvider.overrideWith(() {
             walletController = _FakeWalletController(_wallet(balance: 10));
@@ -86,6 +88,110 @@ void main() {
   );
 
   test(
+    'template generation controller stays idle for explicit unauthenticated app state',
+    () async {
+      final repository = _FakeTemplateGenerationRepository()
+        ..activeGeneration = (
+          generationId: 'generation-restored',
+          correlationId: 'generation-restored-correlation',
+        );
+      final walletController = _FakeWalletController(_wallet(balance: 100));
+      final container = ProviderContainer(
+        overrides: [
+          appLaunchControllerProvider.overrideWith(
+            () => _MutableTemplateAppLaunchController(false),
+          ),
+          templateGenerationRepositoryProvider.overrideWithValue(repository),
+          walletControllerProvider.overrideWith(() => walletController),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(
+        templateGenerationControllerProvider.notifier,
+      );
+
+      await Future<void>.delayed(Duration.zero);
+      controller.selectPhoto(XFile('pet.jpg', name: 'pet.jpg'));
+      final gate = await controller.checkGate(_template(tokenCost: 50));
+      final generation = await controller.startGeneration(
+        _template(tokenCost: 50),
+      );
+      await controller.refreshGeneration();
+
+      expect(gate.kind, TemplateGenerationGateKind.notEnoughTokens);
+      expect(generation, isNull);
+      expect(repository.startCalls, 0);
+      expect(repository.fetchCalls, 0);
+      expect(walletController.loadCalls, 0);
+      expect(
+        container.read(templateGenerationControllerProvider).isPolling,
+        false,
+      );
+    },
+  );
+
+  test(
+    'template generation controller stops polling and private refresh after sign out',
+    () async {
+      final repository = _FakeTemplateGenerationRepository(
+        startResult: _generation(status: TemplateGenerationStatus.queued),
+      );
+      final walletController = _FakeWalletController(_wallet(balance: 100));
+      final launchController = _MutableTemplateAppLaunchController(true);
+      final container = ProviderContainer(
+        overrides: [
+          appLaunchControllerProvider.overrideWith(() => launchController),
+          templateGenerationRepositoryProvider.overrideWithValue(repository),
+          walletControllerProvider.overrideWith(() => walletController),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(
+        templateGenerationControllerProvider.notifier,
+      );
+      controller.selectPhoto(XFile('pet.jpg', name: 'pet.jpg'));
+
+      final generation = await controller.startGeneration(
+        _template(tokenCost: 50),
+      );
+
+      expect(generation?.status, TemplateGenerationStatus.queued);
+      expect(
+        container.read(templateGenerationControllerProvider).isPolling,
+        true,
+      );
+      expect(repository.startCalls, 1);
+      expect(repository.fetchCalls, 0);
+
+      launchController.setAuthenticated(false);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        container.read(templateGenerationControllerProvider).isPolling,
+        false,
+      );
+
+      controller.selectPhoto(XFile('pet-2.jpg', name: 'pet-2.jpg'));
+      final blocked = await controller.startGeneration(
+        _template(tokenCost: 50),
+      );
+      await controller.refreshGeneration();
+
+      expect(blocked, isNull);
+      expect(repository.startCalls, 1);
+      expect(repository.fetchCalls, 0);
+      expect(
+        walletController.loadCalls,
+        1,
+        reason:
+            'initial queued creation refreshes wallet once, sign-out must not add more refreshes',
+      );
+    },
+  );
+
+  test(
     'normalizes wrapped balance error keys before exposing UI state',
     () async {
       final repository = _FakeTemplateGenerationRepository(
@@ -95,6 +201,7 @@ void main() {
       );
       final container = ProviderContainer(
         overrides: [
+          _authenticatedLaunchOverride(),
           templateGenerationRepositoryProvider.overrideWithValue(repository),
           walletControllerProvider.overrideWith(
             () => _FakeWalletController(_wallet(balance: 100)),
@@ -132,6 +239,7 @@ void main() {
       );
       final container = ProviderContainer(
         overrides: [
+          _authenticatedLaunchOverride(),
           templateGenerationRepositoryProvider.overrideWithValue(repository),
           walletControllerProvider.overrideWith(
             () => _FakeWalletController(_wallet(balance: 100)),
@@ -160,6 +268,7 @@ void main() {
   test('premium wallet can pass premium template generation gate', () async {
     final container = ProviderContainer(
       overrides: [
+        _authenticatedLaunchOverride(),
         templateGenerationRepositoryProvider.overrideWithValue(
           _FakeTemplateGenerationRepository(),
         ),
@@ -186,6 +295,7 @@ void main() {
     final repository = _FakeTemplateGenerationRepository();
     final container = ProviderContainer(
       overrides: [
+        _authenticatedLaunchOverride(),
         templateGenerationRepositoryProvider.overrideWithValue(repository),
         walletControllerProvider.overrideWith(
           () => _FakeWalletController(_wallet(balance: 100)),
@@ -211,6 +321,7 @@ void main() {
     late _FakeWalletController walletController;
     final container = ProviderContainer(
       overrides: [
+        _authenticatedLaunchOverride(),
         templateGenerationRepositoryProvider.overrideWithValue(
           _FakeTemplateGenerationRepository(),
         ),
@@ -245,6 +356,7 @@ void main() {
       final repository = _FakeTemplateGenerationRepository();
       final container = ProviderContainer(
         overrides: [
+          _authenticatedLaunchOverride(),
           templateGenerationRepositoryProvider.overrideWithValue(repository),
           walletControllerProvider.overrideWith(
             () => _FakeWalletController(_wallet(balance: 100, isPremium: true)),
@@ -282,6 +394,7 @@ void main() {
     );
     final container = ProviderContainer(
       overrides: [
+        _authenticatedLaunchOverride(),
         templateGenerationRepositoryProvider.overrideWithValue(repository),
         walletControllerProvider.overrideWith(
           () => _FakeWalletController(_wallet(balance: 100)),
@@ -320,6 +433,7 @@ void main() {
       );
       final container = ProviderContainer(
         overrides: [
+          _authenticatedLaunchOverride(),
           templateGenerationRepositoryProvider.overrideWithValue(repository),
           walletControllerProvider.overrideWith(
             () => _FakeWalletController(_wallet(balance: 100)),
@@ -348,6 +462,7 @@ void main() {
     );
     final container = ProviderContainer(
       overrides: [
+        _authenticatedLaunchOverride(),
         templateGenerationRepositoryProvider.overrideWithValue(repository),
         walletControllerProvider.overrideWith(
           () => _FakeWalletController(_wallet(balance: 100)),
@@ -383,6 +498,7 @@ void main() {
       );
       final container = ProviderContainer(
         overrides: [
+          _authenticatedLaunchOverride(),
           templateGenerationRepositoryProvider.overrideWithValue(repository),
           walletControllerProvider.overrideWith(
             () => _FakeWalletController(_wallet(balance: 100)),
@@ -414,6 +530,7 @@ void main() {
       );
       final container = ProviderContainer(
         overrides: [
+          _authenticatedLaunchOverride(),
           templateGenerationRepositoryProvider.overrideWithValue(repository),
           walletControllerProvider.overrideWith(
             () => _FakeWalletController(_wallet(balance: 100)),
@@ -446,6 +563,7 @@ void main() {
       final walletController = _FakeWalletController(_wallet(balance: 100));
       final container = ProviderContainer(
         overrides: [
+          _authenticatedLaunchOverride(),
           templateGenerationRepositoryProvider.overrideWithValue(repository),
           walletControllerProvider.overrideWith(() => walletController),
         ],
@@ -479,6 +597,7 @@ void main() {
       );
       final container = ProviderContainer(
         overrides: [
+          _authenticatedLaunchOverride(),
           templateGenerationRepositoryProvider.overrideWithValue(repository),
           walletControllerProvider.overrideWith(() => walletController),
         ],
@@ -519,6 +638,7 @@ void main() {
       );
       final container = ProviderContainer(
         overrides: [
+          _authenticatedLaunchOverride(),
           templateGenerationRepositoryProvider.overrideWithValue(repository),
           walletControllerProvider.overrideWith(() => walletController),
         ],
@@ -552,6 +672,7 @@ void main() {
       final walletController = _FakeWalletController(_wallet(balance: 100));
       final container = ProviderContainer(
         overrides: [
+          _authenticatedLaunchOverride(),
           templateGenerationRepositoryProvider.overrideWithValue(repository),
           walletControllerProvider.overrideWith(() => walletController),
         ],
@@ -588,6 +709,7 @@ void main() {
             );
       final container = ProviderContainer(
         overrides: [
+          _authenticatedLaunchOverride(),
           templateGenerationRepositoryProvider.overrideWithValue(repository),
           walletControllerProvider.overrideWith(
             () => _FakeWalletController(_wallet(balance: 100)),
@@ -620,6 +742,7 @@ void main() {
         );
       final container = ProviderContainer(
         overrides: [
+          _authenticatedLaunchOverride(),
           templateGenerationRepositoryProvider.overrideWithValue(repository),
           walletControllerProvider.overrideWith(
             () => _FakeWalletController(_wallet(balance: 100)),
@@ -662,6 +785,7 @@ void main() {
       final walletController = _FakeWalletController(_wallet(balance: 100));
       final container = ProviderContainer(
         overrides: [
+          _authenticatedLaunchOverride(),
           templateGenerationRepositoryProvider.overrideWithValue(repository),
           walletControllerProvider.overrideWith(() => walletController),
         ],
@@ -698,6 +822,7 @@ void main() {
       );
       final container = ProviderContainer(
         overrides: [
+          _authenticatedLaunchOverride(),
           templateGenerationRepositoryProvider.overrideWithValue(repository),
           walletControllerProvider.overrideWith(
             () => _FakeWalletController(_wallet(balance: 100)),
@@ -754,6 +879,7 @@ void main() {
       );
       final container = ProviderContainer(
         overrides: [
+          _authenticatedLaunchOverride(),
           templateGenerationRepositoryProvider.overrideWithValue(repository),
           walletControllerProvider.overrideWith(
             () => _FakeWalletController(_wallet(balance: 100)),
@@ -802,6 +928,7 @@ void main() {
     );
     final container = ProviderContainer(
       overrides: [
+        _authenticatedLaunchOverride(),
         templateGenerationRepositoryProvider.overrideWithValue(repository),
         walletControllerProvider.overrideWith(
           () => _FakeWalletController(_wallet(balance: 100)),
@@ -844,6 +971,7 @@ void main() {
             );
       final container = ProviderContainer(
         overrides: [
+          _authenticatedLaunchOverride(),
           templateGenerationRepositoryProvider.overrideWithValue(repository),
           walletControllerProvider.overrideWith(
             () => _FakeWalletController(_wallet(balance: 100)),
@@ -879,6 +1007,7 @@ void main() {
       );
       final container = ProviderContainer(
         overrides: [
+          _authenticatedLaunchOverride(),
           templateGenerationRepositoryProvider.overrideWithValue(repository),
           walletControllerProvider.overrideWith(
             () => _FakeWalletController(_wallet(balance: 100)),
@@ -920,6 +1049,7 @@ void main() {
       final walletController = _FakeWalletController(_wallet(balance: 100));
       final container = ProviderContainer(
         overrides: [
+          _authenticatedLaunchOverride(),
           templateGenerationRepositoryProvider.overrideWithValue(repository),
           walletControllerProvider.overrideWith(() => walletController),
         ],
@@ -953,6 +1083,7 @@ void main() {
     final walletController = _FakeWalletController(_wallet(balance: 100));
     final container = ProviderContainer(
       overrides: [
+        _authenticatedLaunchOverride(),
         templateGenerationRepositoryProvider.overrideWithValue(repository),
         walletControllerProvider.overrideWith(() => walletController),
         networkStatusControllerProvider.overrideWith(
@@ -1436,6 +1567,40 @@ class _FakeTemplateGenerationRepository
   }) async {
     return const [];
   }
+}
+
+class _MutableTemplateAppLaunchController extends AppLaunchController {
+  _MutableTemplateAppLaunchController(this._isAuthenticated);
+
+  bool _isAuthenticated;
+
+  @override
+  AppLaunchState build() {
+    return AppLaunchState(
+      isLoading: false,
+      isAuthenticated: _isAuthenticated,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: _isAuthenticated,
+    );
+  }
+
+  void setAuthenticated(bool value) {
+    _isAuthenticated = value;
+    state = state.copyWith(
+      isLoading: false,
+      isAuthenticated: value,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: value,
+    );
+  }
+}
+
+dynamic _authenticatedLaunchOverride() {
+  return appLaunchControllerProvider.overrideWith(
+    () => _MutableTemplateAppLaunchController(true),
+  );
 }
 
 class _FakeWalletController extends WalletController {

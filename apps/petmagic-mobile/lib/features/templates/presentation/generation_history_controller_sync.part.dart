@@ -6,6 +6,10 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
     GenerationHistoryFilter? filter,
     bool refresh = false,
   }) async {
+    if (!_isAuthenticated) {
+      return;
+    }
+
     final requestedFilter = filter ?? state.filter;
     if (_isLoadInFlight) {
       if (!refresh && requestedFilter == state.filter && state.isLoading) {
@@ -26,7 +30,7 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
     CancelToken? loadCancelToken;
     try {
       await _resumeRealtimeIfNeeded();
-      if (!ref.mounted) {
+      if (!ref.mounted || !_isAuthenticated) {
         return;
       }
 
@@ -64,7 +68,7 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
         persistedItems = await _repository.readCachedGenerations(
           status: nextFilter.apiStatus,
         );
-        if (!ref.mounted) {
+        if (!ref.mounted || !_isAuthenticated) {
           return;
         }
       }
@@ -114,7 +118,7 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
         }
 
         await _flushPendingServerDeletes();
-        if (!ref.mounted || loadCancelToken.isCancelled) {
+        if (!ref.mounted || !_isAuthenticated || loadCancelToken.isCancelled) {
           _completeCancelledLoad();
           return;
         }
@@ -139,14 +143,14 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
               deletedGenerationIds: deletedGenerationIds,
               remoteItems: remoteItems,
             );
-        if (!ref.mounted || loadEpoch != _loadEpoch) {
+        if (!ref.mounted || !_isAuthenticated || loadEpoch != _loadEpoch) {
           return;
         }
 
         final visibleUnreadCount = unreadCount == null
             ? state.unreadCount
             : _visibleUnreadCount(unreadCount);
-        if (!ref.mounted) {
+        if (!ref.mounted || !_isAuthenticated) {
           return;
         }
 
@@ -222,6 +226,7 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
   @override
   Future<void> _loadMore() async {
     if (!ref.mounted ||
+        !_isAuthenticated ||
         !_isScreenVisible ||
         _isLoadInFlight ||
         _isLoadMoreInFlight ||
@@ -244,7 +249,7 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
       final localReadyRecords = await _galleryStore.loadLocalReadyItems();
       _locallyDeletedGenerationIds = Set<String>.from(deletedGenerationIds);
 
-      if (!ref.mounted || loadCancelToken.isCancelled) {
+      if (!ref.mounted || !_isAuthenticated || loadCancelToken.isCancelled) {
         return;
       }
 
@@ -255,6 +260,7 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
         cancelToken: loadCancelToken,
       );
       if (!ref.mounted ||
+          !_isAuthenticated ||
           loadCancelToken.isCancelled ||
           requestEpoch != _loadEpoch ||
           requestFilter != state.filter ||
@@ -300,6 +306,7 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
         return;
       }
       if (!ref.mounted ||
+          !_isAuthenticated ||
           requestEpoch != _loadEpoch ||
           requestFilter != state.filter ||
           requestCursor != state.nextCursor) {
@@ -323,6 +330,10 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
 
   @override
   Future<void> _markRead(String generationId) async {
+    if (!_isAuthenticated) {
+      return;
+    }
+
     final wasUnread =
         _findGeneration(generationId)?.isUnread ??
         state.items.any(
@@ -361,6 +372,10 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
 
   @override
   Future<void> _deleteGeneration(String generationId) async {
+    if (!_isAuthenticated) {
+      return;
+    }
+
     _locallyDeletedGenerationIds = {
       ..._locallyDeletedGenerationIds,
       generationId,
@@ -397,13 +412,13 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
       generationId,
       userId: targetGeneration?.userId,
     );
-    if (!ref.mounted) {
+    if (!ref.mounted || !_isAuthenticated) {
       return;
     }
 
     try {
       await _repository.deleteGeneration(generationId);
-      if (!ref.mounted) {
+      if (!ref.mounted || !_isAuthenticated) {
         return;
       }
 
@@ -420,6 +435,10 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
     List<String> selectedReasons = const [],
     String? comment,
   }) {
+    if (!_isAuthenticated) {
+      return Future<void>.value();
+    }
+
     return _repository.submitGenerationFeedback(
       generationId: generationId,
       rating: rating,
@@ -432,6 +451,10 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
   Future<void> _mergeFetchedGeneration(
     TemplateGenerationResult generation,
   ) async {
+    if (!_isAuthenticated) {
+      return;
+    }
+
     await _mergeExternalGeneration(
       generation,
       refreshUnreadBadge: false,
@@ -445,16 +468,23 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
     required bool refreshUnreadBadge,
     required bool requireScreenVisible,
   }) async {
+    if (!_isAuthenticated) {
+      return;
+    }
+
     final deletedGenerationIds = await _galleryStore.loadDeletedGenerationIds();
     _locallyDeletedGenerationIds = Set<String>.from(deletedGenerationIds);
     if (!ref.mounted ||
+        !_isAuthenticated ||
         (requireScreenVisible && !_isScreenVisible) ||
         deletedGenerationIds.contains(generation.generationId)) {
       return;
     }
 
     final localReadyRecords = await _galleryStore.loadLocalReadyItems();
-    if (!ref.mounted || (requireScreenVisible && !_isScreenVisible)) {
+    if (!ref.mounted ||
+        !_isAuthenticated ||
+        (requireScreenVisible && !_isScreenVisible)) {
       return;
     }
 
@@ -487,10 +517,17 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
   }
 
   Future<void> _flushPendingServerDeletes() async {
+    if (!_isAuthenticated) {
+      return;
+    }
+
     final pendingDeletes = await _galleryStore.loadPendingServerDeleteIds();
     for (final generationId in pendingDeletes) {
       final cancelToken = _activeLoadCancelToken;
-      if (!ref.mounted || cancelToken == null || cancelToken.isCancelled) {
+      if (!ref.mounted ||
+          !_isAuthenticated ||
+          cancelToken == null ||
+          cancelToken.isCancelled) {
         return;
       }
 
@@ -499,7 +536,7 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
           generationId,
           cancelToken: cancelToken,
         );
-        if (!ref.mounted || cancelToken.isCancelled) {
+        if (!ref.mounted || !_isAuthenticated || cancelToken.isCancelled) {
           return;
         }
 
@@ -517,8 +554,12 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
   }
 
   Future<void> _syncCompletedMedia(List<TemplateGenerationResult> items) async {
+    if (!_isAuthenticated) {
+      return;
+    }
+
     for (final generation in items) {
-      if (!_isScreenVisible || !generation.isCompleted) {
+      if (!_isAuthenticated || !_isScreenVisible || !generation.isCompleted) {
         continue;
       }
 
@@ -527,6 +568,7 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
         background: true,
       );
       if (!ref.mounted ||
+          !_isAuthenticated ||
           !_isScreenVisible ||
           localRecord == null ||
           localRecord.isDeletedLocally) {

@@ -11,6 +11,10 @@ mixin _SupportChatControllerMessagingMixin
     String? replyToMessageId,
     String? relatedGenerationId,
   }) async {
+    if (!_canUsePrivateSupportApi) {
+      return false;
+    }
+
     final body = value.trim();
     final normalizedRelatedGenerationId = relatedGenerationId?.trim();
     final conversation = state.conversation;
@@ -123,6 +127,10 @@ mixin _SupportChatControllerMessagingMixin
     String? body,
     String? replyToMessageId,
   }) async {
+    if (!_canUsePrivateSupportApi) {
+      return false;
+    }
+
     if (attachments.isEmpty || state.isSending) {
       return false;
     }
@@ -230,6 +238,10 @@ mixin _SupportChatControllerMessagingMixin
     int? attachmentBatchIndex,
     int? attachmentBatchTotal,
   }) async {
+    if (!_canUsePrivateSupportApi) {
+      return false;
+    }
+
     var conversation = state.conversation;
     if (state.isSending) {
       return false;
@@ -336,6 +348,10 @@ mixin _SupportChatControllerMessagingMixin
     required String fileName,
     required String contentType,
   }) async {
+    if (!_canUsePrivateSupportApi) {
+      return false;
+    }
+
     final conversation = state.conversation;
     if (conversation == null || conversation.isReadOnly || state.isSending) {
       return false;

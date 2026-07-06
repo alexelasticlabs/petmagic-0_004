@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:petmagic_mobile/shared/network/unsafe_remote_host.dart';
 import 'package:petmagic_mobile/shared/files/file_name_sanitizer.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -98,41 +99,18 @@ Uri _parseDownloadUri(String fileUrl) {
   }
 
   if (scheme == 'https') {
+    if (isUnsafeRemoteHost(uri.host)) {
+      throw const FormatException('unsafe_download_url');
+    }
+
     return uri;
   }
 
-  if (scheme == 'http' && kDebugMode && _isLocalDebugHost(uri.host)) {
+  if (scheme == 'http' && kDebugMode && isLocalOrPrivateDebugHost(uri.host)) {
     return uri;
   }
 
   throw const FormatException('unsafe_download_url');
-}
-
-bool _isLocalDebugHost(String host) {
-  final normalizedHost = host.toLowerCase();
-  if (normalizedHost == 'localhost' ||
-      normalizedHost == '127.0.0.1' ||
-      normalizedHost == '10.0.2.2' ||
-      normalizedHost == '10.0.3.2' ||
-      normalizedHost == 'host.docker.internal') {
-    return true;
-  }
-
-  final parts = normalizedHost.split('.');
-  if (parts.length != 4) {
-    return false;
-  }
-
-  final octets = parts.map(int.tryParse).toList(growable: false);
-  if (octets.any((value) => value == null || value < 0 || value > 255)) {
-    return false;
-  }
-
-  final first = octets[0]!;
-  final second = octets[1]!;
-  return first == 10 ||
-      (first == 172 && second >= 16 && second <= 31) ||
-      (first == 192 && second == 168);
 }
 
 void _throwIfDownloadCancelled(CancelToken? cancelToken) {

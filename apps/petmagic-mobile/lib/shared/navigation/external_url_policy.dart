@@ -1,13 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
-
-const _localDebugHosts = <String>{
-  'localhost',
-  '127.0.0.1',
-  '10.0.2.2',
-  '10.0.3.2',
-  'host.docker.internal',
-};
+import 'package:petmagic_mobile/shared/network/unsafe_remote_host.dart';
 
 Uri? parseSafeExternalUri(
   String? rawValue, {
@@ -90,6 +83,10 @@ bool isAllowedExternalUri(
   }
 
   if (scheme == 'https') {
+    if (isUnsafeRemoteHost(host)) {
+      return false;
+    }
+
     final normalizedAllowedHosts = allowedHttpsHosts
         ?.map((value) => value.toLowerCase())
         .toSet();
@@ -106,7 +103,7 @@ bool isAllowedExternalUri(
     return false;
   }
 
-  return _localDebugHosts.contains(host) || _isPrivateIpv4Host(host);
+  return isLocalOrPrivateDebugHost(host);
 }
 
 Set<String> premiumExternalAllowedHosts() {
@@ -193,22 +190,4 @@ Set<String> profileAvatarAllowedHosts() {
   }
 
   return result;
-}
-
-bool _isPrivateIpv4Host(String host) {
-  final parts = host.split('.');
-  if (parts.length != 4) {
-    return false;
-  }
-
-  final octets = parts.map(int.tryParse).toList(growable: false);
-  if (octets.any((value) => value == null || value < 0 || value > 255)) {
-    return false;
-  }
-
-  final first = octets[0]!;
-  final second = octets[1]!;
-  return first == 10 ||
-      (first == 172 && second >= 16 && second <= 31) ||
-      (first == 192 && second == 168);
 }

@@ -10,6 +10,7 @@ import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/logging/log_correlation_context.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/network/request_identity.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
@@ -90,6 +91,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
   bool _disposed = false;
   bool _hasInternet = true;
   bool _isForeground = true;
+  bool _canUsePrivateGenerationApi = true;
   int _generationFlowEpoch = 0;
   String? _activeCorrelationId;
   CancelToken? _activeRequestCancelToken;
@@ -99,8 +101,15 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
   TemplateGenerationState build() {
     _hasInternet = ref.read(networkStatusControllerProvider).hasInternet;
     _isForeground = AppLifecycleSignal.instance.isResumed;
+    _canUsePrivateGenerationApi = _isLaunchAuthorized(
+      ref.read(appLaunchControllerProvider),
+    );
     _appLifecycleListener = _handleAppLifecycleSignal;
     AppLifecycleSignal.instance.addListener(_appLifecycleListener!);
+    ref.listen<AppLaunchState>(
+      appLaunchControllerProvider,
+      (_, next) => _handleAuthStatusChanged(next),
+    );
     ref.listen<bool>(
       networkStatusControllerProvider.select((status) => status.hasInternet),
       (_, hasInternet) => _handleNetworkStatusChanged(hasInternet),
@@ -117,6 +126,29 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
     });
     unawaited(_restoreActiveGeneration());
     return const TemplateGenerationState();
+  }
+
+  bool _isLaunchAuthorized(AppLaunchState state) {
+    return state.isLoading || state.isAuthenticated;
+  }
+
+  void _handleAuthStatusChanged(AppLaunchState launchState) {
+    final canUsePrivateApi = _isLaunchAuthorized(launchState);
+    if (_canUsePrivateGenerationApi == canUsePrivateApi) {
+      return;
+    }
+
+    _canUsePrivateGenerationApi = canUsePrivateApi;
+    if (canUsePrivateApi) {
+      return;
+    }
+
+    _generationFlowEpoch++;
+    _stopPolling();
+    _cancelActiveRequest();
+    _activeCorrelationId = null;
+    _pollTickInFlight = false;
+    state = const TemplateGenerationState();
   }
 
   void selectPhoto(XFile photo) {
@@ -150,6 +182,14 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
   }
 
   Future<TemplateGenerationGate> checkGate(TemplateItem template) async {
+    if (!_canUsePrivateGenerationApi) {
+      return const TemplateGenerationGate(
+        kind: TemplateGenerationGateKind.notEnoughTokens,
+        balance: 0,
+        isPremium: false,
+      );
+    }
+
     var wallet = ref.read(walletControllerProvider).wallet;
     if (wallet == null &&
         ref.read(networkStatusControllerProvider).hasInternet) {
@@ -192,7 +232,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
     TemplateItem template,
   ) async {
     final photo = state.selectedPhoto;
-    if (photo == null || state.isCreating) {
+    if (!_canUsePrivateGenerationApi || photo == null || state.isCreating) {
       return null;
     }
 
@@ -222,7 +262,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
     CancelToken? requestCancelToken;
     try {
       requestCancelToken = _newActiveRequestCancelToken();
-      if (_disposed) {
+      if (_disposed || !_canUsePrivateGenerationApi) {
         return null;
       }
       final generation = await repository.startGeneration(
@@ -233,7 +273,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
         cancelToken: requestCancelToken,
       );
 
-      if (_disposed) {
+      if (_disposed || !_canUsePrivateGenerationApi) {
         if (!generation.isTerminal) {
           await repository.rememberActiveGeneration(
             generationId: generation.generationId,
@@ -255,13 +295,13 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
           generationId: generation.generationId,
           correlationId: _activeCorrelationId,
         );
-        if (_disposed) {
+        if (_disposed || !_canUsePrivateGenerationApi) {
           return generation;
         }
         _startPolling(generation.generationId);
       } else {
         await repository.clearActiveGeneration(generation.generationId);
-        if (_disposed) {
+        if (_disposed || !_canUsePrivateGenerationApi) {
           return generation;
         }
       }
@@ -299,6 +339,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
     final generationId = state.generation?.generationId;
     if (generationId == null ||
         generationId.isEmpty ||
+        !_canUsePrivateGenerationApi ||
         !_hasInternet ||
         !_isForeground) {
       return;
@@ -308,7 +349,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
   }
 
   void _startPolling(String generationId) {
-    if (_disposed || !_isForeground) {
+    if (_disposed || !_canUsePrivateGenerationApi || !_isForeground) {
       return;
     }
 
@@ -317,7 +358,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
   }
 
   void _scheduleNextPoll(TemplateGenerationResult? generation) {
-    if (_disposed || !_isForeground) {
+    if (_disposed || !_canUsePrivateGenerationApi || !_isForeground) {
       return;
     }
 
@@ -353,7 +394,10 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
     String generationId, {
     required bool scheduleNext,
   }) async {
-    if (_disposed || !_hasInternet || !_isForeground) {
+    if (_disposed ||
+        !_canUsePrivateGenerationApi ||
+        !_hasInternet ||
+        !_isForeground) {
       return;
     }
 
@@ -374,7 +418,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
         correlationId: _activeCorrelationId,
         cancelToken: requestCancelToken,
       );
-      if (_disposed) {
+      if (_disposed || !_canUsePrivateGenerationApi) {
         return;
       }
 
@@ -447,12 +491,16 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
 
   Future<void> _restoreActiveGeneration() async {
     final restoreEpoch = _generationFlowEpoch;
+    if (!_canUsePrivateGenerationApi) {
+      return;
+    }
+
     final repository = _repository;
     final active = await repository.readActiveGeneration();
     if (!_isRestoreCurrent(restoreEpoch) || active == null) {
       return;
     }
-    if (!_hasInternet || !_isForeground) {
+    if (!_canUsePrivateGenerationApi || !_hasInternet || !_isForeground) {
       return;
     }
 
@@ -467,7 +515,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
         correlationId: _activeCorrelationId,
         cancelToken: requestCancelToken,
       );
-      if (!_isRestoreCurrent(restoreEpoch)) {
+      if (!_isRestoreCurrent(restoreEpoch) || !_canUsePrivateGenerationApi) {
         return;
       }
 
@@ -480,7 +528,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
 
       if (generation.isTerminal) {
         await repository.clearActiveGeneration(generation.generationId);
-        if (!_isRestoreCurrent(restoreEpoch)) {
+        if (!_isRestoreCurrent(restoreEpoch) || !_canUsePrivateGenerationApi) {
           return;
         }
         _activeCorrelationId = null;
@@ -492,7 +540,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
         generationId: generation.generationId,
         correlationId: _activeCorrelationId,
       );
-      if (!_isRestoreCurrent(restoreEpoch)) {
+      if (!_isRestoreCurrent(restoreEpoch) || !_canUsePrivateGenerationApi) {
         return;
       }
       _startPolling(generation.generationId);
@@ -537,7 +585,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
       return;
     }
 
-    if (!_isForeground) {
+    if (!_isForeground || !_canUsePrivateGenerationApi) {
       return;
     }
 
@@ -571,7 +619,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
       return;
     }
 
-    if (!_hasInternet) {
+    if (!_hasInternet || !_canUsePrivateGenerationApi) {
       return;
     }
 
@@ -586,7 +634,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
   }
 
   Future<void> _refreshWalletIfAlive() async {
-    if (_disposed || !_hasInternet) {
+    if (_disposed || !_canUsePrivateGenerationApi || !_hasInternet) {
       return;
     }
 

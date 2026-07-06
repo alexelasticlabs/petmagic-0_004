@@ -12,6 +12,7 @@ import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_controller.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
+import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/all_transactions_page.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
@@ -386,6 +387,70 @@ void main() {
       );
     },
   );
+
+  testWidgets('wallet auto refresh stops after sign out', (tester) async {
+    final repository = FakeWalletRepository(
+      wallet: walletStateFixture,
+      ledger: ledgerItemsFixture,
+      packs: packsFixture,
+      purchases: purchasesFixture,
+    );
+    final launchController = _MutableWalletAppLaunchController(true);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appLaunchControllerProvider.overrideWith(() => launchController),
+          walletRepositoryProvider.overrideWithValue(repository),
+          templatesControllerProvider.overrideWith(
+            StaticWalletTemplatesController.new,
+          ),
+        ],
+        child: MaterialApp.router(
+          theme: AppTheme.dark(),
+          locale: const Locale('ru'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: const [
+            Locale('ru'),
+            Locale('en'),
+            Locale('de'),
+            Locale('es'),
+            Locale('fr'),
+            Locale('it'),
+            Locale('pl'),
+          ],
+          routerConfig: GoRouter(
+            routes: [
+              GoRoute(
+                path: '/',
+                builder: (context, state) =>
+                    const Material(child: WalletPage()),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(repository.walletFetchCount, 1);
+
+    launchController.setAuthenticated(false);
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 13));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(
+      repository.walletFetchCount,
+      1,
+      reason:
+          'a stale wallet auto-refresh timer must not call private wallet APIs after sign out',
+    );
+  });
 
   testWidgets(
     'wallet page shows legal acceptance action for legal gate errors',

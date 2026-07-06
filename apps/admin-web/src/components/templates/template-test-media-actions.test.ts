@@ -41,6 +41,9 @@ describe("template test media actions", () => {
     expect(source).not.toContain('validationErrors.join(" ")');
     expect(source).toContain("URL.createObjectURL(blob)");
     expect(source).toContain("fetchWithTimeout(previewUrl");
+    expect(source).toContain("isUnsafeTemplateMediaUrl(previewUrl)");
+    expect(source).toContain("templates.media_preview_fetch_blocked");
+    expect(source).toContain("getBlockedUnsafeTemplateMediaUrlDetails(previewUrl)");
     expect(source).toContain("<TemplateSecureMedia");
     expect(source).toContain("templates.media_preview_fetch_failed");
     expect(source).toContain("function getTemplateTestErrorDetails(error: unknown)");
@@ -60,6 +63,7 @@ describe("template test media actions", () => {
     expect(source).not.toContain("templateId,\n          error");
     expect(source).not.toContain("generationId: activeRun.generationId,\n          error");
     expect(source).not.toContain("mediaType,\n        error");
+    expect(source).not.toContain('templates.media_preview_fetch_blocked", { url');
   });
 
   it("aborts pending generated media actions and ignores abort failures", () => {

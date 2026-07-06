@@ -11,6 +11,7 @@ import 'package:image_picker_platform_interface/image_picker_platform_interface.
     as image_picker_platform;
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/pets/presentation/my_pets_page.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
@@ -405,6 +406,9 @@ void main() {
     );
     final container = ProviderContainer(
       overrides: [
+        appLaunchControllerProvider.overrideWith(
+          AuthenticatedAppLaunchController.new,
+        ),
         templateGenerationRepositoryProvider.overrideWithValue(repository),
         networkStatusControllerProvider.overrideWith(
           () => TestMyPetsNetworkStatusController(initialHasInternet: true),
@@ -485,6 +489,9 @@ void main() {
       );
       final container = ProviderContainer(
         overrides: [
+          appLaunchControllerProvider.overrideWith(
+            AuthenticatedAppLaunchController.new,
+          ),
           templateGenerationRepositoryProvider.overrideWithValue(repository),
           networkStatusControllerProvider.overrideWith(() => networkController),
         ],

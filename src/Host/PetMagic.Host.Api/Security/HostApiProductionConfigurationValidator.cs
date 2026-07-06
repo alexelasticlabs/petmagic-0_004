@@ -1,7 +1,6 @@
-using System.Net;
-
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using PetMagic.BuildingBlocks.Security;
 
 namespace PetMagic.Host.Api.Security;
 
@@ -210,7 +209,7 @@ public static class HostApiProductionConfigurationValidator
             throw new InvalidOperationException("Cors:AllowedOrigins must contain origins only, without paths, query strings, fragments, or credentials outside development.");
         }
 
-        if (IsPrivateNetworkTarget(uri))
+        if (SafeNetworkTargetPolicy.IsPrivateNetworkTarget(uri))
         {
             throw new InvalidOperationException("Cors:AllowedOrigins must not contain local or private network origins outside development.");
         }
@@ -249,7 +248,7 @@ public static class HostApiProductionConfigurationValidator
             throw new InvalidOperationException("AllowedHosts must not include ports outside development.");
         }
 
-        if (IsPrivateNetworkTarget(uri))
+        if (SafeNetworkTargetPolicy.IsPrivateNetworkTarget(uri))
         {
             throw new InvalidOperationException("AllowedHosts must not contain local or private network hosts outside development.");
         }
@@ -289,7 +288,7 @@ public static class HostApiProductionConfigurationValidator
             throw new InvalidOperationException($"{settingName} must not contain credentials, query strings, or fragments outside development.");
         }
 
-        if (IsPrivateNetworkTarget(uri))
+        if (SafeNetworkTargetPolicy.IsPrivateNetworkTarget(uri))
         {
             throw new InvalidOperationException($"{settingName} must not point to a local or private network host outside development.");
         }
@@ -298,69 +297,6 @@ public static class HostApiProductionConfigurationValidator
         {
             throw new InvalidOperationException($"{settingName} must not use example.com placeholder hosts outside development.");
         }
-    }
-
-    private static bool IsPrivateNetworkTarget(Uri uri)
-    {
-        var host = uri.IdnHost;
-        if (string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
-            || host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(host, "0.0.0.0", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(host, "[::]", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(host, "::", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        var normalizedHost = host.Trim('[', ']');
-        return IPAddress.TryParse(normalizedHost, out var address) && IsPrivateNetworkAddress(address);
-    }
-
-    private static bool IsPrivateNetworkAddress(IPAddress address)
-    {
-        if (address.IsIPv4MappedToIPv6)
-        {
-            address = address.MapToIPv4();
-        }
-
-        if (IPAddress.IsLoopback(address)
-            || IPAddress.Any.Equals(address)
-            || IPAddress.None.Equals(address)
-            || IPAddress.IPv6Any.Equals(address)
-            || IPAddress.IPv6Loopback.Equals(address)
-            || IPAddress.IPv6None.Equals(address)
-            || address.IsIPv6LinkLocal
-            || address.IsIPv6SiteLocal
-            || address.IsIPv6Multicast
-            || IsIPv6UniqueLocalAddress(address))
-        {
-            return true;
-        }
-
-        if (address.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork)
-        {
-            return false;
-        }
-
-        var bytes = address.GetAddressBytes();
-        return bytes[0] == 10
-            || bytes[0] == 127
-            || bytes[0] == 169 && bytes[1] == 254
-            || bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31
-            || bytes[0] == 192 && bytes[1] == 168
-            || bytes[0] == 100 && bytes[1] >= 64 && bytes[1] <= 127
-            || bytes[0] >= 224;
-    }
-
-    private static bool IsIPv6UniqueLocalAddress(IPAddress address)
-    {
-        if (address.AddressFamily != System.Net.Sockets.AddressFamily.InterNetworkV6)
-        {
-            return false;
-        }
-
-        var bytes = address.GetAddressBytes();
-        return (bytes[0] & 0xfe) == 0xfc;
     }
 
     private static bool ContainsPlaceholder(string value) =>

@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_realtime_client.dart';
@@ -58,6 +59,9 @@ void main() {
       final repository = _FlakyRefreshSupportChatRepository();
       final container = ProviderContainer(
         overrides: [
+          appLaunchControllerProvider.overrideWith(
+            () => _MutableSupportChatAppLaunchController(true),
+          ),
           supportChatRepositoryProvider.overrideWithValue(repository),
           supportChatRealtimeClientProvider.overrideWithValue(
             const _NoopSupportChatRealtimeClient(),
@@ -95,6 +99,9 @@ void main() {
       final realtimeClient = TrackingSupportChatRealtimeClient();
       final container = ProviderContainer(
         overrides: [
+          appLaunchControllerProvider.overrideWith(
+            () => _MutableSupportChatAppLaunchController(true),
+          ),
           supportChatRepositoryProvider.overrideWithValue(repository),
           supportChatRealtimeClientProvider.overrideWithValue(realtimeClient),
         ],
@@ -132,6 +139,9 @@ void main() {
       final realtimeClient = TrackingSupportChatRealtimeClient();
       final container = ProviderContainer(
         overrides: [
+          appLaunchControllerProvider.overrideWith(
+            () => _MutableSupportChatAppLaunchController(true),
+          ),
           supportChatRepositoryProvider.overrideWithValue(repository),
           supportChatRealtimeClientProvider.overrideWithValue(realtimeClient),
         ],
@@ -169,6 +179,9 @@ void main() {
       final realtimeClient = _DelayedConnectSupportChatRealtimeClient();
       final container = ProviderContainer(
         overrides: [
+          appLaunchControllerProvider.overrideWith(
+            () => _MutableSupportChatAppLaunchController(true),
+          ),
           supportChatRepositoryProvider.overrideWithValue(repository),
           supportChatRealtimeClientProvider.overrideWithValue(realtimeClient),
         ],
@@ -207,6 +220,9 @@ void main() {
       );
       final container = ProviderContainer(
         overrides: [
+          appLaunchControllerProvider.overrideWith(
+            () => _MutableSupportChatAppLaunchController(true),
+          ),
           supportChatRepositoryProvider.overrideWithValue(repository),
           supportChatRealtimeClientProvider.overrideWithValue(realtimeClient),
           networkStatusControllerProvider.overrideWith(() => networkController),
@@ -252,6 +268,9 @@ void main() {
       );
       final container = ProviderContainer(
         overrides: [
+          appLaunchControllerProvider.overrideWith(
+            () => _MutableSupportChatAppLaunchController(true),
+          ),
           supportChatRepositoryProvider.overrideWithValue(repository),
           supportChatRealtimeClientProvider.overrideWithValue(realtimeClient),
           networkStatusControllerProvider.overrideWith(() => networkController),
@@ -283,10 +302,94 @@ void main() {
     },
   );
 
+  test(
+    'support chat controller stops realtime and private refresh after sign out',
+    () async {
+      final repository = FakeSupportChatRepository();
+      final realtimeClient = TrackingSupportChatRealtimeClient();
+      final launchController = _MutableSupportChatAppLaunchController(true);
+      final container = ProviderContainer(
+        overrides: [
+          appLaunchControllerProvider.overrideWith(() => launchController),
+          supportChatRepositoryProvider.overrideWithValue(repository),
+          supportChatRealtimeClientProvider.overrideWithValue(realtimeClient),
+        ],
+      );
+      addTearDown(() {
+        realtimeClient.closeStream();
+        container.dispose();
+      });
+
+      final controller = container.read(supportChatControllerProvider.notifier);
+
+      await controller.start();
+
+      expect(repository.getConversationCalls, 1);
+      expect(realtimeClient.connectCalls, 1);
+
+      launchController.setAuthenticated(false);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(realtimeClient.disconnectCalls, 1);
+
+      await controller.refresh();
+      final sent = await controller.sendMessage('hello', localeTag: 'ru');
+
+      expect(sent, isFalse);
+      expect(
+        repository.getConversationCalls,
+        1,
+        reason: 'support refresh must not call private API after sign out',
+      );
+      expect(
+        repository.openConversationCalls,
+        0,
+        reason: 'support send must not open a conversation after sign out',
+      );
+      expect(realtimeClient.connectCalls, 1);
+    },
+  );
+
+  test(
+    'support chat controller stays idle for explicit unauthenticated app state',
+    () async {
+      final repository = FakeSupportChatRepository(hasConversation: false);
+      final realtimeClient = TrackingSupportChatRealtimeClient();
+      final container = ProviderContainer(
+        overrides: [
+          appLaunchControllerProvider.overrideWith(
+            () => _MutableSupportChatAppLaunchController(false),
+          ),
+          supportChatRepositoryProvider.overrideWithValue(repository),
+          supportChatRealtimeClientProvider.overrideWithValue(realtimeClient),
+        ],
+      );
+      addTearDown(() {
+        realtimeClient.closeStream();
+        container.dispose();
+      });
+
+      final controller = container.read(supportChatControllerProvider.notifier);
+
+      await controller.start();
+      final sent = await controller.sendMessage('hello', localeTag: 'ru');
+      final state = container.read(supportChatControllerProvider);
+
+      expect(sent, isFalse);
+      expect(state.isLoading, isFalse);
+      expect(repository.getConversationCalls, 0);
+      expect(repository.openConversationCalls, 0);
+      expect(realtimeClient.connectCalls, 0);
+    },
+  );
+
   test('load older messages stops after duplicate-only page', () async {
     final repository = _DuplicateOlderMessagesSupportChatRepository();
     final container = ProviderContainer(
       overrides: [
+        appLaunchControllerProvider.overrideWith(
+          () => _MutableSupportChatAppLaunchController(true),
+        ),
         supportChatRepositoryProvider.overrideWithValue(repository),
         supportChatRealtimeClientProvider.overrideWithValue(
           const _NoopSupportChatRealtimeClient(),
@@ -351,6 +454,34 @@ class _DuplicateOlderMessagesSupportChatRepository
     }
 
     return _conversationWithOlderMessages();
+  }
+}
+
+class _MutableSupportChatAppLaunchController extends AppLaunchController {
+  _MutableSupportChatAppLaunchController(this._isAuthenticated);
+
+  bool _isAuthenticated;
+
+  @override
+  AppLaunchState build() {
+    return AppLaunchState(
+      isLoading: false,
+      isAuthenticated: _isAuthenticated,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: _isAuthenticated,
+    );
+  }
+
+  void setAuthenticated(bool value) {
+    _isAuthenticated = value;
+    state = state.copyWith(
+      isLoading: false,
+      isAuthenticated: value,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: value,
+    );
   }
 }
 

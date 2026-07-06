@@ -11,6 +11,9 @@ describe("support info attachment links", () => {
     expect(source).not.toContain("url: attachment.fileUrl");
     expect(source).toContain("URL.createObjectURL(blob)");
     expect(source).toContain("fetchWithTimeout(attachment.fileUrl");
+    expect(source).toContain("isUnsafeSupportMediaUrl(attachment.fileUrl)");
+    expect(source).toContain("support.attachment_open_blocked");
+    expect(source).toContain("getBlockedUnsafeSupportMediaUrlDetails(attachment.fileUrl)");
     expect(source).toContain("support.attachment_open_failed");
     expect(source).toContain("function getSupportInfoErrorDetails(error: unknown)");
     expect(source).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
@@ -28,6 +31,7 @@ describe("support info attachment links", () => {
     expect(source).toContain("scheduleSupportInfoBlobUrlRevoke(objectUrl, 1000);");
     expect(source).toContain("scheduleSupportInfoBlobUrlRevoke(objectUrl, 60_000);");
     expect(source).not.toContain("mimeType: attachment.mimeType,\n        error");
+    expect(source).not.toContain('support.attachment_open_blocked", { url');
   });
 
   it("aborts pending attachment opens on unmount and ignores abort errors", () => {

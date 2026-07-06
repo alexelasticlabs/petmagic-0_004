@@ -16,6 +16,38 @@ mixin _SupportChatControllerConversationMixin
   bool _hasInternet = true;
   bool _isScreenVisible = true;
   bool _isRealtimeConnected = false;
+  bool _canUsePrivateSupportApi = true;
+
+  bool _isLaunchAuthorized(AppLaunchState state) {
+    return state.isLoading || state.isAuthenticated;
+  }
+
+  void _handleAuthStatusChanged(AppLaunchState state) {
+    final canUsePrivateApi = _isLaunchAuthorized(state);
+    if (_canUsePrivateSupportApi == canUsePrivateApi) {
+      return;
+    }
+
+    _canUsePrivateSupportApi = canUsePrivateApi;
+    if (canUsePrivateApi) {
+      return;
+    }
+
+    stop();
+    _settlePrivateApiDisabledState();
+  }
+
+  void _settlePrivateApiDisabledState() {
+    _updateStateIfMounted(
+      (state) => state.copyWith(
+        isLoading: false,
+        isRefreshing: false,
+        isSending: false,
+        isLoadingOlder: false,
+        clearSendProgress: true,
+      ),
+    );
+  }
 
   void stop() {
     suspend();
@@ -125,6 +157,11 @@ mixin _SupportChatControllerConversationMixin
     }
 
     _isScreenVisible = visible;
+    if (!_canUsePrivateSupportApi) {
+      suspend();
+      return;
+    }
+
     if (_isScreenVisible) {
       if (_started) {
         unawaited(_resumeRealtimeIfNeeded());
@@ -172,6 +209,12 @@ mixin _SupportChatControllerConversationMixin
   }
 
   Future<void> start() async {
+    if (!_canUsePrivateSupportApi) {
+      stop();
+      _settlePrivateApiDisabledState();
+      return;
+    }
+
     final shouldInitialize = !_hasLoadedConversationSnapshot;
     if (_started) {
       if (_isScreenVisible) {
@@ -203,6 +246,11 @@ mixin _SupportChatControllerConversationMixin
   }
 
   Future<void> _loadConversation({required bool refresh}) async {
+    if (!_canUsePrivateSupportApi) {
+      _settlePrivateApiDisabledState();
+      return;
+    }
+
     if (!_hasInternet) {
       if (state.conversation == null) {
         _updateStateIfMounted(
@@ -281,6 +329,10 @@ mixin _SupportChatControllerConversationMixin
     )
     action,
   ) async {
+    if (!_canUsePrivateSupportApi) {
+      return;
+    }
+
     final conversation = state.conversation;
     if (conversation == null || state.isSending) {
       return;
@@ -316,6 +368,10 @@ mixin _SupportChatControllerConversationMixin
   }
 
   Future<void> _performConversationLoad({required bool refresh}) async {
+    if (!_canUsePrivateSupportApi) {
+      return;
+    }
+
     state = state.copyWith(
       isLoading: !refresh,
       isRefreshing: refresh,
@@ -467,7 +523,10 @@ mixin _SupportChatControllerConversationMixin
   }
 
   void _scheduleRealtimeRefresh() {
-    if (!_isScreenVisible || !_hasInternet || _isConversationBusy) {
+    if (!_canUsePrivateSupportApi ||
+        !_isScreenVisible ||
+        !_hasInternet ||
+        _isConversationBusy) {
       return;
     }
 
@@ -481,6 +540,7 @@ mixin _SupportChatControllerConversationMixin
   void _flushPendingRealtimeRefresh() {
     _realtimeRefreshTimer = null;
     if (!_hasPendingRealtimeRefresh ||
+        !_canUsePrivateSupportApi ||
         !_isScreenVisible ||
         !_hasInternet ||
         _isConversationBusy) {
@@ -496,13 +556,20 @@ mixin _SupportChatControllerConversationMixin
       return;
     }
 
-    if (_isScreenVisible && _hasInternet && _hasPendingRealtimeRefresh) {
+    if (_canUsePrivateSupportApi &&
+        _isScreenVisible &&
+        _hasInternet &&
+        _hasPendingRealtimeRefresh) {
       _scheduleRealtimeRefresh();
     }
   }
 
   Future<void> _resumeRealtimeIfNeeded() async {
-    if (!_started || !ref.mounted || !_isScreenVisible || !_hasInternet) {
+    if (!_started ||
+        !ref.mounted ||
+        !_canUsePrivateSupportApi ||
+        !_isScreenVisible ||
+        !_hasInternet) {
       return;
     }
 
@@ -523,7 +590,11 @@ mixin _SupportChatControllerConversationMixin
       final nextConnect = _realtimeClient.connect();
       _realtimeConnectInFlight = nextConnect;
       await nextConnect;
-      if (!ref.mounted || !_started || !_isScreenVisible || !_hasInternet) {
+      if (!ref.mounted ||
+          !_started ||
+          !_canUsePrivateSupportApi ||
+          !_isScreenVisible ||
+          !_hasInternet) {
         unawaited(_realtimeClient.disconnect());
         _pauseRealtime();
         return;
@@ -549,6 +620,10 @@ mixin _SupportChatControllerConversationMixin
 
   Future<void> _markReadIfNeeded(SupportChatConversation conversation) async {
     if (!ref.mounted) {
+      return;
+    }
+
+    if (!_canUsePrivateSupportApi) {
       return;
     }
 
@@ -600,6 +675,10 @@ mixin _SupportChatControllerConversationMixin
   }
 
   void _handleRealtimeUpdate(SupportChatRealtimeUpdate event) {
+    if (!_canUsePrivateSupportApi) {
+      return;
+    }
+
     final activeConversationId = state.conversation?.conversationId;
     if (activeConversationId != null &&
         activeConversationId != event.conversationId) {

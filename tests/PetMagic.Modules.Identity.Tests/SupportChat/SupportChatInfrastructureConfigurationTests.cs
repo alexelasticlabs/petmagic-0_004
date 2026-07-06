@@ -23,6 +23,27 @@ public sealed class SupportChatInfrastructureConfigurationTests
         Assert.Contains("SupportChat Firebase push is enabled", exception.Message);
     }
 
+    [Theory]
+    [InlineData("https://fcm.googleapis.com/v1/projects/petmagic")]
+    [InlineData("petmagic/production")]
+    [InlineData("petmagic@example")]
+    [InlineData("petmagic production")]
+    public void AddSupportChatInfrastructure_ShouldRejectUnsafeFirebaseProjectId_InProduction(string projectId)
+    {
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["SupportChat:FirebasePush:Enabled"] = "true",
+            ["SupportChat:FirebasePush:ProjectId"] = projectId,
+            ["SupportChat:FirebasePush:ServiceAccountJson"] = """{"type":"service_account"}""",
+            ["ConnectionStrings:DefaultConnection"] = "Host=db.petmagic.internal;Database=petmagic;Username=petmagic_app;Password=strong-secret",
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            new ServiceCollection().AddSupportChatInfrastructure(configuration, isProduction: true));
+
+        Assert.Contains("SupportChat:FirebasePush:ProjectId", exception.Message);
+    }
+
     [Fact]
     public void AddSupportChatInfrastructure_ShouldAllowProduction_WhenPushIsDisabled()
     {
@@ -64,6 +85,8 @@ public sealed class SupportChatInfrastructureConfigurationTests
         Assert.Contains("private static readonly TimeSpan PushHttpClientTimeout = TimeSpan.FromSeconds(30);", source, StringComparison.Ordinal);
         Assert.Contains("services.AddHttpClient<FcmSupportChatPushNotificationSender>(client =>", source, StringComparison.Ordinal);
         Assert.Contains("client.Timeout = PushHttpClientTimeout", source, StringComparison.Ordinal);
+        Assert.Contains(".ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler", source, StringComparison.Ordinal);
+        Assert.Contains("AllowAutoRedirect = false", source, StringComparison.Ordinal);
     }
 
     [Fact]

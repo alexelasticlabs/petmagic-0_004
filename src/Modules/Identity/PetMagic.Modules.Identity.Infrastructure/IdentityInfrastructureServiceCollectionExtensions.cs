@@ -12,6 +12,7 @@ using Microsoft.IdentityModel.Tokens;
 
 using PetMagic.BuildingBlocks.Images;
 using PetMagic.BuildingBlocks.Observability;
+using PetMagic.BuildingBlocks.Security;
 using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Identity.Domain.Enums;
 using PetMagic.Modules.Identity.Infrastructure.Data;
@@ -427,6 +428,41 @@ public static class IdentityInfrastructureServiceCollectionExtensions
         {
             throw new InvalidOperationException("Apple external auth configuration is incomplete. Configure ClientId, ClientSecret, AuthorizationEndpoint, and TokenEndpoint together.");
         }
+
+        if (appleAllConfigured)
+        {
+            ValidateExternalAuthEndpoint(
+                options.Apple.AuthorizationEndpoint,
+                "ExternalAuth:Apple:AuthorizationEndpoint");
+            ValidateExternalAuthEndpoint(
+                options.Apple.TokenEndpoint,
+                "ExternalAuth:Apple:TokenEndpoint");
+        }
+    }
+
+    private static void ValidateExternalAuthEndpoint(string endpoint, string settingName)
+    {
+        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri))
+        {
+            throw new InvalidOperationException($"{settingName} must be an absolute HTTPS URL.");
+        }
+
+        if (!string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"{settingName} must use HTTPS.");
+        }
+
+        if (!string.IsNullOrEmpty(uri.UserInfo)
+            || !string.IsNullOrEmpty(uri.Query)
+            || !string.IsNullOrEmpty(uri.Fragment))
+        {
+            throw new InvalidOperationException($"{settingName} must not contain credentials, query strings, or fragments.");
+        }
+
+        if (SafeNetworkTargetPolicy.IsPrivateNetworkTarget(uri))
+        {
+            throw new InvalidOperationException($"{settingName} must not point to a local or private network host.");
+        }
     }
 
     private static void ValidateJwtConfiguration(JwtOptions options, IHostEnvironment? environment)
@@ -490,6 +526,11 @@ public static class IdentityInfrastructureServiceCollectionExtensions
         if (!options.IsProductionConfigured)
         {
             throw new InvalidOperationException("Email dispatch worker is enabled but SMTP configuration is incomplete.");
+        }
+
+        if (!options.UseSsl)
+        {
+            throw new InvalidOperationException("Email:UseSsl must be enabled outside development when the email dispatch worker is enabled.");
         }
     }
 }

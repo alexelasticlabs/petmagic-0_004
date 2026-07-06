@@ -11,6 +11,7 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
@@ -216,6 +217,9 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedGenerationStatusAppLaunchController.new,
+            ),
             templateGenerationRepositoryProvider.overrideWithValue(
               FakeGenerationStatusTemplateGenerationRepository(
                 generationStatusFixture(),
@@ -283,6 +287,9 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedGenerationStatusAppLaunchController.new,
+            ),
             templateGenerationRepositoryProvider.overrideWithValue(
               FakeGenerationStatusTemplateGenerationRepository(
                 generationStatusFixture(
@@ -351,6 +358,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedGenerationStatusAppLaunchController.new,
+          ),
           templateGenerationRepositoryProvider.overrideWithValue(repository),
           realtimeClientProvider.overrideWithValue(const NoopRealtimeClient()),
           generationHistoryControllerProvider.overrideWith(
@@ -426,6 +436,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedGenerationStatusAppLaunchController.new,
+          ),
           templateGenerationRepositoryProvider.overrideWithValue(repository),
           realtimeClientProvider.overrideWithValue(const NoopRealtimeClient()),
           generationHistoryControllerProvider.overrideWith(
@@ -480,6 +493,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedGenerationStatusAppLaunchController.new,
+          ),
           templateGenerationRepositoryProvider.overrideWithValue(
             FakeGenerationStatusTemplateGenerationRepository(
               generationStatusFixture(
@@ -535,6 +551,9 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedGenerationStatusAppLaunchController.new,
+            ),
             templateGenerationRepositoryProvider.overrideWithValue(repository),
             realtimeClientProvider.overrideWithValue(realtimeClient),
             generationHistoryControllerProvider.overrideWith(
@@ -588,6 +607,78 @@ void main() {
     },
   );
 
+  testWidgets('generation status stops private polling after sign out', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final repository = FakeGenerationStatusTemplateGenerationRepository(
+      generationStatusFixture(
+        status: TemplateGenerationStatus.queued,
+        queuePosition: 2,
+        estimatedWaitSeconds: 120,
+      ),
+    );
+    final realtimeClient = FakeGenerationStatusRealtimeClient();
+    final launchController = _MutableGenerationStatusAppLaunchController(true);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appLaunchControllerProvider.overrideWith(() => launchController),
+          templateGenerationRepositoryProvider.overrideWithValue(repository),
+          realtimeClientProvider.overrideWithValue(realtimeClient),
+          generationHistoryControllerProvider.overrideWith(
+            IdleGenerationStatusHistoryController.new,
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          locale: Locale('en'),
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: GenerationStatusPage(generationId: 'generation-1'),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(repository.fetchGenerationCalls, 1);
+    expect(realtimeClient.connectCalls, 1);
+
+    launchController.setAuthenticated(false);
+    await tester.pump();
+
+    final text = AppLocalizations.of(
+      tester.element(find.byType(GenerationStatusPage)),
+    );
+    expect(find.text(text.authSignInRequired), findsWidgets);
+    expect(realtimeClient.disconnectCalls, 1);
+
+    realtimeClient.emitGenerationStatus({
+      'generationId': 'generation-1',
+      'userId': 'user-1',
+      'templateId': 'template-1',
+      'status': TemplateGenerationStatus.completed.name,
+      'tokenCost': 5,
+      'attemptCount': 1,
+      'createdAtUtc': DateTime.utc(2026).toIso8601String(),
+      'updatedAtUtc': DateTime.utc(2026).toIso8601String(),
+      'outputUrl': 'https://cdn.petmagic.test/late.jpg',
+    });
+    await tester.pump(const Duration(seconds: 9));
+    await tester.pump();
+
+    expect(repository.fetchGenerationCalls, 1);
+    expect(find.text(text.generationStatusStatusCompleted), findsNothing);
+  });
+
   testWidgets(
     'generation status disconnects realtime when connect finishes after network loss',
     (tester) async {
@@ -609,6 +700,9 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedGenerationStatusAppLaunchController.new,
+            ),
             templateGenerationRepositoryProvider.overrideWithValue(repository),
             realtimeClientProvider.overrideWithValue(realtimeClient),
             networkStatusControllerProvider.overrideWith(
@@ -694,6 +788,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedGenerationStatusAppLaunchController.new,
+          ),
           templateGenerationRepositoryProvider.overrideWithValue(repository),
           realtimeClientProvider.overrideWithValue(const NoopRealtimeClient()),
           generationHistoryControllerProvider.overrideWith(
@@ -870,7 +967,9 @@ void main() {
         materializeBody,
         contains('mergeFetchedGeneration(localizedGeneration)'),
       );
-      expect(lifecycleGuardBody, contains('!mounted || !_isPageActive'));
+      expect(lifecycleGuardBody, contains('!mounted ||'));
+      expect(lifecycleGuardBody, contains('!_canUsePrivateStatusApi ||'));
+      expect(lifecycleGuardBody, contains('!_isPageActive'));
       expect(lifecycleGuardBody, contains('AppLifecycleState.resumed'));
       expect(source, contains('_isPageActive = false;'));
       expect(source, contains('_cancelActiveLocalMediaDownloads();'));
@@ -883,6 +982,7 @@ void main() {
       final source = generationStatusLibrarySource;
       final pageSource = generationStatusPageSource;
       final schedulePollBody = methodBody(source, 'void _scheduleNextPoll');
+      final pollTickBody = methodBody(source, 'Future<void> _handlePollTick');
       final resumeRealtimeBody = methodBody(
         source,
         'Future<void> _resumeRealtimeIfNeeded',
@@ -899,6 +999,20 @@ void main() {
         contains(
           'if (!ref.read(networkStatusControllerProvider).hasInternet) {',
         ),
+      );
+      expect(
+        pollTickBody,
+        contains(
+          'if (!ref.read(networkStatusControllerProvider).hasInternet) {',
+        ),
+      );
+      expect(pollTickBody, contains('_stopPolling();'));
+      expect(pollTickBody, contains('AppLifecycleState.resumed'));
+      expect(
+        pollTickBody.indexOf(
+          'if (!ref.read(networkStatusControllerProvider).hasInternet) {',
+        ),
+        lessThan(pollTickBody.indexOf('await _load(silent: true);')),
       );
       expect(
         resumeRealtimeBody,
@@ -924,12 +1038,8 @@ void main() {
           'ref.listen<NetworkStatusState>(networkStatusControllerProvider, (',
         ),
       );
-      expect(
-        pageSource,
-        contains(
-          'if (!_isPageActive || previous?.hasInternet == next.hasInternet) {',
-        ),
-      );
+      expect(pageSource, contains('!_canUsePrivateStatusApi ||'));
+      expect(pageSource, contains('previous?.hasInternet == next.hasInternet'));
       expect(pageSource, contains('if (!next.hasInternet) {'));
       expect(pageSource, contains('_pauseRealtime();'));
       expect(pageSource, contains('_stopPolling();'));
@@ -1006,6 +1116,9 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedGenerationStatusAppLaunchController.new,
+            ),
             templateGenerationRepositoryProvider.overrideWithValue(
               FakeGenerationStatusTemplateGenerationRepository(
                 generationStatusFixture(
@@ -1048,6 +1161,9 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedGenerationStatusAppLaunchController.new,
+            ),
             templateGenerationRepositoryProvider.overrideWithValue(
               FakeGenerationStatusTemplateGenerationRepository(
                 generationStatusFixture(),
@@ -1089,6 +1205,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedGenerationStatusAppLaunchController.new,
+          ),
           templateGenerationRepositoryProvider.overrideWithValue(repository),
           realtimeClientProvider.overrideWithValue(const NoopRealtimeClient()),
           generationHistoryControllerProvider.overrideWith(
@@ -1141,5 +1260,47 @@ class _GenerationStatusNetworkStatusController extends NetworkStatusController {
 
   void setHasInternet(bool value) {
     state = state.copyWith(hasInternet: value);
+  }
+}
+
+class _AuthenticatedGenerationStatusAppLaunchController
+    extends AppLaunchController {
+  @override
+  AppLaunchState build() {
+    return const AppLaunchState(
+      isLoading: false,
+      isAuthenticated: true,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: true,
+    );
+  }
+}
+
+class _MutableGenerationStatusAppLaunchController extends AppLaunchController {
+  _MutableGenerationStatusAppLaunchController(this._isAuthenticated);
+
+  bool _isAuthenticated;
+
+  @override
+  AppLaunchState build() {
+    return AppLaunchState(
+      isLoading: false,
+      isAuthenticated: _isAuthenticated,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: _isAuthenticated,
+    );
+  }
+
+  void setAuthenticated(bool value) {
+    _isAuthenticated = value;
+    state = state.copyWith(
+      isLoading: false,
+      isAuthenticated: value,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: value,
+    );
   }
 }

@@ -6,6 +6,10 @@ import {
   formatSafeSupportDownloadName,
   getMessageAttachments,
 } from "@/components/support/support-conversation-helpers";
+import {
+  getBlockedUnsafeSupportMediaUrlDetails,
+  isUnsafeSupportMediaUrl,
+} from "@/components/support/support-secure-media";
 import type {
   SupportInfoAttachment,
   SupportInfoAttachmentEntry,
@@ -124,6 +128,15 @@ export function useSupportInfoPanelAttachmentActions({
     const controller = new AbortController();
     attachmentOpenAbortControllerRef.current = controller;
     try {
+      if (isUnsafeSupportMediaUrl(attachment.fileUrl)) {
+        clientLogger.warn("support.attachment_open_blocked", {
+          messageId: formatSupportInfoLogText(messageId),
+          mimeType: formatSupportInfoLogText(attachment.mimeType),
+          ...getBlockedUnsafeSupportMediaUrlDetails(attachment.fileUrl),
+        });
+        return;
+      }
+
       const response = await fetchWithTimeout(attachment.fileUrl, {
         credentials: "include",
         signal: controller.signal,

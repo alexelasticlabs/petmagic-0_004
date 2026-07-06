@@ -1,3 +1,10 @@
+using System.Reflection;
+
+using MailKit.Security;
+
+using PetMagic.Modules.Identity.Infrastructure;
+using PetMagic.Modules.Identity.Infrastructure.Options;
+
 namespace PetMagic.Modules.Identity.Tests.Identity;
 
 public sealed class IdentityEmailSenderImplementationTests
@@ -24,6 +31,27 @@ public sealed class IdentityEmailSenderImplementationTests
         Assert.DoesNotContain("using System.Net.Mail;", source, StringComparison.Ordinal);
         Assert.DoesNotContain("SendMailAsync(", source, StringComparison.Ordinal);
         Assert.DoesNotContain("logger.LogWarning(\r\n                exception,", source, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(false, 1025, SecureSocketOptions.None)]
+    [InlineData(true, 465, SecureSocketOptions.SslOnConnect)]
+    [InlineData(true, 587, SecureSocketOptions.StartTls)]
+    [InlineData(true, 2525, SecureSocketOptions.StartTls)]
+    public void IdentityEmailSender_ShouldUseStrictTls_WhenSslIsEnabled(
+        bool useSsl,
+        int port,
+        SecureSocketOptions expected)
+    {
+        var method = typeof(SmtpEmailSender).GetMethod(
+            "ResolveSecureSocketOptions",
+            BindingFlags.NonPublic | BindingFlags.Static);
+
+        Assert.NotNull(method);
+
+        var actual = method!.Invoke(null, [new EmailOptions { UseSsl = useSsl, Port = port }]);
+
+        Assert.Equal(expected, actual);
     }
 
     private static string FindRepositoryRoot()

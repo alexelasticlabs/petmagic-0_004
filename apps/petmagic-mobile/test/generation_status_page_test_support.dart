@@ -75,6 +75,7 @@ class FakeGenerationStatusTemplateGenerationRepository
   final List<String> analyticsEvents = [];
   final List<GenerationStatusAnalyticsCall> analyticsCalls = [];
   final List<String> removeWatermarkCalls = [];
+  int fetchGenerationCalls = 0;
   int fetchDownloadCalls = 0;
   int fetchShareCalls = 0;
   int cancelGenerationCalls = 0;
@@ -85,6 +86,7 @@ class FakeGenerationStatusTemplateGenerationRepository
     String? correlationId,
     CancelToken? cancelToken,
   }) async {
+    fetchGenerationCalls++;
     return generation;
   }
 
