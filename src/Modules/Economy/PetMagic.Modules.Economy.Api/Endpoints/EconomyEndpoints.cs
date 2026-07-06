@@ -3,6 +3,7 @@ using System.Text;
 
 using FluentValidation;
 
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -17,7 +18,7 @@ namespace PetMagic.Modules.Economy.Api.Endpoints;
 public static partial class EconomyEndpoints
 {
     private const string InvalidSubjectCode = "economy.invalid_subject";
-    private const string InvalidSubjectMessage = "Authentication failed.";
+    private const string InvalidSubjectMessage = InvalidSubjectCode;
     private const string InsufficientBalanceCode = "economy.insufficient_balance";
     private const string PurchaseNotFoundCode = "economy.purchase_not_found";
     private const string InvalidStripeSignatureCode = "economy.invalid_stripe_signature";
@@ -31,6 +32,7 @@ public static partial class EconomyEndpoints
         var group = endpoints.MapGroup("/api/economy")
             .WithTags("Economy")
             .RequireRateLimiting("economy")
+            .AddEndpointFilter(ApplyPrivateEconomyResponseHeadersAsync)
             .RequireAuthorization(policy => policy
                 .RequireAuthenticatedUser()
                 .RequireAssertion(context =>
@@ -49,12 +51,10 @@ public static partial class EconomyEndpoints
             .RequireAuthorization();
 
         group.MapPost("/wallet/claim-weekly", ClaimWeeklyAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyJsonRequestBodyBytes));
 
         group.MapPost("/wallet/claim-ad", ClaimAdRewardAsync)
-            .RequireAuthorization();
-
-        group.MapPost("/wallet/spend", SpendAsync)
             .RequireAuthorization()
             .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyJsonRequestBodyBytes));
 
@@ -121,12 +121,14 @@ public static partial class EconomyEndpoints
 
         endpoints.MapPost("/api/billing/google/validate", ValidateGooglePlayBillingAsync)
             .WithTags("Billing")
+            .AddEndpointFilter(ApplyPrivateEconomyResponseHeadersAsync)
             .RequireAuthorization()
             .RequireRateLimiting("economy")
             .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyJsonRequestBodyBytes));
 
         endpoints.MapPost("/api/billing/apple/validate", ValidateAppleAppStoreBillingAsync)
             .WithTags("Billing")
+            .AddEndpointFilter(ApplyPrivateEconomyResponseHeadersAsync)
             .RequireAuthorization()
             .RequireRateLimiting("economy")
             .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyJsonRequestBodyBytes));
@@ -143,7 +145,8 @@ public static partial class EconomyEndpoints
             .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyJsonRequestBodyBytes));
 
         group.MapDelete("/payment-methods/{paymentMethodId:guid}", RemovePaymentMethodAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyJsonRequestBodyBytes));
 
         group.MapGet("/purchases", ListPurchasesAsync)
             .RequireAuthorization();
@@ -190,35 +193,21 @@ public static partial class EconomyEndpoints
             .RequireRateLimiting("webhooks")
             .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyWebhookRequestBodyBytes));
 
-        var stripePaymentsGroup = endpoints.MapGroup("/api/payments/stripe")
-            .WithTags("Stripe Payments")
-            .RequireRateLimiting("economy")
-            .RequireAuthorization(policy => policy
-                .RequireAuthenticatedUser()
-                .RequireAssertion(context =>
-                    context.User.IsInRole("Admin")
-                    || context.User.IsInRole("Moderator")
-                    || !context.User.HasClaim(c => c.Type == "account_status")
-                    || string.Equals(
-                        context.User.FindFirst("account_status")?.Value,
-                        "Active",
-                        StringComparison.Ordinal)));
-
-        stripePaymentsGroup.MapPost("/token-purchase", CreateStripeTokenPurchaseAsync)
-            .RequireAuthorization()
-            .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyJsonRequestBodyBytes));
-
-        stripePaymentsGroup.MapPost("/subscription", CreateStripeSubscriptionAsync)
-            .RequireAuthorization()
-            .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyJsonRequestBodyBytes));
-
-        stripePaymentsGroup.MapPost("/customer-portal", CreateStripeCustomerPortalAsync)
-            .RequireAuthorization()
-            .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyJsonRequestBodyBytes));
-
-        stripePaymentsGroup.MapGet("/diagnostics", GetStripeDiagnosticsAsync)
-            .RequireAuthorization("AdminOnly");
-
         return endpoints;
+    }
+
+    private static async ValueTask<object?> ApplyPrivateEconomyResponseHeadersAsync(
+        EndpointFilterInvocationContext context,
+        EndpointFilterDelegate next)
+    {
+        var endpoint = context.HttpContext.GetEndpoint();
+        if (endpoint?.Metadata.GetMetadata<IAllowAnonymous>() is null)
+        {
+            context.HttpContext.Response.Headers.CacheControl = "no-store";
+            context.HttpContext.Response.Headers.Pragma = "no-cache";
+            context.HttpContext.Response.Headers.XContentTypeOptions = "nosniff";
+        }
+
+        return await next(context);
     }
 }

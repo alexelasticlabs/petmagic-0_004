@@ -120,6 +120,40 @@ public sealed partial class SupportChatEndpointsIntegrationTests
     }
 
     [Fact]
+    public async Task AdminInbox_ShouldFilterWaitingForSupportQueue()
+    {
+        await using var application = await SupportChatTestApplication.CreateAsync();
+
+        var userClient = application.CreateClient(UserId, "User");
+        var otherUserClient = application.CreateClient(OtherUserId, "User");
+        var adminClient = application.CreateClient(AdminId, "Admin");
+
+        var newTicket = await PostAsJsonAsync<SupportConversationDetailResponse>(
+            userClient,
+            "/api/support/conversation/open",
+            new OpenConversationRequest("Waiting for support", SupportConversationPriority.Normal));
+
+        var waitingForUserTicket = await PostAsJsonAsync<SupportConversationDetailResponse>(
+            otherUserClient,
+            "/api/support/conversation/open",
+            new OpenConversationRequest("Waiting for user", SupportConversationPriority.Normal));
+
+        await PostAsJsonAsync<SupportMessageResponse>(
+            adminClient,
+            $"/api/admin/support/tickets/{waitingForUserTicket.ConversationId}/messages",
+            new SendSupportMessageRequest("Please send details"));
+
+        var tickets = await GetFromJsonAsync<SupportConversationInboxPageResponse>(
+            adminClient,
+            "/api/admin/support/tickets?queue=waiting_for_support&page=1&pageSize=10");
+
+        Assert.Equal(1, tickets.TotalCount);
+        var ticket = Assert.Single(tickets.Items);
+        Assert.Equal(newTicket.ConversationId, ticket.ConversationId);
+        Assert.Equal("New", ticket.Status);
+    }
+
+    [Fact]
     public async Task AdminInbox_ShouldReturnFieldSpecificProblemForInvalidAssignmentFilter()
     {
         await using var application = await SupportChatTestApplication.CreateAsync();
@@ -139,7 +173,8 @@ public sealed partial class SupportChatEndpointsIntegrationTests
     [InlineData("source=-1", "support.source_invalid")]
     [InlineData("priority=1", "support.priority_invalid")]
     [InlineData("priority=-1", "support.priority_invalid")]
-    public async Task AdminInbox_ShouldRejectNumericEnumFilters(string query, string expectedErrorCode)
+    [InlineData("queue=unknown", "support.queue_invalid")]
+    public async Task AdminInbox_ShouldRejectInvalidFilters(string query, string expectedErrorCode)
     {
         await using var application = await SupportChatTestApplication.CreateAsync();
 

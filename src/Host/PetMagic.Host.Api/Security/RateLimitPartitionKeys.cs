@@ -21,12 +21,21 @@ public static class RateLimitPartitionKeys
 
     public static string WebhookProvider(HttpContext httpContext)
     {
-        var path = httpContext.Request.Path.Value ?? string.Empty;
-        var provider = path.Contains("stripe", StringComparison.OrdinalIgnoreCase) ? "stripe"
-            : path.Contains("apple", StringComparison.OrdinalIgnoreCase) ? "apple"
-            : path.Contains("google", StringComparison.OrdinalIgnoreCase) ? "google"
-            : "other";
-        return $"{provider}:{Ip(httpContext)}";
+        return $"{ResolveWebhookProvider(httpContext.Request.Path)}:{Ip(httpContext)}";
+    }
+
+    private static string ResolveWebhookProvider(PathString requestPath)
+    {
+        var path = (requestPath.Value ?? string.Empty).TrimEnd('/');
+        return path.ToLowerInvariant() switch
+        {
+            "/api/economy/webhooks/stripe" => "stripe",
+            "/api/economy/webhooks/app-store" => "apple",
+            "/api/webhooks/apple-app-store" => "apple",
+            "/api/economy/webhooks/google-play" => "google",
+            "/api/webhooks/google-play" => "google",
+            _ => "other"
+        };
     }
 
     private static string? FirstNonEmpty(params string?[] values)

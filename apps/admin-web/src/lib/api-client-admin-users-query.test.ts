@@ -15,9 +15,7 @@ import {
 } from "@/lib/api-client.admin-users";
 import { clearAdminListCaches } from "@/lib/api-client.core";
 
-const adminUsersClientPath = fileURLToPath(
-  new URL("./api-client.admin-users.ts", import.meta.url)
-);
+const adminUsersClientPath = fileURLToPath(new URL("./api-client.admin-users.ts", import.meta.url));
 
 describe("admin users api client query and role guards", () => {
   const originalPublicApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -62,6 +60,7 @@ describe("admin users api client query and role guards", () => {
         role: "Owner",
         status: "deleted",
         isPremium: true,
+        sort: "random",
       })
     ).toEqual({
       skip: 0,
@@ -70,6 +69,7 @@ describe("admin users api client query and role guards", () => {
       role: undefined,
       status: undefined,
       isPremium: true,
+      sort: undefined,
     });
 
     expect(
@@ -79,6 +79,7 @@ describe("admin users api client query and role guards", () => {
         search: " alice@example.com ",
         role: " moderator ",
         status: " BLOCKED ",
+        sort: " LAST_ACTIVITY_ASC ",
       })
     ).toEqual({
       skip: 10,
@@ -87,6 +88,7 @@ describe("admin users api client query and role guards", () => {
       role: "Moderator",
       status: "blocked",
       isPremium: undefined,
+      sort: "last_activity_asc",
     });
   });
 
@@ -102,10 +104,29 @@ describe("admin users api client query and role guards", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    await fetchUsers({ skip: 0, take: 25, search: " alice@example.com " });
+    await fetchUsers({ skip: 0, take: 25, search: " alice@example.com ", sort: "created_asc" });
 
     expect(businessRequestUrls(fetchMock)[0]).toBe(
-      "https://api.example.com/api/admin/users?skip=0&take=25&search=alice%40example.com"
+      "https://api.example.com/api/admin/users?skip=0&take=25&search=alice%40example.com&sort=created_asc"
+    );
+  });
+
+  it("serializes authoritative last-activity users sorting through backend params", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json({
+        items: [],
+        totalCount: 0,
+        skip: 0,
+        take: 25,
+        hasMore: false,
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchUsers({ skip: 0, take: 25, sort: "last_activity_desc" });
+
+    expect(businessRequestUrls(fetchMock)[0]).toBe(
+      "https://api.example.com/api/admin/users?skip=0&take=25&sort=last_activity_desc"
     );
   });
 
@@ -131,10 +152,7 @@ describe("admin users api client query and role guards", () => {
       fetchMock.mock.calls
         .filter((call) => !String(call[0]).endsWith("/api/auth/refresh"))
         .map((call) => JSON.parse(String(call[1]?.body)))
-    ).toEqual([
-      { role: "Moderator" },
-      { role: "Admin" },
-    ]);
+    ).toEqual([{ role: "Moderator" }, { role: "Admin" }]);
   });
 
   it("encodes user ids before placing them in API path segments", async () => {
@@ -224,9 +242,7 @@ describe("admin users api client query and role guards", () => {
     expect(source).toContain("function clearAdminUserCaches(userId: string): void");
     expect(source).toContain("cachedUsersLists.clear();");
     expect(source).toContain("cachedAdminUserDetails.delete(`admin-user:${userId}`);");
-    expect(source).toContain(
-      "cachedAdminUserAnalytics.delete(`admin-user-analytics:${userId}`);"
-    );
-    expect(source.match(/clearAdminUserCaches\(userId\);/g)).toHaveLength(7);
+    expect(source).toContain("cachedAdminUserAnalytics.delete(`admin-user-analytics:${userId}`);");
+    expect(source.match(/clearAdminUserCaches\(userId\);/g)).toHaveLength(6);
   });
 });

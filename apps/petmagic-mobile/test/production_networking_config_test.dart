@@ -69,6 +69,50 @@ void main() {
     );
   });
 
+  test('release Dio and health probes do not send tunnel bypass headers', () {
+    final dioProvider = File(
+      'lib/core/network/dio_provider.dart',
+    ).readAsStringSync();
+    final resolver = File(
+      'lib/core/network/api_base_url_resolver.dart',
+    ).readAsStringSync();
+
+    expect(
+      dioProvider,
+      contains(
+        'if (kDebugMode) {\n'
+        "    headers['ngrok-skip-browser-warning'] = 'true';\n"
+        "    headers['Bypass-Tunnel-Reminder'] = 'true';",
+      ),
+    );
+    expect(
+      resolver,
+      contains(
+        'if (kDebugMode) {\n'
+        "        request.headers.set('ngrok-skip-browser-warning', 'true');\n"
+        "        request.headers.set('Bypass-Tunnel-Reminder', 'true');",
+      ),
+    );
+  });
+
+  test('Dio provider closes HTTP client when app scope is disposed', () {
+    final dioProvider = File(
+      'lib/core/network/dio_provider.dart',
+    ).readAsStringSync();
+
+    expect(dioProvider, contains('ref.onDispose(() => dio.close(force: true));'));
+  });
+
+  test('API base URL resolver logs only sanitized origins', () {
+    final resolver = File(
+      'lib/core/network/api_base_url_resolver.dart',
+    ).readAsStringSync();
+
+    expect(resolver, contains("'base_url_origin': _logSafeBaseUrlOrigin("));
+    expect(resolver, contains('String _logSafeBaseUrlOrigin(String baseUrl)'));
+    expect(resolver, isNot(contains("context: {'base_url':")));
+  });
+
   test(
     'android release keeps FCM auto init while smoke manifests disable it',
     () {

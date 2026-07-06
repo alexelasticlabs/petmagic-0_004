@@ -338,7 +338,7 @@ public static class IdentityInfrastructureServiceCollectionExtensions
     {
         return new AvatarStorageOptions
         {
-            PublicBaseUrl = section["PublicBaseUrl"] ?? "http://localhost:5000",
+            PublicBaseUrl = section["PublicBaseUrl"] ?? string.Empty,
             LocalMediaRootPath = section["LocalMediaRootPath"] ?? Path.Combine("wwwroot", "user-avatars"),
             MaxFileSizeBytes = ParsePositiveLong(section["MaxFileSizeBytes"], UploadedMediaPolicies.Avatar.MaxFileSizeBytes)
         };

@@ -100,8 +100,9 @@ class PremiumRepository {
 
   Future<PremiumCheckoutModel> createStripeCheckout(
     PremiumPlanModel plan,
-    Locale locale,
-  ) async {
+    Locale locale, {
+    CancelToken? cancelToken,
+  }) async {
     final platform = _platformValue();
     final payload = <String, Object?>{
       'planCode': plan.planCode,
@@ -120,6 +121,7 @@ class PremiumRepository {
           session.accessToken,
           extraHeaders: {'X-PetMagic-Platform': platform},
         ),
+        cancelToken: cancelToken,
       ),
       retryTransientFailures: false,
     );
@@ -129,19 +131,18 @@ class PremiumRepository {
       return checkout;
     }
 
-    if (checkout.usesPaymentSheet) {
-      return checkout;
-    }
-
     throw const AppException('premium.checkout_failed');
   }
 
-  Future<PremiumBillingPortalModel> createBillingPortal() async {
+  Future<PremiumBillingPortalModel> createBillingPortal({
+    CancelToken? cancelToken,
+  }) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
         '/api/economy/premium/manage',
         data: {'paymentProvider': PremiumPaymentProvider.stripe.value},
         options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
       ),
       retryTransientFailures: false,
     );
@@ -151,12 +152,14 @@ class PremiumRepository {
 
   Future<PremiumStatusModel> cancelSubscription({
     PremiumPaymentProvider provider = PremiumPaymentProvider.stripe,
+    CancelToken? cancelToken,
   }) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
         '/api/economy/premium/cancel',
         data: {'paymentProvider': provider.value},
         options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
       ),
       retryTransientFailures: false,
     );
@@ -164,14 +167,17 @@ class PremiumRepository {
     return PremiumStatusModel.fromJson(response.data ?? const {});
   }
 
-  Future<String> createManagementUrl(PremiumStatusModel status) async {
+  Future<String> createManagementUrl(
+    PremiumStatusModel status, {
+    CancelToken? cancelToken,
+  }) async {
     switch (status.manageSubscriptionAction) {
       case 'AppleSettings':
         return 'https://apps.apple.com/account/subscriptions';
       case 'GooglePlaySettings':
         return 'https://play.google.com/store/account/subscriptions';
       case 'StripeCustomerPortal':
-        final portal = await createBillingPortal();
+        final portal = await createBillingPortal(cancelToken: cancelToken);
         return portal.portalUrl;
       default:
         throw const AppException('premium.manage_failed');
@@ -280,6 +286,7 @@ class PremiumRepository {
     required PremiumPlanModel plan,
     required PremiumPaymentProvider provider,
     required PurchaseDetails purchase,
+    CancelToken? cancelToken,
   }) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
@@ -296,6 +303,7 @@ class PremiumRepository {
           'transactionDate': purchase.transactionDate,
         },
         options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
       ),
       retryTransientFailures: false,
     );
@@ -306,6 +314,7 @@ class PremiumRepository {
   Future<void> verifyStripeSubscriptionCheckout({
     required String planCode,
     required String externalSubscriptionId,
+    CancelToken? cancelToken,
   }) async {
     await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
@@ -315,6 +324,7 @@ class PremiumRepository {
           'externalSubscriptionId': externalSubscriptionId,
         },
         options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
       ),
       retryTransientFailures: false,
     );

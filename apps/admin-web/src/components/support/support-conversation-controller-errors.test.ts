@@ -15,9 +15,7 @@ const supportContentPath = fileURLToPath(
 const supportInboxPagePath = fileURLToPath(new URL("./support-inbox-page.tsx", import.meta.url));
 const supportStylesPath = fileURLToPath(new URL("./support-page.module.css", import.meta.url));
 const selectPath = fileURLToPath(new URL("../ui/select.tsx", import.meta.url));
-const adminFollowupsPath = fileURLToPath(
-  new URL("../../../../../docs/admin-web-production-followups.md", import.meta.url)
-);
+const adminQueryKeysPath = fileURLToPath(new URL("../../lib/admin-query-keys.ts", import.meta.url));
 
 describe("support conversation controller errors", () => {
   it("uses sanitized backend messages for support mutation failures", () => {
@@ -58,6 +56,7 @@ describe("support conversation controller errors", () => {
   it("keeps support workspace fetches and actions role-guarded at the controller layer", () => {
     const controllerSource = readSupportConversationControllerLibrarySource();
     const helpersSource = readFileSync(controllerHelpersPath, "utf8");
+    const contentSource = readFileSync(supportContentPath, "utf8");
     const pageSource = readSupportConversationPageLibrarySource();
     const infoPanelSource = readSupportInfoPanelLibrarySource();
     const selectSource = readFileSync(selectPath, "utf8");
@@ -67,6 +66,12 @@ describe("support conversation controller errors", () => {
       'const canManageSupportWorkspace =\n    sessionUserRoles.includes("Admin") || sessionUserRoles.includes("Moderator");'
     );
     expect(controllerSource).toContain("const supportActionsForbidden =");
+    expect(contentSource).toContain(
+      'actionsForbidden: "Действия поддержки доступны только администраторам или модераторам."'
+    );
+    expect(contentSource.slice(0, contentSource.indexOf("  en: {"))).not.toContain(
+      "Admin или Moderator"
+    );
     expect(controllerSource).toContain(
       "const assertCanManageSupportWorkspace = useCallback(() => {"
     );
@@ -77,15 +82,19 @@ describe("support conversation controller errors", () => {
     expect(helpersSource).toContain(
       "export const supportInboxStaleTimeMs = supportPollingIntervalMs;"
     );
+    expect(helpersSource).toContain(
+      "export const supportRealtimeHealthyPollingIntervalMs = 60_000;"
+    );
     expect(helpersSource).toContain("export const supportSubjectContextStaleTimeMs = 30_000;");
     expect(controllerSource).toContain("staleTime: supportInboxStaleTimeMs");
     expect(controllerSource).toContain("staleTime: supportSubjectContextStaleTimeMs");
     expect(controllerSource).toContain(
-      "refetchInterval: session && canManageSupportWorkspace ? supportPollingIntervalMs : false"
+      'supportRealtimeStatus === "connected"\n      ? supportRealtimeHealthyPollingIntervalMs\n      : supportPollingIntervalMs'
     );
     expect(controllerSource).toContain(
-      "useSupportRealtime(canManageSupportWorkspace ? session?.accessToken : undefined"
+      "refetchInterval: supportPollingEnabled ? supportRealtimeAwarePollingInterval : false"
     );
+    expect(controllerSource).toContain("const supportRealtimeStatus = useSupportRealtime(");
     expect(controllerSource).toContain(
       "!canManageSupportWorkspace ||\n      !conversationQuery.data"
     );
@@ -291,7 +300,7 @@ describe("support conversation controller errors", () => {
 
     expect(pageSource).toContain("setQueueFilter,");
     expect(pageSource).toContain(
-      'const setQueueSubFilter = (value: "all" | "unassigned" | "archive") => {'
+      'const setQueueSubFilter = (value: "all" | "waiting" | "unassigned" | "archive") => {'
     );
     expect(pageSource).toContain("if (isQueueControlsLocked) {\n      return;\n    }");
     expect(pageSource).toContain('setQueueStatusFilter("all");');
@@ -401,27 +410,45 @@ describe("support conversation controller errors", () => {
     );
   });
 
-  it("does not expose support priority and sort controls as local current-page filters", () => {
+  it("routes support queue, priority, and sort controls through backend query params", () => {
+    const controllerSource = readSupportConversationControllerLibrarySource();
     const pageSource = readSupportConversationPageLibrarySource();
-    const followups = readFileSync(adminFollowupsPath, "utf8");
-
-    expect(pageSource).not.toContain('"waiting" | "unassigned"');
-    expect(pageSource).not.toContain('setQueueSubFilter("waiting")');
-    expect(pageSource).not.toContain('subFilter === "waiting"');
+    const adminQueryKeysSource = readFileSync(adminQueryKeysPath, "utf8");
+    expect(pageSource).toContain('"all" | "waiting" | "unassigned" | "archive"');
+    expect(pageSource).toContain('setQueueSubFilter("waiting")');
+    expect(pageSource).toContain('setQueueFilter("waiting")');
     expect(pageSource).not.toContain('item.status === "New" || item.status === "WaitingForUser"');
-    expect(pageSource).not.toContain("queuePriorityFilter");
-    expect(pageSource).not.toContain("setQueuePriorityFilter");
+    expect(pageSource).not.toContain('item.status === "New" || item.status === "InProgress"');
+    expect(controllerSource).toContain(
+      "const [queuePriorityFilter, setQueuePriorityFilter] = useState<"
+    );
+    expect(controllerSource).toContain(
+      'const [queueSort, setQueueSort] = useState<SupportInboxSort>("default");'
+    );
+    expect(controllerSource).toContain(
+      'const effectiveQueuePriority = queuePriorityFilter === "all" ? undefined : queuePriorityFilter;'
+    );
+    expect(controllerSource).toContain("priority: effectiveQueuePriority");
+    expect(controllerSource).toContain("sort: queueSort");
+    expect(controllerSource).toContain("queue: resolvedQueueFilter.queue");
+    expect(controllerSource).toContain("setQueuePriorityFilter: setSupportQueuePriorityFilter");
+    expect(controllerSource).toContain("setQueueSort: setSupportQueueSort");
+    expect(pageSource).toContain("{queueLabels.waiting}");
+    expect(pageSource).toContain("queuePriorityFilter");
+    expect(pageSource).toContain("setExactQueuePriorityFilter");
+    expect(pageSource).toContain("queueSort");
+    expect(pageSource).toContain("setExactQueueSort");
+    expect(pageSource).toContain('{ value: "High", label: queueLabels.priorityHigh }');
+    expect(pageSource).toContain('{ value: "waiting", label: queueLabels.sortWaiting }');
+    expect(adminQueryKeysSource).toContain('options?.priority?.trim() || "all"');
+    expect(adminQueryKeysSource).toContain('options?.sort?.trim() || "default"');
+    expect(adminQueryKeysSource).toContain('options?.queue?.trim() || "all"');
+    expect(pageSource).not.toContain(".filter((item) => item.priority");
+    expect(pageSource).not.toContain(".filter((item) => item.status");
     expect(pageSource).not.toContain("queueSortBy");
     expect(pageSource).not.toContain("setQueueSortBy");
     expect(pageSource).not.toContain("left.priority");
     expect(pageSource).not.toContain("right.priority");
-    expect(followups).toContain("## Support queue priority, sort, and waiting filters");
-    expect(followups).toContain(
-      "The backend support inbox endpoint accepts `priority`, `sort`, and repeated"
-    );
-    expect(followups).toContain(
-      "Re-enable priority and sort controls by passing backend query params"
-    );
   });
 
   it("does not expose removed support-side user mutations without a live UI consumer", () => {
@@ -637,6 +664,11 @@ describe("support conversation controller errors", () => {
     expect(controllerSource).toContain("const previewUrl = URL.createObjectURL(file);");
     expect(controllerSource).toContain("attachmentPreviewUrlRef.current = previewUrl;");
     expect(controllerSource).toContain("setAttachmentPreview({ file, url: previewUrl });");
+    expect(controllerSource).toContain(
+      "} catch (error) {\n        if (attachmentPreviewUrlRef.current === previewUrl)"
+    );
+    expect(controllerSource).toContain("URL.revokeObjectURL(previewUrl);");
+    expect(controllerSource).toContain("throw error;");
     expect(controllerSource).toContain("URL.revokeObjectURL(attachmentPreviewUrlRef.current);");
     expect(controllerSource).toContain("revokeAttachmentPreviewUrl();");
     expect(controllerSource).toContain("setSelectedAttachment: setSupportSelectedAttachment,");
@@ -662,6 +694,15 @@ describe("support conversation controller errors", () => {
       "if (abortController.signal.aborted) {\n      return;\n    }"
     );
     expect(controllerSource).toContain("optimisticAttachmentObjectUrlsRef.current.clear();");
+    expect(controllerSource).toContain("const optimisticAttachmentObjectUrl = selectedAttachment");
+    expect(controllerSource).toContain("optimisticAttachmentObjectUrlsRef.current.set(");
+    expect(controllerSource).toContain(
+      "} catch (error) {\n        if (optimisticAttachmentObjectUrl)"
+    );
+    expect(controllerSource).toContain(
+      "optimisticAttachmentObjectUrlsRef.current.delete(optimisticMessageId);"
+    );
+    expect(controllerSource).toContain("URL.revokeObjectURL(optimisticAttachmentObjectUrl);");
     expect(controllerSource).toContain("},\n    []\n  );");
     expect(controllerSource).not.toContain(
       "loadOlderAbortControllerRef.current?.abort();\n      if (attachmentPreviewUrl)"

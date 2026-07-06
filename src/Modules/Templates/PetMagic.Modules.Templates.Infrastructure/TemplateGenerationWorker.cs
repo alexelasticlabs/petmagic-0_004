@@ -73,11 +73,11 @@ internal sealed class TemplateGenerationWorker(
                     ["ConsecutiveFailures"] = consecutiveFailures
                 });
                 logger.LogError(
-                    exception,
-                    "Template generation worker loop failed. LoopIndex={LoopIndex} ConsecutiveFailures={ConsecutiveFailures} ElapsedMs={ElapsedMs}",
+                    "Template generation worker loop failed. LoopIndex={LoopIndex} ConsecutiveFailures={ConsecutiveFailures} ElapsedMs={ElapsedMs} ExceptionType={ExceptionType}",
                     loopIndex,
                     consecutiveFailures,
-                    ElapsedMsSince(startedAt));
+                    ElapsedMsSince(startedAt),
+                    SafeLogValues.ExceptionType(exception));
                 await Task.Delay(GetBackoffDelay(options.GenerationWorkerPollIntervalMilliseconds, consecutiveFailures), stoppingToken);
             }
         }

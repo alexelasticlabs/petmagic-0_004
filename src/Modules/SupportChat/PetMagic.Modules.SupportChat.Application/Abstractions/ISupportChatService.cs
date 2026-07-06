@@ -9,7 +9,6 @@ public sealed record SupportConversationRealtimeEvent(
     Guid ConversationId,
     Guid InitiatorUserId,
     DateTime UpdatedAtUtc,
-    string? LastMessagePreview,
     DateTime? LastMessageAtUtc,
     string? LastMessageSenderType,
     int AdminUnreadCount,
@@ -37,8 +36,6 @@ public sealed record SupportChatPushNotification(
     Guid ConversationId,
     Guid UserId,
     Guid MessageId,
-    string SenderDisplayName,
-    string Body,
     bool HasAttachment,
     int UserUnreadCount);
 
@@ -57,6 +54,8 @@ public interface ISupportChatRealtimeNotifier
 
 public interface ISupportAttachmentStorage
 {
+    long? ResolveMaxFileSizeBytes(string declaredContentType);
+
     Task<Result<StoredSupportAttachmentResponse>> StoreAsync(SupportAttachmentUploadCommand attachment, CancellationToken cancellationToken);
 
     Task<Result> DeleteAsync(string? attachmentUrl, CancellationToken cancellationToken);

@@ -9,11 +9,7 @@ import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 export type PeriodKey = "7d" | "30d" | "90d" | "all";
 export type TrendMetricKey =
-  | "totalRuns"
-  | "completedRuns"
-  | "failedRuns"
-  | "totalTokenCost"
-  | "averageGenerationSeconds";
+  "totalRuns" | "completedRuns" | "failedRuns" | "totalTokenCost" | "averageGenerationSeconds";
 
 export type TrendTotals = {
   totalRuns: number;

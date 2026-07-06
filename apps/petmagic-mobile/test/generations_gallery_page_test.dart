@@ -506,7 +506,7 @@ void main() {
       (call) => call.method == 'Clipboard.setData',
     );
     expect(clipboardCall.arguments, {
-      'text': 'https://app.petmagic.test/share/generation/token',
+      'text': 'https://app.petmagic.app/share/generation/token',
     });
     await tester.pump(const Duration(seconds: 3));
 
@@ -621,6 +621,62 @@ void main() {
       ),
     );
     expect(actionsSource, isNot(contains('generation.status.name')));
+  });
+
+  test('gallery gold CTA foreground is derived from its button tone', () {
+    final chromeSource = File(
+      'lib/features/templates/presentation/generations_gallery_page_filters_and_chrome.dart',
+    ).readAsStringSync();
+
+    expect(chromeSource, contains('final backgroundColor = colors.gold;'));
+    expect(
+      chromeSource,
+      contains('final foregroundColor = colors.on(backgroundColor);'),
+    );
+    expect(chromeSource, isNot(contains('Color(0xFFF5BD3E)')));
+    expect(
+      chromeSource,
+      isNot(contains('foregroundColor: const Color(0xFF241403)')),
+    );
+  });
+
+  test('gallery premium upsell uses theme tokens for chrome copy', () {
+    final chromeSource = File(
+      'lib/features/templates/presentation/generations_gallery_page_filters_and_chrome.dart',
+    ).readAsStringSync();
+
+    expect(chromeSource, contains('final accent = colors.gold;'));
+    expect(
+      chromeSource,
+      contains('border: Border.all(color: accent.withValues(alpha: 0.74))'),
+    );
+    expect(chromeSource, contains('color: colors.textStrong'));
+    expect(chromeSource, contains('colors.textSoft.withValues('));
+    expect(chromeSource, isNot(contains('const Color(0xFFF2C14E)')));
+    expect(chromeSource, isNot(contains('const Color(0xFFFFC342)')));
+    expect(chromeSource, isNot(contains('const Color(0xFF735018)')));
+    expect(chromeSource, isNot(contains('const Color(0xFFFFD776)')));
+    expect(chromeSource, isNot(contains('const Color(0xFF2D3B54)')));
+  });
+
+  test('gallery type badge foreground is derived from badge tone', () {
+    final actionsSource = File(
+      'lib/features/templates/presentation/generations_gallery_page_states_and_actions.dart',
+    ).readAsStringSync();
+
+    expect(
+      actionsSource,
+      contains('final foreground = colors.on(background);'),
+    );
+    expect(actionsSource, contains('color: foreground'));
+    expect(
+      actionsSource,
+      isNot(
+        contains(
+          'color: Colors.white,\n            fontWeight: FontWeight.w800',
+        ),
+      ),
+    );
   });
 
   testWidgets('ready card save action saves safe media URL', (tester) async {
@@ -936,7 +992,7 @@ void main() {
     ]);
     expect(mediaActions.sharedLocalPaths, [localOutput.path]);
     expect(mediaActions.sharedTexts, [
-      'https://app.petmagic.test/share/generation/token',
+      'https://app.petmagic.app/share/generation/token',
     ]);
     await tester.pump(const Duration(seconds: 3));
     expect(tester.takeException(), isNull);

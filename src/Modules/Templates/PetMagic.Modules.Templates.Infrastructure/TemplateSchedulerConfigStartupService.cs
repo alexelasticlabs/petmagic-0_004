@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Templates.Infrastructure.Data;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
 using PetMagic.Modules.Templates.Infrastructure.Options;
@@ -17,6 +18,12 @@ internal sealed class TemplateSchedulerConfigStartupService(
     TemplateSchedulerConfigRuntimeState runtimeState,
     ILogger<TemplateSchedulerConfigStartupService> logger) : IHostedService
 {
+    private static readonly TimeSpan ActiveFingerprintMaxAge = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(30);
+
+    private CancellationTokenSource? heartbeatCancellationTokenSource;
+    private Task? heartbeatTask;
+
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         var component = componentConfig.Value;
@@ -45,6 +52,7 @@ internal sealed class TemplateSchedulerConfigStartupService(
                 .AsNoTracking()
                 .Where(x => x.Component == otherComponent && x.ProfileName == profileName)
                 .Where(x => !x.MismatchDetected)
+                .Where(x => x.LastSeenAtUtc >= now.Subtract(ActiveFingerprintMaxAge))
                 .OrderByDescending(x => x.StartedAtUtc)
                 .ThenByDescending(x => x.Id)
                 .FirstOrDefaultAsync(cancellationToken);
@@ -54,9 +62,10 @@ internal sealed class TemplateSchedulerConfigStartupService(
                 ? $"current={component}:{fingerprint.Checksum}; other={other!.Component}:{other.Checksum}; profile={profileName}"
                 : null;
 
+            var currentFingerprintId = Guid.NewGuid();
             dbContext.TemplateRuntimeConfigFingerprints.Add(new TemplateRuntimeConfigFingerprint
             {
-                Id = Guid.NewGuid(),
+                Id = currentFingerprintId,
                 Component = component,
                 ProfileName = profileName,
                 Checksum = fingerprint.Checksum,
@@ -90,6 +99,7 @@ internal sealed class TemplateSchedulerConfigStartupService(
             }
 
             runtimeState.MarkHealthy(component, profileName, fingerprint.Checksum);
+            StartHeartbeat(currentFingerprintId);
         }
         catch (Exception exception) when (environment.IsDevelopment() && exception is not InvalidOperationException)
         {
@@ -99,10 +109,71 @@ internal sealed class TemplateSchedulerConfigStartupService(
                 fingerprint.Checksum,
                 $"startup_fingerprint_persistence_failed:{exception.GetType().Name}");
             logger.LogWarning(
-                exception,
-                "Template scheduler config startup fingerprint persistence failed in Development.");
+                "Template scheduler config startup fingerprint persistence failed in Development. ExceptionType={ExceptionType}",
+                SafeLogValues.ExceptionType(exception));
         }
     }
 
-    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    public async Task StopAsync(CancellationToken cancellationToken)
+    {
+        if (heartbeatCancellationTokenSource is null || heartbeatTask is null)
+        {
+            return;
+        }
+
+        await heartbeatCancellationTokenSource.CancelAsync();
+
+        try
+        {
+            await heartbeatTask.WaitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        finally
+        {
+            heartbeatCancellationTokenSource.Dispose();
+            heartbeatCancellationTokenSource = null;
+            heartbeatTask = null;
+        }
+    }
+
+    private void StartHeartbeat(Guid fingerprintId)
+    {
+        heartbeatCancellationTokenSource = new CancellationTokenSource();
+        heartbeatTask = RunHeartbeatAsync(fingerprintId, heartbeatCancellationTokenSource.Token);
+    }
+
+    private async Task RunHeartbeatAsync(Guid fingerprintId, CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(HeartbeatInterval);
+
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                using var scope = scopeFactory.CreateScope();
+                var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+                var fingerprint = await dbContext.TemplateRuntimeConfigFingerprints
+                    .FirstOrDefaultAsync(x => x.Id == fingerprintId, cancellationToken);
+                if (fingerprint is null)
+                {
+                    return;
+                }
+
+                fingerprint.LastSeenAtUtc = DateTime.UtcNow;
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(
+                "Template scheduler config heartbeat failed. FingerprintId={FingerprintId} ExceptionType={ExceptionType}",
+                fingerprintId,
+                SafeLogValues.ExceptionType(exception));
+        }
+    }
 }

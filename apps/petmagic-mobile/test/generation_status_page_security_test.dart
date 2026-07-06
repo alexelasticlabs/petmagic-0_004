@@ -56,6 +56,22 @@ void main() {
     );
   });
 
+  test('generation status uses fresh gallery store for local media sync', () {
+    final pageSource = generationStatusPageSource;
+    final lifecycleSource = File(
+      'lib/features/templates/presentation/generation_status_page_lifecycle.part.dart',
+    ).readAsStringSync();
+
+    expect(pageSource, isNot(contains('late final GenerationGalleryStore')));
+    expect(pageSource, contains('GenerationGalleryStore get _galleryStore {'));
+    expect(pageSource, contains('ref.read(generationGalleryStoreProvider)'));
+    expect(lifecycleSource, contains('final store = _activeGalleryStore;'));
+    expect(
+      lifecycleSource,
+      isNot(contains('unawaited(_galleryStore.cancelActiveDownloads())')),
+    );
+  });
+
   test('generation status feedback UI stays in a dedicated part file', () {
     final pageSource = generationStatusPageSource;
     final sectionsSource = File(
@@ -98,6 +114,8 @@ void main() {
     expect(compareSource, contains('class _BeforeAfterCompareViewer'));
     expect(compareSource, contains('class _CompareImageLayer'));
     expect(compareSource, contains('class _CompareViewerSkeleton'));
+    expect(compareSource, contains('.on(Colors.white)'));
+    expect(compareSource, isNot(contains('Color(0xFF1F2937)')));
   });
 
   test('generation status fullscreen viewer stays in a dedicated part file', () {
@@ -753,6 +771,22 @@ void main() {
     },
   );
 
+  test(
+    'generation status local media rendering uses media signature guard',
+    () {
+      final source = generationStatusSectionsLibrarySource;
+      final localMediaFileBody = methodBody(source, 'File? _localMediaFile');
+
+      expect(
+        localMediaFileBody,
+        contains('final usablePath = usableLocalMediaPathSync(path);'),
+      );
+      expect(localMediaFileBody, contains('return File(usablePath);'));
+      expect(localMediaFileBody, isNot(contains('File(normalized)')));
+      expect(localMediaFileBody, isNot(contains('file.existsSync()')));
+    },
+  );
+
   test('generation result aspect ratio probe is cached and detached', () {
     final source = generationStatusSectionsLibrarySource.replaceAll(
       '\r\n',
@@ -789,7 +823,10 @@ void main() {
     expect(pageSource, contains('parseSafeGenerationMediaUri(mediaUrl)'));
     expect(pageSource, contains('parseSafeGenerationMediaUri(outputUrl)'));
     expect(pageSource, contains('.fetchShareUrl('));
-    expect(pageSource, contains('parseSafeExternalUri(access.shareUrl)'));
+    expect(
+      pageSource,
+      contains('parseSafeGenerationShareUri(access.shareUrl)'),
+    );
     expect(pageSource, contains('ClipboardData(text: safeUri.toString())'));
     expect(pageSource, isNot(contains('ClipboardData(text: shareSafeUrl)')));
     expect(sectionsSource, contains('parseSafeGenerationMediaUri(url)'));
@@ -855,6 +892,7 @@ void main() {
         'void didChangeAppLifecycleState',
       );
       final activateBody = methodBody(pageSource, 'void activate');
+      final disposeBody = methodBody(pageSource, 'void dispose');
 
       expect(
         schedulePollBody,
@@ -896,6 +934,66 @@ void main() {
       expect(pageSource, contains('_pauseRealtime();'));
       expect(pageSource, contains('_stopPolling();'));
       expect(resumeRealtimeBody, contains('!identical(_activeRealtimeClient'));
+      expect(pageSource, isNot(contains('ignore: cancel_subscriptions')));
+      expect(
+        disposeBody,
+        contains('unawaited(_realtimeSubscription?.cancel());'),
+      );
+      expect(disposeBody, contains('_realtimeSubscription = null;'));
+      expect(source, contains('unawaited(_realtimeSubscription?.cancel());'));
+      expect(source, contains('_realtimeSubscription = null;'));
+    },
+  );
+
+  test(
+    'generation status cancels queued-generation requests on lifecycle end',
+    () {
+      final source = generationStatusLibrarySource;
+      final pageSource = generationStatusPageSource;
+      final cancelBody = methodBody(
+        source,
+        'Future<void> _cancelQueuedGeneration',
+      );
+      final startCancelBody = methodBody(
+        source,
+        'CancelToken? _startGenerationCancelRequest',
+      );
+      final cancelActiveBody = methodBody(
+        source,
+        'void _cancelActiveGenerationCancel',
+      );
+      final disposeBody = methodBody(pageSource, 'void dispose');
+      final deactivateBody = methodBody(pageSource, 'void deactivate');
+
+      expect(
+        pageSource,
+        contains('CancelToken? _activeGenerationCancelToken;'),
+      );
+      expect(startCancelBody, contains('_activeGenerationCancelToken != null'));
+      expect(
+        startCancelBody,
+        contains('_activeGenerationCancelToken = cancelToken'),
+      );
+      expect(cancelBody, contains('final cancelToken ='));
+      expect(cancelBody, contains('cancelToken: cancelToken'));
+      expect(cancelBody, contains('cancelToken.isCancelled'));
+      expect(cancelBody, contains('CancelToken.isCancel(error)'));
+      expect(
+        cancelBody,
+        contains('_completeGenerationCancelRequest(cancelToken)'),
+      );
+      expect(
+        cancelActiveBody,
+        contains(
+          "cancelToken.cancel('generation_status_cancel_generation_cancelled')",
+        ),
+      );
+      expect(
+        cancelActiveBody,
+        contains('_activeGenerationCancelToken = null;'),
+      );
+      expect(disposeBody, contains('_cancelActiveGenerationCancel();'));
+      expect(deactivateBody, contains('_cancelActiveGenerationCancel();'));
     },
   );
 

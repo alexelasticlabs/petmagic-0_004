@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
@@ -301,7 +302,11 @@ internal sealed partial class TemplateGenerationJobProcessor
         }
         catch (Exception exception)
         {
-            logger.LogError(exception, "Template generation provider pipeline step failed.");
+            logger.LogError(
+                "Template generation provider pipeline step failed. GenerationIdHash={GenerationIdHash} ProviderStage={ProviderStage} ExceptionType={ExceptionType}",
+                TemplateLogSanitizer.SafeId(job.Id),
+                job.CurrentProviderStage,
+                SafeLogValues.ExceptionType(exception));
             await MarkFailedAsync(job, TemplatesErrors.AiProviderFailed, CancellationToken.None);
             return true;
         }
@@ -773,19 +778,22 @@ internal sealed partial class TemplateGenerationJobProcessor
         var now = DateTime.UtcNow;
         var backoffExponent = Math.Clamp(job.AttemptCount - 1, 0, 5);
         var delaySeconds = options.ProviderTransientRetryBaseDelaySeconds * (1 << backoffExponent);
+        var safeErrorCode = AdminFailureMessageSanitizer.SanitizeCode(error.Code)
+            ?? TemplatesErrors.AiProviderTransientFailure.Code;
+        var safeErrorMessage = AdminFailureMessageSanitizer.Sanitize(error.Message);
 
         job.NextAttemptEarliestAtUtc = now.AddSeconds(delaySeconds);
         job.ProviderStatusCheckedAtUtc = now;
-        job.LastErrorCode = error.Code;
-        job.LastErrorMessage = error.Message;
+        job.LastErrorCode = safeErrorCode;
+        job.LastErrorMessage = safeErrorMessage;
         job.UpdatedAtUtc = now;
 
         await SaveClaimedChangesAsync(job, cancellationToken, releaseLock: true);
         TemplateGenerationMetrics.RecordRetryAttempt(job, "provider_poll_transient");
         logger.LogWarning(
-            "Template generation provider polling deferred after transient failure. GenerationId={GenerationId} ErrorCode={ErrorCode} AttemptCount={AttemptCount} RetryDelaySeconds={RetryDelaySeconds}",
-            job.Id,
-            error.Code,
+            "Template generation provider polling deferred after transient failure. GenerationIdHash={GenerationIdHash} ErrorCode={ErrorCode} AttemptCount={AttemptCount} RetryDelaySeconds={RetryDelaySeconds}",
+            TemplateLogSanitizer.SafeId(job.Id),
+            safeErrorCode,
             job.AttemptCount,
             delaySeconds);
     }
@@ -873,7 +881,9 @@ internal sealed partial class TemplateGenerationJobProcessor
         var durationResult = await mediaMetadataReader.GetVideoDurationSecondsAsync(storedOutput.Value, cancellationToken);
         if (durationResult.IsFailure)
         {
-            logger.LogWarning("Generated template media duration could not be determined. GenerationId={GenerationId}", job.Id);
+            logger.LogWarning(
+                "Generated template media duration could not be determined. GenerationIdHash={GenerationIdHash}",
+                TemplateLogSanitizer.SafeId(job.Id));
         }
         else
         {

@@ -1,5 +1,6 @@
 using System.Text.Json;
 
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -9,11 +10,16 @@ using PetMagic.Modules.Identity.Infrastructure.Entities;
 
 namespace PetMagic.Modules.Identity.Api.Authentication;
 
-public sealed class ExternalLoginCompletionStore(IServiceScopeFactory serviceScopeFactory)
+public sealed class ExternalLoginCompletionStore(
+    IServiceScopeFactory serviceScopeFactory,
+    IDataProtectionProvider dataProtectionProvider)
 {
     private const string Purpose = "external_login_completion";
     private static readonly TimeSpan TicketLifetime = TimeSpan.FromMinutes(2);
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly IDataProtector _payloadProtector = ExternalAuthTicketPayloadProtection.CreateProtector(
+        dataProtectionProvider,
+        Purpose);
 
     public async Task<string> CreateAsync(TokenPairResponse session, CancellationToken cancellationToken)
     {
@@ -26,7 +32,9 @@ public sealed class ExternalLoginCompletionStore(IServiceScopeFactory serviceSco
         {
             Ticket = ticket,
             Purpose = Purpose,
-            PayloadJson = JsonSerializer.Serialize(session, JsonOptions),
+            PayloadJson = ExternalAuthTicketPayloadProtection.ProtectJson(
+                _payloadProtector,
+                JsonSerializer.Serialize(session, JsonOptions)),
             CreatedAtUtc = now,
             ExpiresAtUtc = now.Add(TicketLifetime)
         });
@@ -57,8 +65,38 @@ public sealed class ExternalLoginCompletionStore(IServiceScopeFactory serviceSco
             return null;
         }
 
-        persisted.ConsumedAtUtc = now;
-        await dbContext.SaveChangesAsync(cancellationToken);
-        return JsonSerializer.Deserialize<TokenPairResponse>(persisted.PayloadJson, JsonOptions);
+        var payloadJson = ExternalAuthTicketPayloadProtection.UnprotectJsonOrLegacy(
+            _payloadProtector,
+            persisted.PayloadJson);
+        TokenPairResponse? session;
+        try
+        {
+            session = JsonSerializer.Deserialize<TokenPairResponse>(payloadJson, JsonOptions);
+        }
+        catch (JsonException)
+        {
+            await ConsumeAndClearAsync(dbContext, persisted, now, cancellationToken);
+            return null;
+        }
+
+        if (session is null)
+        {
+            await ConsumeAndClearAsync(dbContext, persisted, now, cancellationToken);
+            return null;
+        }
+
+        await ConsumeAndClearAsync(dbContext, persisted, now, cancellationToken);
+        return session;
+    }
+
+    private static Task ConsumeAndClearAsync(
+        IdentityDbContext dbContext,
+        ExternalAuthTicket ticket,
+        DateTime consumedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        ticket.ConsumedAtUtc = consumedAtUtc;
+        ticket.PayloadJson = "{}";
+        return dbContext.SaveChangesAsync(cancellationToken);
     }
 }

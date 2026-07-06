@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -13,6 +14,21 @@ void main() {
   setUpAll(() {
     SharedPreferencesAsyncPlatform.instance =
         InMemorySharedPreferencesAsync.empty();
+  });
+
+  test('app launch controller does not cache guest storage in build', () {
+    final source = File(
+      'lib/core/startup/app_launch_controller.dart',
+    ).readAsStringSync();
+
+    expect(source, isNot(contains('late final GuestLaunchStorage')));
+    expect(source, contains('GuestLaunchStorage get _guestLaunchStorage =>'));
+    expect(
+      source,
+      isNot(
+        contains('_guestLaunchStorage = ref.watch(guestLaunchStorageProvider)'),
+      ),
+    );
   });
 
   test('markOnboardingSeen does not update state after disposal', () async {

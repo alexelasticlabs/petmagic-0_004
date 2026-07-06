@@ -8,9 +8,9 @@ namespace PetMagic.Modules.Templates.Api.Endpoints;
 public static partial class TemplateGenerationEndpoints
 {
     private const string InvalidSubjectCode = "templates.invalid_subject";
-    private const string InvalidSubjectMessage = "Authentication failed.";
+    private const string InvalidSubjectMessage = InvalidSubjectCode;
     private const string PremiumRequiredCode = "templates.premium_required";
-    private const string PremiumRequiredMessage = "Premium subscription is required for this template.";
+    private const string PremiumRequiredMessage = PremiumRequiredCode;
     private const int FreeActiveGenerationLimit = 1;
     private const int PremiumActiveGenerationLimit = 3;
     private const int PrivilegedActiveGenerationLimit = 10;
@@ -38,6 +38,7 @@ public static partial class TemplateGenerationEndpoints
 
         var group = endpoints.MapGroup("/api/templates")
             .WithTags("Template Generations")
+            .AddEndpointFilter(ApplyPrivateGenerationResponseHeadersAsync)
             .RequireAuthorization(policy => policy
                 .RequireAuthenticatedUser()
                 .RequireAssertion(context =>
@@ -96,19 +97,23 @@ public static partial class TemplateGenerationEndpoints
 
         group.MapPost("/generations/{generationId:guid}/share", ShareGenerationAsync)
             .RequireAuthorization()
-            .RequireRateLimiting("templates");
+            .RequireRateLimiting("templates")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxGenerationJsonRequestBodyBytes));
 
         group.MapPost("/generations/{generationId:guid}/mark-read", MarkReadAsync)
             .RequireAuthorization()
-            .RequireRateLimiting("templates");
+            .RequireRateLimiting("templates")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxGenerationJsonRequestBodyBytes));
 
         group.MapPost("/generations/{generationId:guid}/cancel", CancelQueuedGenerationAsync)
             .RequireAuthorization()
-            .RequireRateLimiting("templates");
+            .RequireRateLimiting("templates")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxGenerationJsonRequestBodyBytes));
 
         group.MapDelete("/generations/{generationId:guid}", DeleteGenerationAsync)
             .RequireAuthorization()
-            .RequireRateLimiting("templates");
+            .RequireRateLimiting("templates")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxGenerationJsonRequestBodyBytes));
 
         group.MapPost("/generations/{generationId:guid}/feedback", RecordFeedbackAsync)
             .RequireAuthorization()
@@ -122,7 +127,8 @@ public static partial class TemplateGenerationEndpoints
 
         group.MapDelete("/qa/generation-fixtures", CleanupQaGenerationFixturesAsync)
             .RequireAuthorization("AdminOnly")
-            .RequireRateLimiting("templates");
+            .RequireRateLimiting("templates")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxGenerationJsonRequestBodyBytes));
 
         group.MapPut("/notifications/push-token", RegisterPushTokenAsync)
             .RequireAuthorization()
@@ -135,5 +141,16 @@ public static partial class TemplateGenerationEndpoints
             .WithMetadata(new RequestSizeLimitAttribute(MaxGenerationJsonRequestBodyBytes));
 
         return endpoints;
+    }
+
+    private static async ValueTask<object?> ApplyPrivateGenerationResponseHeadersAsync(
+        EndpointFilterInvocationContext context,
+        EndpointFilterDelegate next)
+    {
+        context.HttpContext.Response.Headers.CacheControl = "no-store";
+        context.HttpContext.Response.Headers.Pragma = "no-cache";
+        context.HttpContext.Response.Headers.XContentTypeOptions = "nosniff";
+
+        return await next(context);
     }
 }

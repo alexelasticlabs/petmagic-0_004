@@ -3,6 +3,7 @@ using System.Net;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
@@ -220,10 +221,14 @@ public sealed class TemplateWatermarkRendererTests
             var entry = Assert.Single(logger.Entries, x => x.Level == LogLevel.Warning);
             Assert.Contains("Image watermark render failed.", entry.Message, StringComparison.Ordinal);
             Assert.Equal("create_image_watermark", entry.Properties["Operation"]);
-            Assert.Equal(generationId, entry.Properties["GenerationId"]);
-            Assert.Equal("bad.png", entry.Properties["FileName"]);
+            Assert.False(entry.Properties.ContainsKey("GenerationId"));
+            Assert.False(entry.Properties.ContainsKey("FileName"));
+            Assert.Equal(SafeLogValues.StableHash(generationId.ToString("D")), entry.Properties["GenerationIdHash"]);
+            Assert.Equal(SafeLogValues.StableHash("bad.png"), entry.Properties["FileNameHash"]);
             Assert.Equal("image/png", entry.Properties["ContentType"]);
             Assert.Equal(true, entry.Properties["HasLocalPath"]);
+            Assert.Equal("UnknownImageFormatException", entry.Properties["ExceptionType"]);
+            Assert.Null(entry.Exception);
         }
         finally
         {
@@ -268,12 +273,15 @@ public sealed class TemplateWatermarkRendererTests
             var entry = Assert.Single(logger.Entries, x => x.Level == LogLevel.Warning);
             Assert.Contains("Video watermark render failed.", entry.Message, StringComparison.Ordinal);
             Assert.Equal("render_video_watermark", entry.Properties["Operation"]);
-            Assert.Equal(generationId, entry.Properties["GenerationId"]);
-            Assert.Equal("clean.mp4", entry.Properties["FileName"]);
+            Assert.False(entry.Properties.ContainsKey("GenerationId"));
+            Assert.False(entry.Properties.ContainsKey("FileName"));
+            Assert.Equal(SafeLogValues.StableHash(generationId.ToString("D")), entry.Properties["GenerationIdHash"]);
+            Assert.Equal(SafeLogValues.StableHash("clean.mp4"), entry.Properties["FileNameHash"]);
             Assert.Equal("video/mp4", entry.Properties["ContentType"]);
             Assert.Equal(7, entry.Properties["ExitCode"]);
+            Assert.Equal(27, entry.Properties["ErrorLength"]);
             Assert.Equal(true, entry.Properties["HasLocalPath"]);
-            Assert.Contains("ffmpeg failed for watermark", entry.Properties["ErrorPreview"]?.ToString(), StringComparison.Ordinal);
+            Assert.False(entry.Properties.ContainsKey("ErrorPreview"));
         }
         finally
         {
@@ -294,7 +302,7 @@ public sealed class TemplateWatermarkRendererTests
                 await original.SaveAsPngAsync(tempPath);
             }
 
-            var storage = new FailingMediaStorage();
+            var storage = new FailingMediaStorage("templates.media_storage_failed token=watermark-storage-secret");
             var logger = new CapturingLogger<TemplateWatermarkRenderer>();
             var renderer = CreateRenderer(storage, CreateOptions(), logger);
             var media = new StoredMediaResponse("storage/clean.png", "storage/clean.png", "clean.png", "image/png", null, tempPath);
@@ -306,11 +314,17 @@ public sealed class TemplateWatermarkRendererTests
             var entry = Assert.Single(logger.Entries, x => x.Level == LogLevel.Warning);
             Assert.Contains("Image watermark storage failed.", entry.Message, StringComparison.Ordinal);
             Assert.Equal("store_image_watermark", entry.Properties["Operation"]);
-            Assert.Equal(generationId, entry.Properties["GenerationId"]);
-            Assert.Equal("clean.png", entry.Properties["FileName"]);
+            Assert.False(entry.Properties.ContainsKey("GenerationId"));
+            Assert.False(entry.Properties.ContainsKey("FileName"));
+            Assert.Equal(SafeLogValues.StableHash(generationId.ToString("D")), entry.Properties["GenerationIdHash"]);
+            Assert.Equal(SafeLogValues.StableHash("clean.png"), entry.Properties["FileNameHash"]);
             Assert.Equal("image/png", entry.Properties["ContentType"]);
             Assert.Equal(TemplatesErrors.MediaStorageFailed.Code, entry.Properties["ErrorCode"]);
             Assert.Equal(true, entry.Properties["HasLocalPath"]);
+            Assert.DoesNotContain(
+                "watermark-storage-secret",
+                string.Join(' ', entry.Properties.Values.Select(value => value?.ToString())),
+                StringComparison.OrdinalIgnoreCase);
         }
         finally
         {
@@ -503,11 +517,14 @@ public sealed class TemplateWatermarkRendererTests
         }
     }
 
-    private sealed class FailingMediaStorage : IMediaStorage
+    private sealed class FailingMediaStorage(string? errorCode = null) : IMediaStorage
     {
         public Task<Result<StoredMediaResponse>> StoreAsync(MediaUploadCommand asset, CancellationToken cancellationToken)
         {
-            return Task.FromResult(Result.Failure<StoredMediaResponse>(TemplatesErrors.MediaStorageFailed));
+            var error = errorCode is null
+                ? TemplatesErrors.MediaStorageFailed
+                : new Error(errorCode, "Media upload could not be stored.");
+            return Task.FromResult(Result.Failure<StoredMediaResponse>(error));
         }
 
         public Task<Result> DeleteAsync(string assetUrl, CancellationToken cancellationToken)

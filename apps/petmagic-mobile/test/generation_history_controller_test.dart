@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
@@ -11,6 +12,36 @@ import 'generation_history_controller_test_support.dart';
 
 void main() {
   configureGenerationHistoryControllerTestHarness();
+
+  test(
+    'generation history controller does not watch dependencies into fields',
+    () {
+      final source = File(
+        'lib/features/templates/presentation/generation_history_controller.dart',
+      ).readAsStringSync();
+
+      expect(
+        source,
+        contains('_activeRealtimeClient = ref.read(realtimeClientProvider);'),
+      );
+      expect(
+        source,
+        contains(
+          'final galleryStore = ref.read(generationGalleryStoreProvider);',
+        ),
+      );
+      expect(
+        source,
+        isNot(
+          contains('_activeRealtimeClient = ref.watch(realtimeClientProvider)'),
+        ),
+      );
+      expect(
+        source,
+        isNot(contains('ref.watch(templateGenerationRepositoryProvider)')),
+      );
+    },
+  );
 
   test(
     'loads remote history by filter and reuses in-memory filter cache',
@@ -641,6 +672,55 @@ void main() {
     );
     expect(harness.state.items.single.progressPercent, 100);
     expect(repository.cachedUpserts, isEmpty);
+  });
+
+  test('realtime ignores malformed generation status payload ids', () async {
+    final current = generationFixture(
+      generationId: 'generation-ready',
+      status: TemplateGenerationStatus.completed,
+      stage: 'completed',
+      progressPercent: 100,
+      outputUrl: 'https://cdn.petmagic.app/result.jpg',
+      completedAtUtc: DateTime.utc(2026, 6, 14, 12, 5),
+    );
+    final repository = FakeTemplateGenerationRepository(
+      remoteByStatus: {
+        null: [current],
+      },
+    );
+    final realtimeClient = FakeRealtimeClient();
+    final harness = GenerationHistoryControllerHarness(
+      repository: repository,
+      realtimeClient: realtimeClient,
+    );
+    addTearDown(harness.dispose);
+
+    final controller = harness.controller;
+    controller.setScreenVisible(true);
+    await controller.load();
+
+    realtimeClient.emit(
+      RealtimeEvent(
+        topic: RealtimeTopics.templatesGenerationStatusChanged,
+        payload: {
+          'eventType': 'generation.status_changed',
+          'generationId': 123,
+        },
+      ),
+    );
+    realtimeClient.emit(
+      RealtimeEvent(
+        topic: RealtimeTopics.templatesGenerationStatusChanged,
+        payload: {
+          'eventType': 'generation.status_changed',
+          'generationId': 'g' * 160,
+        },
+      ),
+    );
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(repository.fetchGenerationCalls, isEmpty);
   });
 
   test(

@@ -209,19 +209,14 @@ class _MagicLoadingScreenState extends State<MagicLoadingScreen>
   }
 
   void _syncAnimationMode() {
-    final nextUsesStaticEffects = PerformanceGuard.shouldUseStaticPlaceholders(
-      context,
-    );
+    final nextUsesStaticEffects =
+        !PerformanceGuard.shouldAnimateRepeatingEffects(context);
     if (_usesStaticEffects == nextUsesStaticEffects) {
       if (!nextUsesStaticEffects && !_controller.isAnimating) {
         _controller.repeat();
       }
       if (!nextUsesStaticEffects && _messageTimer == null) {
-        _messageTimer = Timer.periodic(const Duration(milliseconds: 1700), (_) {
-          if (mounted) {
-            setState(() => _messageIndex++);
-          }
-        });
+        _scheduleNextMessageTick();
       }
       return;
     }
@@ -239,10 +234,19 @@ class _MagicLoadingScreenState extends State<MagicLoadingScreen>
 
     _controller.repeat();
     _messageTimer?.cancel();
-    _messageTimer = Timer.periodic(const Duration(milliseconds: 1700), (_) {
-      if (mounted) {
-        setState(() => _messageIndex++);
+    _messageTimer = null;
+    _scheduleNextMessageTick();
+  }
+
+  void _scheduleNextMessageTick() {
+    _messageTimer?.cancel();
+    _messageTimer = Timer(const Duration(milliseconds: 1700), () {
+      if (!mounted || _usesStaticEffects) {
+        return;
       }
+
+      setState(() => _messageIndex++);
+      _scheduleNextMessageTick();
     });
   }
 }

@@ -158,10 +158,10 @@ export function EconomyPageWatermarkSection({
                 value={normalizeWatermarkPosition(effectiveWatermarkDraft.position)}
                 onChange={(event) => onUpdateDraft({ position: event.target.value })}
               >
-                <option value="bottom-right">bottom-right</option>
-                <option value="bottom-left">bottom-left</option>
-                <option value="top-right">top-right</option>
-                <option value="top-left">top-left</option>
+                <option value="bottom-right">{text.watermarkPositionBottomRight}</option>
+                <option value="bottom-left">{text.watermarkPositionBottomLeft}</option>
+                <option value="top-right">{text.watermarkPositionTopRight}</option>
+                <option value="top-left">{text.watermarkPositionTopLeft}</option>
               </select>
             </label>
             <label className={styles.field}>
@@ -171,9 +171,9 @@ export function EconomyPageWatermarkSection({
                 value={normalizeWatermarkSize(effectiveWatermarkDraft.size)}
                 onChange={(event) => onUpdateDraft({ size: event.target.value })}
               >
-                <option value="small">small</option>
-                <option value="medium">medium</option>
-                <option value="large">large</option>
+                <option value="small">{text.watermarkSizeSmall}</option>
+                <option value="medium">{text.watermarkSizeMedium}</option>
+                <option value="large">{text.watermarkSizeLarge}</option>
               </select>
             </label>
           </div>

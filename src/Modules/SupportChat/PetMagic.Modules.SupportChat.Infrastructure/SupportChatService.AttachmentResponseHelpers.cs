@@ -1,3 +1,4 @@
+using PetMagic.BuildingBlocks.Storage;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.SupportChat.Application.Contracts;
 using PetMagic.Modules.SupportChat.Domain.Enums;
@@ -61,12 +62,26 @@ public sealed partial class SupportChatService
                 .OrderBy(attachment => attachment.SortOrder)
                 .Select(attachment =>
                 {
+                    if (attachment.IsDeleted)
+                    {
+                        return new SupportMessageAttachmentResponse(
+                            string.Empty,
+                            "file",
+                            string.Empty,
+                            "attachment",
+                            0,
+                            DurationSeconds: null,
+                            Width: null,
+                            Height: null,
+                            IsDeleted: true,
+                            ExpiresAtUtc: null,
+                            attachment.DeletedAtUtc);
+                    }
+
                     var mimeType = attachment.MimeType?.Trim() ?? string.Empty;
                     var fileName = attachment.FileName?.Trim();
                     return new SupportMessageAttachmentResponse(
-                        attachment.IsDeleted
-                            ? string.Empty
-                            : ResolveManagedAttachmentUrl(attachment.FileUrl, attachment.StorageKey),
+                        ResolveManagedAttachmentUrl(attachment.FileUrl, attachment.StorageKey),
                         ResolveAttachmentType(mimeType),
                         mimeType,
                         string.IsNullOrWhiteSpace(fileName) ? "attachment" : fileName,
@@ -74,7 +89,7 @@ public sealed partial class SupportChatService
                         attachment.DurationSeconds,
                         attachment.Width,
                         attachment.Height,
-                        attachment.IsDeleted,
+                        IsDeleted: false,
                         attachment.ExpiresAtUtc,
                         attachment.DeletedAtUtc);
                 })
@@ -113,9 +128,15 @@ public sealed partial class SupportChatService
             return string.Empty;
         }
 
-        return ResolveStorageKey(fileUrl, explicitStorageKey) is null
+        if (ResolveStorageKey(fileUrl, explicitStorageKey) is null)
+        {
+            return string.Empty;
+        }
+
+        var readUrl = attachmentReadUrlSigner.CreateReadUrl(fileUrl);
+        return string.IsNullOrWhiteSpace(readUrl)
             ? string.Empty
-            : fileUrl;
+            : readUrl;
     }
 
     private static bool TryNormalizeManagedAttachmentPath(string candidate, out string managedPath)
@@ -149,15 +170,7 @@ public sealed partial class SupportChatService
 
     private static bool IsUnsafeAttachmentPathSegment(string segment)
     {
-        if (string.Equals(segment, ".", StringComparison.Ordinal)
-            || string.Equals(segment, "..", StringComparison.Ordinal))
-        {
-            return true;
-        }
-
-        var decodedSegment = Uri.UnescapeDataString(segment);
-        return string.Equals(decodedSegment, ".", StringComparison.Ordinal)
-            || string.Equals(decodedSegment, "..", StringComparison.Ordinal);
+        return ManagedPathSegments.IsUnsafe(segment);
     }
 
     private static SupportMessagePendingAttachmentResponse? BuildPendingAttachmentResponse(

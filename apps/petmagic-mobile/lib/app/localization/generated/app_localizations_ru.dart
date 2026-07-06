@@ -116,7 +116,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get randomTemplateAccessFree => 'Бесплатные';
 
   @override
-  String get randomTemplateAccessPremium => 'Premium';
+  String get randomTemplateAccessPremium => 'Премиум';
 
   @override
   String get randomTemplateFindAction => 'Найти случайный шаблон';
@@ -207,7 +207,7 @@ class AppLocalizationsRu extends AppLocalizations {
       'Используйте аккаунт PetMagic, чтобы загрузить профиль и управлять аватаром, который виден в админке.';
 
   @override
-  String get profileEmailLabel => 'Email';
+  String get profileEmailLabel => 'Эл. почта';
 
   @override
   String get profilePasswordLabel => 'Пароль';
@@ -1496,7 +1496,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get premiumFreeColumn => 'Бесплатно';
 
   @override
-  String get premiumPremiumColumn => 'Premium';
+  String get premiumPremiumColumn => 'Премиум';
 
   @override
   String get premiumComparisonFreeTemplates => 'Бесплатные шаблоны';
@@ -1632,7 +1632,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get premiumManageFailed =>
-      'Управление оплатой пока недоступно для этого аккаунта.';
+      'Управление оплатой сейчас недоступно для этого аккаунта.';
 
   @override
   String get premiumRestoreStarted =>
@@ -1929,7 +1929,7 @@ class AppLocalizationsRu extends AppLocalizations {
       'Покупки и подписки';
 
   @override
-  String get profileNotificationsEmailSection => 'Email';
+  String get profileNotificationsEmailSection => 'Эл. почта';
 
   @override
   String get profileNotificationsEmailOffers => 'Акции и скидки';
@@ -2125,7 +2125,7 @@ class AppLocalizationsRu extends AppLocalizations {
       'Мы бережно храним ваши данные и защищаем личную информацию.';
 
   @override
-  String get supportChatTeamTitle => 'PetMagic Support';
+  String get supportChatTeamTitle => 'Поддержка PetMagic';
 
   @override
   String get supportChatTeamStatus => 'Обычно отвечаем в течение 24 часов';
@@ -2752,7 +2752,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get startupMiniFeatureFastStart => 'Быстрый старт';
 
   @override
-  String get startupMiniFeaturePetFirst => 'Pet-first';
+  String get startupMiniFeaturePetFirst => 'Сначала питомец';
 
   @override
   String get startupMiniFeatureUpgradeLater => 'Апгрейд позже';
@@ -3008,7 +3008,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get authPrivacySubtitle =>
-      'Мы не продаем и не передаем ваши данные третьим лицам.';
+      'Мы не продаем персональные данные. Передаем их только обработчикам, нужным для работы PetMagic.';
 
   @override
   String get authRequiredTitle => 'Войдите, чтобы открыть это действие';
@@ -3144,7 +3144,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get templateFlowResultReadySubtitle => 'Ваша магия готова';
 
   @override
-  String get templateFlowResultUnavailable => 'Результат пока недоступен';
+  String get templateFlowResultUnavailable => 'Результат временно недоступен';
 
   @override
   String get templateFlowLoadingResult => 'Загружаем результат...';
@@ -3379,6 +3379,10 @@ class AppLocalizationsRu extends AppLocalizations {
       'Сервис временно недоступен. Попробуйте чуть позже.';
 
   @override
+  String get templateFlowActiveGenerationLimitError =>
+      'У вас уже есть активная генерация. Дождитесь её завершения и запустите новую.';
+
+  @override
   String get templateFlowStartFailedError =>
       'Не удалось запустить генерацию. Попробуйте еще раз.';
 
@@ -3441,11 +3445,11 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get generationStatusResultUnavailableForSave =>
-      'Результат пока недоступен для сохранения.';
+      'Результат временно недоступен для сохранения.';
 
   @override
   String get generationStatusResultUnavailableForShare =>
-      'Результат пока недоступен для шаринга.';
+      'Результат временно недоступен для отправки.';
 
   @override
   String get generationStatusSaveFileDialogTitle => 'Сохранить файл';
@@ -3471,7 +3475,8 @@ class AppLocalizationsRu extends AppLocalizations {
       'Нажмите, чтобы скрыть/показать элементы управления';
 
   @override
-  String get generationStatusDeleteSoonMessage => 'Удаление скоро добавим.';
+  String get generationStatusDeleteSoonMessage =>
+      'Не удалось удалить результат. Попробуйте снова.';
 
   @override
   String get generationStatusRetrySoonMessage =>
@@ -4176,8 +4181,8 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String gamificationXpProgress(Object current, Object required, Object total) {
-    return '$current/$required XP';
+  String gamificationXpProgress(Object current, Object total) {
+    return '$current / $total XP';
   }
 
   @override

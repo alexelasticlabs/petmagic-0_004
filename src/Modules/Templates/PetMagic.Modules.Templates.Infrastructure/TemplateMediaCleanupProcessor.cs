@@ -43,13 +43,13 @@ internal sealed class TemplateMediaCleanupProcessor(
         {
             record.LifecycleState = TemplateMediaLifecycleState.CleanupFailed;
             record.LastCleanupAttemptAtUtc = now;
-            record.FailureCode = deleteResult.Error.Code;
-            record.FailureMessage = deleteResult.Error.Message;
+            record.FailureCode = AdminFailureMessageSanitizer.SanitizeCode(deleteResult.Error.Code);
+            record.FailureMessage = AdminFailureMessageSanitizer.Sanitize(deleteResult.Error.Message);
             await dbContext.SaveChangesAsync(cancellationToken);
             logger.LogWarning(
-                "Temporary upload cleanup failed. MediaRecordId={MediaRecordId} ErrorCode={ErrorCode}",
-                record.Id,
-                deleteResult.Error.Code);
+                "Temporary upload cleanup failed. MediaRecordIdHash={MediaRecordIdHash} ErrorCode={ErrorCode}",
+                TemplateLogSanitizer.SafeId(record.Id),
+                record.FailureCode);
             return true;
         }
 
@@ -117,13 +117,14 @@ internal sealed class TemplateMediaCleanupProcessor(
             var deleteResult = await mediaStorage.DeleteAsync(url, cancellationToken);
             if (deleteResult.IsFailure)
             {
+                var safeErrorCode = AdminFailureMessageSanitizer.SanitizeCode(deleteResult.Error.Code);
                 job.LastUserMediaCleanupAttemptAtUtc = now;
-                job.UserMediaCleanupFailureCode = deleteResult.Error.Code;
+                job.UserMediaCleanupFailureCode = safeErrorCode;
                 await dbContext.SaveChangesAsync(cancellationToken);
                 logger.LogWarning(
-                    "Generation media cleanup failed. GenerationId={GenerationId} ErrorCode={ErrorCode}",
-                    job.Id,
-                    deleteResult.Error.Code);
+                    "Generation media cleanup failed. GenerationIdHash={GenerationIdHash} ErrorCode={ErrorCode}",
+                    TemplateLogSanitizer.SafeId(job.Id),
+                    safeErrorCode);
                 return true;
             }
         }

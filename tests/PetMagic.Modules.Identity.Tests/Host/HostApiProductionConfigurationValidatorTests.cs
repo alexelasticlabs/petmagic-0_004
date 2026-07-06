@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
@@ -8,12 +10,59 @@ namespace PetMagic.Modules.Identity.Tests.Host;
 
 public sealed class HostApiProductionConfigurationValidatorTests
 {
+    [Fact]
+    public void BaseApiAppSettings_ShouldNotCarryLocalMediaOrCorsDefaults()
+    {
+        var root = FindRepositoryRoot();
+        var appsettingsPath = Path.Combine(root, "src", "Host", "PetMagic.Host.Api", "appsettings.json");
+        using var document = JsonDocument.Parse(File.ReadAllText(appsettingsPath));
+        var appsettings = document.RootElement;
+
+        Assert.Equal(string.Empty, appsettings
+            .GetProperty("Identity")
+            .GetProperty("AvatarStorage")
+            .GetProperty("PublicBaseUrl")
+            .GetString());
+        Assert.Equal(string.Empty, appsettings
+            .GetProperty("SupportChat")
+            .GetProperty("AttachmentStorage")
+            .GetProperty("PublicBaseUrl")
+            .GetString());
+        Assert.Equal(string.Empty, appsettings
+            .GetProperty("Templates")
+            .GetProperty("PublicBaseUrl")
+            .GetString());
+        Assert.Empty(appsettings
+            .GetProperty("Cors")
+            .GetProperty("AllowedOrigins")
+            .EnumerateArray());
+        Assert.False(appsettings.TryGetProperty("OpenTelemetry", out _));
+    }
+
+    [Fact]
+    public void BaseGenerationWorkerAppSettings_ShouldNotCarryLocalOtlpEndpoint()
+    {
+        var root = FindRepositoryRoot();
+        var appsettingsPath = Path.Combine(root, "src", "Host", "PetMagic.Host.GenerationWorker", "appsettings.json");
+        using var document = JsonDocument.Parse(File.ReadAllText(appsettingsPath));
+
+        Assert.False(document.RootElement.TryGetProperty("OpenTelemetry", out _));
+    }
+
     [Theory]
     [InlineData("http://localhost:3000")]
     [InlineData("https://localhost")]
     [InlineData("https://127.0.0.2")]
+    [InlineData("https://10.0.0.5")]
+    [InlineData("https://172.16.0.5")]
+    [InlineData("https://192.168.1.10")]
+    [InlineData("https://169.254.169.254")]
+    [InlineData("https://100.64.0.5")]
     [InlineData("https://[::1]")]
     [InlineData("https://[::]")]
+    [InlineData("https://[fe80::1]")]
+    [InlineData("https://[fc00::1]")]
+    [InlineData("https://[fd00::1]")]
     [InlineData("http://admin.petmagic.app")]
     [InlineData("*")]
     [InlineData("")]
@@ -21,6 +70,8 @@ public sealed class HostApiProductionConfigurationValidatorTests
     [InlineData("https://admin.petmagic.app?token=secret")]
     [InlineData("https://user:pass@admin.petmagic.app")]
     [InlineData("https://admin.petmagic.app#fragment")]
+    [InlineData("https://example.com")]
+    [InlineData("https://admin.example.com")]
     public void ValidateCorsAllowedOrigins_ShouldRejectUnsafeOriginsOutsideDevelopment(string origin)
     {
         var environment = CreateEnvironment(Environments.Production);
@@ -60,6 +111,64 @@ public sealed class HostApiProductionConfigurationValidatorTests
         HostApiProductionConfigurationValidator.ValidateCorsAllowedOrigins(
             ["http://localhost:3000"],
             environment);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("*")]
+    [InlineData("*.petmagic.app")]
+    [InlineData("localhost")]
+    [InlineData("127.0.0.1")]
+    [InlineData("10.0.0.5")]
+    [InlineData("192.168.1.10")]
+    [InlineData("api.petmagic.app:5000")]
+    [InlineData("https://api.petmagic.app")]
+    [InlineData("api.petmagic.app/path")]
+    [InlineData("replace_with_backend_host")]
+    [InlineData("example.com")]
+    [InlineData("api.example.com")]
+    public void ValidateAllowedHosts_ShouldRejectMissingWildcardLocalOrMalformedHostsOutsideDevelopment(string allowedHosts)
+    {
+        var environment = CreateEnvironment(Environments.Production);
+        var configuration = CreateConfiguration(
+            defaultConnectionString: "Host=db.petmagic.internal;Database=petmagic;Username=petmagic_app;Password=strong-secret",
+            additionalValues: new Dictionary<string, string?>
+            {
+                ["AllowedHosts"] = allowedHosts
+            });
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            HostApiProductionConfigurationValidator.ValidateAllowedHosts(configuration, environment));
+
+        Assert.Contains("AllowedHosts", exception.Message);
+    }
+
+    [Fact]
+    public void ValidateAllowedHosts_ShouldAllowPublicHostsOutsideDevelopment()
+    {
+        var environment = CreateEnvironment(Environments.Production);
+        var configuration = CreateConfiguration(
+            defaultConnectionString: "Host=db.petmagic.internal;Database=petmagic;Username=petmagic_app;Password=strong-secret",
+            additionalValues: new Dictionary<string, string?>
+            {
+                ["AllowedHosts"] = "api.petmagic.app;admin-api.petmagic.app"
+            });
+
+        HostApiProductionConfigurationValidator.ValidateAllowedHosts(configuration, environment);
+    }
+
+    [Fact]
+    public void ValidateAllowedHosts_ShouldAllowLocalWildcardInDevelopment()
+    {
+        var environment = CreateEnvironment(Environments.Development);
+        var configuration = CreateConfiguration(
+            defaultConnectionString: "",
+            additionalValues: new Dictionary<string, string?>
+            {
+                ["AllowedHosts"] = "*"
+            });
+
+        HostApiProductionConfigurationValidator.ValidateAllowedHosts(configuration, environment);
     }
 
     [Theory]
@@ -162,12 +271,22 @@ public sealed class HostApiProductionConfigurationValidatorTests
     [InlineData("https://localhost:5000")]
     [InlineData("https://127.0.0.1:5000")]
     [InlineData("https://127.0.0.2:5000")]
+    [InlineData("https://10.0.0.5:5000")]
+    [InlineData("https://172.16.0.5:5000")]
+    [InlineData("https://192.168.1.10:5000")]
+    [InlineData("https://169.254.169.254:5000")]
+    [InlineData("https://100.64.0.5:5000")]
     [InlineData("https://[::1]:5000")]
     [InlineData("https://[::]:5000")]
+    [InlineData("https://[fe80::1]:5000")]
+    [InlineData("https://[fc00::1]:5000")]
+    [InlineData("https://[fd00::1]:5000")]
     [InlineData("https://user:pass@api.petmagic.app")]
     [InlineData("https://api.petmagic.app/media?token=secret")]
     [InlineData("https://api.petmagic.app/media#assets")]
     [InlineData("https://replace_with_media_host")]
+    [InlineData("https://example.com/media")]
+    [InlineData("https://cdn.example.com/media")]
     public void ValidatePublicMediaBaseUrls_ShouldRejectUnsafeUrlsOutsideDevelopment(string publicBaseUrl)
     {
         var environment = CreateEnvironment(Environments.Production);
@@ -327,5 +446,21 @@ public sealed class HostApiProductionConfigurationValidatorTests
         public string ContentRootPath { get; set; } = Directory.GetCurrentDirectory();
 
         public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        while (current is not null)
+        {
+            if (File.Exists(Path.Combine(current.FullName, "PetMagic.slnx")))
+            {
+                return current.FullName;
+            }
+
+            current = current.Parent;
+        }
+
+        throw new DirectoryNotFoundException("Could not locate repository root.");
     }
 }

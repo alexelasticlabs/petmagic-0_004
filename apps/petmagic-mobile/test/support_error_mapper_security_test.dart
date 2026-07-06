@@ -14,6 +14,11 @@ void main() {
     expect(body, contains('text.supportChatUnavailableError'));
     expect(body, contains('text.supportChatAttachmentTooLargeError'));
     expect(body, contains('text.supportChatAttachmentUnsupportedFormatError'));
+    expect(body, contains('support.attachment_file_required'));
+    expect(body, contains('support.attachment_file_name_required'));
+    expect(body, contains('support.attachment_content_type_too_long'));
+    expect(body, contains('support.message_body_too_long'));
+    expect(body, contains('support.reply_target_invalid'));
   });
 }
 

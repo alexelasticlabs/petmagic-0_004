@@ -21,6 +21,20 @@ class AppLifecycleSignal extends ChangeNotifier with WidgetsBindingObserver {
     super.addListener(listener);
   }
 
+  @override
+  void removeListener(VoidCallback listener) {
+    super.removeListener(listener);
+    if (!hasListeners) {
+      _detach();
+    }
+  }
+
+  @override
+  void dispose() {
+    _detach();
+    super.dispose();
+  }
+
   void _ensureAttached() {
     if (_isAttached) {
       return;
@@ -30,6 +44,15 @@ class AppLifecycleSignal extends ChangeNotifier with WidgetsBindingObserver {
         WidgetsBinding.instance.lifecycleState ?? AppLifecycleState.resumed;
     WidgetsBinding.instance.addObserver(this);
     _isAttached = true;
+  }
+
+  void _detach() {
+    if (!_isAttached) {
+      return;
+    }
+
+    WidgetsBinding.instance.removeObserver(this);
+    _isAttached = false;
   }
 
   @override

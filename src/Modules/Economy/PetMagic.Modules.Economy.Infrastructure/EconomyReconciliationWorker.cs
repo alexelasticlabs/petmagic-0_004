@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Infrastructure.Options;
 
@@ -42,7 +43,7 @@ public sealed class EconomyReconciliationWorker(
             {
                 logger?.LogWarning(
                     "Economy reconciliation failed. ErrorCode={ErrorCode}",
-                    result.Error.Code);
+                    EconomyLogSanitizer.SafeErrorCode(result.Error.Code));
                 return;
             }
 
@@ -59,7 +60,9 @@ public sealed class EconomyReconciliationWorker(
         }
         catch (Exception ex)
         {
-            logger?.LogWarning(ex, "Economy reconciliation worker run failed.");
+            logger?.LogWarning(
+                "Economy reconciliation worker run failed. ExceptionType={ExceptionType}",
+                SafeLogValues.ExceptionType(ex));
         }
     }
 }

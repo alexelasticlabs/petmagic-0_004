@@ -243,13 +243,10 @@ export async function refundAdminEconomyPurchase(
 ): Promise<AdminEconomyPurchase> {
   const encodedOrderId = encodePathSegment(orderId);
   const normalizedReason = reason?.trim().slice(0, ECONOMY_REFUND_REASON_MAX_LENGTH) || undefined;
-  return apiRequest<AdminEconomyPurchase>(
-    `/api/admin/economy/purchases/${encodedOrderId}/refund`,
-    {
-      method: "POST",
-      body: JSON.stringify({ reason: normalizedReason }),
-    }
-  );
+  return apiRequest<AdminEconomyPurchase>(`/api/admin/economy/purchases/${encodedOrderId}/refund`, {
+    method: "POST",
+    body: JSON.stringify({ reason: normalizedReason }),
+  });
 }
 
 export async function fetchAdminEconomyUserSubscriptionSummary(
@@ -307,9 +304,7 @@ export async function fetchAdminSubscriptionPlans(
 
 export async function fetchAdminPaymentProviderConfigs(
   signal?: AbortSignal
-): Promise<
-  AdminPaymentProviderConfiguration[]
-> {
+): Promise<AdminPaymentProviderConfiguration[]> {
   return apiRequest<AdminPaymentProviderConfiguration[]>(
     "/api/admin/economy/payment-provider-configs",
     { method: "GET", signal }

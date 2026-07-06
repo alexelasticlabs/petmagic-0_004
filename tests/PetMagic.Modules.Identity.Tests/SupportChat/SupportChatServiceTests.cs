@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Identity.Domain.Enums;
 using PetMagic.Modules.Identity.Infrastructure;
@@ -12,6 +14,7 @@ using PetMagic.Modules.SupportChat.Application.Contracts;
 using PetMagic.Modules.SupportChat.Domain.Enums;
 using PetMagic.Modules.SupportChat.Infrastructure;
 using PetMagic.Modules.SupportChat.Infrastructure.Data;
+using PetMagic.Modules.SupportChat.Infrastructure.Entities;
 
 namespace PetMagic.Modules.Identity.Tests.SupportChat;
 
@@ -77,7 +80,12 @@ public sealed class SupportChatServiceTests
         Assert.Contains("Support chat notification fan-out failed.", entry.Message, StringComparison.Ordinal);
         Assert.Equal("conversation_update", entry.Properties["Operation"]);
         Assert.Equal("realtime", entry.Properties["Channel"]);
-        Assert.Equal(userId, entry.Properties["InitiatorUserId"]);
+        Assert.Equal(SafeLogValues.StableHash(conversation.Id.ToString("D")), entry.Properties["ConversationIdHash"]);
+        Assert.Equal(SafeLogValues.StableHash(userId.ToString("D")), entry.Properties["InitiatorUserIdHash"]);
+        Assert.False(entry.Properties.ContainsKey("ConversationId"));
+        Assert.False(entry.Properties.ContainsKey("InitiatorUserId"));
+        Assert.Equal("InvalidOperationException", entry.Properties["ExceptionType"]);
+        Assert.Null(entry.Exception);
     }
 
     [Fact]
@@ -114,11 +122,16 @@ public sealed class SupportChatServiceTests
         Assert.Contains("Support chat notification fan-out failed.", entry.Message, StringComparison.Ordinal);
         Assert.Equal("message_delivery", entry.Properties["Operation"]);
         Assert.Equal("push", entry.Properties["Channel"]);
-        Assert.Equal(conversationId, entry.Properties["ConversationId"]);
-        Assert.Equal(userId, entry.Properties["InitiatorUserId"]);
-        Assert.Equal(sendResult.Value.MessageId, entry.Properties["MessageId"]);
+        Assert.Equal(SafeLogValues.StableHash(conversationId.ToString("D")), entry.Properties["ConversationIdHash"]);
+        Assert.Equal(SafeLogValues.StableHash(userId.ToString("D")), entry.Properties["InitiatorUserIdHash"]);
+        Assert.Equal(SafeLogValues.StableHash(sendResult.Value.MessageId.ToString("D")), entry.Properties["MessageIdHash"]);
+        Assert.False(entry.Properties.ContainsKey("ConversationId"));
+        Assert.False(entry.Properties.ContainsKey("InitiatorUserId"));
+        Assert.False(entry.Properties.ContainsKey("MessageId"));
         Assert.Equal("SupportAgent", entry.Properties["SenderType"]);
         Assert.Equal(false, entry.Properties["HasAttachments"]);
+        Assert.Equal("InvalidOperationException", entry.Properties["ExceptionType"]);
+        Assert.Null(entry.Exception);
     }
 
     [Fact]
@@ -270,10 +283,108 @@ public sealed class SupportChatServiceTests
         Assert.True(sendResult.IsSuccess);
         Assert.Null(sendResult.Value.PendingAttachment);
         var attachment = Assert.Single(sendResult.Value.Attachments);
-        Assert.Equal(attachmentUrl, attachment.FileUrl);
+        AssertSignedSupportAttachmentUrl(attachment.FileUrl);
         Assert.Equal("broken-screen.png", attachment.FileName);
         Assert.Equal("image/png", attachment.MimeType);
         Assert.Equal(2048, attachment.SizeBytes);
+    }
+
+    [Fact]
+    public async Task UpdateAttachmentMessageAsync_ShouldSanitizeFailedUploadErrorCode()
+    {
+        var store = CreateStore();
+
+        var userId = Guid.NewGuid();
+        await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
+
+        Guid conversationId;
+        Guid messageId;
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            var openResult = await openScope.CreateService().OpenConversationAsync(
+                new OpenSupportConversationCommand(userId, "Need help", SupportConversationPriority.Normal),
+                CancellationToken.None);
+            conversationId = openResult.Value.ConversationId;
+        }
+
+        await using (var createScope = await store.CreateScopeAsync())
+        {
+            var createResult = await createScope.CreateService().CreateAttachmentMessageAsync(
+                new CreateSupportAttachmentMessageCommand(
+                    conversationId,
+                    userId,
+                    "Uploading screenshot",
+                    IsAdmin: false,
+                    AttachmentFileName: "issue.png",
+                    AttachmentContentType: "image/png"),
+                CancellationToken.None);
+
+            Assert.True(createResult.IsSuccess);
+            messageId = createResult.Value.MessageId;
+        }
+
+        await using var updateScope = await store.CreateScopeAsync();
+        var failedResult = await updateScope.CreateService().UpdateAttachmentMessageAsync(
+            new UpdateSupportAttachmentMessageCommand(
+                conversationId,
+                messageId,
+                userId,
+                IsAdmin: false,
+                AttachmentUploadStatus: SupportAttachmentUploadStatus.Failed,
+                AttachmentUploadErrorCode: "support.attachment_storage_failed token=attachment-service-secret"),
+            CancellationToken.None);
+
+        Assert.True(failedResult.IsSuccess);
+        Assert.Equal("Failed", failedResult.Value.AttachmentUploadStatus);
+        Assert.Equal("support.attachment_storage_failed", failedResult.Value.AttachmentUploadErrorCode);
+        Assert.DoesNotContain("attachment-service-secret", failedResult.Value.AttachmentUploadErrorCode, StringComparison.OrdinalIgnoreCase);
+
+        var persisted = await updateScope.SupportDbContext.ConversationMessages
+            .AsNoTracking()
+            .SingleAsync(message => message.Id == messageId);
+        Assert.Equal("support.attachment_storage_failed", persisted.AttachmentUploadErrorCode);
+        Assert.DoesNotContain("attachment-service-secret", persisted.AttachmentUploadErrorCode, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SendMessageWithAttachmentsAsync_WithLegacySignedManagedAttachmentUrl_ShouldReturnFreshReadUrl()
+    {
+        var store = CreateStore();
+
+        var userId = Guid.NewGuid();
+        await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
+
+        Guid conversationId;
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            var openResult = await openScope.CreateService().OpenConversationAsync(
+                new OpenSupportConversationCommand(userId, "Need help", SupportConversationPriority.Normal),
+                CancellationToken.None);
+            conversationId = openResult.Value.ConversationId;
+        }
+
+        await using var sendScope = await store.CreateScopeAsync();
+        var sendResult = await sendScope.CreateService().SendMessageWithAttachmentsAsync(
+            new SendSupportAttachmentsCommand(
+                conversationId,
+                userId,
+                "Screenshot from the broken screen",
+                false,
+                [
+                    new SupportMessageAttachmentInput(
+                        "http://localhost:5000/support-attachments/2026/05/test-image.png?token=raw&signature=legacy#viewer",
+                        "image/png",
+                        "broken-screen.png",
+                        2048)
+                ]),
+            CancellationToken.None);
+
+        Assert.True(sendResult.IsSuccess);
+        var attachment = Assert.Single(sendResult.Value.Attachments);
+        AssertSignedSupportAttachmentUrl(attachment.FileUrl);
+        Assert.DoesNotContain("token=raw", attachment.FileUrl, StringComparison.Ordinal);
+        Assert.DoesNotContain("signature=legacy", attachment.FileUrl, StringComparison.Ordinal);
+        Assert.DoesNotContain("#viewer", attachment.FileUrl, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -315,10 +426,228 @@ public sealed class SupportChatServiceTests
         Assert.Equal("broken-screen.png", attachment.FileName);
     }
 
+    [Fact]
+    public async Task GetUserConversationAsync_WithDeletedAttachment_ShouldSuppressOriginalAttachmentMetadata()
+    {
+        var store = CreateStore();
+
+        var userId = Guid.NewGuid();
+        await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
+
+        Guid conversationId;
+        Guid messageId;
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            var openResult = await openScope.CreateService().OpenConversationAsync(
+                new OpenSupportConversationCommand(userId, "Need help", SupportConversationPriority.Normal),
+                CancellationToken.None);
+            conversationId = openResult.Value.ConversationId;
+        }
+
+        await using (var sendScope = await store.CreateScopeAsync())
+        {
+            var sendResult = await sendScope.CreateService().SendMessageWithAttachmentsAsync(
+                new SendSupportAttachmentsCommand(
+                    conversationId,
+                    userId,
+                    "Screenshot from the broken screen",
+                    false,
+                    [
+                        new SupportMessageAttachmentInput(
+                            "http://localhost:5000/support-attachments/2026/05/private-invoice.png",
+                            "image/png",
+                            "alice-private-invoice.png",
+                            4096,
+                            DurationSeconds: null,
+                            Width: 640,
+                            Height: 480)
+                    ]),
+                CancellationToken.None);
+
+            Assert.True(sendResult.IsSuccess);
+            messageId = sendResult.Value.MessageId;
+
+            var persistedAttachment = await sendScope.SupportDbContext.SupportMessageAttachments.SingleAsync();
+            persistedAttachment.IsDeleted = true;
+            persistedAttachment.DeletedAtUtc = DateTime.UtcNow;
+            await sendScope.SupportDbContext.SaveChangesAsync();
+        }
+
+        await using var detailScope = await store.CreateScopeAsync();
+        var detail = await detailScope.CreateService().GetUserConversationAsync(userId, CancellationToken.None);
+
+        Assert.True(detail.IsSuccess);
+        var message = Assert.Single(detail.Value.Messages, x => x.MessageId == messageId);
+        var attachment = Assert.Single(message.Attachments);
+        Assert.True(attachment.IsDeleted);
+        Assert.Equal(string.Empty, attachment.FileUrl);
+        Assert.Equal("file", attachment.Type);
+        Assert.Equal(string.Empty, attachment.MimeType);
+        Assert.Equal("attachment", attachment.FileName);
+        Assert.Equal(0, attachment.SizeBytes);
+        Assert.Null(attachment.DurationSeconds);
+        Assert.Null(attachment.Width);
+        Assert.Null(attachment.Height);
+        Assert.Null(attachment.ExpiresAtUtc);
+        Assert.NotNull(attachment.DeletedAtUtc);
+    }
+
+    [Fact]
+    public async Task CleanupExpiredBatchAsync_ShouldClearDeletedAttachmentMetadata()
+    {
+        var store = CreateStore();
+
+        var userId = Guid.NewGuid();
+        await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
+
+        await using var scope = await store.CreateScopeAsync();
+        var conversationId = Guid.NewGuid();
+        var messageId = Guid.NewGuid();
+        var attachmentId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        scope.SupportDbContext.SupportConversations.Add(new SupportConversation
+        {
+            Id = conversationId,
+            InitiatorUserId = userId,
+            Status = SupportConversationStatus.New,
+            Priority = SupportConversationPriority.Normal,
+            Source = SupportConversationSource.MobileChat,
+            CreatedAtUtc = now.AddHours(-2),
+            UpdatedAtUtc = now.AddHours(-2),
+            LastMessagePreview = "Attachment",
+            LastMessageAtUtc = now.AddHours(-2),
+            LastMessageSenderType = SupportMessageSenderType.User
+        });
+        scope.SupportDbContext.ConversationMessages.Add(new ConversationMessage
+        {
+            Id = messageId,
+            ConversationId = conversationId,
+            SenderUserId = userId,
+            SenderType = SupportMessageSenderType.User,
+            Body = "Attachment",
+            CreatedAtUtc = now.AddHours(-2)
+        });
+        scope.SupportDbContext.SupportMessageAttachments.Add(new SupportMessageAttachment
+        {
+            Id = attachmentId,
+            MessageId = messageId,
+            FileUrl = "http://localhost:5000/support-attachments/2026/05/private-invoice.png",
+            MimeType = "image/png",
+            FileName = "alice-private-invoice.png",
+            SizeBytes = 4096,
+            DurationSeconds = 3.5,
+            Width = 640,
+            Height = 480,
+            StorageKey = "support-attachments/2026/05/private-invoice.png",
+            ExpiresAtUtc = now.AddMinutes(-1),
+            SortOrder = 0,
+            IsDeleted = false
+        });
+        await scope.SupportDbContext.SaveChangesAsync();
+
+        var processor = new SupportAttachmentCleanupProcessor(
+            scope.SupportDbContext,
+            new NoopSupportAttachmentStorage(),
+            new SupportAttachmentStorageOptions { CleanupBatchSize = 10 },
+            new CapturingLogger<SupportAttachmentCleanupProcessor>());
+
+        var processed = await processor.CleanupExpiredBatchAsync(CancellationToken.None);
+
+        Assert.True(processed);
+        var attachment = await scope.SupportDbContext.SupportMessageAttachments.SingleAsync(x => x.Id == attachmentId);
+        Assert.True(attachment.IsDeleted);
+        Assert.NotNull(attachment.DeletedAtUtc);
+        Assert.Equal(string.Empty, attachment.FileUrl);
+        Assert.Equal("attachment", attachment.FileName);
+        Assert.Equal(string.Empty, attachment.MimeType);
+        Assert.Equal(0, attachment.SizeBytes);
+        Assert.Null(attachment.DurationSeconds);
+        Assert.Null(attachment.Width);
+        Assert.Null(attachment.Height);
+        Assert.Null(attachment.StorageKey);
+        Assert.True(attachment.ExpiresAtUtc <= now);
+    }
+
+    [Fact]
+    public async Task CleanupExpiredBatchAsync_ShouldSanitizeStorageFailureLogCode()
+    {
+        var store = CreateStore();
+
+        var userId = Guid.NewGuid();
+        await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
+
+        await using var scope = await store.CreateScopeAsync();
+        var conversationId = Guid.NewGuid();
+        var messageId = Guid.NewGuid();
+        var attachmentId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        scope.SupportDbContext.SupportConversations.Add(new SupportConversation
+        {
+            Id = conversationId,
+            InitiatorUserId = userId,
+            Status = SupportConversationStatus.New,
+            Priority = SupportConversationPriority.Normal,
+            Source = SupportConversationSource.MobileChat,
+            CreatedAtUtc = now.AddHours(-2),
+            UpdatedAtUtc = now.AddHours(-2),
+            LastMessagePreview = "Attachment",
+            LastMessageAtUtc = now.AddHours(-2),
+            LastMessageSenderType = SupportMessageSenderType.User
+        });
+        scope.SupportDbContext.ConversationMessages.Add(new ConversationMessage
+        {
+            Id = messageId,
+            ConversationId = conversationId,
+            SenderUserId = userId,
+            SenderType = SupportMessageSenderType.User,
+            Body = "Attachment",
+            CreatedAtUtc = now.AddHours(-2)
+        });
+        scope.SupportDbContext.SupportMessageAttachments.Add(new SupportMessageAttachment
+        {
+            Id = attachmentId,
+            MessageId = messageId,
+            FileUrl = "http://localhost:5000/support-attachments/2026/05/private-invoice.png",
+            MimeType = "image/png",
+            FileName = "alice-private-invoice.png",
+            SizeBytes = 4096,
+            StorageKey = "support-attachments/2026/05/private-invoice.png",
+            ExpiresAtUtc = now.AddMinutes(-1),
+            SortOrder = 0,
+            IsDeleted = false
+        });
+        await scope.SupportDbContext.SaveChangesAsync();
+
+        var logger = new CapturingLogger<SupportAttachmentCleanupProcessor>();
+        var processor = new SupportAttachmentCleanupProcessor(
+            scope.SupportDbContext,
+            new FailingSupportAttachmentStorage("storage.delete_failed token=support-cleanup-secret"),
+            new SupportAttachmentStorageOptions { CleanupBatchSize = 10 },
+            logger);
+
+        var processed = await processor.CleanupExpiredBatchAsync(CancellationToken.None);
+
+        var attachment = await scope.SupportDbContext.SupportMessageAttachments.SingleAsync(x => x.Id == attachmentId);
+        Assert.True(processed);
+        Assert.False(attachment.IsDeleted);
+        Assert.Contains(
+            logger.Entries,
+            entry => entry.LogLevel == LogLevel.Warning
+                && entry.Properties.TryGetValue("ErrorCode", out var value)
+                && value is string errorCode
+                && errorCode == SupportChatErrors.AttachmentStorageFailed.Code
+                && !errorCode.Contains("support-cleanup-secret", StringComparison.OrdinalIgnoreCase));
+    }
+
     [Theory]
     [InlineData("http://localhost:5000support-attachments/2026/05/test-image.png")]
     [InlineData("http://localhost:5000/support-attachments/2026/../private.png")]
     [InlineData("http://localhost:5000/support-attachments/2026/%2e%2e/private.png")]
+    [InlineData("http://localhost:5000/support-attachments/2026%2f..%2fprivate.png")]
+    [InlineData("http://localhost:5000/support-attachments/2026%5c..%5cprivate.png")]
+    [InlineData("http://localhost:5000/support-attachments/2026/%zz/private.png")]
     public async Task SendMessageWithAttachmentsAsync_WithUnsafeManagedAttachmentUrl_ShouldSuppressReturnedFileUrl(
         string attachmentUrl)
     {
@@ -745,6 +1074,65 @@ public sealed class SupportChatServiceTests
     }
 
     [Fact]
+    public async Task ListAdminInboxAsync_ShouldFilterWaitingForSupportQueueOnBackend()
+    {
+        var store = CreateStore();
+
+        var newUserId = Guid.NewGuid();
+        var assignedUserId = Guid.NewGuid();
+        var waitingUserId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        await SeedUserAsync(store, newUserId, "new-queue@petmagic.test", "New Queue User");
+        await SeedUserAsync(store, assignedUserId, "assigned-queue@petmagic.test", "Assigned Queue User");
+        await SeedUserAsync(store, waitingUserId, "waiting-user@petmagic.test", "Waiting User");
+        await SeedUserAsync(store, adminId, "admin-queue@petmagic.test", "Support Admin", SystemRoles.Admin);
+
+        Guid newConversationId;
+        Guid assignedConversationId;
+        Guid waitingConversationId;
+
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            var service = openScope.CreateService();
+            newConversationId = (await service.OpenConversationAsync(
+                new OpenSupportConversationCommand(newUserId, "Needs triage", SupportConversationPriority.Normal),
+                CancellationToken.None)).Value.ConversationId;
+            assignedConversationId = (await service.OpenConversationAsync(
+                new OpenSupportConversationCommand(assignedUserId, "Assigned but not answered", SupportConversationPriority.Normal),
+                CancellationToken.None)).Value.ConversationId;
+            waitingConversationId = (await service.OpenConversationAsync(
+                new OpenSupportConversationCommand(waitingUserId, "Waiting on user", SupportConversationPriority.Normal),
+                CancellationToken.None)).Value.ConversationId;
+        }
+
+        await using (var stateScope = await store.CreateScopeAsync())
+        {
+            var service = stateScope.CreateService();
+            var assignResult = await service.AssignConversationAsync(
+                new AssignSupportConversationCommand(assignedConversationId, adminId, adminId),
+                CancellationToken.None);
+            var replyResult = await service.SendMessageAsync(
+                new SendSupportMessageCommand(waitingConversationId, adminId, "Please send details", true),
+                CancellationToken.None);
+
+            Assert.True(assignResult.IsSuccess);
+            Assert.Equal("InProgress", assignResult.Value.Status);
+            Assert.True(replyResult.IsSuccess);
+        }
+
+        await using var verificationScope = await store.CreateScopeAsync();
+        var result = await verificationScope.CreateService().ListAdminInboxAsync(
+            new ListAdminSupportInboxQuery(null, PageSize: 10, Queue: "waiting_for_support"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, result.Value.TotalCount);
+        Assert.Contains(result.Value.Items, item => item.ConversationId == newConversationId && item.Status == "New");
+        Assert.Contains(result.Value.Items, item => item.ConversationId == assignedConversationId && item.Status == "InProgress");
+        Assert.DoesNotContain(result.Value.Items, item => item.ConversationId == waitingConversationId);
+    }
+
+    [Fact]
     public async Task ListAdminInboxAsync_ShouldRejectLegacyStatusAndSourceAliases()
     {
         var store = CreateStore();
@@ -795,17 +1183,19 @@ public sealed class SupportChatServiceTests
     }
 
     [Theory]
-    [InlineData(null, "not-a-source", null, "support.source_invalid")]
-    [InlineData(null, "1", null, "support.source_invalid")]
-    [InlineData(null, "-1", null, "support.source_invalid")]
-    [InlineData(null, null, "not-a-priority", "support.priority_invalid")]
-    [InlineData(null, null, "1", "support.priority_invalid")]
-    [InlineData(null, null, "-1", "support.priority_invalid")]
-    [InlineData("not-a-sort", null, null, "support.sort_invalid")]
+    [InlineData(null, "not-a-source", null, null, "support.source_invalid")]
+    [InlineData(null, "1", null, null, "support.source_invalid")]
+    [InlineData(null, "-1", null, null, "support.source_invalid")]
+    [InlineData(null, null, "not-a-priority", null, "support.priority_invalid")]
+    [InlineData(null, null, "1", null, "support.priority_invalid")]
+    [InlineData(null, null, "-1", null, "support.priority_invalid")]
+    [InlineData("not-a-sort", null, null, null, "support.sort_invalid")]
+    [InlineData(null, null, null, "not-a-queue", "support.queue_invalid")]
     public async Task ListAdminInboxAsync_ShouldReturnFieldSpecificFilterErrors(
         string? sort,
         string? source,
         string? priority,
+        string? queue,
         string expectedErrorCode)
     {
         var store = CreateStore();
@@ -816,7 +1206,8 @@ public sealed class SupportChatServiceTests
                 null,
                 Source: source,
                 Priority: priority,
-                Sort: sort),
+                Sort: sort,
+                Queue: queue),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -1400,7 +1791,20 @@ public sealed class SupportChatServiceTests
                 realtimeNotifier,
                 pushNotificationSender,
                 new NoopSupportAttachmentStorage(),
-                new SupportAttachmentStorageOptions(),
+                new SupportAttachmentReadUrlSigner(
+                    new SupportAttachmentStorageOptions
+                    {
+                        PublicBaseUrl = "http://localhost:5000"
+                    },
+                    new SupportAttachmentReadUrlSigningOptions
+                    {
+                        SigningKey = new string('s', 64),
+                        ReadUrlTtlMinutes = 30
+                    }),
+                new SupportAttachmentStorageOptions
+                {
+                    PublicBaseUrl = "http://localhost:5000"
+                },
                 logger);
         }
 
@@ -1409,6 +1813,16 @@ public sealed class SupportChatServiceTests
             await SupportDbContext.DisposeAsync();
             await IdentityDbContext.DisposeAsync();
         }
+    }
+
+    private static void AssertSignedSupportAttachmentUrl(string fileUrl)
+    {
+        var uri = new Uri(fileUrl);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+
+        Assert.StartsWith("/support-attachments/", uri.AbsolutePath, StringComparison.OrdinalIgnoreCase);
+        Assert.True(query.ContainsKey("pmexp"));
+        Assert.True(query.ContainsKey("pmsig"));
     }
 
     private sealed class FakeSupportChatRealtimeNotifier : ISupportChatRealtimeNotifier
@@ -1450,6 +1864,21 @@ public sealed class SupportChatServiceTests
 
     private sealed class NoopSupportAttachmentStorage : ISupportAttachmentStorage
     {
+        public long? ResolveMaxFileSizeBytes(string declaredContentType)
+        {
+            if (declaredContentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase))
+            {
+                return 50L * 1024 * 1024;
+            }
+
+            if (declaredContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+            {
+                return 10L * 1024 * 1024;
+            }
+
+            return null;
+        }
+
         public Task<Result<StoredSupportAttachmentResponse>> StoreAsync(
             SupportAttachmentUploadCommand attachment,
             CancellationToken cancellationToken)
@@ -1470,6 +1899,29 @@ public sealed class SupportChatServiceTests
         public Task<Result> DeleteAsync(string? attachmentUrl, CancellationToken cancellationToken)
         {
             return Task.FromResult(Result.Success());
+        }
+    }
+
+    private sealed class FailingSupportAttachmentStorage(string deleteErrorCode) : ISupportAttachmentStorage
+    {
+        public long? ResolveMaxFileSizeBytes(string declaredContentType)
+        {
+            return declaredContentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase)
+                ? 50L * 1024 * 1024
+                : 10L * 1024 * 1024;
+        }
+
+        public Task<Result<StoredSupportAttachmentResponse>> StoreAsync(
+            SupportAttachmentUploadCommand attachment,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Failure<StoredSupportAttachmentResponse>(
+                SupportChatErrors.AttachmentStorageFailed));
+        }
+
+        public Task<Result> DeleteAsync(string? attachmentUrl, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Failure(new Error(deleteErrorCode, "Delete failed.")));
         }
     }
 

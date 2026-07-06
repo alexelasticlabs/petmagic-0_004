@@ -62,17 +62,42 @@ void main() {
         isNotNull,
       );
       expect(parseSafeExternalUri('http://10.0.0.42:5000/health'), isNotNull);
+      expect(parseSafeExternalUri('http://172.16.0.42:5000/health'), isNotNull);
+      expect(parseSafeExternalUri('http://172.31.0.42:5000/health'), isNotNull);
+      expect(parseSafeExternalUri('http://0.0.0.0:5000/health'), isNull);
+      expect(parseSafeExternalUri('http://100.64.0.1:5000/health'), isNull);
+      expect(
+        parseSafeExternalUri('http://169.254.169.254/latest/meta-data'),
+        isNull,
+      );
+      expect(parseSafeExternalUri('http://224.0.0.1:5000/health'), isNull);
       expect(parseSafeExternalUri('http://example.com/unsafe'), isNull);
     });
 
-    test('rejects local http when local http is explicitly disabled', () {
-      expect(
-        parseSafeExternalUri(
-          'http://127.0.0.1:5000/media/template.mp4',
-          allowLocalHttp: false,
-        ),
-        isNull,
-      );
+    test('rejects every local debug http host when local http is disabled', () {
+      for (final localHost in const [
+        'localhost',
+        '127.0.0.1',
+        '0.0.0.0',
+        '10.0.2.2',
+        '10.0.3.2',
+        'host.docker.internal',
+        '192.168.1.25',
+        '10.0.0.42',
+        '100.64.0.1',
+        '169.254.169.254',
+        '224.0.0.1',
+      ]) {
+        expect(
+          parseSafeExternalUri(
+            'http://$localHost:5000/media/template.mp4',
+            allowLocalHttp: false,
+          ),
+          isNull,
+          reason: localHost,
+        );
+      }
+
       expect(
         parseSafeExternalUri(
           'http://example.com/media/template.mp4',
@@ -168,6 +193,35 @@ void main() {
         parseSafeExternalUri(
           'https://evil.example/generations/result.jpg',
           allowedHttpsHosts: allowedHosts,
+        ),
+        isNull,
+      );
+    });
+  });
+
+  group('generationShareAllowedHosts', () {
+    test('allows only trusted generation share origins', () {
+      expect(
+        parseSafeGenerationShareUri(
+          'https://app.petmagic.app/share/generation/token',
+        ),
+        isNotNull,
+      );
+      expect(
+        parseSafeGenerationShareUri(
+          'https://api.petmagic.app/share/generation/token',
+        ),
+        isNotNull,
+      );
+      expect(
+        parseSafeGenerationShareUri(
+          'https://evil.example/share/generation/token',
+        ),
+        isNull,
+      );
+      expect(
+        parseSafeGenerationShareUri(
+          'https://app.petmagic.app@evil.example/share/generation/token',
         ),
         isNull,
       );

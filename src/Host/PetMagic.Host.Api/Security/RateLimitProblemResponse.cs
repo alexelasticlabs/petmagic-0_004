@@ -29,8 +29,7 @@ public static class RateLimitProblemResponse
         var problem = new ProblemDetails
         {
             Status = StatusCodes.Status429TooManyRequests,
-            Title = "RATE_LIMIT_EXCEEDED",
-            Detail = "Too many requests. Please retry later."
+            Title = "RATE_LIMIT_EXCEEDED"
         };
         problem.Extensions["code"] = "RATE_LIMIT_EXCEEDED";
         problem.Extensions["traceId"] = traceId;

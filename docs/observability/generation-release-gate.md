@@ -14,6 +14,7 @@ Create or verify these dashboard panels before production:
    - `fal_provider_rejected_due_to_capacity`, `fal_provider_submit_failures`,
      `fal_provider_rate_limit_errors`.
    - `histogram_quantile(0.95|0.99, rate(fal_provider_queue_wait_seconds_bucket[10m]))`.
+   - `generation_fal_timeouts_total`.
    - `generation_webhook_delivery_failures_total` and `generation_webhook_signature_failures_total`.
 
 2. Queue and scheduler
@@ -28,6 +29,7 @@ Create or verify these dashboard panels before production:
      `generation_scheduler_borrowing_cap_violations_total`.
    - `generation_jobs_accepted_total` and `generation_jobs_rejected_total` by `media_type`, `tier`,
      and `reason`.
+   - `generation_jobs_cancelled_total`.
 
 3. Billing
    - `generation_jobs_queued_without_charge_total`.
@@ -39,6 +41,7 @@ Create or verify these dashboard panels before production:
      `ImportingMedia`.
    - `generation_jobs_failed_total`, `generation_retry_attempts_total`,
      `generation_jobs_exhausted_total`, and `ai_provider_errors_total`.
+   - `generation_sse_delivery_failures_total`.
 
 5. Media
    - `generation_media_import_failures_total`.

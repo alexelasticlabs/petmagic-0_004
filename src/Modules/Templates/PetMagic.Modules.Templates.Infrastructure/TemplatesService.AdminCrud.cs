@@ -156,14 +156,44 @@ internal sealed partial class TemplatesService
         template.ImageModel = command.ImageModel.Trim();
         template.ImagePrompt = ResolvePrompt(command.ImagePrompt, options.DefaultImagePrompt);
         var now = DateTime.UtcNow;
+        var effectivePreviewAsset = ResolveEffectiveTemplateAsset(
+            template,
+            TemplateAssetKind.Preview,
+            command.PreviewAsset,
+            command.KeepPreviewAsset);
+        var effectiveThumbnailAsset = ResolveEffectiveTemplateAsset(
+            template,
+            TemplateAssetKind.Thumbnail,
+            command.ThumbnailAsset,
+            command.KeepPreviewAsset) ?? effectivePreviewAsset;
+        var effectiveAnimatedPreviewAsset = ResolveEffectiveTemplateAsset(
+            template,
+            TemplateAssetKind.AnimatedPreview,
+            command.AnimatedPreviewAsset,
+            command.KeepPreviewAsset);
+        var effectiveFeedLoopLowAsset = ResolveEffectiveTemplateAsset(
+            template,
+            TemplateAssetKind.FeedLoopLow,
+            command.FeedLoopLowAsset,
+            command.KeepPreviewAsset) ?? effectivePreviewAsset;
+        var effectiveFeedLoopMediumAsset = ResolveEffectiveTemplateAsset(
+            template,
+            TemplateAssetKind.FeedLoopMedium,
+            command.FeedLoopMediumAsset,
+            command.KeepPreviewAsset);
+        var effectiveDetailPreviewAsset = ResolveEffectiveTemplateAsset(
+            template,
+            TemplateAssetKind.DetailPreview,
+            command.DetailPreviewAsset,
+            command.KeepPreviewAsset) ?? effectivePreviewAsset;
 
         var obsoleteAssetUrls = CollectObsoleteAssetUrls([
-            SetAsset(template, TemplateAssetKind.Preview, command.PreviewAsset),
-            SetAsset(template, TemplateAssetKind.Thumbnail, command.ThumbnailAsset ?? command.PreviewAsset),
-            SetAsset(template, TemplateAssetKind.AnimatedPreview, command.AnimatedPreviewAsset),
-            SetAsset(template, TemplateAssetKind.FeedLoopLow, command.FeedLoopLowAsset ?? command.PreviewAsset),
-            SetAsset(template, TemplateAssetKind.FeedLoopMedium, command.FeedLoopMediumAsset),
-            SetAsset(template, TemplateAssetKind.DetailPreview, command.DetailPreviewAsset ?? command.PreviewAsset)
+            SetAsset(template, TemplateAssetKind.Preview, effectivePreviewAsset),
+            SetAsset(template, TemplateAssetKind.Thumbnail, effectiveThumbnailAsset),
+            SetAsset(template, TemplateAssetKind.AnimatedPreview, effectiveAnimatedPreviewAsset),
+            SetAsset(template, TemplateAssetKind.FeedLoopLow, effectiveFeedLoopLowAsset),
+            SetAsset(template, TemplateAssetKind.FeedLoopMedium, effectiveFeedLoopMediumAsset),
+            SetAsset(template, TemplateAssetKind.DetailPreview, effectiveDetailPreviewAsset)
         ]);
 
         if (template.Status == TemplateStatus.Active)
@@ -192,7 +222,7 @@ internal sealed partial class TemplatesService
         catch (DbUpdateConcurrencyException)
         {
             dbContext.ChangeTracker.Clear();
-            var recovered = await TryRecoverUpdatedTemplateAsync(command.TemplateId, command.PreviewAsset, cancellationToken);
+            var recovered = await TryRecoverUpdatedTemplateAsync(command.TemplateId, effectivePreviewAsset, cancellationToken);
             return recovered is null
                 ? Result.Failure<AdminTemplateResponse>(TemplatesErrors.UpdateConflict)
                 : Result.Success(recovered);
@@ -202,12 +232,12 @@ internal sealed partial class TemplatesService
             template.Id,
             cancellationToken,
             PreviewAssetsForLifecycle(
-                command.PreviewAsset,
-                command.ThumbnailAsset,
-                command.AnimatedPreviewAsset,
-                command.FeedLoopLowAsset,
-                command.FeedLoopMediumAsset,
-                command.DetailPreviewAsset));
+                effectivePreviewAsset,
+                effectiveThumbnailAsset,
+                effectiveAnimatedPreviewAsset,
+                effectiveFeedLoopLowAsset,
+                effectiveFeedLoopMediumAsset,
+                effectiveDetailPreviewAsset));
         await PublishTemplateInvalidatedAsync(
             template,
             "updated",
@@ -355,7 +385,42 @@ internal sealed partial class TemplatesService
             return Result.Failure<AdminTemplateResponse>(statusResult.Error);
         }
 
-        var (duration, orientation) = await ResolveReferenceMetadataAsync(command.ReferenceMotionAsset, cancellationToken);
+        var effectivePreviewAsset = ResolveEffectiveTemplateAsset(
+            template,
+            TemplateAssetKind.Preview,
+            command.PreviewAsset,
+            command.KeepPreviewAsset);
+        var effectiveThumbnailAsset = ResolveEffectiveTemplateAsset(
+            template,
+            TemplateAssetKind.Thumbnail,
+            command.ThumbnailAsset,
+            command.KeepPreviewAsset) ?? effectivePreviewAsset;
+        var effectiveAnimatedPreviewAsset = ResolveEffectiveTemplateAsset(
+            template,
+            TemplateAssetKind.AnimatedPreview,
+            command.AnimatedPreviewAsset,
+            command.KeepPreviewAsset);
+        var effectiveFeedLoopLowAsset = ResolveEffectiveTemplateAsset(
+            template,
+            TemplateAssetKind.FeedLoopLow,
+            command.FeedLoopLowAsset,
+            command.KeepPreviewAsset) ?? effectivePreviewAsset;
+        var effectiveFeedLoopMediumAsset = ResolveEffectiveTemplateAsset(
+            template,
+            TemplateAssetKind.FeedLoopMedium,
+            command.FeedLoopMediumAsset,
+            command.KeepPreviewAsset);
+        var effectiveDetailPreviewAsset = ResolveEffectiveTemplateAsset(
+            template,
+            TemplateAssetKind.DetailPreview,
+            command.DetailPreviewAsset,
+            command.KeepPreviewAsset) ?? effectivePreviewAsset;
+        var effectiveReferenceMotionAsset = ResolveEffectiveTemplateAsset(
+            template,
+            TemplateAssetKind.ReferenceMotion,
+            command.ReferenceMotionAsset,
+            command.KeepReferenceMotionAsset);
+        var (duration, orientation) = await ResolveReferenceMetadataAsync(effectiveReferenceMotionAsset, cancellationToken);
 
         template.Title = command.Title.Trim();
         template.ShortDescription = command.ShortDescription.Trim();
@@ -384,13 +449,13 @@ internal sealed partial class TemplatesService
         var now = DateTime.UtcNow;
 
         var obsoleteAssetUrls = CollectObsoleteAssetUrls([
-            SetAsset(template, TemplateAssetKind.Preview, command.PreviewAsset),
-            SetAsset(template, TemplateAssetKind.Thumbnail, command.ThumbnailAsset ?? command.PreviewAsset),
-            SetAsset(template, TemplateAssetKind.AnimatedPreview, command.AnimatedPreviewAsset),
-            SetAsset(template, TemplateAssetKind.FeedLoopLow, command.FeedLoopLowAsset ?? command.PreviewAsset),
-            SetAsset(template, TemplateAssetKind.FeedLoopMedium, command.FeedLoopMediumAsset),
-            SetAsset(template, TemplateAssetKind.DetailPreview, command.DetailPreviewAsset ?? command.PreviewAsset),
-            SetAsset(template, TemplateAssetKind.ReferenceMotion, command.ReferenceMotionAsset)
+            SetAsset(template, TemplateAssetKind.Preview, effectivePreviewAsset),
+            SetAsset(template, TemplateAssetKind.Thumbnail, effectiveThumbnailAsset),
+            SetAsset(template, TemplateAssetKind.AnimatedPreview, effectiveAnimatedPreviewAsset),
+            SetAsset(template, TemplateAssetKind.FeedLoopLow, effectiveFeedLoopLowAsset),
+            SetAsset(template, TemplateAssetKind.FeedLoopMedium, effectiveFeedLoopMediumAsset),
+            SetAsset(template, TemplateAssetKind.DetailPreview, effectiveDetailPreviewAsset),
+            SetAsset(template, TemplateAssetKind.ReferenceMotion, effectiveReferenceMotionAsset)
         ]);
 
         if (template.Status == TemplateStatus.Active)
@@ -419,7 +484,7 @@ internal sealed partial class TemplatesService
         catch (DbUpdateConcurrencyException)
         {
             dbContext.ChangeTracker.Clear();
-            var recovered = await TryRecoverUpdatedTemplateAsync(command.TemplateId, command.PreviewAsset, cancellationToken);
+            var recovered = await TryRecoverUpdatedTemplateAsync(command.TemplateId, effectivePreviewAsset, cancellationToken);
             return recovered is null
                 ? Result.Failure<AdminTemplateResponse>(TemplatesErrors.UpdateConflict)
                 : Result.Success(recovered);
@@ -429,16 +494,16 @@ internal sealed partial class TemplatesService
             template.Id,
             cancellationToken,
             PreviewAssetsForLifecycle(
-                command.PreviewAsset,
-                command.ThumbnailAsset,
-                command.AnimatedPreviewAsset,
-                command.FeedLoopLowAsset,
-                command.FeedLoopMediumAsset,
-                command.DetailPreviewAsset));
+                effectivePreviewAsset,
+                effectiveThumbnailAsset,
+                effectiveAnimatedPreviewAsset,
+                effectiveFeedLoopLowAsset,
+                effectiveFeedLoopMediumAsset,
+                effectiveDetailPreviewAsset));
         await ClaimTemplateAssetsAfterUpdateAsync(
             template.Id,
             cancellationToken,
-            (command.ReferenceMotionAsset, TemplateMediaRole.ReferenceMotionAsset));
+            (effectiveReferenceMotionAsset, TemplateMediaRole.ReferenceMotionAsset));
         await PublishTemplateInvalidatedAsync(
             template,
             "updated",

@@ -86,6 +86,55 @@ public sealed class HttpGeneratedMediaImporterTests
     }
 
     [Fact]
+    public async Task ImportImageAsync_ShouldRejectContentTypeMismatchWithoutStoring()
+    {
+        var handler = new RecordingHandler("image/png", "<html></html>"u8.ToArray());
+        var storage = new RecordingMediaStorage();
+        var importer = CreateImporter(handler, storage);
+
+        var result = await importer.ImportImageAsync("https://cdn.example.com/generated.png", Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(TemplatesErrors.GeneratedMediaImportFailed.Code, result.Error.Code);
+        Assert.Equal(1, handler.RequestCount);
+        Assert.Equal(0, storage.StoreCount);
+    }
+
+    [Fact]
+    public async Task ImportImageAsync_ShouldStoreDetectedContentType()
+    {
+        var handler = new RecordingHandler("image/png", PngPayload());
+        var storage = new RecordingMediaStorage();
+        var importer = CreateImporter(handler, storage);
+
+        var result = await importer.ImportImageAsync("https://cdn.example.com/generated.php", Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, handler.RequestCount);
+        Assert.Equal(1, storage.StoreCount);
+        Assert.NotNull(storage.LastAsset);
+        Assert.Equal("image/png", storage.LastAsset.ContentType);
+        Assert.EndsWith(".png", storage.LastAsset.FileName, StringComparison.OrdinalIgnoreCase);
+        Assert.False(storage.LastAsset.FileName.EndsWith(".php", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ImportImageAsync_ShouldSanitizeStorageFailureCode()
+    {
+        var handler = new RecordingHandler("image/png", PngPayload());
+        var storage = new RecordingMediaStorage("templates.media_storage_failed token=import-storage-secret");
+        var importer = CreateImporter(handler, storage);
+
+        var result = await importer.ImportImageAsync("https://cdn.example.com/generated.png", Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(TemplatesErrors.MediaStorageFailed.Code, result.Error.Code);
+        Assert.DoesNotContain("import-storage-secret", result.Error.Code, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(1, handler.RequestCount);
+        Assert.Equal(1, storage.StoreCount);
+    }
+
+    [Fact]
     public async Task ImportImageAsync_ShouldFailWithoutStoring_WhenProviderUrlReturnsNotFound()
     {
         var handler = new StatusHandler(HttpStatusCode.NotFound);
@@ -159,13 +208,20 @@ public sealed class HttpGeneratedMediaImporterTests
         }
     }
 
-    private sealed class RecordingMediaStorage : IMediaStorage
+    private sealed class RecordingMediaStorage(string? failureCode = null) : IMediaStorage
     {
         public int StoreCount { get; private set; }
 
         public Task<Result<StoredMediaResponse>> StoreAsync(MediaUploadCommand asset, CancellationToken cancellationToken)
         {
             StoreCount++;
+            LastAsset = asset;
+            if (failureCode is not null)
+            {
+                return Task.FromResult(Result.Failure<StoredMediaResponse>(
+                    new Error(failureCode, "Media upload could not be stored.")));
+            }
+
             return Task.FromResult(Result.Success(new StoredMediaResponse(
                 "https://cdn.example.com/stored/generated.png",
                 "templates/generated.png",
@@ -174,6 +230,8 @@ public sealed class HttpGeneratedMediaImporterTests
                 asset.ContentLengthBytes,
                 null)));
         }
+
+        public MediaUploadCommand? LastAsset { get; private set; }
 
         public Task<Result> DeleteAsync(string assetUrl, CancellationToken cancellationToken)
         {
@@ -184,5 +242,16 @@ public sealed class HttpGeneratedMediaImporterTests
         {
             return Task.FromResult(Result.Success(assetUrl));
         }
+    }
+
+    private static byte[] PngPayload()
+    {
+        return
+        [
+            0x89, 0x50, 0x4E, 0x47,
+            0x0D, 0x0A, 0x1A, 0x0A,
+            0x00, 0x00, 0x00, 0x0D,
+            0x49, 0x48, 0x44, 0x52
+        ];
     }
 }

@@ -28,9 +28,11 @@ describe("promo codes editor drawer production form", () => {
     expect(source).not.toContain("aria-label={panelTitle}");
     expect(source).toContain("onClick={isMutating ? undefined : onClose}");
     expect(source).toContain("const isFormLocked = isMutating;");
-    expect(source).toContain('aria-busy={isFormLocked}');
+    expect(source).toContain("aria-busy={isFormLocked}");
     expect(source).toContain("const isSubmitDisabled =");
-    expect(source).toContain("isFormLocked || isCodeInvalid || hasInvalidNumber || hasInvalidDateWindow");
+    expect(source).toContain(
+      "isFormLocked || isCodeInvalid || hasInvalidNumber || hasInvalidDateWindow"
+    );
     expect(source).toContain("disabled={isSubmitDisabled}");
     expect(source).toContain('readOnly={panelMode === "edit" || isFormLocked}');
     expect(source).toContain('disabled={panelMode === "edit" || isFormLocked}');

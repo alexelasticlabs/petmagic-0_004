@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Domain.Enums;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
@@ -63,10 +64,10 @@ public sealed partial class EconomyService
                 WalletLedgerSource.PremiumSubscriptionWeeklyGrant,
                 reason,
                 now,
-                cancellationToken);
+            cancellationToken);
             if (walletMutation.IsFailure)
             {
-                throw new InvalidOperationException(walletMutation.Error.Message);
+                throw BuildSafeEconomyOperationException("premium_weekly_grant", walletMutation.Error);
             }
 
             grantedReasons.Add(reason);
@@ -98,7 +99,7 @@ public sealed partial class EconomyService
 
         if (result.IsFailure)
         {
-            throw new InvalidOperationException(result.Error.Message);
+            throw BuildSafeEconomyOperationException("premium_subscription_allowance", result.Error);
         }
     }
 
@@ -125,12 +126,19 @@ public sealed partial class EconomyService
             }
 
             var allowanceReason = BuildPremiumAllowanceGrantReason(periodStartUtc);
+            const string allowanceReasonPrefix = "premium_allowance:";
+            var allowanceReasonPeriodSuffix = periodStartUtc.ToString("O");
+            var periodEndUtc = subscription.CurrentPeriodEndUtc;
             var existingGrantAtUtc = await dbContext.WalletLedgerEntries
                 .AsNoTracking()
                 .Where(
                     x => x.UserId == subscription.UserId
                         && x.Source == WalletLedgerSource.PremiumSubscriptionGrant
-                        && IsPremiumAllowanceGrantReasonForPeriod(x.Reason, periodStartUtc))
+                        && x.Reason != null
+                        && ((x.Reason.StartsWith(allowanceReasonPrefix)
+                                && x.Reason.EndsWith(allowanceReasonPeriodSuffix))
+                            || (x.CreatedAtUtc >= periodStartUtc
+                                && (!periodEndUtc.HasValue || x.CreatedAtUtc <= periodEndUtc.Value))))
                 .Select(x => (DateTime?)x.CreatedAtUtc)
                 .OrderByDescending(x => x)
                 .FirstOrDefaultAsync(cancellationToken);
@@ -173,10 +181,10 @@ public sealed partial class EconomyService
                 WalletLedgerSource.PremiumSubscriptionGrant,
                 allowanceReason,
                 now,
-                cancellationToken);
+            cancellationToken);
             if (walletMutation.IsFailure)
             {
-                throw new InvalidOperationException(walletMutation.Error.Message);
+                throw BuildSafeEconomyOperationException("premium_subscription_grant", walletMutation.Error);
             }
 
             subscription.MonthlyTokensGranted = options.Value.WeeklyPremiumSpark;
@@ -193,12 +201,12 @@ public sealed partial class EconomyService
         catch (Exception ex)
         {
             logger?.LogWarning(
-                ex,
-                "Failed to grant premium subscription allowance. UserId={UserId} SubscriptionId={SubscriptionId} Provider={Provider} CorrelationId={CorrelationId}",
-                subscription.UserId,
-                subscription.Id,
+                "Failed to grant premium subscription allowance. UserIdHash={UserIdHash} SubscriptionIdHash={SubscriptionIdHash} Provider={Provider} ExceptionType={ExceptionType} CorrelationIdHash={CorrelationIdHash}",
+                EconomyLogSanitizer.SafeUserId(subscription.UserId),
+                SafeLogValues.StableHash(subscription.Id.ToString("D")),
                 providerContext,
-                CurrentCorrelationId);
+                SafeLogValues.ExceptionType(ex),
+                CurrentCorrelationIdHash);
 
             if (transaction is not null)
             {

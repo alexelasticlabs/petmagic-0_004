@@ -17,6 +17,7 @@ Future<List<int>> downloadFileBytes(
   if (maxBytes <= 0) {
     throw ArgumentError.value(maxBytes, 'maxBytes', 'Must be positive.');
   }
+  final safeUri = _parseDownloadUri(fileUrl);
 
   final ownsClient = client == null;
   final httpClient =
@@ -32,7 +33,7 @@ Future<List<int>> downloadFileBytes(
   try {
     _throwIfDownloadCancelled(cancelToken);
     final response = await httpClient.get<ResponseBody>(
-      fileUrl,
+      safeUri.toString(),
       cancelToken: cancelToken,
       options: Options(
         responseType: ResponseType.stream,
@@ -81,12 +82,57 @@ Future<List<int>> downloadFileBytes(
       throw _downloadCancelledException();
     }
 
-    throw _sanitizeDownloadException(error, fileUrl);
+    throw _sanitizeDownloadException(error, safeUri.toString());
   } finally {
     if (ownsClient) {
       httpClient.close(force: true);
     }
   }
+}
+
+Uri _parseDownloadUri(String fileUrl) {
+  final uri = Uri.tryParse(fileUrl.trim());
+  final scheme = uri?.scheme.toLowerCase();
+  if (uri == null || uri.host.isEmpty || uri.userInfo.isNotEmpty) {
+    throw const FormatException('unsafe_download_url');
+  }
+
+  if (scheme == 'https') {
+    return uri;
+  }
+
+  if (scheme == 'http' && kDebugMode && _isLocalDebugHost(uri.host)) {
+    return uri;
+  }
+
+  throw const FormatException('unsafe_download_url');
+}
+
+bool _isLocalDebugHost(String host) {
+  final normalizedHost = host.toLowerCase();
+  if (normalizedHost == 'localhost' ||
+      normalizedHost == '127.0.0.1' ||
+      normalizedHost == '10.0.2.2' ||
+      normalizedHost == '10.0.3.2' ||
+      normalizedHost == 'host.docker.internal') {
+    return true;
+  }
+
+  final parts = normalizedHost.split('.');
+  if (parts.length != 4) {
+    return false;
+  }
+
+  final octets = parts.map(int.tryParse).toList(growable: false);
+  if (octets.any((value) => value == null || value < 0 || value > 255)) {
+    return false;
+  }
+
+  final first = octets[0]!;
+  final second = octets[1]!;
+  return first == 10 ||
+      (first == 172 && second >= 16 && second <= 31) ||
+      (first == 192 && second == 168);
 }
 
 void _throwIfDownloadCancelled(CancelToken? cancelToken) {
@@ -131,7 +177,12 @@ String _safeDownloadPath(String fileUrl) {
     return '';
   }
 
-  return uri.replace(query: '', fragment: '').toString();
+  if (uri.hasScheme && uri.host.isNotEmpty) {
+    final port = uri.hasPort ? ':${uri.port}' : '';
+    return '${uri.scheme}://${uri.host}$port';
+  }
+
+  return '';
 }
 
 int? _contentLengthFromHeaders(Headers headers) {

@@ -4,7 +4,7 @@ namespace PetMagic.Modules.Economy.Infrastructure;
 
 public static class EconomyErrors
 {
-    public static readonly Error WeeklyGrantCooldown = new("economy.weekly_cooldown", "Weekly reward is not available yet.");
+    public static readonly Error WeeklyGrantCooldown = new("economy.weekly_cooldown", "Weekly reward is currently on cooldown.");
 
     public static readonly Error AdRewardLimitReached = new("economy.ad_reward_limit_reached", "Daily ad reward limit reached.");
 

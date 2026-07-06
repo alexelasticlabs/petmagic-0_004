@@ -124,26 +124,17 @@ class _NotificationBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final toneColors = switch (notification.tone) {
-      PetMagicToastTone.success => (
-        base: const Color(0xFF0F2C22),
-        border: const Color(0xFF2B8C67),
-        accent: const Color(0xFF27D38A),
-        iconBg: const Color(0xFF163F31),
-      ),
-      PetMagicToastTone.warning => (
-        base: const Color(0xFF30201F),
-        border: const Color(0xFFAD5762),
-        accent: const Color(0xFFFF7A8C),
-        iconBg: const Color(0xFF4A2A2F),
-      ),
-      PetMagicToastTone.info => (
-        base: const Color(0xFF162636),
-        border: const Color(0xFF3A6FB2),
-        accent: const Color(0xFF6FA8FF),
-        iconBg: const Color(0xFF1C3550),
-      ),
+    final brightness = Theme.of(context).brightness;
+    final toneAccent = switch (notification.tone) {
+      PetMagicToastTone.success => colors.accent,
+      PetMagicToastTone.warning => colors.warning,
+      PetMagicToastTone.info => colors.blue,
     };
+    final toneColors = _NotificationToneColors.from(
+      colors,
+      toneAccent,
+      brightness: brightness,
+    );
 
     final icon = switch (notification.tone) {
       PetMagicToastTone.success => Icons.check_circle_rounded,
@@ -161,14 +152,14 @@ class _NotificationBanner extends StatelessWidget {
           boxShadow: reduceEffects
               ? [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.16),
+                    color: colors.shadow.withValues(alpha: 0.16),
                     blurRadius: 10,
                     offset: const Offset(0, 6),
                   ),
                 ]
               : [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.26),
+                    color: colors.shadow.withValues(alpha: 0.26),
                     blurRadius: 28,
                     offset: const Offset(0, 16),
                   ),
@@ -227,7 +218,7 @@ class _NotificationBanner extends StatelessWidget {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.96),
+                                  color: colors.textStrong,
                                   fontSize: 14,
                                   fontWeight: FontWeight.w800,
                                   height: 1.1,
@@ -240,7 +231,7 @@ class _NotificationBanner extends StatelessWidget {
                               maxLines: notification.title == null ? 3 : 2,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.90),
+                                color: colors.textSoft,
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
                                 height: 1.3,
@@ -288,7 +279,7 @@ class _NotificationBanner extends StatelessWidget {
                       icon: Icon(
                         Icons.close_rounded,
                         size: 18,
-                        color: Colors.white.withValues(alpha: 0.82),
+                        color: colors.textSoft.withValues(alpha: 0.82),
                       ),
                     ),
                   ],
@@ -298,6 +289,37 @@ class _NotificationBanner extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _NotificationToneColors {
+  const _NotificationToneColors({
+    required this.base,
+    required this.border,
+    required this.accent,
+    required this.iconBg,
+  });
+
+  final Color base;
+  final Color border;
+  final Color accent;
+  final Color iconBg;
+
+  factory _NotificationToneColors.from(
+    PetMagicColors colors,
+    Color accent, {
+    required Brightness brightness,
+  }) {
+    final surfaceBlend = brightness == Brightness.dark ? 0.18 : 0.10;
+    final iconBlend = brightness == Brightness.dark ? 0.22 : 0.16;
+    return _NotificationToneColors(
+      base: Color.lerp(colors.surface, accent, surfaceBlend) ?? colors.surface,
+      border: accent,
+      accent: accent,
+      iconBg:
+          Color.lerp(colors.surfaceStrong, accent, iconBlend) ??
+          colors.surfaceStrong,
     );
   }
 }

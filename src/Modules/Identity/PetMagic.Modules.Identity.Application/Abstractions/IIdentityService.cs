@@ -62,6 +62,7 @@ public interface IIdentityService
         string? role,
         string? status,
         bool? isPremium,
+        string? sort,
         CancellationToken cancellationToken);
 
     Task<Result<AdminUserDashboardMetricsResponse>> GetAdminUserDashboardMetricsAsync(CancellationToken cancellationToken);

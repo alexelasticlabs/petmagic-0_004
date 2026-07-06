@@ -51,6 +51,15 @@ class _SupportAttachmentPickerSheetState
   }
 
   @override
+  void didUpdateWidget(covariant _SupportAttachmentPickerSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.scrollController, widget.scrollController)) {
+      oldWidget.scrollController.removeListener(_onGridScrolled);
+      widget.scrollController.addListener(_onGridScrolled);
+    }
+  }
+
+  @override
   void dispose() {
     widget.scrollController.removeListener(_onGridScrolled);
     _captionController.dispose();

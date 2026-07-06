@@ -260,7 +260,7 @@ public sealed partial class EconomyService
             cancellationToken);
         if (referrerMutation.IsFailure)
         {
-            throw new InvalidOperationException(referrerMutation.Error.Message);
+            throw BuildSafeEconomyOperationException("referral_inviter_bonus", referrerMutation.Error);
         }
 
         var refereeMutation = await ApplyWalletMutationAsync(
@@ -272,7 +272,7 @@ public sealed partial class EconomyService
             cancellationToken);
         if (refereeMutation.IsFailure)
         {
-            throw new InvalidOperationException(refereeMutation.Error.Message);
+            throw BuildSafeEconomyOperationException("referral_friend_bonus", refereeMutation.Error);
         }
 
         referral.Status = ReferralAttributionStatus.Rewarded;

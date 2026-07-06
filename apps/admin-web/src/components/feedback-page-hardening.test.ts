@@ -27,6 +27,23 @@ describe("feedback page hardening", () => {
     expect(source).not.toContain('ensureAdminSession(locale, router, { requiredRole: "Admin" });');
   });
 
+  it("does not load user profile context for non-admin feedback viewers", () => {
+    const source = readFeedbackPageLibrarySource();
+
+    expect(source).toContain(
+      'const canViewUserProfile = session?.user.roles.includes("Admin") ?? false;'
+    );
+    expect(source).toContain("canViewUserProfile={canViewUserProfile}");
+    expect(source).toContain("canViewUserProfile: boolean;");
+    expect(
+      source.match(/enabled: canViewUserProfile && Boolean\(details\.userId\)/g) ?? []
+    ).toHaveLength(2);
+    expect(source).toContain(
+      "canViewUserProfile && Boolean(details.userId) && (userQuery.isError || userAnalyticsQuery.isError)"
+    );
+    expect(source).not.toContain("enabled: Boolean(details.userId),");
+  });
+
   it("debounces free-text filters before changing the backend query", () => {
     const source = readFeedbackPageLibrarySource();
 
@@ -194,7 +211,7 @@ describe("feedback page hardening", () => {
       "const isSaveFeedbackDisabled = !isFeedbackDraftDirty || isFeedbackActionLocked;"
     );
     expect(source).toContain(
-      "const isRefundFeedbackDisabled =\n    !details.canRefund || refundableCredits <= 0 || isFeedbackActionLocked;"
+      "const isRefundFeedbackDisabled =\n    !canViewUserProfile || !details.canRefund || refundableCredits <= 0 || isFeedbackActionLocked;"
     );
     expect(source).toContain("amount: refundableCredits,");
     expect(source).toContain("Number.isFinite(details.generation.creditsCharged)");
@@ -286,12 +303,24 @@ describe("feedback page hardening", () => {
       "queryClient.invalidateQueries({ queryKey: adminQueryKeys.feedbackDetails(details.id) })"
     );
     expect(source).toContain('queryClient.invalidateQueries({ queryKey: ["admin", "feedback"] })');
-    expect(source).toContain('queryClient.invalidateQueries({ queryKey: ["admin", "economy", "ledger"] })');
-    expect(source).toContain("queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyDashboardMetrics })");
-    expect(source).toContain("queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDetail(details.userId) })");
-    expect(source).toContain("queryClient.invalidateQueries({ queryKey: adminQueryKeys.userAnalytics(details.userId) })");
-    expect(source).toContain("queryClient.invalidateQueries({ queryKey: adminQueryKeys.usersRoot })");
-    expect(source).toContain("queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDashboardMetrics })");
+    expect(source).toContain(
+      'queryClient.invalidateQueries({ queryKey: ["admin", "economy", "ledger"] })'
+    );
+    expect(source).toContain(
+      "queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyDashboardMetrics })"
+    );
+    expect(source).toContain(
+      "queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDetail(details.userId) })"
+    );
+    expect(source).toContain(
+      "queryClient.invalidateQueries({ queryKey: adminQueryKeys.userAnalytics(details.userId) })"
+    );
+    expect(source).toContain(
+      "queryClient.invalidateQueries({ queryKey: adminQueryKeys.usersRoot })"
+    );
+    expect(source).toContain(
+      "queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDashboardMetrics })"
+    );
     expect(source).not.toContain(
       'await queryClient.invalidateQueries({ queryKey: adminQueryKeys.feedbackDetails(details.id) });\n      await queryClient.invalidateQueries({ queryKey: ["admin", "feedback"] });'
     );
@@ -308,6 +337,16 @@ describe("feedback page hardening", () => {
     expect(source).not.toContain('`${userQuery.data?.isPremium ? "premium" : "free"}');
   });
 
+  it("masks feedback user email before rendering details", () => {
+    const source = readFeedbackPageLibrarySource();
+
+    expect(source).toContain("import { maskEmail, sanitizeSensitiveText }");
+    expect(source).toContain(
+      "userQuery.data?.email ? maskEmail(userQuery.data.email) : shortId(details.userId)"
+    );
+    expect(source).not.toContain("value={userQuery.data?.email ?? shortId(details.userId)}");
+  });
+
   it("keeps feedback user context failures local and retryable", () => {
     const source = readFeedbackPageLibrarySource();
     const contentSource = readFileSync(feedbackPageContentPath, "utf8");
@@ -317,7 +356,7 @@ describe("feedback page hardening", () => {
     expect(contentSource).toContain("userContextErrorDescription:");
     expect(source).toContain("const hasUserContextError =");
     expect(source).toContain(
-      "Boolean(details.userId) && (userQuery.isError || userAnalyticsQuery.isError)"
+      "canViewUserProfile && Boolean(details.userId) && (userQuery.isError || userAnalyticsQuery.isError)"
     );
     expect(source).toContain(
       "const isUserContextFetching = userQuery.isFetching || userAnalyticsQuery.isFetching;"

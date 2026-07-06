@@ -36,44 +36,7 @@ public static partial class EconomyEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
-        }
-
-        var result = await service.CreatePremiumCheckoutAsync(command, cancellationToken);
-        if (result.IsFailure)
-        {
-            return ToClientEconomyProblem(result.Error);
-        }
-
-        return TypedResults.Ok(result.Value);
-    }
-
-    private static async Task<Results<Ok<PremiumCheckoutResponse>, ValidationProblem, ProblemHttpResult>> CreateStripeSubscriptionAsync(
-        HttpContext context,
-        CreateStripeSubscriptionRequest request,
-        IValidator<CreatePremiumCheckoutCommand> validator,
-        IEconomyService service,
-        CancellationToken cancellationToken)
-    {
-        var (userId, _, subjectError) = TryGetSubject(context);
-        if (subjectError is not null)
-        {
-            return ToClientEconomyProblem(subjectError);
-        }
-
-        var command = new CreatePremiumCheckoutCommand(
-            userId!.Value,
-            request.PlanId,
-            "stripe",
-            ResolveCheckoutPlatform(context, request.Platform),
-            request.AppVersion,
-            request.Country,
-            request.Locale);
-
-        var validation = await validator.ValidateAsync(command, cancellationToken);
-        if (!validation.IsValid)
-        {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.CreatePremiumCheckoutAsync(command, cancellationToken);
@@ -105,7 +68,7 @@ public static partial class EconomyEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.CreatePremiumBillingPortalAsync(command, cancellationToken);
@@ -137,7 +100,7 @@ public static partial class EconomyEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.CancelPremiumSubscriptionAsync(command, cancellationToken);
@@ -149,32 +112,4 @@ public static partial class EconomyEndpoints
         return TypedResults.Ok(result.Value);
     }
 
-    private static async Task<Results<Ok<BillingPortalSessionResponse>, ValidationProblem, ProblemHttpResult>> CreateStripeCustomerPortalAsync(
-        HttpContext context,
-        CreateStripeCustomerPortalRequest request,
-        IValidator<CreatePremiumBillingPortalCommand> validator,
-        IEconomyService service,
-        CancellationToken cancellationToken)
-    {
-        var (userId, _, subjectError) = TryGetSubject(context);
-        if (subjectError is not null)
-        {
-            return ToClientEconomyProblem(subjectError);
-        }
-
-        var command = new CreatePremiumBillingPortalCommand(userId!.Value, "stripe");
-        var validation = await validator.ValidateAsync(command, cancellationToken);
-        if (!validation.IsValid)
-        {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
-        }
-
-        var result = await service.CreatePremiumBillingPortalAsync(command, cancellationToken);
-        if (result.IsFailure)
-        {
-            return ToClientEconomyProblem(result.Error);
-        }
-
-        return TypedResults.Ok(result.Value);
-    }
 }

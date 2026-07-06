@@ -148,6 +148,8 @@ abstract class _GenerationHistoryControllerBase
   CancelToken? _activeLoadCancelToken;
   CancelToken? _activeLoadMoreCancelToken;
   CancelToken? _activeUnreadRefreshCancelToken;
+  final Map<String, CancelToken> _activeRealtimeRefetchCancelTokens =
+      <String, CancelToken>{};
   _GenerationHistoryLoadRequest? _pendingLoadRequest;
   Completer<void>? _pendingLoadCompleter;
   Set<String> _locallyDeletedGenerationIds = const {};
@@ -212,7 +214,7 @@ abstract class _GenerationHistoryControllerBase
 
   CancelToken _startLoadCancelToken();
 
-  void _clearActiveLoadCancelToken();
+  void _clearActiveLoadCancelToken(CancelToken cancelToken);
 
   CancelToken _startLoadMoreCancelToken();
 
@@ -292,9 +294,8 @@ class GenerationHistoryController extends _GenerationHistoryControllerBase
         _GenerationHistoryControllerSync {
   @override
   GenerationHistoryState build() {
-    ref.watch(templateGenerationRepositoryProvider);
-    final galleryStore = ref.watch(generationGalleryStoreProvider);
-    _activeRealtimeClient = ref.watch(realtimeClientProvider);
+    final galleryStore = ref.read(generationGalleryStoreProvider);
+    _activeRealtimeClient = ref.read(realtimeClientProvider);
     _hasInternet = ref.read(networkStatusControllerProvider).hasInternet;
     ref.listen<bool>(
       networkStatusControllerProvider.select((state) => state.hasInternet),

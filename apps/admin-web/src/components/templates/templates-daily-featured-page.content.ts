@@ -2,10 +2,11 @@ import { type Locale } from "@/lib/i18n";
 
 const templatesDailyFeaturedPageText = {
   ru: {
+    intlLocale: "ru-RU",
     eyebrow: "Шаблоны",
     title: "Шаблон дня",
     description:
-      "Планируйте витрину Template of the Day: ручные назначения, предпросмотр и автоматический выбор.",
+      "Планируйте витрину шаблона дня: ручные назначения, предпросмотр и автоматический выбор.",
     heroBadge: "Витрина дня",
     refresh: "Обновить",
     retry: "Повторить",
@@ -15,14 +16,14 @@ const templatesDailyFeaturedPageText = {
     form: "Назначение",
     formDescription:
       "Выберите активный шаблон, период показа и текст для карточки в мобильной витрине.",
-    formAdminOnly: "Для изменений нужна роль Admin.",
+    formAdminOnly: "Для изменений нужна роль администратора.",
     templateSearch: "Поиск шаблона",
     templateSearchPlaceholder: "Название, категория или тег",
     templateTypeFilter: "Тип шаблона",
     templateAccessFilter: "Тариф",
     allTemplateTypes: "Все типы",
     allAccessLevels: "Все тарифы",
-    activeTemplatesOnly: "Статус: Active",
+    activeTemplatesOnly: "Статус: активные",
     template: "Шаблон",
     selectTemplate: "Выберите шаблон",
     startDate: "Дата начала",
@@ -50,7 +51,7 @@ const templatesDailyFeaturedPageText = {
     noCurrent: "На сегодня назначение не найдено.",
     noSchedule: "Расписание пока пустое.",
     dateOccupiedWarning:
-      "На выбранные даты уже есть активное ручное назначение. v1 поддерживает одно manual-назначение на дату.",
+      "На выбранные даты уже есть активное ручное назначение. Версия v1 поддерживает одно ручное назначение на дату.",
     invalidDateRangeWarning: "Дата окончания не может быть раньше даты начала.",
     autoPickDateRequired: "Выберите дату для ручного автовыбора.",
     noTemplates: "Активные шаблоны по этому запросу не найдены.",
@@ -60,11 +61,11 @@ const templatesDailyFeaturedPageText = {
     saveError: "Не удалось сохранить назначение.",
     autoPick: "Автовыбор",
     autoPickDescription:
-      "Управляет fallback-выбором и daily job. Ручной запуск ниже создаёт подбор на выбранную дату.",
-    autoMode: "Auto mode",
+      "Управляет резервным выбором и ежедневным заданием. Ручной запуск ниже создаёт подбор на выбранную дату.",
+    autoMode: "Авторежим",
     autoModeEnabled: "Включен",
     autoModeDisabled: "Отключен",
-    autoModeStatus: "Статус auto mode",
+    autoModeStatus: "Статус авторежима",
     autoModeSave: "Сохранить настройки",
     autoPickRun: "Запустить автовыбор",
     allowedTypes: "Типы",
@@ -73,7 +74,7 @@ const templatesDailyFeaturedPageText = {
     manual: "Ручной",
     auto: "Авто",
     premium: "Premium",
-    free: "Free",
+    free: "Бесплатно",
     image: "Изображение",
     video: "Видео",
     date: "Период",
@@ -85,6 +86,7 @@ const templatesDailyFeaturedPageText = {
     badgeLabel: "Бейдж",
   },
   en: {
+    intlLocale: "en-US",
     eyebrow: "Templates",
     title: "Daily Featured",
     description:
@@ -170,8 +172,10 @@ const templatesDailyFeaturedPageText = {
 
 export type TemplatesDailyFeaturedPageText = (typeof templatesDailyFeaturedPageText)["en"];
 
-export function getTemplatesDailyFeaturedPageText(
-  locale: Locale
-): TemplatesDailyFeaturedPageText {
+export function getTemplatesDailyFeaturedPageText(locale: Locale): TemplatesDailyFeaturedPageText {
   return templatesDailyFeaturedPageText[locale] as TemplatesDailyFeaturedPageText;
+}
+
+export function getTemplatesDailyFeaturedPageIntlLocale(locale: Locale): string {
+  return templatesDailyFeaturedPageText[locale].intlLocale;
 }

@@ -27,6 +27,8 @@ public static class PublicTemplateEndpoints
     private const int MaxAnalyticsMetadataEntries = 12;
     private const int MaxAnalyticsMetadataKeyLength = 64;
     private const int MaxAnalyticsMetadataValueLength = 160;
+    private const int MaxPublicRealtimeEventTopicLength = 128;
+    private const int MaxPublicRealtimeEventDataLength = 8192;
     private static readonly JsonSerializerOptions PublicJsonOptions = new(JsonSerializerDefaults.Web);
     // Do not add templates.generation.status_changed to this anonymous public
     // SSE allowlist. Generation status events carry user-specific generation
@@ -520,16 +522,16 @@ public static class PublicTemplateEndpoints
     {
         return TypedResults.Problem(
             title: errorCode,
-            detail: GetPublicTemplateProblemDetail(statusCode),
-            statusCode: statusCode);
+            statusCode: statusCode,
+            extensions: BuildPublicProblemExtensions(errorCode));
     }
 
     private static ProblemHttpResult ToPublicValidationProblem(string errorCode)
     {
         return TypedResults.Problem(
             title: errorCode,
-            detail: GetPublicValidationProblemDetail(errorCode),
-            statusCode: StatusCodes.Status400BadRequest);
+            statusCode: StatusCodes.Status400BadRequest,
+            extensions: BuildPublicProblemExtensions(errorCode));
     }
 
     private static ProblemHttpResult ToPublicCatalogProblem(string errorCode)
@@ -545,31 +547,15 @@ public static class PublicTemplateEndpoints
             _ => StatusCodes.Status503ServiceUnavailable,
         };
 
-        var detail = statusCode == StatusCodes.Status404NotFound
-            ? "Template content was not found."
-            : "Template catalog is temporarily unavailable.";
-
-        return TypedResults.Problem(title: errorCode, detail: detail, statusCode: statusCode);
+        return TypedResults.Problem(
+            title: errorCode,
+            statusCode: statusCode,
+            extensions: BuildPublicProblemExtensions(errorCode));
     }
 
-    private static string GetPublicValidationProblemDetail(string errorCode)
+    private static Dictionary<string, object?> BuildPublicProblemExtensions(string errorCode)
     {
-        return errorCode switch
-        {
-            "templates.invalid_since_version" => "Query parameter sinceVersion must be a non-negative integer.",
-            "templates.invalid_type" => "Query parameter type must be Image, Video, or all.",
-            "templates.invalid_cursor" => "Query parameter cursor must be the nextCursor value returned by a previous feed response.",
-            "templates.invalid_access" => "Query parameter access must be all, free, or premium.",
-            "templates.invalid_event_type" => "Request field eventType must be a supported analytics event name.",
-            _ => "Template request is invalid.",
-        };
-    }
-
-    private static string GetPublicTemplateProblemDetail(int statusCode)
-    {
-        return statusCode == StatusCodes.Status404NotFound
-            ? "Template was not found."
-            : "Template request could not be completed.";
+        return new Dictionary<string, object?> { ["code"] = errorCode };
     }
 
     private static bool TryResolvePublicEventType(string? eventType, out string normalizedEventType)
@@ -828,14 +814,46 @@ public static class PublicTemplateEndpoints
         TemplateFeedRealtimeEvent realtimeEvent,
         CancellationToken cancellationToken)
     {
+        if (!IsSafePublicRealtimeTopic(realtimeEvent.Topic) || !IsSafePublicRealtimeData(realtimeEvent.Data))
+        {
+            return;
+        }
+
         await httpContext.Response.WriteAsync($"event: {realtimeEvent.Topic}\n", cancellationToken);
-        await httpContext.Response.WriteAsync($"data: {realtimeEvent.Data}\n\n", cancellationToken);
+        await WritePublicRealtimeDataAsync(httpContext, realtimeEvent.Data, cancellationToken);
+        await httpContext.Response.WriteAsync("\n", cancellationToken);
         await httpContext.Response.Body.FlushAsync(cancellationToken);
     }
 
     private static bool IsPublicRealtimeTopic(string topic)
     {
         return AllowedPublicRealtimeTopics.Contains(topic);
+    }
+
+    private static bool IsSafePublicRealtimeTopic(string topic)
+    {
+        return !string.IsNullOrWhiteSpace(topic)
+            && topic.Length <= MaxPublicRealtimeEventTopicLength
+            && !topic.Contains('\n')
+            && !topic.Contains('\r');
+    }
+
+    private static bool IsSafePublicRealtimeData(string data)
+    {
+        return data.Length <= MaxPublicRealtimeEventDataLength;
+    }
+
+    private static async Task WritePublicRealtimeDataAsync(
+        HttpContext httpContext,
+        string data,
+        CancellationToken cancellationToken)
+    {
+        using var reader = new StringReader(data);
+        string? line;
+        while ((line = await reader.ReadLineAsync(cancellationToken)) is not null)
+        {
+            await httpContext.Response.WriteAsync($"data: {line}\n", cancellationToken);
+        }
     }
 
     private sealed record RecordTemplateAnalyticsEventRequest(

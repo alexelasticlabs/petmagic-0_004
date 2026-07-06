@@ -317,13 +317,13 @@ class _GalleryPremiumUpsellCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
     final isLight = Theme.of(context).brightness == Brightness.light;
+    final accent = colors.gold;
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: const Color(0xFFF2C14E).withValues(alpha: 0.74),
-        ),
+        border: Border.all(color: accent.withValues(alpha: 0.74)),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -331,7 +331,7 @@ class _GalleryPremiumUpsellCard extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFFFC342).withValues(alpha: 0.16),
+            color: accent.withValues(alpha: 0.16),
             blurRadius: 12,
             offset: const Offset(0, 5),
           ),
@@ -353,9 +353,7 @@ class _GalleryPremiumUpsellCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: isLight
-                          ? const Color(0xFF735018)
-                          : const Color(0xFFFFD776),
+                      color: colors.textStrong,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -365,9 +363,9 @@ class _GalleryPremiumUpsellCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: isLight
-                          ? const Color(0xFF2D3B54)
-                          : Colors.white.withValues(alpha: 0.82),
+                      color: colors.textSoft.withValues(
+                        alpha: isLight ? 0.92 : 0.86,
+                      ),
                       height: 1.2,
                       fontWeight: FontWeight.w600,
                     ),
@@ -483,14 +481,18 @@ class _GalleryGoldShimmerButtonState extends State<_GalleryGoldShimmerButton>
   }
 
   Widget _buildButton() {
+    final colors = context.petMagicColors;
+    final backgroundColor = colors.gold;
+    final foregroundColor = colors.on(backgroundColor);
+
     return FilledButton(
       onPressed: widget.onPressed,
       style: FilledButton.styleFrom(
         minimumSize: const Size(0, 40),
         padding: const EdgeInsets.symmetric(horizontal: 14),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        backgroundColor: const Color(0xFFF5BD3E),
-        foregroundColor: const Color(0xFF241403),
+        backgroundColor: backgroundColor,
+        foregroundColor: foregroundColor,
         textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
           fontSize: 13,
           fontWeight: FontWeight.w900,

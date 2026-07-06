@@ -10,6 +10,15 @@ void main() {
     final messagesSource = File(
       'lib/features/support/presentation/widgets/support_chat_messages.part.dart',
     ).readAsStringSync();
+    final headerSource = File(
+      'lib/features/support/presentation/widgets/support_chat_header.part.dart',
+    ).readAsStringSync();
+    final mediaSource = File(
+      'lib/features/support/presentation/widgets/support_chat_message_media.part.dart',
+    ).readAsStringSync();
+    final metaSource = File(
+      'lib/features/support/presentation/widgets/support_chat_messages_meta.part.dart',
+    ).readAsStringSync();
 
     expect(
       previewSource,
@@ -29,5 +38,38 @@ void main() {
         'NumberFormat.decimalPatternDigits(\n      locale: localeTag,\n      decimalDigits: 1,',
       ),
     );
+    expect(
+      messagesSource,
+      contains('final userBubbleForeground = colors.on(userBubbleColor);'),
+    );
+    expect(messagesSource, contains(': userBubbleForeground;'));
+    expect(
+      messagesSource,
+      contains(': userBubbleForeground.withValues(alpha: 0.82);'),
+    );
+    expect(
+      messagesSource,
+      isNot(
+        contains(
+          'final textColor = message.isFromAdmin ? colors.textStrong : Colors.white;',
+        ),
+      ),
+    );
+    expect(
+      messagesSource,
+      isNot(contains(': Colors.white.withValues(alpha: 0.82);')),
+    );
+    expect(headerSource, contains('final mutedColor = colors.textMuted;'));
+    expect(mediaSource, contains('final warningColor = colors.gold;'));
+    expect(metaSource, contains('color: colors.danger'));
+    expect(
+      headerSource,
+      isNot(contains('const mutedColor = Color(0xFF8A94A6)')),
+    );
+    expect(
+      mediaSource,
+      isNot(contains('const warningColor = Color(0xFFE7A126)')),
+    );
+    expect(metaSource, isNot(contains('const Color(0xFFFF6B6B)')));
   });
 }

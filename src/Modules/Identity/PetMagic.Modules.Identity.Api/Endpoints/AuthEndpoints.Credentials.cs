@@ -29,7 +29,7 @@ public static partial class AuthEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.RegisterAsync(command, cancellationToken);
@@ -56,7 +56,7 @@ public static partial class AuthEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.LoginAsync(command, cancellationToken);
@@ -78,7 +78,7 @@ public static partial class AuthEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.RequestEmailConfirmationAsync(command, cancellationToken);
@@ -99,7 +99,7 @@ public static partial class AuthEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.ResendEmailVerificationCodeAsync(command, cancellationToken);
@@ -120,7 +120,7 @@ public static partial class AuthEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.ConfirmEmailAsync(command, cancellationToken);
@@ -142,7 +142,7 @@ public static partial class AuthEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.VerifyEmailCodeAsync(command, cancellationToken);
@@ -164,7 +164,7 @@ public static partial class AuthEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.RequestPasswordResetAsync(command, cancellationToken);
@@ -185,7 +185,7 @@ public static partial class AuthEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.ConfirmPasswordResetAsync(command, cancellationToken);
@@ -206,7 +206,7 @@ public static partial class AuthEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.VerifyPasswordResetCodeAsync(command, cancellationToken);
@@ -227,7 +227,7 @@ public static partial class AuthEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.ResetPasswordAsync(command, cancellationToken);
@@ -278,7 +278,7 @@ public static partial class AuthEndpoints
         var validation = await validator.ValidateAsync(resolvedCommand, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.ConfirmCurrentPasswordChangeAsync(userId, resolvedCommand, cancellationToken);
@@ -302,7 +302,7 @@ public static partial class AuthEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.RefreshAsync(command, cancellationToken);
@@ -332,7 +332,7 @@ public static partial class AuthEndpoints
         var validation = await validator.ValidateAsync(logoutCommand, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.LogoutAsync(logoutCommand, cancellationToken);

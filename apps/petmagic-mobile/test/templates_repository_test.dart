@@ -165,6 +165,43 @@ void main() {
   );
 
   test(
+    'catalog cache strips signed media URL secrets from list fields on read',
+    () async {
+      final preferences = SharedPreferencesAsync();
+      final cacheDataSource = TemplatesCacheDataSource(preferences);
+      await preferences.setString(
+        'templates_catalog_items_v2',
+        jsonEncode([
+          {
+            ..._catalogItem(
+              id: 'signed-media-list',
+              title: 'Signed media list',
+              version: 1,
+              updatedAtUtc: '2026-06-15T12:00:00Z',
+            ),
+            'referenceImageUrls': [
+              'https://cdn.petmagic.test/ref-1.jpg?X-Amz-Signature=secret&token=raw#fragment',
+              'https://cdn.petmagic.test/ref-2.jpg?signature=secret',
+            ],
+          },
+        ]),
+      );
+
+      final cachedItems = await cacheDataSource.readCatalogItems();
+      final raw = await preferences.getString('templates_catalog_items_v2');
+
+      expect(cachedItems.single.templateId, 'signed-media-list');
+      expect(raw, isNotNull);
+      expect(raw, isNot(contains('X-Amz-Signature')));
+      expect(raw, isNot(contains('token=raw')));
+      expect(raw, isNot(contains('signature=secret')));
+      expect(raw, isNot(contains('fragment')));
+      expect(raw, contains('https://cdn.petmagic.test/ref-1.jpg'));
+      expect(raw, contains('https://cdn.petmagic.test/ref-2.jpg'));
+    },
+  );
+
+  test(
     'catalog delta ignores signed media URL rotation when cleaning stale media',
     () async {
       final cacheDataSource = TemplatesCacheDataSource(

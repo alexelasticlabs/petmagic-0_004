@@ -6,7 +6,8 @@ Flutter iOS/Android client for PetMagic. The app starts with a production-orient
 
 - Flutter 3.41+
 - Dart 3.11+
-- Backend API running locally at `http://localhost:5000`
+- Backend API running locally. The mobile debug resolver probes local port
+  `5000` first and Compose default port `5001` as fallback.
 
 ## Run
 
@@ -16,9 +17,13 @@ flutter gen-l10n
 flutter run
 ```
 
-For Android emulator, the app defaults to `http://10.0.2.2:5000`. For iOS simulator, it defaults to `http://localhost:5000`.
+For Android emulator, the app probes `http://10.0.2.2:5000` first and
+`http://10.0.2.2:5001` as fallback. For iOS simulator and desktop debug runs,
+it probes `http://localhost:5000` first and `http://localhost:5001` as fallback.
 
-If you run on a physical Android device over USB, mirror your host port first:
+If you run on a physical Android device over USB, mirror the host backend port
+first. Use `5000` for the VS Code USB profile or a manually started backend on
+port `5000`:
 
 ```bash
 adb reverse tcp:5000 tcp:5000
@@ -30,10 +35,19 @@ Then keep the default `http://127.0.0.1:5000` or pass it explicitly:
 flutter run --dart-define=API_BASE_URL=http://127.0.0.1:5000
 ```
 
+If you use Docker Compose with the default `BACKEND_HOST_PORT=5001`, mirror and
+pass port `5001` instead:
+
+```bash
+adb reverse tcp:5001 tcp:5001
+flutter run --dart-define=API_BASE_URL=http://127.0.0.1:5001
+```
+
 Override the API URL when needed:
 
 ```bash
 flutter run --dart-define=API_BASE_URL=http://localhost:5000
+flutter run --dart-define=API_BASE_URL=http://localhost:5001
 flutter run --dart-define=API_BASE_URL=https://api.petmagic.app
 ```
 
@@ -45,23 +59,30 @@ flutter run --dart-define=API_BASE_URL=https://api.petmagic.app
 flutter build appbundle --release --dart-define=API_BASE_URL=https://api.petmagic.app
 ```
 
-- Configure release signing in `android/key.properties` (do not commit secrets):
+- Configure release signing by copying
+  `android/key.properties.example` to `android/key.properties` and replacing
+  every placeholder. Do not commit `android/key.properties`, keystores, or
+  password material.
 
 ```properties
 storeFile=../keystore/release.keystore
-storePassword=***
-keyAlias=***
-keyPassword=***
+storePassword=CHANGE_ME
+keyAlias=CHANGE_ME
+keyPassword=CHANGE_ME
 ```
 
-- Release tasks fail fast if signing is missing.
-  For local temporary experiments only, you may bypass with:
+- Release tasks fail fast if signing is missing. This is expected on machines
+  without production signing material and must remain a blocker for store
+  artifacts.
+- For local packaging/R8/resource experiments only, bypass signing with direct
+  Gradle from `apps/petmagic-mobile/android`:
 
 ```bash
-flutter build apk --release -PallowInsecureReleaseSigning=true
+./gradlew :app:bundleRelease -PallowInsecureReleaseSigning=true
 ```
 
-Do not use the insecure override for production artifacts.
+Do not use the insecure override for production artifacts. It signs with the
+debug key only to prove the release packaging pipeline.
 
 ## External auth and password reset
 
@@ -70,7 +91,6 @@ Tracked Firebase files in this repository are placeholders only. For local or CI
 
 - `android/app/google-services.json`
 - `ios/Runner/GoogleService-Info.plist`
-- root-level `GoogleService-Info.plist` only when a local tool explicitly needs it
 
 Do not commit real Firebase API keys, Google OAuth client IDs, signing keystores, or backend OAuth secrets.
 
@@ -90,7 +110,7 @@ For Apple sign-in to work end-to-end:
 
 Password reset emails are sent by the backend SMTP worker, so reset flow depends on valid backend email settings rather than any direct SMTP integration in Flutter.
 
-See the full setup guide in [md/AUTH_EMAIL_SETUP.md](md/AUTH_EMAIL_SETUP.md).
+See the full setup guide in [../../docs/md/AUTH_EMAIL_SETUP.md](../../docs/md/AUTH_EMAIL_SETUP.md).
 
 ## Checks
 
@@ -99,6 +119,11 @@ dart format lib test
 flutter analyze --fatal-infos
 flutter test
 ```
+
+Localization and light/dark theme rules for the mobile app are part of the
+repo-wide guide at [../../docs/localization-and-theme.md](../../docs/localization-and-theme.md).
+Run `flutter gen-l10n` after ARB changes and keep all supported ARB files in
+key parity.
 
 ## Structure
 
@@ -112,4 +137,4 @@ lib/
 
 Templates are loaded from `GET /api/templates/feed`; users can browse without authentication. Feed pagination uses the `nextCursor` value from the previous response as the next request's `cursor` query parameter. Malformed or hand-built cursors are rejected by the backend with `400` and `templates.invalid_cursor`.
 
-Purchase, generation, creations, and profile flows are intentionally left as next-stage feature modules.
+Authenticated areas are implemented as separate feature modules for profile, pets, premium purchases, template generation, gallery/creations, notifications, achievements, and support. Keep new user flows inside the relevant feature folder and route backend access through the existing repository/data-source layer instead of calling HTTP directly from widgets.

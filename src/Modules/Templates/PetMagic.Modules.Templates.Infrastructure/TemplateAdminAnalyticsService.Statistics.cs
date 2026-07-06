@@ -161,7 +161,7 @@ internal sealed partial class TemplateAdminAnalyticsService
             return Result.Failure<IReadOnlyList<AdminTemplateRecentGenerationResponse>>(TemplatesErrors.NotFound);
         }
 
-        var recent = await dbContext.TemplateGenerationJobs
+        var recentRows = await dbContext.TemplateGenerationJobs
             .AsNoTracking()
             .Where(x => x.TemplateId == templateId)
             .OrderByDescending(x => x.CreatedAtUtc)
@@ -182,6 +182,14 @@ internal sealed partial class TemplateAdminAnalyticsService
                 x.StartedAtUtc,
                 x.CompletedAtUtc))
             .ToArrayAsync(cancellationToken);
+        var recent = new List<AdminTemplateRecentGenerationResponse>(recentRows.Length);
+        foreach (var row in recentRows)
+        {
+            recent.Add(row with
+            {
+                OutputUrl = await CreateAdminReadUrlAsync(row.OutputUrl, cancellationToken)
+            });
+        }
 
         return Result.Success<IReadOnlyList<AdminTemplateRecentGenerationResponse>>(recent);
     }
@@ -204,7 +212,19 @@ internal sealed partial class TemplateAdminAnalyticsService
             .Take(take)
             .ToArrayAsync(cancellationToken);
 
-        return Result.Success<IReadOnlyList<TemplateGenerationResponse>>([.. jobs.Select(job => TemplateGenerationService.MapResponse(job))]);
+        var responses = new List<TemplateGenerationResponse>(jobs.Length);
+        foreach (var job in jobs)
+        {
+            var response = TemplateGenerationService.MapResponse(job);
+            responses.Add(await TemplateGenerationService.SignUserMediaUrlsAsync(
+                mediaStorage,
+                options,
+                response,
+                cancellationToken,
+                includeProviderDiagnostics: true));
+        }
+
+        return Result.Success<IReadOnlyList<TemplateGenerationResponse>>(responses);
     }
 
     public async Task<Result<IReadOnlyList<AdminTemplateFailureBreakdownItemResponse>>> GetAdminFailureBreakdownAsync(Guid templateId, CancellationToken cancellationToken)
@@ -248,5 +268,17 @@ internal sealed partial class TemplateAdminAnalyticsService
             TemplateGenerationStatus.Completed => "Completed",
             _ => status.ToString()
         };
+    }
+
+    private async Task<string?> CreateAdminReadUrlAsync(string? assetUrl, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(assetUrl))
+        {
+            return null;
+        }
+
+        var ttl = TimeSpan.FromSeconds(Math.Max(1, options.UserMediaReadUrlTtlSeconds));
+        var signed = await mediaStorage.CreateReadUrlAsync(assetUrl, ttl, cancellationToken);
+        return signed.IsSuccess ? signed.Value : null;
     }
 }

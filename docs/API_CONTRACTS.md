@@ -16,21 +16,23 @@ Compatibility rules:
 - HTTP 429 rate-limit responses use title/code `RATE_LIMIT_EXCEEDED`, include `Retry-After` when the limiter provides it, and must include `correlationId` and `traceId`.
 - Production 5xx responses must not expose exception messages, stack traces, secrets, provider payloads, tokens, or raw request bodies.
 
-## Legacy Stripe Compatibility Routes
+## Stripe and Store Billing Routes
 
-Current compatibility routes:
+Canonical client routes:
 
-- `POST /api/payments/stripe/token-purchase`
-- `POST /api/payments/stripe/subscription`
-- `POST /api/payments/stripe/customer-portal`
-- `GET /api/payments/stripe/diagnostics`
+- `POST /api/economy/purchases/create`
+- `POST /api/economy/purchases/{orderId}/verify-stripe`
+- `POST /api/economy/purchases/{orderId}/verify-store`
+- `POST /api/economy/premium/checkout`
+- `POST /api/economy/premium/manage`
+- `POST /api/economy/premium/cancel`
 - `GET /api/economy/premium/stripe-diagnostics`
 
 Compatibility rules:
 
-- New mobile/admin code must use `/api/economy/purchases/create`, `/api/economy/purchases/{orderId}/verify-stripe`, premium plan/status endpoints, and admin economy endpoints instead of adding new calls to the legacy route group.
-- Legacy diagnostics routes must remain `AdminOnly`; they must never expose Stripe secrets, webhook secrets, raw provider payloads, or unrestricted user data.
-- These routes are kept only for migration compatibility while startup smoke tests still assert their presence. Removal requires a usage search across mobile/admin/backend tests, updating startup smoke tests, and documenting the migration window in this file.
+- Mobile and admin code must use the `/api/economy/...` billing surface only.
+- The old `/api/payments/stripe/*` route group has been removed; do not reintroduce alternate Stripe wrappers.
+- Stripe diagnostics must remain `AdminOnly`; they must never expose Stripe secrets, webhook secrets, raw provider payloads, or unrestricted user data.
 
 ## Public Templates Feed
 
@@ -235,6 +237,10 @@ Compatibility rules:
 - Invalid non-empty catalog filters must fail fast with HTTP 400 ProblemDetails: `templates.invalid_type`, `templates.invalid_status`, `templates.invalid_access`, or `templates.invalid_sort`. Numeric enum values must not fall back to the full catalog.
 - Recent generation history defaults must stay bounded when `take` is omitted.
 - Template status, type, promo badge, asset, and analytics field names must stay aligned with `apps/admin-web/src/lib/api-client.types.ts`.
+- Image and video template update requests may send `keepPreviewAsset=true` to preserve existing preview media when no replacement asset is uploaded. Video update requests may send `keepReferenceMotionAsset=true` to preserve existing reference motion media. Omitted flags keep legacy replace/remove semantics for older clients.
+- Admin generation rows may include `canCancel=true` only for queued jobs. `POST /api/admin/templates/generations/{generationId}/cancel` is `AdminOnly`, may cancel only queued jobs, returns the updated generation response, and must return ProblemDetails with `templates.generation_cancel_not_allowed` for running, completed, failed, retrying, or already-cancelled jobs.
+- Admin generation rows may include `canRetry=true` only for failed/cancelled jobs whose original charge has not been refunded, plus admin test jobs. `POST /api/admin/templates/generations/{generationId}/retry` is `AdminOnly`, requeues the same generation with a fresh attempt budget, does not create a new billing command, does not charge or refund credits, and must return ProblemDetails with `templates.generation_retry_not_allowed` for active, completed, refunded, or otherwise unsafe jobs.
+- `POST /api/admin/templates/generations/{generationId}/retry-refund` is refund-only. It re-arms the idempotent refund retry path for failed/cancelled charged generations without creating or retrying generation work.
 - Admin endpoints must keep `ModeratorOrAdmin` or stricter authorization policies according to route intent.
 - `GET /api/admin/templates/categories/diagnostics` is `AdminOnly` and reports active templates whose string category no longer maps to a non-archived canonical category.
 
@@ -341,6 +347,8 @@ Compatibility rules:
 - List endpoints must support backend pagination with `skip`, `take`, `items`, `totalCount`, and `hasMore`; `take` must remain backend-bounded.
 - Role filters accept `Admin`, `Moderator`, and `User`; backend and admin-web canonicalize casing before querying.
 - Status filters accept `active`, `blocked`, and `unconfirmed`; backend and admin-web canonicalize casing before querying.
+- Sort accepts `created_desc`, `created_asc`, `last_activity_desc`, and `last_activity_asc`; omitted sort defaults to `created_desc`. Invalid non-empty sort values must fail fast with HTTP 400 ProblemDetails and `users.sort_invalid`.
+- User list rows include optional `lastActivityAtUtc`, computed from admin audit, wallet/purchase, and template generation/event activity, so the admin-web users table can sort authoritative backend results instead of sorting the visible page locally.
 - Role mutation payloads keep the `{ "role": "Admin" | "Moderator" }` shape for admin panel actions. Clients may trim/canonicalize before sending, and backend must protect direct API calls by canonicalizing supported role casing before validation/service execution.
 - Active-status mutations use `PUT /api/admin/users/{userId}/active` with `{ "isActive": boolean }`, return 204 on success, and must keep last-admin protection instead of allowing an admin lockout.
 - Admin user mutations return 404 ProblemDetails for missing users and 409 ProblemDetails with `users.cannot_remove_last_admin` when a role revoke, block, or delete would remove the last active admin.
@@ -420,6 +428,9 @@ Query parameters:
 - `priority`: optional `Low`, `Normal`, or `High`.
 - `search`: optional trimmed text, backend-bounded by the admin client.
 - `sort`: optional `default`, `priority`, `waiting`, `updated`, or `created`.
+- `queue`: optional `all` or `waiting_for_support`. `waiting_for_support`
+  returns open tickets that need operator action (`New` or `InProgress`), not
+  tickets whose status is `WaitingForUser`.
 - `page`: optional one-based page number.
 - `pageSize`: optional page size. Missing or non-positive values normalize to `50`; positive values are backend-bounded to `1..100`.
 
@@ -435,7 +446,7 @@ Compatibility rules:
 
 - Preserve the current paged response object so admin pagination and queue counters stay authoritative.
 - Repeatable `status` support must remain backward compatible with single `status`.
-- Invalid filter values must return problem details with field-specific titles: `support.status_invalid`, `support.assignment_invalid`, `support.source_invalid`, `support.priority_invalid`, or `support.sort_invalid`.
+- Invalid filter values must return problem details with field-specific titles: `support.status_invalid`, `support.assignment_invalid`, `support.source_invalid`, `support.priority_invalid`, `support.sort_invalid`, or `support.queue_invalid`.
 - Numeric enum values such as `status=1`, `source=1`, or `priority=1` must not be accepted; clients must send named values and receive HTTP 400 ProblemDetails for numeric values.
 - Extremely large but syntactically valid `page` values must not overflow backend offset calculation; return an empty page with the normalized `page`, `pageSize`, `totalCount`, and `hasMore=false`.
 - Admin support endpoints must require `ModeratorOrAdmin`.
@@ -503,6 +514,7 @@ Rules:
 - Tracked mobile client config must use placeholders for Google OAuth client ids and reversed iOS URL schemes; real per-environment values are injected outside the repository.
 - Server-only secrets belong in backend/server-side environment variables, CI/CD secrets, platform configuration, or a managed secret store.
 - Production startup must reject unsafe placeholder/default backend secrets.
+- Non-development startup must reject missing, placeholder, wildcard, localhost, loopback, private-network, malformed, or port-qualified `AllowedHosts` values.
 - Non-development startup must reject `NEXT_PUBLIC_*` variables whose suffix matches a server-only secret name such as Stripe secret/webhook keys, FAL API keys, R2 access/secret keys, JWT signing keys, bootstrap admin passwords, OAuth client secrets, store private keys, Firebase service account payloads, or App Store shared secrets.
 - Public admin/mobile configuration may expose only client-safe values such as API base URLs; never mirror backend secret names with a `NEXT_PUBLIC_` prefix.
 - Non-development media base URLs returned in API responses for avatars, support attachments, template media, and R2/CDN assets must be configured as HTTPS public URLs and must not point to localhost, loopback, or unspecified hosts, and must not contain credentials, query strings, or fragments.

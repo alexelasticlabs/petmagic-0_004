@@ -39,6 +39,29 @@ void main() {
     },
   );
 
+  test(
+    'email verification cooldown is lifecycle-aware and non-periodic',
+    () async {
+      final verificationPage = await File(
+        'lib/features/profile/presentation/email_verification_page.dart',
+      ).readAsString();
+
+      expect(verificationPage, contains('with WidgetsBindingObserver'));
+      expect(
+        verificationPage,
+        contains('WidgetsBinding.instance.addObserver(this)'),
+      );
+      expect(
+        verificationPage,
+        contains('WidgetsBinding.instance.removeObserver(this)'),
+      );
+      expect(verificationPage, contains('void didChangeAppLifecycleState'));
+      expect(verificationPage, contains('_syncResendCooldownAfterResume();'));
+      expect(verificationPage, contains('_remainingResendCooldownSeconds()'));
+      expect(verificationPage, isNot(contains('Timer.periodic')));
+    },
+  );
+
   test('auth submit operations are guarded against duplicate starts', () async {
     final controller = await File(
       'lib/features/profile/presentation/profile_controller.dart',

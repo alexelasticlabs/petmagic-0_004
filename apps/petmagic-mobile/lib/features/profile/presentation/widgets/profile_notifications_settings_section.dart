@@ -105,6 +105,7 @@ class _ProfileNotificationsSettingsSectionState
         _isLoading = false;
       });
       await _refreshDevicePermissions();
+      await _reconcilePushTokenRegistration(settings.authorizationStatus);
     } catch (error, stackTrace) {
       _logNotificationsFailure('load', error, stackTrace);
       if (!mounted) {
@@ -248,17 +249,25 @@ class _ProfileNotificationsSettingsSectionState
     }
 
     try {
+      final previousToken = await _pushTokenRegistrar.readRegisteredToken();
+      if (!mounted) {
+        return;
+      }
+
       final token = await FirebaseMessaging.instance.getToken();
       if (token == null || token.isEmpty || !mounted) {
         return;
       }
 
-      await _pushTokenRegistrar.registerToken(
+      final registered = await _pushTokenRegistrar.registerToken(
         token: token,
         platform: defaultTargetPlatform.name,
         locale: Localizations.localeOf(context).toLanguageTag(),
         canContinue: () => mounted,
       );
+      if (registered && mounted) {
+        await _unregisterStalePushToken(previousToken, replacementToken: token);
+      }
     } catch (error, stackTrace) {
       _logNotificationsFailure(
         'register_push_token_after_permission',
@@ -266,6 +275,32 @@ class _ProfileNotificationsSettingsSectionState
         stackTrace,
       );
     }
+  }
+
+  Future<void> _unregisterStalePushToken(
+    String? staleToken, {
+    required String replacementToken,
+  }) async {
+    final normalizedStaleToken = staleToken?.trim();
+    if (normalizedStaleToken == null ||
+        normalizedStaleToken.isEmpty ||
+        normalizedStaleToken == replacementToken.trim() ||
+        !mounted) {
+      return;
+    }
+
+    await _pushTokenRegistrar.unregisterToken(
+      token: normalizedStaleToken,
+      clearRegistrationState: false,
+      canContinue: () => mounted,
+      onFailure: (stage, error, stackTrace) {
+        _logNotificationsFailure(
+          'unregister_stale_${stage}_token_after_permission_change',
+          error,
+          stackTrace,
+        );
+      },
+    );
   }
 
   Future<void> _reconcilePushTokenRegistration(
@@ -276,9 +311,12 @@ class _ProfileNotificationsSettingsSectionState
       return;
     }
 
-    final token =
-        await _pushTokenRegistrar.readRegisteredToken() ??
-        await FirebaseMessaging.instance.getToken();
+    final cachedToken = await _pushTokenRegistrar.readRegisteredToken();
+    if (!mounted) {
+      return;
+    }
+
+    final token = cachedToken ?? await FirebaseMessaging.instance.getToken();
     if (token == null || token.isEmpty || !mounted) {
       return;
     }

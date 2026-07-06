@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -193,13 +194,125 @@ void main() {
     expect(submitCount, 0);
     expect(find.byType(CircularProgressIndicator), findsNothing);
   });
+
+  for (final brightness in Brightness.values) {
+    testWidgets(
+      'wallet Stripe checkout submit spinner uses theme foreground in ${brightness.name}',
+      (tester) async {
+        final completer = Completer<WalletStripeCheckoutSubmitResult>();
+
+        await tester.pumpWidget(
+          _TestApp(
+            brightness: brightness,
+            child: WalletStripeCheckoutPage(
+              pack: _walletPack,
+              paymentMethodLabel: 'Stripe',
+              onChooseAnotherMethod: () {},
+              onSubmit: () => completer.future,
+            ),
+          ),
+        );
+
+        await tester.tap(find.byType(FilledButton).first);
+        await tester.pump();
+
+        final context = tester.element(find.byType(WalletStripeCheckoutPage));
+        final expectedColor = Theme.of(context).colorScheme.onPrimary;
+        final indicators = tester.widgetList<CircularProgressIndicator>(
+          find.byType(CircularProgressIndicator),
+        );
+
+        expect(
+          indicators.any((indicator) => indicator.color == expectedColor),
+          isTrue,
+        );
+
+        completer.complete(
+          const WalletStripeCheckoutSubmitResult(
+            status: WalletStripeCheckoutActionStatus.cancelled,
+          ),
+        );
+        await tester.pumpAndSettle();
+      },
+    );
+
+    testWidgets(
+      'premium Stripe checkout submit spinner uses theme foreground in ${brightness.name}',
+      (tester) async {
+        final completer = Completer<PremiumStripeCheckoutSubmitResult>();
+
+        await tester.pumpWidget(
+          _TestApp(
+            brightness: brightness,
+            child: PremiumStripeCheckoutPage(
+              plan: _premiumPlan,
+              paymentMethodLabel: 'Stripe',
+              onChooseAnotherMethod: () {},
+              onSubmit: () => completer.future,
+            ),
+          ),
+        );
+
+        await tester.tap(find.byType(FilledButton).first);
+        await tester.pump();
+
+        final context = tester.element(find.byType(PremiumStripeCheckoutPage));
+        final expectedColor = Theme.of(context).colorScheme.onPrimary;
+        final indicators = tester.widgetList<CircularProgressIndicator>(
+          find.byType(CircularProgressIndicator),
+        );
+
+        expect(
+          indicators.any((indicator) => indicator.color == expectedColor),
+          isTrue,
+        );
+
+        completer.complete(
+          const PremiumStripeCheckoutSubmitResult(
+            status: PremiumStripeCheckoutActionStatus.cancelled,
+          ),
+        );
+        await tester.pumpAndSettle();
+      },
+    );
+  }
+
+  test('Stripe checkout method check icons use themed primary foreground', () {
+    final walletPage = File(
+      'lib/features/wallet/presentation/wallet_stripe_checkout_page.dart',
+    ).readAsStringSync();
+    final premiumPage = File(
+      'lib/features/premium/presentation/premium_stripe_checkout_page.dart',
+    ).readAsStringSync();
+    final walletSections = File(
+      'lib/features/wallet/presentation/wallet_stripe_checkout_page_sections.part.dart',
+    ).readAsStringSync();
+    final premiumSections = File(
+      'lib/features/premium/presentation/premium_stripe_checkout_page_sections.part.dart',
+    ).readAsStringSync();
+
+    for (final source in [walletSections, premiumSections]) {
+      expect(source, contains('Theme.of(context).colorScheme.onPrimary'));
+      expect(source, isNot(contains('color: Colors.white')));
+    }
+
+    for (final source in [walletPage, premiumPage]) {
+      expect(source, contains('Localizations.localeOf(context)'));
+      expect(source, contains('locale: localeTag'));
+    }
+  });
 }
 
 class _TestApp extends StatelessWidget {
-  const _TestApp({required this.child, this.hasInternet = true});
+  const _TestApp({
+    required this.child,
+    this.hasInternet = true,
+    this.brightness = Brightness.dark,
+  });
 
   final Widget child;
   final bool hasInternet;
+  final Brightness brightness;
 
   @override
   Widget build(BuildContext context) {
@@ -210,7 +323,9 @@ class _TestApp extends StatelessWidget {
         ),
       ],
       child: MaterialApp(
-        theme: AppTheme.dark(),
+        theme: brightness == Brightness.dark
+            ? AppTheme.dark()
+            : AppTheme.light(),
         locale: const Locale('en'),
         localizationsDelegates: const [
           AppLocalizations.delegate,

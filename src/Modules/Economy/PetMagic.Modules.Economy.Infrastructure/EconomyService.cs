@@ -243,11 +243,11 @@ public sealed partial class EconomyService(
             dbContext.ChangeTracker.Clear();
             EconomyMetrics.RecordWalletBalanceNegativePrevented("spend", source);
             logger?.LogError(
-                "Wallet balance CHECK constraint prevented an overdraft. UserId={UserId} Amount={Amount} Source={Source} CorrelationId={CorrelationId}",
-                command.UserId,
+                "Wallet balance CHECK constraint prevented an overdraft. UserIdHash={UserIdHash} Amount={Amount} Source={Source} CorrelationIdHash={CorrelationIdHash}",
+                EconomyLogSanitizer.SafeUserId(command.UserId),
                 command.Amount,
                 source,
-                CurrentCorrelationId);
+                CurrentCorrelationIdHash);
             return Result.Failure<WalletOperationResponse>(EconomyErrors.InsufficientBalance);
         }
         catch (DbUpdateException)
@@ -623,13 +623,13 @@ public sealed partial class EconomyService(
                 dbContext.ChangeTracker.Clear();
                 var delay = TimeSpan.FromMilliseconds(25 * attempt * attempt);
                 logger?.LogWarning(
-                    exception,
-                    "Retrying serializable wallet mutation after transient database failure. Operation={Operation} Attempt={Attempt} MaxAttempts={MaxAttempts} DelayMs={DelayMs} CorrelationId={CorrelationId}",
+                    "Retrying serializable wallet mutation after transient database failure. Operation={Operation} Attempt={Attempt} MaxAttempts={MaxAttempts} DelayMs={DelayMs} ExceptionType={ExceptionType} CorrelationIdHash={CorrelationIdHash}",
                     operation,
                     attempt,
                     maxAttempts,
                     delay.TotalMilliseconds,
-                    CurrentCorrelationId);
+                    SafeLogValues.ExceptionType(exception),
+                    CurrentCorrelationIdHash);
                 await Task.Delay(delay, cancellationToken);
             }
         }

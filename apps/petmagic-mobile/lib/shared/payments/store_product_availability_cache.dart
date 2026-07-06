@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:crypto/crypto.dart';
 
 typedef StoreProductAvailabilityLoader =
     Future<StoreProductAvailabilitySnapshot> Function(Set<String> productIds);
@@ -49,13 +51,16 @@ class StoreProductAvailabilityCache {
   StoreProductAvailabilityCache({
     Duration successTtl = const Duration(minutes: 10),
     Duration unavailableTtl = const Duration(minutes: 1),
+    int maxEntries = 64,
     DateTime Function()? now,
   }) : _successTtl = successTtl,
        _unavailableTtl = unavailableTtl,
+       _maxEntries = maxEntries,
        _now = now ?? DateTime.now;
 
   final Duration _successTtl;
   final Duration _unavailableTtl;
+  final int _maxEntries;
   final DateTime Function() _now;
   final Map<String, _StoreProductAvailabilityCacheEntry> _entries =
       <String, _StoreProductAvailabilityCacheEntry>{};
@@ -84,6 +89,7 @@ class StoreProductAvailabilityCache {
     final cachedEntry = _entries[cacheKey];
     final now = _now();
     if (cachedEntry != null && now.isBefore(cachedEntry.expiresAt)) {
+      _rememberEntry(cacheKey, cachedEntry);
       return Future.value(cachedEntry.snapshot.project(normalizedProductIds));
     }
 
@@ -114,9 +120,12 @@ class StoreProductAvailabilityCache {
     final future = () async {
       final snapshot = await loader(normalizedProductIds);
       final ttl = snapshot.isAvailable ? _successTtl : _unavailableTtl;
-      _entries[cacheKey] = _StoreProductAvailabilityCacheEntry(
-        snapshot: snapshot,
-        expiresAt: _now().add(ttl),
+      _rememberEntry(
+        cacheKey,
+        _StoreProductAvailabilityCacheEntry(
+          snapshot: snapshot,
+          expiresAt: _now().add(ttl),
+        ),
       );
       return snapshot;
     }();
@@ -140,6 +149,17 @@ class StoreProductAvailabilityCache {
   void _pruneExpiredEntries() {
     final now = _now();
     _entries.removeWhere((_, entry) => !now.isBefore(entry.expiresAt));
+  }
+
+  void _rememberEntry(
+    String cacheKey,
+    _StoreProductAvailabilityCacheEntry entry,
+  ) {
+    _entries.remove(cacheKey);
+    _entries[cacheKey] = entry;
+    while (_entries.length > _maxEntries) {
+      _entries.remove(_entries.keys.first);
+    }
   }
 
   _StoreProductAvailabilityCacheEntry? _findCoveringEntry(
@@ -214,7 +234,10 @@ class StoreProductAvailabilityCache {
 
   String? _normalizeScopeKey(String? scopeKey) {
     final value = scopeKey?.trim();
-    return value == null || value.isEmpty ? null : value;
+    if (value == null || value.isEmpty) {
+      return null;
+    }
+    return 'sha256:${sha256.convert(utf8.encode(value.toLowerCase()))}';
   }
 }
 

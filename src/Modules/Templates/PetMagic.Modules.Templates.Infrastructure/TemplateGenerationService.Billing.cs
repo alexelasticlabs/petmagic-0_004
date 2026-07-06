@@ -86,6 +86,8 @@ internal sealed partial class TemplateGenerationService
         var charge = await billing.ChargeAsync(job.UserId, job.Id, job.TokenCost, cancellationToken);
         if (charge.IsFailure)
         {
+            var safeErrorCode = AdminFailureMessageSanitizer.SanitizeCode(charge.Error.Code);
+            var safeErrorMessage = AdminFailureMessageSanitizer.Sanitize(charge.Error.Message);
             if (insufficientCreditsAnalyticsEvent is not null)
             {
                 AddAnalyticsEvent(job, insufficientCreditsAnalyticsEvent);
@@ -94,17 +96,17 @@ internal sealed partial class TemplateGenerationService
             var failedAt = DateTime.UtcNow;
             var previousStatus = job.Status;
             command.Status = TemplateGenerationBillingCommandStatuses.Failed;
-            command.LastErrorCode = charge.Error.Code;
-            command.LastErrorMessage = charge.Error.Message;
+            command.LastErrorCode = safeErrorCode;
+            command.LastErrorMessage = safeErrorMessage;
             command.UpdatedAtUtc = failedAt;
             command.CompletedAtUtc = failedAt;
             job.Status = TemplateGenerationStatus.Failed;
-            job.LastErrorCode = charge.Error.Code;
-            job.LastErrorMessage = charge.Error.Message;
+            job.LastErrorCode = safeErrorCode;
+            job.LastErrorMessage = safeErrorMessage;
             job.UpdatedAtUtc = failedAt;
             job.CompletedAtUtc = failedAt;
             await dbContext.SaveChangesAsync(cancellationToken);
-            TemplateGenerationMetrics.RecordJobFailed(job, previousStatus, charge.Error.Code);
+            TemplateGenerationMetrics.RecordJobFailed(job, previousStatus, safeErrorCode ?? "templates.billing_failed");
             return Result.Failure(charge.Error);
         }
 

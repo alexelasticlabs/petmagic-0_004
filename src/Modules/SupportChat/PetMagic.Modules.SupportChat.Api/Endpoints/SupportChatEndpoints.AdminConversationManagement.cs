@@ -29,7 +29,7 @@ public static partial class SupportChatEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.MarkConversationReadAsync(command, cancellationToken);
@@ -66,7 +66,7 @@ public static partial class SupportChatEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.UpdateConversationStatusAsync(command, cancellationToken);
@@ -96,7 +96,7 @@ public static partial class SupportChatEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.AssignConversationAsync(command, cancellationToken);
@@ -138,7 +138,7 @@ public static partial class SupportChatEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.UpdateConversationMetadataAsync(command, cancellationToken);

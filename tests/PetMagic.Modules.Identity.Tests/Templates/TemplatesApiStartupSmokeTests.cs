@@ -77,32 +77,39 @@ public sealed class TemplatesApiStartupSmokeTests
         Assert.Empty(app.GetAdminRoutesWithoutRolePolicy());
     }
 
-    [Theory]
-    [InlineData("POST", "/api/admin/templates/image")]
-    [InlineData("PUT", "/api/admin/templates/image/{templateId:guid}")]
-    [InlineData("POST", "/api/admin/templates/video")]
-    [InlineData("PUT", "/api/admin/templates/video/{templateId:guid}")]
-    [InlineData("PUT", "/api/admin/templates/{templateId:guid}/status")]
-    [InlineData("DELETE", "/api/admin/templates/{templateId:guid}")]
-    [InlineData("POST", "/api/admin/templates/{templateId:guid}/test")]
-    [InlineData("POST", "/api/admin/templates/media/upload")]
-    [InlineData("GET", "/api/admin/templates/monetization/watermark")]
-    [InlineData("PUT", "/api/admin/templates/monetization/watermark")]
-    [InlineData("POST", "/api/admin/templates/generations/{generationId:guid}/grant-clean-download")]
-    [InlineData("POST", "/api/templates/qa/generation-fixtures")]
-    [InlineData("DELETE", "/api/templates/qa/generation-fixtures")]
-    [InlineData("GET", "/api/admin/templates/categories/diagnostics")]
-    [InlineData("POST", "/api/admin/templates/categories/")]
-    [InlineData("PUT", "/api/admin/templates/categories/{categoryId:guid}")]
-    [InlineData("PUT", "/api/admin/templates/categories/{categoryId:guid}/archive")]
-    [InlineData("DELETE", "/api/admin/templates/categories/{categoryId:guid}")]
-    public async Task TemplatesAdminMutationEndpoints_ShouldRequireAdminOnlyPolicy(
-        string method,
-        string routePattern)
+    [Fact]
+    public async Task TemplatesAdminMutationEndpoints_ShouldRequireAdminOnlyPolicy()
     {
         await using var app = await TemplatesApiStartupTestApplication.CreateAsync();
 
-        Assert.Contains("AdminOnly", app.GetAuthorizationPolicies(method, routePattern));
+        var endpoints = new[]
+        {
+            ("POST", "/api/admin/templates/image"),
+            ("PUT", "/api/admin/templates/image/{templateId:guid}"),
+            ("POST", "/api/admin/templates/video"),
+            ("PUT", "/api/admin/templates/video/{templateId:guid}"),
+            ("PUT", "/api/admin/templates/{templateId:guid}/status"),
+            ("DELETE", "/api/admin/templates/{templateId:guid}"),
+            ("POST", "/api/admin/templates/{templateId:guid}/test"),
+            ("POST", "/api/admin/templates/media/upload"),
+            ("GET", "/api/admin/templates/generations"),
+            ("GET", "/api/admin/templates/generations/metrics"),
+            ("GET", "/api/admin/templates/monetization/watermark"),
+            ("PUT", "/api/admin/templates/monetization/watermark"),
+            ("POST", "/api/admin/templates/generations/{generationId:guid}/grant-clean-download"),
+            ("POST", "/api/templates/qa/generation-fixtures"),
+            ("DELETE", "/api/templates/qa/generation-fixtures"),
+            ("GET", "/api/admin/templates/categories/diagnostics"),
+            ("POST", "/api/admin/templates/categories/"),
+            ("PUT", "/api/admin/templates/categories/{categoryId:guid}"),
+            ("PUT", "/api/admin/templates/categories/{categoryId:guid}/archive"),
+            ("DELETE", "/api/admin/templates/categories/{categoryId:guid}")
+        };
+
+        foreach (var (method, routePattern) in endpoints)
+        {
+            Assert.Contains("AdminOnly", app.GetAuthorizationPolicies(method, routePattern));
+        }
     }
 
     [Theory]
@@ -141,7 +148,12 @@ public sealed class TemplatesApiStartupSmokeTests
     [InlineData("POST", "/api/templates/generations/from-result")]
     [InlineData("POST", "/api/templates/generations/{generationId:guid}/generate-similar")]
     [InlineData("POST", "/api/templates/generations/{generationId:guid}/remove-watermark")]
+    [InlineData("POST", "/api/templates/generations/{generationId:guid}/share")]
+    [InlineData("POST", "/api/templates/generations/{generationId:guid}/mark-read")]
+    [InlineData("POST", "/api/templates/generations/{generationId:guid}/cancel")]
+    [InlineData("DELETE", "/api/templates/generations/{generationId:guid}")]
     [InlineData("POST", "/api/templates/generations/{generationId:guid}/feedback")]
+    [InlineData("DELETE", "/api/templates/qa/generation-fixtures")]
     [InlineData("PUT", "/api/templates/notifications/push-token")]
     [InlineData("DELETE", "/api/templates/notifications/push-token")]
     public async Task TemplateGenerationJsonMutationEndpoints_ShouldLimitRequestBodiesBeforeBinding(
@@ -170,7 +182,10 @@ public sealed class TemplatesApiStartupSmokeTests
     [Theory]
     [InlineData("POST", "/api/pets")]
     [InlineData("PUT", "/api/pets/{petId:guid}")]
+    [InlineData("DELETE", "/api/pets/{petId:guid}")]
+    [InlineData("POST", "/api/pets/{petId:guid}/photos/{photoId:guid}/set-avatar")]
     [InlineData("POST", "/api/pets/{petId:guid}/photos/{photoId:guid}/favorite")]
+    [InlineData("DELETE", "/api/pets/{petId:guid}/photos/{photoId:guid}")]
     [InlineData("POST", "/api/templates/generations/from-pet")]
     [InlineData("POST", "/api/admin/users/{userId:guid}/pets/{petId:guid}/status")]
     [InlineData("POST", "/api/admin/users/{userId:guid}/pets/{petId:guid}/photos/{photoId:guid}/status")]
@@ -200,13 +215,20 @@ public sealed class TemplatesApiStartupSmokeTests
     [Theory]
     [InlineData("POST", "/api/admin/templates/moderation/{eventId:guid}/decision")]
     [InlineData("PUT", "/api/admin/templates/monetization/watermark")]
+    [InlineData("POST", "/api/admin/templates/generations/{generationId:guid}/grant-clean-download")]
+    [InlineData("POST", "/api/admin/templates/generations/{generationId:guid}/cancel")]
+    [InlineData("POST", "/api/admin/templates/generations/{generationId:guid}/retry")]
+    [InlineData("POST", "/api/admin/templates/generations/{generationId:guid}/retry-refund")]
     [InlineData("PUT", "/api/admin/templates/{templateId:guid}/status")]
+    [InlineData("DELETE", "/api/admin/templates/{templateId:guid}")]
     [InlineData("POST", "/api/admin/templates/categories/")]
     [InlineData("PUT", "/api/admin/templates/categories/{categoryId:guid}")]
     [InlineData("PUT", "/api/admin/templates/categories/{categoryId:guid}/archive")]
+    [InlineData("DELETE", "/api/admin/templates/categories/{categoryId:guid}")]
     [InlineData("POST", "/api/admin/template-of-the-day")]
     [InlineData("PUT", "/api/admin/template-of-the-day/settings")]
     [InlineData("PUT", "/api/admin/template-of-the-day/{id:guid}")]
+    [InlineData("DELETE", "/api/admin/template-of-the-day/{id:guid}")]
     [InlineData("POST", "/api/admin/template-of-the-day/auto-pick")]
     public async Task AdminTemplateSmallJsonMutationEndpoints_ShouldLimitRequestBodiesBeforeBinding(
         string method,

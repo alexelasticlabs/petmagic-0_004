@@ -487,13 +487,13 @@ class _PaymentCard extends StatelessWidget {
                   ? null
                   : onChangePayment,
               style: OutlinedButton.styleFrom(
-                backgroundColor: isLight ? const Color(0xFFFDFEFF) : null,
+                backgroundColor: isLight ? colors.surface : null,
                 side: BorderSide(
                   color: isLight
-                      ? const Color(0xFFAFC2DB)
+                      ? colors.border
                       : colors.border.withValues(alpha: 0.9),
                 ),
-                foregroundColor: isLight ? const Color(0xFF2F3E56) : null,
+                foregroundColor: isLight ? colors.textStrong : null,
               ),
               child: Text(text.subscriptionChangePaymentAction),
             ),
@@ -526,7 +526,7 @@ class _ActionsSection extends StatelessWidget {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final isLight = Theme.of(context).brightness == Brightness.light;
-    const manageColor = Color(0xFFFFC107);
+    final manageColor = colors.gold;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -541,7 +541,7 @@ class _ActionsSection extends StatelessWidget {
           style: FilledButton.styleFrom(
             minimumSize: const Size.fromHeight(36),
             backgroundColor: manageColor,
-            foregroundColor: const Color(0xFF261903),
+            foregroundColor: colors.on(manageColor),
             disabledBackgroundColor: colors.surfaceStrong,
             disabledForegroundColor: colors.textMuted,
             textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
@@ -559,13 +559,13 @@ class _ActionsSection extends StatelessWidget {
         OutlinedButton(
           onPressed: isProcessing ? null : onRestore,
           style: OutlinedButton.styleFrom(
-            backgroundColor: isLight ? const Color(0xFFFDFEFF) : null,
+            backgroundColor: isLight ? colors.surface : null,
             side: BorderSide(
               color: isLight
-                  ? const Color(0xFFAFC2DB)
+                  ? colors.border
                   : colors.border.withValues(alpha: 0.9),
             ),
-            foregroundColor: isLight ? const Color(0xFF2F3E56) : null,
+            foregroundColor: isLight ? colors.textStrong : null,
           ),
           child: Text(text.premiumRestoreAction),
         ),

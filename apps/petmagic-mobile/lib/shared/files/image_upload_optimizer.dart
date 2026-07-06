@@ -188,7 +188,7 @@ class ImageUploadOptimizer {
 
     final outputPath =
         '${Directory.systemTemp.path}${Platform.pathSeparator}'
-        'petmagic_${profile.logProfileName}_${DateTime.now().microsecondsSinceEpoch}.jpg';
+        'petmagic_${_safeTempProfileName(profile.logProfileName)}_${DateTime.now().microsecondsSinceEpoch}.jpg';
     final outputFile = File(outputPath);
     await outputFile.writeAsBytes(optimizedBytes, flush: true);
 
@@ -223,6 +223,17 @@ class ImageUploadOptimizer {
     );
     final withoutExtension = sanitized.replaceFirst(RegExp(r'\.[^.]*$'), '');
     return '${withoutExtension.isEmpty ? 'petmagic_source_image' : withoutExtension}.jpg';
+  }
+
+  String _safeTempProfileName(String profileName) {
+    final basename = profileName
+        .replaceAll(r'\', '/')
+        .split('/')
+        .where((segment) => segment.trim().isNotEmpty)
+        .lastOrNull;
+    final sanitized = sanitizeFileName(basename, fallback: 'upload');
+    final normalized = sanitized.replaceAll(RegExp(r'^\.+$'), '');
+    return normalized.isEmpty ? 'upload' : normalized;
   }
 
   void _logSkippedOptimization({

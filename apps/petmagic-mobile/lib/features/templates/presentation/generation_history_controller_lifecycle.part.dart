@@ -74,8 +74,10 @@ mixin _GenerationHistoryControllerLifecycle
   }
 
   @override
-  void _clearActiveLoadCancelToken() {
-    _activeLoadCancelToken = null;
+  void _clearActiveLoadCancelToken(CancelToken cancelToken) {
+    if (identical(_activeLoadCancelToken, cancelToken)) {
+      _activeLoadCancelToken = null;
+    }
   }
 
   @override
@@ -357,25 +359,49 @@ mixin _GenerationHistoryControllerLifecycle
   }
 
   String? _readRealtimeGenerationId(Map<String, Object?> payload) {
-    final eventType = payload['eventType']?.toString().trim();
+    final eventType = _readRealtimeString(payload['eventType'], maxLength: 64);
     if (eventType != null &&
         eventType.isNotEmpty &&
         eventType != 'generation.status_changed') {
       return null;
     }
 
-    final generationId = payload['generationId']?.toString().trim();
-    return generationId == null || generationId.isEmpty ? null : generationId;
+    return _readRealtimeString(payload['generationId']);
+  }
+
+  String? _readRealtimeString(Object? value, {int maxLength = 128}) {
+    if (value is! String) {
+      return null;
+    }
+
+    final normalized = value.trim();
+    if (normalized.isEmpty || normalized.length > maxLength) {
+      return null;
+    }
+
+    return normalized;
   }
 
   Future<void> _refetchRealtimeGeneration(String generationId) async {
-    if (!ref.mounted || !_isScreenVisible) {
+    if (!ref.mounted || !_isScreenVisible || !_hasInternet) {
       return;
     }
 
+    if (_activeRealtimeRefetchCancelTokens.containsKey(generationId)) {
+      return;
+    }
+
+    final cancelToken = CancelToken();
+    _activeRealtimeRefetchCancelTokens[generationId] = cancelToken;
     try {
-      final generation = await _repository.fetchGeneration(generationId);
-      if (!ref.mounted || !_isScreenVisible) {
+      final generation = await _repository.fetchGeneration(
+        generationId,
+        cancelToken: cancelToken,
+      );
+      if (!ref.mounted ||
+          !_isScreenVisible ||
+          !_hasInternet ||
+          cancelToken.isCancelled) {
         return;
       }
 
@@ -383,6 +409,19 @@ mixin _GenerationHistoryControllerLifecycle
         generation,
         refreshUnreadBadge: true,
         requireScreenVisible: true,
+      );
+    } on DioException catch (error, stackTrace) {
+      if (CancelToken.isCancel(error) || cancelToken.isCancelled) {
+        return;
+      }
+
+      AppLogger.warn(
+        feature: 'Templates.GenerationHistory',
+        operation: 'realtime_refetch',
+        message: 'Generation history realtime refetch failed',
+        context: {'generation_id': generationId},
+        error: error,
+        stackTrace: stackTrace,
       );
     } catch (error, stackTrace) {
       AppLogger.warn(
@@ -393,6 +432,13 @@ mixin _GenerationHistoryControllerLifecycle
         error: error,
         stackTrace: stackTrace,
       );
+    } finally {
+      if (identical(
+        _activeRealtimeRefetchCancelTokens[generationId],
+        cancelToken,
+      )) {
+        _activeRealtimeRefetchCancelTokens.remove(generationId);
+      }
     }
   }
 
@@ -446,6 +492,7 @@ mixin _GenerationHistoryControllerLifecycle
   }
 
   void _pauseRealtime() {
+    _cancelActiveRealtimeRefetches('generation_history_realtime_paused');
     unawaited(_realtimeSubscription?.cancel());
     _realtimeSubscription = null;
 
@@ -457,5 +504,17 @@ mixin _GenerationHistoryControllerLifecycle
       _isRealtimeConnected = false;
     }
     _realtimeConnectFuture = null;
+  }
+
+  void _cancelActiveRealtimeRefetches(String reason) {
+    final cancelTokens = _activeRealtimeRefetchCancelTokens.values.toList(
+      growable: false,
+    );
+    _activeRealtimeRefetchCancelTokens.clear();
+    for (final cancelToken in cancelTokens) {
+      if (!cancelToken.isCancelled) {
+        cancelToken.cancel(reason);
+      }
+    }
   }
 }

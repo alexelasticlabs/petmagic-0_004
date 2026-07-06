@@ -42,6 +42,10 @@ void main() {
     expect(source, contains('parseSafeProfileAvatarUri(imageUrl)'));
     expect(source, contains('imageUrl: safeImageUrl'));
     expect(source, contains('cacheKey: persistentSafeProfileAvatarUrl('));
+    expect(source, contains('memCacheWidth: avatarCacheSize'));
+    expect(source, contains('memCacheHeight: avatarCacheSize'));
+    expect(source, contains('maxWidthDiskCache: avatarCacheSize'));
+    expect(source, contains('maxHeightDiskCache: avatarCacheSize'));
     expect(source, isNot(contains('imageUrl: imageUrl!')));
   });
 

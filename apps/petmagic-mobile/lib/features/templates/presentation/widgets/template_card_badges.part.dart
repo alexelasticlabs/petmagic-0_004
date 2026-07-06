@@ -66,6 +66,7 @@ class _PromoBadge extends StatelessWidget {
       'new' => const Color(0xFFFF7A1A),
       _ => colors.accent,
     };
+    final foreground = colors.on(tone);
     final text = normalized == 'new' ? 'NEW' : value.toUpperCase();
 
     return DecoratedBox(
@@ -82,7 +83,7 @@ class _PromoBadge extends StatelessWidget {
         child: Text(
           text,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: Colors.white,
+            color: foreground,
             fontSize: 9,
             fontWeight: FontWeight.w700,
           ),
@@ -100,6 +101,9 @@ class _HighlightBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final foreground = colors.on(isFeatured ? colors.gold : colors.accent);
+
     return DecoratedBox(
       decoration: BoxDecoration(
         gradient: isFeatured
@@ -129,18 +133,14 @@ class _HighlightBadge extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.auto_awesome_rounded,
-              size: 11,
-              color: Color(0xFF052317),
-            ),
+            Icon(Icons.auto_awesome_rounded, size: 11, color: foreground),
             const SizedBox(width: 4),
             Text(
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Color(0xFF052317),
+              style: TextStyle(
+                color: foreground,
                 fontSize: 9.5,
                 fontWeight: FontWeight.w900,
                 height: 1,
@@ -329,13 +329,11 @@ class _MetaDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
     return Container(
       width: 4,
       height: 4,
-      decoration: const BoxDecoration(
-        color: Color(0xFF46B0FF),
-        shape: BoxShape.circle,
-      ),
+      decoration: BoxDecoration(color: colors.blue, shape: BoxShape.circle),
     );
   }
 }
@@ -347,8 +345,9 @@ class _AccessTag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
     final textStyle = Theme.of(context).textTheme.labelSmall;
-    const borderColor = Color.fromRGBO(245, 208, 101, 0.5);
+    final borderColor = colors.gold.withValues(alpha: 0.5);
     const background = LinearGradient(
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
@@ -377,7 +376,7 @@ class _AccessTag extends StatelessWidget {
             Text(
               label,
               style: textStyle?.copyWith(
-                color: const Color(0xFFFFE89E),
+                color: colors.gold,
                 fontSize: 9,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.03,
@@ -431,14 +430,10 @@ String? _formatFeaturedPopularity(
     return text.supportChatTodayLabel;
   }
 
+  final localeTag = Localizations.localeOf(context).toLanguageTag();
   if (popularityCount < 1000) {
-    return popularityCount.toString();
+    return NumberFormat.decimalPattern(localeTag).format(popularityCount);
   }
 
-  if (popularityCount < 10000) {
-    final compact = popularityCount / 1000;
-    return '${compact.toStringAsFixed(1).replaceFirst('.0', '')}k';
-  }
-
-  return '${(popularityCount / 1000).round()}k';
+  return NumberFormat.compact(locale: localeTag).format(popularityCount);
 }

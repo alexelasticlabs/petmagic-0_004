@@ -14,7 +14,7 @@ describe("login card logging", () => {
 
     expect(source).not.toContain("email: normalizedEmail");
     expect(source).toContain("maskedEmail: maskEmail(normalizedEmail)");
-    expect(source).toContain('import { maskEmail, sanitizeSensitiveText }');
+    expect(source).toContain("import { maskEmail, sanitizeSensitiveText }");
     expect(source).toContain("function getLoginClientErrorDetails(error: unknown)");
     expect(source).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
     expect(source).toContain('"digest" in error');
@@ -58,9 +58,17 @@ describe("login card logging", () => {
     const stylesSource = readFileSync(loginCardStylesPath, "utf8");
     const contentSource = readFileSync(adminChromeContentPath, "utf8");
 
-    expect(source).toContain('import { getAdminChromeCopy }');
+    expect(source).toContain("import { getAdminChromeCopy }");
     expect(source).toContain("const authText = getAdminChromeCopy(locale).loginCard;");
     expect(contentSource).toContain('emailPlaceholder: "Введите email"');
+    expect(contentSource).toContain('copyright: "© 2026 Админ-панель. Все права защищены."');
+    expect(contentSource.slice(0, contentSource.indexOf("  en: {"))).not.toContain("Admin Panel");
+    expect(contentSource.slice(0, contentSource.indexOf("  en: {"))).not.toContain(
+      "Admin или Moderator"
+    );
+    expect(contentSource).toContain(
+      'noAccess: "Доступ к админ-панели есть только у администраторов или модераторов."'
+    );
     expect(contentSource).toContain('emailPlaceholder: "Enter email"');
     expect(contentSource).toContain('passwordPlaceholder: "Введите пароль"');
     expect(contentSource).toContain('passwordPlaceholder: "Enter password"');
@@ -76,7 +84,7 @@ describe("login card logging", () => {
     expect(source).toContain("{authText.contactText}");
     expect(source).toContain("{authText.contactLinkText}");
     expect(source).toContain("{authText.orText}");
-    expect(source).not.toContain("const isRu = locale === \"ru\";");
+    expect(source).not.toContain('const isRu = locale === "ru";');
     expect(source).not.toContain("const authText = {");
     expect(source).not.toContain('placeholder={isRu ? "Введите email" : "Enter email"}');
     expect(source).not.toContain('placeholder={isRu ? "Введите пароль" : "Enter password"}');

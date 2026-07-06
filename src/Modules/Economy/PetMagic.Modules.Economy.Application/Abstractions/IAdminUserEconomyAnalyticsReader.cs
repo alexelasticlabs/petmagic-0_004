@@ -8,4 +8,8 @@ public interface IAdminUserEconomyAnalyticsReader
     Task<Result<AdminUserEconomyAnalyticsResponse>> GetAdminUserEconomyAnalyticsAsync(
         Guid userId,
         CancellationToken cancellationToken);
+
+    Task<IReadOnlyDictionary<Guid, DateTime>> GetAdminUserLastActivityAsync(
+        IReadOnlyCollection<Guid> userIds,
+        CancellationToken cancellationToken);
 }

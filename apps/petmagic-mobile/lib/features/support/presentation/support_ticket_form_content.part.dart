@@ -138,7 +138,7 @@ class _SupportTicketFormContent extends StatelessWidget {
                   onPressed: isSubmitting ? null : onSubmit,
                   style: FilledButton.styleFrom(
                     backgroundColor: colors.accent,
-                    foregroundColor: Colors.white,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),

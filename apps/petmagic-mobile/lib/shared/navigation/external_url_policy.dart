@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
-import 'package:petmagic_mobile/core/network/network_utils.dart';
 
 const _localDebugHosts = <String>{
   'localhost',
@@ -50,6 +49,14 @@ Uri? parseSafeGenerationMediaUri(String? rawValue) {
     rawValue,
     allowedHttpsHosts: generationMediaAllowedHosts(),
     allowLocalHttp: AppConfig.allowLocalMediaHttp,
+  );
+}
+
+Uri? parseSafeGenerationShareUri(String? rawValue) {
+  return parseSafeExternalUri(
+    rawValue,
+    allowedHttpsHosts: generationShareAllowedHosts(),
+    allowLocalHttp: kDebugMode || AppConfig.allowLocalMediaHttp,
   );
 }
 
@@ -154,6 +161,23 @@ Set<String> generationMediaAllowedHosts() {
   return result;
 }
 
+Set<String> generationShareAllowedHosts() {
+  final result = <String>{
+    'petmagic.app',
+    'www.petmagic.app',
+    'app.petmagic.app',
+    'api.petmagic.app',
+    'cdn.petmagic.app',
+  };
+
+  final apiBaseUri = Uri.tryParse(AppConfig.apiBaseUrl);
+  if (apiBaseUri != null && apiBaseUri.host.isNotEmpty) {
+    result.add(apiBaseUri.host.toLowerCase());
+  }
+
+  return result;
+}
+
 Set<String> profileAvatarAllowedHosts() {
   final result = <String>{
     'api.petmagic.app',
@@ -172,5 +196,19 @@ Set<String> profileAvatarAllowedHosts() {
 }
 
 bool _isPrivateIpv4Host(String host) {
-  return isPrivateIpv4(host);
+  final parts = host.split('.');
+  if (parts.length != 4) {
+    return false;
+  }
+
+  final octets = parts.map(int.tryParse).toList(growable: false);
+  if (octets.any((value) => value == null || value < 0 || value > 255)) {
+    return false;
+  }
+
+  final first = octets[0]!;
+  final second = octets[1]!;
+  return first == 10 ||
+      (first == 172 && second >= 16 && second <= 31) ||
+      (first == 192 && second == 168);
 }

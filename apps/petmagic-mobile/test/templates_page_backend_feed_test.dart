@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
@@ -18,6 +19,7 @@ import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_card.dart';
+import 'package:petmagic_mobile/features/templates/presentation/widgets/template_type_filters.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/loading/magic_loading_screen.dart';
 import 'package:visibility_detector/visibility_detector.dart';
@@ -34,6 +36,120 @@ void main() {
       milliseconds: 500,
     );
   });
+
+  testWidgets(
+    'template filters hide category row when backend has no categories',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          locale: const Locale('en'),
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: TemplateTypeFilters(
+              selectedType: null,
+              categories: const [],
+              selectedCategory: null,
+              onTypeSelected: (_) {},
+              onCategorySelected: (_) {},
+            ),
+          ),
+        ),
+      );
+
+      final context = tester.element(find.byType(TemplateTypeFilters));
+      final text = AppLocalizations.of(context);
+
+      expect(find.text(text.allFilter), findsOneWidget);
+      expect(find.text(text.videosFilter), findsOneWidget);
+      expect(find.text(text.imagesFilter), findsOneWidget);
+    },
+  );
+
+  testWidgets('template filters use theme contrast for selected pills', (
+    tester,
+  ) async {
+    Future<AppLocalizations> pumpFilters({
+      required Brightness brightness,
+      required TemplateType? selectedType,
+    }) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          darkTheme: AppTheme.dark(),
+          themeMode: brightness == Brightness.dark
+              ? ThemeMode.dark
+              : ThemeMode.light,
+          locale: const Locale('en'),
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: TemplateTypeFilters(
+              selectedType: selectedType,
+              categories: const [],
+              selectedCategory: null,
+              onTypeSelected: (_) {},
+              onCategorySelected: (_) {},
+            ),
+          ),
+        ),
+      );
+
+      return AppLocalizations.of(
+        tester.element(find.byType(TemplateTypeFilters)),
+      );
+    }
+
+    var text = await pumpFilters(
+      brightness: Brightness.light,
+      selectedType: null,
+    );
+    var context = tester.element(find.byType(TemplateTypeFilters));
+    var selectedText = tester.widget<Text>(find.text(text.allFilter));
+
+    expect(selectedText.style?.color, Theme.of(context).colorScheme.onPrimary);
+
+    text = await pumpFilters(
+      brightness: Brightness.dark,
+      selectedType: TemplateType.video,
+    );
+    context = tester.element(find.byType(TemplateTypeFilters));
+    selectedText = tester.widget<Text>(find.text(text.videosFilter));
+    final selectedIcon = tester.widget<Icon>(
+      find.byIcon(Icons.play_circle_outline_rounded),
+    );
+
+    expect(selectedText.style?.color, Theme.of(context).colorScheme.onPrimary);
+    expect(selectedIcon.color, Theme.of(context).colorScheme.onPrimary);
+  });
+
+  test(
+    'templates top bar alert badge uses theme contrast for danger token',
+    () {
+      final source = File(
+        'lib/features/templates/presentation/widgets/templates_top_bar.dart',
+      ).readAsStringSync();
+
+      expect(source, contains('color: colors.on(colors.danger)'));
+      expect(
+        source,
+        isNot(
+          contains('color: Colors.white,\n                    fontSize: 9'),
+        ),
+      );
+    },
+  );
 
   testWidgets(
     'templates page uses backend cursor pages and drops stale search results',

@@ -13,6 +13,7 @@ namespace PetMagic.Modules.Templates.Api.Endpoints;
 public static partial class TemplateGenerationEndpoints
 {
     private static async Task<Results<Ok<PublicGalleryShareResponse>, ProblemHttpResult>> GetSharedGenerationAsync(
+        HttpContext context,
         string token,
         [FromServices] ITemplateGenerationService generationService,
         CancellationToken cancellationToken)
@@ -23,10 +24,12 @@ public static partial class TemplateGenerationEndpoints
             return ToClientGenerationProblem(result.Error);
         }
 
+        ApplyPrivateMediaJsonHeaders(context);
         return TypedResults.Ok(result.Value);
     }
 
     private static async Task<Results<ContentHttpResult, ProblemHttpResult>> GetSharedGenerationPageAsync(
+        HttpContext context,
         string token,
         [FromServices] ITemplateGenerationService generationService,
         CancellationToken cancellationToken)
@@ -37,9 +40,27 @@ public static partial class TemplateGenerationEndpoints
             return ToClientGenerationProblem(result.Error);
         }
 
+        ApplySharedGenerationPageSecurityHeaders(context);
         return TypedResults.Content(
             BuildSharedGenerationHtml(result.Value),
             "text/html; charset=utf-8");
+    }
+
+    private static void ApplySharedGenerationPageSecurityHeaders(HttpContext context)
+    {
+        context.Response.Headers.CacheControl = "no-store";
+        context.Response.Headers.Pragma = "no-cache";
+        context.Response.Headers["Referrer-Policy"] = "no-referrer";
+        context.Response.Headers.XContentTypeOptions = "nosniff";
+        context.Response.Headers["Content-Security-Policy"] =
+            "default-src 'none'; script-src 'none'; connect-src 'none'; form-action 'none'; object-src 'none'; frame-src 'none'; img-src 'self' https: data:; media-src 'self' https:; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'";
+    }
+
+    private static void ApplyPrivateMediaJsonHeaders(HttpContext context)
+    {
+        context.Response.Headers.CacheControl = "no-store";
+        context.Response.Headers.Pragma = "no-cache";
+        context.Response.Headers.XContentTypeOptions = "nosniff";
     }
 
     private static string BuildSharedGenerationHtml(PublicGalleryShareResponse share)
@@ -107,6 +128,7 @@ public static partial class TemplateGenerationEndpoints
             return ToClientGenerationProblem(result.Error);
         }
 
+        ApplyPrivateMediaJsonHeaders(context);
         return TypedResults.Ok(result.Value);
     }
 
@@ -136,6 +158,7 @@ public static partial class TemplateGenerationEndpoints
             return ToClientGenerationProblem(result.Error);
         }
 
+        ApplyPrivateMediaJsonHeaders(context);
         return TypedResults.Ok(result.Value);
     }
 
@@ -158,6 +181,7 @@ public static partial class TemplateGenerationEndpoints
             return ToClientGenerationProblem(result.Error);
         }
 
+        ApplyPrivateMediaJsonHeaders(context);
         return TypedResults.Ok(result.Value);
     }
 
@@ -180,6 +204,7 @@ public static partial class TemplateGenerationEndpoints
             return ToClientGenerationProblem(result.Error);
         }
 
+        ApplyPrivateMediaJsonHeaders(context);
         return TypedResults.Ok(result.Value);
     }
 
@@ -216,6 +241,7 @@ public static partial class TemplateGenerationEndpoints
             return ToClientGenerationProblem(result.Error);
         }
 
+        ApplyPrivateMediaJsonHeaders(context);
         return TypedResults.Ok(result.Value);
     }
 
@@ -315,8 +341,8 @@ public static partial class TemplateGenerationEndpoints
     {
         return TypedResults.Problem(
             title: "templates.invalid_status",
-            detail: "Query parameter status must be one of: active, pending, running, completed, failed, cancelled, retrying, preprocessing, generating, finalizing.",
-            statusCode: StatusCodes.Status400BadRequest);
+            statusCode: StatusCodes.Status400BadRequest,
+            extensions: BuildClientGenerationProblemExtensions("templates.invalid_status"));
     }
 
     private static async Task<Results<NoContent, ProblemHttpResult>> DeleteGenerationAsync(

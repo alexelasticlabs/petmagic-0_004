@@ -70,33 +70,35 @@ class TemplateTypeFilters extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 8),
-        SizedBox(
-          height: 36,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: normalizedCategories.length + 1,
-            separatorBuilder: (_, _) => const SizedBox(width: 6),
-            itemBuilder: (context, index) {
-              if (index == 0) {
+        if (normalizedCategories.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 36,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: normalizedCategories.length + 1,
+              separatorBuilder: (_, _) => const SizedBox(width: 6),
+              itemBuilder: (context, index) {
+                if (index == 0) {
+                  return _FilterPill(
+                    label: text.allFilter,
+                    selected: selectedCategory == null,
+                    onTap: () => onCategorySelected(null),
+                    compact: true,
+                  );
+                }
+
+                final category = normalizedCategories[index - 1];
                 return _FilterPill(
-                  label: text.allFilter,
-                  selected: selectedCategory == null,
-                  onTap: () => onCategorySelected(null),
+                  label: category,
+                  selected: selectedCategory == category,
+                  onTap: () => onCategorySelected(category),
                   compact: true,
                 );
-              }
-
-              final category = normalizedCategories[index - 1];
-              return _FilterPill(
-                label: category,
-                selected: selectedCategory == category,
-                onTap: () => onCategorySelected(category),
-                compact: true,
-              );
-            },
+              },
+            ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -120,6 +122,7 @@ class _FilterPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final selectedForeground = Theme.of(context).colorScheme.onPrimary;
     final textStyle = Theme.of(context).textTheme.labelMedium;
 
     return PressableScale(
@@ -167,7 +170,7 @@ class _FilterPill extends StatelessWidget {
               Icon(
                 icon,
                 size: compact ? 13 : 15,
-                color: selected ? Colors.white : colors.textStrong,
+                color: selected ? selectedForeground : colors.textStrong,
               ),
               const SizedBox(width: 4),
             ],
@@ -177,7 +180,7 @@ class _FilterPill extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
               style: textStyle?.copyWith(
-                color: selected ? Colors.white : colors.textStrong,
+                color: selected ? selectedForeground : colors.textStrong,
                 fontSize: compact ? 9.8 : 10.5,
                 fontWeight: FontWeight.w700,
               ),

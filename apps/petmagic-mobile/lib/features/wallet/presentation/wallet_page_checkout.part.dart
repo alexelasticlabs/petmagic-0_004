@@ -1,111 +1,28 @@
 part of 'wallet_page.dart';
 
 extension _WalletPageCheckoutStateX on _WalletPageState {
-  Future<StripePaymentSheetResult> _handleCheckout(
+  Future<ExternalCheckoutResult> _handleCheckout(
     PurchaseCheckoutModel checkout,
   ) async {
     final text = AppLocalizations.of(context);
-    if (!checkout.usesPaymentSheet) {
-      final checkoutUrl = checkout.checkoutUrl.trim();
-      final uri = parseSafePremiumExternalUri(checkoutUrl);
-      if (uri != null) {
-        var launched = false;
-        try {
-          launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-        } on Object {
-          launched = false;
-        }
-        if (launched) {
-          _shouldReloadOnResume = true;
-          return StripePaymentSheetResult.success;
-        }
+    final checkoutUrl = checkout.checkoutUrl.trim();
+    final uri = parseSafePremiumExternalUri(checkoutUrl);
+    if (uri != null) {
+      var launched = false;
+      try {
+        launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } on Object {
+        launched = false;
       }
-
-      return StripePaymentSheetResult.failure(
-        error: StateError('wallet.payment_gateway_unavailable'),
-        errorMessage: text.walletPaymentGatewayUnavailableError,
-      );
+      if (launched) {
+        _shouldReloadOnResume = true;
+        return ExternalCheckoutResult.success;
+      }
     }
 
-    return _presentStripePaymentSheet(checkout);
-  }
-
-  Future<StripePaymentSheetResult> _presentStripePaymentSheet(
-    PurchaseCheckoutModel checkout,
-  ) async {
-    final text = AppLocalizations.of(context);
-    final clientSecret = checkout.paymentIntentClientSecret;
-    final publishableKey = checkout.publishableKey;
-    if (clientSecret == null ||
-        clientSecret.isEmpty ||
-        publishableKey == null ||
-        publishableKey.isEmpty) {
-      return StripePaymentSheetResult.failure(
-        error: StateError('wallet.payment_gateway_unavailable'),
-        errorMessage: text.walletPaymentGatewayUnavailableError,
-      );
-    }
-
-    _shouldReloadOnResume = true;
-    final sheetResult = await StripePaymentSheetCoordinator.present(
-      context,
-      request: StripePaymentSheetRequest(
-        paymentIntentClientSecret: clientSecret,
-        publishableKey: publishableKey,
-        customerId: checkout.customerId,
-        customerEphemeralKeySecret: checkout.customerEphemeralKeySecret,
-      ),
-    );
-
-    if (!sheetResult.completed) {
-      _shouldReloadOnResume = false;
-      return sheetResult;
-    }
-
-    if (!mounted) {
-      _shouldReloadOnResume = false;
-      return StripePaymentSheetResult.failure(
-        error: StateError('wallet.context_unmounted'),
-        errorMessage: text.walletPaymentGatewayUnavailableError,
-      );
-    }
-
-    final controller = ref.read(walletControllerProvider.notifier);
-    await controller.verifyStripeCheckout(checkout.externalPaymentId);
-
-    // Fallback polling keeps UX resilient when direct verification is delayed.
-    var verificationState = ref
-        .read(walletControllerProvider)
-        .checkoutVerificationState;
-    if (verificationState != WalletCheckoutVerificationState.succeeded) {
-      await controller.verifyCheckoutStatus();
-      verificationState = ref
-          .read(walletControllerProvider)
-          .checkoutVerificationState;
-    }
-
-    _shouldReloadOnResume = false;
-
-    if (verificationState == WalletCheckoutVerificationState.succeeded) {
-      return StripePaymentSheetResult.success;
-    }
-
-    final currentState = ref.read(walletControllerProvider);
-    final message = switch (verificationState) {
-      WalletCheckoutVerificationState.pending =>
-        text.externalCheckoutPendingVerificationMessage,
-      WalletCheckoutVerificationState.error => _friendlyError(
-        text,
-        currentState.checkoutErrorMessage ??
-            currentState.errorMessage ??
-            text.walletPaymentGatewayUnavailableError,
-      ),
-      _ => text.walletPaymentGatewayUnavailableError,
-    };
-
-    return StripePaymentSheetResult.failure(
-      error: StateError('wallet.checkout_verification_failed'),
-      errorMessage: message,
+    return ExternalCheckoutResult.failure(
+      error: StateError('wallet.payment_gateway_unavailable'),
+      errorMessage: text.walletPaymentGatewayUnavailableError,
     );
   }
 }
@@ -121,7 +38,7 @@ Future<void> _showPackDetailSheet(
     WalletPaymentMethodModel paymentMethod,
   )
   onBuy,
-  required Future<StripePaymentSheetResult> Function(
+  required Future<ExternalCheckoutResult> Function(
     PurchaseCheckoutModel checkout,
   )
   onCheckoutReady,

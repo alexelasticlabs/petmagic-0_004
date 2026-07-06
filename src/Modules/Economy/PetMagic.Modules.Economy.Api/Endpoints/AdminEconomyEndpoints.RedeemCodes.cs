@@ -105,7 +105,7 @@ public static partial class AdminEconomyEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.CreateRedeemCodeAsync(command, cancellationToken);
@@ -142,7 +142,7 @@ public static partial class AdminEconomyEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.UpdateRedeemCodeAsync(command, cancellationToken);
@@ -161,7 +161,7 @@ public static partial class AdminEconomyEndpoints
             return ToAdminEconomyProblem(
                 new Error(
                     "economy.redeem_code_status_invalid",
-                    "Query parameter status must be all, draft, scheduled, active, paused, exhausted, expired, or archived."),
+                    "Redeem code status filter is invalid."),
                 StatusCodes.Status400BadRequest);
         }
 
@@ -170,7 +170,7 @@ public static partial class AdminEconomyEndpoints
             return ToAdminEconomyProblem(
                 new Error(
                     "economy.redeem_code_reward_kind_invalid",
-                    "Query parameter rewardKind must be all or spark."),
+                    "Redeem code reward filter is invalid."),
                 StatusCodes.Status400BadRequest);
         }
 
@@ -179,7 +179,7 @@ public static partial class AdminEconomyEndpoints
             return ToAdminEconomyProblem(
                 new Error(
                     "economy.redeem_code_sort_invalid",
-                    "Query parameter sort must be updated, usage, reward, code, or expiry."),
+                    "Redeem code sort filter is invalid."),
                 StatusCodes.Status400BadRequest);
         }
 

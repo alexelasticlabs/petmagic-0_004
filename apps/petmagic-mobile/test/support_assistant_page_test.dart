@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -20,6 +22,15 @@ void main() {
       SupportAssistantPage.location('Payment\u0000Refund'),
       SupportAssistantPage.routePath,
     );
+  });
+
+  test('support assistant primary action uses themed contrast color', () {
+    final source = File(
+      'lib/features/support/presentation/support_assistant_page.dart',
+    ).readAsStringSync();
+
+    expect(source, contains('colorScheme.onPrimary'));
+    expect(source, isNot(contains('foregroundColor: Colors.white')));
   });
 
   testWidgets('support assistant shows auth gate for guests', (tester) async {

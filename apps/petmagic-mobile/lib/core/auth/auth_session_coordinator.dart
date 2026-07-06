@@ -129,6 +129,7 @@ class AuthSessionCoordinator {
           data: {'refreshToken': refreshToken},
         ),
         maxAttempts: _refreshTransientRetryAttempts,
+        retryWhen: _isSafeRefreshRetryFailure,
       );
 
       final refreshed = AuthSession.fromJson(response.data ?? const {});
@@ -180,10 +181,12 @@ class AuthSessionCoordinator {
   Future<T> _executeWithTransientRetry<T>({
     required Future<T> Function() operation,
     required int maxAttempts,
+    bool Function(DioException error)? retryWhen,
   }) async {
     final effectiveMaxAttempts = maxAttempts.clamp(1, 4);
     var attempt = 0;
     DioException? lastError;
+    final shouldRetry = retryWhen ?? _isTransientDioFailure;
 
     while (attempt < effectiveMaxAttempts) {
       try {
@@ -192,7 +195,7 @@ class AuthSessionCoordinator {
         lastError = error;
         attempt += 1;
 
-        if (!_isTransientDioFailure(error) || attempt >= effectiveMaxAttempts) {
+        if (!shouldRetry(error) || attempt >= effectiveMaxAttempts) {
           rethrow;
         }
 
@@ -201,6 +204,20 @@ class AuthSessionCoordinator {
     }
 
     throw lastError ?? DioException(requestOptions: RequestOptions(path: ''));
+  }
+
+  bool _isSafeRefreshRetryFailure(DioException error) {
+    if (error.type == DioExceptionType.connectionError ||
+        error.type == DioExceptionType.connectionTimeout) {
+      return true;
+    }
+
+    final statusCode = error.response?.statusCode;
+    return statusCode == 429 ||
+        statusCode == 500 ||
+        statusCode == 502 ||
+        statusCode == 503 ||
+        statusCode == 504;
   }
 
   bool _isTransientDioFailure(DioException error) {

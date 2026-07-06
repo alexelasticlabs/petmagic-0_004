@@ -29,6 +29,7 @@ import type {
   RangeDays,
   RoleFilter,
   StatusFilter,
+  UserSortMode,
   UsersManagementPageProps,
   WalletDialogState,
 } from "@/components/users-management-page.types";
@@ -44,7 +45,6 @@ import {
   revokePremium,
   revokeRole,
   setActive,
-  setPremium,
   USER_WALLET_REASON_MAX_LENGTH,
   type AdminEconomyUserSubscriptionSummary,
   type AdminUserAnalytics,
@@ -66,6 +66,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
   const [premiumFilter, setPremiumFilter] = useState<PremiumFilter>("all");
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [sortMode, setSortMode] = useState<UserSortMode>("created_desc");
   const [rangeDays, setRangeDays] = useState<RangeDays>(30);
   const [page, setPage] = useState(1);
 
@@ -98,8 +99,9 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
       role: roleFilter === "all" ? undefined : roleFilter,
       status: usersStatusFilter === "all" ? undefined : usersStatusFilter,
       isPremium: premiumFilter === "premium" ? true : premiumFilter === "free" ? false : undefined,
+      sort: sortMode,
     }),
-    [debouncedSearch, page, premiumFilter, roleFilter, usersStatusFilter]
+    [debouncedSearch, page, premiumFilter, roleFilter, sortMode, usersStatusFilter]
   );
 
   const {
@@ -305,7 +307,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
 
   const requestDeleteUser = useCallback(
     (user: UserListItem, afterSuccess?: () => void) => {
-      if (!canManageRoles) {
+      if (!canManageRoles || !user.isPremium) {
         return;
       }
 
@@ -344,16 +346,15 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
         userId: user.userId,
         title: ui.confirmPremiumTitle,
         description: ui.premiumChangeDescription(userLabel),
-        confirmLabel: user.isPremium ? text.removePremium : text.makePremium,
+        confirmLabel: text.removePremium,
         errorMessage: text.errorLoadingUsers,
-        action: () => (user.isPremium ? revokePremium(user.userId) : setPremium(user.userId, true)),
+        action: () => revokePremium(user.userId),
       });
     },
     [
       getUserLabel,
       requestUserConfirmation,
       text.errorLoadingUsers,
-      text.makePremium,
       text.removePremium,
       ui,
       canManageRoles,
@@ -668,6 +669,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
           setPremiumFilter("all");
           setActivityFilter("all");
           setStatusFilter("all");
+          setSortMode("created_desc");
           resetUsersSelection();
         }}
         resetUsersSelection={resetUsersSelection}
@@ -679,7 +681,9 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
         setRoleFilter={setRoleFilter}
         setSearch={setSearch}
         setSelectedUserId={setSelectedUserId}
+        setSortMode={setSortMode}
         setStatusFilter={setStatusFilter}
+        sortMode={sortMode}
         statusFilter={statusFilter}
         text={text}
         totalUsersValue={totalUsersValue}

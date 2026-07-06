@@ -2,6 +2,11 @@
 
 Date: 2026-06-13
 
+> Historical UX audit snapshot. This report records the June 2026 simulator-only
+> pass and should not be used as current release evidence. For the current
+> production-readiness gate, use
+> `../../docs/production-readiness-audit-2026-07-03.md`.
+
 ## Devices Checked
 
 - iOS Simulator: iPhone 16, iOS 18.0.

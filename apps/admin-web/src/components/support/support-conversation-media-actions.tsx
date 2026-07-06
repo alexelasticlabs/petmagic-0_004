@@ -59,6 +59,19 @@ export function downloadSupportBlobUrl(objectUrl: string, fileName: string): voi
   link.remove();
 }
 
+function scheduleSupportBlobUrlRevoke(objectUrl: string, delayMs: number): void {
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), delayMs);
+}
+
+function revokeSupportBlobUrlOnFailure(objectUrl: string, action: () => void): void {
+  try {
+    action();
+  } catch (error) {
+    URL.revokeObjectURL(objectUrl);
+    throw error;
+  }
+}
+
 export function getSupportActionErrorDetails(error: unknown) {
   return {
     errorName: error instanceof Error ? error.name : "UnknownError",
@@ -149,11 +162,13 @@ export function useSupportConversationMediaActions({
       const objectUrl = URL.createObjectURL(blob);
       const defaultFileName =
         fullscreenImage.mediaType === "video" ? "support-video" : "support-image";
-      downloadSupportBlobUrl(
-        objectUrl,
-        formatSafeSupportDownloadName(fullscreenImage.fileName, defaultFileName)
-      );
-      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+      revokeSupportBlobUrlOnFailure(objectUrl, () => {
+        downloadSupportBlobUrl(
+          objectUrl,
+          formatSafeSupportDownloadName(fullscreenImage.fileName, defaultFileName)
+        );
+        scheduleSupportBlobUrlRevoke(objectUrl, 1000);
+      });
     } finally {
       if (fullscreenActionAbortControllerRef.current === controller) {
         fullscreenActionAbortControllerRef.current = null;
@@ -207,8 +222,10 @@ export function useSupportConversationMediaActions({
         });
 
         const objectUrl = URL.createObjectURL(shareBlob);
-        downloadSupportBlobUrl(objectUrl, safeFileName);
-        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+        revokeSupportBlobUrlOnFailure(objectUrl, () => {
+          downloadSupportBlobUrl(objectUrl, safeFileName);
+          scheduleSupportBlobUrlRevoke(objectUrl, 1000);
+        });
       }
 
       if (!browserNavigator.share) {
@@ -272,19 +289,21 @@ export function useSupportConversationMediaActions({
       }
 
       const objectUrl = URL.createObjectURL(blob);
-      const opened = window.open(objectUrl, "_blank", "noopener,noreferrer");
-      if (!opened) {
-        const defaultFileName =
-          fullscreenImage.mediaType === "video" ? "support-video" : "support-image";
-        downloadSupportBlobUrl(
-          objectUrl,
-          formatSafeSupportDownloadName(fullscreenImage.fileName, defaultFileName)
-        );
-        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-        return;
-      }
+      revokeSupportBlobUrlOnFailure(objectUrl, () => {
+        const opened = window.open(objectUrl, "_blank", "noopener,noreferrer");
+        if (!opened) {
+          const defaultFileName =
+            fullscreenImage.mediaType === "video" ? "support-video" : "support-image";
+          downloadSupportBlobUrl(
+            objectUrl,
+            formatSafeSupportDownloadName(fullscreenImage.fileName, defaultFileName)
+          );
+          scheduleSupportBlobUrlRevoke(objectUrl, 1000);
+          return;
+        }
 
-      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+        scheduleSupportBlobUrlRevoke(objectUrl, 60_000);
+      });
     } finally {
       if (fullscreenActionAbortControllerRef.current === controller) {
         fullscreenActionAbortControllerRef.current = null;
@@ -329,8 +348,10 @@ export function useSupportConversationMediaActions({
 
       const blob = await response.blob();
       const objectUrl = URL.createObjectURL(blob);
-      downloadSupportBlobUrl(objectUrl, formatSafeSupportDownloadName(attachment.fileName));
-      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+      revokeSupportBlobUrlOnFailure(objectUrl, () => {
+        downloadSupportBlobUrl(objectUrl, formatSafeSupportDownloadName(attachment.fileName));
+        scheduleSupportBlobUrlRevoke(objectUrl, 1000);
+      });
     } catch (error) {
       if (controller.signal.aborted) {
         return;

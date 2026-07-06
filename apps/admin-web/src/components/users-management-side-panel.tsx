@@ -7,6 +7,7 @@ import { AdminBadge, AdminStateCard } from "@/components/admin/admin-primitives"
 import { formatSupportMessagePreview } from "@/components/support/support-message-preview";
 import { Button } from "@/components/ui/button";
 import { UserAvatarView } from "@/components/users/user-avatar";
+import { formatLabeledMetric } from "@/components/users/user-monetization-format";
 import {
   getUserAvatarLabel,
   getUserRoleLabel,
@@ -185,7 +186,9 @@ export function UsersManagementSidePanel({
                 <div className={styles.listBlock}>
                   {selectedUserAnalytics.recentPurchases.slice(0, 5).map((purchase) => (
                     <article key={purchase.orderId} className={styles.listCard}>
-                      <strong>{purchase.sparkToGrant} spark</strong>
+                      <strong>
+                        {formatLabeledMetric(ui.purchasedSparkLabel, purchase.sparkToGrant)}
+                      </strong>
                       <span>
                         {purchase.priceAmount} {sanitizeSensitiveText(purchase.currencyCode, 12)}
                       </span>

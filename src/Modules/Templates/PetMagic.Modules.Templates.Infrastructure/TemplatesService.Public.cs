@@ -577,7 +577,7 @@ internal sealed partial class TemplatesService
         }
 
         TemplateCategoryMetrics.RecordCategoryFilterLookup(usedFallback: true);
-        var fallbackMatches = (await query
+        var fallbackMatches = (await ApplyLegacyCategoryTokenPrefilter(query, categoryKey)
             .Select(template => new
             {
                 template.Id,
@@ -590,8 +590,8 @@ internal sealed partial class TemplatesService
         foreach (var match in fallbackMatches)
         {
             logger?.LogWarning(
-                "category_fallback_used TemplateId={TemplateId} Category={Category} RequestedCategory={RequestedCategory} NormalizedCategory={NormalizedCategory}",
-                match.Id,
+                "category_fallback_used TemplateIdHash={TemplateIdHash} Category={Category} RequestedCategory={RequestedCategory} NormalizedCategory={NormalizedCategory}",
+                TemplateLogSanitizer.SafeId(match.Id),
                 match.Category,
                 normalizedCategory,
                 categoryKey);
@@ -603,6 +603,27 @@ internal sealed partial class TemplatesService
         return fallbackTemplateIds.Length == 0
             ? query.Where(template => false)
             : query.Where(template => fallbackTemplateIds.Contains(template.Id));
+    }
+
+    private static IQueryable<TemplateItem> ApplyLegacyCategoryTokenPrefilter(IQueryable<TemplateItem> query, string categoryKey)
+    {
+        var categoryTokens = categoryKey
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        if (categoryTokens.Length == 0)
+        {
+            return query.Where(template => false);
+        }
+
+        var filtered = query.Where(template => template.Category != null && template.Category.Trim() != string.Empty);
+        foreach (var token in categoryTokens)
+        {
+            var currentToken = token;
+            filtered = filtered.Where(template => (template.Category ?? string.Empty).ToUpper().Contains(currentToken));
+        }
+
+        return filtered;
     }
 
     public async Task<Result<TemplateDetailDto>> GetPublicAsync(

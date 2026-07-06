@@ -166,7 +166,8 @@ public sealed class AdminTemplateUploadEndpointTests
         var (statusCode, body) = await ExecuteAsync(result);
 
         Assert.Equal(StatusCodes.Status400BadRequest, statusCode);
-        Assert.Contains("File content type is not allowed", body);
+        Assert.Contains("templates.file_type_not_allowed", body);
+        Assert.DoesNotContain("File content type is not allowed", body);
     }
 
     [Fact]
@@ -187,7 +188,8 @@ public sealed class AdminTemplateUploadEndpointTests
         var (statusCode, body) = await ExecuteAsync(result);
 
         Assert.Equal(StatusCodes.Status400BadRequest, statusCode);
-        Assert.Contains("File content type is not allowed", body);
+        Assert.Contains("templates.file_type_not_allowed", body);
+        Assert.DoesNotContain("File content type is not allowed", body);
     }
 
     [Fact]
@@ -208,7 +210,8 @@ public sealed class AdminTemplateUploadEndpointTests
         var (statusCode, body) = await ExecuteAsync(result);
 
         Assert.Equal(StatusCodes.Status400BadRequest, statusCode);
-        Assert.Contains("File content type is not allowed", body);
+        Assert.Contains("templates.file_type_not_allowed", body);
+        Assert.DoesNotContain("File content type is not allowed", body);
     }
 
     [Fact]
@@ -229,7 +232,8 @@ public sealed class AdminTemplateUploadEndpointTests
         var (statusCode, body) = await ExecuteAsync(result);
 
         Assert.Equal(StatusCodes.Status400BadRequest, statusCode);
-        Assert.Contains("maximum allowed size of 10 bytes", body);
+        Assert.Contains("templates.file_too_large", body);
+        Assert.DoesNotContain("maximum allowed size of 10 bytes", body);
     }
 
     [Fact]
@@ -259,7 +263,8 @@ public sealed class AdminTemplateUploadEndpointTests
         var (statusCode, body) = await ExecuteAsync(result);
 
         Assert.Equal(StatusCodes.Status400BadRequest, statusCode);
-        Assert.Contains("Preview video duration must be between", body);
+        Assert.Contains("templates.preview_duration_invalid", body);
+        Assert.DoesNotContain("Preview video duration must be between", body);
     }
 
     [Fact]
@@ -289,7 +294,8 @@ public sealed class AdminTemplateUploadEndpointTests
         var (statusCode, body) = await ExecuteAsync(result);
 
         Assert.Equal(StatusCodes.Status400BadRequest, statusCode);
-        Assert.Contains("Preview video duration metadata is required", body);
+        Assert.Contains("templates.preview_duration_required", body);
+        Assert.DoesNotContain("Preview video duration metadata is required", body);
     }
 
     private static FormFile CreateFormFile(string fileName, string contentType, byte[] content)

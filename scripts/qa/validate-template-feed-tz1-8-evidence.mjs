@@ -60,9 +60,8 @@ function checkLongScrollArtifact() {
     'requires plateau_likely=true plus 500+ mixed/video-only loaded items');
   addCheck(
     'mobile.weak_device_or_low_memory_signoff',
-    /weak-device release signoff:\s*PASS/i.test(text)
-      || /low-memory (device|emulator) signoff:\s*PASS/i.test(text),
-    'requires weak-device or low-memory emulator signoff for Task 2 acceptance');
+    hasAcceptedMobileReleaseSignoff(text),
+    'requires weak-device or low-memory emulator signoff with concrete device evidence for Task 2 acceptance');
   addCheck(
     'mobile.video_only_budget_exceeds_mixed',
     parseActivePreviewMetric(text, 'mixed') < parseActivePreviewMetric(text, 'video-only'),
@@ -301,7 +300,8 @@ function hasSnapshotRunnerMetadata(evidence) {
     && isBeforeOrSame(evidence.startedAtUtc, evidence.finishedAtUtc)
     && typeof evidence.prometheusBaseUrl === 'string'
     && evidence.prometheusBaseUrl.trim().length > 0
-    && evidence.prometheusBaseUrl !== 'invalid';
+    && evidence.prometheusBaseUrl !== 'invalid'
+    && !isLocalHttpUrl(evidence.prometheusBaseUrl);
 }
 
 function hasMetricSamples(items) {
@@ -419,6 +419,7 @@ function isAcceptedLoadProbeEvidence(evidence) {
     && typeof evidence?.apiBase === 'string'
     && evidence.apiBase.trim().length > 0
     && evidence.apiBase !== 'invalid'
+    && !isLocalHttpUrl(evidence.apiBase)
     && Number.isInteger(total)
     && Number.isInteger(ok)
     && Number.isInteger(failed)
@@ -437,9 +438,26 @@ function hasFilledMetadata(text, label) {
   return Boolean(getMetadataValue(text, label));
 }
 
+function hasAcceptedMobileReleaseSignoff(text) {
+  const device = getMetadataValue(text, 'Device').replace(/^`|`$/g, '');
+  if (!device || /^(unknown|ordinary device|test-device|test device)$/i.test(device)) {
+    return false;
+  }
+
+  if (/low-memory (device|emulator) signoff:\s*PASS/i.test(text)) {
+    return /(low[- ]memory|constrained[- ]memory)/i.test(device);
+  }
+
+  if (/weak-device release signoff:\s*PASS/i.test(text)) {
+    return /(weak[- ]device|low[- ]end|entry[- ]level|low[- ]memory|constrained[- ]memory)/i.test(device);
+  }
+
+  return false;
+}
+
 function getMetadataValue(text, label) {
   const escaped = escapeRegExp(label);
-  const match = text.match(new RegExp(`^-\\s*${escaped}:[ \\t]*([^\\r\\n]*)$`, 'im'));
+  const match = text.match(new RegExp(`^(?:-\\s*)?${escaped}:[ \\t]*([^\\r\\n]*)$`, 'im'));
   if (!match) {
     return '';
   }
@@ -489,6 +507,21 @@ function parseActivePreviewMetric(text, label) {
 
 function relativeArtifactPath(path) {
   return path.replace(`${repoRoot}\\`, '').replaceAll('\\', '/');
+}
+
+function isLocalHttpUrl(value) {
+  try {
+    const hostname = new URL(value).hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    return [
+      'localhost',
+      '127.0.0.1',
+      '::1',
+      '0.0.0.0',
+      'host.docker.internal',
+    ].includes(hostname) || hostname.endsWith('.localhost');
+  } catch {
+    return true;
+  }
 }
 
 function addCheck(name, ok, detail) {

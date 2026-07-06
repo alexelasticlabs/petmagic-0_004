@@ -194,6 +194,23 @@ describe("template categories view actions", () => {
     expect(contentSource).toContain("archiveCategoryLabel: (name: string) =>");
     expect(contentSource).toContain("restoreCategoryLabel: (name: string) =>");
     expect(contentSource).toContain("deleteCategoryLabel: (name: string) =>");
+    expect(contentSource).toContain(
+      'actionsAdminOnly: "Управление категориями доступно только администратору."'
+    );
+    expect(contentSource).toContain('crudEnabled: "Управление включено"');
+    expect(contentSource).toContain('categoryPlaceholder: "Например, портреты питомцев"');
+    expect(contentSource).toContain(
+      '"Переименование категории синхронно обновляет поле категории у связанных шаблонов."'
+    );
+    expect(contentSource).toContain(
+      "imageCategoryLabel: (name: string) => `Открыть шаблоны изображений категории ${name}`"
+    );
+    const ruContentSource = contentSource.slice(0, contentSource.indexOf("  en: {"));
+    expect(ruContentSource).not.toContain("CRUD подключен");
+    expect(ruContentSource).not.toContain("Portrait Pets");
+    expect(ruContentSource).not.toContain("image-шаблоны");
+    expect(ruContentSource).not.toContain("поле category");
+    expect(ruContentSource).not.toContain("только Admin");
     expect(source).toContain(
       "categoryText.restoreDialogDescription(\n                  formatCategoryActionName(categoryPendingArchive)"
     );

@@ -22,6 +22,7 @@ if (!['pending', 'weak-device', 'low-memory-emulator'].includes(signoff)) {
 
 const output = args.output || join('artifacts', 'templates-feed-tz1-8-long-scroll-500-2026-07-02.md');
 const deviceLabel = args.deviceLabel || readDeviceLabel(runDir);
+validateDeviceLabelForSignoff(signoff, deviceLabel);
 
 const completion = readJson(join(runDir, 'completion-summary.json'));
 const memory = readJson(join(runDir, 'memory-plateau-summary.json'));
@@ -148,6 +149,25 @@ function readDeviceLabel(runDir) {
   const deviceId = envText.match(/^DEVICE_ID=(.+)$/m)?.[1]?.trim();
   const mode = envText.match(/^MODE=(.+)$/m)?.[1]?.trim();
   return [deviceId, mode].filter(Boolean).join(' / ') || 'unknown';
+}
+
+function validateDeviceLabelForSignoff(signoff, deviceLabel) {
+  if (signoff === 'pending') {
+    return;
+  }
+
+  const normalized = deviceLabel.trim().toLowerCase();
+  if (!normalized || ['unknown', 'ordinary device', 'test-device', 'test device'].includes(normalized)) {
+    fail('Release signoff requires a concrete weak-device or low-memory device label.');
+  }
+
+  if (signoff === 'low-memory-emulator' && !/(low[- ]memory|constrained[- ]memory)/i.test(deviceLabel)) {
+    fail('Low-memory emulator signoff requires --device-label to mention low-memory or constrained-memory.');
+  }
+
+  if (signoff === 'weak-device' && !/(weak[- ]device|low[- ]end|entry[- ]level|low[- ]memory|constrained[- ]memory)/i.test(deviceLabel)) {
+    fail('Weak-device signoff requires --device-label to identify a weak, low-end, entry-level, or constrained-memory device.');
+  }
 }
 
 function parseArgs(argv) {

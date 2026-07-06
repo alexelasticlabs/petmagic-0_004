@@ -3,6 +3,7 @@ using System.Globalization;
 
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
@@ -91,15 +92,16 @@ internal sealed class TemplateWatermarkRenderer(
                 return stored;
             }
 
+            var safeErrorCode = SafeStorageErrorCode(stored.Error.Code);
             logger.LogWarning(
-                "Image watermark storage failed. Operation={Operation} GenerationId={GenerationId} FileName={FileName} ContentType={ContentType} ErrorCode={ErrorCode} HasLocalPath={HasLocalPath}",
+                "Image watermark storage failed. Operation={Operation} GenerationIdHash={GenerationIdHash} FileNameHash={FileNameHash} ContentType={ContentType} ErrorCode={ErrorCode} HasLocalPath={HasLocalPath}",
                 "store_image_watermark",
-                generationId,
-                original.FileName,
-                original.ContentType,
-                stored.Error.Code,
+                TemplateLogSanitizer.SafeId(generationId),
+                TemplateLogSanitizer.SafeFileName(original.FileName),
+                TemplateLogSanitizer.SafeContentType(original.ContentType),
+                safeErrorCode,
                 !string.IsNullOrWhiteSpace(original.LocalPath));
-            return stored;
+            return Result.Failure<StoredMediaResponse>(new Error(safeErrorCode, TemplatesErrors.MediaStorageFailed.Message));
         }
         catch (OperationCanceledException)
         {
@@ -108,13 +110,13 @@ internal sealed class TemplateWatermarkRenderer(
         catch (Exception exception)
         {
             logger.LogWarning(
-                exception,
-                "Image watermark render failed. Operation={Operation} GenerationId={GenerationId} FileName={FileName} ContentType={ContentType} HasLocalPath={HasLocalPath}",
+                "Image watermark render failed. Operation={Operation} GenerationIdHash={GenerationIdHash} FileNameHash={FileNameHash} ContentType={ContentType} HasLocalPath={HasLocalPath} ExceptionType={ExceptionType}",
                 "create_image_watermark",
-                generationId,
-                original.FileName,
-                original.ContentType,
-                !string.IsNullOrWhiteSpace(original.LocalPath));
+                TemplateLogSanitizer.SafeId(generationId),
+                TemplateLogSanitizer.SafeFileName(original.FileName),
+                TemplateLogSanitizer.SafeContentType(original.ContentType),
+                !string.IsNullOrWhiteSpace(original.LocalPath),
+                SafeLogValues.ExceptionType(exception));
             return Result.Failure<StoredMediaResponse>(TemplatesErrors.WatermarkRenderFailed);
         }
         finally
@@ -173,18 +175,21 @@ internal sealed class TemplateWatermarkRenderer(
             process.StartInfo.ArgumentList.Add(tempOutput);
 
             process.Start();
+            var stderrLengthTask = ProcessOutputDrainer.CountAsync(process.StandardError, cancellationToken);
+            var stdoutDrainTask = ProcessOutputDrainer.DrainAsync(process.StandardOutput, cancellationToken);
             await process.WaitForExitAsync(cancellationToken);
+            await stdoutDrainTask;
+            var errorLength = await stderrLengthTask;
             if (process.ExitCode != 0 || !File.Exists(tempOutput) || new FileInfo(tempOutput).Length == 0)
             {
-                var error = await process.StandardError.ReadToEndAsync(cancellationToken);
                 logger.LogWarning(
-                    "Video watermark render failed. Operation={Operation} GenerationId={GenerationId} FileName={FileName} ContentType={ContentType} ExitCode={ExitCode} ErrorPreview={ErrorPreview} HasLocalPath={HasLocalPath}",
+                    "Video watermark render failed. Operation={Operation} GenerationIdHash={GenerationIdHash} FileNameHash={FileNameHash} ContentType={ContentType} ExitCode={ExitCode} ErrorLength={ErrorLength} HasLocalPath={HasLocalPath}",
                     "render_video_watermark",
-                    generationId,
-                    original.FileName,
-                    original.ContentType,
+                    TemplateLogSanitizer.SafeId(generationId),
+                    TemplateLogSanitizer.SafeFileName(original.FileName),
+                    TemplateLogSanitizer.SafeContentType(original.ContentType),
                     process.ExitCode,
-                    error.Length > 500 ? error[..500] : error,
+                    errorLength,
                     !string.IsNullOrWhiteSpace(original.LocalPath));
                 return Result.Failure<StoredMediaResponse>(TemplatesErrors.WatermarkRenderFailed);
             }
@@ -198,15 +203,16 @@ internal sealed class TemplateWatermarkRenderer(
                 return stored;
             }
 
+            var safeErrorCode = SafeStorageErrorCode(stored.Error.Code);
             logger.LogWarning(
-                "Video watermark storage failed. Operation={Operation} GenerationId={GenerationId} FileName={FileName} ContentType={ContentType} ErrorCode={ErrorCode} HasLocalPath={HasLocalPath}",
+                "Video watermark storage failed. Operation={Operation} GenerationIdHash={GenerationIdHash} FileNameHash={FileNameHash} ContentType={ContentType} ErrorCode={ErrorCode} HasLocalPath={HasLocalPath}",
                 "store_video_watermark",
-                generationId,
-                original.FileName,
-                original.ContentType,
-                stored.Error.Code,
+                TemplateLogSanitizer.SafeId(generationId),
+                TemplateLogSanitizer.SafeFileName(original.FileName),
+                TemplateLogSanitizer.SafeContentType(original.ContentType),
+                safeErrorCode,
                 !string.IsNullOrWhiteSpace(original.LocalPath));
-            return stored;
+            return Result.Failure<StoredMediaResponse>(new Error(safeErrorCode, TemplatesErrors.MediaStorageFailed.Message));
         }
         catch (OperationCanceledException)
         {
@@ -215,13 +221,13 @@ internal sealed class TemplateWatermarkRenderer(
         catch (Exception exception)
         {
             logger.LogWarning(
-                exception,
-                "Video watermark render failed. Operation={Operation} GenerationId={GenerationId} FileName={FileName} ContentType={ContentType} HasLocalPath={HasLocalPath}",
+                "Video watermark render failed. Operation={Operation} GenerationIdHash={GenerationIdHash} FileNameHash={FileNameHash} ContentType={ContentType} HasLocalPath={HasLocalPath} ExceptionType={ExceptionType}",
                 "create_video_watermark",
-                generationId,
-                original.FileName,
-                original.ContentType,
-                !string.IsNullOrWhiteSpace(original.LocalPath));
+                TemplateLogSanitizer.SafeId(generationId),
+                TemplateLogSanitizer.SafeFileName(original.FileName),
+                TemplateLogSanitizer.SafeContentType(original.ContentType),
+                !string.IsNullOrWhiteSpace(original.LocalPath),
+                SafeLogValues.ExceptionType(exception));
             return Result.Failure<StoredMediaResponse>(TemplatesErrors.WatermarkRenderFailed);
         }
         finally
@@ -229,6 +235,15 @@ internal sealed class TemplateWatermarkRenderer(
             TryDelete(tempInput);
             TryDelete(tempOutput);
         }
+    }
+
+    private static string SafeStorageErrorCode(string? code)
+    {
+        var trimmed = code?.Trim();
+        var sanitized = AdminFailureMessageSanitizer.SanitizeCode(trimmed);
+        return string.Equals(trimmed, sanitized, StringComparison.Ordinal)
+            ? sanitized ?? TemplatesErrors.MediaStorageFailed.Code
+            : TemplatesErrors.MediaStorageFailed.Code;
     }
 
     private async Task<(string Path, string? TempPath)> ResolveInputPathAsync(

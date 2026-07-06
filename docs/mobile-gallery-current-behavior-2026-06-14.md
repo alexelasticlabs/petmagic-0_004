@@ -1,5 +1,10 @@
 # Мобильная галерея: текущее поведение (2026-06-14)
 
+> Historical gallery behavior snapshot. This document preserves the June 2026
+> mobile-gallery analysis and should not be used as current release evidence.
+> For the current production-readiness gate, use
+> `production-readiness-audit-2026-07-03.md`.
+
 ## Что в приложении называется галереей
 
 В мобильном приложении сейчас есть два связанных, но разных сценария:
@@ -13,12 +18,12 @@
 
 ### Где находится логика
 
-- Экран: [apps/petmagic-mobile/lib/features/templates/presentation/generations_gallery_page.dart](apps/petmagic-mobile/lib/features/templates/presentation/generations_gallery_page.dart)
-- Карточки и действия: [apps/petmagic-mobile/lib/features/templates/presentation/generations_gallery_page_cards.dart](apps/petmagic-mobile/lib/features/templates/presentation/generations_gallery_page_cards.dart), [apps/petmagic-mobile/lib/features/templates/presentation/generations_gallery_page_states_and_actions.dart](apps/petmagic-mobile/lib/features/templates/presentation/generations_gallery_page_states_and_actions.dart)
-- Контроллер состояния: [apps/petmagic-mobile/lib/features/templates/presentation/generation_history_controller.dart](apps/petmagic-mobile/lib/features/templates/presentation/generation_history_controller.dart)
-- Локальный стор медиа: [apps/petmagic-mobile/lib/features/templates/data/generation_gallery_store.dart](apps/petmagic-mobile/lib/features/templates/data/generation_gallery_store.dart)
-- Маппинг статусов/превью: [apps/petmagic-mobile/lib/features/templates/presentation/mappers/generations_gallery_mappers.dart](apps/petmagic-mobile/lib/features/templates/presentation/mappers/generations_gallery_mappers.dart)
-- Роутинг вкладки: [apps/petmagic-mobile/lib/app/router/app_router.dart](apps/petmagic-mobile/lib/app/router/app_router.dart)
+- Экран: [apps/petmagic-mobile/lib/features/templates/presentation/generations_gallery_page.dart](../apps/petmagic-mobile/lib/features/templates/presentation/generations_gallery_page.dart)
+- Карточки и действия: [apps/petmagic-mobile/lib/features/templates/presentation/generations_gallery_page_cards.dart](../apps/petmagic-mobile/lib/features/templates/presentation/generations_gallery_page_cards.dart), [apps/petmagic-mobile/lib/features/templates/presentation/generations_gallery_page_states_and_actions.dart](../apps/petmagic-mobile/lib/features/templates/presentation/generations_gallery_page_states_and_actions.dart)
+- Контроллер состояния: [apps/petmagic-mobile/lib/features/templates/presentation/generation_history_controller.dart](../apps/petmagic-mobile/lib/features/templates/presentation/generation_history_controller.dart)
+- Локальный стор медиа: [apps/petmagic-mobile/lib/features/templates/data/generation_gallery_store.dart](../apps/petmagic-mobile/lib/features/templates/data/generation_gallery_store.dart)
+- Маппинг статусов/превью: [apps/petmagic-mobile/lib/features/templates/presentation/mappers/generations_gallery_mappers.dart](../apps/petmagic-mobile/lib/features/templates/presentation/mappers/generations_gallery_mappers.dart)
+- Роутинг вкладки: [apps/petmagic-mobile/lib/app/router/app_router.dart](../apps/petmagic-mobile/lib/app/router/app_router.dart)
 
 ### Пользовательский путь
 
@@ -132,9 +137,9 @@
 
 ### Где находится логика
 
-- Экран списка и деталей питомцев: [apps/petmagic-mobile/lib/features/pets/presentation/my_pets_page.dart](apps/petmagic-mobile/lib/features/pets/presentation/my_pets_page.dart)
-- API-репозиторий: [apps/petmagic-mobile/lib/features/templates/data/template_generation_repository.dart](apps/petmagic-mobile/lib/features/templates/data/template_generation_repository.dart)
-- Роуты: [apps/petmagic-mobile/lib/app/router/app_router.dart](apps/petmagic-mobile/lib/app/router/app_router.dart)
+- Экран списка и деталей питомцев: [apps/petmagic-mobile/lib/features/pets/presentation/my_pets_page.dart](../apps/petmagic-mobile/lib/features/pets/presentation/my_pets_page.dart)
+- API-репозиторий: [apps/petmagic-mobile/lib/features/templates/data/template_generation_repository.dart](../apps/petmagic-mobile/lib/features/templates/data/template_generation_repository.dart)
+- Роуты: [apps/petmagic-mobile/lib/app/router/app_router.dart](../apps/petmagic-mobile/lib/app/router/app_router.dart)
 
 ### Пользовательский путь
 

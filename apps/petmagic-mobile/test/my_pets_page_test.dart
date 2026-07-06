@@ -145,6 +145,8 @@ void main() {
     expect(formSource, contains("feature: 'Pets.Form'"));
     expect(formSource, contains("operation: 'save_pet'"));
     expect(formSource, contains('text.profileActionFailed'));
+    expect(formSource, contains('Theme.of(context).colorScheme.onPrimary'));
+    expect(formSource, isNot(contains('isActive ? Colors.black')));
     expect(formSource, isNot(contains('} catch (_) {')));
   });
 

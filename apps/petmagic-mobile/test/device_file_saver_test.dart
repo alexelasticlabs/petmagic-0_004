@@ -26,6 +26,62 @@ void main() {
       expect(bytes, [1, 2, 3]);
     });
 
+    test(
+      'rejects unsafe URL schemes and credentials before network request',
+      () async {
+        var requestCount = 0;
+        final dio = Dio()
+          ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+            requestCount++;
+            return ResponseBody.fromBytes([1, 2, 3], 200);
+          });
+
+        for (final url in [
+          'javascript:alert(1)',
+          'file:///tmp/petmagic.jpg',
+          '/relative/result.jpg',
+          'http://evil.example/result.jpg',
+          'https://user:secret@cdn.petmagic.test/result.jpg',
+        ]) {
+          await expectLater(
+            downloadFileBytes(url, client: dio, maxBytes: 8),
+            throwsA(
+              isA<FormatException>().having(
+                (error) => error.message,
+                'message',
+                'unsafe_download_url',
+              ),
+            ),
+          );
+        }
+
+        expect(requestCount, 0);
+      },
+    );
+
+    test(
+      'allows local debug http downloads without allowing external http',
+      () async {
+        final requestedUrls = <String>[];
+        final dio = Dio()
+          ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+            requestedUrls.add(options.uri.toString());
+            return ResponseBody.fromBytes([1, 2, 3], 200);
+          });
+
+        final bytes = await downloadFileBytes(
+          'http://127.0.0.1:5000/result.jpg?signature=secret',
+          client: dio,
+          maxBytes: 8,
+        );
+
+        expect(bytes, [1, 2, 3]);
+        expect(requestedUrls, [
+          'http://127.0.0.1:5000/result.jpg?signature=secret',
+        ]);
+      },
+    );
+
     test('rejects responses larger than content length limit', () async {
       final dio = Dio()
         ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
@@ -72,7 +128,8 @@ void main() {
                 (error) => error.requestOptions.path,
                 'request path',
                 allOf(
-                  contains('https://cdn.petmagic.test/result.jpg'),
+                  equals('https://cdn.petmagic.test'),
+                  isNot(contains('result.jpg')),
                   isNot(contains('signature=secret')),
                   isNot(contains('token=raw')),
                 ),
@@ -89,7 +146,8 @@ void main() {
                 (error) => error.response?.requestOptions.path,
                 'response request path',
                 allOf(
-                  contains('https://cdn.petmagic.test/result.jpg'),
+                  equals('https://cdn.petmagic.test'),
+                  isNot(contains('result.jpg')),
                   isNot(contains('signature=secret')),
                   isNot(contains('token=raw')),
                 ),
@@ -378,6 +436,20 @@ void main() {
       expect(source, contains("operation: 'save_local_to_gallery'"));
       expect(source, contains("operation: 'validate_local_media_path'"));
       expect(source, isNot(contains('} catch (_) {\n    return')));
+    },
+  );
+
+  test(
+    'local media cancellation exceptions do not include raw file paths',
+    () async {
+      final source = await File(
+        'lib/shared/files/media_share_save.dart',
+      ).readAsString();
+      final method = _extractMethodBody(source, 'void _throwIfCancelled(');
+
+      expect(method, contains("RequestOptions(path: '/local-media-action')"));
+      expect(method, isNot(contains('RequestOptions(path: path)')));
+      expect(method, isNot(contains('RequestOptions(path: filePath)')));
     },
   );
 

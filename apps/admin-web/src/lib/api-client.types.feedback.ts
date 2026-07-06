@@ -1,26 +1,16 @@
 export type FeedbackType =
-
   | "GenerationResult"
-
   | "GenerationFailure"
-
   | "BugReport"
-
   | "FeatureRequest"
-
   | "PaymentIssue"
-
   | "General";
-
 
 export type FeedbackStatus = "New" | "InReview" | "Resolved" | "Dismissed";
 
-
 export type FeedbackPriority = "Low" | "Medium" | "High" | "Critical";
 
-
 export type AdminFeedbackListItem = {
-
   id: string;
 
   userId?: string | null;
@@ -52,12 +42,9 @@ export type AdminFeedbackListItem = {
   previewUrl?: string | null;
 
   createdAtUtc: string;
-
 };
 
-
 export type AdminFeedbackPage = {
-
   items: AdminFeedbackListItem[];
 
   totalCount: number;
@@ -69,12 +56,9 @@ export type AdminFeedbackPage = {
   hasMore: boolean;
 
   generatedAtUtc: string;
-
 };
 
-
 export type AdminFeedbackGenerationContext = {
-
   generationId: string;
 
   userId: string;
@@ -98,12 +82,9 @@ export type AdminFeedbackGenerationContext = {
   chargedAtUtc?: string | null;
 
   refundedAtUtc?: string | null;
-
 };
 
-
 export type CreditRefund = {
-
   id: string;
 
   userId: string;
@@ -119,12 +100,9 @@ export type CreditRefund = {
   adminId: string;
 
   createdAtUtc: string;
-
 };
 
-
 export type AdminFeedbackDetails = {
-
   id: string;
 
   userId?: string | null;
@@ -174,12 +152,9 @@ export type AdminFeedbackDetails = {
   canRefund: boolean;
 
   refund?: CreditRefund | null;
-
 };
 
-
 export type AdminFeedbackQuery = {
-
   status?: FeedbackStatus | "All";
 
   priority?: FeedbackPriority | "All";
@@ -203,41 +178,29 @@ export type AdminFeedbackQuery = {
   skip?: number;
 
   take?: number;
-
 };
 
-
 export type UpdateFeedbackAdminPayload = {
-
   status?: FeedbackStatus;
 
   priority?: FeedbackPriority;
 
   adminNote?: string;
-
 };
 
-
 export type RefundFeedbackCreditsPayload = {
-
   amount?: number;
 
   reason?: string;
-
 };
 
-
 export type TemplateFeedbackIssue = {
-
   category: string;
 
   count: number;
-
 };
 
-
 export type TemplateFeedbackSummary = {
-
   templateId: string;
 
   positiveCount: number;
@@ -255,5 +218,4 @@ export type TemplateFeedbackSummary = {
   topIssues: TemplateFeedbackIssue[];
 
   hasNegativeWarning: boolean;
-
 };

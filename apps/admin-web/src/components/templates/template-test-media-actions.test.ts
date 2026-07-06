@@ -49,6 +49,10 @@ describe("template test media actions", () => {
     expect(source).toContain("generationId: sanitizeSensitiveText(activeRun.generationId, 80)");
     expect(source).toContain("...getTemplateTestErrorDetails(error)");
     expect(source).toContain("function downloadPreviewBlobUrl(objectUrl: string): void");
+    expect(source).toContain("function revokePreviewBlobUrlOnFailure(");
+    expect(source).toContain("URL.revokeObjectURL(objectUrl);");
+    expect(source).toContain("schedulePreviewBlobUrlRevoke(objectUrl, 1000);");
+    expect(source).toContain("schedulePreviewBlobUrlRevoke(objectUrl, 60_000);");
     expect(source).toContain(
       'anchor.download = downloadName ?? (videoUrl ? "template-test.mp4" : "template-test.png");'
     );
@@ -80,15 +84,27 @@ describe("template test media actions", () => {
     );
     expect(source).toContain("if (!opened) {");
     expect(source).toContain("downloadPreviewBlobUrl(objectUrl);");
-    expect(source).toContain("window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);");
+    expect(source).toContain("schedulePreviewBlobUrlRevoke(objectUrl, 1000);");
     expect(source).not.toContain(
       "if (!opened) {\n        URL.revokeObjectURL(objectUrl);\n        return;\n      }"
     );
   });
 
+  it("revokes generated media blob URLs immediately if action handoff throws", () => {
+    const source = readTemplateTestPageLibrarySource();
+
+    expect(source).toContain("function revokePreviewBlobUrlOnFailure(objectUrl: string");
+    expect(source).toContain("} catch (error) {\n      URL.revokeObjectURL(objectUrl);");
+    expect(source).toContain("revokePreviewBlobUrlOnFailure(objectUrl, () => {");
+  });
+
   it("guards template test generation against invalid and repeated submits", () => {
     const source = readTemplateTestPageLibrarySource();
     const contentSource = readFileSync(templateTestPageContentPath, "utf8");
+    const ruContentSource = contentSource.slice(
+      contentSource.indexOf("  ru: {"),
+      contentSource.indexOf("  en: {")
+    );
 
     expect(source).toContain("const MAX_TEMPLATE_TEST_IMAGE_BYTES = 8 * 1024 * 1024;");
     expect(source).toContain("function isTemplateTestRunInFlight(");
@@ -129,10 +145,12 @@ describe("template test media actions", () => {
     expect(source.indexOf("if (file.size > MAX_TEMPLATE_TEST_IMAGE_BYTES)")).toBeLessThan(
       source.indexOf("const objectUrl = URL.createObjectURL(file)")
     );
-    expect(source).toContain("const isCurrentRunInFlight = isTemplateTestRunInFlight(run);");
     expect(source).toContain(
-      "if (!run || !isTemplateTestRunInFlight(run)) {\n      return;\n    }"
+      "} catch (error) {\n      if (selectedFilePreviewObjectUrlRef.current === objectUrl)"
     );
+    expect(source).toContain("URL.revokeObjectURL(objectUrl);");
+    expect(source).toContain("throw error;");
+    expect(source).toContain("const isCurrentRunInFlight = isTemplateTestRunInFlight(run);");
     expect(source).toContain("const [loadRetryNonce, setLoadRetryNonce] = useState(0);");
     expect(source).toContain("function handleRetryLoad()");
     expect(source).toContain("setLoadRetryNonce((current) => current + 1);");
@@ -141,8 +159,22 @@ describe("template test media actions", () => {
     );
     expect(source).toContain('<Button variant="secondary" onClick={handleRetryLoad}>');
     expect(source).toContain("const [pollRetryNonce, setPollRetryNonce] = useState(0);");
+    expect(source).toContain(
+      'const [isTemplateTestPageVisible, setIsTemplateTestPageVisible] = useState(\n    () => typeof document === "undefined" || !document.hidden\n  );'
+    );
+    expect(source).toContain(
+      'document.addEventListener("visibilitychange", handleVisibilityChange);'
+    );
+    expect(source).toContain(
+      'return () => document.removeEventListener("visibilitychange", handleVisibilityChange);'
+    );
+    expect(source).toContain(
+      "if (!run || !isTemplateTestRunInFlight(run) || !isTemplateTestPageVisible) {\n      return;\n    }"
+    );
     expect(source).toContain("setPollRetryNonce((current) => current + 1);");
-    expect(source).toContain("}, [pageText.refreshStatusError, pollRetryNonce, run, templateId]);");
+    expect(source).toContain(
+      "}, [isTemplateTestPageVisible, pageText.refreshStatusError, pollRetryNonce, run, templateId]);"
+    );
     expect(source).toContain("setRunError(null);");
     expect(source).not.toContain(
       'if (!run || (run.status !== "Queued" && run.status !== "Processing"))'
@@ -164,9 +196,30 @@ describe("template test media actions", () => {
     expect(source).not.toContain('const isRu = locale === "ru";');
     expect(contentSource).toContain('running: "В работе..."');
     expect(contentSource).toContain('running: "Running..."');
+    expect(contentSource).toContain('chooseImageFile: "Выберите изображение"');
     expect(contentSource).toContain(
-      'uploadSupport: "Поддерживается image/* до 8 MB и drag-and-drop."'
+      'uploadSupport: "Поддерживаются изображения до 8 МБ и перетаскивание файла."'
     );
+    expect(ruContentSource).toContain('falInference: "Время инференса Fal"');
+    expect(ruContentSource).toContain('falImageInference: "Инференс изображения Fal"');
+    expect(ruContentSource).toContain('falPreprocessInference: "Инференс препроцессинга Fal"');
+    expect(ruContentSource).toContain('falMotionInferenceDetail: "Инференс движения Fal"');
+    expect(ruContentSource).toContain(
+      'timelineIntermediateVideoReady: "Промежуточный результат готов к импорту в медиахранилище."'
+    );
+    expect(ruContentSource).toContain('imageModelFallback: "Модель изображения"');
+    expect(ruContentSource).toContain('result: "Результат"');
+    expect(ruContentSource).toContain('sourceInputLabel: "Входные данные"');
+    expect(ruContentSource).toContain('dropzoneTitle: "Зона загрузки"');
+    expect(ruContentSource).not.toContain("Fal inference");
+    expect(ruContentSource).not.toContain("media storage");
+    expect(ruContentSource).not.toContain('imageModelFallback: "Image model",');
+    expect(ruContentSource).not.toContain('result: "Result",');
+    expect(ruContentSource).not.toContain('sourceInputLabel: "Input"');
+    expect(ruContentSource).not.toContain('dropzoneTitle: "Dropzone"');
+    expect(ruContentSource).not.toContain('drag-and-drop."');
+    expect(ruContentSource).not.toContain("Выберите файл image/*");
+    expect(ruContentSource).not.toContain("Поддерживается image/*");
     expect(contentSource).toContain(
       'uploadSupport: "Supports image/* up to 8 MB and drag-and-drop."'
     );
@@ -287,6 +340,15 @@ describe("template test media actions", () => {
     expect(source).not.toContain('const stageTwoLabel = isRu ? "Этап 02" : "Stage 02";');
   });
 
+  it("keeps template test monetization labels centralized", () => {
+    const source = readTemplateTestPageLibrarySource();
+
+    expect(source).toContain("label: formatTokenCost(template.tokenCost)");
+    expect(source).toContain("{pageText.petMagicBilling}: {formatTokenCost(item.tokenCost)}");
+    expect(source).not.toContain("label: `${template.tokenCost} PawSpark`");
+    expect(source).not.toContain("<span>PawSpark: {item.tokenCost}</span>");
+  });
+
   it("keeps selected history media previews bound to the active run", () => {
     const source = readTemplateTestPageLibrarySource();
 
@@ -378,8 +440,9 @@ describe("template test media actions", () => {
     );
     expect(source).toContain("title: notificationTitle,");
     expect(contentSource).toContain(
-      'actionsAdminOnly: "Управление шаблонами доступно только Admin."'
+      'actionsAdminOnly: "Управление шаблонами доступно только администратору."'
     );
+    expect(contentSource.slice(0, contentSource.indexOf("  en: {"))).not.toContain("только Admin");
     expect(contentSource).toContain(
       'actionsAdminOnly: "Template management actions are available to Admin only."'
     );

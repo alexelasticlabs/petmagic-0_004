@@ -351,7 +351,7 @@ extension _GenerationStatusPageMediaActions on _GenerationStatusPageState {
             generation.generationId,
             cancelToken: mediaActionCancelToken,
           );
-      final safeShareUri = parseSafeExternalUri(access.shareUrl);
+      final safeShareUri = parseSafeGenerationShareUri(access.shareUrl);
       if (safeShareUri == null) {
         _showInfo(text.generationStatusResultUnavailableForShare);
         return;
@@ -414,7 +414,7 @@ extension _GenerationStatusPageMediaActions on _GenerationStatusPageState {
             generation.generationId,
             cancelToken: mediaActionCancelToken,
           );
-      final safeUri = parseSafeExternalUri(access.shareUrl);
+      final safeUri = parseSafeGenerationShareUri(access.shareUrl);
       if (safeUri == null) {
         _showInfo(text.generationStatusResultUnavailableForShare);
         return;

@@ -1,6 +1,10 @@
+using System.Security.Cryptography;
+using System.Text;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Contracts;
 using PetMagic.Modules.Economy.Domain.Enums;
@@ -96,12 +100,12 @@ public sealed partial class EconomyService
             && !string.Equals(order.ExternalPaymentId, normalizedRequestedReference, StringComparison.Ordinal))
         {
             logger?.LogWarning(
-                "Stripe reference mismatch for order verification. OrderId={OrderId} UserId={UserId} RequestedReferenceType={RequestedReferenceType} StoredReferenceType={StoredReferenceType} CorrelationId={CorrelationId}",
-                order.Id,
-                order.UserId,
+                "Stripe reference mismatch for order verification. OrderIdHash={OrderIdHash} UserIdHash={UserIdHash} RequestedReferenceType={RequestedReferenceType} StoredReferenceType={StoredReferenceType} CorrelationIdHash={CorrelationIdHash}",
+                SafeLogValues.StableHash(order.Id.ToString("D")),
+                EconomyLogSanitizer.SafeUserId(order.UserId),
                 ClassifyStripeReference(normalizedRequestedReference),
                 ClassifyStripeReference(order.ExternalPaymentId),
-                CurrentCorrelationId);
+                CurrentCorrelationIdHash);
 
             stripeReferenceId = order.ExternalPaymentId;
         }
@@ -169,12 +173,12 @@ public sealed partial class EconomyService
         catch (Exception ex)
         {
             logger?.LogWarning(
-                ex,
-                "Stripe payment verification failed. OrderId={OrderId} UserId={UserId} ReferenceType={ReferenceType} CorrelationId={CorrelationId}",
-                order.Id,
-                order.UserId,
+                "Stripe payment verification failed. OrderIdHash={OrderIdHash} UserIdHash={UserIdHash} ReferenceType={ReferenceType} ExceptionType={ExceptionType} CorrelationIdHash={CorrelationIdHash}",
+                SafeLogValues.StableHash(order.Id.ToString("D")),
+                EconomyLogSanitizer.SafeUserId(order.UserId),
                 ClassifyStripeReference(stripeReferenceId),
-                CurrentCorrelationId);
+                SafeLogValues.ExceptionType(ex),
+                CurrentCorrelationIdHash);
             LogPaymentFailed(order, EconomyErrors.PaymentGatewayFailed, "stripe.verify.provider");
             return Result.Failure<PurchaseOrderResponse>(EconomyErrors.PaymentGatewayFailed);
         }
@@ -348,21 +352,22 @@ public sealed partial class EconomyService
         }
 
         var externalPaymentId = ResolveStoreExternalPaymentId(provider, command.ServerVerificationData, verification.Value.ExternalTransactionId, command.PurchaseId);
-        var confirmResult = await ConfirmStorePurchaseInternalAsync(order, externalPaymentId, cancellationToken);
+        var legacyExternalPaymentId = ResolveLegacyStoreExternalPaymentId(provider, command.ServerVerificationData, verification.Value.ExternalTransactionId, command.PurchaseId);
+        var confirmResult = await ConfirmStorePurchaseInternalAsync(order, externalPaymentId, cancellationToken, legacyExternalPaymentId);
         if (confirmResult.IsFailure)
         {
             return Result.Failure<PurchaseOrderResponse>(confirmResult.Error);
         }
 
         logger?.LogInformation(
-            "Store token pack validation succeeded. Provider={Provider} UserId={UserId} ProductId={ProductId} OrderId={OrderId} TokenAmount={TokenAmount} Environment={Environment} CorrelationId={CorrelationId}",
+            "Store token pack validation succeeded. Provider={Provider} UserIdHash={UserIdHash} ProductId={ProductId} OrderIdHash={OrderIdHash} TokenAmount={TokenAmount} Environment={Environment} CorrelationIdHash={CorrelationIdHash}",
             provider,
-            command.UserId,
+            EconomyLogSanitizer.SafeUserId(command.UserId),
             command.ProductId,
-            confirmResult.Value.Id,
+            SafeLogValues.StableHash(confirmResult.Value.Id.ToString("D")),
             confirmResult.Value.SparkToGrant,
             ResolveStoreEnvironment(provider),
-            CurrentCorrelationId);
+            CurrentCorrelationIdHash);
 
         return Result.Success(ToPurchaseOrderResponse(confirmResult.Value));
     }
@@ -517,8 +522,13 @@ public sealed partial class EconomyService
         }
 
         var externalPaymentId = ResolveStoreExternalPaymentId(provider, serverVerificationData, verification.Value.ExternalTransactionId, purchaseId);
+        var legacyExternalPaymentId = ResolveLegacyStoreExternalPaymentId(provider, serverVerificationData, verification.Value.ExternalTransactionId, purchaseId);
         var existing = await dbContext.PurchaseOrders
-            .FirstOrDefaultAsync(x => x.PaymentProvider == provider && x.ExternalPaymentId == externalPaymentId, cancellationToken);
+            .FirstOrDefaultAsync(
+                x => x.PaymentProvider == provider
+                    && (x.ExternalPaymentId == externalPaymentId
+                        || (legacyExternalPaymentId != null && x.ExternalPaymentId == legacyExternalPaymentId)),
+                cancellationToken);
         if (existing is not null)
         {
             if (existing.UserId != userId)
@@ -553,21 +563,21 @@ public sealed partial class EconomyService
         };
 
         dbContext.PurchaseOrders.Add(order);
-        var confirmResult = await ConfirmStorePurchaseInternalAsync(order, externalPaymentId, cancellationToken);
+        var confirmResult = await ConfirmStorePurchaseInternalAsync(order, externalPaymentId, cancellationToken, legacyExternalPaymentId);
         if (confirmResult.IsFailure)
         {
             return Result.Failure<StoreBillingValidationResponse>(confirmResult.Error);
         }
 
         logger?.LogInformation(
-            "Store token pack validation succeeded. Provider={Provider} UserId={UserId} ProductId={ProductId} OrderId={OrderId} TokenAmount={TokenAmount} Environment={Environment} CorrelationId={CorrelationId}",
+            "Store token pack validation succeeded. Provider={Provider} UserIdHash={UserIdHash} ProductId={ProductId} OrderIdHash={OrderIdHash} TokenAmount={TokenAmount} Environment={Environment} CorrelationIdHash={CorrelationIdHash}",
             provider,
-            userId,
+            EconomyLogSanitizer.SafeUserId(userId),
             normalizedProductId,
-            confirmResult.Value.Id,
+            SafeLogValues.StableHash(confirmResult.Value.Id.ToString("D")),
             confirmResult.Value.SparkToGrant,
             ResolveStoreEnvironment(provider),
-            CurrentCorrelationId);
+            CurrentCorrelationIdHash);
 
         return Result.Success(new StoreBillingValidationResponse(
             provider,
@@ -615,9 +625,38 @@ public sealed partial class EconomyService
         string? externalTransactionId,
         string? purchaseId)
     {
+        var rawExternalPaymentId = ResolveRawStoreExternalPaymentId(provider, serverVerificationData, externalTransactionId, purchaseId);
+        return string.Equals(provider, "google_play", StringComparison.Ordinal)
+            ? BuildGooglePlayPurchaseTokenReference(rawExternalPaymentId)
+            : rawExternalPaymentId;
+    }
+
+    private static string? ResolveLegacyStoreExternalPaymentId(
+        string provider,
+        string serverVerificationData,
+        string? externalTransactionId,
+        string? purchaseId)
+    {
+        return string.Equals(provider, "google_play", StringComparison.Ordinal)
+            ? ResolveRawStoreExternalPaymentId(provider, serverVerificationData, externalTransactionId, purchaseId)
+            : null;
+    }
+
+    private static string ResolveRawStoreExternalPaymentId(
+        string provider,
+        string serverVerificationData,
+        string? externalTransactionId,
+        string? purchaseId)
+    {
         return string.Equals(provider, "google_play", StringComparison.Ordinal)
             ? serverVerificationData.Trim()
             : (externalTransactionId ?? purchaseId ?? serverVerificationData).Trim();
+    }
+
+    private static string BuildGooglePlayPurchaseTokenReference(string purchaseToken)
+    {
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(purchaseToken.Trim()))).ToLowerInvariant();
+        return $"gpt_{hash}";
     }
 
     private static string ToStoreTokenPackValidationStatus(string orderStatus, bool tokensGranted)
@@ -645,11 +684,9 @@ public sealed partial class EconomyService
             return string.Empty;
         }
 
-        var bundleId = options.Value.AppStoreBundleId?.Trim();
-        if (string.IsNullOrWhiteSpace(bundleId))
-        {
-            bundleId = options.Value.GooglePlayPackageName?.Trim();
-        }
+        var bundleId = string.Equals(provider, "google_play", StringComparison.Ordinal)
+            ? options.Value.GooglePlayPackageName?.Trim()
+            : options.Value.AppStoreBundleId?.Trim();
 
         if (string.IsNullOrWhiteSpace(bundleId))
         {

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/performance/performance_guard.dart';
+
+const _kPremiumButtonForegroundTone = Color(0xFFEAB13A);
 
 class PremiumShimmerButton extends StatefulWidget {
   const PremiumShimmerButton({
@@ -171,6 +174,8 @@ class _PremiumButtonSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final foreground = context.petMagicColors.on(_kPremiumButtonForegroundTone);
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -181,18 +186,14 @@ class _PremiumButtonSurface extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: const TextStyle(
-                  color: Color(0xFF261903),
+                style: TextStyle(
+                  color: foreground,
                   fontSize: 14.5,
                   fontWeight: FontWeight.w900,
                 ),
               ),
               const SizedBox(width: 6),
-              const Icon(
-                Icons.arrow_forward_rounded,
-                color: Color(0xFF261903),
-                size: 17,
-              ),
+              Icon(Icons.arrow_forward_rounded, color: foreground, size: 17),
             ],
           ),
         ),

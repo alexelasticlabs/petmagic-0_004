@@ -25,13 +25,13 @@ internal sealed class IdentityAdminAuditLog(
             ActorRole = ResolveActorRole(httpContext),
             Action = Truncate(entry.Action, 120) ?? string.Empty,
             TargetType = Truncate(entry.TargetType, 80),
-            TargetId = Truncate(entry.TargetId, 160),
-            OldValue = Truncate(entry.OldValue, 2000),
-            NewValue = Truncate(entry.NewValue, 2000),
+            TargetId = SanitizeAndTruncate(entry.TargetId, 160),
+            OldValue = SanitizeAndTruncate(entry.OldValue, 2000),
+            NewValue = SanitizeAndTruncate(entry.NewValue, 2000),
             IpAddress = Truncate(ResolveClientIpAddress(httpContext), 64),
-            UserAgent = Truncate(httpContext?.Request.Headers.UserAgent.ToString(), 512),
+            UserAgent = SanitizeAndTruncate(httpContext?.Request.Headers.UserAgent.ToString(), 512),
             CorrelationId = Truncate(CorrelationContext.ResolveOrCreate(), 128),
-            Details = Truncate(entry.Details ?? entry.Action, 2000) ?? string.Empty,
+            Details = SanitizeAndTruncate(entry.Details ?? entry.Action, 2000) ?? string.Empty,
             CreatedAtUtc = now,
             OccurredAtUtc = now
         });
@@ -77,6 +77,16 @@ internal sealed class IdentityAdminAuditLog(
         }
 
         return httpContext.Connection.RemoteIpAddress?.ToString();
+    }
+
+    private static string? SanitizeAndTruncate(string? value, int maxLength)
+    {
+        if (value is null)
+        {
+            return null;
+        }
+
+        return SafeLogValues.SanitizeText(value, maxLength);
     }
 
     private static string? Truncate(string? value, int maxLength)

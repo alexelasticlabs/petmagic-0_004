@@ -62,6 +62,38 @@ void main() {
     expect(mapped, text.templateFlowNetworkError);
   });
 
+  testWidgets('avatar validation codes map to localized avatar copy', (
+    tester,
+  ) async {
+    late AppLocalizations text;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: const [Locale('en')],
+        home: Builder(
+          builder: (context) {
+            text = AppLocalizations.of(context);
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    );
+
+    expect(
+      mapProfileFeedbackMessage(
+        'ValidationProblem: users.avatar_content_type_not_allowed',
+        text,
+      ),
+      text.profileAvatarCropError,
+    );
+    expect(
+      mapProfileFeedbackMessage('users.avatar_file_required', text),
+      text.profileAvatarCropError,
+    );
+  });
+
   testWidgets(
     'email confirmation errors map to localized copy instead of generic fallback',
     (tester) async {

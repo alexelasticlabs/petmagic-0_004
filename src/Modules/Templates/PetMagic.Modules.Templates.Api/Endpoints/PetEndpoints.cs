@@ -19,7 +19,7 @@ namespace PetMagic.Modules.Templates.Api.Endpoints;
 public static class PetEndpoints
 {
     private const string InvalidSubjectCode = "templates.invalid_subject";
-    private const string InvalidSubjectMessage = "Authentication failed.";
+    private const string InvalidSubjectMessage = InvalidSubjectCode;
     private const int FreeActiveGenerationLimit = 1;
     private const int PremiumActiveGenerationLimit = 3;
     private const int PrivilegedActiveGenerationLimit = 10;
@@ -31,6 +31,7 @@ public static class PetEndpoints
     {
         var group = endpoints.MapGroup("/api/pets")
             .WithTags("Pets")
+            .AddEndpointFilter(ApplyPrivatePetResponseHeadersAsync)
             .RequireAuthorization();
 
         group.MapGet("", ListPetsAsync).RequireRateLimiting("templates");
@@ -40,28 +41,36 @@ public static class PetEndpoints
         group.MapPut("/{petId:guid}", UpdatePetAsync)
             .RequireRateLimiting("templates")
             .WithMetadata(new RequestSizeLimitAttribute(MaxPetJsonRequestBodyBytes));
-        group.MapDelete("/{petId:guid}", DeletePetAsync).RequireRateLimiting("templates");
+        group.MapDelete("/{petId:guid}", DeletePetAsync)
+            .RequireRateLimiting("templates")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxPetJsonRequestBodyBytes));
         group.MapPost("/{petId:guid}/photos", UploadPhotoAsync)
             .RequireRateLimiting("templates")
             .DisableAntiforgery()
             .WithMetadata(new RequestSizeLimitAttribute(MaxPetPhotoUploadRequestBodyBytes));
         group.MapGet("/{petId:guid}/photos", ListPhotosAsync).RequireRateLimiting("templates");
-        group.MapPost("/{petId:guid}/photos/{photoId:guid}/set-avatar", SetAvatarAsync).RequireRateLimiting("templates");
+        group.MapPost("/{petId:guid}/photos/{photoId:guid}/set-avatar", SetAvatarAsync)
+            .RequireRateLimiting("templates")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxPetJsonRequestBodyBytes));
         group.MapPost("/{petId:guid}/photos/{photoId:guid}/favorite", SetFavoriteAsync)
             .RequireRateLimiting("templates")
             .WithMetadata(new RequestSizeLimitAttribute(MaxPetJsonRequestBodyBytes));
-        group.MapDelete("/{petId:guid}/photos/{photoId:guid}", DeletePhotoAsync).RequireRateLimiting("templates");
+        group.MapDelete("/{petId:guid}/photos/{photoId:guid}", DeletePhotoAsync)
+            .RequireRateLimiting("templates")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxPetJsonRequestBodyBytes));
         group.MapGet("/{petId:guid}/generations", ListGenerationsAsync).RequireRateLimiting("generation-status");
 
         endpoints.MapPost("/api/templates/generations/from-pet", StartFromPetAsync)
             .WithTags("Template Generations")
+            .AddEndpointFilter(ApplyPrivatePetResponseHeadersAsync)
             .RequireAuthorization()
             .RequireRateLimiting("generation-create")
             .WithMetadata(new RequestSizeLimitAttribute(MaxPetJsonRequestBodyBytes));
 
         var adminGroup = endpoints.MapGroup("/api/admin/users/{userId:guid}/pets")
             .WithTags("Admin Users")
-            .RequireAuthorization("ModeratorOrAdmin")
+            .AddEndpointFilter(ApplyPrivatePetResponseHeadersAsync)
+            .RequireAuthorization("AdminOnly")
             .RequireRateLimiting("admin");
 
         adminGroup.MapGet("", ListAdminPetsAsync);
@@ -73,6 +82,17 @@ public static class PetEndpoints
             .WithMetadata(new RequestSizeLimitAttribute(MaxPetJsonRequestBodyBytes));
 
         return endpoints;
+    }
+
+    private static async ValueTask<object?> ApplyPrivatePetResponseHeadersAsync(
+        EndpointFilterInvocationContext context,
+        EndpointFilterDelegate next)
+    {
+        context.HttpContext.Response.Headers.CacheControl = "no-store";
+        context.HttpContext.Response.Headers.Pragma = "no-cache";
+        context.HttpContext.Response.Headers.XContentTypeOptions = "nosniff";
+
+        return await next(context);
     }
 
     private static async Task<Results<Ok<IReadOnlyList<PetResponse>>, ProblemHttpResult>> ListPetsAsync(
@@ -320,7 +340,7 @@ public static class PetEndpoints
         {
             return ToPetProblem(new Error(
                 "templates.premium_required",
-                "Premium subscription is required for this template."));
+                "templates.premium_required"));
         }
 
         var activeGenerationLimit = await ResolveActiveGenerationLimitAsync(context, userId!.Value, cancellationToken);
@@ -409,18 +429,18 @@ public static class PetEndpoints
         var errors = new Dictionary<string, string[]>();
         if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Trim().Length > 40)
         {
-            errors[nameof(request.Name)] = ["Pet name is required and must be at most 40 characters."];
+            errors[nameof(request.Name)] = ["pets.name_invalid"];
         }
 
         var type = request.Type?.Trim().ToLowerInvariant();
         if (type is not ("dog" or "cat" or "other"))
         {
-            errors[nameof(request.Type)] = ["Pet type must be dog, cat, or other."];
+            errors[nameof(request.Type)] = ["pets.type_invalid"];
         }
 
         if (request.Breed?.Trim().Length > 60)
         {
-            errors[nameof(request.Breed)] = ["Breed must be at most 60 characters."];
+            errors[nameof(request.Breed)] = ["pets.breed_invalid"];
         }
 
         return errors;
@@ -431,17 +451,17 @@ public static class PetEndpoints
         var errors = new Dictionary<string, string[]>();
         if (request.PetId == Guid.Empty)
         {
-            errors[nameof(request.PetId)] = ["Pet is required."];
+            errors[nameof(request.PetId)] = ["pets.pet_required"];
         }
 
         if (request.TemplateId == Guid.Empty)
         {
-            errors[nameof(request.TemplateId)] = ["Template is required."];
+            errors[nameof(request.TemplateId)] = ["templates.template_required"];
         }
 
         if (idempotencyKey?.Length > MaxIdempotencyKeyLength)
         {
-            errors["Idempotency-Key"] = [$"Idempotency-Key must be at most {MaxIdempotencyKeyLength} characters."];
+            errors["Idempotency-Key"] = ["templates.idempotency_key_invalid"];
         }
 
         return errors;
@@ -460,7 +480,17 @@ public static class PetEndpoints
         var errors = new Dictionary<string, string[]>();
         if (photo is null || photo.Length == 0)
         {
-            errors[nameof(photo)] = ["Photo is required."];
+            errors[nameof(photo)] = ["pets.photo_required"];
+            return errors;
+        }
+
+        if (photo.Length > maxSizeBytes)
+        {
+            errors[nameof(photo)] = ["pets.photo_too_large"];
+        }
+
+        if (errors.Count > 0)
+        {
             return errors;
         }
 
@@ -469,12 +499,7 @@ public static class PetEndpoints
             || !IsAllowedPhotoContentType(detectedContentType)
             || !TemplateUploadSniffer.MatchesDeclaredContentType(detectedContentType, photo.ContentType))
         {
-            errors[nameof(photo)] = ["Photo content type is not allowed. Please upload JPEG, PNG, WebP, or HEIC."];
-        }
-
-        if (photo.Length > maxSizeBytes)
-        {
-            errors[nameof(photo)] = [$"Photo exceeds the maximum allowed size of {maxSizeBytes} bytes."];
+            errors[nameof(photo)] = ["pets.photo_type_not_allowed"];
         }
 
         return errors;
@@ -503,40 +528,28 @@ public static class PetEndpoints
             "ACTIVE_GENERATION_LIMIT_REACHED" => StatusCodes.Status429TooManyRequests,
             "GENERATION_QUEUE_OVERLOADED" => StatusCodes.Status503ServiceUnavailable,
             "GENERATION_WAIT_TOO_LONG" => StatusCodes.Status503ServiceUnavailable,
+            "PROVIDER_CAPACITY_UNAVAILABLE" => StatusCodes.Status503ServiceUnavailable,
+            "templates.ai_provider_unavailable" => StatusCodes.Status503ServiceUnavailable,
+            "templates.ai_provider_failed" => StatusCodes.Status503ServiceUnavailable,
+            "templates.ai_provider_transient" => StatusCodes.Status503ServiceUnavailable,
+            "templates.ai_provider_timed_out" => StatusCodes.Status503ServiceUnavailable,
+            "templates.generation_attempts_exceeded" => StatusCodes.Status503ServiceUnavailable,
             _ => StatusCodes.Status400BadRequest
         };
     }
 
     private static ProblemHttpResult ToPetProblem(Error error)
     {
+        var statusCode = ResolveFailureStatusCode(error);
         return TypedResults.Problem(
             title: error.Code,
-            detail: GetPetProblemDetail(error),
-            statusCode: ResolveFailureStatusCode(error));
+            statusCode: statusCode,
+            extensions: BuildPetProblemExtensions(error.Code));
     }
 
-    private static string GetPetProblemDetail(Error error)
+    private static Dictionary<string, object?> BuildPetProblemExtensions(string errorCode)
     {
-        return error.Code switch
-        {
-            "templates.invalid_subject" => "Authentication failed.",
-            "templates.not_found" => "Template was not found.",
-            "templates.premium_required" => "Premium subscription is required for this template.",
-            "TEMPLATE_UNAVAILABLE" => "Template is no longer available. Please choose another template.",
-            "TEMPLATE_CHANGED" => "Template was updated. Please reopen it and try again.",
-            "pets.not_found" => "Pet was not found.",
-            "pets.photo_not_found" => "Pet photo was not found.",
-            "pets.photo_required" => "A pet photo is required to complete this action.",
-            "economy.insufficient_balance" => "Not enough credits to complete this action.",
-            "ACTIVE_GENERATION_LIMIT_REACHED" => "Too many active generations are already running. Try again after one completes.",
-            "GENERATION_QUEUE_OVERLOADED" or "GENERATION_WAIT_TOO_LONG" => "Generation queue is busy. Please try again later.",
-            _ when ResolveFailureStatusCode(error) == StatusCodes.Status404NotFound => "Requested pet resource was not found.",
-            _ when ResolveFailureStatusCode(error) == StatusCodes.Status403Forbidden => "Pet action is not allowed for this account.",
-            _ when ResolveFailureStatusCode(error) == StatusCodes.Status409Conflict => "Pet request conflicts with the current resource state.",
-            _ when ResolveFailureStatusCode(error) == StatusCodes.Status429TooManyRequests => "Too many pet requests are already running. Please try again later.",
-            _ when ResolveFailureStatusCode(error) == StatusCodes.Status503ServiceUnavailable => "Pet generation is temporarily unavailable.",
-            _ => "Pet request could not be completed.",
-        };
+        return new Dictionary<string, object?> { ["code"] = errorCode };
     }
 
     private static async Task<int> ResolveActiveGenerationLimitAsync(

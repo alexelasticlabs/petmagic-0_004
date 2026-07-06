@@ -22,7 +22,7 @@ Future<PetMagicActionSheetResult?> showPetMagicActionSheet(
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: Colors.transparent,
-    barrierColor: const Color(0x8C000000),
+    barrierColor: Theme.of(context).colorScheme.scrim.withValues(alpha: 0.55),
     builder: (sheetContext, bottomInset) => PetMagicActionSheet(
       bottomInset: bottomInset,
       onPickFromGallery: () =>
@@ -64,7 +64,7 @@ class _PetMagicActionSheetState extends State<PetMagicActionSheet> {
         PerformanceGuard.shouldDisableGlassEffects(context);
     final colors = context.petMagicColors;
     final bottomPadding = math.max(widget.bottomInset, 12.0);
-    final surfaceBorderColor = const Color(0x1FFF9FDF);
+    final surfaceBorderColor = colors.border.withValues(alpha: 0.72);
 
     return PopScope<void>(
       canPop: _step == PetMagicActionSheetStep.main,
@@ -119,16 +119,16 @@ class _PetMagicActionSheetState extends State<PetMagicActionSheet> {
   }) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFF172433), Color(0xFF101820)],
+          colors: [colors.surfaceGlass, colors.surface],
         ),
         borderRadius: BorderRadius.circular(32),
         border: Border.all(color: surfaceBorderColor),
         boxShadow: [
           BoxShadow(
-            color: const Color(0x3300F2A6),
+            color: colors.accent.withValues(alpha: 0.12),
             blurRadius: 36,
             spreadRadius: 2,
             offset: const Offset(0, 18),
@@ -266,12 +266,13 @@ class _PetMagicActionSheetHandle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
     return Center(
       child: Container(
         width: 46,
         height: 5,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.2),
+          color: colors.border.withValues(alpha: 0.72),
           borderRadius: BorderRadius.circular(999),
         ),
       ),
@@ -312,10 +313,8 @@ class _PetMagicActionSheetStepHeader extends StatelessWidget {
                     height: 32,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white.withValues(alpha: 0.06),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.08),
-                      ),
+                      color: colors.surfaceStrong.withValues(alpha: 0.58),
+                      border: Border.all(color: colors.border),
                     ),
                     child: Icon(
                       Icons.arrow_back_ios_new_rounded,
@@ -375,15 +374,21 @@ class _PetMagicActionSheetItemState extends State<PetMagicActionSheetItem> {
     final duration = PetMotion.effectiveDuration(context, PetMotion.fast);
     final cardBorderRadius = BorderRadius.circular(24);
 
-    final baseFill = Colors.white.withValues(alpha: enabled ? 0.05 : 0.03);
-    final pressedFill = Colors.white.withValues(alpha: enabled ? 0.1 : 0.03);
-    final borderColor = Colors.white.withValues(alpha: enabled ? 0.08 : 0.04);
-    final chevronColor = Colors.white.withValues(alpha: enabled ? 0.68 : 0.3);
+    final baseFill = colors.surfaceGlass.withValues(
+      alpha: enabled ? 0.78 : 0.44,
+    );
+    final pressedFill = colors.surfaceStrong.withValues(
+      alpha: enabled ? 0.92 : 0.44,
+    );
+    final borderColor = colors.border.withValues(alpha: enabled ? 0.84 : 0.46);
+    final chevronColor = colors.textSoft.withValues(
+      alpha: enabled ? 0.82 : 0.34,
+    );
     final secondaryFill = enabled
         ? (_pressed
-              ? Colors.white.withValues(alpha: 0.08)
-              : Colors.white.withValues(alpha: 0.035))
-        : Colors.white.withValues(alpha: 0.016);
+              ? colors.surfaceStrong.withValues(alpha: 0.84)
+              : colors.surface.withValues(alpha: 0.72))
+        : colors.surface.withValues(alpha: 0.36);
 
     return Semantics(
       button: true,
@@ -426,7 +431,9 @@ class _PetMagicActionSheetItemState extends State<PetMagicActionSheetItem> {
                 border: Border.all(color: borderColor),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: enabled ? 0.18 : 0.1),
+                    color: colors.shadow.withValues(
+                      alpha: enabled ? 0.24 : 0.1,
+                    ),
                     blurRadius: 18,
                     offset: const Offset(0, 12),
                   ),
@@ -470,9 +477,9 @@ class _PetMagicActionSheetItemState extends State<PetMagicActionSheetItem> {
                             overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(
-                                  color: const Color(
-                                    0xFFA6ADB4,
-                                  ).withValues(alpha: enabled ? 1 : 0.5),
+                                  color: colors.textSoft.withValues(
+                                    alpha: enabled ? 1 : 0.5,
+                                  ),
                                   height: 1.35,
                                 ),
                           ),
@@ -508,6 +515,11 @@ class PetMagicActionIconContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final colorScheme = Theme.of(context).colorScheme;
+    final highlightColor =
+        Color.lerp(colors.accent, colors.gold, 0.18) ?? colors.accent;
+
     return AnimatedContainer(
       duration: PetMotion.effectiveDuration(context, PetMotion.fast),
       curve: PetMotion.emphasized,
@@ -515,23 +527,21 @@ class PetMagicActionIconContainer extends StatelessWidget {
       height: 62,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF00F2A6), Color(0xFF00C97A)],
+          colors: [colors.accent, highlightColor],
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(
-              0xFF00F2A6,
-            ).withValues(alpha: highlighted ? 0.28 : 0.16),
+            color: colors.accent.withValues(alpha: highlighted ? 0.28 : 0.16),
             blurRadius: highlighted ? 22 : 14,
             spreadRadius: highlighted ? 2 : 0,
             offset: const Offset(0, 8),
           ),
         ],
       ),
-      child: Icon(icon, size: 30, color: Colors.white),
+      child: Icon(icon, size: 30, color: colorScheme.onPrimary),
     );
   }
 }

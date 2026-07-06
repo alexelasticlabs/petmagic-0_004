@@ -13,20 +13,21 @@ class StreakOverviewCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final streakColor = colors.gold;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: const Color(0xFFFF8A50).withValues(alpha: 0.28),
+          color: streakColor.withValues(alpha: 0.28),
           width: 1.1,
         ),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            const Color(0xFFFF8A50).withValues(alpha: 0.16),
+            streakColor.withValues(alpha: 0.16),
             colors.surfaceStrong.withValues(alpha: 0.96),
           ],
         ),
@@ -41,7 +42,7 @@ class StreakOverviewCard extends StatelessWidget {
                 height: 44,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(0xFFFF8A50).withValues(alpha: 0.18),
+                  color: streakColor.withValues(alpha: 0.18),
                 ),
                 alignment: Alignment.center,
                 child: const Text('🔥', style: TextStyle(fontSize: 22)),

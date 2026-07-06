@@ -236,8 +236,8 @@ internal sealed partial class TemplateGenerationJobProcessor
         {
             job.PreprocessingCompletedAtUtc ??= DateTime.UtcNow;
             logger.LogInformation(
-                "Template generation video preprocessing reused from durable normalized image. GenerationId={GenerationId}",
-                job.Id);
+                "Template generation video preprocessing reused from durable normalized image. GenerationIdHash={GenerationIdHash}",
+                TemplateLogSanitizer.SafeId(job.Id));
         }
 
         if (!await PublishProcessingStageAsync(job, cancellationToken))
@@ -308,8 +308,8 @@ internal sealed partial class TemplateGenerationJobProcessor
         if (durationResult.IsFailure)
         {
             logger.LogWarning(
-                "Generated template media duration could not be determined. GenerationId={GenerationId}",
-                job.Id);
+                "Generated template media duration could not be determined. GenerationIdHash={GenerationIdHash}",
+                TemplateLogSanitizer.SafeId(job.Id));
         }
         else
         {
@@ -451,11 +451,12 @@ internal sealed partial class TemplateGenerationJobProcessor
             return watermarked.Value;
         }
 
-        job.WatermarkFailureCode = watermarked.Error.Code;
+        var safeErrorCode = AdminFailureMessageSanitizer.SanitizeCode(watermarked.Error.Code);
+        job.WatermarkFailureCode = safeErrorCode;
         logger.LogWarning(
-            "Template generation watermark copy could not be prepared. GenerationId={GenerationId} ErrorCode={ErrorCode}",
-            job.Id,
-            watermarked.Error.Code);
+            "Template generation watermark copy could not be prepared. GenerationIdHash={GenerationIdHash} ErrorCode={ErrorCode}",
+            TemplateLogSanitizer.SafeId(job.Id),
+            safeErrorCode);
         return null;
     }
 

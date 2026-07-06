@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Threading.RateLimiting;
 
 using Microsoft.AspNetCore.Builder;
@@ -58,10 +59,13 @@ public sealed class RateLimitProblemResponseTests
         request.Headers.Add(CorrelationId.HeaderName, "rate-limit-correlation");
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadFromJsonAsync<Dictionary<string, object?>>();
+        var rawBody = await response.Content.ReadAsStringAsync();
+        var body = JsonSerializer.Deserialize<Dictionary<string, object?>>(rawBody);
 
         Assert.Equal(HttpStatusCode.TooManyRequests, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.DoesNotContain("Too many requests", rawBody, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Please retry", rawBody, StringComparison.OrdinalIgnoreCase);
         Assert.True(response.Headers.TryGetValues(CorrelationId.HeaderName, out var headerValues));
         Assert.Equal("rate-limit-correlation", Assert.Single(headerValues));
         Assert.NotNull(body);

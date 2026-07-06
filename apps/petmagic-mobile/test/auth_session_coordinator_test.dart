@@ -316,6 +316,104 @@ void main() {
     },
   );
 
+  test(
+    'refresh receive timeout is not retried because token rotation may have happened',
+    () async {
+      var refreshCalls = 0;
+      final dio = Dio()
+        ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+          if (options.path == '/api/auth/refresh') {
+            refreshCalls++;
+            throw DioException(
+              requestOptions: options,
+              type: DioExceptionType.receiveTimeout,
+            );
+          }
+
+          throw StateError('Unexpected path: ${options.path}');
+        });
+
+      final storage = _InMemoryAuthSessionStorage(
+        session: _session(
+          accessToken: 'expired-access',
+          refreshToken: 'refresh-token',
+          expiresAtUtc: DateTime.now().toUtc().subtract(
+            const Duration(minutes: 1),
+          ),
+        ),
+      );
+      final coordinator = AuthSessionCoordinator(
+        dio: dio,
+        sessionStorage: storage,
+      );
+
+      await expectLater(
+        coordinator.requireValidSession(
+          mapError: _mapDioException,
+          sessionExpiredMessage: 'session.expired',
+        ),
+        throwsA(isA<AppException>()),
+      );
+
+      expect(refreshCalls, 1);
+      expect(storage.clearCalls, 0);
+      expect(storage.savedSessions, isEmpty);
+    },
+  );
+
+  test(
+    'refresh retries connection failures that happen before token rotation',
+    () async {
+      var refreshCalls = 0;
+      final dio = Dio()
+        ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+          if (options.path == '/api/auth/refresh') {
+            refreshCalls++;
+            if (refreshCalls == 1) {
+              throw DioException.connectionError(
+                requestOptions: options,
+                reason: 'network_down_before_request',
+              );
+            }
+
+            return ResponseBody.fromString(
+              jsonEncode(_sessionJson(accessToken: 'new-access')),
+              200,
+              headers: {
+                Headers.contentTypeHeader: [Headers.jsonContentType],
+              },
+            );
+          }
+
+          throw StateError('Unexpected path: ${options.path}');
+        });
+
+      final storage = _InMemoryAuthSessionStorage(
+        session: _session(
+          accessToken: 'expired-access',
+          refreshToken: 'refresh-token',
+          expiresAtUtc: DateTime.now().toUtc().subtract(
+            const Duration(minutes: 1),
+          ),
+        ),
+      );
+      final coordinator = AuthSessionCoordinator(
+        dio: dio,
+        sessionStorage: storage,
+      );
+
+      final session = await coordinator.requireValidSession(
+        mapError: _mapDioException,
+        sessionExpiredMessage: 'session.expired',
+      );
+
+      expect(session.accessToken, 'new-access');
+      expect(refreshCalls, 2);
+      expect(storage.savedSessions.single.accessToken, 'new-access');
+      expect(storage.clearCalls, 0);
+    },
+  );
+
   test('refresh cancellation is preserved without clearing session', () async {
     var refreshCalls = 0;
     final dio = Dio()

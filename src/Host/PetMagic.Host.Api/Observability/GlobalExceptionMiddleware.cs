@@ -3,12 +3,13 @@ using System.Text.Json;
 
 using Microsoft.AspNetCore.Mvc;
 
+using PetMagic.BuildingBlocks.Observability;
+
 namespace PetMagic.Host.Api.Observability;
 
 public sealed class GlobalExceptionMiddleware(
     RequestDelegate next,
-    ILogger<GlobalExceptionMiddleware> logger,
-    IHostEnvironment environment)
+    ILogger<GlobalExceptionMiddleware> logger)
 {
     public async Task InvokeAsync(HttpContext context)
     {
@@ -31,17 +32,17 @@ public sealed class GlobalExceptionMiddleware(
 
             using var scope = logger.BeginScope(RequestLogging.CreateScope(context, elapsedMs: 0));
             logger.LogError(
-                exception,
-                "Unhandled exception while processing HTTP request {HttpMethod} {RequestPath}.",
+                "Unhandled exception while processing HTTP request {HttpMethod} {SafePath}. ExceptionType={ExceptionType}",
                 context.Request.Method,
-                context.Request.Path.Value ?? string.Empty);
+                RequestLogging.ResolveSafePath(context),
+                SafeLogValues.ExceptionType(exception));
 
             if (context.Response.HasStarted)
             {
                 logger.LogWarning(
-                    "Exception occurred after response started for {HttpMethod} {RequestPath}. Connection will be terminated.",
+                    "Exception occurred after response started for {HttpMethod} {SafePath}. Connection will be terminated.",
                     context.Request.Method,
-                    context.Request.Path.Value ?? string.Empty);
+                    RequestLogging.ResolveSafePath(context));
                 return;
             }
 
@@ -54,10 +55,7 @@ public sealed class GlobalExceptionMiddleware(
             {
                 Status = StatusCodes.Status500InternalServerError,
                 Title = "INTERNAL_SERVER_ERROR",
-                Detail = environment.IsDevelopment()
-                    ? exception.ToString()
-                    : "An unexpected error occurred.",
-                Instance = context.Request.Path.Value
+                Instance = RequestLogging.ResolveSafePath(context)
             };
             problem.Extensions["code"] = "INTERNAL_SERVER_ERROR";
             problem.Extensions["traceId"] = traceId;

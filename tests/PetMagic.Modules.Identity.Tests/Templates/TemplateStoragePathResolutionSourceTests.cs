@@ -10,8 +10,7 @@ public sealed class TemplateStoragePathResolutionSourceTests
         Assert.Contains("TryNormalizeManagedStoragePath", source, StringComparison.Ordinal);
         Assert.Contains("candidate[localBaseUrl.Length] == '/'", source, StringComparison.Ordinal);
         Assert.Contains("candidate[r2BaseUrl.Length] != '/'", source, StringComparison.Ordinal);
-        Assert.Contains("string.Equals(segment, \".\", StringComparison.Ordinal)", source, StringComparison.Ordinal);
-        Assert.Contains("string.Equals(segment, \"..\", StringComparison.Ordinal)", source, StringComparison.Ordinal);
+        Assert.Contains("ManagedPathSegments.IsUnsafe(segment)", source, StringComparison.Ordinal);
         Assert.DoesNotContain(
             "return storageKey.StartsWith($\"{objectKeyPrefix}/\", StringComparison.OrdinalIgnoreCase)",
             source,
@@ -21,16 +20,28 @@ public sealed class TemplateStoragePathResolutionSourceTests
     private static string SourcePath(string fileName)
     {
         return Path.Combine(
-            AppContext.BaseDirectory,
-            "..",
-            "..",
-            "..",
-            "..",
-            "..",
+            FindRepositoryRoot(),
             "src",
             "Modules",
             "Templates",
             "PetMagic.Modules.Templates.Infrastructure",
             fileName);
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+
+        while (current is not null)
+        {
+            if (File.Exists(Path.Combine(current.FullName, ".gitignore")))
+            {
+                return current.FullName;
+            }
+
+            current = current.Parent;
+        }
+
+        throw new DirectoryNotFoundException("Could not locate repository root.");
     }
 }

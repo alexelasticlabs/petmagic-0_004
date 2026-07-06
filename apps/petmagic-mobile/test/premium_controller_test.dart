@@ -19,6 +19,64 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
+    'premium controller does not cache dependencies through build assignment',
+    () {
+      final source = readPremiumControllerLibrarySource();
+
+      expect(source, isNot(contains('late PremiumRepository _repository')));
+      expect(
+        source,
+        isNot(contains('late PremiumRefreshProfile _refreshProfile')),
+      );
+      expect(source, contains('PremiumRepository? _activeRepository;'));
+      expect(source, contains('PremiumRefreshProfile? _activeRefreshProfile;'));
+      expect(
+        source,
+        contains('_activeRepository = ref.read(premiumRepositoryProvider);'),
+      );
+      expect(
+        source,
+        contains(
+          '_activeRefreshProfile = ref.read(premiumRefreshProfileProvider);',
+        ),
+      );
+      expect(
+        source,
+        isNot(contains('_repository = ref.watch(premiumRepositoryProvider)')),
+      );
+      expect(
+        source,
+        isNot(
+          contains(
+            '_refreshProfile = ref.watch(premiumRefreshProfileProvider)',
+          ),
+        ),
+      );
+      expect(source, contains('CancelToken? _activePremiumActionCancelToken;'));
+      expect(
+        source,
+        contains('CancelToken? _activeCheckoutVerificationCancelToken;'),
+      );
+      expect(source, contains('void _cancelActivePremiumAction()'));
+      expect(source, contains('void _cancelActiveCheckoutVerification()'));
+      expect(source, contains('_cancelActivePremiumAction();'));
+      expect(source, contains('_cancelActiveCheckoutVerification();'));
+      expect(source, contains('CancelToken _startPremiumActionCancelToken()'));
+      expect(
+        source,
+        contains('CancelToken _startCheckoutVerificationCancelToken()'),
+      );
+      expect(source, contains('_clearActivePremiumAction(cancelToken)'));
+      expect(
+        source,
+        contains('_clearActiveCheckoutVerification(verificationCancelToken)'),
+      );
+      expect(source, contains('cancelToken: cancelToken'));
+      expect(source, contains('cancelToken: verificationCancelToken'));
+    },
+  );
+
+  test(
     'load selects configured non-stripe provider when store products are available',
     () async {
       final repository = _FakePremiumRepository(
@@ -98,12 +156,6 @@ void main() {
         checkoutUrl: 'https://checkout.stripe.com/c/pay/cs_test_123',
         status: 'pending',
         externalSubscriptionId: 'cs_test_123',
-        paymentIntentClientSecret: 'pi_client_secret',
-        customerId: 'cus_123',
-        customerEphemeralKeySecret: 'ephkey_123',
-        publishableKey:
-            'pk_'
-            'test_123',
       ),
     );
 
@@ -153,10 +205,6 @@ void main() {
         checkoutUrl: 'https://checkout.stripe.com@evil.example/session',
         status: 'pending',
         externalSubscriptionId: 'cs_test_123',
-        paymentIntentClientSecret: null,
-        customerId: null,
-        customerEphemeralKeySecret: null,
-        publishableKey: null,
       ),
     );
 
@@ -611,6 +659,58 @@ void main() {
   });
 
   test(
+    'explicit Stripe checkout verification cancels active request on provider disposal',
+    () async {
+      final repository = _DelayedStripeVerificationPremiumRepository(
+        config: _paywallConfig(
+          methods: const [
+            PremiumPaymentMethodModel(
+              provider: PremiumPaymentProvider.stripe,
+              purchaseChannel: 'external_checkout',
+              platform: 'android',
+              region: '*',
+              isEnabled: true,
+              isSelectedByDefault: true,
+              requiresExternalWarning: false,
+              requiresStoreDisclosure: false,
+              isRecommended: true,
+              bonusTokensPercent: 0,
+            ),
+          ],
+        ),
+        status: _status(provider: 'stripe', canManageSubscription: false),
+      );
+
+      final container = ProviderContainer(
+        overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedAppLaunchController.new,
+          ),
+          premiumRepositoryProvider.overrideWithValue(repository),
+          premiumRefreshProfileProvider.overrideWithValue(() async {}),
+        ],
+      );
+
+      final controller = container.read(premiumControllerProvider.notifier);
+      await controller.load();
+      controller.markCheckoutOpened(wasPremiumBeforeCheckout: false);
+
+      final verificationFuture = controller.verifyCheckoutStatus(
+        stripePlanCode: 'yearly',
+        stripeExternalSubscriptionId: 'sub_test_cancel',
+      );
+      final cancelToken = await repository.stripeVerificationStarted.future;
+      expect(cancelToken.isCancelled, isFalse);
+
+      container.dispose();
+
+      expect(cancelToken.isCancelled, isTrue);
+      repository.completeStripeVerification();
+      await expectLater(verificationFuture, completes);
+    },
+  );
+
+  test(
     'checkout verification stops quietly after sign out without polling subscription status',
     () async {
       final launchController = _MutableAppLaunchController(true);
@@ -714,6 +814,54 @@ void main() {
       expect(cancelToken.isCancelled, isTrue);
       repository.completeStatusRefresh();
       await expectLater(verificationFuture, completes);
+    },
+  );
+
+  test(
+    'premium checkout action cancels active Stripe request on provider disposal',
+    () async {
+      final repository = _DelayedCheckoutPremiumRepository(
+        config: _paywallConfig(
+          methods: const [
+            PremiumPaymentMethodModel(
+              provider: PremiumPaymentProvider.stripe,
+              purchaseChannel: 'external_checkout',
+              platform: 'android',
+              region: '*',
+              isEnabled: true,
+              isSelectedByDefault: true,
+              requiresExternalWarning: false,
+              requiresStoreDisclosure: false,
+              isRecommended: true,
+              bonusTokensPercent: 0,
+            ),
+          ],
+        ),
+        status: _status(provider: 'stripe', canManageSubscription: true),
+      );
+
+      final container = ProviderContainer(
+        overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedAppLaunchController.new,
+          ),
+          premiumRepositoryProvider.overrideWithValue(repository),
+          premiumRefreshProfileProvider.overrideWithValue(() async {}),
+        ],
+      );
+
+      final controller = container.read(premiumControllerProvider.notifier);
+      await controller.load();
+
+      final checkoutFuture = controller.startCheckout();
+      final cancelToken = await repository.checkoutStarted.future;
+      expect(cancelToken.isCancelled, isFalse);
+
+      container.dispose();
+
+      expect(cancelToken.isCancelled, isTrue);
+      repository.completeCheckout();
+      await expectLater(checkoutFuture, completes);
     },
   );
 
@@ -1137,10 +1285,6 @@ class _FakePremiumRepository extends PremiumRepository {
       checkoutUrl: '',
       status: 'pending',
       externalSubscriptionId: '',
-      paymentIntentClientSecret: null,
-      customerId: null,
-      customerEphemeralKeySecret: null,
-      publishableKey: null,
     ),
     this.availabilityByProvider = const {},
     this.statusSequence = const [],
@@ -1206,8 +1350,9 @@ class _FakePremiumRepository extends PremiumRepository {
   @override
   Future<PremiumCheckoutModel> createStripeCheckout(
     PremiumPlanModel plan,
-    Locale locale,
-  ) async {
+    Locale locale, {
+    CancelToken? cancelToken,
+  }) async {
     createStripeCheckoutCalls++;
     if (checkoutError != null) {
       throw checkoutError!;
@@ -1216,7 +1361,9 @@ class _FakePremiumRepository extends PremiumRepository {
   }
 
   @override
-  Future<PremiumBillingPortalModel> createBillingPortal() async {
+  Future<PremiumBillingPortalModel> createBillingPortal({
+    CancelToken? cancelToken,
+  }) async {
     createBillingPortalCalls++;
     return const PremiumBillingPortalModel(
       paymentProvider: 'stripe',
@@ -1263,6 +1410,7 @@ class _FakePremiumRepository extends PremiumRepository {
     required PremiumPlanModel plan,
     required PremiumPaymentProvider provider,
     required PurchaseDetails purchase,
+    CancelToken? cancelToken,
   }) async {
     return PremiumStoreVerificationModel(
       paymentProvider: provider.value,
@@ -1297,6 +1445,81 @@ class _DelayedPremiumRepository extends _FakePremiumRepository {
 
   void completePaywallConfig() {
     _paywallConfig.complete(config);
+  }
+}
+
+class _DelayedCheckoutPremiumRepository extends _FakePremiumRepository {
+  _DelayedCheckoutPremiumRepository({
+    required super.config,
+    required super.status,
+  });
+
+  final checkoutStarted = Completer<CancelToken>();
+  final _checkout = Completer<PremiumCheckoutModel>();
+
+  @override
+  Future<PremiumCheckoutModel> createStripeCheckout(
+    PremiumPlanModel plan,
+    Locale locale, {
+    CancelToken? cancelToken,
+  }) {
+    createStripeCheckoutCalls++;
+    final token = cancelToken ?? CancelToken();
+    if (!checkoutStarted.isCompleted) {
+      checkoutStarted.complete(token);
+    }
+
+    return Future.any<PremiumCheckoutModel>([
+      _checkout.future,
+      token.whenCancel.then((_) => throw const RequestCancelledException()),
+    ]);
+  }
+
+  void completeCheckout() {
+    if (!_checkout.isCompleted) {
+      _checkout.complete(
+        const PremiumCheckoutModel(
+          paymentProvider: 'stripe',
+          checkoutUrl: 'https://checkout.stripe.com/c/pay/cs_test_cancel',
+          status: 'pending',
+          externalSubscriptionId: 'cs_test_cancel',
+        ),
+      );
+    }
+  }
+}
+
+class _DelayedStripeVerificationPremiumRepository
+    extends _FakePremiumRepository {
+  _DelayedStripeVerificationPremiumRepository({
+    required super.config,
+    required super.status,
+  });
+
+  final stripeVerificationStarted = Completer<CancelToken>();
+  final _stripeVerification = Completer<void>();
+
+  @override
+  Future<void> verifyStripeSubscriptionCheckout({
+    required String planCode,
+    required String externalSubscriptionId,
+    CancelToken? cancelToken,
+  }) {
+    final token = cancelToken ?? CancelToken();
+    if (!stripeVerificationStarted.isCompleted) {
+      stripeVerificationStarted.complete(token);
+    }
+
+    return Future.any<void>([
+      _stripeVerification.future,
+      token.whenCancel.then((_) => throw const RequestCancelledException()),
+    ]);
+  }
+
+  void completeStripeVerification() {
+    if (!_stripeVerification.isCompleted) {
+      _stripeVerification.complete();
+    }
   }
 }
 

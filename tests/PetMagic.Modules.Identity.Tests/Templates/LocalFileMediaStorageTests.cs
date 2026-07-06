@@ -1,7 +1,9 @@
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.WebUtilities;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Infrastructure;
 using PetMagic.Modules.Templates.Infrastructure.Options;
@@ -116,11 +118,17 @@ public sealed class LocalFileMediaStorageTests
             Directory.GetParent(rootPath)!.FullName,
             $"petmagic-media-sibling-{Guid.NewGuid():N}.jpg");
         var unmanagedRootPath = Path.Combine(rootPath, "unmanaged-template.jpg");
+        var encodedSeparatorFilePath = Path.Combine(rootPath, "2026%2f..%2fencoded-template.jpg");
+        var malformedPercentDirectory = Path.Combine(rootPath, "2026");
+        var malformedPercentFilePath = Path.Combine(malformedPercentDirectory, "%zz-private-template.jpg");
 
         try
         {
             await File.WriteAllTextAsync(siblingPath, "sibling");
             await File.WriteAllTextAsync(unmanagedRootPath, "unmanaged");
+            await File.WriteAllTextAsync(encodedSeparatorFilePath, "encoded-separator");
+            Directory.CreateDirectory(malformedPercentDirectory);
+            await File.WriteAllTextAsync(malformedPercentFilePath, "malformed-percent");
 
             var siblingDelete = await storage.DeleteAsync(
                 $"templates-media/../{Path.GetFileName(siblingPath)}",
@@ -128,11 +136,21 @@ public sealed class LocalFileMediaStorageTests
             var unmanagedDelete = await storage.DeleteAsync(
                 "http://localhost:5000/templates-media/2026/../unmanaged-template.jpg?pmexp=123&pmsig=abc",
                 CancellationToken.None);
+            var encodedSeparatorDelete = await storage.DeleteAsync(
+                "http://localhost:5000/templates-media/2026%2f..%2fencoded-template.jpg",
+                CancellationToken.None);
+            var malformedPercentDelete = await storage.DeleteAsync(
+                "http://localhost:5000/templates-media/2026/%zz-private-template.jpg",
+                CancellationToken.None);
 
             Assert.True(siblingDelete.IsSuccess);
             Assert.True(unmanagedDelete.IsSuccess);
+            Assert.True(encodedSeparatorDelete.IsSuccess);
+            Assert.True(malformedPercentDelete.IsSuccess);
             Assert.True(File.Exists(siblingPath));
             Assert.True(File.Exists(unmanagedRootPath));
+            Assert.True(File.Exists(encodedSeparatorFilePath));
+            Assert.True(File.Exists(malformedPercentFilePath));
         }
         finally
         {
@@ -232,9 +250,10 @@ public sealed class LocalFileMediaStorageTests
     }
 
     [Theory]
-    [InlineData("templates-media/2026/06/result.png", "http://localhost:5000/templates-media/2026/06/result.png")]
-    [InlineData("http://localhost:5000/templates-media/2026/06/result.png", "http://localhost:5000/templates-media/2026/06/result.png")]
-    public async Task CreateReadUrlAsync_ShouldResolveManagedKeys(string assetUrl, string expected)
+    [InlineData("templates-media/2026/06/result.png")]
+    [InlineData("http://localhost:5000/templates-media/2026/06/result.png")]
+    [InlineData("http://localhost:5000/templates-media/2026/06/result.png?token=raw&signature=legacy#viewer")]
+    public async Task CreateReadUrlAsync_ShouldReturnSignedCanonicalManagedUrls(string assetUrl)
     {
         var rootPath = CreateTempDirectory();
         var storage = CreateStorage(rootPath);
@@ -244,7 +263,10 @@ public sealed class LocalFileMediaStorageTests
             var readUrl = await storage.CreateReadUrlAsync(assetUrl, TimeSpan.FromMinutes(5), CancellationToken.None);
 
             Assert.True(readUrl.IsSuccess);
-            Assert.Equal(expected, readUrl.Value);
+            AssertSignedTemplatesMediaUrl(readUrl.Value);
+            Assert.DoesNotContain("token=raw", readUrl.Value, StringComparison.Ordinal);
+            Assert.DoesNotContain("signature=legacy", readUrl.Value, StringComparison.Ordinal);
+            Assert.DoesNotContain("#viewer", readUrl.Value, StringComparison.Ordinal);
         }
         finally
         {
@@ -353,12 +375,22 @@ public sealed class LocalFileMediaStorageTests
                 entry => entry.Level == LogLevel.Warning
                     && entry.Message.Contains("Local media delete failed.", StringComparison.Ordinal)
                     && Equals(entry.Properties["Operation"], "delete")
-                    && Equals(entry.Properties["StorageKey"], stored.Value.StorageKey));
+                    && Equals(entry.Properties["StorageKeyHash"], SafeLogValues.StableHash(stored.Value.StorageKey))
+                    && Equals(entry.Properties["ExceptionType"], "IOException")
+                    && !ContainsLogValue(entry, stored.Value.StorageKey)
+                    && !ContainsLogValue(entry, stored.Value.LocalPath!));
         }
         finally
         {
             Directory.Delete(rootPath, recursive: true);
         }
+    }
+
+    private static bool ContainsLogValue(CapturedLogEntry entry, string value)
+    {
+        return entry.Message.Contains(value, StringComparison.Ordinal)
+            || entry.Properties.Values.Any(property =>
+                property?.ToString()?.Contains(value, StringComparison.Ordinal) == true);
     }
 
     private static LocalFileMediaStorage CreateStorage(string rootPath)
@@ -384,7 +416,25 @@ public sealed class LocalFileMediaStorageTests
             SeedSampleTemplates = false
         };
 
-        return new LocalFileMediaStorage(options, new TestHostEnvironment(rootPath), logger);
+        var signer = new TemplateMediaReadUrlSigner(
+            options,
+            new TemplateMediaReadUrlSigningOptions
+            {
+                SigningKey = new string('s', 64)
+            });
+
+        return new LocalFileMediaStorage(options, new TestHostEnvironment(rootPath), signer, logger);
+    }
+
+    private static void AssertSignedTemplatesMediaUrl(string mediaUrl)
+    {
+        var uri = new Uri(mediaUrl);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+
+        Assert.StartsWith("/templates-media/", uri.AbsolutePath, StringComparison.OrdinalIgnoreCase);
+        Assert.True(query.ContainsKey("pmexp"));
+        Assert.True(query.ContainsKey("pmsig"));
+        Assert.Equal(string.Empty, uri.Fragment);
     }
 
     private static string CreateTempDirectory()

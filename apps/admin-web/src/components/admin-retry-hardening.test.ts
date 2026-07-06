@@ -71,8 +71,8 @@ describe("admin retry hardening", () => {
     const source = readFileSync(roleManagementPath, "utf8");
     const contentSource = readFileSync(roleManagementContentPath, "utf8");
 
-    expect(contentSource).toContain('adminsError: "Не удалось загрузить Admin"');
-    expect(contentSource).toContain('moderatorsError: "Не удалось загрузить Moderator"');
+    expect(contentSource).toContain('adminsError: "Не удалось загрузить администраторов"');
+    expect(contentSource).toContain('moderatorsError: "Не удалось загрузить модераторов"');
     expect(source).toContain(
       "const hasAnyRoleData = Boolean(adminsQuery.data || moderatorsQuery.data);"
     );

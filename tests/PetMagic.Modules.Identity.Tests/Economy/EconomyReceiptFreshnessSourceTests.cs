@@ -31,16 +31,28 @@ public sealed class EconomyReceiptFreshnessSourceTests
     private static string SourcePath(string fileName)
     {
         return Path.Combine(
-            AppContext.BaseDirectory,
-            "..",
-            "..",
-            "..",
-            "..",
-            "..",
+            FindRepositoryRoot(),
             "src",
             "Modules",
             "Economy",
             "PetMagic.Modules.Economy.Infrastructure",
             fileName);
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+
+        while (current is not null)
+        {
+            if (File.Exists(Path.Combine(current.FullName, ".gitignore")))
+            {
+                return current.FullName;
+            }
+
+            current = current.Parent;
+        }
+
+        throw new InvalidOperationException("Could not locate repository root.");
     }
 }

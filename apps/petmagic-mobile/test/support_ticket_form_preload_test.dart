@@ -464,6 +464,8 @@ void main() {
 
     expect(buildBody, contains('child: ListView('));
     expect(buildBody, isNot(contains('SingleChildScrollView(')));
+    expect(buildBody, contains('Theme.of(context).colorScheme.onPrimary'));
+    expect(buildBody, isNot(contains('foregroundColor: Colors.white')));
   });
 }
 

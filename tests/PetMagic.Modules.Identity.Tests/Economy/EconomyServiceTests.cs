@@ -594,7 +594,7 @@ public sealed partial class EconomyServiceTests
         public Task<Result<UserProfileResponse>> UpdateCurrentUserProfileAsync(Guid userId, UpdateCurrentUserProfileCommand command, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
         public Task<Result<UserProfileResponse>> UpdateUserAvatarAsync(UpdateUserAvatarCommand command, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
         public Task<Result<UserProfileResponse>> RemoveUserAvatarAsync(RemoveUserAvatarCommand command, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
-        public Task<Result<UserListPageResponse>> ListUsersAsync(int skip, int take, string? search, string? role, string? status, bool? isPremium, CancellationToken cancellationToken) => NotSupported<UserListPageResponse>();
+        public Task<Result<UserListPageResponse>> ListUsersAsync(int skip, int take, string? search, string? role, string? status, bool? isPremium, string? sort, CancellationToken cancellationToken) => NotSupported<UserListPageResponse>();
         public Task<Result<AdminUserDashboardMetricsResponse>> GetAdminUserDashboardMetricsAsync(CancellationToken cancellationToken) => NotSupported<AdminUserDashboardMetricsResponse>();
         public Task<Result<AdminUserDetailResponse>> GetAdminUserAsync(Guid userId, CancellationToken cancellationToken) => NotSupported<AdminUserDetailResponse>();
         public Task<Result<AdminUserAnalyticsResponse>> GetAdminUserAnalyticsAsync(Guid userId, CancellationToken cancellationToken) => NotSupported<AdminUserAnalyticsResponse>();

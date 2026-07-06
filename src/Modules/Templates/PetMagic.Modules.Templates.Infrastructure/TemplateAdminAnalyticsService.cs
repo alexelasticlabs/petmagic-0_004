@@ -1,10 +1,15 @@
 using PetMagic.Modules.Templates.Domain.Enums;
+using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Infrastructure.Data;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
+using PetMagic.Modules.Templates.Infrastructure.Options;
 
 namespace PetMagic.Modules.Templates.Infrastructure;
 
-internal sealed partial class TemplateAdminAnalyticsService(TemplatesDbContext dbContext)
+internal sealed partial class TemplateAdminAnalyticsService(
+    TemplatesDbContext dbContext,
+    IMediaStorage mediaStorage,
+    TemplatesOptions options)
 {
     private sealed record GenerationAnalyticsProjection(
         Guid GenerationId,

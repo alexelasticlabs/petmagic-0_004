@@ -127,6 +127,10 @@ class NotificationPreferencesStorage {
     try {
       final decoded = jsonDecode(rawValue);
       if (decoded is! Map<String, dynamic>) {
+        await _clearStoredPreferences(
+          storageKey: storageKey,
+          legacyStorageKey: legacyStorageKey,
+        );
         return NotificationPreferences.defaults().copyWith(
           emailOffersAndDiscounts: fallbackMarketingEmails,
         );
@@ -138,6 +142,7 @@ class NotificationPreferencesStorage {
       );
       if (shouldMigrateLegacy) {
         await save(scope: scope, preferences: preferences);
+      } else {
         await _preferences.remove(legacyStorageKey);
       }
 
@@ -151,9 +156,10 @@ class NotificationPreferencesStorage {
         error: error,
         stackTrace: stackTrace,
       );
-      if (shouldMigrateLegacy) {
-        await _preferences.remove(legacyStorageKey);
-      }
+      await _clearStoredPreferences(
+        storageKey: storageKey,
+        legacyStorageKey: legacyStorageKey,
+      );
       return NotificationPreferences.defaults().copyWith(
         emailOffersAndDiscounts: fallbackMarketingEmails,
       );
@@ -168,6 +174,17 @@ class NotificationPreferencesStorage {
       _keyForScope(scope),
       jsonEncode(preferences.toJson()),
     );
+    await _preferences.remove(_legacyKeyForScope(scope));
+  }
+
+  Future<void> _clearStoredPreferences({
+    required String storageKey,
+    required String legacyStorageKey,
+  }) async {
+    await Future.wait<void>([
+      _preferences.remove(storageKey),
+      _preferences.remove(legacyStorageKey),
+    ]);
   }
 
   static String _keyForScope(String scope) {

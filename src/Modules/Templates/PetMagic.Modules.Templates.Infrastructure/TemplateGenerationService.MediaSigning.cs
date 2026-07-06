@@ -17,7 +17,8 @@ internal sealed partial class TemplateGenerationService
         IMediaStorage mediaStorage,
         TemplatesOptions options,
         TemplateGenerationResponse response,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool includeProviderDiagnostics = false)
     {
         var ttl = TimeSpan.FromSeconds(Math.Max(1, options.UserMediaReadUrlTtlSeconds));
         var sourceImageAsset = response.SourceImageAsset;
@@ -29,7 +30,7 @@ internal sealed partial class TemplateGenerationService
                 : sourceImageAsset with { Url = signedSourceUrl };
         }
 
-        return response with
+        var signedResponse = response with
         {
             SourceImageAsset = sourceImageAsset,
             NormalizedImageUrl = await TryCreateReadUrlAsync(mediaStorage, response.NormalizedImageUrl, ttl, cancellationToken),
@@ -37,6 +38,15 @@ internal sealed partial class TemplateGenerationService
             InputPreviewUrl = await TryCreateReadUrlAsync(mediaStorage, response.InputPreviewUrl, ttl, cancellationToken),
             ResultPreviewUrl = await TryCreateReadUrlAsync(mediaStorage, response.ResultPreviewUrl, ttl, cancellationToken)
         };
+
+        return includeProviderDiagnostics
+            ? signedResponse
+            : signedResponse with
+            {
+                PreprocessingProviderRequestId = null,
+                MotionProviderRequestId = null,
+                MotionProviderCostUsd = null
+            };
     }
 
     private async Task<string?> TryCreateReadUrlAsync(string? assetUrl, TimeSpan ttl, CancellationToken cancellationToken)

@@ -73,6 +73,24 @@ describe("api-client.support query normalization", () => {
     );
   });
 
+  it("serializes support waiting-for-support queue through backend params", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json({ items: [], page: 1, pageSize: 50, totalCount: 0, hasMore: false })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchSupportInbox(undefined, "all", {
+      queue: "waiting_for_support",
+      sort: "waiting",
+      page: 1,
+      pageSize: 50,
+    });
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+      "https://api.example.com/api/admin/support/tickets?sort=waiting&queue=waiting_for_support&page=1&pageSize=50"
+    );
+  });
+
   it("drops unsupported support inbox enum filters before backend requests", async () => {
     const fetchMock = vi.fn<typeof fetch>(async () =>
       Response.json({ items: [], page: 1, pageSize: 50, totalCount: 0, hasMore: false })
@@ -82,6 +100,7 @@ describe("api-client.support query normalization", () => {
     await fetchSupportInbox(["New", "Deleted" as never], "everyone" as never, {
       priority: "Urgent" as never,
       sort: "oldest" as never,
+      queue: "stale" as never,
       search: " billing ",
       page: 1,
       pageSize: 50,

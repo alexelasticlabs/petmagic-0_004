@@ -75,6 +75,16 @@ temp/
 tmp/
 .tmp/
 artifacts/
+*.bak
+*.backup
+*.tmp
+*.temp
+*.old
+*.orig
+*.rej
+tmp_*
+debug_*
+backup_*
 
 # Docker Compose volumes
 postgres_data/

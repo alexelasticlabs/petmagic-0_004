@@ -192,7 +192,7 @@ internal sealed class TemplateGenerationQaFixtureService(
             }
             else
             {
-                job.RefundLastErrorCode = refund.Error.Code;
+                job.RefundLastErrorCode = AdminFailureMessageSanitizer.SanitizeCode(refund.Error.Code);
             }
         }
 
@@ -272,7 +272,7 @@ internal sealed class TemplateGenerationQaFixtureService(
                 }
                 else
                 {
-                    job.RefundLastErrorCode = refund.Error.Code;
+                    job.RefundLastErrorCode = AdminFailureMessageSanitizer.SanitizeCode(refund.Error.Code);
                 }
             }
 
@@ -283,7 +283,8 @@ internal sealed class TemplateGenerationQaFixtureService(
             mediaStorage,
             options,
             TemplateGenerationService.MapResponse(job),
-            cancellationToken));
+            cancellationToken,
+            includeProviderDiagnostics: true));
     }
 
     private async Task<QaGenerationWaitTooLongFixtureResponse> CreateWaitTooLongBacklogAsync(

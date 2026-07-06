@@ -39,10 +39,26 @@ describe("theme storage diagnostics", () => {
 
     expect(source).toContain('import { sanitizeSensitiveText } from "@/lib/sensitive-display";');
     expect(source).toContain("function getThemeStorageErrorDetails(error: unknown)");
+    expect(source).toContain("function removeStoredAdminTheme(storageFailureEvent: string)");
     expect(source).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
-    expect(source).toContain("clientLogger.warn(\"theme.storage_read_failed\", getThemeStorageErrorDetails(error));");
-    expect(source).toContain("clientLogger.warn(\"theme.storage_write_failed\", getThemeStorageErrorDetails(error));");
+    expect(source).toContain(
+      'clientLogger.warn("theme.storage_read_failed", getThemeStorageErrorDetails(error));'
+    );
+    expect(source).toContain(
+      'clientLogger.warn("theme.storage_write_failed", getThemeStorageErrorDetails(error));'
+    );
     expect(source).not.toContain('clientLogger.warn("theme.storage_read_failed", { error });');
     expect(source).not.toContain('clientLogger.warn("theme.storage_write_failed", { error });');
+  });
+
+  test("cleans invalid persisted theme values through safe storage cleanup", () => {
+    const source = readFileSync(themeSourcePath, "utf8");
+
+    expect(source).toContain('removeStoredAdminTheme("theme.storage_invalid_cleanup_failed");');
+    expect(source).toContain("window.localStorage.removeItem(ADMIN_THEME_STORAGE_KEY);");
+    expect(source).toContain(
+      "clientLogger.warn(storageFailureEvent, getThemeStorageErrorDetails(error));"
+    );
+    expect(source).not.toContain("return isAdminTheme(raw) ? raw : null;");
   });
 });

@@ -47,6 +47,7 @@ class SupportChatRepository {
   static const _maxAttachmentCount = 5;
   static const _imageMaxFileSizeBytes = UploadMediaPolicy.supportImageMaxBytes;
   static const _videoMaxFileSizeBytes = UploadMediaPolicy.supportVideoMaxBytes;
+  static const _safeAttachmentFileNameMaxLength = 120;
 
   Future<SupportChatConversation> openConversation({
     String? initialMessage,
@@ -538,12 +539,26 @@ class SupportChatRepository {
   }
 
   String _sanitizeFileName(String value) {
-    return value
+    final sanitized = value
         .trim()
         .replaceAll(RegExp(r'\s+'), '_')
         .replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_')
         .replaceAll(RegExp(r'_+'), '_')
         .replaceAll(RegExp(r'^_+|_+$'), '');
+    if (sanitized.length <= _safeAttachmentFileNameMaxLength) {
+      return sanitized;
+    }
+
+    final extensionIndex = sanitized.lastIndexOf('.');
+    final extension = extensionIndex > 0
+        ? sanitized.substring(extensionIndex)
+        : '';
+    if (extension.length > 1 && extension.length <= 16) {
+      final baseLength = _safeAttachmentFileNameMaxLength - extension.length;
+      return '${sanitized.substring(0, baseLength)}$extension';
+    }
+
+    return sanitized.substring(0, _safeAttachmentFileNameMaxLength);
   }
 
   Future<PreparedSupportAttachmentUpload> _prepareAttachmentForUpload({
@@ -587,7 +602,7 @@ class SupportChatRepository {
         feature: 'Support.Chat',
         operation: 'prepare_attachment_for_upload',
         message: 'Failed to prepare support attachment upload',
-        context: {'contentType': contentType},
+        context: {'contentType': _safeAttachmentContentTypeForLog(contentType)},
         error: error,
         stackTrace: stackTrace,
       );
@@ -628,6 +643,18 @@ String _supportPathSegment(String value) {
 
 int _supportPageSize(int take) {
   return take.clamp(1, 100);
+}
+
+String _safeAttachmentContentTypeForLog(String contentType) {
+  final normalized = contentType.trim().toLowerCase().replaceAll(
+    RegExp(r'[\x00-\x1F\x7F]'),
+    '',
+  );
+  if (normalized.isEmpty) {
+    return 'unknown';
+  }
+
+  return normalized.length <= 80 ? normalized : normalized.substring(0, 80);
 }
 
 class PreparedSupportAttachmentUpload {

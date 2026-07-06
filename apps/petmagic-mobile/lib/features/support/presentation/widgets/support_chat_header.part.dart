@@ -236,8 +236,9 @@ class _SupportConversationStatusStrip extends StatelessWidget {
   ({IconData icon, Color color, String title, String subtitle})
   _resolveConversationStatusDescriptor(BuildContext context) {
     final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
     final normalizedStatus = conversation.status.trim().toLowerCase();
-    const mutedColor = Color(0xFF8A94A6);
+    final mutedColor = colors.textMuted;
     final activeColor = _supportSecondaryGreen(context);
 
     if (normalizedStatus == 'resolved') {

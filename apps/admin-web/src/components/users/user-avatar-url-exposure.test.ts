@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
+import { resolveUserMediaUrl } from "./user-secure-media";
+
 const userAvatarPath = fileURLToPath(new URL("./user-avatar.tsx", import.meta.url));
 const userAvatarStylesPath = fileURLToPath(new URL("./user-avatar.module.css", import.meta.url));
 const userDetailPath = fileURLToPath(new URL("./user-detail-page.tsx", import.meta.url));
@@ -36,6 +38,12 @@ describe("user avatar URL exposure", () => {
     expect(helperSource).toContain(
       "function getUserMediaUrlResolutionErrorDetails(rawUrl: string, error: unknown)"
     );
+    expect(helperSource).toContain("function getBlockedLocalUserMediaUrlDetails(rawUrl: string)");
+    expect(helperSource).toContain('"users.media_url_localhost_blocked"');
+    expect(helperSource).toContain("function getBlockedUnsafeUserMediaUrlDetails(rawUrl: string)");
+    expect(helperSource).toContain('"users.media_url_unsafe_host_blocked"');
+    expect(helperSource).toContain("function isUnsafeUserMediaHost(hostname: string)");
+    expect(helperSource).toContain("if (!isLocalDevelopmentHost(new URL(apiOrigin).hostname))");
     expect(helperSource).toContain('clientLogger.warn(\n      "users.media_url_resolve_failed",');
     expect(helperSource).toContain("rawLength: rawUrl.length");
     expect(helperSource).toContain('startsWithSlash: rawUrl.startsWith("/")');
@@ -50,6 +58,41 @@ describe("user avatar URL exposure", () => {
     expect(helperSource).not.toContain(
       'clientLogger.warn("users.media_url_resolve_failed", { rawUrl'
     );
+    expect(helperSource).not.toContain(
+      'clientLogger.warn("users.media_url_localhost_blocked", { rawUrl'
+    );
+    expect(helperSource).not.toContain(
+      'clientLogger.warn("users.media_url_unsafe_host_blocked", { rawUrl'
+    );
+  });
+
+  it("blocks private network and placeholder user media URLs before browser fetch", () => {
+    expect(resolveUserMediaUrl("https://192.168.1.5/avatar.jpg")).toBeNull();
+    expect(resolveUserMediaUrl("https://10.0.0.5/avatar.jpg")).toBeNull();
+    expect(resolveUserMediaUrl("https://169.254.169.254/avatar.jpg")).toBeNull();
+    expect(resolveUserMediaUrl("https://[::]/avatar.jpg")).toBeNull();
+    expect(resolveUserMediaUrl("https://[fd00::1]/avatar.jpg")).toBeNull();
+    expect(resolveUserMediaUrl("https://cdn.example.com/avatar.jpg")).toBeNull();
+  });
+
+  it("blocks local user media URLs when the admin API origin is public", () => {
+    const originalPublicApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+    process.env.NEXT_PUBLIC_API_BASE_URL = "https://api.petmagic.app";
+
+    try {
+      expect(resolveUserMediaUrl("https://localhost/avatar.jpg")).toBeNull();
+      expect(resolveUserMediaUrl("https://api.localhost/avatar.jpg")).toBeNull();
+      expect(resolveUserMediaUrl("https://host.docker.internal/avatar.jpg")).toBeNull();
+      expect(resolveUserMediaUrl("https://backend:5000/avatar.jpg")).toBeNull();
+      expect(resolveUserMediaUrl("https://0.0.0.0/avatar.jpg")).toBeNull();
+      expect(resolveUserMediaUrl("https://[::1]/avatar.jpg")).toBeNull();
+    } finally {
+      if (originalPublicApiBaseUrl === undefined) {
+        delete process.env.NEXT_PUBLIC_API_BASE_URL;
+      } else {
+        process.env.NEXT_PUBLIC_API_BASE_URL = originalPublicApiBaseUrl;
+      }
+    }
   });
 
   it("does not render backend pet photo URLs directly in user detail cards", () => {

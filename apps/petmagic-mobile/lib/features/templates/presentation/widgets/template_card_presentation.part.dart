@@ -111,6 +111,7 @@ class _TemplateDetails extends StatelessWidget {
             showTodayFallback: featuredData!.showPopularityTodayFallback,
           )
         : null;
+    final colors = context.petMagicColors;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -124,13 +125,13 @@ class _TemplateDetails extends StatelessWidget {
                 _TemplateFeaturedMetaChip(
                   icon: Icons.timer_outlined,
                   label: featuredCountdownLabel,
-                  accent: const Color(0xFF22D394),
+                  accent: colors.accent,
                 ),
               if (featuredPopularityLabel != null)
                 _TemplateFeaturedMetaChip(
                   icon: Icons.pets_rounded,
                   label: featuredPopularityLabel,
-                  accent: const Color(0xFFF5D679),
+                  accent: colors.gold,
                 ),
             ],
           )
@@ -249,9 +250,16 @@ class _TemplateActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textStyle = Theme.of(context).textTheme.labelLarge;
-    const premiumTextColor = Color(0xFF251102);
+    final colors = context.petMagicColors;
     final usePremiumStyle = isPremiumLockCta || isPremiumTemplateCta;
     final useSoftPremiumStyle = isPremiumTemplateCta && !isPremiumLockCta;
+    final foregroundColor = usePremiumStyle
+        ? colors.on(
+            isPremiumLockCta
+                ? const Color(0xFFF3C65A)
+                : const Color(0xFFEFCB72),
+          )
+        : colors.on(colors.accent);
     return PetMagicInteractiveSurface(
       onTap: onPressed,
       borderRadius: BorderRadius.circular(16),
@@ -317,9 +325,7 @@ class _TemplateActionButton extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: textStyle?.copyWith(
-                    color: usePremiumStyle
-                        ? premiumTextColor
-                        : const Color(0xFF082313),
+                    color: foregroundColor,
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                   ),
@@ -340,9 +346,7 @@ class _TemplateActionButton extends StatelessWidget {
                     ? const PremiumCrownIcon(size: 13.5)
                     : Icon(
                         Icons.arrow_forward_rounded,
-                        color: usePremiumStyle
-                            ? premiumTextColor
-                            : const Color(0xFF082313),
+                        color: foregroundColor,
                         size: usePremiumStyle ? 13.5 : 16,
                       ),
               ),

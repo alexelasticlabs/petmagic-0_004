@@ -41,7 +41,7 @@ Before traffic:
   `GlobalMaxConcurrentGenerations=3`, `ImageMaxConcurrentGenerations=2`,
   `VideoMaxConcurrentGenerations=1`.
 - Confirm wait thresholds are fixed for staging:
-  `FreeImageMaxEstimatedWaitSeconds=1800`, `PremiumImageMaxEstimatedWaitSeconds=600`,
+  `FreeImageMaxEstimatedWaitSeconds=1800`, `PremiumImageMaxEstimatedWaitSeconds=900`,
   `FreeVideoMaxEstimatedWaitSeconds=3600`, `PremiumVideoMaxEstimatedWaitSeconds=1800`.
 - Confirm realtime retention is fixed for staging:
   `RealtimeEventRetentionMinutes=60`, `RealtimeEventCleanupIntervalMinutes=10`,
@@ -167,6 +167,21 @@ node scripts/qa/run-local-generation-scheduler-smoke.mjs
 Local smoke writes artifacts under `artifacts/local-generation-scheduler-smoke/<run>/` and every
 summary includes `LOCAL DEVELOPMENT SMOKE ONLY - NOT STAGING OR PRODUCTION EVIDENCE`.
 
+For a clean local Compose startup proof before running scheduler smoke, use an isolated
+project and host ports so long-running developer containers cannot hide a broken fresh start:
+
+```powershell
+$env:BACKEND_HOST_PORT = "5601"
+$env:ADMIN_WEB_HOST_PORT = "3600"
+$env:POSTGRES_HOST_PORT = "56543"
+$env:MAILPIT_SMTP_HOST_PORT = "1625"
+$env:MAILPIT_WEB_HOST_PORT = "8625"
+docker compose -p petmagic_goal_probe --env-file .env.local-smoke.example up -d --build --wait --wait-timeout 240
+curl http://localhost:5601/health
+curl "http://localhost:5601/api/templates/feed?limit=3"
+curl http://localhost:3600
+```
+
 Local smoke data setup:
 
 - Start local Docker Compose with `ASPNETCORE_ENVIRONMENT=Development` and the separate
@@ -286,6 +301,12 @@ STAGING_API_PROCESS_ID=
 STAGING_WORKER_PROCESS_ID=
 STAGING_MIGRATION_TOOLING_LABEL=
 ```
+
+When the same file is also used as the Docker Compose staging env file, keep the
+deployment keys from `.env.staging.local.example` filled as well: `POSTGRES_PASSWORD`,
+`NEXT_PUBLIC_API_BASE_URL`, `INTERNAL_API_BASE_URL`, `BACKEND_PUBLIC_BASE_URL`,
+`BACKEND_ALLOWED_HOSTS`, `BACKEND_HEALTHCHECK_HOST`, `JWT_SIGNING_KEY`, and the
+monitoring profile keys when that profile is enabled.
 
 Store those values only in local `.env.staging.local`, CI secrets, 1Password/Vault, or another
 approved secret store. `.env.staging.local` is ignored by git; do not paste JWTs or database URLs
@@ -411,11 +432,11 @@ Current selected staging profile after the 2026-07-01 fal.ai dashboard check:
 
 - Dashboard concurrency limit: 10.
 - Selected profile: `FalConcurrency10`.
-- Staging API and GenerationWorker appsettings are pinned to the same scheduler values.
+- Staging API and GenerationWorker environment overrides must be pinned to the same scheduler values.
 - Production must still set the same values explicitly in the production secret/env store before
   rollout; do not rely on local docker defaults for production.
 
-| Setting | API value | Worker value | Docker/env override | Effective default |
+| Setting | Staging API env value | Staging worker env value | Docker/env override | Effective staging value |
 | --- | ---: | ---: | --- | ---: |
 | `GlobalMaxConcurrentGenerations` | 8 | 8 | `GENERATION_GLOBAL_MAX_CONCURRENT=8` | 8 |
 | `ImageReservedConcurrentGenerations` | 3 | 3 | `GENERATION_IMAGE_RESERVED_CONCURRENT=3` | 3 |

@@ -1,21 +1,21 @@
 import {
-    apiRequest,
-    cachedAdminUserAnalytics,
-    cachedAdminUserDetails,
-    cachedGet,
-    cachedUsersLists,
-    encodePathSegment,
+  apiRequest,
+  cachedAdminUserAnalytics,
+  cachedAdminUserDetails,
+  cachedGet,
+  cachedUsersLists,
+  encodePathSegment,
 } from "./api-client.core";
 
 import type {
-    AdminUserAnalytics,
-    AdminUserDashboardMetrics,
-    AdminUserDetail,
-    AdminUserPet,
-    AdminUserPetGeneration,
-    AdminUserPetPhoto,
-    AdminUserWalletOperation,
-    UserListPage,
+  AdminUserAnalytics,
+  AdminUserDashboardMetrics,
+  AdminUserDetail,
+  AdminUserPet,
+  AdminUserPetGeneration,
+  AdminUserPetPhoto,
+  AdminUserWalletOperation,
+  UserListPage,
 } from "./api-client.types";
 
 export type FetchUsersQuery = {
@@ -25,8 +25,11 @@ export type FetchUsersQuery = {
   role?: string;
   status?: string;
   isPremium?: boolean;
+  sort?: string;
 };
 
+export type AdminUserSort =
+  "created_desc" | "created_asc" | "last_activity_desc" | "last_activity_asc";
 type AdminAssignableRole = "Admin" | "Moderator";
 type AdminUserRoleFilter = AdminAssignableRole | "User";
 type AdminUserStatusFilter = "active" | "blocked" | "unconfirmed";
@@ -36,6 +39,12 @@ export const USER_SEARCH_MAX_LENGTH = 120;
 export const USER_WALLET_REASON_MAX_LENGTH = 240;
 const allowedUserRoles: readonly AdminUserRoleFilter[] = ["Admin", "Moderator", "User"];
 const allowedUserStatuses: readonly AdminUserStatusFilter[] = ["active", "blocked", "unconfirmed"];
+const allowedUserSorts: readonly AdminUserSort[] = [
+  "created_desc",
+  "created_asc",
+  "last_activity_desc",
+  "last_activity_asc",
+];
 const allowedAssignableRoles: readonly AdminAssignableRole[] = ["Admin", "Moderator"];
 
 function normalizeAllowedValue<const T extends string>(
@@ -56,6 +65,7 @@ export function normalizeFetchUsersQuery(query: FetchUsersQuery = {}): FetchUser
   const search = query.search?.trim().slice(0, USER_SEARCH_MAX_LENGTH) || undefined;
   const role = normalizeAllowedValue(query.role, allowedUserRoles);
   const status = normalizeAllowedValue(query.status, allowedUserStatuses);
+  const sort = normalizeAllowedValue(query.sort, allowedUserSorts);
 
   return {
     skip:
@@ -70,6 +80,7 @@ export function normalizeFetchUsersQuery(query: FetchUsersQuery = {}): FetchUser
     role,
     status,
     isPremium: typeof query.isPremium === "boolean" ? query.isPremium : undefined,
+    sort,
   };
 }
 
@@ -82,6 +93,7 @@ function getUsersCacheKey(query: FetchUsersQuery): string {
     role: normalizedQuery.role ?? null,
     status: normalizedQuery.status ?? null,
     isPremium: normalizedQuery.isPremium ?? null,
+    sort: normalizedQuery.sort ?? null,
   });
 }
 
@@ -105,6 +117,10 @@ function buildUsersPath(query: FetchUsersQuery): string {
 
   if (typeof normalizedQuery.isPremium === "boolean") {
     params.set("isPremium", String(normalizedQuery.isPremium));
+  }
+
+  if (normalizedQuery.sort) {
+    params.set("sort", normalizedQuery.sort);
   }
 
   return `/api/admin/users?${params.toString()}`;
@@ -206,13 +222,10 @@ export async function changeAdminUserPetStatus(
 ): Promise<AdminUserPet> {
   const encodedUserId = encodePathSegment(userId);
   const encodedPetId = encodePathSegment(petId);
-  return apiRequest<AdminUserPet>(
-    `/api/admin/users/${encodedUserId}/pets/${encodedPetId}/status`,
-    {
-      method: "POST",
-      body: JSON.stringify({ status }),
-    }
-  );
+  return apiRequest<AdminUserPet>(`/api/admin/users/${encodedUserId}/pets/${encodedPetId}/status`, {
+    method: "POST",
+    body: JSON.stringify({ status }),
+  });
 }
 
 export async function fetchAdminUserPetPhotos(
@@ -301,15 +314,6 @@ export async function revokeRole(userId: string, role: string): Promise<void> {
   await apiRequest<void>(`/api/admin/users/${encodedUserId}/role`, {
     method: "DELETE",
     body: JSON.stringify({ role: normalizedRole }),
-  });
-  clearAdminUserCaches(userId);
-}
-
-export async function setPremium(userId: string, isPremium: boolean): Promise<void> {
-  const encodedUserId = encodePathSegment(userId);
-  await apiRequest<void>(`/api/admin/users/${encodedUserId}/premium`, {
-    method: "PUT",
-    body: JSON.stringify({ isPremium }),
   });
   clearAdminUserCaches(userId);
 }

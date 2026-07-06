@@ -2,15 +2,8 @@
 
 import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
 import { type EconomyPageText } from "@/components/economy-page.content";
-import {
-  formatCurrency,
-  safeText,
-  shortGuid,
-} from "@/components/economy-page.shared";
-import {
-  type AdminEconomyPurchase,
-  type AdminEconomySubscription,
-} from "@/lib/api-client";
+import { formatCurrency, safeText, shortGuid } from "@/components/economy-page.shared";
+import { type AdminEconomyPurchase, type AdminEconomySubscription } from "@/lib/api-client";
 import { type Locale } from "@/lib/i18n";
 
 type EconomyPageConfirmationDialogsProps = {

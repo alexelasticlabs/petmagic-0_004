@@ -1,6 +1,5 @@
 "use client";
 
-
 import { ReplyIcon, SearchIcon } from "@/components/admin/admin-icons";
 import { AdminBadge, AdminStateCard } from "@/components/admin/admin-primitives";
 import styles from "@/components/support/support-conversation-chat-content.module.css";

@@ -138,10 +138,23 @@ void main() {
       'lib/features/profile/presentation/widgets/profile_notifications_settings_section.dart',
     ).readAsString();
 
+    final loadBody = _methodBody(source, '_load');
     final requestPushBody = _methodBody(source, '_requestPushPermission');
     final refreshPushBody = _methodBody(source, '_refreshPushPermissionStatus');
     final registerBody = _methodBody(source, '_registerPushTokenIfAllowed');
+    final reconcileBody = _methodBody(
+      source,
+      '_reconcilePushTokenRegistration',
+    );
+    final staleUnregisterBody = _methodBody(
+      source,
+      '_unregisterStalePushToken',
+    );
 
+    expect(
+      loadBody,
+      contains('_reconcilePushTokenRegistration(settings.authorizationStatus)'),
+    );
     expect(
       requestPushBody,
       contains('_reconcilePushTokenRegistration(settings.authorizationStatus)'),
@@ -161,8 +174,45 @@ void main() {
       registerBody,
       contains('Localizations.localeOf(context).toLanguageTag()'),
     );
+    expect(
+      registerBody,
+      contains(
+        'final previousToken = await _pushTokenRegistrar.readRegisteredToken()',
+      ),
+    );
+    expect(
+      registerBody.indexOf('if (!mounted)'),
+      greaterThan(
+        registerBody.indexOf(
+          'final previousToken = await _pushTokenRegistrar.readRegisteredToken()',
+        ),
+      ),
+    );
+    expect(
+      registerBody.indexOf('FirebaseMessaging.instance.getToken()'),
+      greaterThan(registerBody.indexOf('if (!mounted)')),
+    );
     expect(registerBody, contains('canContinue: () => mounted'));
+    expect(registerBody, contains('await _unregisterStalePushToken('));
+    expect(
+      reconcileBody,
+      contains('await _pushTokenRegistrar.unregisterToken('),
+    );
+    expect(staleUnregisterBody, contains('clearRegistrationState: false'));
+    expect(
+      staleUnregisterBody,
+      contains("unregister_stale_\${stage}_token_after_permission_change"),
+    );
     expect(registerBody, contains('register_push_token_after_permission'));
+    expect(reconcileBody, contains('final cachedToken ='));
+    expect(
+      reconcileBody.indexOf('if (!mounted)'),
+      greaterThan(reconcileBody.indexOf('readRegisteredToken()')),
+    );
+    expect(
+      reconcileBody.indexOf('FirebaseMessaging.instance.getToken()'),
+      greaterThan(reconcileBody.indexOf('if (!mounted)')),
+    );
   });
 }
 

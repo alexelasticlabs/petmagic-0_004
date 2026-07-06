@@ -89,46 +89,59 @@ mixin _PremiumControllerCheckout
       ),
     );
 
+    final cancelToken = _startPremiumActionCancelToken();
     try {
       if (state.selectedProvider == PremiumPaymentProvider.stripe) {
         final checkout = await _repository.createStripeCheckout(
           plan,
           WidgetsBinding.instance.platformDispatcher.locale,
+          cancelToken: cancelToken,
         );
-        if (!ref.mounted) {
+        if (!ref.mounted || cancelToken.isCancelled) {
           return null;
         }
-        if (!checkout.usesPaymentSheet) {
-          final safeCheckoutUri = parseSafePremiumExternalUri(
-            checkout.checkoutUrl,
-          );
-          if (safeCheckoutUri != null) {
-            _updateStateIfMounted(
-              (state) => state.copyWith(
-                isBuying: false,
-                externalUrl: safeCheckoutUri.toString(),
-              ),
-            );
-            return null;
-          }
-
+        final safeCheckoutUri = parseSafePremiumExternalUri(
+          checkout.checkoutUrl,
+        );
+        if (safeCheckoutUri != null) {
           _updateStateIfMounted(
             (state) => state.copyWith(
               isBuying: false,
-              errorMessage: 'premium.checkout_failed',
+              externalUrl: safeCheckoutUri.toString(),
             ),
           );
           return null;
         }
 
-        _updateStateIfMounted((state) => state.copyWith(isBuying: false));
-        return checkout;
+        _updateStateIfMounted(
+          (state) => state.copyWith(
+            isBuying: false,
+            errorMessage: 'premium.checkout_failed',
+          ),
+        );
+        return null;
       }
 
       await _repository.startStoreCheckout(plan, state.selectedProvider);
-      if (!ref.mounted) {
+      if (!ref.mounted || cancelToken.isCancelled) {
         return null;
       }
+      return null;
+    } on RequestCancelledException {
+      _updateStateIfMounted((state) => state.copyWith(isBuying: false));
+      return null;
+    } on DioException catch (error) {
+      if (CancelToken.isCancel(error) || cancelToken.isCancelled) {
+        _updateStateIfMounted((state) => state.copyWith(isBuying: false));
+        return null;
+      }
+
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isBuying: false,
+          errorMessage: _premiumErrorMessage(error, 'premium.checkout_failed'),
+        ),
+      );
       return null;
     } catch (error) {
       _updateStateIfMounted(
@@ -138,6 +151,8 @@ mixin _PremiumControllerCheckout
         ),
       );
       return null;
+    } finally {
+      _clearActivePremiumAction(cancelToken);
     }
   }
 
@@ -156,6 +171,7 @@ mixin _PremiumControllerCheckout
       ),
     );
 
+    final cancelToken = _startPremiumActionCancelToken();
     try {
       final status = state.status;
       if (status == null) {
@@ -168,8 +184,11 @@ mixin _PremiumControllerCheckout
         return;
       }
 
-      final managementUrl = await _repository.createManagementUrl(status);
-      if (!ref.mounted) {
+      final managementUrl = await _repository.createManagementUrl(
+        status,
+        cancelToken: cancelToken,
+      );
+      if (!ref.mounted || cancelToken.isCancelled) {
         return;
       }
       final safeManagementUri = parseSafePremiumExternalUri(managementUrl);
@@ -188,6 +207,20 @@ mixin _PremiumControllerCheckout
           externalUrl: safeManagementUri.toString(),
         ),
       );
+    } on RequestCancelledException {
+      _updateStateIfMounted((state) => state.copyWith(isManaging: false));
+    } on DioException catch (error) {
+      if (CancelToken.isCancel(error) || cancelToken.isCancelled) {
+        _updateStateIfMounted((state) => state.copyWith(isManaging: false));
+        return;
+      }
+
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isManaging: false,
+          errorMessage: _premiumErrorMessage(error, 'premium.manage_failed'),
+        ),
+      );
     } catch (error) {
       _updateStateIfMounted(
         (state) => state.copyWith(
@@ -195,6 +228,8 @@ mixin _PremiumControllerCheckout
           errorMessage: _premiumErrorMessage(error, 'premium.manage_failed'),
         ),
       );
+    } finally {
+      _clearActivePremiumAction(cancelToken);
     }
   }
 
@@ -352,11 +387,32 @@ mixin _PremiumControllerCheckout
     final normalizedSubscriptionId = stripeExternalSubscriptionId?.trim();
     if ((normalizedPlanCode?.isNotEmpty ?? false) &&
         (normalizedSubscriptionId?.isNotEmpty ?? false)) {
+      final verificationCancelToken = _startCheckoutVerificationCancelToken();
       try {
         await _repository.verifyStripeSubscriptionCheckout(
           planCode: normalizedPlanCode!,
           externalSubscriptionId: normalizedSubscriptionId!,
+          cancelToken: verificationCancelToken,
         );
+        if (!ref.mounted ||
+            !_hasInternet ||
+            verificationCancelToken.isCancelled) {
+          return;
+        }
+      } on RequestCancelledException {
+        return;
+      } on DioException catch (error, stackTrace) {
+        if (CancelToken.isCancel(error) ||
+            verificationCancelToken.isCancelled) {
+          return;
+        }
+
+        _logPremiumCheckoutFailure(
+          'verify_stripe_subscription_checkout',
+          error,
+          stackTrace,
+        );
+        // Keep polling fallback even when explicit Stripe verification fails.
       } catch (error, stackTrace) {
         _logPremiumCheckoutFailure(
           'verify_stripe_subscription_checkout',
@@ -364,6 +420,8 @@ mixin _PremiumControllerCheckout
           stackTrace,
         );
         // Keep polling fallback even when explicit Stripe verification fails.
+      } finally {
+        _clearActiveCheckoutVerification(verificationCancelToken);
       }
     }
 
@@ -573,16 +631,18 @@ mixin _PremiumControllerCheckout
       }
     }
 
+    final verificationCancelToken = _startCheckoutVerificationCancelToken();
     try {
       final verified = await _repository.verifyStorePurchase(
         plan: matchedPlan,
         provider: provider,
         purchase: purchase,
+        cancelToken: verificationCancelToken,
       );
       if (verificationKey != null) {
         _rememberStorePurchaseVerifiedKey(verificationKey);
       }
-      if (!ref.mounted) {
+      if (!ref.mounted || verificationCancelToken.isCancelled) {
         return;
       }
 
@@ -625,7 +685,32 @@ mixin _PremiumControllerCheckout
       );
       markCheckoutOpened(wasPremiumBeforeCheckout: wasPremiumBeforeCheckout);
       await verifyCheckoutStatus();
+    } on RequestCancelledException {
+      return;
+    } on DioException catch (error) {
+      if (CancelToken.isCancel(error) || verificationCancelToken.isCancelled) {
+        return;
+      }
+
+      if (purchase.pendingCompletePurchase) {
+        await _repository.completePurchase(purchase);
+        if (!ref.mounted) {
+          return;
+        }
+      }
+
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isBuying: false,
+          isRestoring: false,
+          errorMessage: _premiumErrorMessage(error, 'premium.checkout_failed'),
+        ),
+      );
     } catch (error) {
+      if (verificationCancelToken.isCancelled) {
+        return;
+      }
+
       if (purchase.pendingCompletePurchase) {
         await _repository.completePurchase(purchase);
         if (!ref.mounted) {
@@ -641,6 +726,7 @@ mixin _PremiumControllerCheckout
         ),
       );
     } finally {
+      _clearActiveCheckoutVerification(verificationCancelToken);
       if (verificationKey != null) {
         _storePurchaseVerificationInFlightKeys.remove(verificationKey);
       }

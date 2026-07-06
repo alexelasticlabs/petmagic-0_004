@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
+using PetMagic.BuildingBlocks.Storage;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
@@ -123,8 +124,8 @@ internal sealed class TemplateMediaLifecycleService(
         record.AttachedAtUtc = null;
         record.ExpiresAtUtc ??= DateTime.UtcNow;
         record.LastCleanupAttemptAtUtc = DateTime.UtcNow;
-        record.FailureCode = errorCode;
-        record.FailureMessage = errorMessage;
+        record.FailureCode = AdminFailureMessageSanitizer.SanitizeCode(errorCode);
+        record.FailureMessage = AdminFailureMessageSanitizer.Sanitize(errorMessage);
     }
 
     public Task SaveChangesAsync(CancellationToken cancellationToken)
@@ -218,9 +219,7 @@ internal sealed class TemplateMediaLifecycleService(
 
         var segments = pathOnly
             .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (segments.Any(segment =>
-                string.Equals(segment, ".", StringComparison.Ordinal)
-                || string.Equals(segment, "..", StringComparison.Ordinal)))
+        if (segments.Any(IsUnsafeManagedStoragePathSegment))
         {
             return false;
         }
@@ -233,6 +232,11 @@ internal sealed class TemplateMediaLifecycleService(
 
         managedPath = normalized;
         return true;
+    }
+
+    private static bool IsUnsafeManagedStoragePathSegment(string segment)
+    {
+        return ManagedPathSegments.IsUnsafe(segment);
     }
 
     private static string NormalizeObjectKeyPrefix(string prefix)

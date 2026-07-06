@@ -103,6 +103,120 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task ListAsync_ShouldNotExposeProviderDiagnosticsToUserHistory()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var generationService = CreateGenerationService(dbContext);
+        var templateId = await CreateActiveImageTemplateAsync(service, "User History Portrait", "Portrait", ["history"]);
+        var userId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        var job = new TemplateGenerationJob
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            TemplateId = templateId,
+            Status = TemplateGenerationStatus.Completed,
+            TokenCost = 20,
+            SourceImageUrl = "https://cdn.example.com/source.jpg",
+            SourceImageFileName = "source.jpg",
+            SourceImageContentType = "image/jpeg",
+            ResultUrl = "https://cdn.example.com/output.png",
+            UsedPreprocessingModel = "openai/gpt-image-2/edit",
+            UsedKlingModel = "fal-ai/kling-video/v3/pro/motion-control",
+            PreprocessingProviderRequestId = "preprocess-provider-secret",
+            MotionProviderRequestId = "motion-provider-secret",
+            MotionProviderCostUsd = 0.4321m,
+            AttemptCount = 1,
+            CreatedAtUtc = now.AddMinutes(-3),
+            QueuedAtUtc = now.AddMinutes(-3),
+            StartedAtUtc = now.AddMinutes(-2),
+            CompletedAtUtc = now.AddMinutes(-1),
+            UpdatedAtUtc = now.AddMinutes(-1),
+            ChargedAtUtc = now.AddMinutes(-3)
+        };
+
+        dbContext.TemplateGenerationJobs.Add(job);
+        await dbContext.SaveChangesAsync();
+
+        var history = await generationService.ListAsync(
+            userId,
+            new TemplateGenerationHistoryQuery("completed", null, 10),
+            isPremium: false,
+            CancellationToken.None);
+
+        Assert.True(history.IsSuccess);
+        var item = Assert.Single(history.Value);
+        Assert.Null(item.PreprocessingProviderRequestId);
+        Assert.Null(item.MotionProviderRequestId);
+        Assert.Null(item.MotionProviderCostUsd);
+
+        var serialized = JsonSerializer.Serialize(item);
+        Assert.DoesNotContain("preprocess-provider-secret", serialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("motion-provider-secret", serialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("0.4321", serialized, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task UserGenerationResponses_ShouldNotExposeRawFailureMessages()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var generationService = CreateGenerationService(dbContext);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Failure Privacy Portrait", "Portrait", ["history"]);
+        var userId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        const string rawProviderFailure =
+            "provider failed at https://provider.example.com/jobs/job-secret?token=raw-secret requestId=req-secret";
+
+        var job = new TemplateGenerationJob
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            TemplateId = templateId,
+            Status = TemplateGenerationStatus.Failed,
+            TokenCost = 20,
+            SourceImageUrl = "https://cdn.example.com/source.jpg",
+            SourceImageFileName = "source.jpg",
+            SourceImageContentType = "image/jpeg",
+            AttemptCount = 3,
+            LastErrorCode = TemplatesErrors.AiProviderFailed.Code,
+            LastErrorMessage = rawProviderFailure,
+            CreatedAtUtc = now.AddMinutes(-4),
+            QueuedAtUtc = now.AddMinutes(-4),
+            StartedAtUtc = now.AddMinutes(-3),
+            CompletedAtUtc = now.AddMinutes(-1),
+            UpdatedAtUtc = now.AddMinutes(-1),
+            ChargedAtUtc = now.AddMinutes(-4)
+        };
+        dbContext.TemplateGenerationJobs.Add(job);
+        await dbContext.SaveChangesAsync();
+
+        var status = await generationService.GetAsync(userId, job.Id, isPremium: false, CancellationToken.None);
+        var gallery = await generationService.ListPageAsync(
+            userId,
+            new TemplateGenerationHistoryQuery("all", null, 10),
+            isPremium: false,
+            CancellationToken.None);
+
+        Assert.True(status.IsSuccess);
+        Assert.True(gallery.IsSuccess);
+        Assert.Equal(TemplatesErrors.AiProviderFailed.Code, status.Value.FailureCode);
+        Assert.Equal(TemplatesErrors.AiProviderFailed.Message, status.Value.FailureMessage);
+
+        var item = Assert.Single(gallery.Value.Items);
+        Assert.Equal(TemplatesErrors.AiProviderFailed.Code, item.Failure?.Code);
+        Assert.Equal(TemplatesErrors.AiProviderFailed.Message, item.Failure?.Message);
+
+        var serialized = JsonSerializer.Serialize(new { Status = status.Value, Gallery = gallery.Value });
+        Assert.DoesNotContain("provider.example.com", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("raw-secret", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("req-secret", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(rawProviderFailure, serialized, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ListAdminGenerationsAsync_ShouldReturnBatchedRelationshipAndPreviewFields()
     {
         await using var dbContext = CreateDbContext();

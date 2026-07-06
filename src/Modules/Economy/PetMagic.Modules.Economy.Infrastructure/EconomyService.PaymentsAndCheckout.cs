@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
@@ -592,13 +593,13 @@ public sealed partial class EconomyService
             EconomyMetrics.RecordEmptyCheckoutUrl(provider, command.Platform, order.CurrencyCode);
 
             logger?.LogWarning(
-                "Payment gateway returned empty checkout URL for wallet top-up. OrderId={OrderId} UserId={UserId} PackId={PackId} Provider={Provider} HasExternalPaymentId={HasExternalPaymentId} CorrelationId={CorrelationId}",
-                order.Id,
-                order.UserId,
+                "Payment gateway returned empty checkout URL for wallet top-up. OrderIdHash={OrderIdHash} UserIdHash={UserIdHash} PackId={PackId} Provider={Provider} HasExternalPaymentId={HasExternalPaymentId} CorrelationIdHash={CorrelationIdHash}",
+                SafeLogValues.StableHash(order.Id.ToString("D")),
+                EconomyLogSanitizer.SafeUserId(order.UserId),
                 order.PackId,
                 provider,
                 !string.IsNullOrWhiteSpace(paymentResult.Value.ExternalPaymentId),
-                CurrentCorrelationId);
+                CurrentCorrelationIdHash);
         }
 
         order.ExternalPaymentId = paymentResult.Value.ExternalPaymentId;

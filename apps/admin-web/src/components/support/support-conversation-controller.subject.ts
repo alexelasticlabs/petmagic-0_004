@@ -46,7 +46,9 @@ export function useSupportConversationSubjectQueries({
       ? adminQueryKeys.userAnalytics(subjectUserId)
       : adminQueryKeys.userAnalyticsDisabled,
     queryFn: ({ signal }) => fetchAdminUserAnalytics(subjectUserId!, signal),
-    enabled: Boolean(hasSession && subjectUserId && canViewSubjectUserContext && !isSubjectUserDeleted),
+    enabled: Boolean(
+      hasSession && subjectUserId && canViewSubjectUserContext && !isSubjectUserDeleted
+    ),
     staleTime: supportSubjectContextStaleTimeMs,
     retry: (failureCount, error) => !isNotFoundError(error) && failureCount < 2,
   });
@@ -65,7 +67,9 @@ export function useSupportConversationSubjectQueries({
 
       return response.items;
     },
-    enabled: Boolean(hasSession && subjectUserId && canViewSubjectUserContext && !isSubjectUserDeleted),
+    enabled: Boolean(
+      hasSession && subjectUserId && canViewSubjectUserContext && !isSubjectUserDeleted
+    ),
     staleTime: supportSubjectContextStaleTimeMs,
     retry: (failureCount, error) => !isNotFoundError(error) && failureCount < 2,
   });
@@ -75,7 +79,9 @@ export function useSupportConversationSubjectQueries({
       ? adminQueryKeys.economyUserSubscriptionSummary(subjectUserId)
       : adminQueryKeys.economyUserSubscriptionSummaryDisabled,
     queryFn: ({ signal }) => fetchAdminEconomyUserSubscriptionSummary(subjectUserId!, signal),
-    enabled: Boolean(hasSession && subjectUserId && canViewSubjectUserContext && !isSubjectUserDeleted),
+    enabled: Boolean(
+      hasSession && subjectUserId && canViewSubjectUserContext && !isSubjectUserDeleted
+    ),
     staleTime: supportSubjectContextStaleTimeMs,
     retry: (failureCount, error) => !isNotFoundError(error) && failureCount < 2,
   });

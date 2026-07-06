@@ -165,6 +165,62 @@ void main() {
   );
 
   test(
+    'template media cache rejects oversized responses before caching',
+    () async {
+      await TemplateMediaCache.clearAll();
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final requestCountsByPath = <String, int>{};
+      final subscription = server.listen((request) async {
+        final path = request.uri.path;
+        requestCountsByPath[path] = (requestCountsByPath[path] ?? 0) + 1;
+        final isVideo = path.endsWith('.mp4');
+        request.response.headers
+          ..contentType = isVideo
+              ? ContentType('video', 'mp4')
+              : ContentType('image', 'jpeg')
+          ..set(HttpHeaders.cacheControlHeader, 'max-age=3600');
+        request.response.contentLength =
+            (isVideo
+                ? TemplateMediaCache.maxPreviewDownloadBytesForTesting
+                : TemplateMediaCache.maxThumbnailDownloadBytesForTesting) +
+            1;
+        request.response.add(const [0]);
+        try {
+          await request.response.close();
+        } on Object {
+          // The client rejects on headers and may close the socket first.
+        }
+      });
+      addTearDown(() async {
+        await subscription.cancel();
+        await server.close(force: true);
+        await TemplateMediaCache.clearAll();
+      });
+
+      final baseUrl = 'http://${server.address.host}:${server.port}';
+      final thumbnailUrl = '$baseUrl/oversized-template-thumb.jpg';
+      final videoUrl = '$baseUrl/oversized-template-preview.mp4';
+
+      await expectLater(
+        TemplateMediaCache.fetchThumbnailFile(thumbnailUrl),
+        throwsA(isA<StateError>()),
+      );
+      await expectLater(
+        TemplateMediaCache.fetchPreviewFile(videoUrl),
+        throwsA(isA<StateError>()),
+      );
+
+      expect(
+        await TemplateMediaCache.getCachedThumbnailFile(thumbnailUrl),
+        isNull,
+      );
+      expect(await TemplateMediaCache.getCachedPreviewFile(videoUrl), isNull);
+      expect(requestCountsByPath['/oversized-template-thumb.jpg'], 1);
+      expect(requestCountsByPath['/oversized-template-preview.mp4'], 1);
+    },
+  );
+
+  test(
     'template media cache keys include mediaVersion without changing request url',
     () async {
       await TemplateMediaCache.clearAll();
@@ -716,4 +772,17 @@ void main() {
       );
     },
   );
+
+  test('template media cache bounds in-flight fetch tracking', () async {
+    final source = await File(
+      'lib/core/performance/template_media_cache.dart',
+    ).readAsString();
+
+    expect(source, contains('_maxThumbnailInFlightFetches'));
+    expect(source, contains('_maxPreviewInFlightFetches'));
+    expect(source, contains('_rememberInFlightFetch('));
+    expect(source, contains('maxEntries: _maxThumbnailInFlightFetches'));
+    expect(source, contains('maxEntries: _maxPreviewInFlightFetches'));
+    expect(source, contains('fetchesByUrl.remove(fetchesByUrl.keys.first)'));
+  });
 }

@@ -4,6 +4,9 @@ const URL_PATTERN = /\bhttps?:\/\/[^\s<>"')]+/gi;
 const PHONE_PATTERN = /(^|[^\w])(\+?\d[\d\s().-]{6,}\d)(?=$|[^\w])/g;
 const SECRET_ASSIGNMENT_PATTERN =
   /\b(authorization|access_?token|refresh_?token|token|jwt|session|cookie|set-cookie|secret|password|api_?key|credential|signature|stripe_signature|receipt)\s*[:=]\s*["']?[^"',\s}&]+/gi;
+const STABLE_IDENTIFIER_ASSIGNMENT_PATTERN =
+  /\b(user_?ids?|profile_?user_?ids?|owner_?user_?ids?|subject_?ids?|account_?ids?|account_?scope|user_?scope|scope|pet_?ids?|pet_?photo_?ids?|generation_?ids?|template_?ids?|assignment_?ids?|conversation_?ids?|message_?ids?|ticket_?ids?|attachment_?ids?|purchase_?ids?|subscription_?ids?|order_?ids?|feedback_?ids?|report_?ids?|moderation_?ids?)\s*[:=]\s*["']?[^"'\s}&]+/gi;
+const FILE_NAME_ASSIGNMENT_PATTERN = /\b([a-z0-9_-]*file_?names?)\s*[:=]\s*["']?[^"'\s}&]+/gi;
 const CARD_ASSIGNMENT_PATTERN = /\b(card(?:_?number)?|pan|cvv|cvc)\s*[:=]\s*["']?[\d\s-]{3,19}/gi;
 const BEARER_TOKEN_PATTERN = /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi;
 const JWT_PATTERN = /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g;
@@ -82,6 +85,8 @@ export function sanitizeSensitiveText(value: string | null | undefined, maxLengt
     .replace(EMAIL_PATTERN, (match) => maskEmail(match))
     .replace(URL_PATTERN, (match) => maskSignedUrl(match))
     .replace(SECRET_ASSIGNMENT_PATTERN, (_match, key: string) => `${key}=[redacted]`)
+    .replace(STABLE_IDENTIFIER_ASSIGNMENT_PATTERN, (_match, key: string) => `${key}=[redacted]`)
+    .replace(FILE_NAME_ASSIGNMENT_PATTERN, (_match, key: string) => `${key}=[redacted]`)
     .replace(CARD_ASSIGNMENT_PATTERN, (_match, key: string) => `${key}=[redacted]`)
     .replace(
       PHONE_PATTERN,
@@ -108,7 +113,11 @@ export function getAdminUserDisplayName(user: {
   userId: string;
 }): string {
   const email = user.email?.trim();
-  return user.displayName?.trim() || (email ? maskEmail(email) : shortIdentifier(user.userId));
+  return user.displayName?.trim()
+    ? sanitizeSensitiveText(user.displayName, 96)
+    : email
+      ? maskEmail(email)
+      : shortIdentifier(user.userId);
 }
 
 export function shortIdentifier(value: string, visibleLength = 8): string {

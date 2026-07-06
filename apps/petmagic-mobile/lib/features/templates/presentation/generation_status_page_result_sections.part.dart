@@ -791,16 +791,12 @@ class _InlineVideoPreviewState extends State<_InlineVideoPreview> {
 
       final controller = VideoPlayerController.networkUrl(safeUri);
       _controller = controller;
-      await controller.setLooping(true);
-      await controller.setVolume(0);
       await _initializeController(requestVersion, url, controller);
       return;
     }
 
     final controller = VideoPlayerController.file(localFile);
     _controller = controller;
-    await controller.setLooping(true);
-    await controller.setVolume(0);
     await _initializeController(requestVersion, url, controller);
   }
 
@@ -809,11 +805,24 @@ class _InlineVideoPreviewState extends State<_InlineVideoPreview> {
     String url,
     VideoPlayerController controller,
   ) async {
-    if (_controller != controller) {
+    if (!_isCurrentVideoRequest(requestVersion, url, controller)) {
+      await controller.dispose();
       return;
     }
 
     try {
+      await controller.setLooping(true);
+      if (!_isCurrentVideoRequest(requestVersion, url, controller)) {
+        await controller.dispose();
+        return;
+      }
+
+      await controller.setVolume(0);
+      if (!_isCurrentVideoRequest(requestVersion, url, controller)) {
+        await controller.dispose();
+        return;
+      }
+
       await controller.initialize();
       if (!_isCurrentVideoRequest(requestVersion, url, controller)) {
         await controller.dispose();

@@ -1,9 +1,15 @@
 "use client";
 
-
 import { UsersManagementSummaryGrid } from "@/components/users-management-page.chrome";
 import type { UsersManagementPageText } from "@/components/users-management-page.content";
-import type { ActivityFilter, PremiumFilter, RangeDays, RoleFilter, StatusFilter } from "@/components/users-management-page.types";
+import type {
+  ActivityFilter,
+  PremiumFilter,
+  RangeDays,
+  RoleFilter,
+  StatusFilter,
+  UserSortMode,
+} from "@/components/users-management-page.types";
 import { UsersManagementUsersCard } from "@/components/users-management-users-card";
 import type {
   AdminEconomyUserSubscriptionSummary,
@@ -52,7 +58,9 @@ type UsersManagementPageWorkspaceProps = {
   setRoleFilter: (value: RoleFilter) => void;
   setSearch: (value: string) => void;
   setSelectedUserId: (userId: string) => void;
+  setSortMode: (value: UserSortMode) => void;
   setStatusFilter: (value: StatusFilter) => void;
+  sortMode: UserSortMode;
   statusFilter: StatusFilter;
   text: Dictionary;
   totalPages: number;
@@ -100,7 +108,9 @@ export function UsersManagementPageWorkspace({
   setRoleFilter,
   setSearch,
   setSelectedUserId,
+  setSortMode,
   setStatusFilter,
+  sortMode,
   statusFilter,
   text,
   totalPages,
@@ -155,7 +165,9 @@ export function UsersManagementPageWorkspace({
         setRoleFilter={setRoleFilter}
         setSearch={setSearch}
         setSelectedUserId={setSelectedUserId}
+        setSortMode={setSortMode}
         setStatusFilter={setStatusFilter}
+        sortMode={sortMode}
         statusFilter={statusFilter}
         text={text}
         totalPages={totalPages}

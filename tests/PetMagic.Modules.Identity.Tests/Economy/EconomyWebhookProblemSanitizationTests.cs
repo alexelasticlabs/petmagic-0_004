@@ -13,14 +13,13 @@ namespace PetMagic.Modules.Identity.Tests.Economy;
 public sealed class EconomyWebhookProblemSanitizationTests
 {
     [Theory]
-    [InlineData("economy.invalid_stripe_signature", StatusCodes.Status401Unauthorized, "Webhook signature validation failed.")]
-    [InlineData("economy.invalid_webhook_payload", StatusCodes.Status400BadRequest, "Webhook payload is invalid.")]
-    [InlineData("economy.store_verification_unavailable", StatusCodes.Status503ServiceUnavailable, "Webhook verification is temporarily unavailable.")]
-    [InlineData("economy.premium_billing_unavailable", StatusCodes.Status400BadRequest, "Webhook request could not be processed.")]
-    public async Task ToWebhookProblem_ShouldHideInternalErrorDetails(
+    [InlineData("economy.invalid_stripe_signature", StatusCodes.Status401Unauthorized)]
+    [InlineData("economy.invalid_webhook_payload", StatusCodes.Status400BadRequest)]
+    [InlineData("economy.store_verification_unavailable", StatusCodes.Status503ServiceUnavailable)]
+    [InlineData("economy.premium_billing_unavailable", StatusCodes.Status400BadRequest)]
+    public async Task ToWebhookProblem_ShouldReturnStableCodeWithoutUserFacingDetail(
         string errorCode,
-        int statusCode,
-        string expectedDetail)
+        int statusCode)
     {
         var method = typeof(EconomyEndpoints).GetMethod(
             "ToWebhookProblem",
@@ -47,8 +46,14 @@ public sealed class EconomyWebhookProblemSanitizationTests
         var body = await new StreamReader(httpContext.Response.Body, Encoding.UTF8)
             .ReadToEndAsync();
 
-        Assert.Contains(expectedDetail, body, StringComparison.Ordinal);
+        Assert.Contains(errorCode, body, StringComparison.Ordinal);
+        Assert.Contains("\"code\"", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"detail\"", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(rawDetail, body, StringComparison.Ordinal);
         Assert.DoesNotContain("secret_token", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("Webhook signature validation failed.", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("Webhook payload is invalid.", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("Webhook verification is temporarily unavailable.", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("Webhook request could not be processed.", body, StringComparison.Ordinal);
     }
 }

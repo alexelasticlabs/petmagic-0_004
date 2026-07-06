@@ -123,7 +123,7 @@ class _WalletHighlightCard extends StatelessWidget {
         : weeklyReady
         ? text.profileWalletPreviewWeeklyReady
         : text.profileWalletPreviewAdCount(walletValue.adRewardsRemainingToday);
-    const cardAccent = Color(0xFF00F2A6);
+    final cardAccent = colors.accent;
     final rewardColor = walletValue == null
         ? colors.textMuted
         : weeklyReady
@@ -253,12 +253,12 @@ class _ProfileActionChip extends StatelessWidget {
     final colors = context.petMagicColors;
     final isLight = Theme.of(context).brightness == Brightness.light;
     final chipBg = isLight
-        ? const Color(0xFFDCF6EA)
+        ? colors.accentSoft
         : colors.accent.withValues(alpha: 0.12);
     final chipBorder = isLight
-        ? const Color(0xFF8FD6B8)
+        ? colors.accent.withValues(alpha: 0.42)
         : colors.accent.withValues(alpha: 0.24);
-    final chipText = isLight ? const Color(0xFF0A7A4D) : colors.accent;
+    final chipText = isLight ? colors.on(chipBg) : colors.accent;
 
     return DecoratedBox(
       decoration: BoxDecoration(

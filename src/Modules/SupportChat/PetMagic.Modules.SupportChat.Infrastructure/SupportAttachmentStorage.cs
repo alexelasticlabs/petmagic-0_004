@@ -2,14 +2,16 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 using PetMagic.BuildingBlocks.Images;
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
+using PetMagic.BuildingBlocks.Storage;
 using PetMagic.Modules.SupportChat.Application.Abstractions;
 
 namespace PetMagic.Modules.SupportChat.Infrastructure;
 
 public sealed class SupportAttachmentStorageOptions
 {
-    public string PublicBaseUrl { get; init; } = "http://localhost:5000";
+    public string PublicBaseUrl { get; init; } = string.Empty;
 
     public string LocalMediaRootPath { get; init; } = Path.Combine("wwwroot", "support-attachments");
 
@@ -103,6 +105,9 @@ internal sealed class LocalSupportAttachmentStorage(
         }
 
         var signatureBytes = headerBytes.AsSpan(0, headerLength).ToArray();
+        var nonSeekableStreamPrefix = attachment.ContentStream?.CanSeek == false
+            ? signatureBytes
+            : Array.Empty<byte>();
         if (!TryResolveStoredFileFormat(attachment.ContentType, attachment.FileName, signatureBytes, out var extension, out var normalizedContentType, out var signatureMismatch))
         {
             if (signatureMismatch)
@@ -113,7 +118,7 @@ internal sealed class LocalSupportAttachmentStorage(
             return Result.Failure<StoredSupportAttachmentResponse>(SupportChatErrors.AttachmentContentTypeNotAllowed);
         }
 
-        var maxFileSizeBytes = ResolveMaxFileSizeBytes(normalizedContentType);
+        var maxFileSizeBytes = ResolveStoredMaxFileSizeBytes(normalizedContentType);
         if (contentLength > maxFileSizeBytes)
         {
             return Result.Failure<StoredSupportAttachmentResponse>(SupportChatErrors.AttachmentFileTooLarge);
@@ -125,7 +130,17 @@ internal sealed class LocalSupportAttachmentStorage(
             var attachmentBytes = attachment.Content;
             if (attachmentBytes is null)
             {
-                attachmentBytes = await ReadAllBytesAsync(attachment.ContentStream, cancellationToken);
+                var readResult = await ReadAllBytesWithinLimitAsync(
+                    attachment.ContentStream,
+                    nonSeekableStreamPrefix,
+                    maxFileSizeBytes,
+                    cancellationToken);
+                if (readResult.ExceededLimit)
+                {
+                    return Result.Failure<StoredSupportAttachmentResponse>(SupportChatErrors.AttachmentFileTooLarge);
+                }
+
+                attachmentBytes = readResult.Content;
                 if (attachmentBytes is null)
                 {
                     return Result.Failure<StoredSupportAttachmentResponse>(SupportChatErrors.InvalidAttachmentUpload);
@@ -180,7 +195,17 @@ internal sealed class LocalSupportAttachmentStorage(
                 }
 
                 await using var output = new FileStream(physicalPath, FileMode.Create, FileAccess.Write, FileShare.None);
-                await attachment.ContentStream.CopyToAsync(output, cancellationToken);
+                if (!await CopyToFileWithinLimitAsync(
+                    attachment.ContentStream,
+                    nonSeekableStreamPrefix,
+                    output,
+                    maxFileSizeBytes,
+                    cancellationToken))
+                {
+                    output.Close();
+                    File.Delete(physicalPath);
+                    return Result.Failure<StoredSupportAttachmentResponse>(SupportChatErrors.AttachmentFileTooLarge);
+                }
             }
             else
             {
@@ -190,12 +215,12 @@ internal sealed class LocalSupportAttachmentStorage(
         catch (Exception exception)
         {
             logger.LogWarning(
-                exception,
-                "Support attachment store failed. Operation={Operation} StorageKey={StorageKey} ContentType={ContentType} ContentLength={ContentLength}",
+                "Support attachment store failed. Operation={Operation} StorageKeyHash={StorageKeyHash} ContentType={ContentType} ContentLength={ContentLength} ExceptionType={ExceptionType}",
                 "store",
-                normalizedRelativePath,
+                SafeLogValues.StableHash(normalizedRelativePath),
                 normalizedContentType,
-                contentLength);
+                contentLength,
+                SafeLogValues.ExceptionType(exception));
             return Result.Failure<StoredSupportAttachmentResponse>(SupportChatErrors.AttachmentStorageFailed);
         }
 
@@ -257,12 +282,28 @@ internal sealed class LocalSupportAttachmentStorage(
         catch (Exception exception)
         {
             logger.LogWarning(
-                exception,
-                "Support attachment delete failed. Operation={Operation} StorageKey={StorageKey}",
+                "Support attachment delete failed. Operation={Operation} StorageKeyHash={StorageKeyHash} ExceptionType={ExceptionType}",
                 "delete",
-                relativePath);
+                SafeLogValues.StableHash(relativePath),
+                SafeLogValues.ExceptionType(exception));
             return Task.FromResult(Result.Failure(SupportChatErrors.AttachmentStorageFailed));
         }
+    }
+
+    public long? ResolveMaxFileSizeBytes(string declaredContentType)
+    {
+        var normalizedContentType = NormalizeContentType(declaredContentType);
+        if (normalizedContentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase))
+        {
+            return options.MaxVideoFileSizeBytes;
+        }
+
+        if (normalizedContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        {
+            return options.MaxImageFileSizeBytes;
+        }
+
+        return null;
     }
 
     private string ResolveRootPath()
@@ -325,10 +366,7 @@ internal sealed class LocalSupportAttachmentStorage(
 
         var segments = pathOnly
             .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (segments.Length <= 1
-            || segments.Any(segment =>
-                string.Equals(segment, ".", StringComparison.Ordinal)
-                || string.Equals(segment, "..", StringComparison.Ordinal)))
+        if (segments.Length <= 1 || segments.Any(IsUnsafeManagedPathSegment))
         {
             return false;
         }
@@ -337,11 +375,20 @@ internal sealed class LocalSupportAttachmentStorage(
         return true;
     }
 
-    private static async Task<byte[]?> ReadAllBytesAsync(Stream? stream, CancellationToken cancellationToken)
+    private static bool IsUnsafeManagedPathSegment(string segment)
+    {
+        return ManagedPathSegments.IsUnsafe(segment);
+    }
+
+    private static async Task<BoundedReadResult> ReadAllBytesWithinLimitAsync(
+        Stream? stream,
+        byte[] prefixBytes,
+        long maxBytes,
+        CancellationToken cancellationToken)
     {
         if (stream is null)
         {
-            return null;
+            return new BoundedReadResult(null, ExceededLimit: false);
         }
 
         if (stream.CanSeek)
@@ -350,8 +397,70 @@ internal sealed class LocalSupportAttachmentStorage(
         }
 
         using var buffer = new MemoryStream();
-        await stream.CopyToAsync(buffer, cancellationToken);
-        return buffer.ToArray();
+        long totalBytes = prefixBytes.LongLength;
+        if (totalBytes > maxBytes)
+        {
+            return new BoundedReadResult(null, ExceededLimit: true);
+        }
+
+        if (prefixBytes.Length > 0)
+        {
+            await buffer.WriteAsync(prefixBytes, cancellationToken);
+        }
+
+        var scratch = new byte[81920];
+        int read;
+        while ((read = await stream.ReadAsync(scratch.AsMemory(0, scratch.Length), cancellationToken)) > 0)
+        {
+            totalBytes += read;
+            if (totalBytes > maxBytes)
+            {
+                return new BoundedReadResult(null, ExceededLimit: true);
+            }
+
+            await buffer.WriteAsync(scratch.AsMemory(0, read), cancellationToken);
+        }
+
+        return new BoundedReadResult(buffer.ToArray(), ExceededLimit: false);
+    }
+
+    private static async Task<bool> CopyToFileWithinLimitAsync(
+        Stream source,
+        byte[] prefixBytes,
+        Stream destination,
+        long maxBytes,
+        CancellationToken cancellationToken)
+    {
+        if (source.CanSeek)
+        {
+            source.Position = 0;
+        }
+
+        var scratch = new byte[81920];
+        long totalBytes = prefixBytes.LongLength;
+        if (totalBytes > maxBytes)
+        {
+            return false;
+        }
+
+        if (prefixBytes.Length > 0)
+        {
+            await destination.WriteAsync(prefixBytes, cancellationToken);
+        }
+
+        int read;
+        while ((read = await source.ReadAsync(scratch.AsMemory(0, scratch.Length), cancellationToken)) > 0)
+        {
+            totalBytes += read;
+            if (totalBytes > maxBytes)
+            {
+                return false;
+            }
+
+            await destination.WriteAsync(scratch.AsMemory(0, read), cancellationToken);
+        }
+
+        return true;
     }
 
     private static bool TryResolveStoredFileFormat(
@@ -446,7 +555,7 @@ internal sealed class LocalSupportAttachmentStorage(
         };
     }
 
-    private long ResolveMaxFileSizeBytes(string normalizedContentType)
+    private long ResolveStoredMaxFileSizeBytes(string normalizedContentType)
     {
         return normalizedContentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase)
             ? options.MaxVideoFileSizeBytes
@@ -489,4 +598,6 @@ internal sealed class LocalSupportAttachmentStorage(
         });
         return true;
     }
+
+    private sealed record BoundedReadResult(byte[]? Content, bool ExceededLimit);
 }

@@ -160,8 +160,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           return _buildFadeSlidePage(
             state: state,
             child: AuthEntryPage(
-              initialEmail:
-                  args?.initialEmail ?? state.uri.queryParameters['email'],
+              initialEmail: args?.initialEmail,
               redirectPath: normalizeAuthRedirectPath(
                 args?.redirectPath ?? state.uri.queryParameters['redirect'],
               ),
@@ -188,10 +187,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               : null;
           return _buildFadeSlidePage(
             state: state,
-            child: PasswordResetPage(
-              initialEmail:
-                  args?.initialEmail ?? state.uri.queryParameters['email'],
-            ),
+            child: PasswordResetPage(initialEmail: args?.initialEmail),
           );
         },
       ),
@@ -204,7 +200,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           return _buildFadeSlidePage(
             state: state,
             child: EmailVerificationPage(
-              email: args?.email ?? state.uri.queryParameters['email'] ?? '',
+              email: args?.email ?? '',
               startResendCooldown:
                   args?.startResendCooldown ??
                   state.uri.queryParameters['cooldown'] == '1',
@@ -416,9 +412,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               : null;
           return _buildFadeSlidePage(
             state: state,
-            child: PasswordChangePage(
-              email: args?.email ?? state.uri.queryParameters['email'] ?? '',
-            ),
+            child: PasswordChangePage(email: args?.email ?? ''),
           );
         },
       ),

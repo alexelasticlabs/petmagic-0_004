@@ -210,9 +210,9 @@ public static partial class AdminTemplateEndpoints
 
             title: errorCode,
 
-            detail: GetCatalogFilterProblemDetail(errorCode),
+            statusCode: StatusCodes.Status400BadRequest,
 
-            statusCode: StatusCodes.Status400BadRequest);
+            extensions: BuildAdminTemplateProblemExtensions(errorCode));
 
     }
 
@@ -225,32 +225,9 @@ public static partial class AdminTemplateEndpoints
 
             title: "templates.invalid_status",
 
-            detail: "Query parameter status must be one of: pending, running, completed, failed, cancelled, retrying.",
+            statusCode: StatusCodes.Status400BadRequest,
 
-            statusCode: StatusCodes.Status400BadRequest);
-
-    }
-
-
-    private static string GetCatalogFilterProblemDetail(string errorCode)
-
-    {
-
-        return errorCode switch
-
-        {
-
-            "templates.invalid_type" => "Query parameter type must be Image or Video.",
-
-            "templates.invalid_status" => "Query parameter status must be Draft, Active, Archived, or not_archived.",
-
-            "templates.invalid_access" => "Query parameter access must be premium or free.",
-
-            "templates.invalid_sort" => "Query parameter sort must be newest, updated, title, or tokens.",
-
-            _ => "Template catalog filter is invalid.",
-
-        };
+            extensions: BuildAdminTemplateProblemExtensions("templates.invalid_status"));
 
     }
 

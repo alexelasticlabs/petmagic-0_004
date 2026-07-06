@@ -16,7 +16,7 @@ This document defines the current push notification payloads and mobile routing 
 | Type | Sender | Required data | Route | Persistence |
 | --- | --- | --- | --- | --- |
 | `template_generation` | `FcmTemplateGenerationPushNotificationSender` | `type`, `generationId`, `status`, `route`, `dedupe_key` | `/generations/{generationId}` | Generation history unread/read |
-| `wallet` | `FcmEconomyPushNotificationSender` | `type`, `status`, `route`, `dedupe_key` | `/wallet` | Transient-only |
+| `wallet` | `FcmEconomyPushNotificationSender` | `type`, `status`, `route`, `dedupe_key` | `/profile/wallet` | Transient-only |
 | `premium` | `FcmEconomyPushNotificationSender` | `type`, `status`, `route`, `dedupe_key`, optional `provider`, `planId` | `/profile` | Transient-only |
 | `support_chat` | `FcmSupportChatPushNotificationSender` | `type`, `conversationId`, `route`, `dedupe_key` | `/profile/support` | Transient-only |
 
@@ -27,7 +27,7 @@ Mobile allows app routes such as:
 - `/templates`
 - `/creations`
 - `/generations/{generationId}`
-- `/wallet`
+- `/profile/wallet`
 - `/rewards`
 - `/profile`
 - `/profile/support`
@@ -55,7 +55,7 @@ Mobile should treat payload data as routing/state hints and not as a source of b
 - If FCM is not configured, backend sender returns without failing the business operation.
 - If token is invalid, backend disables that token.
 - If mobile cannot route immediately, bootstrap stores pending route until auth/legal state is ready.
-- If a transient notification is missed, user-visible state must be fetched from `/wallet`, `/premium/status`, generation history or support conversation.
+- If a transient notification is missed, user-visible state must be fetched from `/api/economy/wallet`, `/api/economy/premium/status`, generation history or support conversation.
 
 ## Inbox decision
 

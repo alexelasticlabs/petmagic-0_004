@@ -1,6 +1,4 @@
-import {
-  type SidePanelTab,
-} from "@/components/support/support-conversation-controller.helpers";
+import { type SidePanelTab } from "@/components/support/support-conversation-controller.helpers";
 import {
   buildActivityTimeline,
   buildConversationTimeline,
@@ -96,8 +94,9 @@ export function getSupportConversationDerivedState({
   );
   const recentFailures = analytics?.failureBreakdown.slice(0, 4) ?? [];
   const failedGenerations =
-    analytics?.recentGenerations.filter((generation) => generation.status.toLowerCase() === "failed") ??
-    [];
+    analytics?.recentGenerations.filter(
+      (generation) => generation.status.toLowerCase() === "failed"
+    ) ?? [];
   const totalPurchases = canViewSubjectUserContext
     ? (analytics?.summary.totalPurchases ?? recentUserPurchases.length)
     : 0;

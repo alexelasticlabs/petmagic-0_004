@@ -9,23 +9,58 @@ describe("admin-error-message", () => {
     ).toBe("Name is required. Too long");
   });
 
-  it("maps common HTTP statuses to friendly messages", () => {
-    expect(getAdminErrorMessage({ status: 403, message: "auth.forbidden" }, "Fallback")).toBe(
-      "You do not have permission to perform this action."
+  it("uses localized fallbacks for status-only and code-only errors", () => {
+    expect(getAdminErrorMessage({ status: 403, message: "auth.forbidden" }, "Localized")).toBe(
+      "Localized"
     );
+  });
+
+  it("uses localized fallbacks for generic backend problem details", () => {
+    expect(
+      getAdminErrorMessage(
+        {
+          code: "auth.invalid_credentials",
+          detail: "Sign-in credentials are invalid.",
+          message: "Sign-in credentials are invalid.",
+        },
+        "Localized login error"
+      )
+    ).toBe("Localized login error");
+    expect(
+      getAdminErrorMessage(
+        {
+          code: "templates.not_found",
+          detail: "Template was not found.",
+          message: "Template was not found.",
+        },
+        "Localized template error"
+      )
+    ).toBe("Localized template error");
+    expect(
+      getAdminErrorMessage(
+        {
+          code: "templates.update_conflict",
+          detail: "Template was changed while saving. Reload and try again.",
+        },
+        "Localized save error"
+      )
+    ).toBe("Localized save error");
   });
 
   it("does not expose raw JSON or technical messages", () => {
     expect(getAdminErrorMessage({ message: '{"token":"secret"}' }, "Fallback")).toBe("Fallback");
-    expect(getAdminErrorMessage({ message: "API request failed with status 500" }, "Fallback")).toBe(
-      "Fallback"
-    );
+    expect(
+      getAdminErrorMessage({ message: "API request failed with status 500" }, "Fallback")
+    ).toBe("Fallback");
     expect(
       getAdminErrorMessage(
         { status: 422, validationErrors: ['{"token":"secret"}', "validation.required"] },
         "Fallback"
       )
-    ).toBe("Request validation failed.");
+    ).toBe("Fallback");
+    expect(
+      getAdminErrorMessage({ status: 401, message: "Session expired. Sign in again." }, "Localized")
+    ).toBe("Localized");
   });
 
   it("filters technical validation errors while keeping safe backend validation copy", () => {

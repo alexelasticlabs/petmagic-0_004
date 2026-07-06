@@ -70,7 +70,7 @@ internal sealed class AdminUserTemplateAnalyticsReader(
                 row.Status.ToString(),
                 row.TokenCost,
                 row.FailureCode,
-                row.FailureMessage,
+                AdminFailureMessageSanitizer.Sanitize(row.FailureMessage),
                 signedOutputUrl,
                 row.CreatedAtUtc,
                 row.CompletedAtUtc));
@@ -174,6 +174,55 @@ internal sealed class AdminUserTemplateAnalyticsReader(
             recentTemplateEvents,
             failureBreakdownItems,
             recentActivity));
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, DateTime>> GetAdminUserLastActivityAsync(
+        IReadOnlyCollection<Guid> userIds,
+        CancellationToken cancellationToken)
+    {
+        if (userIds.Count == 0)
+        {
+            return new Dictionary<Guid, DateTime>();
+        }
+
+        var generationActivity = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .Where(generation => userIds.Contains(generation.UserId))
+            .GroupBy(generation => generation.UserId)
+            .Select(group => new
+            {
+                UserId = group.Key,
+                LastActivityAtUtc = group.Max(generation => (DateTime?)generation.CreatedAtUtc)
+            })
+            .ToListAsync(cancellationToken);
+
+        var templateEventActivity = await dbContext.TemplateAnalyticsEvents
+            .AsNoTracking()
+            .Where(templateEvent => templateEvent.UserId.HasValue && userIds.Contains(templateEvent.UserId.Value))
+            .GroupBy(templateEvent => templateEvent.UserId!.Value)
+            .Select(group => new
+            {
+                UserId = group.Key,
+                LastActivityAtUtc = group.Max(templateEvent => (DateTime?)templateEvent.CreatedAtUtc)
+            })
+            .ToListAsync(cancellationToken);
+
+        var lastActivityByUserId = new Dictionary<Guid, DateTime>();
+        foreach (var row in generationActivity.Concat(templateEventActivity))
+        {
+            if (!row.LastActivityAtUtc.HasValue)
+            {
+                continue;
+            }
+
+            if (!lastActivityByUserId.TryGetValue(row.UserId, out var current)
+                || row.LastActivityAtUtc.Value > current)
+            {
+                lastActivityByUserId[row.UserId] = row.LastActivityAtUtc.Value;
+            }
+        }
+
+        return lastActivityByUserId;
     }
 
     private async Task<string?> CreateAdminReadUrlAsync(string? assetUrl, CancellationToken cancellationToken)

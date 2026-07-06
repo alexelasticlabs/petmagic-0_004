@@ -40,11 +40,10 @@ class AppPreferencesState {
 }
 
 class AppPreferencesController extends Notifier<AppPreferencesState> {
-  late final AppPreferencesStorage _storage;
+  AppPreferencesStorage get _storage => ref.read(appPreferencesStorageProvider);
 
   @override
   AppPreferencesState build() {
-    _storage = ref.watch(appPreferencesStorageProvider);
     Future.microtask(_load);
     return const AppPreferencesState.initial();
   }

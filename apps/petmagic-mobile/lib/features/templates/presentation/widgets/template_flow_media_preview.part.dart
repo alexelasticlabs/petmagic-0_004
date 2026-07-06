@@ -239,8 +239,23 @@ class _NetworkVideoPreviewState extends State<_NetworkVideoPreview>
       }
 
       _controller = controller;
+      if (!_isCurrentVideoRequest(requestVersion, url, controller)) {
+        await controller.dispose();
+        return;
+      }
+
       await controller.setVolume(0);
+      if (!_isCurrentVideoRequest(requestVersion, url, controller)) {
+        await controller.dispose();
+        return;
+      }
+
       await controller.setLooping(true);
+      if (!_isCurrentVideoRequest(requestVersion, url, controller)) {
+        await controller.dispose();
+        return;
+      }
+
       await controller.initialize();
       if (!_isCurrentVideoRequest(requestVersion, url, controller)) {
         await controller.dispose();

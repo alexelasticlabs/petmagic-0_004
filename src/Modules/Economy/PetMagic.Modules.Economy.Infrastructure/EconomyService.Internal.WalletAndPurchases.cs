@@ -827,7 +827,8 @@ public sealed partial class EconomyService
     private async Task<Result<PurchaseOrder>> ConfirmStorePurchaseInternalAsync(
         PurchaseOrder order,
         string externalPaymentId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? legacyExternalPaymentId = null)
     {
         var normalizedExternalPaymentId = externalPaymentId.Trim();
         if (string.IsNullOrWhiteSpace(normalizedExternalPaymentId))
@@ -835,10 +836,19 @@ public sealed partial class EconomyService
             return Result.Failure<PurchaseOrder>(EconomyErrors.StorePurchaseInvalid);
         }
 
+        var normalizedLegacyExternalPaymentId = string.IsNullOrWhiteSpace(legacyExternalPaymentId)
+            ? null
+            : legacyExternalPaymentId.Trim();
+        if (string.Equals(normalizedLegacyExternalPaymentId, normalizedExternalPaymentId, StringComparison.Ordinal))
+        {
+            normalizedLegacyExternalPaymentId = null;
+        }
+
         var existingOrder = await dbContext.PurchaseOrders
             .FirstOrDefaultAsync(
                 x => x.PaymentProvider == order.PaymentProvider
-                    && x.ExternalPaymentId == normalizedExternalPaymentId,
+                    && (x.ExternalPaymentId == normalizedExternalPaymentId
+                        || (normalizedLegacyExternalPaymentId != null && x.ExternalPaymentId == normalizedLegacyExternalPaymentId)),
                 cancellationToken);
 
         if (existingOrder is not null && existingOrder.Id != order.Id)

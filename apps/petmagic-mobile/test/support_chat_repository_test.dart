@@ -157,6 +157,45 @@ void main() {
     expect(uploadedFileName, isNot(contains(r'\')));
   });
 
+  test('bounds multipart attachment filename length before upload', () async {
+    final file = await _createJpegFile(tempDir, 'photo.jpg');
+    String? uploadedFileName;
+    final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+      ..interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            final formData = options.data as FormData;
+            uploadedFileName = formData.files.single.value.filename;
+            handler.resolve(
+              Response<Map<String, dynamic>>(
+                requestOptions: options,
+                statusCode: 200,
+                data: _supportMessageJson(),
+              ),
+            );
+          },
+        ),
+      );
+    final repository = SupportChatRepository(
+      dio: dio,
+      sessionStorage: _SessionStorage(_session()),
+    );
+
+    await repository.sendAttachment(
+      conversationId: 'conversation-1',
+      filePath: file.path,
+      fileName: '${'private_user_pet_' * 20}.jpg',
+      contentType: 'image/jpeg',
+      localeTag: 'en',
+    );
+
+    expect(uploadedFileName, isNotNull);
+    expect(uploadedFileName!.length, lessThanOrEqualTo(120));
+    expect(uploadedFileName, endsWith('.jpg'));
+    expect(uploadedFileName, isNot(contains('/')));
+    expect(uploadedFileName, isNot(contains(r'\')));
+  });
+
   test('rejects spoofed attachment content before upload', () async {
     final file = File('${tempDir.path}/spoofed-photo.jpg');
     await file.writeAsBytes('%PDF-1.7 not an image'.codeUnits, flush: true);
@@ -431,6 +470,18 @@ void main() {
       );
     },
   );
+
+  test('sanitizes attachment content type before logging upload failures', () {
+    final source = File(
+      'lib/features/support/data/support_chat_repository.dart',
+    ).readAsStringSync();
+
+    expect(source, contains('_safeAttachmentContentTypeForLog(contentType)'));
+    expect(source, contains('String _safeAttachmentContentTypeForLog('));
+    expect(source, contains(r"RegExp(r'[\x00-\x1F\x7F]')"));
+    expect(source, contains('normalized.substring(0, 80)'));
+    expect(source, isNot(contains("context: {'contentType': contentType}")));
+  });
 }
 
 Future<File> _createFile(

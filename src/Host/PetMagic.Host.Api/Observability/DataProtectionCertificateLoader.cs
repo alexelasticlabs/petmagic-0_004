@@ -3,6 +3,8 @@ using System.Security.Cryptography.X509Certificates;
 
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
+
 namespace PetMagic.Host.Api.Observability;
 
 public static class DataProtectionCertificateLoader
@@ -24,18 +26,20 @@ public static class DataProtectionCertificateLoader
                     certificatePassword,
                     X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
                 logger?.LogInformation(
-                    "Development Data Protection certificate loaded. CertificatePath={CertificatePath} ApplicationName={ApplicationName}",
-                    certificatePath,
+                    "Development Data Protection certificate loaded. CertificateFileName={CertificateFileName} CertificatePathHash={CertificatePathHash} ApplicationName={ApplicationName}",
+                    Path.GetFileName(certificatePath),
+                    SafeLogValues.StableHash(certificatePath),
                     applicationName);
                 return existingCertificate;
             }
             catch (CryptographicException exception)
             {
                 logger?.LogWarning(
-                    exception,
-                    "Development Data Protection certificate is unreadable and will be regenerated. CertificatePath={CertificatePath} ApplicationName={ApplicationName}",
-                    certificatePath,
-                    applicationName);
+                    "Development Data Protection certificate is unreadable and will be regenerated. CertificateFileName={CertificateFileName} CertificatePathHash={CertificatePathHash} ApplicationName={ApplicationName} ExceptionType={ExceptionType}",
+                    Path.GetFileName(certificatePath),
+                    SafeLogValues.StableHash(certificatePath),
+                    applicationName,
+                    SafeLogValues.ExceptionType(exception));
                 File.Delete(certificatePath);
             }
         }
@@ -64,8 +68,9 @@ public static class DataProtectionCertificateLoader
             certificate.Export(X509ContentType.Pfx, certificatePassword));
 
         logger?.LogInformation(
-            "Development Data Protection certificate generated. CertificatePath={CertificatePath} ApplicationName={ApplicationName}",
-            certificatePath,
+            "Development Data Protection certificate generated. CertificateFileName={CertificateFileName} CertificatePathHash={CertificatePathHash} ApplicationName={ApplicationName}",
+            Path.GetFileName(certificatePath),
+            SafeLogValues.StableHash(certificatePath),
             applicationName);
 
         return X509CertificateLoader.LoadPkcs12FromFile(

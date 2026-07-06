@@ -14,7 +14,7 @@ const templatesAnalyticsHubPageText = {
     updated: "Обновлено",
     active: "Активные",
     premium: "Premium",
-    free: "Free",
+    free: "Бесплатно",
     loading: "Загрузка аналитики шаблонов...",
     loadError: "Не удалось загрузить аналитику шаблонов.",
     partialErrorTitle: "Отчет показан из последнего успешного ответа",
@@ -51,10 +51,10 @@ const templatesAnalyticsHubPageText = {
     providerSpend: "Наши затраты",
     providerSpendHint: "Реальные USD-затраты на AI-провайдера.",
     complaints: "Жалобы",
-    complaintsHint: "Количество complaint событий; ниже доступен список самих обращений.",
+    complaintsHint: "Количество жалоб; ниже доступен список самих обращений.",
     feedbackTitle: "Жалобы и фидбек",
     feedbackHint:
-      "Последние complaint и feedback события по выбранным шаблонам с текстом сообщения и переходом в конкретный шаблон.",
+      "Последние жалобы и фидбек по выбранным шаблонам с текстом сообщения и переходом в конкретный шаблон.",
     feedbackEmpty: "По выбранным фильтрам пока нет жалоб или фидбека.",
     feedbackMessageMissing: "Без текста сообщения.",
     feedbackTypeComplaint: "Жалоба",
@@ -246,9 +246,7 @@ export type TemplatesAnalyticsHubPageText = {
 
 export type TemplatesAnalyticsHubPeriodKey = "7" | "30" | "90" | "all";
 
-export function getTemplatesAnalyticsHubPageText(
-  locale: Locale
-): TemplatesAnalyticsHubPageText {
+export function getTemplatesAnalyticsHubPageText(locale: Locale): TemplatesAnalyticsHubPageText {
   return templatesAnalyticsHubPageText[locale] as TemplatesAnalyticsHubPageText;
 }
 

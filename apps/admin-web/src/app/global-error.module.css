@@ -9,9 +9,18 @@
   --global-error-accent: var(--accent, LinkText);
   --global-error-accent-hover: var(--accent-strong, var(--accent, LinkText));
   --global-error-accent-contrast: var(--accent-contrast, Canvas);
-  --global-error-grid-primary: var(--bg-grid-primary, color-mix(in srgb, CanvasText 4%, transparent));
-  --global-error-grid-secondary: var(--bg-grid-secondary, color-mix(in srgb, CanvasText 3%, transparent));
-  --global-error-glow: var(--bg-glow, color-mix(in srgb, var(--global-error-accent) 10%, transparent));
+  --global-error-grid-primary: var(
+    --bg-grid-primary,
+    color-mix(in srgb, CanvasText 4%, transparent)
+  );
+  --global-error-grid-secondary: var(
+    --bg-grid-secondary,
+    color-mix(in srgb, CanvasText 3%, transparent)
+  );
+  --global-error-glow: var(
+    --bg-glow,
+    color-mix(in srgb, var(--global-error-accent) 10%, transparent)
+  );
   --global-error-focus-ring: var(
     --focus-ring,
     0 0 0 2px color-mix(in srgb, var(--global-error-accent) 24%, transparent)
@@ -37,11 +46,7 @@
     linear-gradient(90deg, var(--global-error-grid-primary) 1px, transparent 1px),
     linear-gradient(180deg, var(--global-error-grid-secondary) 1px, transparent 1px),
     linear-gradient(135deg, var(--global-error-glow) 0%, transparent 34rem),
-    linear-gradient(
-      180deg,
-      var(--global-error-surface-0) 0%,
-      var(--global-error-surface-2) 100%
-    );
+    linear-gradient(180deg, var(--global-error-surface-0) 0%, var(--global-error-surface-2) 100%);
   background-size:
     32px 32px,
     32px 32px,
@@ -161,7 +166,10 @@
       --bg-grid-secondary,
       color-mix(in srgb, CanvasText 1%, transparent)
     );
-    --global-error-glow: var(--bg-glow, color-mix(in srgb, var(--global-error-accent) 4%, transparent));
+    --global-error-glow: var(
+      --bg-glow,
+      color-mix(in srgb, var(--global-error-accent) 4%, transparent)
+    );
     --global-error-focus-ring: var(
       --focus-ring,
       0 0 0 2px color-mix(in srgb, var(--global-error-accent) 24%, transparent)
@@ -175,11 +183,7 @@
       linear-gradient(90deg, var(--global-error-grid-primary) 1px, transparent 1px),
       linear-gradient(180deg, var(--global-error-grid-secondary) 1px, transparent 1px),
       linear-gradient(135deg, var(--global-error-glow) 0%, transparent 34rem),
-      linear-gradient(
-        180deg,
-        var(--global-error-surface-0) 0%,
-        var(--global-error-surface-1) 100%
-      );
+      linear-gradient(180deg, var(--global-error-surface-0) 0%, var(--global-error-surface-1) 100%);
     background-size:
       32px 32px,
       32px 32px,

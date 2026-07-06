@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.SupportChat.Application.Abstractions;
 using PetMagic.Modules.SupportChat.Infrastructure;
 
@@ -79,6 +80,118 @@ public sealed class LocalSupportAttachmentStorageTests
 
             Assert.True(stored.IsFailure);
             Assert.Equal("support.attachment_mime_mismatch", stored.Error.Code);
+        }
+        finally
+        {
+            Directory.Delete(rootPath, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task StoreAsync_ShouldRejectImageStream_WhenActualBytesExceedLimit()
+    {
+        var rootPath = CreateTempDirectory();
+        var storage = new LocalSupportAttachmentStorage(
+            new SupportAttachmentStorageOptions
+            {
+                PublicBaseUrl = "http://localhost:5000",
+                LocalMediaRootPath = rootPath,
+                MaxImageFileSizeBytes = 64
+            },
+            new TestHostEnvironment(rootPath),
+            NullLogger<LocalSupportAttachmentStorage>.Instance);
+        var payload = PngBytes();
+
+        try
+        {
+            Assert.True(payload.Length > 64);
+            await using var stream = new MemoryStream(payload);
+
+            var stored = await storage.StoreAsync(
+                new SupportAttachmentUploadCommand(
+                    "support.png",
+                    "image/png",
+                    stream,
+                    contentLengthBytes: 8),
+                CancellationToken.None);
+
+            Assert.True(stored.IsFailure);
+            Assert.Equal("support.attachment_file_too_large", stored.Error.Code);
+            Assert.Empty(Directory.GetFiles(rootPath, "*", SearchOption.AllDirectories));
+        }
+        finally
+        {
+            Directory.Delete(rootPath, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task StoreAsync_ShouldRejectVideoStream_WhenActualBytesExceedLimit()
+    {
+        var rootPath = CreateTempDirectory();
+        var storage = new LocalSupportAttachmentStorage(
+            new SupportAttachmentStorageOptions
+            {
+                PublicBaseUrl = "http://localhost:5000",
+                LocalMediaRootPath = rootPath,
+                MaxVideoFileSizeBytes = 32
+            },
+            new TestHostEnvironment(rootPath),
+            NullLogger<LocalSupportAttachmentStorage>.Instance);
+        var payload = Mp4Bytes(128);
+
+        try
+        {
+            await using var stream = new MemoryStream(payload);
+
+            var stored = await storage.StoreAsync(
+                new SupportAttachmentUploadCommand(
+                    "support.mp4",
+                    "video/mp4",
+                    stream,
+                    contentLengthBytes: 12),
+                CancellationToken.None);
+
+            Assert.True(stored.IsFailure);
+            Assert.Equal("support.attachment_file_too_large", stored.Error.Code);
+            Assert.Empty(Directory.GetFiles(rootPath, "*", SearchOption.AllDirectories));
+        }
+        finally
+        {
+            Directory.Delete(rootPath, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task StoreAsync_ShouldWriteCompleteVideo_WhenStreamCannotSeek()
+    {
+        var rootPath = CreateTempDirectory();
+        var storage = new LocalSupportAttachmentStorage(
+            new SupportAttachmentStorageOptions
+            {
+                PublicBaseUrl = "http://localhost:5000",
+                LocalMediaRootPath = rootPath,
+                MaxVideoFileSizeBytes = 256
+            },
+            new TestHostEnvironment(rootPath),
+            NullLogger<LocalSupportAttachmentStorage>.Instance);
+        var payload = Mp4Bytes(96);
+
+        try
+        {
+            await using var stream = new NonSeekableReadStream(payload);
+
+            var stored = await storage.StoreAsync(
+                new SupportAttachmentUploadCommand(
+                    "support.mp4",
+                    "video/mp4",
+                    stream,
+                    contentLengthBytes: payload.LongLength),
+                CancellationToken.None);
+
+            Assert.True(stored.IsSuccess);
+            Assert.Equal(payload.LongLength, stored.Value.FileSizeBytes);
+            Assert.Equal(payload, await File.ReadAllBytesAsync(stored.Value.LocalPath!));
         }
         finally
         {
@@ -168,11 +281,17 @@ public sealed class LocalSupportAttachmentStorageTests
             Directory.GetParent(rootPath)!.FullName,
             $"petmagic-support-sibling-{Guid.NewGuid():N}.jpg");
         var unmanagedRootPath = Path.Combine(rootPath, "unmanaged-support.jpg");
+        var encodedSeparatorFilePath = Path.Combine(rootPath, "2026%2f..%2fencoded-support.jpg");
+        var malformedPercentDirectory = Path.Combine(rootPath, "2026");
+        var malformedPercentFilePath = Path.Combine(malformedPercentDirectory, "%zz-private-support.jpg");
 
         try
         {
             await File.WriteAllTextAsync(siblingPath, "sibling");
             await File.WriteAllTextAsync(unmanagedRootPath, "unmanaged");
+            await File.WriteAllTextAsync(encodedSeparatorFilePath, "encoded-separator");
+            Directory.CreateDirectory(malformedPercentDirectory);
+            await File.WriteAllTextAsync(malformedPercentFilePath, "malformed-percent");
 
             var siblingDelete = await storage.DeleteAsync(
                 $"support-attachments/../{Path.GetFileName(siblingPath)}",
@@ -180,11 +299,21 @@ public sealed class LocalSupportAttachmentStorageTests
             var unmanagedDelete = await storage.DeleteAsync(
                 "http://localhost:5000/support-attachments/2026/../unmanaged-support.jpg?pmexp=123&pmsig=abc",
                 CancellationToken.None);
+            var encodedSeparatorDelete = await storage.DeleteAsync(
+                "http://localhost:5000/support-attachments/2026%2f..%2fencoded-support.jpg",
+                CancellationToken.None);
+            var malformedPercentDelete = await storage.DeleteAsync(
+                "http://localhost:5000/support-attachments/2026/%zz-private-support.jpg",
+                CancellationToken.None);
 
             Assert.True(siblingDelete.IsSuccess);
             Assert.True(unmanagedDelete.IsSuccess);
+            Assert.True(encodedSeparatorDelete.IsSuccess);
+            Assert.True(malformedPercentDelete.IsSuccess);
             Assert.True(File.Exists(siblingPath));
             Assert.True(File.Exists(unmanagedRootPath));
+            Assert.True(File.Exists(encodedSeparatorFilePath));
+            Assert.True(File.Exists(malformedPercentFilePath));
         }
         finally
         {
@@ -241,7 +370,12 @@ public sealed class LocalSupportAttachmentStorageTests
                 entry => entry.Level == LogLevel.Warning
                     && entry.Message.Contains("Support attachment store failed.", StringComparison.Ordinal)
                     && Equals(entry.Properties["Operation"], "store")
-                    && Equals(entry.Properties["ContentType"], "image/jpeg"));
+                    && Equals(entry.Properties["ContentType"], "image/jpeg")
+                    && Equals(entry.Properties["ExceptionType"], "IOException")
+                    && entry.Exception is null
+                    && entry.Properties["StorageKeyHash"] is string { Length: 16 }
+                    && !entry.Properties.ContainsKey("StorageKey")
+                    && !ContainsLogValue(entry, rootPath));
         }
         finally
         {
@@ -281,12 +415,25 @@ public sealed class LocalSupportAttachmentStorageTests
                 entry => entry.Level == LogLevel.Warning
                     && entry.Message.Contains("Support attachment delete failed.", StringComparison.Ordinal)
                     && Equals(entry.Properties["Operation"], "delete")
-                    && Equals(entry.Properties["StorageKey"], stored.Value.StorageKey));
+                    && Equals(entry.Properties["StorageKeyHash"], SafeLogValues.StableHash(stored.Value.StorageKey))
+                    && Equals(entry.Properties["ExceptionType"], "IOException")
+                    && entry.Exception is null
+                    && !entry.Properties.ContainsKey("StorageKey")
+                    && !ContainsLogValue(entry, stored.Value.StorageKey)
+                    && !ContainsLogValue(entry, stored.Value.LocalPath!));
         }
         finally
         {
             Directory.Delete(rootPath, recursive: true);
         }
+    }
+
+    private static bool ContainsLogValue(CapturedLogEntry entry, string value)
+    {
+        return entry.Message.Contains(value, StringComparison.Ordinal)
+            || entry.Properties.Values.Any(property =>
+                property?.ToString()?.Contains(value, StringComparison.Ordinal) == true)
+            || entry.Exception?.ToString().Contains(value, StringComparison.Ordinal) == true;
     }
 
     private static LocalSupportAttachmentStorage CreateStorage(
@@ -332,6 +479,24 @@ public sealed class LocalSupportAttachmentStorageTests
     private static byte[] HeicFtypBytes()
     {
         return [0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63, 0x00, 0x00, 0x00, 0x00];
+    }
+
+    private static byte[] Mp4Bytes(int length)
+    {
+        var bytes = new byte[length];
+        bytes[0] = 0x00;
+        bytes[1] = 0x00;
+        bytes[2] = 0x00;
+        bytes[3] = 0x18;
+        bytes[4] = 0x66;
+        bytes[5] = 0x74;
+        bytes[6] = 0x79;
+        bytes[7] = 0x70;
+        bytes[8] = 0x6D;
+        bytes[9] = 0x70;
+        bytes[10] = 0x34;
+        bytes[11] = 0x32;
+        return bytes;
     }
 
     private sealed class TestHostEnvironment(string contentRootPath) : IHostEnvironment
@@ -385,4 +550,52 @@ public sealed class LocalSupportAttachmentStorageTests
         string Message,
         Exception? Exception,
         IReadOnlyDictionary<string, object?> Properties);
+
+    private sealed class NonSeekableReadStream(byte[] content) : Stream
+    {
+        private readonly MemoryStream inner = new(content);
+
+        public override bool CanRead => true;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+            => inner.Read(buffer, offset, count);
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+            => inner.ReadAsync(buffer, cancellationToken);
+
+        public override long Seek(long offset, SeekOrigin origin)
+            => throw new NotSupportedException();
+
+        public override void SetLength(long value)
+            => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count)
+            => throw new NotSupportedException();
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                inner.Dispose();
+            }
+
+            base.Dispose(disposing);
+        }
+    }
 }

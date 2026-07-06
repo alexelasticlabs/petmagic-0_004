@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 
 using PetMagic.BuildingBlocks.Results;
@@ -11,11 +12,14 @@ namespace PetMagic.Modules.Gamification.Api.Endpoints;
 
 public static class AdminGamificationEndpoints
 {
+    private const int MaxAdminGamificationMutationRequestBodyBytes = 8 * 1024;
+
     public static IEndpointRouteBuilder MapAdminGamificationEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/admin/gamification")
             .WithTags("Admin.Gamification")
-            .RequireAuthorization("ModeratorOrAdmin")
+            .RequireAuthorization("AdminOnly")
+            .AddEndpointFilter(ApplyPrivateAdminGamificationResponseHeadersAsync)
             .RequireRateLimiting("admin");
 
         group.MapGet("/dashboard/metrics", GetDashboardMetricsAsync);
@@ -23,9 +27,20 @@ public static class AdminGamificationEndpoints
         group.MapGet("/challenges/current", ListCurrentChallengesAsync);
         group.MapGet("/users/{userId:guid}", GetUserOverviewAsync);
         group.MapDelete("/users/{userId:guid}/streak", ResetUserStreakAsync)
-            .RequireAuthorization("AdminOnly");
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminGamificationMutationRequestBodyBytes));
 
         return endpoints;
+    }
+
+    private static async ValueTask<object?> ApplyPrivateAdminGamificationResponseHeadersAsync(
+        EndpointFilterInvocationContext context,
+        EndpointFilterDelegate next)
+    {
+        context.HttpContext.Response.Headers.CacheControl = "no-store";
+        context.HttpContext.Response.Headers.Pragma = "no-cache";
+        context.HttpContext.Response.Headers.XContentTypeOptions = "nosniff";
+
+        return await next(context);
     }
 
     private static async Task<Results<Ok<AdminGamificationDashboardMetricsResponse>, ProblemHttpResult>> GetDashboardMetricsAsync(
@@ -101,10 +116,14 @@ public static class AdminGamificationEndpoints
             ? StatusCodes.Status404NotFound
             : StatusCodes.Status400BadRequest;
 
-        var detail = string.Equals(error.Code, "gamification.streak_not_found", StringComparison.Ordinal)
-            ? "Streak was not found."
-            : "Gamification request could not be completed.";
+        return TypedResults.Problem(
+            title: error.Code,
+            statusCode: statusCode,
+            extensions: BuildAdminGamificationProblemExtensions(error.Code));
+    }
 
-        return TypedResults.Problem(title: error.Code, detail: detail, statusCode: statusCode);
+    private static Dictionary<string, object?> BuildAdminGamificationProblemExtensions(string errorCode)
+    {
+        return new Dictionary<string, object?> { ["code"] = errorCode };
     }
 }

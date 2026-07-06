@@ -8,6 +8,22 @@ export type TemplateGenerationJobStatus =
 export type AdminGenerationStatus =
   "Pending" | "Running" | "Completed" | "Failed" | "Cancelled" | "Retrying";
 
+export type TemplateGenerationResponse = {
+  generationId: string;
+
+  userId: string;
+
+  templateId: string;
+
+  status: string;
+
+  tokenCost: number;
+
+  refundedAtUtc?: string | null;
+
+  canCancel: boolean;
+};
+
 export type TemplatePromoBadgeMode = "Auto" | "New" | "Trending" | "Popular" | "Funny";
 
 export type TemplateAssetInput = {
@@ -818,6 +834,10 @@ export type AdminTemplateGenerationListItem = {
   petId?: string | null;
 
   petPhotoId?: string | null;
+
+  canCancel: boolean;
+
+  canRetry: boolean;
 };
 
 export type AdminTemplateGenerationsQuery = {
@@ -963,6 +983,8 @@ export type ImageTemplatePayload = {
 
   previewAsset?: TemplateAssetInput;
 
+  keepPreviewAsset?: boolean;
+
   thumbnailAsset?: TemplateAssetInput;
 
   animatedPreviewAsset?: TemplateAssetInput;
@@ -1013,6 +1035,8 @@ export type VideoTemplatePayload = {
 
   previewAsset?: TemplateAssetInput;
 
+  keepPreviewAsset?: boolean;
+
   thumbnailAsset?: TemplateAssetInput;
 
   animatedPreviewAsset?: TemplateAssetInput;
@@ -1024,6 +1048,8 @@ export type VideoTemplatePayload = {
   detailPreviewAsset?: TemplateAssetInput;
 
   referenceMotionAsset?: TemplateAssetInput;
+
+  keepReferenceMotionAsset?: boolean;
 
   preprocessingModel: string;
 

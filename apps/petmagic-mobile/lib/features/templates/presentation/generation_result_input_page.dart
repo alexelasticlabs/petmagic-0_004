@@ -119,13 +119,17 @@ class _GenerationResultInputPageState
         _error = _copy.error;
       });
     } on Object {
-      if (!mounted) {
+      if (!mounted || cancelToken.isCancelled) {
         return;
       }
       setState(() {
         _isLoading = false;
         _error = _copy.error;
       });
+    } finally {
+      if (identical(_cancelToken, cancelToken)) {
+        _cancelToken = null;
+      }
     }
   }
 

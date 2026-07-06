@@ -256,8 +256,9 @@ describe("promo code dangerous action hardening", () => {
     expect(source).toContain("title: promoText.notificationTitle,");
     expect(contentSource).toContain('archiveActionLabel: "Архивировать"');
     expect(contentSource).toContain(
-      'adminOnlyMessage: "Управление промокодами доступно только Admin."'
+      'adminOnlyMessage: "Управление промокодами доступно только администратору."'
     );
+    expect(contentSource.slice(0, contentSource.indexOf("  en: {"))).not.toContain("только Admin");
     expect(contentSource).toContain('notificationTitle: "Промокоды"');
     expect(source).toContain("if (!canManagePromoCodes || promoCodesQuery.isLoading)");
     expect(source).not.toContain(
@@ -372,6 +373,8 @@ describe("promo code dangerous action hardening", () => {
     expect(viewSource).toContain("document.body.append(link);");
     expect(viewSource).toContain("link.remove();");
     expect(viewSource).toContain("window.setTimeout(() => URL.revokeObjectURL(url), 1000);");
+    expect(viewSource).toContain("} catch (error) {\n      URL.revokeObjectURL(url);");
+    expect(viewSource).toContain("} finally {\n      link.remove();");
     expect(viewSource).not.toContain("link.click();\n    URL.revokeObjectURL(url);");
     expect(viewSource).toContain("canManagePromoCodes={canManagePromoCodes}");
     expect(viewSource).toContain("promoCodesActionLocked={isMutating}");

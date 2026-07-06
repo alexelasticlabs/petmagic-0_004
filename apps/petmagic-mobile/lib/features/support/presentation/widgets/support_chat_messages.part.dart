@@ -94,10 +94,13 @@ class _MessageBubble extends StatelessWidget {
     final timeLabel = DateFormat.Hm(
       Localizations.localeOf(context).toLanguageTag(),
     ).format(message.createdAtUtc.toLocal());
-    final textColor = message.isFromAdmin ? colors.textStrong : Colors.white;
+    final userBubbleForeground = colors.on(userBubbleColor);
+    final textColor = message.isFromAdmin
+        ? colors.textStrong
+        : userBubbleForeground;
     final metaColor = message.isFromAdmin
         ? colors.textMuted
-        : Colors.white.withValues(alpha: 0.82);
+        : userBubbleForeground.withValues(alpha: 0.82);
     final attachmentUploadStatus = message.normalizedAttachmentUploadStatus;
     final shouldShowAttachmentStatus =
         attachmentUploadStatus != null &&

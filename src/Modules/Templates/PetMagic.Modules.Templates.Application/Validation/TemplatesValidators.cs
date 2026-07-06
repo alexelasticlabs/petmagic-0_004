@@ -33,14 +33,14 @@ public sealed class CreateImageTemplateCommandValidator : AbstractValidator<Crea
         RuleFor(x => x.ShortDescription).NotEmpty().MaximumLength(240);
         RuleFor(x => x.Category).NotEmpty().MaximumLength(64);
         RuleFor(x => x.TokenCost).GreaterThanOrEqualTo(0);
-        RuleFor(x => x.PromoBadgeMode).Must(raw => Enum.TryParse<TemplatePromoBadgeMode>(raw, true, out _)).WithMessage("Promo badge mode is invalid.");
+        RuleFor(x => x.PromoBadgeMode).Must(raw => Enum.TryParse<TemplatePromoBadgeMode>(raw, true, out _)).WithMessage("templates.promo_badge_mode_invalid");
         RuleFor(x => x.ImageModel).NotEmpty().MaximumLength(128);
         RuleFor(x => x.ImagePrompt).NotNull().MaximumLength(TemplateValidationRules.PromptMaxLength);
         RuleFor(x => x.Status).MaximumLength(32);
-        RuleFor(x => x.Status).Must(raw => string.IsNullOrWhiteSpace(raw) || Enum.TryParse<TemplateStatus>(raw, true, out _)).WithMessage("Template status is invalid.");
-        RuleFor(x => x.RequiredInputMediaType).Must(TemplateInputMediaTypeValidation.IsValidInputMediaType).WithMessage("Required input media type is invalid.");
-        RuleFor(x => x.DefaultVariationStrength).Must(TemplateInputMediaTypeValidation.IsValidVariationStrength).WithMessage("Default variation strength is invalid.");
-        RuleFor(x => x.PetPhotoRequirements).Must(items => items is null || items.Count <= TemplateValidationRules.RequirementMaxCount).WithMessage("Pet photo requirements can contain up to 6 items.");
+        RuleFor(x => x.Status).Must(raw => string.IsNullOrWhiteSpace(raw) || Enum.TryParse<TemplateStatus>(raw, true, out _)).WithMessage("templates.status_invalid");
+        RuleFor(x => x.RequiredInputMediaType).Must(TemplateInputMediaTypeValidation.IsValidInputMediaType).WithMessage("templates.required_input_media_type_invalid");
+        RuleFor(x => x.DefaultVariationStrength).Must(TemplateInputMediaTypeValidation.IsValidVariationStrength).WithMessage("templates.default_variation_strength_invalid");
+        RuleFor(x => x.PetPhotoRequirements).Must(items => items is null || items.Count <= TemplateValidationRules.RequirementMaxCount).WithMessage("templates.pet_photo_requirements_count_invalid");
         RuleForEach(x => x.PetPhotoRequirements).NotEmpty().MaximumLength(TemplateValidationRules.RequirementMaxLength).When(x => x.PetPhotoRequirements is not null);
         RuleForEach(x => x.Tags).NotEmpty().MaximumLength(TemplateValidationRules.TagMaxLength);
         RuleFor(x => x.PreviewAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.PreviewAsset is not null);
@@ -61,14 +61,14 @@ public sealed class UpdateImageTemplateCommandValidator : AbstractValidator<Upda
         RuleFor(x => x.ShortDescription).NotEmpty().MaximumLength(240);
         RuleFor(x => x.Category).NotEmpty().MaximumLength(64);
         RuleFor(x => x.TokenCost).GreaterThanOrEqualTo(0);
-        RuleFor(x => x.PromoBadgeMode).Must(raw => Enum.TryParse<TemplatePromoBadgeMode>(raw, true, out _)).WithMessage("Promo badge mode is invalid.");
+        RuleFor(x => x.PromoBadgeMode).Must(raw => Enum.TryParse<TemplatePromoBadgeMode>(raw, true, out _)).WithMessage("templates.promo_badge_mode_invalid");
         RuleFor(x => x.ImageModel).NotEmpty().MaximumLength(128);
         RuleFor(x => x.ImagePrompt).NotNull().MaximumLength(TemplateValidationRules.PromptMaxLength);
         RuleFor(x => x.Status).MaximumLength(32);
-        RuleFor(x => x.Status).Must(raw => string.IsNullOrWhiteSpace(raw) || Enum.TryParse<TemplateStatus>(raw, true, out _)).WithMessage("Template status is invalid.");
-        RuleFor(x => x.RequiredInputMediaType).Must(TemplateInputMediaTypeValidation.IsValidInputMediaType).WithMessage("Required input media type is invalid.");
-        RuleFor(x => x.DefaultVariationStrength).Must(TemplateInputMediaTypeValidation.IsValidVariationStrength).WithMessage("Default variation strength is invalid.");
-        RuleFor(x => x.PetPhotoRequirements).Must(items => items is null || items.Count <= TemplateValidationRules.RequirementMaxCount).WithMessage("Pet photo requirements can contain up to 6 items.");
+        RuleFor(x => x.Status).Must(raw => string.IsNullOrWhiteSpace(raw) || Enum.TryParse<TemplateStatus>(raw, true, out _)).WithMessage("templates.status_invalid");
+        RuleFor(x => x.RequiredInputMediaType).Must(TemplateInputMediaTypeValidation.IsValidInputMediaType).WithMessage("templates.required_input_media_type_invalid");
+        RuleFor(x => x.DefaultVariationStrength).Must(TemplateInputMediaTypeValidation.IsValidVariationStrength).WithMessage("templates.default_variation_strength_invalid");
+        RuleFor(x => x.PetPhotoRequirements).Must(items => items is null || items.Count <= TemplateValidationRules.RequirementMaxCount).WithMessage("templates.pet_photo_requirements_count_invalid");
         RuleForEach(x => x.PetPhotoRequirements).NotEmpty().MaximumLength(TemplateValidationRules.RequirementMaxLength).When(x => x.PetPhotoRequirements is not null);
         RuleForEach(x => x.Tags).NotEmpty().MaximumLength(TemplateValidationRules.TagMaxLength);
         RuleFor(x => x.PreviewAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.PreviewAsset is not null);
@@ -88,17 +88,17 @@ public sealed class CreateVideoTemplateCommandValidator : AbstractValidator<Crea
         RuleFor(x => x.ShortDescription).NotEmpty().MaximumLength(240);
         RuleFor(x => x.Category).NotEmpty().MaximumLength(64);
         RuleFor(x => x.TokenCost).GreaterThanOrEqualTo(0);
-        RuleFor(x => x.PromoBadgeMode).Must(raw => Enum.TryParse<TemplatePromoBadgeMode>(raw, true, out _)).WithMessage("Promo badge mode is invalid.");
+        RuleFor(x => x.PromoBadgeMode).Must(raw => Enum.TryParse<TemplatePromoBadgeMode>(raw, true, out _)).WithMessage("templates.promo_badge_mode_invalid");
         RuleFor(x => x.MusicDescription).MaximumLength(240);
         RuleFor(x => x.PreprocessingModel).NotEmpty().MaximumLength(128);
         RuleFor(x => x.PreprocessingPrompt).NotNull().MaximumLength(TemplateValidationRules.PromptMaxLength);
         RuleFor(x => x.KlingModel).NotEmpty().MaximumLength(128);
         RuleFor(x => x.KlingPrompt).NotNull().MaximumLength(TemplateValidationRules.PromptMaxLength);
         RuleFor(x => x.Status).MaximumLength(32);
-        RuleFor(x => x.Status).Must(raw => string.IsNullOrWhiteSpace(raw) || Enum.TryParse<TemplateStatus>(raw, true, out _)).WithMessage("Template status is invalid.");
-        RuleFor(x => x.RequiredInputMediaType).Must(TemplateInputMediaTypeValidation.IsValidInputMediaType).WithMessage("Required input media type is invalid.");
-        RuleFor(x => x.DefaultVariationStrength).Must(TemplateInputMediaTypeValidation.IsValidVariationStrength).WithMessage("Default variation strength is invalid.");
-        RuleFor(x => x.PetPhotoRequirements).Must(items => items is null || items.Count <= TemplateValidationRules.RequirementMaxCount).WithMessage("Pet photo requirements can contain up to 6 items.");
+        RuleFor(x => x.Status).Must(raw => string.IsNullOrWhiteSpace(raw) || Enum.TryParse<TemplateStatus>(raw, true, out _)).WithMessage("templates.status_invalid");
+        RuleFor(x => x.RequiredInputMediaType).Must(TemplateInputMediaTypeValidation.IsValidInputMediaType).WithMessage("templates.required_input_media_type_invalid");
+        RuleFor(x => x.DefaultVariationStrength).Must(TemplateInputMediaTypeValidation.IsValidVariationStrength).WithMessage("templates.default_variation_strength_invalid");
+        RuleFor(x => x.PetPhotoRequirements).Must(items => items is null || items.Count <= TemplateValidationRules.RequirementMaxCount).WithMessage("templates.pet_photo_requirements_count_invalid");
         RuleForEach(x => x.PetPhotoRequirements).NotEmpty().MaximumLength(TemplateValidationRules.RequirementMaxLength).When(x => x.PetPhotoRequirements is not null);
         RuleForEach(x => x.Tags).NotEmpty().MaximumLength(TemplateValidationRules.TagMaxLength);
         RuleFor(x => x.PreviewAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.PreviewAsset is not null);
@@ -120,17 +120,17 @@ public sealed class UpdateVideoTemplateCommandValidator : AbstractValidator<Upda
         RuleFor(x => x.ShortDescription).NotEmpty().MaximumLength(240);
         RuleFor(x => x.Category).NotEmpty().MaximumLength(64);
         RuleFor(x => x.TokenCost).GreaterThanOrEqualTo(0);
-        RuleFor(x => x.PromoBadgeMode).Must(raw => Enum.TryParse<TemplatePromoBadgeMode>(raw, true, out _)).WithMessage("Promo badge mode is invalid.");
+        RuleFor(x => x.PromoBadgeMode).Must(raw => Enum.TryParse<TemplatePromoBadgeMode>(raw, true, out _)).WithMessage("templates.promo_badge_mode_invalid");
         RuleFor(x => x.MusicDescription).MaximumLength(240);
         RuleFor(x => x.PreprocessingModel).NotEmpty().MaximumLength(128);
         RuleFor(x => x.PreprocessingPrompt).NotNull().MaximumLength(TemplateValidationRules.PromptMaxLength);
         RuleFor(x => x.KlingModel).NotEmpty().MaximumLength(128);
         RuleFor(x => x.KlingPrompt).NotNull().MaximumLength(TemplateValidationRules.PromptMaxLength);
         RuleFor(x => x.Status).MaximumLength(32);
-        RuleFor(x => x.Status).Must(raw => string.IsNullOrWhiteSpace(raw) || Enum.TryParse<TemplateStatus>(raw, true, out _)).WithMessage("Template status is invalid.");
-        RuleFor(x => x.RequiredInputMediaType).Must(TemplateInputMediaTypeValidation.IsValidInputMediaType).WithMessage("Required input media type is invalid.");
-        RuleFor(x => x.DefaultVariationStrength).Must(TemplateInputMediaTypeValidation.IsValidVariationStrength).WithMessage("Default variation strength is invalid.");
-        RuleFor(x => x.PetPhotoRequirements).Must(items => items is null || items.Count <= TemplateValidationRules.RequirementMaxCount).WithMessage("Pet photo requirements can contain up to 6 items.");
+        RuleFor(x => x.Status).Must(raw => string.IsNullOrWhiteSpace(raw) || Enum.TryParse<TemplateStatus>(raw, true, out _)).WithMessage("templates.status_invalid");
+        RuleFor(x => x.RequiredInputMediaType).Must(TemplateInputMediaTypeValidation.IsValidInputMediaType).WithMessage("templates.required_input_media_type_invalid");
+        RuleFor(x => x.DefaultVariationStrength).Must(TemplateInputMediaTypeValidation.IsValidVariationStrength).WithMessage("templates.default_variation_strength_invalid");
+        RuleFor(x => x.PetPhotoRequirements).Must(items => items is null || items.Count <= TemplateValidationRules.RequirementMaxCount).WithMessage("templates.pet_photo_requirements_count_invalid");
         RuleForEach(x => x.PetPhotoRequirements).NotEmpty().MaximumLength(TemplateValidationRules.RequirementMaxLength).When(x => x.PetPhotoRequirements is not null);
         RuleForEach(x => x.Tags).NotEmpty().MaximumLength(TemplateValidationRules.TagMaxLength);
         RuleFor(x => x.PreviewAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.PreviewAsset is not null);
@@ -161,7 +161,7 @@ public sealed class StartSimilarTemplateGenerationCommandValidator : AbstractVal
         RuleFor(x => x.UserId).NotEmpty();
         RuleFor(x => x.SourceGenerationId).NotEmpty();
         RuleFor(x => x.IdempotencyKey).NotEmpty().MaximumLength(256);
-        RuleFor(x => x.VariationStrength).Must(TemplateInputMediaTypeValidation.IsValidVariationStrength).WithMessage("Variation strength is invalid.");
+        RuleFor(x => x.VariationStrength).Must(TemplateInputMediaTypeValidation.IsValidVariationStrength).WithMessage("templates.variation_strength_invalid");
     }
 }
 
@@ -211,7 +211,7 @@ public sealed class SubmitFeedbackCommandValidator : AbstractValidator<SubmitFee
             .NotEmpty()
             .MaximumLength(32)
             .Must(value => value is "GenerationResult" or "GenerationFailure" or "BugReport" or "FeatureRequest" or "PaymentIssue" or "General")
-            .WithMessage("Feedback type is invalid.");
+            .WithMessage("templates.feedback_type_invalid");
         RuleFor(x => x.Category).NotEmpty().MaximumLength(80);
         RuleFor(x => x.Rating).InclusiveBetween(-1, 1).When(x => x.Rating.HasValue);
         RuleFor(x => x.Message).MaximumLength(2000);
@@ -231,10 +231,10 @@ public sealed class UpdateFeedbackAdminCommandValidator : AbstractValidator<Upda
         RuleFor(x => x.AdminUserId).NotEmpty();
         RuleFor(x => x.Status)
             .Must(value => value is null or "New" or "InReview" or "Resolved" or "Dismissed")
-            .WithMessage("Feedback status is invalid.");
+            .WithMessage("templates.feedback_status_invalid");
         RuleFor(x => x.Priority)
             .Must(value => value is null or "Low" or "Medium" or "High" or "Critical")
-            .WithMessage("Feedback priority is invalid.");
+            .WithMessage("templates.feedback_priority_invalid");
         RuleFor(x => x.AdminNote).MaximumLength(2000);
     }
 }
@@ -303,6 +303,6 @@ public sealed class StartTemplateGenerationCommandValidator : AbstractValidator<
                 contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(contentType, "image/heic", StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(contentType, "image/heif", StringComparison.OrdinalIgnoreCase))
-            .WithMessage("Source image content type is invalid. Please upload JPEG, PNG, or WebP.");
+            .WithMessage("templates.source_image_type_not_allowed");
     }
 }

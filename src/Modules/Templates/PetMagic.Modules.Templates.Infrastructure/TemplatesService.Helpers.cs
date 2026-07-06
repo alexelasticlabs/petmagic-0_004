@@ -122,8 +122,8 @@ internal sealed partial class TemplatesService
         }
 
         logger.LogWarning(
-            "Template activated with incomplete public media variants. TemplateId={TemplateId} MissingMediaVariants={MissingMediaVariants}",
-            template.Id,
+            "Template activated with incomplete public media variants. TemplateIdHash={TemplateIdHash} MissingMediaVariants={MissingMediaVariants}",
+            TemplateLogSanitizer.SafeId(template.Id),
             string.Join(",", missing));
     }
 
@@ -566,6 +566,34 @@ internal sealed partial class TemplatesService
             .Where(assetUrl => !string.IsNullOrWhiteSpace(assetUrl))
             .Cast<string>()
             .Distinct(StringComparer.OrdinalIgnoreCase)];
+    }
+
+    private static TemplateAssetCommand? ResolveEffectiveTemplateAsset(
+        TemplateItem template,
+        TemplateAssetKind assetKind,
+        TemplateAssetCommand? requestedAsset,
+        bool keepExistingAsset)
+    {
+        if (requestedAsset is not null)
+        {
+            return requestedAsset;
+        }
+
+        return keepExistingAsset
+            ? ToTemplateAssetCommand(template.Assets.FirstOrDefault(asset => asset.AssetKind == assetKind))
+            : null;
+    }
+
+    private static TemplateAssetCommand? ToTemplateAssetCommand(TemplateAsset? asset)
+    {
+        return asset is null
+            ? null
+            : new TemplateAssetCommand(
+                asset.Url,
+                asset.FileName ?? string.Empty,
+                asset.ContentType ?? string.Empty,
+                asset.FileSizeBytes,
+                asset.DurationSeconds);
     }
 
     private ValueTask PublishFeedInvalidatedAsync(CancellationToken cancellationToken)

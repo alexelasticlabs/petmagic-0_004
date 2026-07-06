@@ -660,7 +660,7 @@
   border: 1px solid color-mix(in srgb, var(--tone-color) 34%, transparent);
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--tone-color) 14%, var(--surface-2));
-  color: color-mix(in srgb, var(--tone-color) 88%, white);
+  color: color-mix(in srgb, var(--tone-color) 88%, var(--accent-contrast));
   font-size: 0.74rem;
   font-weight: 600;
   line-height: 1;
@@ -960,4 +960,3 @@
     padding: 0.48rem 0.44rem;
   }
 }
-

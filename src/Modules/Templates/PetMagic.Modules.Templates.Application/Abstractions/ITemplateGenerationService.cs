@@ -47,6 +47,10 @@ public interface ITemplateGenerationService
 
     Task<Result<RemoveGenerationWatermarkResponse>> GrantAdminCleanDownloadAsync(Guid adminUserId, Guid generationId, CancellationToken cancellationToken);
 
+    Task<Result<TemplateGenerationResponse>> CancelAdminQueuedAsync(Guid adminUserId, Guid generationId, CancellationToken cancellationToken);
+
+    Task<Result<TemplateGenerationResponse>> RetryAdminGenerationAsync(Guid adminUserId, Guid generationId, CancellationToken cancellationToken);
+
     Task<Result<TemplateGenerationResponse>> RetryAdminGenerationRefundAsync(Guid adminUserId, Guid generationId, CancellationToken cancellationToken);
 }
 

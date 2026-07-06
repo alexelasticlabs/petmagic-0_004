@@ -68,6 +68,11 @@ void main() {
       pageSource,
       contains('CancelToken? _activeMediaDownloadCancelToken;'),
     );
+    expect(pageSource, isNot(contains('late final SupportChatController')));
+    expect(pageSource, contains('SupportChatController? _activeController;'));
+    expect(pageSource, contains('SupportChatController get _controller {'));
+    expect(disposeBody, contains('_activeController?.stop();'));
+    expect(disposeBody, contains('_activeController = null;'));
     expect(disposeBody, contains('_cancelActiveMediaDownload();'));
     expect(pageSource, contains('CancelToken? _startMediaDownload()'));
     expect(pageSource, contains('void _completeMediaDownload(CancelToken'));

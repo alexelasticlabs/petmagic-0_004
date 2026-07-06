@@ -44,9 +44,9 @@ internal sealed partial class TemplateGenerationService
         }
 
         logger?.LogWarning(
-            "Template generation request rejected by visibility policy. Reason={Reason} TemplateId={TemplateId} UserId={UserId}",
+            "Template generation request rejected by visibility policy. Reason={Reason} TemplateIdHash={TemplateIdHash} UserIdHash={UserIdHash}",
             error.Code,
-            templateId,
-            userId);
+            TemplateLogSanitizer.SafeId(templateId),
+            TemplateLogSanitizer.SafeId(userId));
     }
 }

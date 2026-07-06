@@ -75,7 +75,8 @@ export function PromoCodesEditorDrawer({
     Boolean(form.expiresAtUtc) &&
     new Date(form.startsAtUtc).getTime() > new Date(form.expiresAtUtc).getTime();
   const isFormLocked = isMutating;
-  const isSubmitDisabled = isFormLocked || isCodeInvalid || hasInvalidNumber || hasInvalidDateWindow;
+  const isSubmitDisabled =
+    isFormLocked || isCodeInvalid || hasInvalidNumber || hasInvalidDateWindow;
 
   return (
     <div className={styles.drawerBackdrop} onClick={isMutating ? undefined : onClose}>
@@ -465,8 +466,7 @@ export function PromoCodesEditorDrawer({
               </span>
               <span className={styles.formSummaryItem}>
                 <PeopleIcon className={styles.formSummaryIcon} />
-                {text.promoCodesSummaryLimitLabel}{" "}
-                <strong>{form.maxRedemptions || "—"}</strong>
+                {text.promoCodesSummaryLimitLabel} <strong>{form.maxRedemptions || "—"}</strong>
                 {" ("}
                 <strong>{form.maxRedemptionsPerUser || "—"}</strong>
                 {` ${text.promoCodesSummaryPerUserSuffix})`}

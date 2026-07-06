@@ -95,7 +95,10 @@ class GenerationGalleryMediaRecord {
     );
   }
 
-  Map<String, dynamic> toJson() {
+  Map<String, dynamic> toJson({
+    String? Function(String? path)? localPathMapper,
+  }) {
+    final mapLocalPath = localPathMapper ?? (String? path) => path;
     return {
       'generationId': generationId,
       'status': status,
@@ -104,8 +107,8 @@ class GenerationGalleryMediaRecord {
       'updatedAtUtc': updatedAtUtc.toIso8601String(),
       'previewRemoteUrl': persistentSafeGenerationMediaUrl(previewRemoteUrl),
       'outputRemoteUrl': persistentSafeGenerationMediaUrl(outputRemoteUrl),
-      'previewLocalPath': previewLocalPath,
-      'outputLocalPath': outputLocalPath,
+      'previewLocalPath': mapLocalPath(previewLocalPath),
+      'outputLocalPath': mapLocalPath(outputLocalPath),
       'isDeletedLocally': isDeletedLocally,
       'isDownloadComplete': isDownloadComplete,
       'lastSyncedAtUtc': lastSyncedAtUtc.toIso8601String(),

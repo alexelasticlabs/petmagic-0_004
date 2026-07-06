@@ -3,6 +3,9 @@ using Microsoft.AspNetCore.Identity;
 using PetMagic.Modules.Identity.Application.Contracts;
 using PetMagic.Modules.Identity.Domain.Enums;
 using PetMagic.Modules.Identity.Infrastructure.Entities;
+using PetMagic.Modules.Economy.Infrastructure.Entities;
+using PetMagic.Modules.Templates.Domain.Enums;
+using PetMagic.Modules.Templates.Infrastructure.Entities;
 
 namespace PetMagic.Modules.Identity.Tests.Identity;
 
@@ -30,6 +33,7 @@ public sealed partial class IdentityServiceProfileTests
             role: null,
             status: null,
             isPremium: null,
+            sort: null,
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -63,6 +67,7 @@ public sealed partial class IdentityServiceProfileTests
             role: null,
             status: null,
             isPremium: null,
+            sort: null,
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -100,12 +105,168 @@ public sealed partial class IdentityServiceProfileTests
             role: " moderator ",
             status: " ACTIVE ",
             isPremium: true,
+            sort: null,
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value.Items);
         Assert.Equal(matching.Id, item.UserId);
         Assert.Contains(SystemRoles.Moderator, item.Roles);
+    }
+
+    [Fact]
+    public async Task ListUsersAsync_ShouldApplyCreatedSortOnBackend()
+    {
+        await using var identityDb = CreateIdentityDbContext();
+        await using var economyDb = CreateEconomyDbContext();
+        await using var templatesDb = CreateTemplatesDbContext();
+        var service = await CreateServiceAsync(identityDb, economyDb, templatesDb, new TrackingAvatarStorage());
+        var now = DateTime.UtcNow;
+        var newest = CreateListUser("newest-sort@petmagic.app", now);
+        var middle = CreateListUser("middle-sort@petmagic.app", now.AddMinutes(-1));
+        var oldest = CreateListUser("oldest-sort@petmagic.app", now.AddMinutes(-2));
+
+        identityDb.Users.AddRange(newest, middle, oldest);
+        await identityDb.SaveChangesAsync();
+
+        var result = await service.ListUsersAsync(
+            skip: 0,
+            take: 3,
+            search: null,
+            role: null,
+            status: null,
+            isPremium: null,
+            sort: "created_asc",
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(
+            [oldest.Id, middle.Id, newest.Id],
+            result.Value.Items.Select(item => item.UserId).ToArray());
+    }
+
+    [Fact]
+    public async Task ListUsersAsync_ShouldApplyLastActivitySortAcrossBackendModules()
+    {
+        await using var identityDb = CreateIdentityDbContext();
+        await using var economyDb = CreateEconomyDbContext();
+        await using var templatesDb = CreateTemplatesDbContext();
+        var service = await CreateServiceAsync(identityDb, economyDb, templatesDb, new TrackingAvatarStorage());
+        var now = DateTime.UtcNow;
+        var auditUser = CreateListUser("audit-activity@petmagic.app", now.AddDays(-10));
+        var economyUser = CreateListUser("economy-activity@petmagic.app", now.AddDays(-9));
+        var templateUser = CreateListUser("template-activity@petmagic.app", now.AddDays(-8));
+        var idleUser = CreateListUser("idle-activity@petmagic.app", now);
+
+        identityDb.Users.AddRange(auditUser, economyUser, templateUser, idleUser);
+        identityDb.AuditEvents.Add(new AuditEvent
+        {
+            Id = Guid.NewGuid(),
+            SubjectUserId = auditUser.Id,
+            Action = "auth.login.succeeded",
+            Details = "login",
+            CreatedAtUtc = now.AddHours(-3),
+            OccurredAtUtc = now.AddHours(-3)
+        });
+        await identityDb.SaveChangesAsync();
+
+        economyDb.WalletLedgerEntries.Add(new WalletLedgerEntry
+        {
+            Id = Guid.NewGuid(),
+            UserId = economyUser.Id,
+            Delta = 10,
+            BalanceAfter = 10,
+            Source = "admin_grant",
+            Reason = "activity sort test",
+            CreatedAtUtc = now.AddHours(-2)
+        });
+        await economyDb.SaveChangesAsync();
+
+        var template = new TemplateItem
+        {
+            Id = Guid.NewGuid(),
+            TemplateType = TemplateType.Image,
+            Title = "Activity Sort Template",
+            Category = "tests",
+            Tags = "tests",
+            Status = TemplateStatus.Active,
+            PromoBadgeMode = TemplatePromoBadgeMode.Auto,
+            TokenCost = 1,
+            CreatedAtUtc = now.AddDays(-1),
+            UpdatedAtUtc = now.AddDays(-1)
+        };
+        templatesDb.TemplateItems.Add(template);
+        templatesDb.TemplateGenerationJobs.Add(new TemplateGenerationJob
+        {
+            Id = Guid.NewGuid(),
+            UserId = templateUser.Id,
+            TemplateId = template.Id,
+            Template = template,
+            Status = TemplateGenerationStatus.Completed,
+            TokenCost = 1,
+            SourceImageUrl = "https://cdn.example.com/source.jpg",
+            SourceImageFileName = "source.jpg",
+            SourceImageContentType = "image/jpeg",
+            CreatedAtUtc = now.AddHours(-1),
+            UpdatedAtUtc = now.AddHours(-1),
+            CompletedAtUtc = now.AddHours(-1)
+        });
+        await templatesDb.SaveChangesAsync();
+
+        var descending = await service.ListUsersAsync(
+            skip: 0,
+            take: 4,
+            search: "activity@petmagic.app",
+            role: null,
+            status: null,
+            isPremium: null,
+            sort: "last_activity_desc",
+            CancellationToken.None);
+        var ascending = await service.ListUsersAsync(
+            skip: 0,
+            take: 4,
+            search: "activity@petmagic.app",
+            role: null,
+            status: null,
+            isPremium: null,
+            sort: "last_activity_asc",
+            CancellationToken.None);
+
+        Assert.True(descending.IsSuccess);
+        Assert.Equal(
+            [templateUser.Id, economyUser.Id, auditUser.Id, idleUser.Id],
+            descending.Value.Items.Select(item => item.UserId).ToArray());
+        Assert.Equal(now.AddHours(-1), descending.Value.Items[0].LastActivityAtUtc);
+        Assert.Equal(now.AddHours(-2), descending.Value.Items[1].LastActivityAtUtc);
+        Assert.Equal(now.AddHours(-3), descending.Value.Items[2].LastActivityAtUtc);
+        Assert.Null(descending.Value.Items[3].LastActivityAtUtc);
+
+        Assert.True(ascending.IsSuccess);
+        Assert.Equal(
+            [idleUser.Id, auditUser.Id, economyUser.Id, templateUser.Id],
+            ascending.Value.Items.Select(item => item.UserId).ToArray());
+    }
+
+    [Fact]
+    public async Task ListUsersAsync_ShouldRejectInvalidSort()
+    {
+        await using var identityDb = CreateIdentityDbContext();
+        await using var economyDb = CreateEconomyDbContext();
+        await using var templatesDb = CreateTemplatesDbContext();
+        var service = await CreateServiceAsync(identityDb, economyDb, templatesDb, new TrackingAvatarStorage());
+
+        var result = await service.ListUsersAsync(
+            skip: 0,
+            take: 20,
+            search: null,
+            role: null,
+            status: null,
+            isPremium: null,
+            sort: "random",
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("users.sort_invalid", result.Error.Code);
     }
 
     [Fact]

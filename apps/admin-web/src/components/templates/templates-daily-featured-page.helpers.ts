@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { getTemplatesDailyFeaturedPageIntlLocale } from "@/components/templates/templates-daily-featured-page.content";
 import type {
   AssignmentFormState,
   TemplateOption,
@@ -10,8 +11,8 @@ import {
   type TemplateOfTheDayPayload,
   type TemplateType,
 } from "@/lib/api-client";
+import type { Locale } from "@/lib/i18n";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
-
 
 export const SEARCH_LIMIT = 80;
 export const SEARCH_DEBOUNCE_MS = 300;
@@ -123,10 +124,37 @@ export function statusTone(assignment: AdminTemplateOfTheDay) {
   return "info" as const;
 }
 
-export function formatDateRange(assignment: AdminTemplateOfTheDay) {
+export function formatDateRange(assignment: AdminTemplateOfTheDay, locale: Locale) {
   return assignment.endDate
-    ? `${assignment.startDate} - ${assignment.endDate}`
-    : assignment.startDate;
+    ? `${formatDateOnly(assignment.startDate, locale)} - ${formatDateOnly(assignment.endDate, locale)}`
+    : formatDateOnly(assignment.startDate, locale);
+}
+
+function formatDateOnly(value: string, locale: Locale) {
+  const trimmed = value.trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+
+  if (!match) {
+    return safeDisplayText(trimmed, 32);
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return safeDisplayText(trimmed, 32);
+  }
+
+  return new Intl.DateTimeFormat(getTemplatesDailyFeaturedPageIntlLocale(locale), {
+    dateStyle: "medium",
+    timeZone: "UTC",
+  }).format(date);
 }
 
 export function safeDisplayText(value: string | null | undefined, maxLength = 120) {

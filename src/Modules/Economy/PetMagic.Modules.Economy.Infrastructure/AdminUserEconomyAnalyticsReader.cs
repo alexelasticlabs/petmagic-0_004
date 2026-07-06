@@ -105,6 +105,55 @@ internal sealed class AdminUserEconomyAnalyticsReader(EconomyDbContext dbContext
             recentActivity));
     }
 
+    public async Task<IReadOnlyDictionary<Guid, DateTime>> GetAdminUserLastActivityAsync(
+        IReadOnlyCollection<Guid> userIds,
+        CancellationToken cancellationToken)
+    {
+        if (userIds.Count == 0)
+        {
+            return new Dictionary<Guid, DateTime>();
+        }
+
+        var purchaseActivity = await dbContext.PurchaseOrders
+            .AsNoTracking()
+            .Where(order => userIds.Contains(order.UserId) && order.Status == PurchaseOrderStatus.Succeeded)
+            .GroupBy(order => order.UserId)
+            .Select(group => new
+            {
+                UserId = group.Key,
+                LastActivityAtUtc = group.Max(order => (DateTime?)(order.ConfirmedAtUtc ?? order.CreatedAtUtc))
+            })
+            .ToListAsync(cancellationToken);
+
+        var walletActivity = await dbContext.WalletLedgerEntries
+            .AsNoTracking()
+            .Where(entry => userIds.Contains(entry.UserId))
+            .GroupBy(entry => entry.UserId)
+            .Select(group => new
+            {
+                UserId = group.Key,
+                LastActivityAtUtc = group.Max(entry => (DateTime?)entry.CreatedAtUtc)
+            })
+            .ToListAsync(cancellationToken);
+
+        var lastActivityByUserId = new Dictionary<Guid, DateTime>();
+        foreach (var row in purchaseActivity.Concat(walletActivity))
+        {
+            if (!row.LastActivityAtUtc.HasValue)
+            {
+                continue;
+            }
+
+            if (!lastActivityByUserId.TryGetValue(row.UserId, out var current)
+                || row.LastActivityAtUtc.Value > current)
+            {
+                lastActivityByUserId[row.UserId] = row.LastActivityAtUtc.Value;
+            }
+        }
+
+        return lastActivityByUserId;
+    }
+
     private static string DescribeWalletLedgerTitle(string source)
     {
         return source switch

@@ -320,9 +320,9 @@ class _PaymentMethodSection extends StatelessWidget {
                   color: colors.accent,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.check_rounded,
-                  color: Colors.white,
+                  color: Theme.of(context).colorScheme.onPrimary,
                   size: 14,
                 ),
               ),

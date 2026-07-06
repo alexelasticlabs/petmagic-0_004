@@ -87,7 +87,11 @@ String _mapSupportError(AppLocalizations text, String raw) {
     return text.supportChatAttachmentTooLargeError;
   }
 
-  if (value.contains('support.attachment_unavailable')) {
+  if (value.contains('support.attachment_unavailable') ||
+      value.contains('support.attachment_file_required') ||
+      value.contains('support.attachment_file_name_required') ||
+      value.contains('support.attachment_file_name_too_long') ||
+      value.contains('support.attachment_content_type_too_long')) {
     return text.supportChatAttachmentUnavailableError;
   }
 
@@ -104,7 +108,9 @@ String _mapSupportError(AppLocalizations text, String raw) {
     return text.supportChatAttachmentUnavailableError;
   }
 
-  if (value.contains('support.unavailable') ||
+  if (value.contains('support.message_body_too_long') ||
+      value.contains('support.reply_target_invalid') ||
+      value.contains('support.unavailable') ||
       value.contains('support.request_failed')) {
     return text.supportChatUnavailableError;
   }

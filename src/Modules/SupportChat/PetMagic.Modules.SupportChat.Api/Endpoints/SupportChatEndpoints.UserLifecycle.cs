@@ -27,7 +27,7 @@ public static partial class SupportChatEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.MarkConversationReadAsync(command, cancellationToken);
@@ -56,7 +56,7 @@ public static partial class SupportChatEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.ResolveConversationAsync(command, cancellationToken);
@@ -85,7 +85,7 @@ public static partial class SupportChatEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.CloseConversationAsync(command, cancellationToken);
@@ -114,7 +114,7 @@ public static partial class SupportChatEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.ReopenConversationAsync(command, cancellationToken);
@@ -144,7 +144,7 @@ public static partial class SupportChatEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.SubmitConversationFeedbackAsync(command, cancellationToken);
@@ -178,7 +178,7 @@ public static partial class SupportChatEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await pushTokenService.RegisterAsync(command, cancellationToken);
@@ -207,7 +207,7 @@ public static partial class SupportChatEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await pushTokenService.UnregisterAsync(command, cancellationToken);

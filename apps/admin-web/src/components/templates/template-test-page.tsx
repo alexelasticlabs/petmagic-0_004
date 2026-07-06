@@ -82,6 +82,22 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
   const [isSourceDragActive, setIsSourceDragActive] = useState(false);
   const [loadRetryNonce, setLoadRetryNonce] = useState(0);
   const [pollRetryNonce, setPollRetryNonce] = useState(0);
+  const [isTemplateTestPageVisible, setIsTemplateTestPageVisible] = useState(
+    () => typeof document === "undefined" || !document.hidden
+  );
+
+  useEffect(() => {
+    function handleVisibilityChange() {
+      const isVisible = !document.hidden;
+      setIsTemplateTestPageVisible(isVisible);
+      if (isVisible) {
+        setPollRetryNonce((current) => current + 1);
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, []);
 
   useEffect(() => {
     let isCancelled = false;
@@ -153,7 +169,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
   }, [canManageTemplates, loadRetryNonce, locale, pageText.loadTemplateError, router, templateId]);
 
   useEffect(() => {
-    if (!run || !isTemplateTestRunInFlight(run)) {
+    if (!run || !isTemplateTestRunInFlight(run) || !isTemplateTestPageVisible) {
       return;
     }
 
@@ -193,7 +209,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [pageText.refreshStatusError, pollRetryNonce, run, templateId]);
+  }, [isTemplateTestPageVisible, pageText.refreshStatusError, pollRetryNonce, run, templateId]);
 
   useEffect(
     () => () => {
@@ -296,12 +312,20 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
 
     clearSelectedFilePreviewUrl();
     const objectUrl = URL.createObjectURL(file);
-    selectedFilePreviewObjectUrlRef.current = objectUrl;
-    setSelectedFile(file);
-    setSelectedFilePreviewUrl(objectUrl);
-    setRun(null);
-    setSelectedHistoryGenerationId(null);
-    setRunError(null);
+    try {
+      selectedFilePreviewObjectUrlRef.current = objectUrl;
+      setSelectedFile(file);
+      setSelectedFilePreviewUrl(objectUrl);
+      setRun(null);
+      setSelectedHistoryGenerationId(null);
+      setRunError(null);
+    } catch (error) {
+      if (selectedFilePreviewObjectUrlRef.current === objectUrl) {
+        selectedFilePreviewObjectUrlRef.current = null;
+      }
+      URL.revokeObjectURL(objectUrl);
+      throw error;
+    }
   }
 
   function handleResetTest() {
@@ -473,7 +497,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
     },
     {
       tone: "muted" as const,
-      label: `${template.tokenCost} PawSpark`,
+      label: formatTokenCost(template.tokenCost),
     },
     {
       tone: "muted" as const,

@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
@@ -111,6 +112,7 @@ public static partial class AdminTemplateEndpoints
 
 
     private static async Task<Results<Ok<AdminTemplateGenerationListPageResponse>, ProblemHttpResult>> ListGenerationsAsync(
+        HttpContext context,
 
         [FromQuery] string? status,
 
@@ -123,8 +125,6 @@ public static partial class AdminTemplateEndpoints
         [FromQuery] int? skip,
 
         [FromQuery] int? take,
-
-        [FromServices] ITemplatesService service,
 
         CancellationToken cancellationToken)
 
@@ -141,6 +141,7 @@ public static partial class AdminTemplateEndpoints
         }
 
 
+        var service = context.RequestServices.GetRequiredService<ITemplatesService>();
         var result = await service.ListAdminGenerationsAsync(
 
             new AdminTemplateGenerationsQuery(status, provider, user, search, skip, take),
@@ -292,6 +293,54 @@ public static partial class AdminTemplateEndpoints
         }
 
         var result = await generationService.RetryAdminGenerationRefundAsync(
+            adminUserId,
+            generationId,
+            cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToAdminTemplateProblem(result.Error);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<TemplateGenerationResponse>, ProblemHttpResult>> RetryGenerationAsync(
+        HttpContext context,
+        Guid generationId,
+        [FromServices] ITemplateGenerationService generationService,
+        CancellationToken cancellationToken)
+    {
+        var (adminUserId, subjectError) = TryGetAdminUserId(context);
+        if (subjectError is not null)
+        {
+            return ToAdminTemplateProblem(subjectError);
+        }
+
+        var result = await generationService.RetryAdminGenerationAsync(
+            adminUserId,
+            generationId,
+            cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToAdminTemplateProblem(result.Error);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<TemplateGenerationResponse>, ProblemHttpResult>> CancelGenerationAsync(
+        HttpContext context,
+        Guid generationId,
+        [FromServices] ITemplateGenerationService generationService,
+        CancellationToken cancellationToken)
+    {
+        var (adminUserId, subjectError) = TryGetAdminUserId(context);
+        if (subjectError is not null)
+        {
+            return ToAdminTemplateProblem(subjectError);
+        }
+
+        var result = await generationService.CancelAdminQueuedAsync(
             adminUserId,
             generationId,
             cancellationToken);

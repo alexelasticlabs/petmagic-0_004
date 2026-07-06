@@ -233,7 +233,17 @@ class AppLogger {
         continue;
       }
 
+      if (_isStableIdentifierKey(key)) {
+        sanitized[key] = '***';
+        continue;
+      }
+
       if (_isRawUserDataKey(key)) {
+        sanitized[key] = '***';
+        continue;
+      }
+
+      if (_isUserFileNameKey(key)) {
         sanitized[key] = '***';
         continue;
       }
@@ -272,8 +282,16 @@ class AppLogger {
       return _maskRemoteMediaUrl(value);
     }
 
+    if (_isSensitiveNavigationUrlKey(key)) {
+      return '***';
+    }
+
     if (_isSensitiveKey(key)) {
       return value.startsWith('Bearer ') ? 'Bearer ***' : '***';
+    }
+
+    if (_isStableIdentifierKey(key)) {
+      return '***';
     }
 
     if (_isRawUserDataKey(key)) {
@@ -289,15 +307,22 @@ class AppLogger {
     }
 
     final uri = Uri.tryParse(value);
-    if (_isEndpointKey(key) && uri != null && uri.hasQuery) {
-      return uri.replace(query: '').toString().replaceFirst(RegExp(r'\?$'), '');
+    if (_isEndpointKey(key) && uri != null) {
+      if (_isHttpUrl(uri)) {
+        return _stripUrlCredentialsQueryAndFragment(uri);
+      }
+
+      if (uri.hasQuery || uri.hasFragment) {
+        return value.split(RegExp(r'[?#]')).first;
+      }
     }
 
-    if (uri != null &&
-        uri.hasScheme &&
-        (uri.scheme == 'http' || uri.scheme == 'https') &&
-        uri.hasQuery) {
-      return uri.replace(query: '***').toString();
+    if (uri != null && _isHttpUrl(uri) && uri.userInfo.isNotEmpty) {
+      return _stripUrlCredentialsQueryAndFragment(uri);
+    }
+
+    if (uri != null && _isHttpUrl(uri) && (uri.hasQuery || uri.hasFragment)) {
+      return _maskUrlQueryAndFragment(uri);
     }
 
     return _maskSensitiveText(value);
@@ -325,6 +350,7 @@ class AppLogger {
         normalizedKey.contains('phone') ||
         normalizedKey.contains('email') ||
         normalizedKey.contains('signedurl') ||
+        _isSensitiveNavigationUrlKey(key) ||
         normalizedKey == 'ticket' ||
         normalizedKey == 'authticket' ||
         normalizedKey == 'externalauthticket' ||
@@ -340,6 +366,99 @@ class AppLogger {
         normalizedKey == 'externalpaymentid' ||
         normalizedKey == 'externalsubscriptionid' ||
         normalizedKey == 'signedtransactioninfo';
+  }
+
+  static bool _isStableIdentifierKey(String key) {
+    final normalizedKey = key.toLowerCase().replaceAll(
+      RegExp(r'[^a-z0-9]'),
+      '',
+    );
+
+    return normalizedKey == 'userid' ||
+        normalizedKey == 'profileuserid' ||
+        normalizedKey == 'owneruserid' ||
+        normalizedKey == 'subjectid' ||
+        normalizedKey == 'accountid' ||
+        normalizedKey == 'accountscope' ||
+        normalizedKey == 'userscope' ||
+        normalizedKey == 'scope' ||
+        normalizedKey == 'petid' ||
+        normalizedKey == 'petphotoid' ||
+        normalizedKey == 'generationid' ||
+        normalizedKey == 'templateid' ||
+        normalizedKey == 'assignmentid' ||
+        normalizedKey == 'conversationid' ||
+        normalizedKey == 'messageid' ||
+        normalizedKey == 'ticketid' ||
+        normalizedKey == 'attachmentid' ||
+        normalizedKey == 'feedbackid' ||
+        normalizedKey == 'reportid' ||
+        normalizedKey == 'moderationid' ||
+        normalizedKey == 'orderid' ||
+        _isCompoundStableDomainIdentifierKey(normalizedKey);
+  }
+
+  static bool _isCompoundStableDomainIdentifierKey(String normalizedKey) {
+    if (normalizedKey == 'requestid' ||
+        normalizedKey == 'correlationid' ||
+        normalizedKey == 'traceid') {
+      return false;
+    }
+
+    return (normalizedKey.contains('user') && normalizedKey.endsWith('id')) ||
+        (normalizedKey.contains('account') && normalizedKey.endsWith('id')) ||
+        (normalizedKey.contains('pet') && normalizedKey.endsWith('id')) ||
+        (normalizedKey.contains('generation') &&
+            normalizedKey.endsWith('id')) ||
+        (normalizedKey.contains('template') && normalizedKey.endsWith('id')) ||
+        (normalizedKey.contains('assignment') &&
+            normalizedKey.endsWith('id')) ||
+        (normalizedKey.contains('conversation') &&
+            normalizedKey.endsWith('id')) ||
+        (normalizedKey.contains('message') && normalizedKey.endsWith('id')) ||
+        (normalizedKey.contains('ticket') && normalizedKey.endsWith('id')) ||
+        (normalizedKey.contains('attachment') &&
+            normalizedKey.endsWith('id')) ||
+        (normalizedKey.contains('purchase') && normalizedKey.endsWith('id')) ||
+        (normalizedKey.contains('subscription') &&
+            normalizedKey.endsWith('id')) ||
+        (normalizedKey.contains('feedback') && normalizedKey.endsWith('id')) ||
+        (normalizedKey.contains('report') && normalizedKey.endsWith('id')) ||
+        (normalizedKey.contains('moderation') &&
+            normalizedKey.endsWith('id')) ||
+        (normalizedKey.contains('order') && normalizedKey.endsWith('id')) ||
+        _isCompoundStableDomainIdentifierListKey(normalizedKey);
+  }
+
+  static bool _isCompoundStableDomainIdentifierListKey(String normalizedKey) {
+    if (normalizedKey == 'requestids' ||
+        normalizedKey == 'correlationids' ||
+        normalizedKey == 'traceids') {
+      return false;
+    }
+
+    return (normalizedKey.contains('user') && normalizedKey.endsWith('ids')) ||
+        (normalizedKey.contains('account') && normalizedKey.endsWith('ids')) ||
+        (normalizedKey.contains('pet') && normalizedKey.endsWith('ids')) ||
+        (normalizedKey.contains('generation') &&
+            normalizedKey.endsWith('ids')) ||
+        (normalizedKey.contains('template') && normalizedKey.endsWith('ids')) ||
+        (normalizedKey.contains('assignment') &&
+            normalizedKey.endsWith('ids')) ||
+        (normalizedKey.contains('conversation') &&
+            normalizedKey.endsWith('ids')) ||
+        (normalizedKey.contains('message') && normalizedKey.endsWith('ids')) ||
+        (normalizedKey.contains('ticket') && normalizedKey.endsWith('ids')) ||
+        (normalizedKey.contains('attachment') &&
+            normalizedKey.endsWith('ids')) ||
+        (normalizedKey.contains('purchase') && normalizedKey.endsWith('ids')) ||
+        (normalizedKey.contains('subscription') &&
+            normalizedKey.endsWith('ids')) ||
+        (normalizedKey.contains('feedback') && normalizedKey.endsWith('ids')) ||
+        (normalizedKey.contains('report') && normalizedKey.endsWith('ids')) ||
+        (normalizedKey.contains('moderation') &&
+            normalizedKey.endsWith('ids')) ||
+        (normalizedKey.contains('order') && normalizedKey.endsWith('ids'));
   }
 
   static bool _isEmailKey(String key) {
@@ -382,6 +501,18 @@ class AppLogger {
         normalizedKey == 'zipcode';
   }
 
+  static bool _isUserFileNameKey(String key) {
+    final normalizedKey = key.toLowerCase().replaceAll(
+      RegExp(r'[^a-z0-9]'),
+      '',
+    );
+
+    return normalizedKey == 'filename' ||
+        normalizedKey == 'filenames' ||
+        normalizedKey.endsWith('filename') ||
+        normalizedKey.endsWith('filenames');
+  }
+
   static bool _isEndpointKey(String key) {
     final normalizedKey = key.toLowerCase().replaceAll(
       RegExp(r'[^a-z0-9]'),
@@ -389,7 +520,11 @@ class AppLogger {
     );
     return normalizedKey == 'path' ||
         normalizedKey == 'endpoint' ||
-        normalizedKey == 'route';
+        normalizedKey == 'route' ||
+        normalizedKey == 'baseurl' ||
+        normalizedKey == 'apiurl' ||
+        normalizedKey == 'apibaseurl' ||
+        normalizedKey == 'publicbaseurl';
   }
 
   static bool _isRemoteMediaUrlKey(String key) {
@@ -398,16 +533,43 @@ class AppLogger {
       '',
     );
     return normalizedKey == 'attachmenturl' ||
+        normalizedKey == 'attachmenturls' ||
         normalizedKey == 'fileurl' ||
+        normalizedKey == 'fileurls' ||
         normalizedKey == 'mediaurl' ||
+        normalizedKey == 'mediaurls' ||
         normalizedKey == 'imageurl' ||
+        normalizedKey == 'imageurls' ||
         normalizedKey == 'videourl' ||
+        normalizedKey == 'videourls' ||
         normalizedKey == 'avatarurl' ||
+        normalizedKey == 'avatarurls' ||
         normalizedKey == 'thumbnailurl' ||
+        normalizedKey == 'thumbnailurls' ||
         normalizedKey == 'previewurl' ||
+        normalizedKey == 'previewurls' ||
         normalizedKey == 'outputurl' ||
+        normalizedKey == 'outputurls' ||
         normalizedKey == 'downloadurl' ||
-        normalizedKey == 'uploadurl';
+        normalizedKey == 'downloadurls' ||
+        normalizedKey == 'uploadurl' ||
+        normalizedKey == 'uploadurls';
+  }
+
+  static bool _isSensitiveNavigationUrlKey(String key) {
+    final normalizedKey = key.toLowerCase().replaceAll(
+      RegExp(r'[^a-z0-9]'),
+      '',
+    );
+    return normalizedKey == 'checkouturl' ||
+        normalizedKey == 'paymenturl' ||
+        normalizedKey == 'billingportalurl' ||
+        normalizedKey == 'customerportalurl' ||
+        normalizedKey == 'redirecturl' ||
+        normalizedKey == 'callbackurl' ||
+        normalizedKey == 'returnurl' ||
+        normalizedKey == 'successurl' ||
+        normalizedKey == 'cancelurl';
   }
 
   static bool _isLocalFilePathKey(String key) {
@@ -499,6 +661,19 @@ class AppLogger {
     );
 
     masked = masked.replaceAllMapped(
+      RegExp(
+        r'\b(x[_-]?api[_-]?key|api[_-]?key|x[_-]?fal[_-]?key|fal[_-]?key|stripe[_-]?signature|x[_-]?goog[_-]?signature|x[_-]?webhook[_-]?signature)\s*[:=]\s*[^\s,}\]]+',
+        caseSensitive: false,
+      ),
+      (match) {
+        final value = match.group(0)!;
+        final key = value.split(RegExp(r'\s*[:=]\s*')).first;
+        final separator = value.contains(':') ? ':' : '=';
+        return '$key$separator ***';
+      },
+    );
+
+    masked = masked.replaceAllMapped(
       RegExp(r'\bBearer\s+[A-Za-z0-9._~+/=-]+', caseSensitive: false),
       (_) => 'Bearer ***',
     );
@@ -510,7 +685,7 @@ class AppLogger {
 
     masked = masked.replaceAllMapped(
       RegExp(
-        r'''(["']?)(access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|jwt|api[_-]?key|credential|signature|payment[_-]?intent[_-]?client[_-]?secret|payment[_-]?intent[_-]?id|setup[_-]?intent[_-]?id|client[_-]?secret|secret|password|receipt|signed[_-]?url|card[_-]?number|cvc|cvv|auth[_-]?ticket|external[_-]?auth[_-]?ticket|ticket|session[_-]?id|checkout[_-]?session[_-]?id|stripe[_-]?session[_-]?id|purchase[_-]?token|purchase[_-]?id|server[_-]?verification[_-]?data|local[_-]?verification[_-]?data|verification[_-]?data|signed[_-]?transaction[_-]?info|external[_-]?payment[_-]?id|external[_-]?subscription[_-]?id|subscription[_-]?id|customer[_-]?id)\1(\s*[:=]\s*)(["']?)[^,}\]\s"']+\4''',
+        r'''(["']?)(access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|jwt|api[_-]?key|credential|signature|payment[_-]?intent[_-]?client[_-]?secret|payment[_-]?intent[_-]?ids?|setup[_-]?intent[_-]?ids?|client[_-]?secret|secret|password|receipt|signed[_-]?url|checkout[_-]?url|payment[_-]?url|billing[_-]?portal[_-]?url|customer[_-]?portal[_-]?url|redirect[_-]?url|callback[_-]?url|return[_-]?url|success[_-]?url|cancel[_-]?url|user[_-]?ids?|profile[_-]?user[_-]?ids?|owner[_-]?user[_-]?ids?|subject[_-]?ids?|account[_-]?ids?|account[_-]?scope|user[_-]?scope|scope|pet[_-]?ids?|pet[_-]?photo[_-]?ids?|generation[_-]?ids?|template[_-]?ids?|assignment[_-]?ids?|conversation[_-]?ids?|message[_-]?ids?|ticket[_-]?ids?|attachment[_-]?ids?|feedback[_-]?ids?|report[_-]?ids?|moderation[_-]?ids?|order[_-]?ids?|card[_-]?number|cvc|cvv|auth[_-]?ticket|external[_-]?auth[_-]?ticket|ticket|session[_-]?ids?|checkout[_-]?session[_-]?ids?|stripe[_-]?session[_-]?ids?|purchase[_-]?token|purchase[_-]?ids?|server[_-]?verification[_-]?data|local[_-]?verification[_-]?data|verification[_-]?data|signed[_-]?transaction[_-]?info|external[_-]?payment[_-]?ids?|external[_-]?subscription[_-]?ids?|subscription[_-]?ids?|customer[_-]?ids?)\1(\s*[:=]\s*)(["']?)[^}\]\s"']+\4''',
         caseSensitive: false,
       ),
       (match) {
@@ -524,7 +699,21 @@ class AppLogger {
 
     masked = masked.replaceAllMapped(
       RegExp(
-        r'''(["']?)(attachment[_-]?url|file[_-]?url|media[_-]?url|image[_-]?url|video[_-]?url|avatar[_-]?url|thumbnail[_-]?url|preview[_-]?url|output[_-]?url|download[_-]?url|upload[_-]?url)\1(\s*[:=]\s*)(["']?)(https?://[^,}\]\s"']+)\4''',
+        r'''(["']?)([a-z0-9_-]*(?:user[_-]?ids?|account[_-]?ids?|pet[_-]?ids?|generation(?:[_-]?result)?[_-]?ids?|template[_-]?ids?|assignment[_-]?ids?|conversation[_-]?ids?|message[_-]?ids?|ticket[_-]?ids?|attachment[_-]?ids?|purchase[_-]?ids?|subscription[_-]?ids?|feedback[_-]?ids?|report[_-]?ids?|moderation[_-]?ids?|order[_-]?ids?))\1(\s*[:=]\s*)(["']?)[^}\]\s"']+\4''',
+        caseSensitive: false,
+      ),
+      (match) {
+        final quote = match.group(1) ?? '';
+        final key = match.group(2) ?? '';
+        final separator = match.group(3) ?? ': ';
+        final valueQuote = match.group(4) ?? '';
+        return '$quote$key$quote$separator$valueQuote***$valueQuote';
+      },
+    );
+
+    masked = masked.replaceAllMapped(
+      RegExp(
+        r'''(["']?)(attachment[_-]?urls?|file[_-]?urls?|media[_-]?urls?|image[_-]?urls?|video[_-]?urls?|avatar[_-]?urls?|thumbnail[_-]?urls?|preview[_-]?urls?|output[_-]?urls?|download[_-]?urls?|upload[_-]?urls?)\1(\s*[:=]\s*)(["']?)(https?://[^,}\]\s"']+)\4''',
         caseSensitive: false,
       ),
       (match) {
@@ -540,6 +729,20 @@ class AppLogger {
     masked = masked.replaceAllMapped(
       RegExp(
         r'''(["']?)(user[_-]?name|display[_-]?name|full[_-]?name|first[_-]?name|last[_-]?name|sender[_-]?name|sender[_-]?display[_-]?name|recipient[_-]?name|recipient[_-]?display[_-]?name|contact[_-]?name|contact[_-]?display[_-]?name|address|full[_-]?address|street[_-]?address|address[_-]?line1?|address[_-]?line2|city|country|region|province|postal[_-]?code|zip[_-]?code)\1(\s*[:=]\s*)(["']?)[^,}\]\n"']+\4''',
+        caseSensitive: false,
+      ),
+      (match) {
+        final quote = match.group(1) ?? '';
+        final key = match.group(2) ?? '';
+        final separator = match.group(3) ?? ': ';
+        final valueQuote = match.group(4) ?? '';
+        return '$quote$key$quote$separator$valueQuote***$valueQuote';
+      },
+    );
+
+    masked = masked.replaceAllMapped(
+      RegExp(
+        r'''(["']?)([a-z0-9_-]*file[_-]?names?)\1(\s*[:=]\s*)(?:(["'])([^"']*)\4|([^}\]\s"']+))''',
         caseSensitive: false,
       ),
       (match) {
@@ -587,14 +790,14 @@ class AppLogger {
     );
 
     masked = masked.replaceAllMapped(
-      RegExp(r'https?://[^\s]+[?][^\s]+', caseSensitive: false),
+      RegExp(r'https?://[^\s]+[?#][^\s]+', caseSensitive: false),
       (match) {
         final uri = Uri.tryParse(match.group(0)!);
-        if (uri == null || !uri.hasQuery) {
+        if (uri == null || (!uri.hasQuery && !uri.hasFragment)) {
           return match.group(0)!;
         }
 
-        return uri.replace(query: '***').toString();
+        return _maskUrlQueryAndFragment(uri);
       },
     );
 
@@ -649,6 +852,30 @@ class AppLogger {
     return normalized.endsWith('/')
         ? normalized.substring(0, normalized.length - 1)
         : normalized;
+  }
+
+  static String _maskUrlQueryAndFragment(Uri uri) {
+    final sanitized = Uri(
+      scheme: uri.scheme,
+      host: uri.host,
+      port: uri.hasPort ? uri.port : null,
+      path: '/***',
+    );
+    return sanitized.toString();
+  }
+
+  static bool _isHttpUrl(Uri uri) {
+    return uri.hasScheme && (uri.scheme == 'http' || uri.scheme == 'https');
+  }
+
+  static String _stripUrlCredentialsQueryAndFragment(Uri uri) {
+    final sanitized = Uri(
+      scheme: uri.scheme,
+      host: uri.host,
+      port: uri.hasPort ? uri.port : null,
+      path: uri.path,
+    );
+    return sanitized.toString().replaceFirst(RegExp(r'\?$'), '');
   }
 
   static String _normalizeLogText(String value) {

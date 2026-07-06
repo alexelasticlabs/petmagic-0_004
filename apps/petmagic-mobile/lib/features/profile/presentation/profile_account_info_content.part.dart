@@ -101,21 +101,18 @@ class _AccountProfileHeroCard extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
-              ProfileStatusPill(
-                label: profile.isPremium ? text.premiumLabel : text.freeLabel,
-                leading: profile.isPremium
-                    ? null
-                    : Icons.person_outline_rounded,
-                leadingWidget: profile.isPremium
-                    ? const PremiumCrownIcon(size: 13)
-                    : null,
-                backgroundColor: profile.isPremium
-                    ? const Color(0xFFFFC107).withValues(alpha: 0.18)
-                    : null,
-                foregroundColor: profile.isPremium
-                    ? const Color(0xFFF59E0B)
-                    : null,
-              ),
+              if (profile.isPremium)
+                ProfileStatusPill(
+                  label: text.premiumLabel,
+                  leadingWidget: const PremiumCrownIcon(size: 13),
+                  backgroundColor: colors.gold.withValues(alpha: 0.18),
+                  foregroundColor: colors.gold,
+                )
+              else
+                ProfileStatusPill(
+                  label: text.freeLabel,
+                  leading: Icons.person_outline_rounded,
+                ),
               ProfileStatusPill(
                 label: profile.emailConfirmed
                     ? text.profileEmailVerifiedShort

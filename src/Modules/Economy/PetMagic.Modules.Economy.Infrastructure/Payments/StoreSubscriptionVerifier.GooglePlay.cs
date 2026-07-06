@@ -37,14 +37,16 @@ public sealed partial class StoreSubscriptionVerifier
                 $"https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{Uri.EscapeDataString(options.Value.GooglePlayPackageName)}/purchases/subscriptionsv2/tokens/{Uri.EscapeDataString(request.ServerVerificationData)}");
             requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-            using var response = await CreateClient().SendAsync(requestMessage, cancellationToken);
+            using var response = await CreateClient().SendAsync(
+                requestMessage,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 return Result.Failure<StoreSubscriptionVerificationResponse>(EconomyErrors.StorePurchaseInvalid);
             }
 
-            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+            using var document = await ReadProviderJsonAsync(response.Content, cancellationToken);
             var root = document.RootElement;
 
             if (!root.TryGetProperty("subscriptionState", out var stateElement)
@@ -110,18 +112,18 @@ public sealed partial class StoreSubscriptionVerifier
         catch (Exception ex)
         {
             logger?.LogWarning(
-                ex,
-                "Store subscription verification failed. Provider={Provider} Operation={Operation} UserId={UserId} PlanCode={PlanCode} ProductId={ProductId} PurchaseId={PurchaseId} VerificationDataKind={VerificationDataKind} HasLocalVerificationData={HasLocalVerificationData} HasTransactionDate={HasTransactionDate} CorrelationId={CorrelationId}",
+                "Store subscription verification failed. Provider={Provider} Operation={Operation} UserIdHash={UserIdHash} PlanCode={PlanCode} ProductId={ProductId} PurchaseIdSafe={PurchaseIdSafe} VerificationDataKind={VerificationDataKind} HasLocalVerificationData={HasLocalVerificationData} HasTransactionDate={HasTransactionDate} ExceptionType={ExceptionType} CorrelationIdHash={CorrelationIdHash}",
                 "google_play",
                 "subscription_verify",
-                request.UserId,
+                EconomyLogSanitizer.SafeUserId(request.UserId),
                 request.PlanCode,
                 request.ProductId,
                 EconomyLogSanitizer.SafeExternalId(request.PurchaseId),
                 DescribeGooglePlayVerificationData(request.ServerVerificationData),
                 !string.IsNullOrWhiteSpace(request.LocalVerificationData),
                 !string.IsNullOrWhiteSpace(request.TransactionDate),
-                CorrelationContext.ResolveOrCreate());
+                SafeLogValues.ExceptionType(ex),
+                SafeLogValues.StableHash(CorrelationContext.ResolveOrCreate()));
 
             return Result.Failure<StoreSubscriptionVerificationResponse>(EconomyErrors.StoreVerificationUnavailable);
         }
@@ -151,14 +153,16 @@ public sealed partial class StoreSubscriptionVerifier
                 $"https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{Uri.EscapeDataString(options.Value.GooglePlayPackageName)}/purchases/products/{Uri.EscapeDataString(request.ProductId)}/tokens/{Uri.EscapeDataString(request.ServerVerificationData)}");
             requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-            using var response = await CreateClient().SendAsync(requestMessage, cancellationToken);
+            using var response = await CreateClient().SendAsync(
+                requestMessage,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 return Result.Failure<StoreProductVerificationResponse>(EconomyErrors.StorePurchaseInvalid);
             }
 
-            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+            using var document = await ReadProviderJsonAsync(response.Content, cancellationToken);
             var root = document.RootElement;
 
             var purchaseState = root.TryGetProperty("purchaseState", out var purchaseStateElement)
@@ -193,17 +197,17 @@ public sealed partial class StoreSubscriptionVerifier
         catch (Exception ex)
         {
             logger?.LogWarning(
-                ex,
-                "Store product verification failed. Provider={Provider} Operation={Operation} UserId={UserId} ProductId={ProductId} PurchaseId={PurchaseId} VerificationDataKind={VerificationDataKind} HasLocalVerificationData={HasLocalVerificationData} HasTransactionDate={HasTransactionDate} CorrelationId={CorrelationId}",
+                "Store product verification failed. Provider={Provider} Operation={Operation} UserIdHash={UserIdHash} ProductId={ProductId} PurchaseIdSafe={PurchaseIdSafe} VerificationDataKind={VerificationDataKind} HasLocalVerificationData={HasLocalVerificationData} HasTransactionDate={HasTransactionDate} ExceptionType={ExceptionType} CorrelationIdHash={CorrelationIdHash}",
                 "google_play",
                 "product_verify",
-                request.UserId,
+                EconomyLogSanitizer.SafeUserId(request.UserId),
                 request.ProductId,
                 EconomyLogSanitizer.SafeExternalId(request.PurchaseId),
                 DescribeGooglePlayVerificationData(request.ServerVerificationData),
                 !string.IsNullOrWhiteSpace(request.LocalVerificationData),
                 !string.IsNullOrWhiteSpace(request.TransactionDate),
-                CorrelationContext.ResolveOrCreate());
+                SafeLogValues.ExceptionType(ex),
+                SafeLogValues.StableHash(CorrelationContext.ResolveOrCreate()));
 
             return Result.Failure<StoreProductVerificationResponse>(EconomyErrors.StoreVerificationUnavailable);
         }
@@ -246,13 +250,17 @@ public sealed partial class StoreSubscriptionVerifier
             var signature = SignGoogleJwt(unsignedToken, options.Value.GooglePlayPrivateKeyPem);
             var assertion = $"{unsignedToken}.{signature}";
 
-            using var response = await CreateClient().PostAsync(
-                "https://oauth2.googleapis.com/token",
-                new FormUrlEncodedContent(new Dictionary<string, string>
+            using var tokenRequest = new HttpRequestMessage(HttpMethod.Post, "https://oauth2.googleapis.com/token")
+            {
+                Content = new FormUrlEncodedContent(new Dictionary<string, string>
                 {
                     ["grant_type"] = "urn:ietf:params:oauth:grant-type:jwt-bearer",
                     ["assertion"] = assertion
-                }),
+                })
+            };
+            using var response = await CreateClient().SendAsync(
+                tokenRequest,
+                HttpCompletionOption.ResponseHeadersRead,
                 cancellationToken);
 
             if (!response.IsSuccessStatusCode)
@@ -260,8 +268,7 @@ public sealed partial class StoreSubscriptionVerifier
                 return null;
             }
 
-            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+            using var document = await ReadProviderJsonAsync(response.Content, cancellationToken);
             if (!document.RootElement.TryGetProperty("access_token", out var tokenElement)
                 || tokenElement.ValueKind != JsonValueKind.String)
             {
@@ -294,6 +301,17 @@ public sealed partial class StoreSubscriptionVerifier
         rsa.ImportFromPem(pem);
         var signature = rsa.SignData(Encoding.UTF8.GetBytes(value), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
         return Base64UrlEncode(signature);
+    }
+
+    private static async Task<JsonDocument> ReadProviderJsonAsync(
+        HttpContent content,
+        CancellationToken cancellationToken)
+    {
+        var responseBody = await SafeHttpContentReader.ReadRawStringPrefixAsync(
+            content,
+            cancellationToken,
+            ProviderJsonResponseMaxChars);
+        return JsonDocument.Parse(responseBody);
     }
 
     private static string Base64UrlEncode(byte[] bytes)

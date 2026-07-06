@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 
+using PetMagic.BuildingBlocks.Storage;
 using PetMagic.Modules.Identity.Infrastructure.Options;
 
 namespace PetMagic.Modules.Identity.Infrastructure;
@@ -54,6 +55,7 @@ public sealed class AvatarReadUrlSigner(
             Query =
                 $"{ExpiresQueryKey}={Uri.EscapeDataString(expiresAtUnixSeconds.ToString())}&{SignatureQueryKey}={Uri.EscapeDataString(signature)}"
         };
+        builder.Fragment = string.Empty;
         return builder.Uri.ToString();
     }
 
@@ -190,15 +192,7 @@ public sealed class AvatarReadUrlSigner(
 
     private static bool IsUnsafePathSegment(string segment)
     {
-        if (string.Equals(segment, ".", StringComparison.Ordinal)
-            || string.Equals(segment, "..", StringComparison.Ordinal))
-        {
-            return true;
-        }
-
-        var decodedSegment = Uri.UnescapeDataString(segment);
-        return string.Equals(decodedSegment, ".", StringComparison.Ordinal)
-            || string.Equals(decodedSegment, "..", StringComparison.Ordinal);
+        return ManagedPathSegments.IsUnsafe(segment);
     }
 
     private static bool ContainsUnsafePathSegments(string value)

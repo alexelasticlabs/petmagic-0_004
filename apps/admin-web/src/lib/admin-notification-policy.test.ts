@@ -7,15 +7,11 @@ import {
 
 describe("isActionableAdminNotification", () => {
   it("keeps support realtime notifications even with info tone", () => {
-    expect(isActionableAdminNotification({ source: "support-realtime", tone: "info" })).toBe(
-      true
-    );
+    expect(isActionableAdminNotification({ source: "support-realtime", tone: "info" })).toBe(true);
   });
 
   it("keeps errors and warnings for non-realtime sources", () => {
-    expect(isActionableAdminNotification({ source: "templates-editor", tone: "error" })).toBe(
-      true
-    );
+    expect(isActionableAdminNotification({ source: "templates-editor", tone: "error" })).toBe(true);
     expect(isActionableAdminNotification({ source: "templates-editor", tone: "warning" })).toBe(
       true
     );

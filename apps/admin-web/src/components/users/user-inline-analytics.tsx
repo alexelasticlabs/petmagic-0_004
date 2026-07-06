@@ -88,7 +88,10 @@ export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps
       title={text.userInlineAnalyticsTitle}
       description={text.userInlineAnalyticsDescription}
       action={
-        <Link href={`/${locale}/users/${encodeURIComponent(user.userId)}`} className={styles.profileLink}>
+        <Link
+          href={`/${locale}/users/${encodeURIComponent(user.userId)}`}
+          className={styles.profileLink}
+        >
           {text.userOpenFullProfile}
         </Link>
       }
@@ -185,7 +188,9 @@ export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps
             <div className={styles.list}>
               {analytics.recentPurchases.slice(0, 4).map((purchase) => (
                 <article key={purchase.orderId} className={styles.compactCard}>
-                  <strong>{formatLabeledMetric(text.purchasedSparkLabel, purchase.sparkToGrant)}</strong>
+                  <strong>
+                    {formatLabeledMetric(text.purchasedSparkLabel, purchase.sparkToGrant)}
+                  </strong>
                   <span>
                     {purchase.priceAmount} {sanitizeSensitiveText(purchase.currencyCode, 12)}
                   </span>

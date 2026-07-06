@@ -103,6 +103,33 @@ void main() {
     await optimized.dispose();
   });
 
+  test('sanitizes temporary optimizer profile names', () async {
+    final sourcePath = '${tempDir.path}/unsafe-profile-source.jpg';
+    final sourceBytes = _noisyJpegBytes(width: 1200, height: 900);
+    await File(sourcePath).writeAsBytes(sourceBytes, flush: true);
+
+    const optimizer = ImageUploadOptimizer(
+      generationSourceProfile: ImageUploadOptimizationProfile(
+        logProfileName: r'..\private/support image',
+        minInputBytes: 1,
+        maxDimension: 420,
+        jpegQuality: 60,
+      ),
+    );
+    final optimized = await optimizer.optimizeGenerationSource(
+      XFile(sourcePath, name: 'source-photo.jpg'),
+    );
+
+    final tempName = optimized.file.path.split(Platform.pathSeparator).last;
+    expect(optimized.isTemporary, true);
+    expect(tempName, startsWith('petmagic_support_image_'));
+    expect(tempName, isNot(contains('..')));
+    expect(tempName, isNot(contains('/')));
+    expect(tempName, isNot(contains(r'\')));
+
+    await optimized.dispose();
+  });
+
   test('skips already-small pet photos', () async {
     final sourcePath = '${tempDir.path}/pet-photo.jpg';
     final sourceBytes = _noisyJpegBytes(width: 320, height: 240);

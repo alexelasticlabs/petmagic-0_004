@@ -12,6 +12,7 @@ const promoterPath = join(scriptDir, 'promote-template-feed-long-scroll-artifact
 try {
   await assertPendingPromotion();
   await assertLowMemoryPromotion();
+  await assertReleaseSignoffRejectsOrdinaryDeviceLabel();
   console.log('template feed long-scroll promoter self-test passed');
 } catch (error) {
   console.error(error.stack || String(error));
@@ -38,6 +39,18 @@ async function assertLowMemoryPromotion() {
   const markdown = readFileSync(output, 'utf8');
   assert(markdown.includes('Low-memory emulator signoff: PASS'), 'low-memory signoff missing');
   assert(!markdown.includes('not final Task 2 release evidence'), 'PASS artifact must not include pending note');
+}
+
+async function assertReleaseSignoffRejectsOrdinaryDeviceLabel() {
+  const fixture = createFixture('ordinary-signoff');
+  const output = join(fixture, 'curated.md');
+  const result = await runPromoter(fixture, output, 'low-memory-emulator', 'ordinary device');
+
+  assert(result.code !== 0, 'release signoff with ordinary device label should fail');
+  assert(
+    result.stderr.includes('Release signoff requires a concrete weak-device or low-memory device label.'),
+    `missing concrete device-label failure\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
+  );
 }
 
 function createFixture(label) {

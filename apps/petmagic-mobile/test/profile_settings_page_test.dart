@@ -235,6 +235,16 @@ void main() {
     expect(feedbackSource, contains('AppLogger.warn('));
     expect(feedbackSource, contains("feature: 'Profile.SettingsFeedback'"));
     expect(feedbackSource, isNot(contains('} catch (_) {')));
+    expect(contentSource, contains('Color.alphaBlend('));
+    expect(
+      contentSource,
+      contains('colors.danger.withValues(alpha: isLight ? 0.08 : 0.18)'),
+    );
+    expect(contentSource, contains('colors.surfaceStrong'));
+    expect(contentSource, isNot(contains('const Color(0xFFF7EEF0)')));
+    expect(contentSource, isNot(contains('const Color(0xFF151A29)')));
+    expect(contentSource, isNot(contains('const Color(0xFFFDF7F8)')));
+    expect(contentSource, isNot(contains('const Color(0xFF1A2236)')));
   });
 }
 

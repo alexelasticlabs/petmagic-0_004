@@ -139,6 +139,61 @@ void main() {
     expect(source, isNot(contains('Политику конфиденциальности')));
   });
 
+  test('auth primary controls use themed contrast colors', () {
+    final authContentSource = File(
+      'lib/features/profile/presentation/auth_entry_content.part.dart',
+    ).readAsStringSync();
+    final authHeroSource = File(
+      'lib/features/profile/presentation/widgets/auth_flow_hero.part.dart',
+    ).readAsStringSync();
+    final consentSource = File(
+      'lib/features/profile/presentation/auth_entry_consent.part.dart',
+    ).readAsStringSync();
+    final resetSource = File(
+      'lib/features/profile/presentation/password_reset_page.dart',
+    ).readAsStringSync();
+
+    expect(authContentSource, contains('colorScheme.onPrimary'));
+    expect(consentSource, contains('colorScheme.onPrimary'));
+    expect(resetSource, contains('colorScheme.onPrimary'));
+    for (final source in [authContentSource, consentSource, resetSource]) {
+      expect(source, isNot(contains('foregroundColor: isDark')));
+      expect(source, isNot(contains('checkColor: isDark')));
+      expect(source, isNot(contains('const Color(0xFF03130C)')));
+      expect(source, isNot(contains('const Color(0xFFD6E2DC)')));
+    }
+    expect(authHeroSource, contains('color: colors.textStrong'));
+    expect(authHeroSource, isNot(contains('const Color(0xFF10234A)')));
+  });
+
+  test('auth shared form surfaces use theme tokens', () {
+    final formSource = File(
+      'lib/features/profile/presentation/widgets/auth_flow_form.part.dart',
+    ).readAsStringSync();
+
+    expect(formSource, contains('final colors = context.petMagicColors;'));
+    expect(formSource, contains('colors.surfaceGlass.withValues(alpha: 0.72)'));
+    expect(formSource, contains('colors.surfaceStrong : colors.surface'));
+    expect(
+      formSource,
+      contains('colors.border.withValues(alpha: isDark ? 0.64 : 0.72)'),
+    );
+    expect(formSource, contains('colors.surfaceGlass.withValues(alpha: 0.86)'));
+    for (final rawColor in const [
+      'const Color(0xB8181F26)',
+      'const Color(0xB8FFFFFF)',
+      'const Color(0x40789687)',
+      'const Color(0x8CB4C8BE)',
+      'const Color(0xFF141C24)',
+      'const Color(0xFFFCFEFF)',
+      'const Color(0x665F7D70)',
+      'const Color(0xB6BAC8D2)',
+      'const Color(0xCC111922)',
+    ]) {
+      expect(formSource, isNot(contains(rawColor)));
+    }
+  });
+
   test(
     'profile account info page keeps account cards split from orchestration',
     () {
@@ -156,6 +211,13 @@ void main() {
       expect(pageSource, isNot(contains('class _AccountProfileHeroCard')));
       expect(accountContentSource, contains('class _AccountProfileHeroCard'));
       expect(accountContentSource, contains('class _ProfileEditableNameCard'));
+      expect(
+        accountContentSource,
+        contains('backgroundColor: colors.gold.withValues(alpha: 0.18)'),
+      );
+      expect(accountContentSource, contains('foregroundColor: colors.gold'));
+      expect(accountContentSource, isNot(contains('const Color(0xFFFFC107)')));
+      expect(accountContentSource, isNot(contains('const Color(0xFFF59E0B)')));
     },
   );
 }

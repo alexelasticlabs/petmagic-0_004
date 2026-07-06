@@ -62,22 +62,40 @@ public sealed class GamificationApiStartupSmokeTests
     }
 
     [Fact]
-    public async Task GamificationAdminEndpoints_ShouldRequireAdminOrModeratorPolicy()
+    public async Task GamificationAdminEndpoints_ShouldRequireAdminRolePolicy()
     {
         await using var app = await GamificationApiStartupTestApplication.CreateAsync();
 
         Assert.Empty(app.GetAdminRoutesWithoutRolePolicy());
     }
 
-    [Fact]
-    public async Task GamificationAdminMutationEndpoint_ShouldRequireAdminOnlyPolicy()
+    [Theory]
+    [InlineData("GET", "/api/admin/gamification/dashboard/metrics")]
+    [InlineData("GET", "/api/admin/gamification/achievements")]
+    [InlineData("GET", "/api/admin/gamification/challenges/current")]
+    [InlineData("GET", "/api/admin/gamification/users/{userId:guid}")]
+    [InlineData("DELETE", "/api/admin/gamification/users/{userId:guid}/streak")]
+    public async Task GamificationAdminEndpoints_ShouldRequireAdminOnlyPolicy(
+        string method,
+        string routePattern)
+    {
+        await using var app = await GamificationApiStartupTestApplication.CreateAsync();
+        var policies = app.GetAuthorizationPolicies(method, routePattern);
+
+        Assert.Contains("AdminOnly", policies, StringComparer.Ordinal);
+        Assert.DoesNotContain("ModeratorOrAdmin", policies, StringComparer.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("POST", "/api/gamification/streaks/freeze")]
+    [InlineData("DELETE", "/api/admin/gamification/users/{userId:guid}/streak")]
+    public async Task GamificationMutationEndpoints_ShouldLimitRequestBodiesBeforeHandlerExecution(
+        string method,
+        string routePattern)
     {
         await using var app = await GamificationApiStartupTestApplication.CreateAsync();
 
-        Assert.Contains(
-            "AdminOnly",
-            app.GetAuthorizationPolicies("DELETE", "/api/admin/gamification/users/{userId:guid}/streak"),
-            StringComparer.Ordinal);
+        Assert.Equal(8 * 1024, app.GetRequestSizeLimit(method, routePattern));
     }
 
     private sealed class GamificationApiStartupTestApplication : IAsyncDisposable
@@ -217,6 +235,22 @@ public sealed class GamificationApiStartupSmokeTests
                 .Select(metadata => metadata.Policy)
                 .Where(policy => !string.IsNullOrWhiteSpace(policy))
                 .ToArray()!;
+        }
+
+        public long? GetRequestSizeLimit(string method, string routePattern)
+        {
+            var endpoint = app.Services
+                .GetRequiredService<EndpointDataSource>()
+                .Endpoints
+                .OfType<RouteEndpoint>()
+                .Single(endpoint =>
+                    string.Equals(endpoint.RoutePattern.RawText, routePattern, StringComparison.Ordinal)
+                    && endpoint.Metadata
+                        .GetRequiredMetadata<IHttpMethodMetadata>()
+                        .HttpMethods
+                        .Contains(method, StringComparer.OrdinalIgnoreCase));
+
+            return endpoint.Metadata.GetMetadata<IRequestSizeLimitMetadata>()?.MaxRequestBodySize;
         }
 
         public async ValueTask DisposeAsync()

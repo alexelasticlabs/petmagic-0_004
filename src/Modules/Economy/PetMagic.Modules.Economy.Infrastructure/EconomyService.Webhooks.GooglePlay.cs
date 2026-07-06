@@ -40,6 +40,13 @@ public sealed partial class EconomyService
 
             if (parsed.IsOneTimeProductNotification)
             {
+                var purchaseTokenExternalPaymentId = string.IsNullOrWhiteSpace(parsed.PurchaseToken)
+                    ? null
+                    : ResolveStoreExternalPaymentId("google_play", parsed.PurchaseToken, null, parsed.PurchaseToken);
+                var legacyPurchaseTokenExternalPaymentId = string.IsNullOrWhiteSpace(parsed.PurchaseToken)
+                    ? null
+                    : ResolveLegacyStoreExternalPaymentId("google_play", parsed.PurchaseToken, null, parsed.PurchaseToken);
+
                 var pendingOrder = await dbContext.PurchaseOrders
                     .Join(
                         dbContext.CurrencyPacks.AsNoTracking(),
@@ -49,8 +56,9 @@ public sealed partial class EconomyService
                     .Where(x =>
                         x.order.PaymentProvider == "google_play"
                         && x.order.Status == PurchaseOrderStatus.Pending
-                        && !string.IsNullOrWhiteSpace(parsed.PurchaseToken)
-                        && x.order.ExternalPaymentId == parsed.PurchaseToken)
+                        && purchaseTokenExternalPaymentId != null
+                        && (x.order.ExternalPaymentId == purchaseTokenExternalPaymentId
+                            || (legacyPurchaseTokenExternalPaymentId != null && x.order.ExternalPaymentId == legacyPurchaseTokenExternalPaymentId)))
                     .OrderByDescending(x => x.order.CreatedAtUtc)
                     .Select(x => new { x.order, ExpectedProductId = ResolvePackStoreProductId(x.pack, "google_play") })
                     .FirstOrDefaultAsync(cancellationToken);
@@ -98,11 +106,22 @@ public sealed partial class EconomyService
                 return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, false, "ignored_unknown_notification"));
             }
 
+            var purchaseTokenExternalTransactionId = string.IsNullOrWhiteSpace(parsed.PurchaseToken)
+                ? null
+                : BuildGooglePlayPurchaseTokenReference(parsed.PurchaseToken);
+            var legacyPurchaseTokenExternalTransactionId = string.IsNullOrWhiteSpace(parsed.PurchaseToken)
+                ? null
+                : parsed.PurchaseToken.Trim();
+
             var existingSubscription = await dbContext.UserSubscriptions
                 .FirstOrDefaultAsync(
                     x => x.Provider == "google_play"
-                        && ((!string.IsNullOrWhiteSpace(parsed.PurchaseToken) && x.ExternalTransactionId == parsed.PurchaseToken)
-                            || (!string.IsNullOrWhiteSpace(parsed.PurchaseToken) && x.ExternalSubscriptionId == parsed.PurchaseToken)),
+                        && purchaseTokenExternalTransactionId != null
+                        && (x.ExternalTransactionId == purchaseTokenExternalTransactionId
+                            || x.ExternalSubscriptionId == purchaseTokenExternalTransactionId
+                            || (legacyPurchaseTokenExternalTransactionId != null
+                                && (x.ExternalTransactionId == legacyPurchaseTokenExternalTransactionId
+                                    || x.ExternalSubscriptionId == legacyPurchaseTokenExternalTransactionId))),
                     cancellationToken);
 
             if (existingSubscription is null)
@@ -156,12 +175,13 @@ public sealed partial class EconomyService
                 status,
                 existingSubscription.ExternalCustomerId,
                 existingSubscription.ExternalSubscriptionId ?? verification.Value.ExternalSubscriptionId,
-                parsed.PurchaseToken ?? existingSubscription.ExternalTransactionId,
+                purchaseTokenExternalTransactionId ?? existingSubscription.ExternalTransactionId,
                 ResolveNotificationPeriodStartUtc(plan.BillingPeriod, currentPeriodEndUtc, existingSubscription.CurrentPeriodStartUtc),
                 currentPeriodEndUtc,
                 cancelAtPeriodEnd,
                 plan.MonthlyTokenLimit,
-                cancellationToken);
+                cancellationToken,
+                legacyPurchaseTokenExternalTransactionId);
             if (subscriptionResult.IsFailure)
             {
                 return Result.Failure<StoreWebhookResultResponse>(subscriptionResult.Error);

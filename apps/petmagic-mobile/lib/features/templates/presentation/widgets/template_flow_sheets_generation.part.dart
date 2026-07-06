@@ -97,6 +97,7 @@ class _GenerationCompletedPremiumGate extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
     final isLight = Theme.of(context).brightness == Brightness.light;
 
     return LayoutBuilder(
@@ -109,9 +110,7 @@ class _GenerationCompletedPremiumGate extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(22),
             border: Border.all(
-              color: const Color(
-                0xFFE0A91E,
-              ).withValues(alpha: isLight ? 0.78 : 0.9),
+              color: colors.gold.withValues(alpha: isLight ? 0.78 : 0.9),
               width: 1.15,
             ),
             gradient: LinearGradient(
@@ -127,12 +126,7 @@ class _GenerationCompletedPremiumGate extends StatelessWidget {
                 top: 8,
                 child: IconButton(
                   onPressed: onClose,
-                  icon: Icon(
-                    Icons.close_rounded,
-                    color: isLight
-                        ? const Color(0xFF514325)
-                        : const Color(0xFFE1DED4),
-                  ),
+                  icon: Icon(Icons.close_rounded, color: colors.textSoft),
                 ),
               ),
               Positioned(
@@ -155,9 +149,7 @@ class _GenerationCompletedPremiumGate extends StatelessWidget {
                     Text(
                       '${text.generationStatusVideoReady}! 🎉',
                       style: TextStyle(
-                        color: isLight
-                            ? const Color(0xFF1E1608)
-                            : const Color(0xFFEDE7D8),
+                        color: colors.textStrong,
                         fontSize: compact ? 27 : 32,
                         fontWeight: FontWeight.w900,
                         height: 1.02,
@@ -167,9 +159,7 @@ class _GenerationCompletedPremiumGate extends StatelessWidget {
                     Text(
                       text.templateFlowCompletedPremiumHeadline,
                       style: TextStyle(
-                        color: isLight
-                            ? const Color(0xFF3C3222)
-                            : const Color(0xFFD2D8E5),
+                        color: colors.textStrong,
                         fontSize: compact ? 15.5 : 17.5,
                         fontWeight: FontWeight.w700,
                       ),
@@ -178,9 +168,7 @@ class _GenerationCompletedPremiumGate extends StatelessWidget {
                     Text(
                       text.templateFlowCompletedPremiumMessage,
                       style: TextStyle(
-                        color: isLight
-                            ? const Color(0xFF3B3324)
-                            : const Color(0xFFE3DFD2),
+                        color: colors.textSoft,
                         fontSize: compact ? 13.4 : 15.2,
                         height: 1.3,
                         fontWeight: FontWeight.w500,
@@ -200,9 +188,9 @@ class _GenerationCompletedPremiumGate extends StatelessWidget {
                         onPressed: onLater,
                         style: OutlinedButton.styleFrom(
                           side: BorderSide(
-                            color: isLight
-                                ? const Color(0xFFBCB29B)
-                                : const Color(0xFF2A3651),
+                            color: colors.border.withValues(
+                              alpha: isLight ? 0.9 : 0.78,
+                            ),
                           ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
@@ -211,9 +199,7 @@ class _GenerationCompletedPremiumGate extends StatelessWidget {
                         child: Text(
                           text.templateFlowChooseAnotherTemplateAction,
                           style: TextStyle(
-                            color: isLight
-                                ? const Color(0xFF3C3324)
-                                : const Color(0xFFC6CEDD),
+                            color: colors.textSoft,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -368,13 +354,15 @@ class _GenerationGoldShimmerButtonState
   }
 
   Widget _buildButtonSurface() {
+    final foreground = context.petMagicColors.on(const Color(0xFFEAB13A));
+
     return Center(
       child: FittedBox(
         fit: BoxFit.scaleDown,
         child: Text(
           widget.label,
-          style: const TextStyle(
-            color: Color(0xFF261903),
+          style: TextStyle(
+            color: foreground,
             fontSize: 17,
             fontWeight: FontWeight.w900,
           ),

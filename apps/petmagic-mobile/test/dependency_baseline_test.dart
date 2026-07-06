@@ -10,7 +10,7 @@ void main() {
       'cupertino_icons': '^1.0.9',
       'go_router': '^17.3.0',
       'google_fonts': '^8.1.0',
-      'image_picker': '^1.2.2',
+      'image_picker': '^1.2.3',
       'share_plus': '^13.2.0',
       'in_app_purchase': '^3.3.0',
       'firebase_core': '^4.10.0',

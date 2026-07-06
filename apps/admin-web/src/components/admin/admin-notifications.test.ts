@@ -142,7 +142,12 @@ describe("admin notification sanitization", () => {
     const source = readFileSync(adminNotificationsPath, "utf8");
 
     expect(source).toContain("function getAdminNotificationStorageErrorDetails(error: unknown)");
+    expect(source).toContain(
+      "function removeStoredAdminNotifications(storageFailureEvent: string)"
+    );
     expect(source).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
+    expect(source).toContain("clientLogger.warn(storageFailureEvent,");
+    expect(source).toContain("getAdminNotificationStorageErrorDetails(error)");
     expect(source).toContain(
       'clientLogger.warn(\n      "admin.notifications_hydrate_failed",\n      getAdminNotificationStorageErrorDetails(error)\n    );'
     );
@@ -155,6 +160,35 @@ describe("admin notification sanitization", () => {
     expect(source).not.toContain(
       'clientLogger.warn("admin.notifications_persist_failed", { error });'
     );
+    expect(source).not.toContain(
+      'catch (error) {\n    clientLogger.warn(\n      "admin.notifications_hydrate_failed",\n      getAdminNotificationStorageErrorDetails(error)\n    );\n    window.localStorage.removeItem(ADMIN_NOTIFICATIONS_STORAGE_KEY);'
+    );
+  });
+
+  it("removes empty persisted notification state instead of storing an empty list", () => {
+    const source = readFileSync(adminNotificationsPath, "utf8");
+
+    expect(source).toContain("if (items.length === 0)");
+    expect(
+      source.indexOf(
+        'removeStoredAdminNotifications("admin.notifications_empty_persist_cleanup_failed");'
+      )
+    ).toBeLessThan(source.indexOf("window.localStorage.setItem(ADMIN_NOTIFICATIONS_STORAGE_KEY"));
+  });
+
+  it("cleans malformed or fully stale notification storage through safe cleanup", () => {
+    const source = readFileSync(adminNotificationsPath, "utf8");
+
+    expect(source).toContain(
+      'removeStoredAdminNotifications("admin.notifications_invalid_storage_cleanup_failed");'
+    );
+    expect(source).toContain(
+      'removeStoredAdminNotifications("admin.notifications_empty_hydration_cleanup_failed");'
+    );
+    expect(source).toContain(
+      'removeStoredAdminNotifications("admin.notifications_hydrate_cleanup_failed");'
+    );
+    expect(source).not.toContain("if (!Array.isArray(parsed)) {\n      return [];\n    }");
   });
 
   it("sanitizes notification text again at the topbar render boundary", () => {

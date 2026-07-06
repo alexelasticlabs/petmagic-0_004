@@ -112,6 +112,21 @@ public sealed class AuthEndpointsNativeGoogleTests
     }
 
     [Fact]
+    public async Task LoginValidationError_ShouldApplyNoStoreHeaders()
+    {
+        await using var app = await TestApplication.CreateAsync(
+            new FakeGoogleIdentityTokenVerifier(isConfigured: true, clientId: "google-web-client-id"),
+            new FakeIdentityService());
+
+        var response = await app.Client.PostAsJsonAsync(
+            "/api/auth/login",
+            new LoginCommand(string.Empty, string.Empty));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        AssertNoStoreCacheHeaders(response);
+    }
+
+    [Fact]
     public async Task LegalCurrent_ShouldReturnServiceUnavailable_WhenLegalCatalogFails()
     {
         var verifier = new FakeGoogleIdentityTokenVerifier(isConfigured: true, clientId: "google-web-client-id");
@@ -128,7 +143,9 @@ public sealed class AuthEndpointsNativeGoogleTests
         var payload = JsonNode.Parse(body);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
-        Assert.Equal("Current legal documents are temporarily unavailable.", payload?["detail"]?.GetValue<string>());
+        Assert.Equal("legal.catalog_unavailable", payload?["title"]?.GetValue<string>());
+        Assert.Equal("legal.catalog_unavailable", payload?["code"]?.GetValue<string>());
+        Assert.Null(payload?["detail"]);
         Assert.DoesNotContain("legal-private", body, StringComparison.Ordinal);
         Assert.DoesNotContain("storage=r2", body, StringComparison.Ordinal);
     }
@@ -229,7 +246,9 @@ public sealed class AuthEndpointsNativeGoogleTests
         var payload = JsonNode.Parse(body);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-        Assert.Equal("External identity token is invalid.", payload?["detail"]?.GetValue<string>());
+        Assert.Equal("auth.external_token_invalid", payload?["title"]?.GetValue<string>());
+        Assert.Equal("auth.external_token_invalid", payload?["code"]?.GetValue<string>());
+        Assert.Null(payload?["detail"]);
         Assert.DoesNotContain("secret-token", body, StringComparison.Ordinal);
         Assert.DoesNotContain("trace=", body, StringComparison.Ordinal);
     }
@@ -260,7 +279,9 @@ public sealed class AuthEndpointsNativeGoogleTests
         var payload = JsonNode.Parse(body);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-        Assert.Equal("Account is unavailable.", payload?["detail"]?.GetValue<string>());
+        Assert.Equal("auth.account_deleted", payload?["title"]?.GetValue<string>());
+        Assert.Equal("auth.account_deleted", payload?["code"]?.GetValue<string>());
+        Assert.Null(payload?["detail"]);
         Assert.DoesNotContain("provider_blocklist", body, StringComparison.Ordinal);
         Assert.DoesNotContain("internal_reason", body, StringComparison.Ordinal);
     }
@@ -372,7 +393,8 @@ public sealed class AuthEndpointsNativeGoogleTests
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Contains("Avatar content type is not allowed", body, StringComparison.Ordinal);
+        Assert.Contains("users.avatar_content_type_not_allowed", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("Avatar content type is not allowed", body, StringComparison.Ordinal);
         Assert.Null(service.LastUpdateAvatarCommand);
     }
 
@@ -392,6 +414,8 @@ public sealed class AuthEndpointsNativeGoogleTests
         Assert.Contains(
             response.Headers.Pragma,
             value => string.Equals(value.Name, "no-cache", StringComparison.OrdinalIgnoreCase));
+        Assert.True(response.Headers.TryGetValues("X-Content-Type-Options", out var contentTypeOptions));
+        Assert.Contains("nosniff", contentTypeOptions);
     }
 
     private sealed class GoogleMobileConfigResponse
@@ -683,7 +707,7 @@ public sealed class AuthEndpointsNativeGoogleTests
             return NotSupported<UserProfileResponse>();
         }
         public Task<Result<UserProfileResponse>> RemoveUserAvatarAsync(RemoveUserAvatarCommand command, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
-        public Task<Result<UserListPageResponse>> ListUsersAsync(int skip, int take, string? search, string? role, string? status, bool? isPremium, CancellationToken cancellationToken) => NotSupported<UserListPageResponse>();
+        public Task<Result<UserListPageResponse>> ListUsersAsync(int skip, int take, string? search, string? role, string? status, bool? isPremium, string? sort, CancellationToken cancellationToken) => NotSupported<UserListPageResponse>();
         public Task<Result<AdminUserDashboardMetricsResponse>> GetAdminUserDashboardMetricsAsync(CancellationToken cancellationToken) => NotSupported<AdminUserDashboardMetricsResponse>();
         public Task<Result<AdminUserDetailResponse>> GetAdminUserAsync(Guid userId, CancellationToken cancellationToken) => NotSupported<AdminUserDetailResponse>();
         public Task<Result<AdminUserAnalyticsResponse>> GetAdminUserAnalyticsAsync(Guid userId, CancellationToken cancellationToken) => NotSupported<AdminUserAnalyticsResponse>();

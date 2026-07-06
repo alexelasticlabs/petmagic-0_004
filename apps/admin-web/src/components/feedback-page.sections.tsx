@@ -22,7 +22,7 @@ import {
 } from "@/lib/api-client";
 import { formatDateTime } from "@/lib/format-date-time";
 import { type Locale } from "@/lib/i18n";
-import { sanitizeSensitiveText } from "@/lib/sensitive-display";
+import { maskEmail, sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 import { getFeedbackPageText, type FeedbackPageText } from "./feedback-page.content";
 
@@ -146,10 +146,12 @@ export function FeedbackRow({
 }
 
 export function DetailsPanel({
+  canViewUserProfile,
   details,
   isDetailsFetching,
   locale,
 }: {
+  canViewUserProfile: boolean;
   details: AdminFeedbackDetails;
   isDetailsFetching: boolean;
   locale: Locale;
@@ -206,7 +208,7 @@ export function DetailsPanel({
     adminNote !== (details.adminNote ?? "");
   const isSaveFeedbackDisabled = !isFeedbackDraftDirty || isFeedbackActionLocked;
   const isRefundFeedbackDisabled =
-    !details.canRefund || refundableCredits <= 0 || isFeedbackActionLocked;
+    !canViewUserProfile || !details.canRefund || refundableCredits <= 0 || isFeedbackActionLocked;
   const requestSaveFeedback = () => {
     if (isSaveFeedbackDisabled) {
       return;
@@ -226,14 +228,14 @@ export function DetailsPanel({
       ? adminQueryKeys.userDetail(details.userId)
       : adminQueryKeys.userDetailDisabled,
     queryFn: ({ signal }) => fetchAdminUser(details.userId!, signal),
-    enabled: Boolean(details.userId),
+    enabled: canViewUserProfile && Boolean(details.userId),
   });
   const userAnalyticsQuery = useQuery({
     queryKey: details.userId
       ? adminQueryKeys.userAnalytics(details.userId)
       : adminQueryKeys.userAnalyticsDisabled,
     queryFn: ({ signal }) => fetchAdminUserAnalytics(details.userId!, signal),
-    enabled: Boolean(details.userId),
+    enabled: canViewUserProfile && Boolean(details.userId),
   });
   const userPlan =
     details.userPlan ??
@@ -251,7 +253,7 @@ export function DetailsPanel({
       : (userAnalyticsQuery.data?.summary.walletBalance ?? "-"));
   // prettier-ignore
   const hasUserContextError =
-    Boolean(details.userId) && (userQuery.isError || userAnalyticsQuery.isError);
+    canViewUserProfile && Boolean(details.userId) && (userQuery.isError || userAnalyticsQuery.isError);
   const isUserContextFetching = userQuery.isFetching || userAnalyticsQuery.isFetching;
 
   return (
@@ -262,7 +264,12 @@ export function DetailsPanel({
             <Detail label={text.type} value={optionLabel(text.typeOptions, details.type)} />
             <Detail label={text.category} value={details.category} />
             <Detail label={text.rating} value={ratingLabel(details.rating, text)} />
-            <Detail label={text.user} value={userQuery.data?.email ?? shortId(details.userId)} />
+            <Detail
+              label={text.user}
+              value={
+                userQuery.data?.email ? maskEmail(userQuery.data.email) : shortId(details.userId)
+              }
+            />
             <Detail label={text.planCredits} value={`${userPlan} / ${userCredits}`} />
             <Detail label={text.source} value={details.sourceScreen} />
             <Detail label={text.platform} value={details.platform ?? "-"} />

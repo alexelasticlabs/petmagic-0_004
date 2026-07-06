@@ -1,15 +1,23 @@
 import 'dart:convert';
 
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 final walletStorePurchaseRecoveryPreferencesProvider =
     Provider<SharedPreferencesAsync>((ref) => SharedPreferencesAsync());
 
+final walletStorePurchaseRecoverySecureStorageProvider =
+    Provider<FlutterSecureStorage>((ref) => const FlutterSecureStorage());
+
 final walletStorePurchaseRecoveryStoreProvider =
     Provider<WalletStorePurchaseRecoveryStore>((ref) {
       return WalletStorePurchaseRecoveryStore(
         preferences: ref.watch(walletStorePurchaseRecoveryPreferencesProvider),
+        secureStorage: ref.watch(
+          walletStorePurchaseRecoverySecureStorageProvider,
+        ),
       );
     });
 
@@ -59,26 +67,66 @@ class PendingStoreWalletPurchase {
 class WalletStorePurchaseRecoveryStore {
   const WalletStorePurchaseRecoveryStore({
     required SharedPreferencesAsync preferences,
+    FlutterSecureStorage? secureStorage,
     DateTime Function()? clock,
   }) : _preferences = preferences,
+       _secureStorage = secureStorage ?? const FlutterSecureStorage(),
        _clock = clock;
 
-  static const _pendingPurchaseKey = 'wallet_pending_store_purchase_v1';
+  static const legacyPendingPurchaseKey = 'wallet_pending_store_purchase_v1';
+  static const pendingPurchaseSecureStorageKey =
+      'petmagic_mobile_wallet_pending_store_purchase_v2';
   static const _maxPendingPurchaseAge = Duration(days: 14);
 
   final SharedPreferencesAsync _preferences;
+  final FlutterSecureStorage _secureStorage;
   final DateTime Function()? _clock;
 
   Future<PendingStoreWalletPurchase?> readPendingPurchase() async {
-    final raw = await _preferences.getString(_pendingPurchaseKey);
+    final raw = await _secureStorage.read(key: pendingPurchaseSecureStorageKey);
     if (raw == null || raw.trim().isEmpty) {
+      return _readAndMigrateLegacyPendingPurchase();
+    }
+
+    return _decodePendingPurchase(raw, clearOnInvalid: clearPendingPurchase);
+  }
+
+  Future<PendingStoreWalletPurchase?>
+  _readAndMigrateLegacyPendingPurchase() async {
+    final raw = await _preferences.getString(legacyPendingPurchaseKey);
+    if (raw == null || raw.trim().isEmpty) {
+      return null;
+    }
+
+    final pending = await _decodePendingPurchase(
+      raw,
+      clearOnInvalid: () => _preferences.remove(legacyPendingPurchaseKey),
+    );
+    if (pending == null) {
+      return null;
+    }
+
+    await _secureStorage.write(
+      key: pendingPurchaseSecureStorageKey,
+      value: jsonEncode(pending),
+    );
+    await _preferences.remove(legacyPendingPurchaseKey);
+    return pending;
+  }
+
+  Future<PendingStoreWalletPurchase?> _decodePendingPurchase(
+    String raw, {
+    required Future<void> Function() clearOnInvalid,
+  }) async {
+    if (raw.trim().isEmpty) {
+      await clearOnInvalid();
       return null;
     }
 
     try {
       final decoded = jsonDecode(raw);
       if (decoded is! Map<String, dynamic>) {
-        await clearPendingPurchase();
+        await clearOnInvalid();
         return null;
       }
 
@@ -87,19 +135,31 @@ class WalletStorePurchaseRecoveryStore {
           pending.provider.trim().isEmpty ||
           pending.productId.trim().isEmpty ||
           _isExpired(pending.createdAtUtc)) {
-        await clearPendingPurchase();
+        await clearOnInvalid();
         return null;
       }
 
       return pending;
-    } on FormatException {
-      await clearPendingPurchase();
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Wallet.StorePurchaseRecovery',
+        operation: 'decode_pending_purchase',
+        message: 'Stored pending wallet purchase was invalid and cleared',
+        context: {'stage': 'decode_pending_purchase'},
+        error: error,
+        stackTrace: stackTrace,
+      );
+      await clearOnInvalid();
       return null;
     }
   }
 
   Future<void> savePendingPurchase(PendingStoreWalletPurchase purchase) async {
-    await _preferences.setString(_pendingPurchaseKey, jsonEncode(purchase));
+    await _secureStorage.write(
+      key: pendingPurchaseSecureStorageKey,
+      value: jsonEncode(purchase),
+    );
+    await _preferences.remove(legacyPendingPurchaseKey);
   }
 
   Future<void> clearPendingPurchase({String? orderId}) async {
@@ -113,7 +173,10 @@ class WalletStorePurchaseRecoveryStore {
       }
     }
 
-    await _preferences.remove(_pendingPurchaseKey);
+    await Future.wait<void>([
+      _secureStorage.delete(key: pendingPurchaseSecureStorageKey),
+      _preferences.remove(legacyPendingPurchaseKey),
+    ]);
   }
 
   bool _isExpired(DateTime createdAtUtc) {

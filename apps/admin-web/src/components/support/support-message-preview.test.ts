@@ -40,16 +40,21 @@ describe("support message preview display", () => {
     expect(formatSupportMessagePreview("A ".repeat(100), "Fallback", 24)).toHaveLength(24);
   });
 
-  it("routes support realtime preview through the shared sanitizer", () => {
+  it("keeps persisted admin realtime notifications free of user message previews", () => {
     const adminShellSource = readFileSync(adminShellPath, "utf8");
+    const adminChromeSource = readFileSync(
+      fileURLToPath(new URL("../admin/admin-chrome.content.ts", import.meta.url)),
+      "utf8"
+    );
     const supportControllerHelpersSource = readFileSync(supportControllerHelpersPath, "utf8");
 
-    expect(adminShellSource).toContain("formatSupportMessagePreview(event.lastMessagePreview");
-    expect(supportControllerHelpersSource).toContain(
-      "formatSupportMessagePreview(event.lastMessagePreview"
-    );
+    expect(adminShellSource).toContain("message: copy.realtimeSupport.fallback");
+    expect(adminShellSource).not.toContain("formatSupportMessagePreview(event.lastMessagePreview");
+    expect(adminShellSource).not.toContain("copy.realtimeSupport.withPreview");
+    expect(adminChromeSource).not.toContain("withPreview");
+    expect(supportControllerHelpersSource).not.toContain("lastMessagePreview");
+    expect(supportControllerHelpersSource).not.toContain("realtimeMessageWithPreview");
     expect(adminShellSource).not.toContain("event.lastMessagePreview?.trim()");
-    expect(supportControllerHelpersSource).not.toContain("event.lastMessagePreview?.trim()");
   });
 
   it("encodes support realtime notification route ids before building hrefs", () => {

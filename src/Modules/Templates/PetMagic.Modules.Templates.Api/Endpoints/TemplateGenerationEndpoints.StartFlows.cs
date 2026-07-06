@@ -78,7 +78,7 @@ public static partial class TemplateGenerationEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await generationService.StartFromResultAsync(command, cancellationToken);
@@ -116,7 +116,7 @@ public static partial class TemplateGenerationEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await generationService.StartSimilarAsync(command, cancellationToken);
@@ -169,7 +169,7 @@ public static partial class TemplateGenerationEndpoints
         var idempotencyKey = NormalizeIdempotencyKey(context.Request.Headers["Idempotency-Key"].FirstOrDefault());
         if (idempotencyKey?.Length > MaxIdempotencyKeyLength)
         {
-            uploadValidation["Idempotency-Key"] = [$"Idempotency-Key must be at most {MaxIdempotencyKeyLength} characters."];
+            uploadValidation["Idempotency-Key"] = ["templates.idempotency_key_invalid"];
         }
 
         if (uploadValidation.Count > 0)
@@ -222,7 +222,7 @@ public static partial class TemplateGenerationEndpoints
             if (!validation.IsValid)
             {
                 await DeleteUploadedGenerationMediaAsync(mediaStorage, stored, preview);
-                return TypedResults.ValidationProblem(validation.ToDictionary());
+                return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
             }
 
             var result = await generationService.StartAsync(command, cancellationToken);
@@ -270,7 +270,17 @@ public static partial class TemplateGenerationEndpoints
         var errors = new Dictionary<string, string[]>();
         if (sourceImage is null || sourceImage.Length == 0)
         {
-            errors[nameof(sourceImage)] = ["Source image is required."];
+            errors[nameof(sourceImage)] = ["templates.source_image_empty"];
+            return errors;
+        }
+
+        if (sourceImage.Length > maxSizeBytes)
+        {
+            errors[nameof(sourceImage)] = ["templates.source_image_too_large"];
+        }
+
+        if (errors.Count > 0)
+        {
             return errors;
         }
 
@@ -279,12 +289,7 @@ public static partial class TemplateGenerationEndpoints
             || !IsAllowedSourceImageContentType(detectedContentType)
             || !TemplateUploadSniffer.MatchesDeclaredContentType(detectedContentType, sourceImage.ContentType))
         {
-            errors[nameof(sourceImage)] = ["Source image content type is not allowed. Please upload JPEG, PNG, or WebP."];
-        }
-
-        if (sourceImage.Length > maxSizeBytes)
-        {
-            errors[nameof(sourceImage)] = [$"Source image exceeds the maximum allowed size of {maxSizeBytes} bytes."];
+            errors[nameof(sourceImage)] = ["templates.source_image_type_not_allowed"];
         }
 
         return errors;

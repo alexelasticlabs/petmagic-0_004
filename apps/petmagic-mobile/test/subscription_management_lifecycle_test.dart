@@ -102,6 +102,28 @@ void main() {
     expect(sectionsSource, contains('class _ActionsSection'));
     expect(sectionsSource, contains('String _resolveStatusLabel'));
     expect(sectionsSource, contains('Color _resolveStatusColor'));
+    expect(sectionsSource, contains('final manageColor = colors.gold;'));
+    expect(sectionsSource, contains('foregroundColor: colors.on(manageColor)'));
+    expect(
+      sectionsSource,
+      contains('backgroundColor: isLight ? colors.surface : null'),
+    );
+    expect(
+      sectionsSource,
+      contains('foregroundColor: isLight ? colors.textStrong : null'),
+    );
+    expect(
+      sectionsSource,
+      isNot(contains('const manageColor = Color(0xFFFFC107)')),
+    );
+    expect(
+      sectionsSource,
+      isNot(contains('foregroundColor: const Color(0xFF261903)')),
+    );
+    expect(
+      sectionsSource,
+      isNot(contains('foregroundColor: isLight ? const Color(0xFF2F3E56)')),
+    );
     expect(
       progressSource,
       contains("part of 'subscription_management_page.dart';"),
@@ -143,6 +165,121 @@ void main() {
       }
     },
   );
+
+  test('subscription grant countdown uses adaptive low-traffic ticker', () async {
+    final progressSource = await File(
+      'lib/features/premium/presentation/subscription_management_progress.part.dart',
+    ).readAsString();
+
+    expect(progressSource, contains('void _scheduleNextTick()'));
+    expect(progressSource, contains('Duration? _nextTickInterval()'));
+    expect(
+      progressSource,
+      contains('with SingleTickerProviderStateMixin, WidgetsBindingObserver'),
+    );
+    expect(
+      progressSource,
+      contains('WidgetsBinding.instance.addObserver(this)'),
+    );
+    expect(
+      progressSource,
+      contains('WidgetsBinding.instance.removeObserver(this)'),
+    );
+    expect(progressSource, contains('void didChangeAppLifecycleState'));
+    expect(progressSource, contains('bool _shouldRunTicker()'));
+    expect(progressSource, contains('TickerMode.valuesOf(context).enabled'));
+    expect(
+      progressSource,
+      contains('lifecycle == null || lifecycle == AppLifecycleState.resumed'),
+    );
+    expect(progressSource, contains('Timer(interval, ()'));
+    expect(progressSource, contains('const Duration(minutes: 1)'));
+    expect(progressSource, contains('const Duration(hours: 1)'));
+    expect(progressSource, contains('_ticker?.cancel();'));
+    expect(progressSource, contains('_controller.dispose();'));
+    expect(
+      progressSource,
+      isNot(contains('Timer.periodic(const Duration(seconds: 1)')),
+    );
+  });
+
+  test('subscription management actions are cancellable on dispose', () async {
+    final pageSource = await File(
+      'lib/features/premium/presentation/subscription_management_page.dart',
+    ).readAsString();
+    final controllerSource = await File(
+      'lib/features/premium/presentation/premium_controller.dart',
+    ).readAsString();
+    final repositorySource = await File(
+      'lib/features/premium/data/premium_repository.dart',
+    ).readAsString();
+    final openManageBody = _methodBody(
+      pageSource,
+      'Future<void> _openManageTarget',
+    );
+    final cancelBody = _methodBody(
+      pageSource,
+      'Future<void> _cancelAtPeriodEnd',
+    );
+    final disposeBody = _methodBody(pageSource, 'void dispose');
+    final serviceCreateBody = _methodBody(
+      controllerSource,
+      'Future<String> createManagementUrl',
+    );
+    final serviceCancelBody = _methodBody(
+      controllerSource,
+      'Future<PremiumSubscriptionSummaryView> requestCancelAtPeriodEnd',
+    );
+    final repositoryPortalBody = _methodBody(
+      repositorySource,
+      'Future<PremiumBillingPortalModel> createBillingPortal',
+    );
+    final repositoryCancelBody = _methodBody(
+      repositorySource,
+      'Future<PremiumStatusModel> cancelSubscription',
+    );
+
+    expect(
+      pageSource,
+      contains('CancelToken? _activeSubscriptionActionCancelToken;'),
+    );
+    expect(disposeBody, contains('_cancelActiveSubscriptionAction();'));
+    expect(openManageBody, contains('final cancelToken ='));
+    expect(openManageBody, contains('cancelToken: cancelToken'));
+    expect(openManageBody, contains('cancelToken.isCancelled'));
+    expect(openManageBody, contains('CancelToken.isCancel(error)'));
+    expect(
+      openManageBody,
+      contains('_completeSubscriptionAction(cancelToken)'),
+    );
+    expect(cancelBody, contains('final cancelToken ='));
+    expect(cancelBody, contains('cancelToken: cancelToken'));
+    expect(cancelBody, contains('cancelToken.isCancelled'));
+    expect(cancelBody, contains('CancelToken.isCancel(error)'));
+    expect(cancelBody, contains('_completeSubscriptionAction(cancelToken)'));
+    expect(controllerSource, contains('CancelToken? cancelToken'));
+    expect(serviceCreateBody, contains('createBillingPortal('));
+    expect(serviceCreateBody, contains('cancelToken: cancelToken'));
+    expect(
+      controllerSource,
+      contains(
+        'Future<PremiumSubscriptionSummaryView> requestCancelAtPeriodEnd({',
+      ),
+    );
+    expect(serviceCancelBody, contains('cancelSubscription('));
+    expect(serviceCancelBody, contains('cancelToken: cancelToken'));
+    expect(
+      repositorySource,
+      contains('Future<PremiumBillingPortalModel> createBillingPortal({'),
+    );
+    expect(repositorySource, contains('CancelToken? cancelToken'));
+    expect(repositoryPortalBody, contains('cancelToken: cancelToken'));
+    expect(
+      repositorySource,
+      contains('Future<PremiumStatusModel> cancelSubscription({'),
+    );
+    expect(repositoryCancelBody, contains('cancelToken: cancelToken'));
+  });
 
   testWidgets(
     'subscription management shows auth gate for guests without loading summary',
@@ -468,6 +605,53 @@ class _DelayedRestorePremiumController extends PremiumController {
       _restoreCompleter.complete();
     }
   }
+}
+
+String _methodBody(String source, String signature) {
+  final start = source.indexOf(signature);
+  expect(start, isNonNegative, reason: 'Missing method: $signature');
+
+  final parameterStart = source.indexOf('(', start);
+  expect(
+    parameterStart,
+    isNonNegative,
+    reason: 'Missing method parameters: $signature',
+  );
+  final parameterEnd = _matchingCloseParen(source, parameterStart);
+  final braceStart = source.indexOf('{', parameterEnd);
+  expect(braceStart, isNonNegative, reason: 'Missing method body: $signature');
+
+  var depth = 0;
+  for (var index = braceStart; index < source.length; index += 1) {
+    final character = source[index];
+    if (character == '{') {
+      depth += 1;
+    } else if (character == '}') {
+      depth -= 1;
+      if (depth == 0) {
+        return source.substring(braceStart, index + 1);
+      }
+    }
+  }
+
+  fail('Unclosed method body: $signature');
+}
+
+int _matchingCloseParen(String source, int openParenIndex) {
+  var depth = 0;
+  for (var index = openParenIndex; index < source.length; index += 1) {
+    final character = source[index];
+    if (character == '(') {
+      depth += 1;
+    } else if (character == ')') {
+      depth -= 1;
+      if (depth == 0) {
+        return index;
+      }
+    }
+  }
+
+  fail('Unclosed method parameters.');
 }
 
 class _UnauthenticatedAppLaunchController extends AppLaunchController {

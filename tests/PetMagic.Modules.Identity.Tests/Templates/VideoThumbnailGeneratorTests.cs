@@ -1,5 +1,6 @@
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
@@ -16,11 +17,13 @@ public sealed class VideoThumbnailGeneratorTests
         var tempVideo = Path.Combine(Path.GetTempPath(), $"petmagic-thumbnail-missing-ffmpeg-{Guid.NewGuid():N}.mp4");
         await File.WriteAllBytesAsync(tempVideo, [0, 0, 0, 24, 102, 116, 121, 112, 109, 112, 52, 50]);
         var storage = new TrackingMediaStorage();
+        var logger = new CapturingLogger<VideoThumbnailGenerator>();
+        var generationId = Guid.NewGuid();
         var generator = new VideoThumbnailGenerator(
             storage,
             new NoopHttpClientFactory(),
             CreateOptions($"petmagic-missing-ffmpeg-{Guid.NewGuid():N}"),
-            NullLogger<VideoThumbnailGenerator>.Instance);
+            logger);
 
         try
         {
@@ -32,13 +35,20 @@ public sealed class VideoThumbnailGeneratorTests
                     "video/mp4",
                     new FileInfo(tempVideo).Length,
                     tempVideo),
-                Guid.NewGuid(),
+                generationId,
                 "generation-result-preview.jpg",
                 "users/user/generations/generation/result-preview.jpg",
                 CancellationToken.None);
 
             Assert.Null(result);
             Assert.Empty(storage.StoredUploads);
+            var entry = Assert.Single(logger.Entries, x => x.Level == LogLevel.Warning);
+            Assert.Contains("Video thumbnail generation failed.", entry.Message, StringComparison.Ordinal);
+            Assert.False(entry.Properties.ContainsKey("GenerationId"));
+            Assert.False(entry.Properties.ContainsKey("FileName"));
+            Assert.Equal(SafeLogValues.StableHash(generationId.ToString("D")), entry.Properties["GenerationIdHash"]);
+            Assert.Equal(SafeLogValues.StableHash("generated.mp4"), entry.Properties["FileNameHash"]);
+            Assert.Equal("video/mp4", entry.Properties["ContentType"]);
         }
         finally
         {
@@ -99,5 +109,48 @@ public sealed class VideoThumbnailGeneratorTests
     private sealed class NoopHttpClientFactory : IHttpClientFactory
     {
         public HttpClient CreateClient(string name) => new();
+    }
+
+    private sealed class CapturingLogger<T> : ILogger<T>
+    {
+        public List<CapturedLogEntry> Entries { get; } = [];
+
+        public IDisposable BeginScope<TState>(TState state)
+            where TState : notnull
+        {
+            return NullScope.Instance;
+        }
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            var properties = state is IEnumerable<KeyValuePair<string, object?>> values
+                ? values
+                    .Where(x => !string.Equals(x.Key, "{OriginalFormat}", StringComparison.Ordinal))
+                    .ToDictionary(x => x.Key, x => x.Value)
+                : [];
+            Entries.Add(new CapturedLogEntry(logLevel, formatter(state, exception), exception, properties));
+        }
+    }
+
+    private sealed record CapturedLogEntry(
+        LogLevel Level,
+        string Message,
+        Exception? Exception,
+        IReadOnlyDictionary<string, object?> Properties);
+
+    private sealed class NullScope : IDisposable
+    {
+        public static readonly NullScope Instance = new();
+
+        public void Dispose()
+        {
+        }
     }
 }

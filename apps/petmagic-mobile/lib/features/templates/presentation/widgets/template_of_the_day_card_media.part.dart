@@ -144,6 +144,12 @@ class _TemplateOfTheDayVideoPreviewState
       }
 
       await controller.setVolume(0);
+      if (!_isCurrentVideoRequestToken(requestVersion, previewUrl)) {
+        await controller.dispose();
+        _releasePreviewSlot();
+        return;
+      }
+
       await controller.setLooping(true);
       if (!_isCurrentVideoRequestToken(requestVersion, previewUrl)) {
         await controller.dispose();

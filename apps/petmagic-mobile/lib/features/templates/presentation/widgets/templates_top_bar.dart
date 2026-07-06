@@ -140,12 +140,12 @@ class _GiftButton extends StatelessWidget {
                 color: colors.danger,
                 shape: BoxShape.circle,
               ),
-              child: const Padding(
-                padding: EdgeInsets.all(4),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
                 child: Text(
                   '1',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: colors.on(colors.danger),
                     fontSize: 9,
                     fontWeight: FontWeight.w900,
                   ),

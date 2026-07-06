@@ -9,9 +9,36 @@ public sealed class FalTransientProviderPipelineSourceTests
 
         Assert.Contains("status.timeout", source, StringComparison.Ordinal);
         Assert.Contains("status.network", source, StringComparison.Ordinal);
+        Assert.Contains("status.parse", source, StringComparison.Ordinal);
         Assert.Contains("response.timeout", source, StringComparison.Ordinal);
         Assert.Contains("response.network", source, StringComparison.Ordinal);
+        Assert.Contains("response.parse", source, StringComparison.Ordinal);
         Assert.True(Count(source, "IsTransientStatusCode(response.StatusCode)") >= 2);
+    }
+
+    [Fact]
+    public void FalQueueClient_ShouldBoundProviderResponseReads()
+    {
+        var source = File.ReadAllText(SourcePath("FalQueueClient.cs"));
+
+        Assert.Contains("HttpCompletionOption.ResponseHeadersRead", source, StringComparison.Ordinal);
+        Assert.Contains("SafeHttpContentReader.ReadRawStringPrefixAsync(", source, StringComparison.Ordinal);
+        Assert.Contains("QueueMetadataMaxChars", source, StringComparison.Ordinal);
+        Assert.Contains("QueueResponseMaxChars", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ReadAsStringAsync(cancellationToken)", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FalQueueClient_ShouldSanitizeConfiguredQueueUrlInFailureLogs()
+    {
+        var source = File.ReadAllText(SourcePath("FalQueueClient.cs"));
+
+        Assert.Contains("QueueBaseUrl={QueueBaseUrl}", source, StringComparison.Ordinal);
+        Assert.Contains("SafeLogValues.SanitizeText(queueBaseUri.ToString())", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("QueueBaseUrl={queueBaseUri}", source, StringComparison.Ordinal);
+        Assert.Contains("ProviderRequestIdHash={ProviderRequestIdHash}", source, StringComparison.Ordinal);
+        Assert.Contains("SafeLogValues.StableHash(requestId)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProviderRequestId={ProviderRequestId}", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -46,17 +73,30 @@ public sealed class FalTransientProviderPipelineSourceTests
 
     private static string SourcePath(string fileName)
     {
+        var root = FindRepositoryRoot();
         return Path.Combine(
-            AppContext.BaseDirectory,
-            "..",
-            "..",
-            "..",
-            "..",
-            "..",
+            root,
             "src",
             "Modules",
             "Templates",
             "PetMagic.Modules.Templates.Infrastructure",
             fileName);
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            if (Directory.Exists(Path.Combine(directory.FullName, "src"))
+                && Directory.Exists(Path.Combine(directory.FullName, "tests")))
+            {
+                return directory.FullName;
+            }
+
+            directory = directory.Parent;
+        }
+
+        throw new DirectoryNotFoundException("Repository root was not found.");
     }
 }

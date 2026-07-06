@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.SupportChat.Application.Abstractions;
 using PetMagic.Modules.SupportChat.Infrastructure.Data;
 
@@ -31,20 +32,41 @@ internal sealed class SupportAttachmentCleanupProcessor(
             var deleteResult = await attachmentStorage.DeleteAsync(attachment.FileUrl, cancellationToken);
             if (deleteResult.IsFailure)
             {
+                var safeErrorCode = SafeCleanupErrorCode(deleteResult.Error.Code);
                 logger.LogWarning(
-                    "Support attachment cleanup failed. AttachmentId={AttachmentId} ErrorCode={ErrorCode}",
-                    attachment.Id,
-                    deleteResult.Error.Code);
+                    "Support attachment cleanup failed. AttachmentIdHash={AttachmentIdHash} ErrorCode={ErrorCode}",
+                    SafeLogValues.StableHash(attachment.Id.ToString("D")),
+                    safeErrorCode);
                 continue;
             }
 
             attachment.IsDeleted = true;
             attachment.DeletedAtUtc = now;
             attachment.FileUrl = string.Empty;
+            attachment.FileName = "attachment";
+            attachment.MimeType = string.Empty;
+            attachment.SizeBytes = 0;
+            attachment.DurationSeconds = null;
+            attachment.Width = null;
+            attachment.Height = null;
+            attachment.StorageKey = null;
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
         return true;
     }
-}
 
+    private static string SafeCleanupErrorCode(string? code)
+    {
+        var trimmed = code?.Trim();
+        if (string.IsNullOrWhiteSpace(trimmed))
+        {
+            return SupportChatErrors.AttachmentStorageFailed.Code;
+        }
+
+        var sanitized = SafeLogValues.SanitizeText(trimmed, 128);
+        return string.Equals(trimmed, sanitized, StringComparison.Ordinal)
+            ? sanitized
+            : SupportChatErrors.AttachmentStorageFailed.Code;
+    }
+}

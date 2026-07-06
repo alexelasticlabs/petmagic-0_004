@@ -2,22 +2,31 @@
 
 ## Verdict
 
-Production release is blocked.
+Production release is still blocked.
 
-Code-level reconciliation checks are in a much better state after the reconciliation-first fix, but this gate cannot be closed as production-ready because:
+The backend crash, EF migration, and reconciliation-query blockers from this gate are closed on the local release-gate environment. The remaining no-go items are external sandbox/device validations that cannot be completed from this workspace without missing provider credentials, iOS hardware/tooling, or manual hosted checkout interaction.
 
-- full backend `dotnet test` still exits with code 1 due to a test host crash after the assertion failure was fixed;
-- EF migration checks and `database update` cannot run in this shell because migration connection strings are not configured;
-- Stripe / Google Play / App Store sandbox purchases were not executed against external providers;
-- real-device Android and iOS notification and purchase flows were not manually verified.
+Closed during this gate:
 
-The current state is suitable for the next sandbox/device validation pass, not for production rollout.
+- full backend test-host crash was not reproduced after diagnostics and the latest local changes;
+- Economy and Templates EF migrations were validated from clean databases and from a copied existing database;
+- Templates generation billing reconciliation was indexed and revalidated;
+- admin incident detail query shape was reviewed as bounded and not N+1.
+
+Still blocking production go:
+
+- the current local `petmagic_db` reconciliation inventory is not clean and cannot be used as production-readiness evidence until the open incidents are resolved or the gate is rerun on a clean staging snapshot;
+- Stripe hosted checkout payment completion and webhook delivery were not completed end to end;
+- Google Play Billing sandbox is blocked by missing Google Play service account/package/test setup;
+- App Store sandbox is blocked by missing App Store API credentials and iOS device/tooling;
+- real push delivery is blocked by missing FCM/APNs credentials and iOS device;
+- real Android/iOS wallet refresh and generation spend/refund device flows remain unverified end to end.
 
 ## Changes Made During Gate
 
-- Tightened Templates generation billing snapshot selection so reconciliation does not scan every historical charged generation:
-  - `TemplateGenerationBillingReconciliationService.ListGenerationBillingSnapshotsAsync` now filters `ChargedAtUtc` and `RefundedAtUtc` by `changedAfterUtc`.
-- Added backend tests for the remaining generation billing incident branches:
+- Tightened Templates generation billing snapshot selection so reconciliation does not scan every historical charged/refunded generation:
+  - `TemplateGenerationBillingReconciliationService.ListGenerationBillingSnapshotsAsync` filters `ChargedAtUtc` and `RefundedAtUtc` by `changedAfterUtc`.
+- Added backend tests for generation billing incident branches:
   - refund without spend;
   - refund ledger without `RefundedAtUtc`;
   - `RefundedAtUtc` without refund ledger;
@@ -25,8 +34,14 @@ The current state is suitable for the next sandbox/device validation pass, not f
   - duplicate refund ledger;
   - stale uncharged active generation;
   - clean completed charged generation with ledger.
+- Added Templates database indexes for reconciliation:
+  - migration `20260702234729_AddGenerationBillingReconciliationIndexes`;
+  - `IX_tgj_CreatedAtUtc_Id`;
+  - `IX_tgj_UpdatedAtUtc_Id`;
+  - `IX_tgj_ChargedAtUtc`;
+  - `IX_tgj_RefundedAtUtc`.
 - Fixed one non-economy backend release-gate failure in `Program.cs`:
-  - production `/templates-media` static-media blocking now uses `IsManagedStaticMediaPath(context.Request.Path, "/templates-media")` instead of raw string prefix matching.
+  - production `/templates-media` static-media blocking now uses managed path segment classification instead of raw string prefix matching.
 
 ## Architecture Review
 
@@ -40,7 +55,7 @@ The cross-module boundary is acceptable:
 
 Risk fixed during gate:
 
-- The initial snapshot query included every charged job with `x.ChargedAtUtc != null`. This could become a full historical scan. It was changed to `x.ChargedAtUtc >= changedAfterUtc` and `x.RefundedAtUtc >= changedAfterUtc`, while still keeping failed/cancelled unrefunded jobs visible.
+- The initial snapshot query included every charged job with `x.ChargedAtUtc != null`. It was changed to `x.ChargedAtUtc >= changedAfterUtc` and `x.RefundedAtUtc >= changedAfterUtc`, while still keeping failed/cancelled unrefunded jobs visible.
 
 ## Generation Billing Flow Coverage
 
@@ -81,16 +96,34 @@ Admin recovery actions checked:
 
 Both are behind Admin economy endpoints, write incident audit entries in tests, and are idempotent where the ledger mutation must not duplicate.
 
-## Legacy Payment Endpoints
+Admin incident detail query shape:
 
-Legacy Stripe endpoints still exist in backend:
+- ledger rows are limited by `IncidentDetailLedgerLimit = 25`;
+- webhook rows are limited by `IncidentDetailWebhookLimit = 10`;
+- audit rows are limited by `IncidentDetailAuditLimit = 50`;
+- generation billing details call `GetGenerationBillingSnapshotAsync` once for generation incidents;
+- no per-row detail loop or N+1 query pattern was found in `BuildIncidentDetailAsync`.
+
+## Removed Legacy Payment Endpoints
+
+The old `/api/payments/stripe/*` compatibility route group was removed after source search found no mobile or admin-web consumers.
+
+Removed routes:
 
 - `POST /api/payments/stripe/token-purchase`;
 - `POST /api/payments/stripe/subscription`;
 - `POST /api/payments/stripe/customer-portal`;
 - `GET /api/payments/stripe/diagnostics`.
 
-They are still documented and smoke-tested. Scoped search did not find mobile or admin-web source usage of these legacy routes. Treat them as backend compatibility legacy, not active client dependency. A separate deprecation/removal decision is still needed before production cleanup can remove them safely.
+Canonical replacements:
+
+- token packs: `POST /api/economy/purchases/create`;
+- Stripe purchase verification: `POST /api/economy/purchases/{orderId}/verify-stripe`;
+- premium checkout: `POST /api/economy/premium/checkout`;
+- premium billing portal: `POST /api/economy/premium/manage`;
+- Stripe diagnostics: `GET /api/economy/premium/stripe-diagnostics`.
+
+Startup route tests were updated to assert the canonical endpoints instead of preserving the legacy surface.
 
 ## Automated Verification
 
@@ -98,6 +131,12 @@ Passed:
 
 - `dotnet test tests/PetMagic.Modules.Identity.Tests/PetMagic.Modules.Identity.Tests.csproj --filter "FullyQualifiedName~EconomyServiceTests" -p:UseSharedCompilation=false`
   - 159 passed, 0 failed.
+- `dotnet test -p:UseSharedCompilation=false --logger "trx;LogFileName=full-backend.trx" --blame-crash --blame-hang-timeout 5m`
+  - 1400 passed, 0 failed, exit code 0;
+  - TRX: `tests/PetMagic.Modules.Identity.Tests/TestResults/full-backend.trx`;
+  - no blame sequence file was produced because the test run completed.
+- `dotnet test -p:UseSharedCompilation=false`
+  - final run after the Templates index migration: 1425 passed, 0 failed, exit code 0.
 - `npm run typecheck` in `apps/admin-web`
   - passed.
 - `npm test` in `apps/admin-web`
@@ -107,53 +146,195 @@ Passed:
 - `flutter test` in `apps/petmagic-mobile`
   - 1132 tests passed.
 
-Blocked / not green:
+Current-tree refresh after the wider repository hardening pass:
 
-- `dotnet test -p:UseSharedCompilation=false`
-  - first run failed `HostApiMiddlewareOrderTests.Program_ShouldClassifyStaticMediaOnlyByManagedPathSegments`;
-  - fixed raw `/templates-media` prefix check in `Program.cs`;
-  - second run had 0 failed assertions and 1277 passed, but still exited with code 1: `Active test run aborted. Reason: Test host process crashed`.
+- `dotnet test PetMagic.slnx --no-restore`
+  - 1438 passed, 0 failed, 0 skipped.
+- `npm test` in `apps/admin-web`
+  - 82 test files passed, 605 tests passed.
+- `npm run lint` in `apps/admin-web`
+  - passed.
+- `npm run build` in `apps/admin-web`
+  - passed on Next.js 16.2.10.
+- `flutter analyze` in `apps/petmagic-mobile`
+  - no issues found.
+- `flutter test` in `apps/petmagic-mobile`
+  - 1142 tests passed.
+- `flutter build apk --debug` in `apps/petmagic-mobile`
+  - built `build/app/outputs/flutter-apk/app-debug.apk`.
+- `flutter build apk --profile` in `apps/petmagic-mobile`
+  - built `build/app/outputs/flutter-apk/app-profile.apk`.
+- current Docker runtime smoke:
+  - `docker compose ps` showed backend and generation-worker healthy;
+  - `GET http://localhost:5000/health` returned `Healthy`;
+  - `GET http://localhost:5000/api/templates/feed?limit=3` returned HTTP 200 with public feed items;
+  - `GET http://localhost:3000/` returned HTTP 200 from admin-web;
+  - `GET http://localhost:9090/-/healthy` returned HTTP 200 from Prometheus;
+  - recent backend and generation-worker logs had no matches for critical error patterns in the last 400 lines.
+
+Backend crash blocker status: closed locally.
 
 ## EF / Database Verification
 
 EF CLI is available:
 
-- `dotnet ef --version` -> `10.0.8`.
+- `dotnet tool list` -> `dotnet-ef 10.0.9` from `.config/dotnet-tools.json`.
 
-Both migration checks built successfully, then failed at design-time context creation because required environment variables are absent:
+Note: EF CLI is pinned to the same `10.0.9` major/minor patch as the EF runtime packages, so a tools/runtime version warning is no longer expected.
 
-- Economy:
-  - command: `dotnet ef migrations has-pending-model-changes --project src/Modules/Economy/PetMagic.Modules.Economy.Infrastructure/PetMagic.Modules.Economy.Infrastructure.csproj --startup-project src/Host/PetMagic.Host.Api/PetMagic.Host.Api.csproj --context EconomyDbContext`
-  - failure: `PETMAGIC_ECONOMY_MIGRATIONS_CONNECTION_STRING is required for design-time migrations.`
-- Templates:
-  - command: `dotnet ef migrations has-pending-model-changes --project src/Modules/Templates/PetMagic.Modules.Templates.Infrastructure/PetMagic.Modules.Templates.Infrastructure.csproj --startup-project src/Host/PetMagic.Host.Api/PetMagic.Host.Api.csproj --context TemplatesDbContext`
-  - failure: `PETMAGIC_TEMPLATES_MIGRATIONS_CONNECTION_STRING is required for design-time migrations.`
+Local Docker PostgreSQL was used through temporary release-gate databases:
 
-`dotnet ef database update` was not run because the same required migration connection strings are missing. Running it without an explicit local/staging target would not be a safe production gate check.
+- clean Economy DB: `petmagic_ef_economy_clean_20260703`;
+- clean Templates DB: `petmagic_ef_templates_clean_20260703`;
+- existing-state copy DB: `petmagic_ef_existing_20260703`, restored from local `petmagic_db`.
+
+Economy checks passed:
+
+- clean `database update` applied through `20260702200211_AddWalletTokenAccounting`;
+- existing-copy `database update` applied the pending local-copy migrations:
+  - `20260702121600_AddWalletBalanceNonNegativeConstraint`;
+  - `20260702192404_AddEconomyIncidents`;
+  - `20260702194646_AddEconomyIncidentAuditEntries`;
+  - `20260702200211_AddWalletTokenAccounting`;
+- clean and existing-copy `has-pending-model-changes` both returned no model changes;
+- rollback to `20260702194646_AddEconomyIncidentAuditEntries` and reapply to latest succeeded.
+
+Templates checks passed:
+
+- clean `database update` applied through `20260702234729_AddGenerationBillingReconciliationIndexes`;
+- existing-copy `database update` applied `20260702234729_AddGenerationBillingReconciliationIndexes`;
+- clean and existing-copy `has-pending-model-changes` both returned no model changes;
+- rollback to `20260702232501_AddTemplateGenerationBillingCommands` and reapply to latest succeeded.
+
+Whole-project EF refresh after the wider repository hardening pass:
+
+- an isolated temporary PostgreSQL 16 container was used and removed after verification;
+- shared clean app database `petmagic_full_clean_20260703055542` applied all five EF contexts sequentially:
+  - `IdentityDbContext` through `20260702213414_AddExternalAuthTickets`;
+  - `EconomyDbContext` through `20260702200211_AddWalletTokenAccounting`;
+  - `GamificationDbContext` through `20260630213815_RemoveAchievementIconAssetPath`;
+  - `SupportChatDbContext` through `20260629133404_RepairSupportChatSchemaDrift`;
+  - `TemplatesDbContext` through `20260702234729_AddGenerationBillingReconciliationIndexes`;
+- shared clean `has-pending-model-changes` returned no model changes for all five contexts;
+- per-context existing-state simulations applied each context to its previous migration and then to latest:
+  - Identity: `20260609071042_AddIdentityModelCompatibility` -> `20260702213414_AddExternalAuthTickets`;
+  - Economy: `20260702194646_AddEconomyIncidentAuditEntries` -> `20260702200211_AddWalletTokenAccounting`;
+  - Gamification: `20260624133602_BaselineGamification` -> `20260630213815_RemoveAchievementIconAssetPath`;
+  - SupportChat: `20260629132451_NormalizeLegacyConversationEnums` -> `20260629133404_RepairSupportChatSchemaDrift`;
+  - Templates: `20260702232501_AddTemplateGenerationBillingCommands` -> `20260702234729_AddGenerationBillingReconciliationIndexes`;
+- existing-state simulation `has-pending-model-changes` returned no model changes for all five contexts.
+
+Known migration warning:
+
+- older Templates migrations that create indexes concurrently emit EF warnings about non-transactional operations. The update still completed successfully in the local gate DBs.
+
+EF migration blocker status: closed locally.
+
+## Reconciliation Query Safety
+
+Economy ledger indexes verified on `economy_wallet_ledger`:
+
+- `IX_economy_wallet_ledger_CreatedAtUtc`;
+- `IX_economy_wallet_ledger_Source_CreatedAtUtc`;
+- `IX_economy_wallet_ledger_UserId_CreatedAtUtc`;
+- `UX_ewl_UserId_Reason_GenerationRefund`.
+
+Templates indexes verified after migration:
+
+- `IX_tgj_ChargedAtUtc`;
+- `IX_tgj_CreatedAtUtc_Id`;
+- `IX_tgj_RefundedAtUtc`;
+- `IX_tgj_Status_RefundedAtUtc_RefundLastAttemptedAtUtc`;
+- `IX_tgj_UpdatedAtUtc_Id`.
+
+`EXPLAIN` on the reconciliation snapshot query in the clean Templates gate DB used:
+
+- `Limit`;
+- `Index Scan Backward using "IX_tgj_UpdatedAtUtc_Id" on templates_generation_jobs`.
+
+The query remains data-distribution dependent because of OR filters, but the release-gate risk of an unindexed historical scan was reduced by timestamp filtering plus direct indexes on the relevant columns.
+
+Reconciliation performance blocker status: closed locally.
+
+## Current Local Reconciliation Inventory
+
+The local Docker database is useful for exercising the reconciliation worker, but it is not a clean release fixture.
+The current `petmagic_db` contains historical local smoke and queue-QA data that intentionally or accidentally violates billing invariants.
+
+The latest inventory check against `economy_incidents` showed 295 open incidents:
+
+| Type | Open count | Notes |
+| --- | ---: | --- |
+| `GenerationBillingJobMissing` | 133 | Mostly local smoke users and fixed fixture UUID users where ledger rows reference missing Templates jobs. |
+| `GenerationLedgerSpendMissing` | 43 | Mostly queue-QA generations marked charged without a matching spend ledger entry. |
+| `GenerationRefundWithoutSpend` | 40 | Mostly queue-QA refund ledger rows without matching spend rows. |
+| `PurchaseSettlementFailed` | 36 | Local/sandbox purchase rows that still need provider-side completion or manual resolution. |
+| `LedgerWalletMismatch` | 33 | Wallet projection mismatches from historical local data. |
+| `PremiumEntitlementMismatch` | 9 | Sandbox subscription or premium sync rows; several include `sub_*` references or local QA identifiers. |
+| `SubscriptionStateMismatch` | 1 | A canceled premium-like subscription state that remains open for review. |
+
+Supporting evidence:
+
+- open incident rows were first detected during the 2026-07-03 local release-gate run and then updated by each reconciliation run;
+- grouped user samples were dominated by `local-smoke-*`, `queue-qa-*`, `example.test`, and fixed `10000000-...` fixture IDs;
+- the backend startup worker correctly surfaced the condition as `ManualReviewRequired`, so this is visible to operators rather than silent.
+
+Do not mark this local DB as production-ready by simply deleting the incidents.
+The pre-production gate must be rerun on either:
+
+1. a clean staging database with no historical local QA fixtures; or
+2. a copied staging database where every open incident has been reviewed, repaired through the admin incident actions where applicable, or explicitly accepted with an audit note.
+
+The production-release acceptance criterion is:
+
+- `SELECT "Type", "Status", COUNT(*) FROM "economy_incidents" GROUP BY "Type", "Status";` has no unexpected open critical incidents;
+- a manual or scheduled reconciliation run completes without creating or updating unexpected critical incidents;
+- the admin incidents page can open the remaining accepted incidents and show the audit trail/recovery context.
 
 ## Sandbox and Device Verification
 
-Not verified in this gate:
+Available local prerequisites:
 
-- Stripe sandbox one-time token purchase;
-- Stripe subscription purchase, renewal/cancel/refund webhook behavior;
-- Google Play Billing sandbox purchase;
-- App Store sandbox purchase;
-- real Android notification token registration and push receipt;
-- real iOS APNs/FCM token registration and push receipt;
-- real Android/iOS wallet balance refresh immediately after purchase/refund;
-- real generation start on device with spend, worker processing, failure refund, and reconciliation rerun.
+- backend `/health` was healthy on `http://localhost:5000/health`;
+- Android device was connected: `SM G991B`, Android 15 API 35;
+- `adb reverse --list` included `tcp:5000 tcp:5000`;
+- Stripe CLI was installed and authenticated in test mode;
+- Stripe API checkout creation succeeded through `/api/economy/purchases/create`:
+  - pack: `starter`;
+  - provider: `stripe`;
+  - status: `pending`;
+  - checkout URL returned;
+  - amount: `6.29 EUR`;
+  - spark tokens: `20`.
 
-These remain mandatory before production go.
+Blocked / incomplete external validations:
+
+- Stripe hosted checkout payment completion and webhook replay were not completed automatically because this workspace had no usable browser automation/runtime for the hosted checkout flow.
+- Google Play Billing sandbox is blocked:
+  - `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` missing;
+  - `GOOGLE_PLAY_PACKAGE_NAME` missing;
+  - no Play test product/test account setup was available to the gate.
+- App Store sandbox is blocked:
+  - `APP_STORE_ISSUER_ID` missing;
+  - `APP_STORE_KEY_ID` missing;
+  - `APP_STORE_PRIVATE_KEY` missing;
+  - no iOS device/Xcode execution path was available in this Windows workspace.
+- Push notification delivery is blocked:
+  - Firebase/FCM service credentials missing;
+  - APNs credentials missing;
+  - no iOS device was available.
+- Real-device Android wallet refresh/generation spend/refund was not completed end to end because purchase completion and external provider-side events were not available.
 
 ## Go / No-Go
 
 No-go for production.
 
-Go only for the next controlled validation stage after:
+The release gate can move to the next validation stage after the remaining external checks are executed with real sandbox/provider prerequisites:
 
-1. rerun full backend tests and resolve the test host crash;
-2. provide local/staging migration connection strings and run Economy/Templates `has-pending-model-changes` plus `database update`;
-3. execute Stripe / Google Play / App Store sandbox purchase scenarios;
-4. verify real-device Android and iOS notifications and wallet refresh;
-5. rerun economy reconciliation on the target environment and confirm no critical open generation billing incidents.
+1. complete Stripe hosted checkout payment and verify webhook-driven wallet update;
+2. complete Stripe subscription renewal/cancel/refund webhook behavior;
+3. complete Google Play Billing sandbox purchase and wallet refresh;
+4. complete App Store sandbox purchase and wallet refresh;
+5. verify Android FCM token registration and push receipt on a real device;
+6. verify iOS APNs/FCM token registration and push receipt on a real device;
+7. run real generation spend, worker processing, failure refund, wallet refresh, and reconciliation rerun on device/staging.

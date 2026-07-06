@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 
+using PetMagic.BuildingBlocks.Storage;
 using PetMagic.Modules.SupportChat.Application.Abstractions;
 
 namespace PetMagic.Modules.SupportChat.Infrastructure;
@@ -45,6 +46,7 @@ public sealed class SupportAttachmentReadUrlSigner(
         var builder = new UriBuilder(fileUrl);
         builder.Query =
             $"{ExpiresQueryKey}={Uri.EscapeDataString(expiresAtUnixSeconds.ToString())}&{SignatureQueryKey}={Uri.EscapeDataString(signature)}";
+        builder.Fragment = string.Empty;
         return builder.Uri.ToString();
     }
 
@@ -187,15 +189,7 @@ public sealed class SupportAttachmentReadUrlSigner(
 
     private static bool IsUnsafePathSegment(string segment)
     {
-        if (string.Equals(segment, ".", StringComparison.Ordinal)
-            || string.Equals(segment, "..", StringComparison.Ordinal))
-        {
-            return true;
-        }
-
-        var decodedSegment = Uri.UnescapeDataString(segment);
-        return string.Equals(decodedSegment, ".", StringComparison.Ordinal)
-            || string.Equals(decodedSegment, "..", StringComparison.Ordinal);
+        return ManagedPathSegments.IsUnsafe(segment);
     }
 
     private static bool ContainsUnsafePathSegments(string value)

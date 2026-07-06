@@ -15,6 +15,27 @@ void main() {
       );
     });
 
+    test('maps backend economy payment codes to localized wallet keys', () {
+      expect(
+        normalizeWalletErrorKey(
+          'ProblemDetails.title: economy.payment_provider_unavailable',
+        ),
+        'wallet.payment_unavailable',
+      );
+      expect(
+        normalizeWalletErrorKey(
+          'ProblemDetails.title: economy.payment_gateway_failed',
+        ),
+        'payment_gateway_failed',
+      );
+      expect(
+        normalizeWalletErrorKey(
+          'ProblemDetails.title: economy.store_purchase_invalid',
+        ),
+        'wallet.payment_unavailable',
+      );
+    });
+
     test('rejects arbitrary wallet error text', () {
       expect(
         normalizeWalletErrorKey('FileSystemException: /private/payment.txt'),
@@ -32,6 +53,33 @@ void main() {
       expect(
         normalizePremiumErrorKey('RuntimeError: auth.session_expired'),
         'auth.session_expired',
+      );
+    });
+
+    test('maps backend economy premium codes to localized premium keys', () {
+      expect(
+        normalizePremiumErrorKey(
+          'ProblemDetails.title: economy.store_verification_unavailable',
+        ),
+        'premium.store_unavailable',
+      );
+      expect(
+        normalizePremiumErrorKey(
+          'ProblemDetails.title: economy.payment_gateway_failed',
+        ),
+        'premium.checkout_failed',
+      );
+      expect(
+        normalizePremiumErrorKey(
+          'ProblemDetails.title: economy.premium_plan_not_found',
+        ),
+        'premium.store_product_unavailable',
+      );
+      expect(
+        normalizePremiumErrorKey(
+          'ProblemDetails.title: economy.payment_method_not_found',
+        ),
+        'premium.manage_failed',
       );
     });
 

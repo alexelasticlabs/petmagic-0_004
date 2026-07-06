@@ -20,6 +20,24 @@ public sealed class TemplateMediaLifecycleStoragePathTests
     [InlineData(
         "https://cdn.petmagic.test/templates-media/2026/./private.png",
         "https://cdn.petmagic.test/templates-media/2026/./private.png")]
+    [InlineData(
+        "http://localhost:5000/templates-media/2026%2f..%2fprivate.png",
+        "http://localhost:5000/templates-media/2026%2f..%2fprivate.png")]
+    [InlineData(
+        "http://localhost:5000/templates-media/2026%5c..%5cprivate.png",
+        "http://localhost:5000/templates-media/2026%5c..%5cprivate.png")]
+    [InlineData(
+        "http://localhost:5000/templates-media/2026/%zz-private.png",
+        "http://localhost:5000/templates-media/2026/%zz-private.png")]
+    [InlineData(
+        "https://cdn.petmagic.test/templates-media/2026%2f..%2fprivate.png",
+        "https://cdn.petmagic.test/templates-media/2026%2f..%2fprivate.png")]
+    [InlineData(
+        "https://cdn.petmagic.test/templates-media/2026%5c..%5cprivate.png",
+        "https://cdn.petmagic.test/templates-media/2026%5c..%5cprivate.png")]
+    [InlineData(
+        "https://cdn.petmagic.test/templates-media/2026/%zz-private.png",
+        "https://cdn.petmagic.test/templates-media/2026/%zz-private.png")]
     public async Task RegisterTemporaryUploadAsync_ShouldNotPersistUnsafeManagedStoragePath(
         string assetUrl,
         string expectedStoragePath)
@@ -59,6 +77,35 @@ public sealed class TemplateMediaLifecycleStoragePathTests
 
         var record = await dbContext.TemplateMediaRecords.SingleAsync();
         Assert.Equal(expectedStoragePath, record.StoragePath);
+    }
+
+    [Fact]
+    public async Task MarkCleanupFailureAsync_ShouldSanitizeDurableFailureDiagnostics()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = new TemplateMediaLifecycleService(dbContext, CreateOptions());
+        const string assetUrl = "http://localhost:5000/templates-media/2026/06/result.png";
+
+        await service.RegisterTemporaryUploadAsync(
+            new TemplateAssetCommand(assetUrl, "result.png", "image/png", 1024, null),
+            TemplateMediaRole.PreviewAsset,
+            CancellationToken.None);
+        await service.SaveChangesAsync(CancellationToken.None);
+
+        await service.MarkCleanupFailureAsync(
+            assetUrl,
+            "storage token=code-secret",
+            "Provider delete failed token=raw-secret api_secret=storage-secret requestId=req-secret",
+            CancellationToken.None);
+        await service.SaveChangesAsync(CancellationToken.None);
+
+        var record = await dbContext.TemplateMediaRecords.SingleAsync();
+        Assert.NotNull(record.FailureCode);
+        Assert.NotNull(record.FailureMessage);
+        Assert.DoesNotContain("code-secret", record.FailureCode, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("raw-secret", record.FailureMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("storage-secret", record.FailureMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("req-secret", record.FailureMessage, StringComparison.OrdinalIgnoreCase);
     }
 
     private static TemplatesDbContext CreateDbContext()

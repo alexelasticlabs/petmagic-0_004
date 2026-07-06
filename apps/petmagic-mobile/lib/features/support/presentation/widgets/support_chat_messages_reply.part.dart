@@ -115,6 +115,7 @@ class _MessageReplyAttachmentThumbnail extends StatelessWidget {
                 cacheKey: persistentSafeSupportMediaUrl(safeUri.toString()),
                 fit: BoxFit.cover,
                 memCacheWidth: _supportReplyThumbnailCacheWidth,
+                maxWidthDiskCache: _supportReplyThumbnailCacheWidth,
                 filterQuality: FilterQuality.medium,
                 placeholder: (context, url) {
                   return ColoredBox(color: colors.surface);

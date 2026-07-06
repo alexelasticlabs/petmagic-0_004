@@ -232,6 +232,50 @@ void main() {
     expect(manager.activeVideoControllersCount, 3);
   });
 
+  test('video preload queue stops fetching after traffic budget', () async {
+    final tempDir = await Directory.systemTemp.createTemp(
+      'petmagic-feed-preload-budget-',
+    );
+    addTearDown(() async {
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+    final downloadedFile = File(
+      '${tempDir.path}${Platform.pathSeparator}v.mp4',
+    );
+    await downloadedFile.writeAsBytes(List<int>.filled(12, 1));
+    final fetched = <String>[];
+    final queue = TemplateFeedMediaPreloadQueue(
+      maxVideoPreloads: 1,
+      maxTrafficBytesPerFeedSession: 10,
+      previewCacheLookup: (_, {mediaVersion}) async => null,
+      previewFetch: (url, {mediaVersion}) async {
+        fetched.add(url);
+        return downloadedFile;
+      },
+    );
+
+    queue.preloadVideoCandidates(const [
+      TemplateFeedMediaPreloadCandidate(
+        templateId: 'template-heavy-1',
+        url: 'https://cdn.example.com/heavy-1.mp4',
+      ),
+    ], reason: 'test_first');
+    await _waitUntil(() => queue.trafficBytesThisFeedSession == 12);
+
+    queue.preloadVideoCandidates(const [
+      TemplateFeedMediaPreloadCandidate(
+        templateId: 'template-heavy-2',
+        url: 'https://cdn.example.com/heavy-2.mp4',
+      ),
+    ], reason: 'test_second');
+    await Future<void>.delayed(Duration.zero);
+
+    expect(fetched, ['https://cdn.example.com/heavy-1.mp4']);
+    expect(queue.trafficBytesThisFeedSession, 12);
+  });
+
   test('feed scope change cancels active video preloads', () async {
     final queue = TemplateFeedMediaPreloadQueue(
       previewCacheLookup: (_, {mediaVersion}) async => null,
@@ -337,4 +381,42 @@ void main() {
 
     expect(MediaLifecyclePolicy.activeVideoPreviews, 0);
   });
+
+  test('feed media telemetry stays debug-only in release builds', () async {
+    final preloadSource = await File(
+      'lib/features/templates/presentation/template_feed_media_preload_queue.dart',
+    ).readAsString();
+    final playbackSource = await File(
+      'lib/features/templates/presentation/template_feed_playback_manager.dart',
+    ).readAsString();
+
+    expect(preloadSource, contains('operation: \'media_cache_hit_rate\''));
+    expect(preloadSource, contains('operation: \'traffic_per_feed_session\''));
+    expect(preloadSource, contains('operation: \'traffic_budget_skip\''));
+    expect(
+      playbackSource,
+      contains('operation: \'active_video_controllers_count\''),
+    );
+    expect(preloadSource, isNot(contains('AppLogger.info(')));
+    expect(playbackSource, isNot(contains('AppLogger.info(')));
+    expect(
+      preloadSource,
+      contains(
+        "AppLogger.warn(\n        feature: 'Templates.FeedMediaPreload',",
+      ),
+    );
+  });
+}
+
+Future<void> _waitUntil(
+  bool Function() predicate, {
+  Duration timeout = const Duration(seconds: 1),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (!predicate()) {
+    if (DateTime.now().isAfter(deadline)) {
+      fail('Condition was not met before timeout.');
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+  }
 }

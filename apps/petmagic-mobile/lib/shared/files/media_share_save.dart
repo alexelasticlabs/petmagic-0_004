@@ -85,7 +85,7 @@ Future<void> shareLocalMediaFile({
   String? text,
   CancelToken? cancelToken,
 }) async {
-  _throwIfCancelled(cancelToken, filePath);
+  _throwIfCancelled(cancelToken);
   final usablePath = await usableLocalMediaPath(filePath);
   if (usablePath == null) {
     throw StateError('Local media file is not usable.');
@@ -95,7 +95,7 @@ Future<void> shareLocalMediaFile({
     fileName,
     fallback: 'petmagic_${DateTime.now().millisecondsSinceEpoch}',
   );
-  _throwIfCancelled(cancelToken, filePath);
+  _throwIfCancelled(cancelToken);
   await SharePlus.instance.share(
     ShareParams(
       files: [XFile(usablePath, name: safeFileName)],
@@ -165,7 +165,7 @@ Future<bool> saveLocalMediaToGallery({
   String? albumName,
   CancelToken? cancelToken,
 }) async {
-  _throwIfCancelled(cancelToken, filePath);
+  _throwIfCancelled(cancelToken);
   final usablePath = await usableLocalMediaPath(filePath);
   if (usablePath == null) {
     return false;
@@ -175,7 +175,7 @@ Future<bool> saveLocalMediaToGallery({
   final saveTitle = _safeMediaFileName(fileName);
 
   try {
-    _throwIfCancelled(cancelToken, filePath);
+    _throwIfCancelled(cancelToken);
     if (isVideo) {
       await PhotoManager.editor.saveVideo(
         file,
@@ -266,13 +266,13 @@ String? usableLocalMediaPathSync(String? localPath) {
   }
 }
 
-void _throwIfCancelled(CancelToken? cancelToken, String path) {
+void _throwIfCancelled(CancelToken? cancelToken) {
   if (cancelToken?.isCancelled != true) {
     return;
   }
 
   throw DioException.requestCancelled(
-    requestOptions: RequestOptions(path: path),
+    requestOptions: RequestOptions(path: '/local-media-action'),
     reason: 'media_action_cancelled',
   );
 }

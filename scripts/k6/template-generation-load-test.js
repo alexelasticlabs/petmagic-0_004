@@ -27,7 +27,7 @@ export const options = {
 };
 
 export function setup() {
-    const baseUrl = (__ENV.BASE_URL || 'http://localhost:5000').replace(/\/$/, '');
+    const baseUrl = (__ENV.BASE_URL || 'http://localhost:5001').replace(/\/$/, '');
     const templateId = __ENV.TEMPLATE_ID;
     if (!templateId) {
         fail('TEMPLATE_ID is required.');

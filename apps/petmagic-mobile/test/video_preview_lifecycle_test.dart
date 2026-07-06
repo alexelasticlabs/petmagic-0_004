@@ -30,6 +30,45 @@ void main() {
       );
       expect(source, contains('widget.url == url'));
       expect(source, contains('widget.mediaUrl == mediaUrl'));
+
+      final inlineInitializerStart = sectionsSource.indexOf(
+        'Future<void> _initializeController(',
+      );
+      final firstStaleCheck = sectionsSource.indexOf(
+        'if (!_isCurrentVideoRequest(requestVersion, url, controller))',
+        inlineInitializerStart,
+      );
+      final setLooping = sectionsSource.indexOf(
+        'await controller.setLooping(true);',
+        inlineInitializerStart,
+      );
+      final secondStaleCheck = sectionsSource.indexOf(
+        'if (!_isCurrentVideoRequest(requestVersion, url, controller))',
+        firstStaleCheck + 1,
+      );
+      final setVolume = sectionsSource.indexOf(
+        'await controller.setVolume(0);',
+        inlineInitializerStart,
+      );
+
+      expect(inlineInitializerStart, isNonNegative);
+      expect(firstStaleCheck, lessThan(setLooping));
+      expect(secondStaleCheck, lessThan(setVolume));
+
+      final fullscreenInitializerStart = fullscreenSource.indexOf(
+        'Future<void> _initializeFullscreenVideo(',
+      );
+      final fullscreenStaleCheck = fullscreenSource.indexOf(
+        'if (!_isCurrentVideoRequest(requestVersion, mediaUrl, controller))',
+        fullscreenInitializerStart,
+      );
+      final fullscreenSetLooping = fullscreenSource.indexOf(
+        'await controller.setLooping(true);',
+        fullscreenInitializerStart,
+      );
+
+      expect(fullscreenInitializerStart, isNonNegative);
+      expect(fullscreenStaleCheck, lessThan(fullscreenSetLooping));
     });
 
     test('template flow preview ignores stale async initialization', () {
@@ -87,6 +126,82 @@ void main() {
       );
       expect(source, contains('requestVersion == _initializeRequestVersion'));
       expect(source, contains('widget.url == url'));
+
+      final flowControllerAssignment = source.indexOf(
+        '_controller = controller;',
+      );
+      final flowFirstStaleCheck = source.indexOf(
+        'if (!_isCurrentVideoRequest(requestVersion, url, controller))',
+        flowControllerAssignment,
+      );
+      final flowSetVolume = source.indexOf(
+        'await controller.setVolume(0);',
+        flowControllerAssignment,
+      );
+      final flowSecondStaleCheck = source.indexOf(
+        'if (!_isCurrentVideoRequest(requestVersion, url, controller))',
+        flowFirstStaleCheck + 1,
+      );
+      final flowSetLooping = source.indexOf(
+        'await controller.setLooping(true);',
+        flowControllerAssignment,
+      );
+
+      expect(flowControllerAssignment, isNonNegative);
+      expect(flowFirstStaleCheck, lessThan(flowSetVolume));
+      expect(flowSecondStaleCheck, lessThan(flowSetLooping));
+    });
+
+    test('template of the day preview ignores stale async initialization', () {
+      final source = File(
+        'lib/features/templates/presentation/widgets/template_of_the_day_card_media.part.dart',
+      ).readAsStringSync();
+
+      expect(source, contains('int _initializeRequestVersion = 0;'));
+      expect(source, contains('bool _hasPreviewSlot = false;'));
+      expect(source, contains('WidgetsBinding.instance.addObserver(this);'));
+      expect(source, contains('WidgetsBinding.instance.removeObserver(this);'));
+      expect(source, contains('void didChangeAppLifecycleState'));
+      expect(source, contains('state == AppLifecycleState.resumed'));
+      expect(source, contains('state == AppLifecycleState.paused'));
+      expect(
+        source,
+        contains('MediaLifecyclePolicy.tryAcquireVideoPreviewSlot()'),
+      );
+      expect(
+        source,
+        contains('MediaLifecyclePolicy.releaseVideoPreviewSlot()'),
+      );
+      expect(
+        source,
+        contains('_isCurrentVideoRequestToken(requestVersion, previewUrl)'),
+      );
+      expect(source, contains('requestVersion == _initializeRequestVersion'));
+      expect(source, contains('widget.previewUrl == previewUrl'));
+
+      final createController = source.indexOf(
+        'controller = await createCachedTemplatePreviewVideoController(',
+      );
+      final firstStaleCheck = source.indexOf(
+        'if (!_isCurrentVideoRequestToken(requestVersion, previewUrl))',
+        createController,
+      );
+      final setVolume = source.indexOf(
+        'await controller.setVolume(0);',
+        createController,
+      );
+      final secondStaleCheck = source.indexOf(
+        'if (!_isCurrentVideoRequestToken(requestVersion, previewUrl))',
+        firstStaleCheck + 1,
+      );
+      final setLooping = source.indexOf(
+        'await controller.setLooping(true);',
+        createController,
+      );
+
+      expect(createController, isNonNegative);
+      expect(firstStaleCheck, lessThan(setVolume));
+      expect(secondStaleCheck, lessThan(setLooping));
     });
 
     test('support video previews ignore stale async initialization', () {

@@ -30,11 +30,15 @@ export function useAdminTemplateFeedback({
   const feedbackQuery = useQuery<AdminTemplateFeedbackItem[]>({
     queryKey: adminQueryKeys.templateAnalyticsFeedback(templateId, filter, normalizedSearch),
     queryFn: ({ signal }) =>
-      fetchAdminTemplateFeedback(templateId, {
-        search: normalizedSearch || undefined,
-        take,
-        type: filter === "all" ? undefined : filter,
-      }, signal),
+      fetchAdminTemplateFeedback(
+        templateId,
+        {
+          search: normalizedSearch || undefined,
+          take,
+          type: filter === "all" ? undefined : filter,
+        },
+        signal
+      ),
     enabled,
     placeholderData: keepPreviousData,
   });

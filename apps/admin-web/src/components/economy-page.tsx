@@ -150,7 +150,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
 
   const resolveIncidentMutation = useMutation<AdminEconomyIncident, Error, AdminEconomyIncident>({
     mutationFn: async (incident) =>
-      resolveAdminEconomyIncident(incident.incidentId, "Resolved from admin economy page"),
+      resolveAdminEconomyIncident(incident.incidentId, text.incidentAutoResolveReason),
     onSuccess: async () => {
       setFeedback({ tone: "success", message: text.incidentResolved });
       await queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyIncidents({}) });

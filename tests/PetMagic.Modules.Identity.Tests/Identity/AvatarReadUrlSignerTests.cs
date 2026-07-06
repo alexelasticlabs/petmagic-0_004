@@ -33,6 +33,24 @@ public sealed class AvatarReadUrlSignerTests
     }
 
     [Fact]
+    public void CreateReadUrl_ShouldStripLegacyQueryAndFragmentFromManagedAvatars()
+    {
+        var signer = CreateSigner();
+
+        var signedUrl = signer.CreateReadUrl(
+            "https://api.petmagic.app/media/user-avatars/2026/06/test.jpg?token=raw&signature=legacy#profile");
+        var uri = new Uri(signedUrl);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+
+        Assert.Equal("/media/user-avatars/2026/06/test.jpg", uri.AbsolutePath);
+        Assert.True(query.ContainsKey("pmexp"));
+        Assert.True(query.ContainsKey("pmsig"));
+        Assert.False(query.ContainsKey("token"));
+        Assert.False(query.ContainsKey("signature"));
+        Assert.Equal(string.Empty, uri.Fragment);
+    }
+
+    [Fact]
     public void IsAuthorizedRequest_ShouldAcceptCanonicalAvatarPath_WhenProxyPrefixIsStripped()
     {
         var signer = CreateSigner();
@@ -81,6 +99,9 @@ public sealed class AvatarReadUrlSignerTests
     [Theory]
     [InlineData("https://api.petmagic.app/media/user-avatars/2026/../private.jpg")]
     [InlineData("https://api.petmagic.app/media/user-avatars/2026/%2e%2e/private.jpg")]
+    [InlineData("https://api.petmagic.app/media/user-avatars/2026%2f..%2fprivate.jpg")]
+    [InlineData("https://api.petmagic.app/media/user-avatars/2026%5c..%5cprivate.jpg")]
+    [InlineData("https://api.petmagic.app/media/user-avatars/2026/%zz/private.jpg")]
     public void CreateReadUrl_ShouldHideTraversalLikeManagedAvatarUrl(string fileUrl)
     {
         var signer = CreateSigner();
@@ -130,6 +151,9 @@ public sealed class AvatarReadUrlSignerTests
     [Theory]
     [InlineData("/user-avatars/2026/../private.jpg")]
     [InlineData("/media/user-avatars/2026/%2e%2e/private.jpg")]
+    [InlineData("/user-avatars/2026%2f..%2fprivate.jpg")]
+    [InlineData("/user-avatars/2026%5c..%5cprivate.jpg")]
+    [InlineData("/user-avatars/2026/%zz/private.jpg")]
     public void IsAuthorizedRequest_ShouldRejectTraversalLikeManagedAvatarPath(string requestPath)
     {
         var signer = CreateSigner();

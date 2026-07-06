@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
+import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
@@ -33,6 +34,7 @@ class _LegalAcceptanceGatePageState
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
     final state = ref.watch(profileControllerProvider);
     final locale = Localizations.localeOf(context).toLanguageTag();
     final hasInternet = ref.watch(
@@ -137,7 +139,7 @@ class _LegalAcceptanceGatePageState
                 const SizedBox(height: 10),
                 Text(
                   mapProfileFeedbackMessage(_error!, text),
-                  style: const TextStyle(color: Colors.red),
+                  style: TextStyle(color: colors.error),
                 ),
               ],
               const SizedBox(height: 10),

@@ -38,7 +38,6 @@ public static class IdentityApiModule
         services.AddScoped<IValidator<SendBulkEmailCommand>, SendBulkEmailCommandValidator>();
         services.AddScoped<IValidator<AssignRoleCommand>, AssignRoleCommandValidator>();
         services.AddScoped<IValidator<RevokeRoleCommand>, RevokeRoleCommandValidator>();
-        services.AddScoped<IValidator<SetPremiumStatusCommand>, SetPremiumStatusCommandValidator>();
         services.AddScoped<IValidator<SetUserActiveStatusCommand>, SetUserActiveStatusCommandValidator>();
         services.AddScoped<IValidator<AdminAdjustUserWalletCommand>, AdminAdjustUserWalletCommandValidator>();
         services.AddScoped<IValidator<DeleteAdminUserCommand>, DeleteAdminUserCommandValidator>();

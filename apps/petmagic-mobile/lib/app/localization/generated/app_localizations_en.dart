@@ -1636,7 +1636,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get premiumManageFailed =>
-      'Billing management is not available yet for this account.';
+      'Billing management is currently unavailable for this account.';
 
   @override
   String get premiumRestoreStarted =>
@@ -2998,7 +2998,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get authPrivacySubtitle =>
-      'We never sell or share your data with third parties.';
+      'We do not sell personal data. We share it only with processors needed to run PetMagic.';
 
   @override
   String get authRequiredTitle => 'Sign in to unlock this action';
@@ -3136,7 +3136,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get templateFlowResultReadySubtitle => 'Your magic is ready';
 
   @override
-  String get templateFlowResultUnavailable => 'Result is not available yet';
+  String get templateFlowResultUnavailable => 'Result is currently unavailable';
 
   @override
   String get templateFlowLoadingResult => 'Loading result...';
@@ -3370,6 +3370,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Service is temporarily unavailable. Please try again later.';
 
   @override
+  String get templateFlowActiveGenerationLimitError =>
+      'You already have a generation in progress. Wait for it to finish, then start a new one.';
+
+  @override
   String get templateFlowStartFailedError =>
       'Could not start generation. Please try again.';
 
@@ -3432,11 +3436,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get generationStatusResultUnavailableForSave =>
-      'Result is not available for saving yet.';
+      'Result is currently unavailable for saving.';
 
   @override
   String get generationStatusResultUnavailableForShare =>
-      'Result is not available for sharing yet.';
+      'Result is currently unavailable for sharing.';
 
   @override
   String get generationStatusSaveFileDialogTitle => 'Save file';
@@ -3463,7 +3467,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get generationStatusDeleteSoonMessage =>
-      'Deletion will be available soon.';
+      'Could not delete this result. Please try again.';
 
   @override
   String get generationStatusRetrySoonMessage =>
@@ -4159,7 +4163,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String gamificationXpProgress(Object current, Object required, Object total) {
+  String gamificationXpProgress(Object current, Object total) {
     return '$current / $total XP';
   }
 

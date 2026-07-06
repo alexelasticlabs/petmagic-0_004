@@ -168,6 +168,43 @@ public sealed partial class SupportChatEndpointsIntegrationTests
     }
 
     [Fact]
+    public async Task UserAttachmentEndpoint_ShouldSanitizeStorageFailureCode()
+    {
+        await using var application = await SupportChatTestApplication.CreateAsync();
+        application.AttachmentStorage.FailNextStore("support.attachment_storage_failed token=attachment-storage-secret");
+
+        var userClient = application.CreateClient(UserId, "User");
+        var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
+            userClient,
+            "/api/support/conversation/open",
+            new OpenConversationRequest("Need failed upload proof", SupportConversationPriority.Normal));
+
+        using var form = new MultipartFormDataContent();
+        var fileContent = new ByteArrayContent([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+        form.Add(fileContent, "file", "issue.png");
+        form.Add(new StringContent("Upload should fail safely"), "body");
+
+        using var response = await userClient.PostAsync(
+            $"/api/support/conversation/{created.ConversationId}/attachments",
+            form);
+
+        await AssertSuccessAsync(response);
+        var message = (await response.Content.ReadFromJsonAsync<SupportMessageResponse>(JsonOptions))!;
+        Assert.Equal("Failed", message.AttachmentUploadStatus);
+        Assert.Equal("support.attachment_storage_failed", message.AttachmentUploadErrorCode);
+        Assert.DoesNotContain("attachment-storage-secret", message.AttachmentUploadErrorCode, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(message.Attachments);
+
+        var conversation = await GetFromJsonAsync<SupportConversationDetailResponse>(
+            application.CreateClient(AdminId, "Admin"),
+            $"/api/admin/support/tickets/{created.ConversationId}");
+        var persistedMessage = Assert.Single(conversation.Messages, item => item.MessageId == message.MessageId);
+        Assert.Equal("support.attachment_storage_failed", persistedMessage.AttachmentUploadErrorCode);
+        Assert.DoesNotContain("attachment-storage-secret", persistedMessage.AttachmentUploadErrorCode, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task UserMessageEndpoint_ShouldAppendLocalizedAutomaticReply_ForFirstMessage()
     {
         await using var application = await SupportChatTestApplication.CreateAsync();

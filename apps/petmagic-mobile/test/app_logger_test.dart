@@ -109,6 +109,113 @@ void main() {
     expect(sanitized.toString(), isNot(contains('Texas')));
   });
 
+  test('redacts stable domain identifiers while preserving trace ids', () {
+    final sanitized = AppLogger.sanitizeContextForTesting({
+      'userId': 'user-123',
+      'profileUserId': 'profile-user-123',
+      'accountScope': 'account-scope-123',
+      'userScope': 'user-scope-123',
+      'scope': 'scope-user-123',
+      'petId': 'pet-123',
+      'generationId': 'generation-123',
+      'templateId': 'template-123',
+      'assignmentId': 'assignment-123',
+      'conversationId': 'conversation-123',
+      'messageId': 'message-123',
+      'ticketId': 'ticket-123',
+      'attachmentId': 'attachment-123',
+      'pendingPurchaseId': 'purchase-pending-123',
+      'activeSubscriptionId': 'subscription-active-123',
+      'feedbackId': 'feedback-123',
+      'reportId': 'report-123',
+      'moderationId': 'moderation-123',
+      'orderId': 'order-123',
+      'sourceGenerationId': 'generation-source-123',
+      'relatedGenerationId': 'generation-related-123',
+      'parentGenerationResultId': 'generation-parent-123',
+      'highlightedPurchaseOrderId': 'order-highlighted-123',
+      'visibleTemplateId': 'template-visible-123',
+      'requestId': 'request-123',
+      'correlationId': 'flow-123',
+      'traceId': 'trace-123',
+    });
+
+    expect(sanitized['userId'], '***');
+    expect(sanitized['profileUserId'], '***');
+    expect(sanitized['accountScope'], '***');
+    expect(sanitized['userScope'], '***');
+    expect(sanitized['scope'], '***');
+    expect(sanitized['petId'], '***');
+    expect(sanitized['generationId'], '***');
+    expect(sanitized['templateId'], '***');
+    expect(sanitized['assignmentId'], '***');
+    expect(sanitized['conversationId'], '***');
+    expect(sanitized['messageId'], '***');
+    expect(sanitized['ticketId'], '***');
+    expect(sanitized['attachmentId'], '***');
+    expect(sanitized['pendingPurchaseId'], '***');
+    expect(sanitized['activeSubscriptionId'], '***');
+    expect(sanitized['feedbackId'], '***');
+    expect(sanitized['reportId'], '***');
+    expect(sanitized['moderationId'], '***');
+    expect(sanitized['orderId'], '***');
+    expect(sanitized['sourceGenerationId'], '***');
+    expect(sanitized['relatedGenerationId'], '***');
+    expect(sanitized['parentGenerationResultId'], '***');
+    expect(sanitized['highlightedPurchaseOrderId'], '***');
+    expect(sanitized['visibleTemplateId'], '***');
+    expect(sanitized['requestId'], 'request-123');
+    expect(sanitized['correlationId'], 'flow-123');
+    expect(sanitized['traceId'], 'trace-123');
+    expect(sanitized.toString(), isNot(contains('user-123')));
+    expect(sanitized.toString(), isNot(contains('scope-user-123')));
+    expect(sanitized.toString(), isNot(contains('generation-123')));
+    expect(sanitized.toString(), isNot(contains('assignment-123')));
+    expect(sanitized.toString(), isNot(contains('conversation-123')));
+    expect(sanitized.toString(), isNot(contains('ticket-123')));
+    expect(sanitized.toString(), isNot(contains('attachment-123')));
+    expect(sanitized.toString(), isNot(contains('purchase-pending-123')));
+    expect(sanitized.toString(), isNot(contains('subscription-active-123')));
+    expect(sanitized.toString(), isNot(contains('feedback-123')));
+    expect(sanitized.toString(), isNot(contains('report-123')));
+    expect(sanitized.toString(), isNot(contains('moderation-123')));
+    expect(sanitized.toString(), isNot(contains('generation-source-123')));
+    expect(sanitized.toString(), isNot(contains('generation-related-123')));
+    expect(sanitized.toString(), isNot(contains('generation-parent-123')));
+    expect(sanitized.toString(), isNot(contains('order-highlighted-123')));
+    expect(sanitized.toString(), isNot(contains('template-visible-123')));
+  });
+
+  test('redacts plural domain identifiers and media collections by key', () {
+    final sanitized = AppLogger.sanitizeContextForTesting({
+      'templateIds': ['template-123', 'template-456'],
+      'generationIds': ['generation-123'],
+      'conversationIds': ['conversation-123'],
+      'purchaseIds': ['purchase-123'],
+      'requestIds': ['request-123'],
+      'mediaUrls': [
+        'https://cdn.petmagic.ai/private/file-a.jpg',
+        'https://cdn.petmagic.ai/private/file-b.jpg?signature=secret',
+      ],
+      'fileNames': ['pet-photo-rover.jpg'],
+    });
+
+    expect(sanitized['templateIds'], '***');
+    expect(sanitized['generationIds'], '***');
+    expect(sanitized['conversationIds'], '***');
+    expect(sanitized['purchaseIds'], '***');
+    expect(sanitized['requestIds'], contains('request-123'));
+    expect(sanitized['mediaUrls'], '***');
+    expect(sanitized['fileNames'], '***');
+    expect(sanitized.toString(), isNot(contains('template-123')));
+    expect(sanitized.toString(), isNot(contains('generation-123')));
+    expect(sanitized.toString(), isNot(contains('conversation-123')));
+    expect(sanitized.toString(), isNot(contains('purchase-123')));
+    expect(sanitized.toString(), isNot(contains('/private/file-a.jpg')));
+    expect(sanitized.toString(), isNot(contains('signature=secret')));
+    expect(sanitized.toString(), isNot(contains('pet-photo-rover.jpg')));
+  });
+
   test('sanitizes sensitive patterns embedded in text', () {
     final sanitized = AppLogger.sanitizeContextForTesting({
       'message':
@@ -121,12 +228,102 @@ void main() {
     final message = sanitized['message'] as String;
     expect(message, contains('Bearer ***'));
     expect(message, contains('p***@example.com'));
-    expect(message, contains('https://cdn.petmagic.ai/file.jpg?***'));
+    expect(message, contains('https://cdn.petmagic.ai/***'));
+    expect(message, isNot(contains('/file.jpg')));
     expect(message, isNot(contains('abc.def')));
     expect(message, isNot(contains('sk_live_123456789')));
     expect(message, isNot(contains('raw-credential')));
     expect(message, isNot(contains('raw-signature')));
     expect(message, isNot(contains('555')));
+  });
+
+  test('redacts stable domain identifiers embedded in text', () {
+    final message = AppLogger.sanitizeMessageForTesting(
+      'generationId=generation-123 template_id: template-123 '
+      'userScope=user-scope-123 scope=scope-user-123 '
+      'assignmentId=assignment-123 conversationId=conversation-123 '
+      'ticketId=ticket-123 attachmentId=attachment-123 '
+      'pendingPurchaseId=purchase-pending-123 '
+      'activeSubscriptionId: subscription-active-123 '
+      'feedbackId=feedback-123 reportId=report-123 '
+      'moderationId=moderation-123 orderId=order-123 '
+      'sourceGenerationId=generation-source-123 '
+      'related_generation_id: generation-related-123 '
+      'parentGenerationResultId=generation-parent-123 '
+      'highlightedPurchaseOrderId=order-highlighted-123 '
+      'visibleTemplateId=template-visible-123 '
+      'requestId=request-123 correlationId=flow-123 traceId=trace-123',
+    );
+
+    expect(message, contains('generationId=***'));
+    expect(message, contains('template_id: ***'));
+    expect(message, contains('userScope=***'));
+    expect(message, contains('scope=***'));
+    expect(message, contains('assignmentId=***'));
+    expect(message, contains('conversationId=***'));
+    expect(message, contains('ticketId=***'));
+    expect(message, contains('attachmentId=***'));
+    expect(message, contains('pendingPurchaseId=***'));
+    expect(message, contains('activeSubscriptionId: ***'));
+    expect(message, contains('feedbackId=***'));
+    expect(message, contains('reportId=***'));
+    expect(message, contains('moderationId=***'));
+    expect(message, contains('orderId=***'));
+    expect(message, contains('sourceGenerationId=***'));
+    expect(message, contains('related_generation_id: ***'));
+    expect(message, contains('parentGenerationResultId=***'));
+    expect(message, contains('highlightedPurchaseOrderId=***'));
+    expect(message, contains('visibleTemplateId=***'));
+    expect(message, contains('requestId=request-123'));
+    expect(message, contains('correlationId=flow-123'));
+    expect(message, contains('traceId=trace-123'));
+    expect(message, isNot(contains('generation-123')));
+    expect(message, isNot(contains('template-123')));
+    expect(message, isNot(contains('user-scope-123')));
+    expect(message, isNot(contains('scope-user-123')));
+    expect(message, isNot(contains('assignment-123')));
+    expect(message, isNot(contains('ticket-123')));
+    expect(message, isNot(contains('attachment-123')));
+    expect(message, isNot(contains('purchase-pending-123')));
+    expect(message, isNot(contains('subscription-active-123')));
+    expect(message, isNot(contains('feedback-123')));
+    expect(message, isNot(contains('report-123')));
+    expect(message, isNot(contains('moderation-123')));
+    expect(message, isNot(contains('conversation-123')));
+    expect(message, isNot(contains('order-123')));
+    expect(message, isNot(contains('generation-source-123')));
+    expect(message, isNot(contains('generation-related-123')));
+    expect(message, isNot(contains('generation-parent-123')));
+    expect(message, isNot(contains('order-highlighted-123')));
+    expect(message, isNot(contains('template-visible-123')));
+  });
+
+  test('redacts plural domain identifiers and filenames embedded in text', () {
+    final message = AppLogger.sanitizeMessageForTesting(
+      'templateIds=template-123,template-456 '
+      'generationIds: generation-123 '
+      'purchaseIds=purchase-123 '
+      'requestIds=request-123 '
+      'fileName=alice-vet-bill.pdf '
+      'fileNames=passport-scan.png,home-address-dog.jpeg '
+      'mediaUrls=https://cdn.petmagic.ai/private/file-a.jpg',
+    );
+
+    expect(message, contains('templateIds=***'));
+    expect(message, contains('generationIds: ***'));
+    expect(message, contains('purchaseIds=***'));
+    expect(message, contains('requestIds=request-123'));
+    expect(message, contains('fileName=***'));
+    expect(message, contains('fileNames=***'));
+    expect(message, contains('mediaUrls=https://cdn.petmagic.ai/***'));
+    expect(message, isNot(contains('template-123')));
+    expect(message, isNot(contains('template-456')));
+    expect(message, isNot(contains('generation-123')));
+    expect(message, isNot(contains('purchase-123')));
+    expect(message, isNot(contains('alice-vet-bill')));
+    expect(message, isNot(contains('passport-scan')));
+    expect(message, isNot(contains('home-address-dog')));
+    expect(message, isNot(contains('/private/file-a.jpg')));
   });
 
   test('sanitizes top-level log messages before developer log output', () {
@@ -139,7 +336,8 @@ void main() {
 
     expect(message, contains('Bearer ***'));
     expect(message, contains('p***@example.com'));
-    expect(message, contains('https://cdn.petmagic.ai/file.jpg?***'));
+    expect(message, contains('https://cdn.petmagic.ai/***'));
+    expect(message, isNot(contains('/file.jpg')));
     expect(message, contains('paymentIntentClientSecret=***'));
     expect(message, isNot(contains('raw.jwt.token')));
     expect(message, isNot(contains('signature=secret')));
@@ -195,6 +393,27 @@ void main() {
     expect(message, isNot(contains('raw-refresh')));
     expect(message, isNot(contains('json-secret')));
     expect(message, isNot(contains('raw-cookie')));
+  });
+
+  test('masks provider signature and api key headers embedded in text', () {
+    final message = AppLogger.sanitizeMessageForTesting(
+      'X-Api-Key: raw-api-key '
+      'x_fal_key=fal-secret '
+      'Stripe-Signature: stripe-signature-secret '
+      'X-Goog-Signature=google-signature-secret '
+      'X-Webhook-Signature: webhook-signature-secret',
+    );
+
+    expect(message, contains('X-Api-Key: ***'));
+    expect(message, contains('x_fal_key= ***'));
+    expect(message, contains('Stripe-Signature: ***'));
+    expect(message, contains('X-Goog-Signature= ***'));
+    expect(message, contains('X-Webhook-Signature: ***'));
+    expect(message, isNot(contains('raw-api-key')));
+    expect(message, isNot(contains('fal-secret')));
+    expect(message, isNot(contains('stripe-signature-secret')));
+    expect(message, isNot(contains('google-signature-secret')));
+    expect(message, isNot(contains('webhook-signature-secret')));
   });
 
   test('sanitizes sensitive key value pairs inside nested text', () {
@@ -347,20 +566,61 @@ void main() {
     expect(message, isNot(contains('external-auth-ticket')));
   });
 
+  test('redacts checkout and redirect urls that may carry session secrets', () {
+    final sanitized = AppLogger.sanitizeContextForTesting({
+      'checkoutUrl':
+          'https://checkout.stripe.com/c/pay/cs_test_checkoutSession123#fidkdWxOYHwnPyd1blpxYHZxWjA0TnFsecret',
+      'billingPortalUrl':
+          'https://billing.stripe.com/p/session/bps_test_secret',
+      'redirectUrl': 'petmagic://auth/external?ticket=external-auth-ticket',
+      'genericUrl': 'https://status.petmagic.app/path#fragment-secret',
+    });
+
+    expect(sanitized['checkoutUrl'], '***');
+    expect(sanitized['billingPortalUrl'], '***');
+    expect(sanitized['redirectUrl'], '***');
+    expect(sanitized['genericUrl'], 'https://status.petmagic.app/***');
+    expect(sanitized.toString(), isNot(contains('cs_test_checkoutSession123')));
+    expect(sanitized.toString(), isNot(contains('/path')));
+    expect(sanitized.toString(), isNot(contains('fragment-secret')));
+    expect(sanitized.toString(), isNot(contains('external-auth-ticket')));
+    expect(sanitized.toString(), isNot(contains('bps_test_secret')));
+  });
+
+  test('redacts checkout urls embedded in log text', () {
+    final message = AppLogger.sanitizeMessageForTesting(
+      'checkoutUrl=https://checkout.stripe.com/c/pay/cs_test_checkoutSession123#fidkdSecret '
+      'return_url: https://petmagic.app/checkout/done?session_id=cs_test_secret',
+    );
+
+    expect(message, contains('checkoutUrl=***'));
+    expect(message, contains('return_url: ***'));
+    expect(message, isNot(contains('cs_test_checkoutSession123')));
+    expect(message, isNot(contains('fidkdSecret')));
+    expect(message, isNot(contains('cs_test_secret')));
+  });
+
   test('strips query strings from endpoint context values', () {
     final sanitized = AppLogger.sanitizeContextForTesting({
       'path': '/api/templates/generations?token=abc&signature=secret',
       'endpoint': 'https://api.petmagic.app/api/wallet?receipt=secret',
       'route': '/checkout?paymentIntentClientSecret=pi_secret_123',
+      'base_url': 'https://user:password@api.petmagic.app/api?token=secret',
+      'apiUrl': 'https://admin:secret@api.petmagic.app/admin#fragment-secret',
     });
 
     expect(sanitized['path'], '/api/templates/generations');
     expect(sanitized['endpoint'], 'https://api.petmagic.app/api/wallet');
     expect(sanitized['route'], '/checkout');
+    expect(sanitized['base_url'], 'https://api.petmagic.app/api');
+    expect(sanitized['apiUrl'], 'https://api.petmagic.app/admin');
     expect(sanitized.toString(), isNot(contains('token=abc')));
     expect(sanitized.toString(), isNot(contains('signature=secret')));
     expect(sanitized.toString(), isNot(contains('receipt=secret')));
     expect(sanitized.toString(), isNot(contains('pi_secret_123')));
+    expect(sanitized.toString(), isNot(contains('user:password')));
+    expect(sanitized.toString(), isNot(contains('admin:secret')));
+    expect(sanitized.toString(), isNot(contains('fragment-secret')));
   });
 
   test('redacts remote media urls in context without exposing object paths', () {
@@ -404,6 +664,23 @@ void main() {
     expect(sanitized.toString(), isNot(contains('file:///private')));
   });
 
+  test('redacts user supplied file names in context', () {
+    final sanitized = AppLogger.sanitizeContextForTesting({
+      'fileName': 'alice-vet-bill.pdf',
+      'attachmentFileName': 'passport-scan.png',
+      'source_file_name': 'home-address-dog.jpeg',
+      'status': 'failed',
+    });
+
+    expect(sanitized['fileName'], '***');
+    expect(sanitized['attachmentFileName'], '***');
+    expect(sanitized['source_file_name'], '***');
+    expect(sanitized['status'], 'failed');
+    expect(sanitized.toString(), isNot(contains('alice-vet-bill')));
+    expect(sanitized.toString(), isNot(contains('passport-scan')));
+    expect(sanitized.toString(), isNot(contains('home-address-dog')));
+  });
+
   test('redacts local file paths embedded in log text', () {
     final message = AppLogger.sanitizeMessageForTesting(
       'Upload failed filePath=/tmp/petmagic/source.jpg '
@@ -417,6 +694,21 @@ void main() {
     expect(message, isNot(contains('/tmp/petmagic')));
     expect(message, isNot(contains('/storage/emulated')));
     expect(message, isNot(contains('file:///private')));
+  });
+
+  test('redacts user supplied file names embedded in log text', () {
+    final message = AppLogger.sanitizeMessageForTesting(
+      'Upload failed fileName=alice-vet-bill.pdf '
+      'attachmentFileName: "passport-scan.png" '
+      'source_file_name=home-address-dog.jpeg',
+    );
+
+    expect(message, contains('fileName=***'));
+    expect(message, contains('attachmentFileName: "***"'));
+    expect(message, contains('source_file_name=***'));
+    expect(message, isNot(contains('alice-vet-bill')));
+    expect(message, isNot(contains('passport-scan')));
+    expect(message, isNot(contains('home-address-dog')));
   });
 
   test('redacts keyed remote media urls embedded in log text', () {

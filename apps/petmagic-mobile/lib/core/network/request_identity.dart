@@ -1,6 +1,8 @@
 import 'dart:developer' as developer;
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
+
 abstract final class RequestIdentity {
   static final Random _defaultRandom = _createDefaultRandom();
   static bool _reportedInsecureRandomFallback = false;
@@ -42,8 +44,8 @@ abstract final class RequestIdentity {
       'Secure random unavailable; falling back to Random.',
       name: 'PetMagic.RequestIdentity',
       level: 900,
-      error: error,
-      stackTrace: stackTrace,
+      error: kDebugMode ? error : error.runtimeType.toString(),
+      stackTrace: kDebugMode ? stackTrace : null,
     );
   }
 }

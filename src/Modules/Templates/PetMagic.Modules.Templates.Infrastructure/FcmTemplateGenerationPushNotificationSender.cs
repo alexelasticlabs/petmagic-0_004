@@ -90,52 +90,36 @@ internal sealed class FcmTemplateGenerationPushNotificationSender(
         };
         httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-        using var response = await httpClient.SendAsync(httpRequest, cancellationToken);
-        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        using var response = await httpClient.SendAsync(
+            httpRequest,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
+        var eventIdHash = SafeLogValues.StableHash(eventId);
+        var tokenIdHash = SafeLogValues.StableHash(token.Id.ToString("D"));
         if (response.IsSuccessStatusCode)
         {
             logger.LogInformation(
-                "FCM send succeeded for template generation event. EventId={EventId} TokenId={TokenId} MessageName={MessageName} CorrelationId={CorrelationId}",
-                eventId,
-                token.Id,
-                TryReadFcmMessageName(body),
-                CorrelationContext.ResolveOrCreate());
+                "FCM send succeeded for template generation event. EventIdHash={EventIdHash} TokenIdHash={TokenIdHash} CorrelationIdHash={CorrelationIdHash}",
+                eventIdHash,
+                tokenIdHash,
+                SafeLogValues.StableHash(CorrelationContext.ResolveOrCreate()));
             return;
         }
 
+        var body = await SafeHttpContentReader.ReadStringPrefixAsync(response.Content, cancellationToken);
         logger.LogWarning(
-            "FCM send failed for template generation event. EventId={EventId} TokenId={TokenId} StatusCode={StatusCode} ErrorReason={ErrorReason} CorrelationId={CorrelationId}",
-            eventId,
-            token.Id,
+            "FCM send failed for template generation event. EventIdHash={EventIdHash} TokenIdHash={TokenIdHash} StatusCode={StatusCode} ErrorReason={ErrorReason} CorrelationIdHash={CorrelationIdHash}",
+            eventIdHash,
+            tokenIdHash,
             response.StatusCode,
             FirebaseMessagingErrorClassifier.ResolveErrorReason(body),
-            CorrelationContext.ResolveOrCreate());
+            SafeLogValues.StableHash(CorrelationContext.ResolveOrCreate()));
 
         if (FirebaseMessagingErrorClassifier.ShouldDisableToken(response.StatusCode, body))
         {
             token.DisabledAtUtc = DateTime.UtcNow;
             token.UpdatedAtUtc = token.DisabledAtUtc.Value;
             await dbContext.SaveChangesAsync(cancellationToken);
-        }
-    }
-
-    private static string? TryReadFcmMessageName(string body)
-    {
-        if (string.IsNullOrWhiteSpace(body))
-        {
-            return null;
-        }
-
-        try
-        {
-            using var document = JsonDocument.Parse(body);
-            return document.RootElement.TryGetProperty("name", out var name) && name.ValueKind == JsonValueKind.String
-                ? name.GetString()
-                : null;
-        }
-        catch (JsonException)
-        {
-            return null;
         }
     }
 

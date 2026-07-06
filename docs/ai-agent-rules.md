@@ -55,7 +55,9 @@ dotnet test PetMagic.slnx --no-restore
 For local API runtime checks:
 
 ```bash
-docker compose --env-file /dev/null config
+docker compose --env-file .env.example config --quiet
+docker compose --env-file .env.local-smoke.example config --quiet
+docker compose --env-file .env.staging.local.example config --quiet
 docker compose ps
 docker compose logs backend
 dotnet run --project src/Host/PetMagic.Host.Api/PetMagic.Host.Api.csproj
@@ -90,11 +92,24 @@ adb reverse --list
 flutter run --dart-define=API_BASE_URL=http://127.0.0.1:5000
 ```
 
+If the backend is running through the default Compose host port, mirror and pass
+`5001` instead:
+
+```bash
+adb reverse tcp:5001 tcp:5001
+adb reverse --list
+flutter run --dart-define=API_BASE_URL=http://127.0.0.1:5001
+```
+
 For release hardening:
 
 ```bash
 flutter build appbundle --release --dart-define=API_BASE_URL=https://api.petmagic.app
 ```
+
+Release app bundles require real `apps/petmagic-mobile/android/key.properties`
+signing material. For local packaging/R8 checks without production signing, run
+the documented direct Gradle bypass from `apps/petmagic-mobile/android`.
 
 ### Admin Web
 
@@ -115,6 +130,7 @@ From the repository root:
 
 ```bash
 rg --files -g "*.md" -g "!apps/petmagic-mobile/third_party/**" -g "!**/Assets.xcassets/**"
+node scripts/qa/check-markdown-local-links.mjs
 git diff --check
 git status --short
 ```

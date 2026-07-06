@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -42,6 +43,13 @@ class SubscriptionManagementPage extends ConsumerStatefulWidget {
 class _SubscriptionManagementPageState
     extends ConsumerState<SubscriptionManagementPage> {
   bool _isProcessing = false;
+  CancelToken? _activeSubscriptionActionCancelToken;
+
+  @override
+  void dispose() {
+    _cancelActiveSubscriptionAction();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -162,10 +170,14 @@ class _SubscriptionManagementPageState
     }
 
     setState(() => _isProcessing = true);
+    final cancelToken = _startSubscriptionActionCancelToken();
     try {
       final service = ref.read(premiumSubscriptionManagementServiceProvider);
-      final url = await service.createManagementUrl(manageSubscriptionAction);
-      if (!mounted) {
+      final url = await service.createManagementUrl(
+        manageSubscriptionAction,
+        cancelToken: cancelToken,
+      );
+      if (!mounted || cancelToken.isCancelled) {
         return;
       }
 
@@ -217,10 +229,22 @@ class _SubscriptionManagementPageState
           tone: PetMagicToastTone.warning,
         );
       }
+    } on DioException catch (error) {
+      if (CancelToken.isCancel(error) || cancelToken.isCancelled) {
+        return;
+      }
+
+      _logSubscriptionActionFailure(
+        'open_manage_target',
+        error,
+        error.stackTrace,
+      );
+      _showSubscriptionActionFailed();
     } catch (error, stackTrace) {
       _logSubscriptionActionFailure('open_manage_target', error, stackTrace);
       _showSubscriptionActionFailed();
     } finally {
+      _completeSubscriptionAction(cancelToken);
       if (mounted) {
         ref.invalidate(premiumSubscriptionSummaryProvider);
         setState(() => _isProcessing = false);
@@ -250,10 +274,11 @@ class _SubscriptionManagementPageState
     if (!mounted || confirmed != true) return;
 
     setState(() => _isProcessing = true);
+    final cancelToken = _startSubscriptionActionCancelToken();
     try {
       final service = ref.read(premiumSubscriptionManagementServiceProvider);
-      await service.requestCancelAtPeriodEnd();
-      if (!mounted) {
+      await service.requestCancelAtPeriodEnd(cancelToken: cancelToken);
+      if (!mounted || cancelToken.isCancelled) {
         return;
       }
 
@@ -267,10 +292,22 @@ class _SubscriptionManagementPageState
           tone: PetMagicToastTone.success,
         );
       }
+    } on DioException catch (error) {
+      if (CancelToken.isCancel(error) || cancelToken.isCancelled) {
+        return;
+      }
+
+      _logSubscriptionActionFailure(
+        'cancel_at_period_end',
+        error,
+        error.stackTrace,
+      );
+      _showSubscriptionActionFailed();
     } catch (error, stackTrace) {
       _logSubscriptionActionFailure('cancel_at_period_end', error, stackTrace);
       _showSubscriptionActionFailed();
     } finally {
+      _completeSubscriptionAction(cancelToken);
       if (mounted) setState(() => _isProcessing = false);
     }
   }
@@ -322,6 +359,27 @@ class _SubscriptionManagementPageState
       message: AppLocalizations.of(context).premiumManageFailed,
       tone: PetMagicToastTone.warning,
     );
+  }
+
+  CancelToken _startSubscriptionActionCancelToken() {
+    _cancelActiveSubscriptionAction();
+    final cancelToken = CancelToken();
+    _activeSubscriptionActionCancelToken = cancelToken;
+    return cancelToken;
+  }
+
+  void _completeSubscriptionAction(CancelToken cancelToken) {
+    if (identical(_activeSubscriptionActionCancelToken, cancelToken)) {
+      _activeSubscriptionActionCancelToken = null;
+    }
+  }
+
+  void _cancelActiveSubscriptionAction() {
+    final cancelToken = _activeSubscriptionActionCancelToken;
+    if (cancelToken != null && !cancelToken.isCancelled) {
+      cancelToken.cancel('subscription_management_disposed');
+    }
+    _activeSubscriptionActionCancelToken = null;
   }
 
   void _logSubscriptionActionFailure(

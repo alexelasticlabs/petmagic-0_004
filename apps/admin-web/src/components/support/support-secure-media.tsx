@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { isUnsafeAdminMediaHost } from "@/lib/admin-unsafe-remote-host";
 import { clientLogger } from "@/lib/client-logger";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
@@ -43,6 +44,23 @@ function getSupportMediaErrorDetails(error: unknown) {
   };
 }
 
+function getBlockedUnsafeSupportMediaUrlDetails(url: string) {
+  return {
+    rawLength: url.length,
+    startsWithSlash: url.startsWith("/"),
+    isBlobOrData: isLocalObjectUrl(url),
+  };
+}
+
+export function isUnsafeSupportMediaUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return isUnsafeMediaHost(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
 export function SupportSecureMedia({
   url,
   alt = "",
@@ -59,6 +77,7 @@ export function SupportSecureMedia({
   logContext,
 }: SupportSecureMediaProps) {
   const localObjectUrl = isLocalObjectUrl(url) ? url : null;
+  const unsafeRemoteUrl = !localObjectUrl && isUnsafeSupportMediaUrl(url);
   const [remoteMedia, setRemoteMedia] = useState<{
     sourceUrl: string;
     objectUrl: string | null;
@@ -67,7 +86,8 @@ export function SupportSecureMedia({
   const activeObjectUrlRef = useRef<string | null>(null);
   const objectUrl =
     localObjectUrl ?? (remoteMedia.sourceUrl === url ? remoteMedia.objectUrl : null);
-  const loadFailed = !localObjectUrl && remoteMedia.sourceUrl === url && remoteMedia.failed;
+  const loadFailed =
+    unsafeRemoteUrl || (!localObjectUrl && remoteMedia.sourceUrl === url && remoteMedia.failed);
   const revokeActiveObjectUrl = useCallback(() => {
     if (!activeObjectUrlRef.current) {
       return;
@@ -87,6 +107,17 @@ export function SupportSecureMedia({
 
   useEffect(() => {
     if (localObjectUrl) {
+      return;
+    }
+
+    if (unsafeRemoteUrl) {
+      clientLogger.warn("support.secure_media_unsafe_host_blocked", {
+        messageId: formatSupportMediaLogText(logContext?.messageId),
+        mimeType: formatSupportMediaLogText(logContext?.mimeType),
+        kind,
+        ...getBlockedUnsafeSupportMediaUrlDetails(url),
+      });
+      revokeActiveObjectUrl();
       return;
     }
 
@@ -149,6 +180,7 @@ export function SupportSecureMedia({
     logContext?.mimeType,
     markRemoteMediaFailed,
     revokeActiveObjectUrl,
+    unsafeRemoteUrl,
     url,
   ]);
 
@@ -192,4 +224,8 @@ export function SupportSecureMedia({
       onError={markRemoteMediaFailed}
     />
   );
+}
+
+function isUnsafeMediaHost(hostname: string): boolean {
+  return isUnsafeAdminMediaHost(hostname);
 }

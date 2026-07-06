@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
@@ -499,6 +500,7 @@ void main() {
     'readActiveGeneration migrates missing correlation id in persisted state',
     () async {
       final preferences = SharedPreferencesAsync();
+      final secureStorage = _FakeSecureStorage();
       await preferences.setString(
         'templates_active_generation_id_v1:user-1',
         'generation-1',
@@ -508,6 +510,7 @@ void main() {
         dio: Dio(),
         sessionStorage: TestSessionStorage(sessionFixture()),
         preferences: preferences,
+        secureStorage: secureStorage,
       );
 
       final restored = await repository.readActiveGeneration();
@@ -521,15 +524,15 @@ void main() {
       );
       final keys = await preferences.getKeys();
       expect(keys.any((key) => key.contains('user-1')), isFalse);
-      final correlationKey = keys.singleWhere(
-        (key) =>
-            key.startsWith('templates_active_generation_correlation_id_v1:'),
+      expect(
+        keys.any(
+          (key) =>
+              key.startsWith('templates_active_generation_correlation_id_v1:'),
+        ),
+        isFalse,
       );
-      final persistedCorrelationId = await preferences.getString(
-        correlationKey,
-      );
-      expect(correlationKey, isNot(contains('user-1')));
-      expect(persistedCorrelationId, restored?.correlationId);
+      expect(secureStorage.values.values, contains('generation-1'));
+      expect(secureStorage.values.values, contains(restored?.correlationId));
     },
   );
 
@@ -1285,7 +1288,7 @@ void main() {
             'contentType': 'image/png',
           }),
           9 => jsonResponse({
-            'shareUrl': 'https://app.petmagic.test/share/generation/token',
+            'shareUrl': 'https://app.petmagic.app/share/generation/token',
             'shareToken': 'token',
             'signedMediaUrl': 'https://cdn.petmagic.test/generated.jpg',
             'hasWatermark': false,
@@ -1329,7 +1332,7 @@ void main() {
     expect(watermark.watermarkRemoved, isTrue);
     expect(download.mediaUrl, 'https://cdn.petmagic.test/generated.jpg');
     expect(share.mediaUrl, 'https://cdn.petmagic.test/generated.jpg');
-    expect(share.shareUrl, 'https://app.petmagic.test/share/generation/token');
+    expect(share.shareUrl, 'https://app.petmagic.app/share/generation/token');
     expect(share.shareToken, 'token');
     expect(share.fileName, 'generated.jpg');
     expect(
@@ -1339,4 +1342,56 @@ void main() {
     expect(requests[5].data, containsPair('generationId', generationId));
     expect(requests[6].data, containsPair('generationId', generationId));
   });
+}
+
+class _FakeSecureStorage extends FlutterSecureStorage {
+  _FakeSecureStorage([Map<String, String>? initialValues])
+    : values = initialValues ?? <String, String>{};
+
+  final Map<String, String> values;
+
+  @override
+  Future<String?> read({
+    required String key,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    return values[key];
+  }
+
+  @override
+  Future<void> write({
+    required String key,
+    required String? value,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    if (value == null) {
+      values.remove(key);
+      return;
+    }
+
+    values[key] = value;
+  }
+
+  @override
+  Future<void> delete({
+    required String key,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    values.remove(key);
+  }
 }

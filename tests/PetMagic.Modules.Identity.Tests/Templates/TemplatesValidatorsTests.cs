@@ -106,4 +106,24 @@ public sealed class TemplatesValidatorsTests
         Assert.Contains(result.Errors, error => error.PropertyName == "Priority");
         Assert.Contains(result.Errors, error => error.PropertyName == "AdminNote");
     }
+
+    [Fact]
+    public void StartTemplateGenerationValidator_ShouldReturnSourceImageContentTypeCode()
+    {
+        var validator = new StartTemplateGenerationCommandValidator();
+
+        var result = validator.Validate(new StartTemplateGenerationCommand(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            new TemplateAssetCommand(
+                "https://cdn.example.com/source.heic",
+                "source.heic",
+                "image/heic",
+                1024,
+                null)));
+
+        var error = Assert.Single(result.Errors, item => item.PropertyName == "SourceImageAsset.ContentType");
+        Assert.Equal("templates.source_image_type_not_allowed", error.ErrorMessage);
+        Assert.DoesNotContain("Please upload", error.ErrorMessage, StringComparison.Ordinal);
+    }
 }

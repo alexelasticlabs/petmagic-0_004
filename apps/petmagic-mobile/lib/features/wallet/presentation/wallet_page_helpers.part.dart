@@ -89,12 +89,16 @@ String _valuePerCurrencyLabel(AppLocalizations text, CurrencyPackModel pack) {
   }
 
   final sparkPerUnit = pack.totalSpark / pack.priceAmount;
-  final formatted = NumberFormat('0.0').format(sparkPerUnit);
+  final formatted = NumberFormat.decimalPatternDigits(
+    locale: text.localeName,
+    decimalDigits: 1,
+  ).format(sparkPerUnit);
   return '$formatted ${text.walletBalanceUnit} / ${pack.currencyCode}1';
 }
 
-String _formatPrice(CurrencyPackModel pack) {
+String _formatPrice(CurrencyPackModel pack, String localeTag) {
   return NumberFormat.simpleCurrency(
+    locale: localeTag,
     name: pack.currencyCode,
   ).format(pack.priceAmount);
 }

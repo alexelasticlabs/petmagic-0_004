@@ -49,6 +49,51 @@ void main() {
       contains('unawaited(_resumePremiumCheckoutSyncIfOnline());'),
     );
   });
+
+  test('paywall feedback submit is best-effort and does not block close', () {
+    final pageSource = File(
+      'lib/features/premium/presentation/premium_page.dart',
+    ).readAsStringSync();
+    final feedbackBody = _methodBody(pageSource, '_maybeAskPaywallFeedback');
+
+    expect(feedbackBody, contains('try {'));
+    expect(feedbackBody, contains('submitFeedback('));
+    expect(feedbackBody, contains('} catch (error, stackTrace) {'));
+    expect(feedbackBody, contains("feature: 'Premium.PaywallFeedback'"));
+    expect(feedbackBody, contains("operation: 'submit'"));
+    expect(feedbackBody, contains("'category': result.category"));
+    expect(feedbackBody, isNot(contains("'message': result.message")));
+    expect(feedbackBody, isNot(contains("'feedback': result.message")));
+  });
+
+  test('paywall feedback removes legacy raw-scope cooldown key', () {
+    final pageSource = File(
+      'lib/features/premium/presentation/premium_page.dart',
+    ).readAsStringSync();
+    final feedbackBody = _methodBody(pageSource, '_maybeAskPaywallFeedback');
+    final legacyCleanupIndex = feedbackBody.indexOf(
+      'await preferences.remove(legacyLastShownKey);',
+    );
+    final cooldownReturnIndex = feedbackBody.indexOf(
+      'now.difference(lastShown) < _paywallFeedbackCooldown',
+    );
+
+    expect(feedbackBody, contains('legacyLastShownKey != lastShownKey'));
+    expect(legacyCleanupIndex, isNonNegative);
+    expect(cooldownReturnIndex, isNonNegative);
+    expect(legacyCleanupIndex, lessThan(cooldownReturnIndex));
+  });
+
+  test('paywall feedback sheet disposes its text controller after close', () {
+    final pageSource = File(
+      'lib/features/premium/presentation/premium_page.dart',
+    ).readAsStringSync();
+    final sheetBody = _methodBody(pageSource, '_showPaywallFeedbackSheet');
+
+    expect(sheetBody, contains('final controller = TextEditingController();'));
+    expect(sheetBody, contains('controller: controller,'));
+    expect(sheetBody, contains(').whenComplete(controller.dispose);'));
+  });
 }
 
 String _methodBody(String source, String methodName) {

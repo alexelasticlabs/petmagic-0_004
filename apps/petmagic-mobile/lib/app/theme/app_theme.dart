@@ -149,6 +149,8 @@ extension PetMagicSemanticTokens on PetMagicColors {
   Color get warning => gold;
   Color get error => danger;
   Color get disabled => surfaceStrong;
+
+  Color on(Color background) => AppTheme._onColor(background);
 }
 
 class AppTheme {

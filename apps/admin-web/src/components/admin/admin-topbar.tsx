@@ -19,14 +19,7 @@ import { type Locale } from "@/lib/i18n";
 import { type AdminTheme } from "@/lib/theme";
 
 type NotificationFilter =
-  | "all"
-  | "unread"
-  | "support"
-  | "users"
-  | "templates"
-  | "economy"
-  | "promo"
-  | "system";
+  "all" | "unread" | "support" | "users" | "templates" | "economy" | "promo" | "system";
 
 type AdminTopbarProps = {
   locale: Locale;
@@ -132,8 +125,7 @@ export function AdminTopbar({
       notificationFilter === "support");
 
   const isNotificationsOpen = notificationPanelPathname === pathname;
-  const notificationTriggerLabel =
-    copy.topbar.notificationTriggerLabel(isNotificationsOpen);
+  const notificationTriggerLabel = copy.topbar.notificationTriggerLabel(isNotificationsOpen);
 
   const closeNotificationPanel = useCallback((options?: { restoreFocus?: boolean }) => {
     setNotificationPanelPathname(null);
@@ -256,9 +248,7 @@ export function AdminTopbar({
             >
               <div className={styles.notificationPanelHeader}>
                 <div className={styles.notificationPanelCopy}>
-                  <span className={styles.notificationEyebrow}>
-                    {copy.topbar.centerEyebrow}
-                  </span>
+                  <span className={styles.notificationEyebrow}>{copy.topbar.centerEyebrow}</span>
                   <strong id={notificationPanelTitleId} className={styles.notificationTitle}>
                     {copy.topbar.centerTitle}
                   </strong>
@@ -322,9 +312,7 @@ export function AdminTopbar({
                           {copy.topbar.categoryLabels.support}
                         </span>
                       </div>
-                      <span className={styles.notificationTime}>
-                        {copy.topbar.needsAttention}
-                      </span>
+                      <span className={styles.notificationTime}>{copy.topbar.needsAttention}</span>
                     </div>
                     <strong className={styles.notificationCardTitle}>
                       {copy.topbar.supportSummaryTitle(supportUnreadCount)}
@@ -338,9 +326,7 @@ export function AdminTopbar({
                 {pinnedNotifications.length > 0 ? (
                   <section className={styles.notificationGroupSection}>
                     <div className={styles.notificationGroupHeader}>
-                      <span className={styles.notificationGroupTitle}>
-                        {copy.topbar.critical}
-                      </span>
+                      <span className={styles.notificationGroupTitle}>{copy.topbar.critical}</span>
                     </div>
                     <div className={styles.notificationGroupItems}>
                       {pinnedNotifications.map((item) => {
@@ -362,7 +348,10 @@ export function AdminTopbar({
                                 <span
                                   className={`${styles.notificationCategoryPill} ${item.category === "support" ? styles.notificationCategorySupport : item.category === "users" ? styles.notificationCategoryUsers : item.category === "templates" ? styles.notificationCategoryTemplates : item.category === "economy" ? styles.notificationCategoryEconomy : item.category === "promo" ? styles.notificationCategoryPromo : styles.notificationCategorySystem}`}
                                 >
-                                  {getNotificationCategoryLabel(item.category, copy.topbar.categoryLabels)}
+                                  {getNotificationCategoryLabel(
+                                    item.category,
+                                    copy.topbar.categoryLabels
+                                  )}
                                 </span>
                               </div>
                               <span className={styles.notificationTime}>
@@ -430,7 +419,10 @@ export function AdminTopbar({
                               <span
                                 className={`${styles.notificationCategoryPill} ${item.category === "support" ? styles.notificationCategorySupport : item.category === "users" ? styles.notificationCategoryUsers : item.category === "templates" ? styles.notificationCategoryTemplates : item.category === "economy" ? styles.notificationCategoryEconomy : item.category === "promo" ? styles.notificationCategoryPromo : styles.notificationCategorySystem}`}
                               >
-                                {getNotificationCategoryLabel(item.category, copy.topbar.categoryLabels)}
+                                {getNotificationCategoryLabel(
+                                  item.category,
+                                  copy.topbar.categoryLabels
+                                )}
                               </span>
                               <span className={styles.notificationTime}>
                                 {formatRelativeNotificationTime(item.createdAt, locale)}

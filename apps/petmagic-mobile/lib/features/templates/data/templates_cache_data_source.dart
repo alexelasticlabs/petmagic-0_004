@@ -298,7 +298,9 @@ Object? _sanitizePersistentCatalogValue(Object? value, {String? key}) {
   }
 
   if (value is List) {
-    return value.map(_sanitizePersistentCatalogValue).toList(growable: false);
+    return value
+        .map((item) => _sanitizePersistentCatalogValue(item, key: key))
+        .toList(growable: false);
   }
 
   return value;
@@ -310,7 +312,10 @@ bool _isPersistentCatalogMediaUrlKey(String? key) {
     return false;
   }
 
-  return normalized == 'url' || normalized.endsWith('url');
+  return normalized == 'url' ||
+      normalized.endsWith('url') ||
+      normalized.endsWith('urls') ||
+      normalized.endsWith('mediaurls');
 }
 
 bool _isPersistentCatalogMediaFileNameKey(String? key) {

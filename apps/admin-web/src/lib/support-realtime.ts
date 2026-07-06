@@ -1,7 +1,7 @@
 "use client";
 
 import { HubConnectionBuilder, LogLevel, type HubConnection } from "@microsoft/signalr";
-import { useEffect, useEffectEvent } from "react";
+import { useEffect, useEffectEvent, useSyncExternalStore } from "react";
 
 import { getAdminPublicApiBaseUrl } from "@/lib/admin-api-base-url";
 import { clientLogger } from "@/lib/client-logger";
@@ -11,19 +11,25 @@ export type SupportConversationUpdatedEvent = {
   conversationId: string;
   initiatorUserId: string;
   updatedAtUtc: string;
-  lastMessagePreview?: string | null;
   lastMessageAtUtc?: string | null;
   lastMessageSenderType?: string | null;
   adminUnreadCount?: number;
   userUnreadCount?: number;
 };
 
+export type SupportRealtimeStatus = "idle" | "connecting" | "connected" | "unavailable";
+
 const supportRealtimeCooldownMs = 30_000;
+const supportRealtimeIdMaxLength = 128;
+const supportRealtimeTimestampMaxLength = 64;
+const supportRealtimeSenderTypeMaxLength = 32;
 
 let supportRealtimeBlockedUntil = 0;
 let supportRealtimeAccessToken: string | undefined;
 let supportRealtimeConnection: HubConnection | null = null;
+let supportRealtimeStatus: SupportRealtimeStatus = "idle";
 const supportRealtimeListeners = new Set<(event: SupportConversationUpdatedEvent) => void>();
+const supportRealtimeStatusListeners = new Set<() => void>();
 
 function getSupportRealtimeErrorDetails(error: unknown) {
   return {
@@ -40,9 +46,19 @@ export function useSupportRealtime(
   onConversationUpdated: (event: SupportConversationUpdatedEvent) => void
 ) {
   const handleConversationUpdated = useEffectEvent(onConversationUpdated);
+  const status = useSyncExternalStore(
+    subscribeToSupportRealtimeStatus,
+    getSupportRealtimeStatus,
+    getSupportRealtimeStatus
+  );
 
   useEffect(() => {
-    if (!accessToken || Date.now() < supportRealtimeBlockedUntil) {
+    if (!accessToken) {
+      return;
+    }
+
+    if (Date.now() < supportRealtimeBlockedUntil) {
+      setSupportRealtimeStatus("unavailable");
       return;
     }
 
@@ -57,6 +73,8 @@ export function useSupportRealtime(
       }
     };
   }, [accessToken]);
+
+  return status;
 }
 
 function ensureSupportRealtimeConnection(accessToken: string): void {
@@ -66,6 +84,7 @@ function ensureSupportRealtimeConnection(accessToken: string): void {
 
   stopSupportRealtimeConnection();
   supportRealtimeAccessToken = accessToken;
+  setSupportRealtimeStatus("connecting");
 
   const supportHubUrl = `${getAdminPublicApiBaseUrl()}/hubs/support-chat`;
   const connection = new HubConnectionBuilder()
@@ -86,13 +105,11 @@ function ensureSupportRealtimeConnection(accessToken: string): void {
     const expectedFailure = isExpectedConnectionFailure(error);
     if (expectedFailure) {
       supportRealtimeBlockedUntil = Date.now() + supportRealtimeCooldownMs;
+      setSupportRealtimeStatus("unavailable");
+    } else {
+      setSupportRealtimeStatus("idle");
+      logUnexpectedSupportRealtimeFailure("support.realtime_closed", error);
     }
-
-    clientLogger.warn("support.realtime_closed", {
-      expectedFailure,
-      blockedUntil: supportRealtimeBlockedUntil,
-      ...getSupportRealtimeErrorDetails(error),
-    });
 
     supportRealtimeConnection = null;
     supportRealtimeAccessToken = undefined;
@@ -112,6 +129,7 @@ function ensureSupportRealtimeConnection(accessToken: string): void {
     .then(() => {
       if (connection === supportRealtimeConnection) {
         supportRealtimeBlockedUntil = 0;
+        setSupportRealtimeStatus("connected");
       }
     })
     .catch((error: unknown) => {
@@ -122,23 +140,50 @@ function ensureSupportRealtimeConnection(accessToken: string): void {
       const expectedFailure = isExpectedConnectionFailure(error);
       if (expectedFailure) {
         supportRealtimeBlockedUntil = Date.now() + supportRealtimeCooldownMs;
+        setSupportRealtimeStatus("unavailable");
+      } else {
+        setSupportRealtimeStatus("idle");
+        logUnexpectedSupportRealtimeFailure("support.realtime_start_failed", error);
       }
-
-      clientLogger.warn("support.realtime_start_failed", {
-        expectedFailure,
-        blockedUntil: supportRealtimeBlockedUntil,
-        ...getSupportRealtimeErrorDetails(error),
-      });
 
       supportRealtimeConnection = null;
       supportRealtimeAccessToken = undefined;
     });
 }
 
+function setSupportRealtimeStatus(status: SupportRealtimeStatus): void {
+  supportRealtimeStatus = status;
+  for (const listener of [...supportRealtimeStatusListeners]) {
+    listener();
+  }
+}
+
+function subscribeToSupportRealtimeStatus(listener: () => void): () => void {
+  supportRealtimeStatusListeners.add(listener);
+  return () => {
+    supportRealtimeStatusListeners.delete(listener);
+  };
+}
+
+function getSupportRealtimeStatus(): SupportRealtimeStatus {
+  return supportRealtimeStatus;
+}
+
+function logUnexpectedSupportRealtimeFailure(
+  event: "support.realtime_closed" | "support.realtime_start_failed",
+  error: unknown
+): void {
+  clientLogger.warn(event, {
+    blockedUntil: supportRealtimeBlockedUntil,
+    ...getSupportRealtimeErrorDetails(error),
+  });
+}
+
 function stopSupportRealtimeConnection(): void {
   const connection = supportRealtimeConnection;
   supportRealtimeConnection = null;
   supportRealtimeAccessToken = undefined;
+  setSupportRealtimeStatus("idle");
 
   if (!connection) {
     return;
@@ -158,29 +203,59 @@ function isExpectedConnectionFailure(error: unknown) {
   );
 }
 
+function normalizeSupportRealtimeString(value: unknown, maxLength: number): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = sanitizeSensitiveText(value, maxLength);
+  return normalized === "—" ? null : normalized;
+}
+
+function normalizeSupportRealtimeCount(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
+    return undefined;
+  }
+
+  return value;
+}
+
 function normalizeConversationUpdated(payload: unknown): SupportConversationUpdatedEvent | null {
   if (!payload || typeof payload !== "object") {
     return null;
   }
 
   const candidate = payload as Partial<SupportConversationUpdatedEvent>;
-  if (!candidate.conversationId || !candidate.initiatorUserId || !candidate.updatedAtUtc) {
+  const conversationId = normalizeSupportRealtimeString(
+    candidate.conversationId,
+    supportRealtimeIdMaxLength
+  );
+  const initiatorUserId = normalizeSupportRealtimeString(
+    candidate.initiatorUserId,
+    supportRealtimeIdMaxLength
+  );
+  const updatedAtUtc = normalizeSupportRealtimeString(
+    candidate.updatedAtUtc,
+    supportRealtimeTimestampMaxLength
+  );
+
+  if (!conversationId || !initiatorUserId || !updatedAtUtc) {
     return null;
   }
 
   return {
-    conversationId: candidate.conversationId,
-    initiatorUserId: candidate.initiatorUserId,
-    updatedAtUtc: candidate.updatedAtUtc,
-    lastMessagePreview:
-      typeof candidate.lastMessagePreview === "string" ? candidate.lastMessagePreview : null,
-    lastMessageAtUtc:
-      typeof candidate.lastMessageAtUtc === "string" ? candidate.lastMessageAtUtc : null,
-    lastMessageSenderType:
-      typeof candidate.lastMessageSenderType === "string" ? candidate.lastMessageSenderType : null,
-    adminUnreadCount:
-      typeof candidate.adminUnreadCount === "number" ? candidate.adminUnreadCount : undefined,
-    userUnreadCount:
-      typeof candidate.userUnreadCount === "number" ? candidate.userUnreadCount : undefined,
+    conversationId,
+    initiatorUserId,
+    updatedAtUtc,
+    lastMessageAtUtc: normalizeSupportRealtimeString(
+      candidate.lastMessageAtUtc,
+      supportRealtimeTimestampMaxLength
+    ),
+    lastMessageSenderType: normalizeSupportRealtimeString(
+      candidate.lastMessageSenderType,
+      supportRealtimeSenderTypeMaxLength
+    ),
+    adminUnreadCount: normalizeSupportRealtimeCount(candidate.adminUnreadCount),
+    userUnreadCount: normalizeSupportRealtimeCount(candidate.userUnreadCount),
   };
 }

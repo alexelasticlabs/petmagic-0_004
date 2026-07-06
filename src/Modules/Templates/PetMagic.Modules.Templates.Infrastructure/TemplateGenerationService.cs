@@ -28,7 +28,8 @@ internal sealed partial class TemplateGenerationService(
     ITemplateFeedRealtimeService? realtimeService = null,
     ITemplateAiProviderHealthService? aiProviderHealthService = null,
     ITemplateVisibilityPolicy? visibilityPolicy = null,
-    IDataProtectionProvider? dataProtectionProvider = null) : ITemplateGenerationService
+    IDataProtectionProvider? dataProtectionProvider = null,
+    IAdminAuditLog? adminAuditLog = null) : ITemplateGenerationService
 {
     private readonly ITemplateVisibilityPolicy _visibilityPolicy =
         visibilityPolicy ?? new TemplateVisibilityPolicy();
@@ -115,7 +116,7 @@ internal sealed partial class TemplateGenerationService(
             OutputVideoDurationSeconds: job.OutputVideoDurationSeconds,
             MotionProviderCostUsd: job.MotionProviderCostUsd,
             FailureCode: job.LastErrorCode,
-            FailureMessage: job.LastErrorMessage,
+            FailureMessage: ResolvePublicFailureMessage(job.LastErrorCode),
             CreatedAtUtc: job.CreatedAtUtc,
             UpdatedAtUtc: job.UpdatedAtUtc,
             StartedAtUtc: job.StartedAtUtc,
@@ -166,4 +167,58 @@ internal sealed partial class TemplateGenerationService(
             CanCancel: job.Status == TemplateGenerationStatus.Queued);
     }
 
+    private static string? ResolvePublicFailureMessage(string? failureCode)
+    {
+        var code = failureCode?.Trim();
+        if (string.IsNullOrEmpty(code))
+        {
+            return null;
+        }
+
+        if (string.Equals(code, TemplatesErrors.PetPhotoRequired.Code, StringComparison.Ordinal)
+            || string.Equals(code, TemplatesErrors.PetPhotoNotFound.Code, StringComparison.Ordinal)
+            || string.Equals(code, TemplatesErrors.SourceMediaUnavailable.Code, StringComparison.Ordinal)
+            || string.Equals(code, TemplatesErrors.InvalidMediaUpload.Code, StringComparison.Ordinal)
+            || string.Equals(code, TemplatesErrors.MediaMetadataFailed.Code, StringComparison.Ordinal))
+        {
+            return TemplatesErrors.SourceMediaUnavailable.Message;
+        }
+
+        if (string.Equals(code, TemplatesErrors.AiProviderTransientFailure.Code, StringComparison.Ordinal))
+        {
+            return TemplatesErrors.AiProviderTransientFailure.Message;
+        }
+
+        if (string.Equals(code, TemplatesErrors.AiProviderTimedOut.Code, StringComparison.Ordinal))
+        {
+            return TemplatesErrors.AiProviderTimedOut.Message;
+        }
+
+        if (string.Equals(code, TemplatesErrors.GenerationAttemptsExceeded.Code, StringComparison.Ordinal))
+        {
+            return TemplatesErrors.GenerationAttemptsExceeded.Message;
+        }
+
+        if (string.Equals(code, TemplatesErrors.GenerationQueueOrphaned.Code, StringComparison.Ordinal))
+        {
+            return TemplatesErrors.GenerationQueueOrphaned.Message;
+        }
+
+        if (string.Equals(code, TemplatesErrors.GenerationQueueOverloaded.Code, StringComparison.Ordinal)
+            || string.Equals(code, TemplatesErrors.GenerationWaitTooLong.Code, StringComparison.Ordinal)
+            || string.Equals(code, TemplatesErrors.ProviderCapacityUnavailable.Code, StringComparison.Ordinal))
+        {
+            return TemplatesErrors.ProviderCapacityUnavailable.Message;
+        }
+
+        if (string.Equals(code, TemplatesErrors.GeneratedMediaImportFailed.Code, StringComparison.Ordinal)
+            || string.Equals(code, TemplatesErrors.GeneratedMediaTooLarge.Code, StringComparison.Ordinal)
+            || string.Equals(code, TemplatesErrors.MediaStorageFailed.Code, StringComparison.Ordinal)
+            || string.Equals(code, TemplatesErrors.WatermarkRenderFailed.Code, StringComparison.Ordinal))
+        {
+            return TemplatesErrors.GeneratedMediaImportFailed.Message;
+        }
+
+        return TemplatesErrors.AiProviderFailed.Message;
+    }
 }

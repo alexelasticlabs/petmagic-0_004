@@ -315,12 +315,7 @@ export function FileIcon({ className }: IconProps) {
         strokeWidth="1.7"
         strokeLinejoin="round"
       />
-      <path
-        d="M8.5 13h7M8.5 16h5"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
+      <path d="M8.5 13h7M8.5 16h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   );
 }
@@ -558,10 +553,7 @@ export function AccessTierIcon({ className }: IconProps) {
         strokeWidth="1.8"
         strokeLinejoin="round"
       />
-      <path
-        d="m12 6.4 4.15 2.35v4.5L12 15.6l-4.15-2.35v-4.5L12 6.4Z"
-        fill="currentColor"
-      />
+      <path d="m12 6.4 4.15 2.35v4.5L12 15.6l-4.15-2.35v-4.5L12 6.4Z" fill="currentColor" />
     </svg>
   );
 }

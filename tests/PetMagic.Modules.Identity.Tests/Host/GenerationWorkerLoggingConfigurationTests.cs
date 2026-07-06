@@ -8,12 +8,7 @@ public sealed class GenerationWorkerLoggingConfigurationTests
     public void ProductionLoggingConfiguration_ShouldUseInformationJsonConsoleAndStderrForErrors()
     {
         var configurationPath = Path.GetFullPath(Path.Combine(
-            AppContext.BaseDirectory,
-            "..",
-            "..",
-            "..",
-            "..",
-            "..",
+            FindRepositoryRoot(),
             "src",
             "Host",
             "PetMagic.Host.GenerationWorker",
@@ -30,5 +25,22 @@ public sealed class GenerationWorkerLoggingConfigurationTests
         Assert.Equal("Warning", overrides.GetProperty("Microsoft").GetString());
         Assert.Equal("Serilog.Formatting.Json.JsonFormatter, Serilog", consoleArgs.GetProperty("formatter").GetString());
         Assert.Equal("Error", consoleArgs.GetProperty("standardErrorFromLevel").GetString());
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+
+        while (current is not null)
+        {
+            if (File.Exists(Path.Combine(current.FullName, ".gitignore")))
+            {
+                return current.FullName;
+            }
+
+            current = current.Parent;
+        }
+
+        throw new InvalidOperationException("Could not locate repository root.");
     }
 }

@@ -22,6 +22,11 @@ const requiredEnv = [
   "PREMIUM_TOKEN",
 ];
 
+if (hasHelpArg()) {
+  printUsage();
+  process.exit(0);
+}
+
 const missing = requiredEnv.filter((name) => !process.env[name]);
 if (missing.length > 0) {
   fail(`Missing required env: ${missing.join(", ")}`);
@@ -30,6 +35,8 @@ if (missing.length > 0) {
 const apiBaseUrl = process.env.API_BASE_URL.replace(/\/+$/, "");
 const publicBaseUrl = (process.env.PUBLIC_BASE_URL ?? apiBaseUrl).replace(/\/+$/, "");
 const evidencePath = process.env.WATERMARK_QA_EVIDENCE_PATH ?? "artifacts/watermark-backend-qa-evidence.json";
+const psqlCommand = process.env.WATERMARK_QA_PSQL_COMMAND ?? "psql";
+const psqlInvocation = resolvePsqlInvocation(psqlCommand);
 mkdirSync(dirname(evidencePath), { recursive: true });
 
 const evidence = {
@@ -161,8 +168,9 @@ console.log(`Watermark backend QA passed. Evidence: ${evidencePath}`);
 
 function runSeed() {
   const result = spawnSync(
-    "psql",
+    psqlInvocation.command,
     [
+      ...psqlInvocation.args,
       process.env.DATABASE_URL,
       "-v",
       `free_user_id='${process.env.FREE_USER_ID}'`,
@@ -178,7 +186,7 @@ function runSeed() {
     { encoding: "utf8" });
 
   if (result.status !== 0) {
-    fail(`Seed failed:\n${result.stdout}\n${result.stderr}`);
+    fail(`Seed failed:\n${formatCommandFailure(result)}`);
   }
 
   evidence.checks.push({
@@ -186,6 +194,73 @@ function runSeed() {
     passed: true,
     stdout: trimOutput(result.stdout),
   });
+}
+
+function hasHelpArg() {
+  return process.argv.slice(2).some((arg) => arg === "--help" || arg === "-h");
+}
+
+function resolvePsqlInvocation(command) {
+  if (process.platform !== "win32") {
+    const normalized = command.replaceAll("\\", "/").toLowerCase();
+    if (
+      normalized === "scripts/qa/psql"
+      || normalized.endsWith("/scripts/qa/psql")
+    ) {
+      return { command: "bash", args: [command] };
+    }
+
+    return { command, args: [] };
+  }
+
+  const normalized = command.replaceAll("/", "\\").toLowerCase();
+  if (
+    normalized === "scripts\\qa\\psql"
+    || normalized.endsWith("\\scripts\\qa\\psql")
+    || normalized === "scripts\\qa\\psql.cmd"
+    || normalized.endsWith("\\scripts\\qa\\psql.cmd")
+  ) {
+    const scriptPath = command.replace(/\.cmd$/i, "") + ".ps1";
+    return {
+      command: "powershell.exe",
+      args: ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath],
+    };
+  }
+
+  return { command, args: [] };
+}
+
+function printUsage() {
+  console.log(`
+Watermark backend QA runner.
+
+Usage:
+  node scripts/qa/run-watermark-backend-qa.mjs
+
+Required environment:
+  API_BASE_URL
+  DATABASE_URL
+  FREE_USER_ID
+  NO_CREDIT_USER_ID
+  PREMIUM_USER_ID
+  FREE_TOKEN
+  NO_CREDIT_TOKEN
+  PREMIUM_TOKEN
+
+Optional environment:
+  ADMIN_TOKEN                 Enables admin watermark settings and grant checks.
+  PUBLIC_BASE_URL             Public media base URL, defaults to API_BASE_URL.
+  WATERMARK_QA_EVIDENCE_PATH  Evidence JSON path, default artifacts/watermark-backend-qa-evidence.json.
+  WATERMARK_QA_PSQL_COMMAND   psql command path, default psql. Use scripts/qa/psql for local Docker, or scripts\\qa\\psql.cmd from Windows PowerShell.
+		`.trim());
+}
+
+function formatCommandFailure(result) {
+  return [
+    result.error ? `error: ${result.error.message}` : "",
+    result.stdout ?? "",
+    result.stderr ?? "",
+  ].filter(Boolean).join("\n");
 }
 
 async function getGeneration(token, id, label) {

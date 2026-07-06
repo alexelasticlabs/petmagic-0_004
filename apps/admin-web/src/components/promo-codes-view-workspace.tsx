@@ -3,10 +3,7 @@
 import { PromoCodeActivationsCard } from "@/components/promo-code-activations-card";
 import { PromoCodesListCard } from "@/components/promo-codes-list-card";
 import { type PromoCodesViewText } from "@/components/promo-codes-view.content";
-import {
-  type PromoSortMode,
-  type PromoStatusFilter,
-} from "@/components/promo-codes-view.helpers";
+import { type PromoSortMode, type PromoStatusFilter } from "@/components/promo-codes-view.helpers";
 import { type SelectOption } from "@/components/ui/select";
 import {
   type AdminRedeemCode,

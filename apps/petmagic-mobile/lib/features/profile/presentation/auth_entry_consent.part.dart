@@ -70,7 +70,7 @@ class _TermsConsentOption extends StatelessWidget {
               value: value,
               onChanged: enabled ? onChanged : null,
               activeColor: colors.accent,
-              checkColor: isDark ? const Color(0xFF03130C) : Colors.white,
+              checkColor: Theme.of(context).colorScheme.onPrimary,
               visualDensity: VisualDensity.compact,
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               side: BorderSide(
@@ -131,7 +131,6 @@ class _MarketingConsentOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Material(
       color: Colors.transparent,
@@ -147,7 +146,7 @@ class _MarketingConsentOption extends StatelessWidget {
                 value: value,
                 onChanged: onChanged,
                 activeColor: colors.accent,
-                checkColor: isDark ? const Color(0xFF03130C) : Colors.white,
+                checkColor: Theme.of(context).colorScheme.onPrimary,
                 visualDensity: VisualDensity.compact,
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 side: BorderSide(

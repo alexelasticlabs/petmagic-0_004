@@ -273,7 +273,6 @@ class AuthSession {
             ? null
             : {
                 'url': user.avatar!.url,
-                'fileName': user.avatar!.fileName,
                 'contentType': user.avatar!.contentType,
                 'fileSizeBytes': user.avatar!.fileSizeBytes,
                 'updatedAtUtc': user.avatar!.updatedAtUtc?.toIso8601String(),

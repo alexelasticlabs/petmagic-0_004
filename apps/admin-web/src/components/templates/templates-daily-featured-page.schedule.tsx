@@ -16,6 +16,7 @@ import type { AdminTemplateOfTheDay } from "@/lib/api-client";
 
 export function TemplateScheduleCard({
   text,
+  locale,
   schedule,
   canManageTemplates,
   isActionLocked,
@@ -50,7 +51,7 @@ export function TemplateScheduleCard({
                       {assignment.isPremium ? text.premium : text.free}
                     </span>
                   </td>
-                  <td>{formatDateRange(assignment)}</td>
+                  <td>{formatDateRange(assignment, locale)}</td>
                   <td>
                     <AdminBadge tone={statusTone(assignment)}>
                       {assignment.isManual ? text.manual : text.auto}
@@ -105,15 +106,17 @@ export function TemplateScheduleCard({
 export function AssignmentSummary({
   assignment,
   text,
+  locale,
 }: {
   assignment: AdminTemplateOfTheDay;
   text: CurrentAssignmentCardProps["text"];
+  locale: CurrentAssignmentCardProps["locale"];
 }) {
   return (
     <div className={styles.assignmentSummary}>
       <strong>{safeDisplayText(assignment.templateTitle, 120)}</strong>
       <span>
-        {formatDateRange(assignment)} · {safeDisplayText(assignment.templateType, 32)} ·{" "}
+        {formatDateRange(assignment, locale)} · {safeDisplayText(assignment.templateType, 32)} ·{" "}
         {safeDisplayText(assignment.category, 72)}
       </span>
       <span>

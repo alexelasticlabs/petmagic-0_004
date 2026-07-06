@@ -19,8 +19,11 @@ public sealed class IdentityEmailSenderImplementationTests
         Assert.Contains("new BodyBuilder", source, StringComparison.Ordinal);
         Assert.Contains("await client.ConnectAsync(", source, StringComparison.Ordinal);
         Assert.Contains("await client.SendAsync(message, cancellationToken);", source, StringComparison.Ordinal);
+        Assert.Contains("SafeLogValues.ExceptionType(exception)", source, StringComparison.Ordinal);
+        Assert.Contains("ExceptionType={ExceptionType}", source, StringComparison.Ordinal);
         Assert.DoesNotContain("using System.Net.Mail;", source, StringComparison.Ordinal);
         Assert.DoesNotContain("SendMailAsync(", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("logger.LogWarning(\r\n                exception,", source, StringComparison.Ordinal);
     }
 
     private static string FindRepositoryRoot()

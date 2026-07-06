@@ -199,7 +199,7 @@ public static partial class AuthEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var verification = await verifier.VerifyIdTokenAsync(command.IdToken, cancellationToken);
@@ -233,7 +233,7 @@ public static partial class AuthEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         return await CompleteSocialLoginAsync(
@@ -254,7 +254,7 @@ public static partial class AuthEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         return await CompleteSocialLoginAsync(
@@ -300,7 +300,7 @@ public static partial class AuthEndpoints
         {
             return TypedResults.ValidationProblem(new Dictionary<string, string[]>
             {
-                [nameof(request.Ticket)] = ["Ticket is required."]
+                [nameof(request.Ticket)] = [ExternalTicketInvalidCode]
             });
         }
 
@@ -393,30 +393,8 @@ public static partial class AuthEndpoints
     {
         return TypedResults.Problem(
             title: errorCode,
-            detail: GetExternalAuthProblemDetail(errorCode, statusCode),
-            statusCode: statusCode);
-    }
-
-    private static string GetExternalAuthProblemDetail(string errorCode, int statusCode)
-    {
-        return errorCode switch
-        {
-            ExternalCancelledCode => ExternalCancelledMessage,
-            ExternalTicketInvalidCode => ExternalTicketInvalidMessage,
-            "auth.external_not_configured" => "External sign-in is not configured.",
-            "auth.external_token_invalid" => "External identity token is invalid.",
-            "auth.external_email_missing" => "External provider did not supply an email.",
-            "auth.external_email_not_verified" => "External provider email is not verified.",
-            "auth.external_already_linked" => "This external account is already linked to another user.",
-            "auth.external_provider_already_linked" => "This provider is already linked to the current user.",
-            "auth.external_not_linked" => "This provider is not linked to the current user.",
-            "auth.external_last_sign_in_method" => "At least one sign-in method must remain linked to this account.",
-            "auth.account_deleted" => "Account is unavailable.",
-            "common.operation_failed" => "External authentication could not be completed.",
-            _ when statusCode == StatusCodes.Status404NotFound => "External sign-in is not configured.",
-            _ when statusCode == StatusCodes.Status400BadRequest => "External authentication request is invalid.",
-            _ => "External authentication failed.",
-        };
+            statusCode: statusCode,
+            extensions: IdentityClientProblems.BuildProblemExtensions(errorCode));
     }
 
     private sealed record ExternalLoginExchangeRequest(string Ticket);

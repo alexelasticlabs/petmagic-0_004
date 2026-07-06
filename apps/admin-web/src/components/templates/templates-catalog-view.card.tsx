@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 
-
 import {
   CancelCircleIcon,
   ChartIcon,
@@ -110,9 +109,7 @@ export function TemplateCatalogCard({
           >
             {getTemplateStatusLabel(template.status, locale)}
           </AdminStatusBadge>
-          {template.isQaOnly ? (
-            <span className={styles.qaOnlyPill}>{copy.qaOnlyLabel}</span>
-          ) : null}
+          {template.isQaOnly ? <span className={styles.qaOnlyPill}>{copy.qaOnlyLabel}</span> : null}
         </div>
         <div className={styles.cardMetrics}>
           {getTemplateCardMetrics(template, analytics, locale, copy).map((metric) => (

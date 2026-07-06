@@ -1,14 +1,10 @@
 export type LegalDocumentSection = {
-
   heading: string;
 
   paragraphs: string[];
-
 };
 
-
 export type LegalDocument = {
-
   kind: string;
 
   title: string;
@@ -20,21 +16,15 @@ export type LegalDocument = {
   summary: string;
 
   sections: LegalDocumentSection[];
-
 };
 
-
 export type LegalDocumentsResponse = {
-
   termsOfUse: LegalDocument;
 
   privacyPolicy: LegalDocument;
-
 };
 
-
 export type LegalAcceptanceStatus = {
-
   termsOfUseAccepted: boolean;
 
   termsOfUseAcceptedVersion?: string | null;
@@ -52,21 +42,15 @@ export type LegalAcceptanceStatus = {
   currentPrivacyPolicyVersion: string;
 
   requiresAcceptance: boolean;
-
 };
 
-
 export type AcceptLegalDocumentsCommand = {
-
   termsOfUseVersion: string;
 
   privacyPolicyVersion: string;
-
 };
 
-
 export type UserProfile = {
-
   userId: string;
 
   email: string;
@@ -88,12 +72,9 @@ export type UserProfile = {
   legalAcceptance?: LegalAcceptanceStatus;
 
   avatar?: UserAvatar | null;
-
 };
 
-
 export type UserAvatar = {
-
   url: string;
 
   fileName: string;
@@ -103,12 +84,9 @@ export type UserAvatar = {
   fileSizeBytes?: number | null;
 
   updatedAtUtc?: string | null;
-
 };
 
-
 export type AuthSession = {
-
   accessToken?: string;
 
   refreshToken?: string;
@@ -116,7 +94,4 @@ export type AuthSession = {
   expiresAtUtc: string;
 
   user: UserProfile;
-
 };
-
-

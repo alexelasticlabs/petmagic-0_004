@@ -70,6 +70,7 @@ export function FeedbackPage({ locale }: FeedbackPageProps) {
   const session = useAuthSession();
   const canView =
     session?.user.roles.some((role) => role === "Admin" || role === "Moderator") ?? false;
+  const canViewUserProfile = session?.user.roles.includes("Admin") ?? false;
   const [status, setStatus] = useState<FeedbackStatus | "All">("All");
   const [priority, setPriority] = useState<FeedbackPriority | "All">("All");
   const [type, setType] = useState<FeedbackType | "All">("All");
@@ -435,6 +436,7 @@ export function FeedbackPage({ locale }: FeedbackPageProps) {
           ].join(":")}
           details={detailsQuery.data}
           isDetailsFetching={isDetailsFetching}
+          canViewUserProfile={canViewUserProfile}
           locale={locale}
         />
       ) : null}

@@ -140,7 +140,7 @@ class FakeGenerationStatusTemplateGenerationRepository
       mediaUrl: mediaAccessUrl,
       hasWatermark: false,
       fileName: mediaAccessFileName,
-      shareUrl: 'https://app.petmagic.test/share/generation/token',
+      shareUrl: 'https://app.petmagic.app/share/generation/token',
       shareToken: 'token',
     );
   }

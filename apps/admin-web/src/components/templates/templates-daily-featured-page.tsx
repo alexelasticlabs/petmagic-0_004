@@ -114,7 +114,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
       {isScheduleLoading ? <AdminStateCard title={text.loading} /> : null}
 
       <AdminPageGrid columns="two" className={styles.topGrid}>
-        <CurrentAssignmentCard current={current} text={text} />
+        <CurrentAssignmentCard current={current} text={text} locale={locale} />
         <AutoPickSettingsCard
           text={text}
           autoPick={autoPick}
@@ -174,6 +174,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
 
       <TemplateScheduleCard
         text={text}
+        locale={locale}
         schedule={schedule}
         canManageTemplates={canManageTemplates}
         isActionLocked={isActionLocked}

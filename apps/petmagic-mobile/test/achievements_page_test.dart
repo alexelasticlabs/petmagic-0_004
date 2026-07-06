@@ -261,6 +261,68 @@ void main() {
     },
   );
 
+  test('xp level badge uses theme contrast foreground', () async {
+    final source = await File(
+      'lib/features/gamification/presentation/widgets/xp_progress_bar.dart',
+    ).readAsString();
+
+    expect(
+      source,
+      contains(
+        'final foreground = context.petMagicColors.on(stageColors.last);',
+      ),
+    );
+    expect(source, contains('color: foreground'));
+    expect(source, isNot(contains('color: Color(0xFFFFFFFF)')));
+  });
+
+  test('challenge card status colors use theme tokens', () async {
+    final source = await File(
+      'lib/features/gamification/presentation/widgets/challenge_card.dart',
+    ).readAsString();
+
+    expect(source, contains('final completedColor = colors.accent;'));
+    expect(source, contains('final inProgressColor = colors.gold;'));
+    expect(source, isNot(contains('const Color(0xFF4CAF50)')));
+    expect(source, isNot(contains('Color(0xFF4CAF50)')));
+    expect(source, isNot(contains('const Color(0xFFFF6D00)')));
+  });
+
+  test('achievements overview progress uses theme gold token', () async {
+    final source = await File(
+      'lib/features/gamification/presentation/widgets/achievements_overview_card.dart',
+    ).readAsString();
+
+    expect(source, contains('final progressColor = colors.gold;'));
+    expect(
+      source,
+      contains('valueColor: AlwaysStoppedAnimation<Color>(progressColor)'),
+    );
+    expect(source, isNot(contains('const Color(0xFFFFD54F)')));
+    expect(source, isNot(contains('Color(0xFFFFB300)')));
+    expect(source, isNot(contains('Color(0xFFFFC107)')));
+  });
+
+  test('streak widgets localize weekday labels and use theme gold', () async {
+    final calendarSource = await File(
+      'lib/features/gamification/presentation/widgets/streak_calendar.dart',
+    ).readAsString();
+    final overviewSource = await File(
+      'lib/features/gamification/presentation/widgets/streak_overview_card.dart',
+    ).readAsString();
+
+    expect(calendarSource, contains('DateFormat.E('));
+    expect(
+      calendarSource,
+      contains('Localizations.localeOf(context).toLanguageTag()'),
+    );
+    expect(calendarSource, contains('final streakColor = colors.gold;'));
+    expect(calendarSource, isNot(contains('String _dayLabel(int weekday)')));
+    expect(calendarSource, isNot(contains('const Color(0xFFFF6D00)')));
+    expect(overviewSource, contains('final streakColor = colors.gold;'));
+    expect(overviewSource, isNot(contains('const Color(0xFFFF8A50)')));
+  });
+
   test(
     'achievements provider keeps warm cache instead of dropping immediately',
     () async {

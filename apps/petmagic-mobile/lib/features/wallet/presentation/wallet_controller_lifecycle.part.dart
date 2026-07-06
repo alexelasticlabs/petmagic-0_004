@@ -25,6 +25,8 @@ mixin _WalletControllerLifecycle on _WalletControllerBase {
       _cancelActiveLoad();
       _cancelActiveWalletSync();
       _cancelActiveLedgerLoadMore();
+      _cancelActiveCheckout();
+      _cancelActiveCheckoutVerification();
       unawaited(purchaseSubscription.cancel());
     });
   }
@@ -38,6 +40,8 @@ mixin _WalletControllerLifecycle on _WalletControllerBase {
     _cancelActiveLoad();
     _cancelActiveWalletSync();
     _cancelActiveLedgerLoadMore();
+    _cancelActiveCheckout();
+    _cancelActiveCheckoutVerification();
     _loadInFlight = null;
     _isWalletSyncInFlight = false;
     _updateStateIfMounted(
@@ -45,6 +49,7 @@ mixin _WalletControllerLifecycle on _WalletControllerBase {
         isLoading: false,
         isRefreshing: false,
         isLoadingMoreLedger: false,
+        isBuying: false,
         clearLedgerLoadMoreError: true,
       ),
     );
@@ -57,7 +62,7 @@ mixin _WalletControllerLifecycle on _WalletControllerBase {
   @override
   void setWalletPageVisible(bool visible) {
     _isWalletPageVisible = visible;
-    if (visible && _repositoryInitialized) {
+    if (visible) {
       unawaited(_recoverPendingStorePurchase(requestStoreRestore: true));
     }
   }
@@ -122,6 +127,48 @@ mixin _WalletControllerLifecycle on _WalletControllerBase {
   void _clearActiveLedgerLoadMore(CancelToken cancelToken) {
     if (identical(_activeLedgerLoadMoreCancelToken, cancelToken)) {
       _activeLedgerLoadMoreCancelToken = null;
+    }
+  }
+
+  CancelToken _startCheckoutCancelToken() {
+    _cancelActiveCheckout();
+    final cancelToken = CancelToken();
+    _activeCheckoutCancelToken = cancelToken;
+    return cancelToken;
+  }
+
+  void _cancelActiveCheckout() {
+    final cancelToken = _activeCheckoutCancelToken;
+    if (cancelToken != null && !cancelToken.isCancelled) {
+      cancelToken.cancel('wallet_checkout_cancelled');
+    }
+    _activeCheckoutCancelToken = null;
+  }
+
+  void _clearActiveCheckout(CancelToken cancelToken) {
+    if (identical(_activeCheckoutCancelToken, cancelToken)) {
+      _activeCheckoutCancelToken = null;
+    }
+  }
+
+  CancelToken _startCheckoutVerificationCancelToken() {
+    _cancelActiveCheckoutVerification();
+    final cancelToken = CancelToken();
+    _activeCheckoutVerificationCancelToken = cancelToken;
+    return cancelToken;
+  }
+
+  void _cancelActiveCheckoutVerification() {
+    final cancelToken = _activeCheckoutVerificationCancelToken;
+    if (cancelToken != null && !cancelToken.isCancelled) {
+      cancelToken.cancel('wallet_checkout_verification_cancelled');
+    }
+    _activeCheckoutVerificationCancelToken = null;
+  }
+
+  void _clearActiveCheckoutVerification(CancelToken cancelToken) {
+    if (identical(_activeCheckoutVerificationCancelToken, cancelToken)) {
+      _activeCheckoutVerificationCancelToken = null;
     }
   }
 

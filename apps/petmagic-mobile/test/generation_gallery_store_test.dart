@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -461,11 +462,11 @@ void main() {
       );
 
       expect(body, contains('latestEntry?.isDeletedLocally == true'));
-      expect(
-        body,
-        contains('await _galleryDeleteLocalPath(previewLocalPath);'),
-      );
-      expect(body, contains('await _galleryDeleteLocalPath(outputLocalPath);'));
+      expect(body, contains('await _galleryDeleteLocalPath('));
+      expect(body, contains('baseEntry.accountScope'));
+      expect(body, contains('generation.generationId'));
+      expect(body, contains('previewLocalPath'));
+      expect(body, contains('outputLocalPath'));
       expect(body, contains('return latestEntry;'));
     },
   );
@@ -978,6 +979,68 @@ void main() {
         .toList();
     expect(files, isEmpty);
   });
+
+  test(
+    'background materialization cancels oversized downloads early',
+    () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'petmagic-generation-gallery-store-test-',
+      );
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      var requestCount = 0;
+      var bytesWritten = 0;
+      const chunkBytes = 4096;
+      const totalBytes = 256 * 1024;
+      late final StreamSubscription<HttpRequest> subscription;
+      subscription = server.listen((request) async {
+        requestCount++;
+        request.response.headers.contentType = ContentType('image', 'jpeg');
+        request.response.contentLength = totalBytes;
+
+        final chunk = Uint8List(chunkBytes);
+        for (var offset = 0; offset < totalBytes; offset += chunkBytes) {
+          try {
+            request.response.add(chunk);
+            await request.response.flush();
+            bytesWritten += chunkBytes;
+            await Future<void>.delayed(const Duration(milliseconds: 1));
+          } on Object {
+            break;
+          }
+        }
+
+        try {
+          await request.response.close();
+        } on Object {
+          // Client-side byte budget cancellation closes the socket first.
+        }
+      });
+
+      addTearDown(() async {
+        await subscription.cancel();
+        await server.close(force: true);
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+
+      final store = _store(tempDir, maxBackgroundFileBytes: 8 * 1024);
+      final outputUrl =
+          'http://${server.address.address}:${server.port}/large.jpg';
+
+      final record = await store.materializeGenerationMedia(
+        _completedGeneration(outputUrl: outputUrl),
+        background: true,
+      );
+
+      expect(record, isNotNull);
+      expect(record!.isDownloadComplete, isFalse);
+      expect(record.materializationFailureCode, 'background_file_too_large');
+      expect(record.outputLocalPath, isNull);
+      expect(requestCount, 1);
+      expect(bytesWritten, lessThan(totalBytes));
+    },
+  );
 
   test('background materialization backs off failed files', () async {
     final tempDir = await Directory.systemTemp.createTemp(

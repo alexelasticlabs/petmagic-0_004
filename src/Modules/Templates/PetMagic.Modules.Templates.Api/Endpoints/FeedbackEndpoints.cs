@@ -17,7 +17,7 @@ namespace PetMagic.Modules.Templates.Api.Endpoints;
 public static class FeedbackEndpoints
 {
     private const string InvalidSubjectCode = "templates.invalid_subject";
-    private const string InvalidSubjectMessage = "Authentication failed.";
+    private const string InvalidSubjectMessage = InvalidSubjectCode;
     private const int MaxFeedbackRequestBodyBytes = 8 * 1024;
     private const int MaxAdminFeedbackMutationRequestBodyBytes = 8 * 1024;
 
@@ -27,11 +27,13 @@ public static class FeedbackEndpoints
             .WithTags("Feedback")
             .RequireAuthorization()
             .RequireRateLimiting("templates")
+            .AddEndpointFilter(ApplyPrivateFeedbackResponseHeadersAsync)
             .WithMetadata(new RequestSizeLimitAttribute(MaxFeedbackRequestBodyBytes));
 
         var admin = endpoints.MapGroup("/api/admin/feedback")
             .WithTags("Admin.Feedback")
             .RequireAuthorization("ModeratorOrAdmin")
+            .AddEndpointFilter(ApplyPrivateFeedbackResponseHeadersAsync)
             .RequireRateLimiting("admin");
 
         admin.MapGet("/", ListAdminFeedbackAsync);
@@ -45,9 +47,21 @@ public static class FeedbackEndpoints
         endpoints.MapGet("/api/admin/templates/{templateId:guid}/feedback-summary", GetTemplateFeedbackSummaryAsync)
             .WithTags("Admin.Feedback")
             .RequireAuthorization("ModeratorOrAdmin")
-            .RequireRateLimiting("admin");
+            .RequireRateLimiting("admin")
+            .AddEndpointFilter(ApplyPrivateFeedbackResponseHeadersAsync);
 
         return endpoints;
+    }
+
+    private static async ValueTask<object?> ApplyPrivateFeedbackResponseHeadersAsync(
+        EndpointFilterInvocationContext context,
+        EndpointFilterDelegate next)
+    {
+        context.HttpContext.Response.Headers.CacheControl = "no-store";
+        context.HttpContext.Response.Headers.Pragma = "no-cache";
+        context.HttpContext.Response.Headers.XContentTypeOptions = "nosniff";
+
+        return await next(context);
     }
 
     private static async Task<Results<Ok<SubmitFeedbackResponse>, ValidationProblem, ProblemHttpResult>> SubmitFeedbackAsync(
@@ -80,7 +94,7 @@ public static class FeedbackEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.SubmitAsync(command, cancellationToken);
@@ -113,12 +127,15 @@ public static class FeedbackEndpoints
     }
 
     private static async Task<Results<Ok<AdminFeedbackDetailsResponse>, ProblemHttpResult>> GetAdminFeedbackAsync(
+        HttpContext context,
         Guid feedbackId,
         [FromServices] IFeedbackService service,
         CancellationToken cancellationToken)
     {
         var result = await service.GetAdminAsync(feedbackId, cancellationToken);
-        return result.IsFailure ? ToProblem(result.Error) : TypedResults.Ok(result.Value);
+        return result.IsFailure
+            ? ToProblem(result.Error)
+            : TypedResults.Ok(RestrictAdminFeedbackDetailsForRole(context, result.Value));
     }
 
     private static async Task<Results<Ok<AdminFeedbackDetailsResponse>, ValidationProblem, ProblemHttpResult>> UpdateAdminFeedbackAsync(
@@ -144,11 +161,13 @@ public static class FeedbackEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.UpdateAdminAsync(command, cancellationToken);
-        return result.IsFailure ? ToProblem(result.Error) : TypedResults.Ok(result.Value);
+        return result.IsFailure
+            ? ToProblem(result.Error)
+            : TypedResults.Ok(RestrictAdminFeedbackDetailsForRole(context, result.Value));
     }
 
     private static async Task<Results<Ok<CreditRefundResponse>, ValidationProblem, ProblemHttpResult>> RefundAdminFeedbackAsync(
@@ -173,7 +192,7 @@ public static class FeedbackEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.RefundCreditsAsync(command, cancellationToken);
@@ -209,6 +228,15 @@ public static class FeedbackEndpoints
             : (Guid.Empty, new Error(InvalidSubjectCode, InvalidSubjectMessage));
     }
 
+    private static AdminFeedbackDetailsResponse RestrictAdminFeedbackDetailsForRole(
+        HttpContext context,
+        AdminFeedbackDetailsResponse details)
+    {
+        return context.User.IsInRole("Admin")
+            ? details
+            : details with { CanRefund = false, Refund = null };
+    }
+
     private static ProblemHttpResult ToProblem(Error error)
     {
         var statusCode = error.Code switch
@@ -222,7 +250,10 @@ public static class FeedbackEndpoints
             _ => StatusCodes.Status400BadRequest
         };
 
-        return TypedResults.Problem(title: error.Code, detail: GetProblemDetail(error.Code, statusCode), statusCode: statusCode);
+        return TypedResults.Problem(
+            title: error.Code,
+            statusCode: statusCode,
+            extensions: BuildProblemExtensions(error.Code));
     }
 
     private static ProblemHttpResult ToUserProblem(Error error)
@@ -231,31 +262,16 @@ public static class FeedbackEndpoints
         {
             return TypedResults.Problem(
                 title: "feedback.not_found",
-                detail: GetProblemDetail("feedback.not_found", StatusCodes.Status404NotFound),
-                statusCode: StatusCodes.Status404NotFound);
+                statusCode: StatusCodes.Status404NotFound,
+                extensions: BuildProblemExtensions("feedback.not_found"));
         }
 
         return ToProblem(error);
     }
 
-    private static string GetProblemDetail(string errorCode, int statusCode)
+    private static Dictionary<string, object?> BuildProblemExtensions(string errorCode)
     {
-        return errorCode switch
-        {
-            "templates.invalid_subject" => "Authentication failed.",
-            "GENERATION_JOB_NOT_FOUND" => "Generation was not found.",
-            "feedback.not_found" => "Feedback entry was not found.",
-            "feedback.forbidden" => "Feedback action is not allowed for this user.",
-            "feedback.rate_limited" => "Feedback was submitted too frequently. Please try again later.",
-            "feedback.refund_unavailable" => "Feedback refund is not available.",
-            "feedback.refund_already_issued" => "Feedback refund has already been issued.",
-            "feedback.invalid_refund_amount" => "Feedback refund amount is invalid.",
-            _ when statusCode == StatusCodes.Status404NotFound => "Requested feedback resource was not found.",
-            _ when statusCode == StatusCodes.Status403Forbidden => "Feedback action is forbidden.",
-            _ when statusCode == StatusCodes.Status429TooManyRequests => "Too many feedback requests were sent. Please try again later.",
-            _ when statusCode == StatusCodes.Status409Conflict => "Feedback request conflicts with the current resource state.",
-            _ => "Feedback request could not be completed.",
-        };
+        return new Dictionary<string, object?> { ["code"] = errorCode };
     }
 
     private sealed record SubmitFeedbackRequest(

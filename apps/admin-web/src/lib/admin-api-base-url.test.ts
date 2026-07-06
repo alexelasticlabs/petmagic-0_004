@@ -10,10 +10,10 @@ describe("resolveAdminApiBaseUrl", () => {
         isServer: false,
         nodeEnv: "production",
       })
-    ).toThrow("Admin production API base URL cannot point to localhost.");
+    ).toThrow("Admin production API base URL cannot point to local or private hosts.");
   });
 
-  it("allows localhost public API URLs for opted-in local production builds", () => {
+  it("allows local public API URLs for opted-in local production builds", () => {
     expect(
       resolveAdminApiBaseUrl({
         publicApiBaseUrl: "http://localhost:5000",
@@ -22,6 +22,17 @@ describe("resolveAdminApiBaseUrl", () => {
         allowLocalApiBaseUrlInProduction: true,
       })
     ).toBe("http://localhost:5000");
+  });
+
+  it("allows compose backend API URLs only for opted-in local production builds", () => {
+    expect(
+      resolveAdminApiBaseUrl({
+        internalApiBaseUrl: "http://backend:5000",
+        isServer: true,
+        nodeEnv: "production",
+        allowLocalApiBaseUrlInProduction: true,
+      })
+    ).toBe("http://backend:5000");
   });
 
   it("still rejects non-local HTTP API URLs in production even with opt-in", () => {
@@ -64,25 +75,28 @@ describe("admin-api-base-url", () => {
         publicApiBaseUrl: "http://localhost:5000",
         nodeEnv: "production",
       })
-    ).toThrow(/localhost/);
+    ).toThrow(/local or private/);
   });
 
-  it("rejects IPv6 loopback and wildcard production URLs", () => {
-    expect(() =>
-      resolveAdminApiBaseUrl({
-        isServer: false,
-        publicApiBaseUrl: "https://[::1]:5000",
-        nodeEnv: "production",
-      })
-    ).toThrow(/localhost/);
-
-    expect(() =>
-      resolveAdminApiBaseUrl({
-        isServer: false,
-        publicApiBaseUrl: "https://0.0.0.0:5000",
-        nodeEnv: "production",
-      })
-    ).toThrow(/localhost/);
+  it("rejects local and private production URLs by default", () => {
+    for (const publicApiBaseUrl of [
+      "https://[::1]:5000",
+      "https://[fd00::1]:5000",
+      "https://0.0.0.0:5000",
+      "https://10.0.2.2:5000",
+      "https://172.20.0.5:5000",
+      "https://192.168.1.20:5000",
+      "https://host.docker.internal:5000",
+      "https://backend:5000",
+    ]) {
+      expect(() =>
+        resolveAdminApiBaseUrl({
+          isServer: false,
+          publicApiBaseUrl,
+          nodeEnv: "production",
+        })
+      ).toThrow(/local or private/);
+    }
   });
 
   it("rejects non-HTTPS production API URLs", () => {

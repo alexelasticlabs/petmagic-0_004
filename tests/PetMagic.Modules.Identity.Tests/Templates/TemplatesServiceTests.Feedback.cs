@@ -8,6 +8,7 @@ using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
 using PetMagic.Modules.Economy.Domain.Enums;
+using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain;
 using PetMagic.Modules.Templates.Infrastructure;
@@ -87,8 +88,8 @@ public sealed partial class TemplatesServiceTests
         Assert.True(details.IsSuccess);
         Assert.Equal(generation.Id, details.Value.Generation?.GenerationId);
         Assert.Equal(generation.TemplateId, details.Value.Generation?.TemplateId);
-        Assert.Equal(generation.SourceImageUrl, details.Value.Generation?.InputPreviewUrl);
-        Assert.Equal(generation.WatermarkedResultUrl, details.Value.Generation?.ResultPreviewUrl);
+        Assert.Equal($"{generation.SourceImageUrl}?signed=1", details.Value.Generation?.InputPreviewUrl);
+        Assert.Equal($"{generation.WatermarkedResultUrl}?signed=1", details.Value.Generation?.ResultPreviewUrl);
         Assert.Equal("templates.ai_provider_failed", details.Value.Generation?.ErrorCode);
 
         var analytics = await dbContext.TemplateAnalyticsEvents.SingleAsync();
@@ -99,6 +100,80 @@ public sealed partial class TemplatesServiceTests
         Assert.Equal(-1, metadata.RootElement.GetProperty("rating").GetInt32());
         Assert.Equal(generation.Id, metadata.RootElement.GetProperty("generationId").GetGuid());
         Assert.Equal("ios", metadata.RootElement.GetProperty("platform").GetString());
+    }
+
+    [Fact]
+    public async Task ListAdminAsync_ShouldReturnSignedPreviewUrlWithoutExposingRawStoragePath()
+    {
+        await using var dbContext = CreateDbContext();
+        var templateService = CreateService(dbContext);
+        var userId = Guid.NewGuid();
+        var generation = await CreateCompletedImageGenerationAsync(dbContext, templateService, userId);
+        var feedbackService = CreateFeedbackService(dbContext);
+        var submitted = await feedbackService.SubmitAsync(
+            new SubmitFeedbackCommand(
+                userId,
+                "GenerationResult",
+                "quality",
+                -1,
+                "Bad quality",
+                generation.Id,
+                null,
+                null,
+                "generation_result",
+                "1.2.3",
+                "android",
+                "Pixel",
+                "en-US"),
+            CancellationToken.None);
+        Assert.True(submitted.IsSuccess);
+
+        var page = await feedbackService.ListAdminAsync(
+            new AdminFeedbackQuery(null, null, null, null, null, null, null, null, null, null, null, null),
+            CancellationToken.None);
+
+        Assert.True(page.IsSuccess);
+        var item = Assert.Single(page.Value.Items);
+        Assert.Equal($"{generation.WatermarkedResultUrl}?signed=1", item.PreviewUrl);
+        Assert.NotEqual(generation.WatermarkedResultUrl, item.PreviewUrl);
+    }
+
+    [Fact]
+    public async Task GetAdminAsync_ShouldNotExposeRawPreviewPaths_WhenReadUrlSigningFails()
+    {
+        await using var dbContext = CreateDbContext();
+        var templateService = CreateService(dbContext);
+        var userId = Guid.NewGuid();
+        var generation = await CreateCompletedImageGenerationAsync(dbContext, templateService, userId);
+        var feedbackService = CreateFeedbackService(dbContext, new FailingReadMediaStorage());
+        var submitted = await feedbackService.SubmitAsync(
+            new SubmitFeedbackCommand(
+                userId,
+                "GenerationResult",
+                "quality",
+                -1,
+                "Bad quality",
+                generation.Id,
+                null,
+                null,
+                "generation_result",
+                "1.2.3",
+                "android",
+                "Pixel",
+                "en-US"),
+            CancellationToken.None);
+        Assert.True(submitted.IsSuccess);
+
+        var details = await feedbackService.GetAdminAsync(submitted.Value.FeedbackId, CancellationToken.None);
+        var page = await feedbackService.ListAdminAsync(
+            new AdminFeedbackQuery(null, null, null, null, null, null, null, null, null, null, null, null),
+            CancellationToken.None);
+
+        Assert.True(details.IsSuccess);
+        Assert.Null(details.Value.Generation?.InputPreviewUrl);
+        Assert.Null(details.Value.Generation?.ResultPreviewUrl);
+        Assert.True(page.IsSuccess);
+        Assert.Null(Assert.Single(page.Value.Items).PreviewUrl);
     }
 
     [Fact]
@@ -526,8 +601,29 @@ public sealed partial class TemplatesServiceTests
         out RecordingEconomyServiceProxy economyProxy,
         IAdminAuditLog? adminAuditLog)
     {
+        return CreateFeedbackService(dbContext, new RecordingMediaStorage(signReadUrls: true), out economyProxy, adminAuditLog);
+    }
+
+    private static FeedbackService CreateFeedbackService(
+        TemplatesDbContext dbContext,
+        IMediaStorage mediaStorage)
+    {
+        return CreateFeedbackService(dbContext, mediaStorage, out _, null);
+    }
+
+    private static FeedbackService CreateFeedbackService(
+        TemplatesDbContext dbContext,
+        IMediaStorage mediaStorage,
+        out RecordingEconomyServiceProxy economyProxy,
+        IAdminAuditLog? adminAuditLog)
+    {
         var economyService = RecordingEconomyServiceProxy.Create(out economyProxy);
-        return new FeedbackService(dbContext, economyService, adminAuditLog);
+        return new FeedbackService(
+            dbContext,
+            economyService,
+            mediaStorage,
+            CreateTemplatesOptions(),
+            adminAuditLog);
     }
 
     private class RecordingEconomyServiceProxy : DispatchProxy
@@ -557,7 +653,8 @@ public sealed partial class TemplatesServiceTests
                     0)));
             }
 
-            throw new NotImplementedException(targetMethod?.Name);
+            throw new NotSupportedException(
+                $"Unexpected IEconomyService call in feedback test proxy: {targetMethod?.Name ?? "<unknown>"}");
         }
     }
 }

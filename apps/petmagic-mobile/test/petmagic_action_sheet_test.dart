@@ -45,10 +45,33 @@ void main() {
 
     expect(find.text('result:gallery'), findsOneWidget);
   });
+
+  testWidgets(
+    'PetMagicActionSheet surface follows light and dark theme tokens',
+    (tester) async {
+      for (final themeMode in [ThemeMode.light, ThemeMode.dark]) {
+        await tester.pumpWidget(_ActionSheetHost(themeMode: themeMode));
+
+        await tester.tap(find.text('Open'));
+        await tester.pumpAndSettle();
+
+        final sheetContext = tester.element(find.text('Add a photo or video'));
+        final colors = sheetContext.petMagicColors;
+        final gradient =
+            (_sheetSurfaceDecoration(tester).gradient! as LinearGradient);
+
+        expect(gradient.colors, [colors.surfaceGlass, colors.surface]);
+
+        await tester.pumpWidget(const SizedBox.shrink());
+      }
+    },
+  );
 }
 
 class _ActionSheetHost extends StatefulWidget {
-  const _ActionSheetHost();
+  const _ActionSheetHost({this.themeMode = ThemeMode.light});
+
+  final ThemeMode themeMode;
 
   @override
   State<_ActionSheetHost> createState() => _ActionSheetHostState();
@@ -62,6 +85,7 @@ class _ActionSheetHostState extends State<_ActionSheetHost> {
     return MaterialApp(
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
+      themeMode: widget.themeMode,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
@@ -94,4 +118,21 @@ class _ActionSheetHostState extends State<_ActionSheetHost> {
       ),
     );
   }
+}
+
+BoxDecoration _sheetSurfaceDecoration(WidgetTester tester) {
+  final decoratedBox = tester.widget<DecoratedBox>(
+    find.byWidgetPredicate((widget) {
+      if (widget is! DecoratedBox) {
+        return false;
+      }
+
+      final decoration = widget.decoration;
+      return decoration is BoxDecoration &&
+          decoration.borderRadius == BorderRadius.circular(32) &&
+          decoration.gradient is LinearGradient;
+    }),
+  );
+
+  return decoratedBox.decoration as BoxDecoration;
 }

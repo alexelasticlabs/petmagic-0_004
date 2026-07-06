@@ -80,7 +80,7 @@ Manual k6 commands are useful for focused checks when host metrics are not neede
 ```bash
 # 50-100 concurrent generation create requests.
 k6 run \
-  -e BASE_URL=http://localhost:5000 \
+  -e BASE_URL=http://localhost:5001 \
   -e TEMPLATE_ID=<template-id> \
   -e AUTH_TOKENS=<token1,token2> \
   -e PROFILE=generation \
@@ -90,7 +90,7 @@ k6 run \
 
 # Create jobs and poll status until terminal state or timeout.
 k6 run \
-  -e BASE_URL=http://localhost:5000 \
+  -e BASE_URL=http://localhost:5001 \
   -e TEMPLATE_ID=<template-id> \
   -e AUTH_TOKENS=<token1,token2> \
   -e PROFILE=create-and-poll \
@@ -102,7 +102,7 @@ k6 run \
 
 # High-frequency status polling for an existing job.
 k6 run \
-  -e BASE_URL=http://localhost:5000 \
+  -e BASE_URL=http://localhost:5001 \
   -e TEMPLATE_ID=<template-id> \
   -e GENERATION_ID=<generation-id> \
   -e AUTH_TOKEN=<token> \
@@ -113,7 +113,7 @@ k6 run \
 
 # Duplicate Idempotency-Key requests must return the same generation id.
 k6 run \
-  -e BASE_URL=http://localhost:5000 \
+  -e BASE_URL=http://localhost:5001 \
   -e TEMPLATE_ID=<template-id> \
   -e AUTH_TOKEN=<token> \
   -e PROFILE=duplicates \
@@ -123,7 +123,7 @@ k6 run \
 
 # Queue overload should produce GENERATION_QUEUE_OVERLOADED or expected throttling.
 k6 run \
-  -e BASE_URL=http://localhost:5000 \
+  -e BASE_URL=http://localhost:5001 \
   -e TEMPLATE_ID=<template-id> \
   -e AUTH_TOKENS=<token1,token2> \
   -e PROFILE=overload \

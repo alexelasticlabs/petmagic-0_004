@@ -368,7 +368,8 @@ public sealed partial class EconomyServiceTests
         Assert.Equal("Canceled", subscription.Status);
         Assert.Null(subscription.ExternalCustomerId);
         Assert.True(subscription.CancelAtPeriodEnd);
-        Assert.Equal("gp-token-1", subscription.ExternalTransactionId);
+        Assert.StartsWith("gpt_", subscription.ExternalTransactionId, StringComparison.Ordinal);
+        Assert.DoesNotContain("gp-token-1", subscription.ExternalTransactionId, StringComparison.Ordinal);
         Assert.Equal("order-1", subscription.ExternalSubscriptionId);
         Assert.Equal(40, subscription.MonthlyTokensGranted);
         Assert.Equal(40, wallet.Balance);
@@ -457,6 +458,9 @@ public sealed partial class EconomyServiceTests
         Assert.DoesNotContain(purchaseToken, processedEvent.EventId, StringComparison.Ordinal);
 
         var eventLog = await dbContext.SubscriptionEventLogs.SingleAsync(x => x.Provider == "google_play");
+        var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.Provider == "google_play");
+        Assert.StartsWith("gpt_", subscription.ExternalTransactionId, StringComparison.Ordinal);
+        Assert.DoesNotContain(purchaseToken, subscription.ExternalTransactionId, StringComparison.Ordinal);
         Assert.DoesNotContain(purchaseToken, eventLog.ExternalEventId, StringComparison.Ordinal);
         Assert.DoesNotContain(purchaseToken, eventLog.PayloadJson, StringComparison.Ordinal);
     }
@@ -536,7 +540,8 @@ public sealed partial class EconomyServiceTests
         var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId && x.Provider == "google_play");
         Assert.Equal(40, wallet.Balance);
         Assert.Equal(40, subscription.MonthlyTokensGranted);
-        Assert.Equal("gp-duplicate-token-1", subscription.ExternalTransactionId);
+        Assert.StartsWith("gpt_", subscription.ExternalTransactionId, StringComparison.Ordinal);
+        Assert.DoesNotContain("gp-duplicate-token-1", subscription.ExternalTransactionId, StringComparison.Ordinal);
         Assert.Single(await dbContext.ProcessedWebhookEvents.Where(x => x.Provider == "google_play" && x.EventId == "google-duplicate-message-1").ToListAsync());
         Assert.Single(await dbContext.SubscriptionEventLogs.Where(x => x.Provider == "google_play").ToListAsync());
     }
@@ -937,4 +942,3 @@ public sealed partial class EconomyServiceTests
 
 
 }
-

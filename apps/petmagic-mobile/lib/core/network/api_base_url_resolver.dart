@@ -105,9 +105,9 @@ class ApiBaseUrlResolver {
     return _activeBaseUrl!;
   }
 
-  Future<String> _resolveWithProbe() async {
+  Future<String> _resolveWithProbe() {
     if (_disposed) {
-      return _activeBaseUrl ?? AppConfig.apiBaseUrl;
+      return Future.value(_activeBaseUrl ?? AppConfig.apiBaseUrl);
     }
 
     final inFlight = _resolveInFlight;
@@ -117,29 +117,32 @@ class ApiBaseUrlResolver {
 
     final completer = Completer<String>();
     _resolveInFlight = completer;
+    unawaited(_completeResolveWithProbe(completer));
+    return completer.future;
+  }
+
+  Future<void> _completeResolveWithProbe(Completer<String> completer) async {
     try {
       final candidates = await prioritizedCandidates();
       final reachableBaseUrl = await _findReachableBaseUrl(candidates);
       if (_disposed) {
         final fallback = _activeBaseUrl ?? AppConfig.apiBaseUrl;
-        completer.complete(fallback);
-        return completer.future;
+        _completeResolve(completer, fallback);
+        return;
       }
 
       if (reachableBaseUrl != null) {
         await markSuccessful(reachableBaseUrl);
-        completer.complete(reachableBaseUrl);
-        return completer.future;
+        _completeResolve(completer, reachableBaseUrl);
+        return;
       }
 
       final fallback = _activeBaseUrl ?? AppConfig.apiBaseUrl;
       _activeBaseUrl = fallback;
       _lastSuccessfulConnectionAt = null;
-      completer.complete(fallback);
-      return completer.future;
+      _completeResolve(completer, fallback);
     } catch (error, stackTrace) {
-      completer.completeError(error, stackTrace);
-      return completer.future;
+      _completeResolveError(completer, error, stackTrace);
     } finally {
       if (identical(_resolveInFlight, completer)) {
         _resolveInFlight = null;
@@ -269,7 +272,27 @@ class ApiBaseUrlResolver {
   void dispose() {
     _disposed = true;
     _backgroundRefreshInFlight = false;
+    final inFlight = _resolveInFlight;
     _resolveInFlight = null;
+    if (inFlight != null) {
+      _completeResolve(inFlight, _activeBaseUrl ?? AppConfig.apiBaseUrl);
+    }
+  }
+
+  void _completeResolve(Completer<String> completer, String value) {
+    if (!completer.isCompleted) {
+      completer.complete(value);
+    }
+  }
+
+  void _completeResolveError(
+    Completer<String> completer,
+    Object error,
+    StackTrace stackTrace,
+  ) {
+    if (!completer.isCompleted) {
+      completer.completeError(error, stackTrace);
+    }
   }
 
   Future<String?> _findReachableBaseUrl(List<String> candidates) async {
@@ -348,7 +371,7 @@ class ApiBaseUrlResolver {
           'probe_active_base_url',
           error,
           stackTrace,
-          context: {'base_url': normalized},
+          context: {'base_url_origin': _logSafeBaseUrlOrigin(normalized)},
         );
       }
       return false;
@@ -470,6 +493,15 @@ class ApiBaseUrlResolver {
     );
   }
 
+  String _logSafeBaseUrlOrigin(String baseUrl) {
+    final uri = Uri.tryParse(baseUrl);
+    if (uri == null || uri.scheme.isEmpty || uri.host.isEmpty) {
+      return 'invalid';
+    }
+
+    return uri.hasPort ? '${uri.scheme}://${uri.host}:${uri.port}' : uri.origin;
+  }
+
   List<int> _buildHostProbeOrder(Set<int> ownHostOctets) {
     final orderedHosts = <int>[];
     final used = <int>{};
@@ -540,10 +572,12 @@ class ApiBaseUrlResolver {
   Future<String?> _readPersistedBaseUrl() async {
     final persisted = await _preferences.getString(_persistedBaseUrlKey);
     final normalized = _normalizeBaseUrl(persisted);
-    if (persisted != null &&
-        persisted.trim().isNotEmpty &&
-        normalized == null) {
-      await _preferences.remove(_persistedBaseUrlKey);
+    if (persisted != null && persisted.trim().isNotEmpty) {
+      if (normalized == null) {
+        await _preferences.remove(_persistedBaseUrlKey);
+      } else if (persisted.trim() != normalized) {
+        await _preferences.setString(_persistedBaseUrlKey, normalized);
+      }
     }
 
     return normalized;

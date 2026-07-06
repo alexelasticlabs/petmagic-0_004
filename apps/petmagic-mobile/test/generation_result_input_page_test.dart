@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -206,6 +207,31 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  test('result-input load ignores generic failures after cancellation', () {
+    final source = File(
+      'lib/features/templates/presentation/generation_result_input_page.dart',
+    ).readAsStringSync();
+    final loadBody = _methodBody(source, '_load');
+    final genericCatchIndex = loadBody.indexOf('} on Object {');
+    final canceledGuardIndex = loadBody.indexOf(
+      'if (!mounted || cancelToken.isCancelled)',
+      genericCatchIndex,
+    );
+    final errorStateIndex = loadBody.indexOf(
+      '_error = _copy.error;',
+      genericCatchIndex,
+    );
+    final finallyIndex = loadBody.indexOf('} finally {', genericCatchIndex);
+
+    expect(genericCatchIndex, isNonNegative);
+    expect(canceledGuardIndex, isNonNegative);
+    expect(errorStateIndex, isNonNegative);
+    expect(canceledGuardIndex, lessThan(errorStateIndex));
+    expect(finallyIndex, isNonNegative);
+    expect(loadBody, contains('if (identical(_cancelToken, cancelToken))'));
+    expect(loadBody, contains('_cancelToken = null;'));
+  });
 }
 
 class _ResultInputTestApp extends StatelessWidget {
@@ -419,4 +445,33 @@ TemplateGenerationResult _generation({
     userMediaExpired: false,
     templateTitle: 'Ready portrait',
   );
+}
+
+String _methodBody(String source, String methodName) {
+  final methodMatch = RegExp(
+    r'Future<void>\s+' + methodName + r'\s*\([^)]*\)\s*(?:async\s*)?\{',
+  ).firstMatch(source);
+  if (methodMatch == null) {
+    fail('Method $methodName was not found.');
+  }
+
+  final openBraceIndex = source.indexOf('{', methodMatch.start);
+  if (openBraceIndex < 0) {
+    fail('Method $methodName has no body.');
+  }
+
+  var depth = 0;
+  for (var index = openBraceIndex; index < source.length; index++) {
+    final char = source[index];
+    if (char == '{') {
+      depth++;
+    } else if (char == '}') {
+      depth--;
+      if (depth == 0) {
+        return source.substring(openBraceIndex, index + 1);
+      }
+    }
+  }
+
+  fail('Method $methodName body was not closed.');
 }

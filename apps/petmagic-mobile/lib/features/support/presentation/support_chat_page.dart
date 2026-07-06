@@ -66,6 +66,8 @@ part 'widgets/support_chat_states.part.dart';
 const int _supportReplyThumbnailCacheWidth = 160;
 const int _supportComposerAttachmentPreviewCacheExtent = 220;
 const int _supportRecentMediaThumbnailCacheExtent = 300;
+const int _supportAttachmentGridThumbnailCacheWidth = 512;
+const int _supportImagePreviewDialogCacheWidth = 1440;
 
 class SupportChatPage extends ConsumerStatefulWidget {
   const SupportChatPage({
@@ -149,7 +151,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
   final ScrollController _scrollController = ScrollController();
   final FocusNode _messageFocusNode = FocusNode();
   final ImagePicker _imagePicker = ImagePicker();
-  late final SupportChatController _controller;
+  SupportChatController? _activeController;
   Timer? _loadingFallbackTimer;
   Timer? _messageHighlightTimer;
   CancelToken? _activeMediaDownloadCancelToken;
@@ -177,6 +179,16 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
   bool get _composerCanSend => _composerHasText || _hasPendingAttachment;
 
   bool get _isExternalMediaPickerOpen => _externalMediaPickerDepth > 0;
+
+  SupportChatController get _controller {
+    final controller = ref.read(supportChatControllerProvider.notifier);
+    if (!identical(_activeController, controller)) {
+      _activeController?.stop();
+      _activeController = controller;
+    }
+
+    return controller;
+  }
 
   bool _isWaitingForInitialConversation(SupportChatState state) {
     return state.isLoading && state.conversation == null;
@@ -214,7 +226,6 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
   @override
   void initState() {
     super.initState();
-    _controller = ref.read(supportChatControllerProvider.notifier);
     WidgetsBinding.instance.addObserver(this);
     _messageController.addListener(_handleComposerChanged);
     _messageFocusNode.addListener(_handleComposerFocusChanged);
@@ -286,7 +297,8 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
     _messageFocusNode.removeListener(_handleComposerFocusChanged);
     WidgetsBinding.instance.removeObserver(this);
     _cancelActiveMediaDownload();
-    _controller.stop();
+    _activeController?.stop();
+    _activeController = null;
     _messageController.dispose();
     _scrollController.dispose();
     _messageFocusNode.dispose();

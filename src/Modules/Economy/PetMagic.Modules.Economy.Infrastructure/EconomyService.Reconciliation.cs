@@ -2,6 +2,7 @@ using System.Text.Json;
 
 using Microsoft.EntityFrameworkCore;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
@@ -271,7 +272,7 @@ public sealed partial class EconomyService
 
         if (result.IsFailure)
         {
-            throw new InvalidOperationException(result.Error.Message);
+            throw BuildSafeEconomyOperationException("reconcile_purchase_ledger", result.Error);
         }
     }
 
@@ -993,7 +994,7 @@ public sealed partial class EconomyService
                 Provider = provider,
                 ExternalReferenceId = externalReferenceId,
                 Summary = summary,
-                DetailsJson = details is null ? null : JsonSerializer.Serialize(details),
+                DetailsJson = SerializeSafeIncidentDetails(details, maxChars: 32000),
                 DetectionCount = 1,
                 RetryCount = status == "Open" ? 1 : 0,
                 FirstDetectedAtUtc = now,
@@ -1019,7 +1020,9 @@ public sealed partial class EconomyService
             incident.Provider = provider ?? incident.Provider;
             incident.ExternalReferenceId = externalReferenceId ?? incident.ExternalReferenceId;
             incident.Summary = summary;
-            incident.DetailsJson = details is null ? incident.DetailsJson : JsonSerializer.Serialize(details);
+            incident.DetailsJson = details is null
+                ? incident.DetailsJson
+                : SerializeSafeIncidentDetails(details, maxChars: 32000);
             incident.DetectionCount += 1;
             incident.RetryCount += status == "Open" ? 1 : 0;
             incident.LastDetectedAtUtc = now;
@@ -1194,7 +1197,7 @@ public sealed partial class EconomyService
             return null;
         }
 
-        return trimmed.Length <= 1000 ? trimmed : trimmed[..1000];
+        return SafeLogValues.SanitizeText(trimmed, 1000);
     }
 
     private static string? NormalizeIncidentError(string? value)
@@ -1205,7 +1208,7 @@ public sealed partial class EconomyService
             return null;
         }
 
-        return trimmed.Length <= 1000 ? trimmed : trimmed[..1000];
+        return SafeLogValues.SanitizeText(trimmed, 1000);
     }
 
     private static AdminEconomyIncidentResponse ToAdminEconomyIncidentResponse(EconomyIncident incident)

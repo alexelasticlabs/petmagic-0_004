@@ -2,6 +2,7 @@ using System.Diagnostics;
 
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Infrastructure.Options;
@@ -53,18 +54,21 @@ internal sealed class VideoThumbnailGenerator(
             process.StartInfo.ArgumentList.Add(tempOutput);
 
             process.Start();
+            var stderrLengthTask = ProcessOutputDrainer.CountAsync(process.StandardError, cancellationToken);
+            var stdoutDrainTask = ProcessOutputDrainer.DrainAsync(process.StandardOutput, cancellationToken);
             await process.WaitForExitAsync(cancellationToken);
+            await stdoutDrainTask;
+            var errorLength = await stderrLengthTask;
             if (process.ExitCode != 0 || !File.Exists(tempOutput) || new FileInfo(tempOutput).Length == 0)
             {
-                var error = await process.StandardError.ReadToEndAsync(cancellationToken);
                 logger.LogWarning(
-                    "Video thumbnail generation failed. Operation={Operation} GenerationId={GenerationId} FileName={FileName} ContentType={ContentType} ExitCode={ExitCode} ErrorPreview={ErrorPreview} HasLocalPath={HasLocalPath}",
+                    "Video thumbnail generation failed. Operation={Operation} GenerationIdHash={GenerationIdHash} FileNameHash={FileNameHash} ContentType={ContentType} ExitCode={ExitCode} ErrorLength={ErrorLength} HasLocalPath={HasLocalPath}",
                     "create_video_thumbnail",
-                    generationId,
-                    original.FileName,
-                    original.ContentType,
+                    TemplateLogSanitizer.SafeId(generationId),
+                    TemplateLogSanitizer.SafeFileName(original.FileName),
+                    TemplateLogSanitizer.SafeContentType(original.ContentType),
                     process.ExitCode,
-                    error.Length > 500 ? error[..500] : error,
+                    errorLength,
                     !string.IsNullOrWhiteSpace(original.LocalPath));
                 return null;
             }
@@ -85,13 +89,14 @@ internal sealed class VideoThumbnailGenerator(
                 return stored.Value;
             }
 
+            var safeErrorCode = SafeStorageErrorCode(stored.Error.Code);
             logger.LogWarning(
-                "Video thumbnail storage failed. Operation={Operation} GenerationId={GenerationId} FileName={FileName} ContentType={ContentType} ErrorCode={ErrorCode} HasLocalPath={HasLocalPath}",
+                "Video thumbnail storage failed. Operation={Operation} GenerationIdHash={GenerationIdHash} FileNameHash={FileNameHash} ContentType={ContentType} ErrorCode={ErrorCode} HasLocalPath={HasLocalPath}",
                 "store_video_thumbnail",
-                generationId,
-                original.FileName,
-                original.ContentType,
-                stored.Error.Code,
+                TemplateLogSanitizer.SafeId(generationId),
+                TemplateLogSanitizer.SafeFileName(original.FileName),
+                TemplateLogSanitizer.SafeContentType(original.ContentType),
+                safeErrorCode,
                 !string.IsNullOrWhiteSpace(original.LocalPath));
             return null;
         }
@@ -102,13 +107,13 @@ internal sealed class VideoThumbnailGenerator(
         catch (Exception exception)
         {
             logger.LogWarning(
-                exception,
-                "Video thumbnail generation failed. Operation={Operation} GenerationId={GenerationId} FileName={FileName} ContentType={ContentType} HasLocalPath={HasLocalPath}",
+                "Video thumbnail generation failed. Operation={Operation} GenerationIdHash={GenerationIdHash} FileNameHash={FileNameHash} ContentType={ContentType} HasLocalPath={HasLocalPath} ExceptionType={ExceptionType}",
                 "create_video_thumbnail",
-                generationId,
-                original.FileName,
-                original.ContentType,
-                !string.IsNullOrWhiteSpace(original.LocalPath));
+                TemplateLogSanitizer.SafeId(generationId),
+                TemplateLogSanitizer.SafeFileName(original.FileName),
+                TemplateLogSanitizer.SafeContentType(original.ContentType),
+                !string.IsNullOrWhiteSpace(original.LocalPath),
+                SafeLogValues.ExceptionType(exception));
             return null;
         }
         finally
@@ -116,6 +121,15 @@ internal sealed class VideoThumbnailGenerator(
             TryDelete(tempInput);
             TryDelete(tempOutput);
         }
+    }
+
+    private static string SafeStorageErrorCode(string? code)
+    {
+        var trimmed = code?.Trim();
+        var sanitized = AdminFailureMessageSanitizer.SanitizeCode(trimmed);
+        return string.Equals(trimmed, sanitized, StringComparison.Ordinal)
+            ? sanitized ?? TemplatesErrors.MediaStorageFailed.Code
+            : TemplatesErrors.MediaStorageFailed.Code;
     }
 
     private async Task<(string Path, string? TempPath)> ResolveInputPathAsync(
@@ -206,10 +220,10 @@ internal sealed class VideoThumbnailGenerator(
         catch (Exception exception)
         {
             logger.LogWarning(
-                exception,
-                "Video thumbnail temp cleanup failed. Operation={Operation} TempFileName={TempFileName}",
+                "Video thumbnail temp cleanup failed. Operation={Operation} TempFileName={TempFileName} ExceptionType={ExceptionType}",
                 "delete_temp_video_thumbnail",
-                Path.GetFileName(path));
+                Path.GetFileName(path),
+                SafeLogValues.ExceptionType(exception));
         }
     }
 }

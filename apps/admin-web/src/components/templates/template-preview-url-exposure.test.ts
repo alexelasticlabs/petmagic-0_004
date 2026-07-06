@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
+import { isUnsafeTemplateMediaUrl } from "@/components/templates/template-secure-media";
 import { readTemplateTestPageLibrarySource } from "@/components/templates/template-test-page.test-source";
 import { readTemplatesAnalyticsHubPageLibrarySource } from "@/components/templates/templates-analytics-hub-page.test-source";
 import { readTemplatesCatalogViewLibrarySource } from "@/components/templates/templates-catalog-view.test-source";
@@ -58,11 +59,11 @@ describe("template preview media URL exposure", () => {
       "if (createdObjectUrl && activeObjectUrlRef.current === createdObjectUrl)"
     );
     expect(secureMediaSource).toContain("onError={markRemoteMediaFailed}");
-    expect(secureMediaSource).toContain("function shouldUseDirectMediaUrl(url: string)");
-    expect(secureMediaSource).toContain("candidate.origin !== globalThis.location.origin");
     expect(secureMediaSource).toContain("fetchWithTimeout(url");
     expect(secureMediaSource).toContain("templates.secure_media_fetch_failed");
-    expect(secureMediaSource).toContain("templates.secure_media_origin_check_failed");
+    expect(secureMediaSource).toContain("templates.secure_media_unsafe_host_blocked");
+    expect(secureMediaSource).toContain("export function isUnsafeTemplateMediaUrl(");
+    expect(secureMediaSource).toContain("function getBlockedUnsafeTemplateMediaUrlDetails(");
     expect(secureMediaSource).toContain("function getMediaFetchErrorName(error: unknown)");
     expect(secureMediaSource).toContain("function formatTemplateMediaLogText(");
     expect(secureMediaSource).toContain("rawLength: url.length");
@@ -85,6 +86,30 @@ describe("template preview media URL exposure", () => {
     expect(secureMediaSource).not.toContain(
       'clientLogger.warn("templates.secure_media_origin_check_failed", { url'
     );
+    expect(secureMediaSource).not.toContain(
+      'clientLogger.warn("templates.secure_media_unsafe_host_blocked", { url'
+    );
+    expect(secureMediaSource).not.toContain("function shouldUseDirectMediaUrl(");
+    expect(secureMediaSource).not.toContain("directMediaUrl");
+    expect(secureMediaSource).not.toContain("public cross-origin media can render directly");
+  });
+
+  it("blocks unsafe template media URLs before direct rendering or fetching", () => {
+    expect(isUnsafeTemplateMediaUrl("https://localhost/templates/preview.jpg")).toBe(true);
+    expect(isUnsafeTemplateMediaUrl("https://api.localhost/templates/preview.jpg")).toBe(true);
+    expect(isUnsafeTemplateMediaUrl("https://host.docker.internal/templates/preview.jpg")).toBe(
+      true
+    );
+    expect(isUnsafeTemplateMediaUrl("https://backend:5000/templates/preview.jpg")).toBe(true);
+    expect(isUnsafeTemplateMediaUrl("https://0.0.0.0/templates/preview.jpg")).toBe(true);
+    expect(isUnsafeTemplateMediaUrl("https://192.168.1.5/templates/preview.jpg")).toBe(true);
+    expect(isUnsafeTemplateMediaUrl("https://10.0.0.5/templates/preview.jpg")).toBe(true);
+    expect(isUnsafeTemplateMediaUrl("https://169.254.169.254/templates/preview.jpg")).toBe(true);
+    expect(isUnsafeTemplateMediaUrl("https://[::1]/templates/preview.jpg")).toBe(true);
+    expect(isUnsafeTemplateMediaUrl("https://[::]/templates/preview.jpg")).toBe(true);
+    expect(isUnsafeTemplateMediaUrl("https://[fd00::1]/templates/preview.jpg")).toBe(true);
+    expect(isUnsafeTemplateMediaUrl("https://cdn.example.com/templates/preview.jpg")).toBe(true);
+    expect(isUnsafeTemplateMediaUrl("https://cdn.petmagic.ai/templates/preview.jpg")).toBe(false);
   });
 
   it("sanitizes visible template media file names before rendering them", () => {
@@ -106,8 +131,10 @@ describe("template preview media URL exposure", () => {
     expect(previewAssetSource).toContain(
       "const localPreviewUrl = localPreview?.file === previewFile ? localPreview.url : null;"
     );
+    expect(previewAssetSource).toContain("const objectUrl = URL.createObjectURL(file);");
+    expect(previewAssetSource).toContain("setLocalPreview({ file, url: objectUrl });");
     expect(previewAssetSource).toContain(
-      "setLocalPreview({ file, url: URL.createObjectURL(file) });"
+      "} catch (error) {\n      URL.revokeObjectURL(objectUrl);"
     );
     expect(previewAssetSource).toContain("URL.revokeObjectURL(localPreview.url);");
     expect(previewAssetSource).not.toContain(
@@ -117,8 +144,10 @@ describe("template preview media URL exposure", () => {
     expect(editorSectionsSource).toContain(
       "const localReferenceUrl = localReference?.file === referenceFile ? localReference.url : null;"
     );
+    expect(editorSectionsSource).toContain("const objectUrl = URL.createObjectURL(file);");
+    expect(editorSectionsSource).toContain("setLocalReference({ file, url: objectUrl });");
     expect(editorSectionsSource).toContain(
-      "setLocalReference({ file, url: URL.createObjectURL(file) });"
+      "} catch (error) {\n      URL.revokeObjectURL(objectUrl);"
     );
     expect(editorSectionsSource).toContain("URL.revokeObjectURL(localReference.url);");
     expect(editorSectionsSource).not.toContain(

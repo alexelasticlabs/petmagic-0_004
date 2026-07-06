@@ -102,6 +102,55 @@ public sealed class AdminUserTemplateAnalyticsReaderHardeningTests
         Assert.Null(generation.OutputUrl);
     }
 
+    [Fact]
+    public async Task GetAdminUserTemplateAnalyticsAsync_ShouldSanitizeRecentGenerationFailureMessage()
+    {
+        await using var dbContext = CreateDbContext();
+        var userId = Guid.NewGuid();
+        var generationId = Guid.NewGuid();
+        var template = CreateTemplate();
+        const string rawProviderFailure =
+            "Provider failed callbackUrl=https://provider.example.com/jobs/job-secret?token=raw-secret "
+            + "requestId=req-secret apiKey=provider-key generationId=9f9dbb7a-910e-4d48-88bd-1b914ad46732";
+        dbContext.TemplateItems.Add(template);
+        dbContext.TemplateGenerationJobs.Add(new TemplateGenerationJob
+        {
+            Id = generationId,
+            UserId = userId,
+            TemplateId = template.Id,
+            Status = TemplateGenerationStatus.Failed,
+            TokenCost = 20,
+            SourceImageUrl = "templates-media/private/source.jpg",
+            SourceImageFileName = "source.jpg",
+            SourceImageContentType = "image/jpeg",
+            LastErrorCode = TemplatesErrors.AiProviderFailed.Code,
+            LastErrorMessage = rawProviderFailure,
+            AttemptCount = 1,
+            CreatedAtUtc = DateTime.UtcNow.AddMinutes(-2),
+            QueuedAtUtc = DateTime.UtcNow.AddMinutes(-2),
+            UpdatedAtUtc = DateTime.UtcNow,
+            CompletedAtUtc = DateTime.UtcNow
+        });
+        await dbContext.SaveChangesAsync();
+        var reader = new AdminUserTemplateAnalyticsReader(dbContext, new SigningMediaStorage(), CreateOptions());
+
+        var result = await reader.GetAdminUserTemplateAnalyticsAsync(userId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var generation = Assert.Single(result.Value.RecentGenerations);
+        Assert.Equal(TemplatesErrors.AiProviderFailed.Code, generation.FailureCode);
+        Assert.NotNull(generation.FailureMessage);
+        Assert.StartsWith("Provider failed callbackUrl=", generation.FailureMessage, StringComparison.Ordinal);
+        Assert.Contains("***", generation.FailureMessage, StringComparison.Ordinal);
+        Assert.True(generation.FailureMessage.Length <= 240);
+        var serialized = System.Text.Json.JsonSerializer.Serialize(result.Value);
+        Assert.DoesNotContain("job-secret", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("raw-secret", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("req-secret", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("provider-key", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("9f9dbb7a-910e-4d48-88bd-1b914ad46732", serialized, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string FindRepositoryRoot()
     {
         var current = new DirectoryInfo(AppContext.BaseDirectory);

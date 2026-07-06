@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
@@ -17,7 +18,7 @@ public sealed class ImagePreviewGeneratorTests
     public async Task CreatePreviewAsync_ShouldLogWarning_WhenPreviewStorageFails()
     {
         var logger = new CapturingLogger<ImagePreviewGenerator>();
-        var storage = new FailingStoreMediaStorage();
+        var storage = new FailingStoreMediaStorage("templates.media_storage_failed token=preview-storage-secret");
         var generator = new ImagePreviewGenerator(
             storage,
             new StaticHttpClientFactory(new HttpClient(new RemoteImageHandler(CreatePngBytes()))),
@@ -40,10 +41,15 @@ public sealed class ImagePreviewGeneratorTests
         var entry = Assert.Single(logger.Entries, x => x.Level == LogLevel.Warning);
         Assert.Contains("Image preview storage failed.", entry.Message, StringComparison.Ordinal);
         Assert.Equal("store_preview", entry.Properties["Operation"]);
-        Assert.Equal("source.png", entry.Properties["FileName"]);
+        Assert.False(entry.Properties.ContainsKey("FileName"));
+        Assert.Equal(SafeLogValues.StableHash("source.png"), entry.Properties["FileNameHash"]);
         Assert.Equal("image/png", entry.Properties["ContentType"]);
         Assert.Equal("templates.media_storage_failed", entry.Properties["ErrorCode"]);
         Assert.Equal(false, entry.Properties["HasLocalPath"]);
+        Assert.DoesNotContain(
+            "preview-storage-secret",
+            string.Join(' ', entry.Properties.Values.Select(value => value?.ToString())),
+            StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -72,9 +78,12 @@ public sealed class ImagePreviewGeneratorTests
         var entry = Assert.Single(logger.Entries, x => x.Level == LogLevel.Warning);
         Assert.Contains("Image preview generation failed.", entry.Message, StringComparison.Ordinal);
         Assert.Equal("create_preview", entry.Properties["Operation"]);
-        Assert.Equal("source.png", entry.Properties["FileName"]);
+        Assert.False(entry.Properties.ContainsKey("FileName"));
+        Assert.Equal(SafeLogValues.StableHash("source.png"), entry.Properties["FileNameHash"]);
         Assert.Equal("image/png", entry.Properties["ContentType"]);
         Assert.Equal(false, entry.Properties["HasLocalPath"]);
+        Assert.Equal("UnknownImageFormatException", entry.Properties["ExceptionType"]);
+        Assert.Null(entry.Exception);
     }
 
     [Fact]
@@ -129,6 +138,40 @@ public sealed class ImagePreviewGeneratorTests
         Assert.Equal(1, handler.RequestCount);
     }
 
+    [Fact]
+    public void Source_ShouldNotLogRawSourceFileNameDuringTempCleanup()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Infrastructure",
+            "ImagePreviewGenerator.cs"));
+
+        Assert.Contains("SourceFileNameHash={SourceFileNameHash}", source, StringComparison.Ordinal);
+        Assert.Contains("TemplateLogSanitizer.SafeFileName(sourceFileName)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("SourceFileName={SourceFileName}", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("? \"unknown\" : sourceFileName", source, StringComparison.Ordinal);
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            if (Directory.Exists(Path.Combine(directory.FullName, "src"))
+                && Directory.Exists(Path.Combine(directory.FullName, "tests")))
+            {
+                return directory.FullName;
+            }
+
+            directory = directory.Parent;
+        }
+
+        throw new InvalidOperationException("Repository root could not be found.");
+    }
+
     private static TemplatesOptions CreateOptions(long previewMaxFileSizeBytes = 25 * 1024 * 1024)
     {
         return new TemplatesOptions
@@ -154,11 +197,14 @@ public sealed class ImagePreviewGeneratorTests
         return stream.ToArray();
     }
 
-    private sealed class FailingStoreMediaStorage : IMediaStorage
+    private sealed class FailingStoreMediaStorage(string? errorCode = null) : IMediaStorage
     {
         public Task<Result<StoredMediaResponse>> StoreAsync(MediaUploadCommand asset, CancellationToken cancellationToken)
         {
-            return Task.FromResult(Result.Failure<StoredMediaResponse>(TemplatesErrors.MediaStorageFailed));
+            var error = errorCode is null
+                ? TemplatesErrors.MediaStorageFailed
+                : new Error(errorCode, "Media upload could not be stored.");
+            return Task.FromResult(Result.Failure<StoredMediaResponse>(error));
         }
 
         public Task<Result> DeleteAsync(string assetUrl, CancellationToken cancellationToken)

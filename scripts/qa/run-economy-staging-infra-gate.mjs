@@ -31,6 +31,8 @@ const evidence = {
 
 try {
   requireEnv('STAGING_DATABASE_URL');
+  validateStagingTargets();
+  validateStagingPsqlCommand();
 
   if (boolEnv('ECONOMY_GATE_RUN_MIGRATIONS', false)) {
     if (!boolEnv('ECONOMY_GATE_BACKUP_CONFIRMED', false)) {
@@ -68,7 +70,7 @@ try {
 async function runEfDatabaseUpdate() {
   const env = {
     ...process.env,
-    PETMAGIC_ECONOMY_MIGRATIONS_CONNECTION_STRING: requiredEnv('STAGING_DATABASE_URL')
+    PETMAGIC_ECONOMY_MIGRATIONS_CONNECTION_STRING: requireEnv('STAGING_DATABASE_URL')
   };
 
   const result = run(
@@ -95,7 +97,7 @@ async function runEfDatabaseUpdate() {
 async function runEfPendingModelCheck() {
   const env = {
     ...process.env,
-    PETMAGIC_ECONOMY_MIGRATIONS_CONNECTION_STRING: requiredEnv('STAGING_DATABASE_URL')
+    PETMAGIC_ECONOMY_MIGRATIONS_CONNECTION_STRING: requireEnv('STAGING_DATABASE_URL')
   };
 
   const result = run(
@@ -220,7 +222,7 @@ async function runRuntimeChecks() {
 function runPsql(sql) {
   const command = process.env.STAGING_PSQL_COMMAND || 'psql';
   return run(command, [
-    requiredEnv('STAGING_DATABASE_URL'),
+    requireEnv('STAGING_DATABASE_URL'),
     '-v',
     'ON_ERROR_STOP=1',
     '-P',
@@ -378,6 +380,80 @@ function requireEnv(name) {
   return value;
 }
 
+function validateStagingTargets() {
+  assertNotLocalStagingTarget('STAGING_DATABASE_URL', requireEnv('STAGING_DATABASE_URL'));
+
+  const apiBaseUrl = process.env.STAGING_API_BASE_URL?.trim();
+  if (apiBaseUrl) {
+    assertNotLocalStagingTarget('STAGING_API_BASE_URL', apiBaseUrl);
+  }
+}
+
+function validateStagingPsqlCommand() {
+  const command = process.env.STAGING_PSQL_COMMAND?.trim();
+  if (!command) {
+    return;
+  }
+
+  const normalized = command.replaceAll('\\', '/').toLowerCase();
+  if (
+    normalized === 'docker-compose-psql'
+    || normalized === 'scripts/qa/psql.cmd'
+    || normalized === 'scripts/qa/psql.ps1'
+    || normalized === 'scripts/qa/psql-docker-wrapper.sh'
+    || normalized.endsWith('/docker-compose-psql')
+    || normalized.endsWith('/scripts/qa/psql.cmd')
+    || normalized.endsWith('/scripts/qa/psql.ps1')
+    || normalized.endsWith('/scripts/qa/psql-docker-wrapper.sh')
+  ) {
+    fail('STAGING_PSQL_COMMAND must not use repo-local Docker compose psql wrappers for the economy staging infra gate.');
+  }
+}
+
+function assertNotLocalStagingTarget(name, value) {
+  const host = extractHost(value);
+  if (!host || !isLocalInfrastructureHost(host)) {
+    return;
+  }
+
+  fail(`${name} must not target localhost/local infrastructure for the economy staging infra gate.`);
+}
+
+function extractHost(value) {
+  const trimmed = String(value).trim();
+  try {
+    return new URL(trimmed).hostname;
+  } catch {
+    // Non-URL connection strings are handled below.
+  }
+
+  const hostMatch = trimmed.match(/(?:^|;)\s*Host\s*=\s*([^;]+)/i);
+  if (hostMatch) {
+    return hostMatch[1].trim();
+  }
+
+  const serverMatch = trimmed.match(/(?:^|;)\s*(?:Server|Data Source)\s*=\s*([^;]+)/i);
+  if (serverMatch) {
+    return serverMatch[1].trim();
+  }
+
+  return null;
+}
+
+function isLocalInfrastructureHost(host) {
+  const normalized = host.trim().toLowerCase().replace(/^\[|\]$/g, '');
+  return [
+    'localhost',
+    '127.0.0.1',
+    '::1',
+    '0.0.0.0',
+    'host.docker.internal',
+    'postgres',
+    'db',
+    'petmagic-postgres'
+  ].includes(normalized) || normalized.endsWith('.localhost');
+}
+
 function boolEnv(name, fallback) {
   const value = process.env[name];
   if (value === undefined || value === '') {
@@ -445,6 +521,7 @@ Optional migration apply:
 Other:
   ECONOMY_GATE_ENV_FILE                 Env file path, defaults to STAGING_ENV_FILE or .env.staging.local.
   STAGING_PSQL_COMMAND                  psql command, defaults to psql.
+                                        Repo-local Docker compose psql wrappers are rejected.
   ECONOMY_GATE_ARTIFACT_DIR             Evidence output directory.
 `);
 }

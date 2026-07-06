@@ -1,5 +1,12 @@
 import { useMutation, type QueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 
 import {
   type SendOptimisticContext,
@@ -16,7 +23,7 @@ import {
   type SupportConversationPriority,
   type SupportConversationStatus,
 } from "@/lib/api-client";
-import { maskEmail } from "@/lib/sensitive-display";
+import { maskEmail, sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 type SupportControllerSessionIdentity = {
   userId?: string | null;
@@ -125,70 +132,81 @@ export function useSupportConversationMutations({
       const optimisticAttachmentObjectUrl = selectedAttachment
         ? URL.createObjectURL(selectedAttachment)
         : undefined;
-      const optimisticLastMessagePreview =
-        trimmedReply || optimisticAttachmentPreview(selectedAttachment?.name);
-      const optimisticMessage = {
-        messageId: optimisticMessageId,
-        conversationId,
-        senderUserId: sessionUser?.userId ?? "admin",
-        senderDisplayName:
-          sessionUser?.displayName?.trim() ||
-          (sessionUser?.email ? maskEmail(sessionUser.email) : null) ||
-          operatorLabel,
-        isFromAdmin: true,
-        senderType: "Admin",
-        body: trimmedReply,
-        replyToMessageId: replyToMessageId?.trim() || null,
-        replyToPreview: replyToPreview?.trim() || null,
-        attachmentUrl: optimisticAttachmentObjectUrl ?? null,
-        attachmentFileName: selectedAttachment?.name ?? null,
-        attachmentContentType:
-          selectedAttachment?.type?.trim() ||
-          (selectedAttachment ? "application/octet-stream" : null),
-        attachmentFileSizeBytes: selectedAttachment?.size ?? null,
-        attachmentUploadStatus: selectedAttachment ? "uploading" : null,
-        attachmentUploadErrorCode: null,
-        attachments: selectedAttachment
-          ? [
-              {
-                fileUrl: optimisticAttachmentObjectUrl!,
-                type: selectedAttachment.type,
-                mimeType: selectedAttachment.type || "application/octet-stream",
-                fileName: selectedAttachment.name,
-                sizeBytes: selectedAttachment.size,
-                isDeleted: false,
-                expiresAtUtc: null,
-                deletedAtUtc: null,
-                durationSeconds: null,
-                width: null,
-                height: null,
-              },
-            ]
-          : null,
-        isRead: false,
-        readAtUtc: null,
-        deliveredAtUtc: null,
-        isInternalNote: false,
-        createdAtUtc: nowUtc,
-      };
+      try {
+        if (optimisticAttachmentObjectUrl) {
+          optimisticAttachmentObjectUrlsRef.current.set(
+            optimisticMessageId,
+            optimisticAttachmentObjectUrl
+          );
+        }
 
-      if (optimisticAttachmentObjectUrl) {
-        optimisticAttachmentObjectUrlsRef.current.set(
-          optimisticMessageId,
-          optimisticAttachmentObjectUrl
-        );
+        const safeSelectedAttachmentName = selectedAttachment
+          ? sanitizeSensitiveText(selectedAttachment.name, 120)
+          : undefined;
+        const optimisticLastMessagePreview =
+          trimmedReply || optimisticAttachmentPreview(safeSelectedAttachmentName);
+        const optimisticMessage = {
+          messageId: optimisticMessageId,
+          conversationId,
+          senderUserId: sessionUser?.userId ?? "admin",
+          senderDisplayName:
+            sessionUser?.displayName?.trim() ||
+            (sessionUser?.email ? maskEmail(sessionUser.email) : null) ||
+            operatorLabel,
+          isFromAdmin: true,
+          senderType: "Admin",
+          body: trimmedReply,
+          replyToMessageId: replyToMessageId?.trim() || null,
+          replyToPreview: replyToPreview?.trim() || null,
+          attachmentUrl: optimisticAttachmentObjectUrl ?? null,
+          attachmentFileName: safeSelectedAttachmentName ?? null,
+          attachmentContentType:
+            selectedAttachment?.type?.trim() ||
+            (selectedAttachment ? "application/octet-stream" : null),
+          attachmentFileSizeBytes: selectedAttachment?.size ?? null,
+          attachmentUploadStatus: selectedAttachment ? "uploading" : null,
+          attachmentUploadErrorCode: null,
+          attachments: selectedAttachment
+            ? [
+                {
+                  fileUrl: optimisticAttachmentObjectUrl!,
+                  type: selectedAttachment.type,
+                  mimeType: selectedAttachment.type || "application/octet-stream",
+                  fileName: safeSelectedAttachmentName ?? "attachment",
+                  sizeBytes: selectedAttachment.size,
+                  isDeleted: false,
+                  expiresAtUtc: null,
+                  deletedAtUtc: null,
+                  durationSeconds: null,
+                  width: null,
+                  height: null,
+                },
+              ]
+            : null,
+          isRead: false,
+          readAtUtc: null,
+          deliveredAtUtc: null,
+          isInternalNote: false,
+          createdAtUtc: nowUtc,
+        };
+
+        queryClient.setQueryData<AdminSupportConversation>(queryKey, {
+          ...previousConversation,
+          messages: [...previousConversation.messages, optimisticMessage],
+          lastMessageAtUtc: nowUtc,
+          lastMessagePreview: optimisticLastMessagePreview,
+          lastMessageSenderType: "Admin",
+          updatedAtUtc: nowUtc,
+        });
+
+        return { previousConversation, optimisticMessageId, optimisticAttachmentObjectUrl };
+      } catch (error) {
+        if (optimisticAttachmentObjectUrl) {
+          optimisticAttachmentObjectUrlsRef.current.delete(optimisticMessageId);
+          URL.revokeObjectURL(optimisticAttachmentObjectUrl);
+        }
+        throw error;
       }
-
-      queryClient.setQueryData<AdminSupportConversation>(queryKey, {
-        ...previousConversation,
-        messages: [...previousConversation.messages, optimisticMessage],
-        lastMessageAtUtc: nowUtc,
-        lastMessagePreview: optimisticLastMessagePreview,
-        lastMessageSenderType: "Admin",
-        updatedAtUtc: nowUtc,
-      });
-
-      return { previousConversation, optimisticMessageId, optimisticAttachmentObjectUrl };
     },
     onSuccess: async (_data, _variables, context) => {
       if (context?.optimisticMessageId) {

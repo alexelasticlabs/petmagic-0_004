@@ -152,14 +152,17 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
   bool _hasLoadedInitially = false;
   bool? _isTabActive;
   CancelToken? _activeMediaActionCancelToken;
-  late final GenerationHistoryController _historyController;
-  late final WalletController _walletController;
+  GenerationHistoryController? _visibleHistoryController;
+  ProviderSubscription<GenerationHistoryState>? _historySubscription;
+  bool _historyScreenVisible = false;
 
   @override
   void initState() {
     super.initState();
-    _historyController = ref.read(generationHistoryControllerProvider.notifier);
-    _walletController = ref.read(walletControllerProvider.notifier);
+    _historySubscription = ref.listenManual<GenerationHistoryState>(
+      generationHistoryControllerProvider,
+      (_, _) => _syncVisibleHistoryController(),
+    );
     WidgetsBinding.instance.addObserver(this);
     Future.microtask(() async {
       if (!mounted) {
@@ -185,7 +188,7 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
         .read(appLaunchControllerProvider)
         .isAuthenticated;
     if (!isAuthenticated) {
-      _historyController.setScreenVisible(false);
+      _setHistoryScreenVisible(false);
       return;
     }
 
@@ -197,13 +200,14 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
       return;
     }
 
-    _historyController.setScreenVisible(false);
+    _setHistoryScreenVisible(false);
   }
 
   @override
   void dispose() {
     _cancelActiveMediaAction();
-    _historyController.setScreenVisible(false, clearLoadingState: false);
+    _historySubscription?.close();
+    _setStoredHistoryScreenVisible(false, clearLoadingState: false);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -632,7 +636,7 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
 
       if (!isTabActive) {
         _cancelActiveMediaAction();
-        _historyController.setScreenVisible(false);
+        _setHistoryScreenVisible(false);
         return;
       }
 
@@ -645,20 +649,24 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
         .read(appLaunchControllerProvider)
         .isAuthenticated;
     if (!isAuthenticated) {
-      _historyController.setScreenVisible(false);
+      _setHistoryScreenVisible(false);
       return;
     }
 
-    _historyController.setScreenVisible(true);
+    _setHistoryScreenVisible(true);
     _maybeLoadWalletForAuthenticatedUser();
     if (!_hasLoadedInitially) {
       _hasLoadedInitially = true;
-      unawaited(_historyController.load());
+      unawaited(ref.read(generationHistoryControllerProvider.notifier).load());
       return;
     }
 
     if (fromAppResume) {
-      unawaited(_historyController.load(refresh: true));
+      unawaited(
+        ref
+            .read(generationHistoryControllerProvider.notifier)
+            .load(refresh: true),
+      );
     }
   }
 
@@ -673,7 +681,47 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
       return;
     }
 
-    unawaited(_walletController.load());
+    unawaited(ref.read(walletControllerProvider.notifier).load());
+  }
+
+  void _setHistoryScreenVisible(bool visible) {
+    final controller = ref.read(generationHistoryControllerProvider.notifier);
+    final controllerChanged = !identical(_visibleHistoryController, controller);
+    if (!controllerChanged && _historyScreenVisible == visible) {
+      return;
+    }
+
+    _historyScreenVisible = visible;
+    if (controllerChanged) {
+      _visibleHistoryController?.setScreenVisible(false);
+      _visibleHistoryController = controller;
+    }
+
+    controller.setScreenVisible(visible);
+  }
+
+  void _syncVisibleHistoryController() {
+    final controller = ref.read(generationHistoryControllerProvider.notifier);
+    if (!identical(_visibleHistoryController, controller)) {
+      _visibleHistoryController?.setScreenVisible(false);
+      _visibleHistoryController = controller;
+      controller.setScreenVisible(_historyScreenVisible);
+    }
+  }
+
+  void _setStoredHistoryScreenVisible(
+    bool visible, {
+    bool clearLoadingState = true,
+  }) {
+    if (_historyScreenVisible == visible) {
+      return;
+    }
+
+    _historyScreenVisible = visible;
+    _visibleHistoryController?.setScreenVisible(
+      visible,
+      clearLoadingState: clearLoadingState,
+    );
   }
 
   Widget _sectionHeaderSliver(String title, int count) {

@@ -58,12 +58,24 @@ describe("shared admin toast hardening", () => {
       /^\s+--(?:surface-overlay|shadow-(?:soft|card|strong)|focus-ring|interactive-glow|scrollbar-(?:track|thumb|thumb-hover)|bg-grid-(?:primary|secondary)|bg-glow|primary-border(?:-hover)?|ghost-bg|secondary-bg|surface-hover|accent-soft-bg|danger-soft-bg|toast-(?:success|error)-(?:bg|border)):\s.*$/gm;
     const derivedTokenLines = [...css.matchAll(derivedTokenPattern)].map((match) => match[0]);
 
-    expect(darkRoot).toContain("--surface-overlay: color-mix(in srgb, var(--surface-0) 92%, transparent);");
-    expect(darkRoot).toContain("--focus-ring: 0 0 0 2px color-mix(in srgb, var(--accent) 24%, transparent);");
-    expect(darkRoot).toContain("--toast-error-bg: color-mix(in srgb, var(--danger) 18%, var(--surface-2));");
-    expect(lightRoot).toContain("--surface-overlay: color-mix(in srgb, var(--surface-1) 94%, transparent);");
-    expect(lightRoot).toContain("--focus-ring: 0 0 0 2px color-mix(in srgb, var(--accent) 24%, transparent);");
-    expect(lightRoot).toContain("--toast-error-bg: color-mix(in srgb, var(--danger) 12%, var(--surface-1));");
+    expect(darkRoot).toContain(
+      "--surface-overlay: color-mix(in srgb, var(--surface-0) 92%, transparent);"
+    );
+    expect(darkRoot).toContain(
+      "--focus-ring: 0 0 0 2px color-mix(in srgb, var(--accent) 24%, transparent);"
+    );
+    expect(darkRoot).toContain(
+      "--toast-error-bg: color-mix(in srgb, var(--danger) 18%, var(--surface-2));"
+    );
+    expect(lightRoot).toContain(
+      "--surface-overlay: color-mix(in srgb, var(--surface-1) 94%, transparent);"
+    );
+    expect(lightRoot).toContain(
+      "--focus-ring: 0 0 0 2px color-mix(in srgb, var(--accent) 24%, transparent);"
+    );
+    expect(lightRoot).toContain(
+      "--toast-error-bg: color-mix(in srgb, var(--danger) 12%, var(--surface-1));"
+    );
     expect(derivedTokenLines.length).toBeGreaterThan(30);
     expect(derivedTokenLines.join("\n")).toContain("color-mix(in srgb");
     expect(derivedTokenLines.join("\n")).not.toContain("rgba(");

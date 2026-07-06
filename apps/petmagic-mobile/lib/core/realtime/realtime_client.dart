@@ -65,17 +65,7 @@ class PollingRealtimeClient implements RealtimeClient {
       return;
     }
 
-    final controller = _controller ??=
-        StreamController<RealtimeEvent>.broadcast();
-    _timer = Timer.periodic(interval, (_) {
-      if (controller.isClosed) {
-        return;
-      }
-
-      for (final topic in topics) {
-        controller.add(RealtimeEvent(topic: topic));
-      }
-    });
+    _scheduleNextPoll();
   }
 
   @override
@@ -96,6 +86,28 @@ class PollingRealtimeClient implements RealtimeClient {
     _controller = null;
     await controller?.close();
   }
+
+  void _scheduleNextPoll() {
+    _timer?.cancel();
+    _timer = null;
+    if (_connectionHolders == 0) {
+      return;
+    }
+
+    _timer = Timer(interval, () {
+      _timer = null;
+      final controller = _controller ??=
+          StreamController<RealtimeEvent>.broadcast();
+      if (controller.isClosed || _connectionHolders == 0) {
+        return;
+      }
+
+      for (final topic in topics) {
+        controller.add(RealtimeEvent(topic: topic));
+      }
+      _scheduleNextPoll();
+    });
+  }
 }
 
 class ServerSentEventsRealtimeClient implements RealtimeClient {
@@ -108,6 +120,7 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
   }) : _apiBaseUrlResolver = apiBaseUrlResolver,
        _sessionStorage = sessionStorage,
        _httpClient = httpClient,
+       _ownsHttpClient = httpClient == null,
        _connectionTimeout = connectionTimeout {
     _httpClient?.connectionTimeout = connectionTimeout;
   }
@@ -115,8 +128,12 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
   final ApiBaseUrlResolver _apiBaseUrlResolver;
   final AuthSessionStorage _sessionStorage;
   HttpClient? _httpClient;
+  final bool _ownsHttpClient;
   final Duration reconnectDelay;
   final Duration _connectionTimeout;
+
+  static const _eventTopicMaxLength = 128;
+  static const _eventPayloadMaxLength = 8192;
 
   StreamController<RealtimeEvent>? _controller;
   Future<void>? _connectionLoop;
@@ -149,25 +166,38 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
       return;
     }
 
+    await _stopTransport(closeEvents: false);
+  }
+
+  Future<void> dispose() async {
+    _connectionHolders = 0;
+    await _stopTransport(closeEvents: true);
+  }
+
+  Future<void> _stopTransport({required bool closeEvents}) async {
     final stopSignal = _stopSignal;
     if (stopSignal != null && !stopSignal.isCompleted) {
       stopSignal.complete();
     }
 
-    _httpClient?.close(force: true);
-    _httpClient = null;
+    if (_ownsHttpClient) {
+      _httpClient?.close(force: true);
+      _httpClient = null;
+    }
 
     final connectionLoop = _connectionLoop;
     _connectionLoop = null;
     _stopSignal = null;
-    final controller = _controller;
-    _controller = null;
 
     if (connectionLoop != null) {
       await connectionLoop;
     }
 
-    await controller?.close();
+    if (closeEvents) {
+      final controller = _controller;
+      _controller = null;
+      await controller?.close();
+    }
   }
 
   Future<void> _runConnectionLoop() async {
@@ -237,7 +267,7 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
         stackTrace,
         requestId: requestId,
         correlationId: correlationId,
-        context: {'base_url': baseUrl},
+        context: {'base_url_origin': _realtimeLogSafeBaseUrlOrigin(baseUrl)},
       );
       await _apiBaseUrlResolver.invalidate(baseUrl);
       return false;
@@ -252,40 +282,112 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
   Future<void> _consumeResponse(HttpClientResponse response) async {
     String? currentEvent;
     final dataLines = <String>[];
+    var dataLength = 0;
+    var discardCurrentEvent = false;
 
-    await for (final line
-        in response.transform(utf8.decoder).transform(const LineSplitter())) {
+    final stopSignal = _stopSignal;
+    final streamCompleted = Completer<void>();
+    var completedByStream = false;
+    late final StreamSubscription<String> subscription;
+
+    void handleLine(String line) {
       if (_isStopping) {
         return;
       }
 
       if (line.isEmpty) {
-        _dispatchEvent(currentEvent, dataLines);
+        _dispatchEvent(
+          currentEvent,
+          dataLines,
+          discardEvent: discardCurrentEvent,
+        );
         currentEvent = null;
         dataLines.clear();
-        continue;
+        dataLength = 0;
+        discardCurrentEvent = false;
+        return;
       }
 
       if (line.startsWith(':')) {
-        continue;
+        return;
       }
 
       if (line.startsWith('event:')) {
         currentEvent = line.substring(6).trim();
-        continue;
+        return;
       }
 
       if (line.startsWith('data:')) {
-        dataLines.add(line.substring(5).trimLeft());
+        final dataLine = line.substring(5).trimLeft();
+        dataLength += dataLine.length + (dataLines.isEmpty ? 0 : 1);
+        if (dataLength > _eventPayloadMaxLength) {
+          discardCurrentEvent = true;
+          dataLines.clear();
+          return;
+        }
+
+        if (!discardCurrentEvent) {
+          dataLines.add(dataLine);
+        }
       }
     }
 
-    _dispatchEvent(currentEvent, dataLines);
+    subscription = response
+        .transform(utf8.decoder)
+        .transform(const LineSplitter())
+        .listen(
+          (line) {
+            try {
+              handleLine(line);
+            } catch (error, stackTrace) {
+              if (!streamCompleted.isCompleted) {
+                streamCompleted.completeError(error, stackTrace);
+              }
+            }
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            if (!streamCompleted.isCompleted) {
+              streamCompleted.completeError(error, stackTrace);
+            }
+          },
+          onDone: () {
+            completedByStream = true;
+            if (!streamCompleted.isCompleted) {
+              streamCompleted.complete();
+            }
+          },
+          cancelOnError: true,
+        );
+
+    try {
+      await Future.any<void>([
+        streamCompleted.future,
+        if (stopSignal != null) stopSignal.future,
+      ]);
+    } finally {
+      await subscription.cancel();
+    }
+
+    if (completedByStream && !_isStopping) {
+      _dispatchEvent(
+        currentEvent,
+        dataLines,
+        discardEvent: discardCurrentEvent,
+      );
+    }
   }
 
-  void _dispatchEvent(String? eventName, List<String> dataLines) {
+  void _dispatchEvent(
+    String? eventName,
+    List<String> dataLines, {
+    required bool discardEvent,
+  }) {
+    if (discardEvent) {
+      return;
+    }
+
     final topic = eventName?.trim();
-    if (topic == null || topic.isEmpty) {
+    if (topic == null || topic.isEmpty || topic.length > _eventTopicMaxLength) {
       return;
     }
 
@@ -366,6 +468,16 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
   bool get _isStopping => _stopSignal?.isCompleted ?? true;
 }
 
+String _realtimeLogSafeBaseUrlOrigin(String baseUrl) {
+  final uri = Uri.tryParse(baseUrl.trim());
+  if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
+    return 'invalid';
+  }
+
+  final port = uri.hasPort ? ':${uri.port}' : '';
+  return '${uri.scheme}://${uri.host}$port';
+}
+
 class LifecycleAwareRealtimeClient
     with WidgetsBindingObserver
     implements RealtimeClient {
@@ -426,6 +538,11 @@ class LifecycleAwareRealtimeClient
   Future<void> dispose() async {
     WidgetsBinding.instance.removeObserver(this);
     _connectionHolders = 0;
+    if (_delegate case final ServerSentEventsRealtimeClient client) {
+      await client.dispose();
+      return;
+    }
+
     await _delegate.disconnect();
   }
 }

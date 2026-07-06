@@ -8,6 +8,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 using NSec.Cryptography;
+using PetMagic.BuildingBlocks.Observability;
 
 namespace PetMagic.Modules.Templates.Api;
 
@@ -29,6 +30,7 @@ internal sealed class FalWebhookSignatureVerifier(
     private const string TimestampHeader = "X-Fal-Webhook-Timestamp";
     private const string SignatureHeader = "X-Fal-Webhook-Signature";
     private const int TimestampLeewaySeconds = 300;
+    private const int JwksResponseMaxChars = 64 * 1024;
     private const string JwksCacheKey = "templates:fal:webhook:jwks";
 
     public async Task<bool> VerifyAsync(IHeaderDictionary headers, byte[] body, CancellationToken cancellationToken)
@@ -97,15 +99,21 @@ internal sealed class FalWebhookSignatureVerifier(
         {
             using var response = await httpClientFactory
                 .CreateClient(HttpClientName)
-                .GetAsync(jwksUrl, cancellationToken);
+                .GetAsync(jwksUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
-                logger.LogWarning("fal webhook JWKS fetch failed. StatusCode={StatusCode}", response.StatusCode);
+                logger.LogWarning(
+                    "fal webhook JWKS fetch failed. StatusCode={StatusCode} JwksUrl={JwksUrl}",
+                    response.StatusCode,
+                    SafeLogValues.SanitizeText(jwksUrl));
                 return [];
             }
 
-            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+            var responseBody = await SafeHttpContentReader.ReadRawStringPrefixAsync(
+                response.Content,
+                cancellationToken,
+                JwksResponseMaxChars);
+            using var document = JsonDocument.Parse(responseBody);
             if (!document.RootElement.TryGetProperty("keys", out var keysElement)
                 || keysElement.ValueKind != JsonValueKind.Array)
             {
@@ -133,7 +141,10 @@ internal sealed class FalWebhookSignatureVerifier(
         }
         catch (Exception exception)
         {
-            logger.LogWarning(exception, "fal webhook JWKS fetch failed.");
+            logger.LogWarning(
+                "fal webhook JWKS fetch failed. ExceptionType={ExceptionType} JwksUrl={JwksUrl}",
+                SafeLogValues.ExceptionType(exception),
+                SafeLogValues.SanitizeText(jwksUrl));
             return [];
         }
     }

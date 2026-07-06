@@ -266,10 +266,6 @@ class PurchaseCheckoutModel {
     required this.paymentProvider,
     required this.checkoutUrl,
     required this.externalPaymentId,
-    required this.paymentIntentClientSecret,
-    required this.customerId,
-    required this.customerEphemeralKeySecret,
-    required this.publishableKey,
     required this.status,
   });
 
@@ -277,13 +273,7 @@ class PurchaseCheckoutModel {
   final String paymentProvider;
   final String checkoutUrl;
   final String externalPaymentId;
-  final String? paymentIntentClientSecret;
-  final String? customerId;
-  final String? customerEphemeralKeySecret;
-  final String? publishableKey;
   final String status;
-
-  bool get usesPaymentSheet => false;
 
   factory PurchaseCheckoutModel.fromJson(Map<String, dynamic> json) {
     return PurchaseCheckoutModel(
@@ -291,10 +281,6 @@ class PurchaseCheckoutModel {
       paymentProvider: json['paymentProvider'] as String? ?? '',
       checkoutUrl: json['checkoutUrl'] as String? ?? '',
       externalPaymentId: json['externalPaymentId'] as String? ?? '',
-      paymentIntentClientSecret: json['paymentIntentClientSecret'] as String?,
-      customerId: json['customerId'] as String?,
-      customerEphemeralKeySecret: json['customerEphemeralKeySecret'] as String?,
-      publishableKey: json['publishableKey'] as String?,
       status: json['status'] as String? ?? '',
     );
   }

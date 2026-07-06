@@ -142,6 +142,37 @@ void main() {
     },
   );
 
+  test(
+    'legacy persisted base URL is rewritten without path query or fragment secrets',
+    () async {
+      final previousPreferences = SharedPreferencesAsyncPlatform.instance;
+      SharedPreferencesAsyncPlatform.instance =
+          InMemorySharedPreferencesAsync.empty();
+      addTearDown(() {
+        SharedPreferencesAsyncPlatform.instance = previousPreferences;
+      });
+
+      final preferences = SharedPreferencesAsync();
+      await preferences.setString(
+        persistedBaseUrlKey,
+        'http://127.0.0.1:5000/api?token=raw&signature=secret#debug',
+      );
+      final resolver = ApiBaseUrlResolver(
+        preferences: preferences,
+        preferConfiguredBaseUrls: false,
+        healthProbe: (_) async => false,
+      );
+
+      addTearDown(resolver.dispose);
+
+      expect(await resolver.resolveBaseUrl(), 'http://127.0.0.1:5000');
+      expect(
+        await preferences.getString(persistedBaseUrlKey),
+        'http://127.0.0.1:5000',
+      );
+    },
+  );
+
   test('late health probe completion does not mutate after dispose', () async {
     final previousPreferences = SharedPreferencesAsyncPlatform.instance;
     SharedPreferencesAsyncPlatform.instance =
@@ -176,6 +207,39 @@ void main() {
       await resolver.resolveBaseUrl(forceRefresh: true),
       AppConfig.apiBaseUrl,
     );
+  });
+
+  test('dispose completes in-flight base URL resolution immediately', () async {
+    final previousPreferences = SharedPreferencesAsyncPlatform.instance;
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.empty();
+    addTearDown(() {
+      SharedPreferencesAsyncPlatform.instance = previousPreferences;
+    });
+
+    final probeStarted = Completer<void>();
+    final neverCompletes = Completer<bool>();
+    final resolver = ApiBaseUrlResolver(
+      preferences: SharedPreferencesAsync(),
+      baseUrls: const ['http://127.0.0.1:5000'],
+      healthProbe: (_) {
+        if (!probeStarted.isCompleted) {
+          probeStarted.complete();
+        }
+        return neverCompletes.future;
+      },
+    );
+
+    final resolveFuture = resolver.resolveBaseUrl(forceRefresh: true);
+    await probeStarted.future;
+
+    resolver.dispose();
+
+    expect(
+      await resolveFuture.timeout(const Duration(milliseconds: 100)),
+      AppConfig.apiBaseUrl,
+    );
+    expect(resolver.activeBaseUrl, isNull);
   });
 
   test(

@@ -25,7 +25,11 @@ import {
 } from "@/components/support/use-support-conversation-controller";
 import { Button } from "@/components/ui/button";
 import { Toast } from "@/components/ui/toast";
-import type { SupportConversationStatus } from "@/lib/api-client";
+import type {
+  SupportConversationPriority,
+  SupportConversationStatus,
+  SupportInboxSort,
+} from "@/lib/api-client";
 
 export function SupportConversationPage({
   locale,
@@ -37,7 +41,7 @@ export function SupportConversationPage({
   const [fullscreenImage, setFullscreenImage] = useState<FullscreenImage | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
-  const [subFilter, setSubFilter] = useState<"all" | "unassigned" | "archive">("all");
+  const [subFilter, setSubFilter] = useState<"all" | "waiting" | "unassigned" | "archive">("all");
   const [queueStatusFilter, setQueueStatusFilter] = useState<"all" | SupportConversationStatus>(
     "all"
   );
@@ -74,6 +78,8 @@ export function SupportConversationPage({
     isSendReplySubmitting,
     loadOlderMessages,
     primaryStatusAction,
+    queuePriorityFilter,
+    queueSort,
     reply,
     replyToMessage,
     replyToPreview,
@@ -88,6 +94,8 @@ export function SupportConversationPage({
     setReply,
     setQueueFilter,
     setQueuePage,
+    setQueuePriorityFilter,
+    setQueueSort,
     setSearchQuery,
     setSelectedAttachment,
     statusMutation,
@@ -102,13 +110,17 @@ export function SupportConversationPage({
   const isComposerDisabled = isConversationReadOnly || !canManageSupportWorkspace || isComposerBusy;
   const isConversationClosed = conversation?.status === "Closed";
   const isQueueControlsLocked = !canManageSupportWorkspace || inboxQuery.isFetching;
-  const setQueueSubFilter = (value: "all" | "unassigned" | "archive") => {
+  const setQueueSubFilter = (value: "all" | "waiting" | "unassigned" | "archive") => {
     if (isQueueControlsLocked) {
       return;
     }
 
     setSubFilter(value);
     setQueueStatusFilter("all");
+    if (value === "waiting") {
+      setQueueFilter("waiting");
+      return;
+    }
     if (value === "archive") {
       setQueueFilter("Closed");
       return;
@@ -128,6 +140,20 @@ export function SupportConversationPage({
     setQueueFilter("all");
     setQueueStatusFilter(value);
     setQueuePage(1);
+  };
+  const setExactQueuePriorityFilter = (value: "all" | SupportConversationPriority) => {
+    if (isQueueControlsLocked) {
+      return;
+    }
+
+    setQueuePriorityFilter(value);
+  };
+  const setExactQueueSort = (value: SupportInboxSort) => {
+    if (isQueueControlsLocked) {
+      return;
+    }
+
+    setQueueSort(value);
   };
   const requestPreviousQueuePage = () => {
     if (isQueueControlsLocked || !canGoToPreviousQueuePage) {
@@ -468,11 +494,15 @@ export function SupportConversationPage({
               queueLabels={queueLabels}
               queueShownEnd={queueShownEnd}
               queueShownStart={queueShownStart}
+              queuePriorityFilter={queuePriorityFilter}
+              queueSort={queueSort}
               queueStatusFilter={queueStatusFilter}
               requestInboxRetry={requestInboxRetry}
               requestNextQueuePage={requestNextQueuePage}
               requestPreviousQueuePage={requestPreviousQueuePage}
               setExactQueueStatusFilter={setExactQueueStatusFilter}
+              setExactQueuePriorityFilter={setExactQueuePriorityFilter}
+              setExactQueueSort={setExactQueueSort}
               setQueueSubFilter={setQueueSubFilter}
               subFilter={subFilter}
               text={text}

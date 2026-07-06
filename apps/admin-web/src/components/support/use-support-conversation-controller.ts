@@ -21,6 +21,7 @@ import {
   supportConversationMessagesTake,
   supportInboxStaleTimeMs,
   supportPollingIntervalMs,
+  supportRealtimeHealthyPollingIntervalMs,
   type SidePanelTab,
   type SupportQueueFilter,
   type ToastState,
@@ -44,6 +45,7 @@ import {
   type AdminSupportInboxPage,
   type AdminSupportInboxMetrics,
   type SupportConversationPriority,
+  type SupportInboxSort,
 } from "@/lib/api-client";
 import { clientLogger } from "@/lib/client-logger";
 import { getDictionary } from "@/lib/i18n";
@@ -71,6 +73,10 @@ export function useSupportConversationController({
     sessionUserRoles.includes("Admin") || sessionUserRoles.includes("Moderator");
   const supportActionsForbidden = copy.controller.actionsForbidden;
   const [queueFilter, setQueueFilter] = useState<SupportQueueFilter>("all");
+  const [queuePriorityFilter, setQueuePriorityFilter] = useState<
+    "all" | SupportConversationPriority
+  >("all");
+  const [queueSort, setQueueSort] = useState<SupportInboxSort>("default");
   const [queuePage, setQueuePage] = useState(1);
   const [searchQuery, setRawSearchQuery] = useState("");
   const debouncedSearchQuery = useDebouncedValue(searchQuery.trim(), 350);
@@ -120,8 +126,16 @@ export function useSupportConversationController({
       }
 
       const previewUrl = URL.createObjectURL(file);
-      attachmentPreviewUrlRef.current = previewUrl;
-      setAttachmentPreview({ file, url: previewUrl });
+      try {
+        attachmentPreviewUrlRef.current = previewUrl;
+        setAttachmentPreview({ file, url: previewUrl });
+      } catch (error) {
+        if (attachmentPreviewUrlRef.current === previewUrl) {
+          attachmentPreviewUrlRef.current = null;
+        }
+        URL.revokeObjectURL(previewUrl);
+        throw error;
+      }
     },
     [clearAttachmentPreview]
   );
@@ -195,6 +209,19 @@ export function useSupportConversationController({
     setQueueFilter(filter);
   }, []);
 
+  const setSupportQueuePriorityFilter = useCallback(
+    (priority: "all" | SupportConversationPriority) => {
+      setQueuePage(1);
+      setQueuePriorityFilter(priority);
+    },
+    []
+  );
+
+  const setSupportQueueSort = useCallback((sort: SupportInboxSort) => {
+    setQueuePage(1);
+    setQueueSort(sort);
+  }, []);
+
   const setSupportQueuePage = useCallback((value: number | ((currentPage: number) => number)) => {
     setQueuePage((currentPage) => {
       const nextPage = typeof value === "function" ? value(currentPage) : value;
@@ -231,6 +258,63 @@ export function useSupportConversationController({
     };
   }, [revokeAttachmentPreviewUrl]);
 
+  const supportRealtimeStatus = useSupportRealtime(
+    canManageSupportWorkspace ? session?.accessToken : undefined,
+    (event) => {
+      void queryClient.invalidateQueries({ queryKey: adminQueryKeys.supportInboxRoot });
+      if (event.conversationId === conversationId) {
+        const now = Date.now();
+        if (now - lastConversationRealtimeFetchRef.current < 700) {
+          return;
+        }
+
+        lastConversationRealtimeFetchRef.current = now;
+        void queryClient
+          .fetchQuery({
+            queryKey: adminQueryKeys.supportConversation(conversationId),
+            queryFn: ({ signal }) =>
+              fetchSupportConversation(conversationId, {
+                take: supportConversationMessagesTake,
+                signal,
+              }),
+          })
+          .then((latestConversation) => {
+            queryClient.setQueryData<AdminSupportConversation>(
+              adminQueryKeys.supportConversation(conversationId),
+              (currentConversation) => {
+                if (!currentConversation) {
+                  return latestConversation;
+                }
+
+                return mergeSupportConversationMessages(currentConversation, latestConversation);
+              }
+            );
+          })
+          .catch((error) => {
+            clientLogger.warn("support.realtime_fetch_conversation_failed", {
+              conversationId: formatSupportControllerLogText(conversationId),
+              ...getSupportControllerErrorDetails(error),
+            });
+            void queryClient.invalidateQueries({
+              queryKey: adminQueryKeys.supportConversation(conversationId),
+            });
+          });
+        return;
+      }
+
+      const toastKey = `${event.conversationId}:${event.updatedAtUtc}`;
+      if (isUserSupportMessageEvent(event) && lastRealtimeToastRef.current !== toastKey) {
+        lastRealtimeToastRef.current = toastKey;
+        setToast({ type: "success", message: buildSupportRealtimeToastMessage(locale) });
+      }
+    }
+  );
+  const supportPollingEnabled = Boolean(session && canManageSupportWorkspace);
+  const supportRealtimeAwarePollingInterval =
+    supportRealtimeStatus === "connected"
+      ? supportRealtimeHealthyPollingIntervalMs
+      : supportPollingIntervalMs;
+
   const conversationQuery = useQuery<AdminSupportConversation>({
     queryKey: adminQueryKeys.supportConversation(conversationId),
     queryFn: ({ signal }) =>
@@ -246,12 +330,16 @@ export function useSupportConversationController({
   const resolvedQueueFilter = resolveQueueFilter(queueFilter);
   const effectiveQueueStatus =
     queueStatusFilter === "all" ? resolvedQueueFilter.status : queueStatusFilter;
+  const effectiveQueuePriority = queuePriorityFilter === "all" ? undefined : queuePriorityFilter;
   const inboxQuery = useQuery<AdminSupportInboxPage>({
     queryKey: adminQueryKeys.supportInbox(
       effectiveQueueStatus ?? "all",
       resolvedQueueFilter.assignment,
       {
         search: debouncedSearchQuery,
+        priority: effectiveQueuePriority,
+        sort: queueSort,
+        queue: resolvedQueueFilter.queue,
         page: queuePage,
         pageSize: SUPPORT_INBOX_PAGE_SIZE,
       }
@@ -259,6 +347,9 @@ export function useSupportConversationController({
     queryFn: ({ signal }) => {
       return fetchSupportInbox(effectiveQueueStatus, resolvedQueueFilter.assignment, {
         search: debouncedSearchQuery,
+        priority: effectiveQueuePriority,
+        sort: queueSort,
+        queue: resolvedQueueFilter.queue,
         page: queuePage,
         pageSize: SUPPORT_INBOX_PAGE_SIZE,
         signal,
@@ -266,7 +357,7 @@ export function useSupportConversationController({
     },
     enabled: Boolean(session && canManageSupportWorkspace),
     staleTime: supportInboxStaleTimeMs,
-    refetchInterval: session && canManageSupportWorkspace ? supportPollingIntervalMs : false,
+    refetchInterval: supportPollingEnabled ? supportRealtimeAwarePollingInterval : false,
     refetchIntervalInBackground: false,
   });
   const inboxMetricsQuery = useQuery<AdminSupportInboxMetrics>({
@@ -274,7 +365,7 @@ export function useSupportConversationController({
     queryFn: ({ signal }) => fetchSupportInboxMetrics(signal),
     enabled: Boolean(session && canManageSupportWorkspace),
     staleTime: supportInboxStaleTimeMs,
-    refetchInterval: session && canManageSupportWorkspace ? supportPollingIntervalMs : false,
+    refetchInterval: supportPollingEnabled ? supportRealtimeAwarePollingInterval : false,
     refetchIntervalInBackground: false,
   });
 
@@ -291,55 +382,6 @@ export function useSupportConversationController({
       subjectUserId,
       canViewSubjectUserContext,
     });
-
-  useSupportRealtime(canManageSupportWorkspace ? session?.accessToken : undefined, (event) => {
-    void queryClient.invalidateQueries({ queryKey: adminQueryKeys.supportInboxRoot });
-    if (event.conversationId === conversationId) {
-      const now = Date.now();
-      if (now - lastConversationRealtimeFetchRef.current < 700) {
-        return;
-      }
-
-      lastConversationRealtimeFetchRef.current = now;
-      void queryClient
-        .fetchQuery({
-          queryKey: adminQueryKeys.supportConversation(conversationId),
-          queryFn: ({ signal }) =>
-            fetchSupportConversation(conversationId, {
-              take: supportConversationMessagesTake,
-              signal,
-            }),
-        })
-        .then((latestConversation) => {
-          queryClient.setQueryData<AdminSupportConversation>(
-            adminQueryKeys.supportConversation(conversationId),
-            (currentConversation) => {
-              if (!currentConversation) {
-                return latestConversation;
-              }
-
-              return mergeSupportConversationMessages(currentConversation, latestConversation);
-            }
-          );
-        })
-        .catch((error) => {
-          clientLogger.warn("support.realtime_fetch_conversation_failed", {
-            conversationId: formatSupportControllerLogText(conversationId),
-            ...getSupportControllerErrorDetails(error),
-          });
-          void queryClient.invalidateQueries({
-            queryKey: adminQueryKeys.supportConversation(conversationId),
-          });
-        });
-      return;
-    }
-
-    const toastKey = `${event.conversationId}:${event.updatedAtUtc}`;
-    if (isUserSupportMessageEvent(event) && lastRealtimeToastRef.current !== toastKey) {
-      lastRealtimeToastRef.current = toastKey;
-      setToast({ type: "success", message: buildSupportRealtimeToastMessage(event, locale) });
-    }
-  });
 
   const attemptMarkRead = useCallback(() => {
     if (
@@ -696,6 +738,8 @@ export function useSupportConversationController({
     setSearchQuery: setSupportSearchQuery,
     setQueueFilter: setSupportQueueFilter,
     setQueuePage: setSupportQueuePage,
+    setQueuePriorityFilter: setSupportQueuePriorityFilter,
+    setQueueSort: setSupportQueueSort,
     setSelectedAttachment: setSupportSelectedAttachment,
     setMessagesViewportVisible,
     loadOlderMessages,
@@ -709,6 +753,8 @@ export function useSupportConversationController({
     removeOperatorTag,
     queueFilter,
     queuePage,
+    queuePriorityFilter,
+    queueSort,
     isSubjectUserDeleted,
     subscriptionQuery,
     statusMutation,

@@ -5,16 +5,11 @@ const int _resultFullscreenImageCacheWidth = 1440;
 const int _beforeAfterCompareImageCacheWidth = 1024;
 
 File? _localMediaFile(String? path) {
-  final normalized = path?.trim();
-  if (normalized == null || normalized.isEmpty) {
+  final usablePath = usableLocalMediaPathSync(path);
+  if (usablePath == null) {
     return null;
   }
-
-  final file = File(normalized);
-  if (!file.existsSync()) {
-    return null;
-  }
-  return file;
+  return File(usablePath);
 }
 
 class _Header extends StatelessWidget {

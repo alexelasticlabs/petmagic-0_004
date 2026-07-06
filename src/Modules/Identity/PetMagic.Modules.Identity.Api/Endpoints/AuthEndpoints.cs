@@ -44,6 +44,7 @@ public static partial class AuthEndpoints
     {
         var group = endpoints.MapGroup("/api/auth")
             .WithTags("Auth")
+            .AddEndpointFilter(ApplySensitiveNoStoreHeadersAsync)
             .RequireRateLimiting("auth");
 
         group.MapPost("/register", RegisterAsync)
@@ -102,7 +103,8 @@ public static partial class AuthEndpoints
 
         group.MapPost("/me/password-change/request", RequestCurrentPasswordChangeCodeAsync)
             .RequireAuthorization()
-            .RequireRateLimiting("auth-password-reset");
+            .RequireRateLimiting("auth-password-reset")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAuthJsonRequestBodyBytes));
 
         group.MapPost("/me/password-change/confirm", ConfirmCurrentPasswordChangeAsync)
             .RequireAuthorization()
@@ -125,7 +127,8 @@ public static partial class AuthEndpoints
             .WithMetadata(new RequestSizeLimitAttribute(MaxAuthJsonRequestBodyBytes));
 
         group.MapDelete("/me", DeleteMeAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAuthJsonRequestBodyBytes));
 
         group.MapPost("/me/legal-acceptance", AcceptCurrentLegalDocumentsAsync)
             .RequireAuthorization()
@@ -135,10 +138,12 @@ public static partial class AuthEndpoints
             .RequireAuthorization();
 
         group.MapPost("/me/linked-accounts/{provider}/prepare", PrepareLinkedAccountAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAuthJsonRequestBodyBytes));
 
         group.MapDelete("/me/linked-accounts/{provider}", UnlinkLinkedAccountAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAuthJsonRequestBodyBytes));
 
         group.MapPut("/me/avatar", UpdateAvatarAsync)
             .RequireAuthorization()
@@ -146,7 +151,8 @@ public static partial class AuthEndpoints
             .WithMetadata(new RequestSizeLimitAttribute(MaxAvatarUploadRequestBodyBytes));
 
         group.MapDelete("/me/avatar", RemoveAvatarAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAuthJsonRequestBodyBytes));
 
         group.MapGet("/external/{provider}", ExternalChallengeAsync)
             .AllowAnonymous()
@@ -181,5 +187,14 @@ public static partial class AuthEndpoints
             .WithMetadata(new RequestSizeLimitAttribute(MaxAuthJsonRequestBodyBytes));
 
         return endpoints;
+    }
+
+    private static async ValueTask<object?> ApplySensitiveNoStoreHeadersAsync(
+        EndpointFilterInvocationContext context,
+        EndpointFilterDelegate next)
+    {
+        ApplySensitiveNoStoreHeaders(context.HttpContext);
+
+        return await next(context);
     }
 }

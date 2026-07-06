@@ -408,7 +408,7 @@ class TemplateFeedPlaybackManager extends ChangeNotifier {
       if (budget == 0) {
         _recordVideoPreloadCancellation(reason);
       }
-      AppLogger.info(
+      AppLogger.debug(
         feature: 'Templates.FeedPlayback',
         operation: 'active_video_controllers_count',
         message: 'Template feed autoplay budget updated.',
@@ -484,7 +484,7 @@ class TemplateFeedPlaybackManager extends ChangeNotifier {
 
   void _recordVideoPreloadCancellation(String reason) {
     _videoPreloadCancellations++;
-    AppLogger.info(
+    AppLogger.debug(
       feature: 'Templates.FeedPlayback',
       operation: 'video_preload_cancellations',
       message: 'Template feed video preload/playback was cancelled.',

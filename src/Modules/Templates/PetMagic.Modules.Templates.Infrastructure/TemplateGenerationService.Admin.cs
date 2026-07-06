@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
 
 using PetMagic.BuildingBlocks.Observability;
@@ -7,12 +8,15 @@ using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain;
 using PetMagic.Modules.Templates.Domain.Enums;
 using PetMagic.Modules.Templates.Infrastructure.Data;
+using PetMagic.Modules.Templates.Infrastructure.Entities;
 using PetMagic.Modules.Templates.Infrastructure.Options;
 
 namespace PetMagic.Modules.Templates.Infrastructure;
 
 internal sealed partial class TemplateGenerationService
 {
+    private const string NpgsqlProviderName = "Npgsql.EntityFrameworkCore.PostgreSQL";
+
     public async Task<Result<TemplateGenerationResponse>> GetAdminAsync(Guid generationId, CancellationToken cancellationToken)
     {
         var job = await dbContext.TemplateGenerationJobs
@@ -53,6 +57,109 @@ internal sealed partial class TemplateGenerationService
         return Result.Success(new RemoveGenerationWatermarkResponse(true, existing.CreditsSpent, null, mediaUrl));
     }
 
+    public async Task<Result<TemplateGenerationResponse>> CancelAdminQueuedAsync(
+        Guid adminUserId,
+        Guid generationId,
+        CancellationToken cancellationToken)
+    {
+        if (!options.CancelQueuedGenerationEnabled)
+        {
+            return Result.Failure<TemplateGenerationResponse>(TemplatesErrors.GenerationCancelDisabled);
+        }
+
+        var job = await dbContext.TemplateGenerationJobs
+            .Include(x => x.Template)
+            .Include(x => x.WatermarkUnlocks)
+            .FirstOrDefaultAsync(x => x.Id == generationId && x.HiddenByUserAtUtc == null, cancellationToken);
+        if (job is null)
+        {
+            return Result.Failure<TemplateGenerationResponse>(TemplatesErrors.GenerationJobNotFound);
+        }
+
+        var cancelled = await CancelQueuedJobAsync(job, adminUserId, cancellationToken);
+        return cancelled.IsFailure
+            ? Result.Failure<TemplateGenerationResponse>(cancelled.Error)
+            : Result.Success(cancelled.Value.Response);
+    }
+
+    public async Task<Result<TemplateGenerationResponse>> RetryAdminGenerationAsync(
+        Guid adminUserId,
+        Guid generationId,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await BeginGenerationAdminActionTransactionAsync(cancellationToken);
+        if (transaction is not null)
+        {
+            await LockGenerationRowForAdminActionAsync(generationId, cancellationToken);
+        }
+
+        var job = await dbContext.TemplateGenerationJobs
+            .Include(x => x.Template)
+            .Include(x => x.WatermarkUnlocks)
+            .FirstOrDefaultAsync(x => x.Id == generationId && x.HiddenByUserAtUtc == null, cancellationToken);
+        if (job is null)
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+
+            return Result.Failure<TemplateGenerationResponse>(TemplatesErrors.GenerationJobNotFound);
+        }
+
+        if (!CanAdminRetryGeneration(job))
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+
+            return Result.Failure<TemplateGenerationResponse>(TemplatesErrors.GenerationRetryNotAllowed);
+        }
+
+        var previousStatus = job.Status;
+        var now = DateTime.UtcNow;
+        ResetAdminRetryState(job, now);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
+
+        TemplateGenerationMetrics.RecordJobRequeued(job);
+        TemplateGenerationMetrics.RecordRetryAttempt(job, "admin_manual");
+        var response = await MapResponseWithQueueMetricsAsync(job, cancellationToken);
+        if (realtimeService is not null)
+        {
+            await realtimeService.PublishGenerationStatusChangedAsync(response, cancellationToken);
+        }
+
+        if (adminAuditLog is not null)
+        {
+            await adminAuditLog.WriteAsync(
+                new AdminAuditEntry(
+                    "admin.templates.generation.retry",
+                    "TemplateGenerationJob",
+                    job.Id.ToString(),
+                    previousStatus.ToString(),
+                    job.Status.ToString(),
+                    $"tokenCost={job.TokenCost};chargedAtUtc={job.ChargedAtUtc:O};attemptBudgetReset=true",
+                    adminUserId),
+                cancellationToken);
+        }
+
+        logger?.LogWarning(
+            "ADMIN ACTION: generation retry queued. AdminUserIdHash={AdminUserIdHash} GenerationIdHash={GenerationIdHash} UserIdHash={UserIdHash} PreviousStatus={PreviousStatus} TokenCost={TokenCost} CorrelationIdHash={CorrelationIdHash}",
+            TemplateLogSanitizer.SafeId(adminUserId),
+            TemplateLogSanitizer.SafeId(job.Id),
+            TemplateLogSanitizer.SafeId(job.UserId),
+            previousStatus,
+            job.TokenCost,
+            SafeLogValues.StableHash(CorrelationContext.ResolveOrCreate()));
+
+        return Result.Success(response);
+    }
+
     public async Task<Result<TemplateGenerationResponse>> RetryAdminGenerationRefundAsync(
         Guid adminUserId,
         Guid generationId,
@@ -83,13 +190,88 @@ internal sealed partial class TemplateGenerationService
         await dbContext.SaveChangesAsync(cancellationToken);
 
         logger?.LogWarning(
-            "ADMIN ACTION: generation refund retry re-armed. AdminUserId={AdminUserId} GenerationId={GenerationId} UserId={UserId} TokenCost={TokenCost} CorrelationId={CorrelationId}",
-            adminUserId,
-            job.Id,
-            job.UserId,
+            "ADMIN ACTION: generation refund retry re-armed. AdminUserIdHash={AdminUserIdHash} GenerationIdHash={GenerationIdHash} UserIdHash={UserIdHash} TokenCost={TokenCost} CorrelationIdHash={CorrelationIdHash}",
+            TemplateLogSanitizer.SafeId(adminUserId),
+            TemplateLogSanitizer.SafeId(job.Id),
+            TemplateLogSanitizer.SafeId(job.UserId),
             job.TokenCost,
-            CorrelationContext.ResolveOrCreate());
+            SafeLogValues.StableHash(CorrelationContext.ResolveOrCreate()));
 
         return Result.Success(await MapResponseWithQueueMetricsAsync(job, cancellationToken));
+    }
+
+    private async Task<IDbContextTransaction?> BeginGenerationAdminActionTransactionAsync(CancellationToken cancellationToken)
+    {
+        return string.Equals(dbContext.Database.ProviderName, NpgsqlProviderName, StringComparison.Ordinal)
+            ? await dbContext.Database.BeginTransactionAsync(cancellationToken)
+            : null;
+    }
+
+    private async Task LockGenerationRowForAdminActionAsync(Guid generationId, CancellationToken cancellationToken)
+    {
+        await dbContext.Database.SqlQueryRaw<Guid>(
+            """
+            SELECT "Id" AS "Value"
+            FROM templates_generation_jobs
+            WHERE "Id" = {0}
+            FOR UPDATE
+            """,
+            generationId)
+            .ToListAsync(cancellationToken);
+    }
+
+    private static bool CanAdminRetryGeneration(TemplateGenerationJob job)
+    {
+        var canReuseCharge = job.UserId == AdminTestUserId
+            || (job.ChargedAtUtc is not null && job.RefundedAtUtc is null);
+        return job.Status is TemplateGenerationStatus.Failed or TemplateGenerationStatus.Cancelled
+            && canReuseCharge;
+    }
+
+    private static void ResetAdminRetryState(TemplateGenerationJob job, DateTime now)
+    {
+        job.Status = TemplateGenerationStatus.Queued;
+        job.AttemptCount = 0;
+        job.LastAttemptAtUtc = null;
+        job.StartedAtUtc = null;
+        job.CompletedAtUtc = null;
+        job.CancelledAtUtc = null;
+        job.QueuedAtUtc = now;
+        job.UpdatedAtUtc = now;
+        job.LockedAtUtc = null;
+        job.LockedBy = null;
+        job.NextAttemptEarliestAtUtc = null;
+        job.ResultUrl = null;
+        job.WatermarkedResultUrl = null;
+        job.ResultMediaAssetId = null;
+        job.IsWatermarkRequired = false;
+        job.IsWatermarkRemoved = false;
+        job.WatermarkFailureCode = null;
+        job.PreprocessingProviderRequestId = null;
+        job.PreprocessingProviderStatusUrl = null;
+        job.PreprocessingProviderResponseUrl = null;
+        job.PreprocessingInferenceTimeSeconds = null;
+        job.PreprocessingCompletedAtUtc = null;
+        job.MotionProviderRequestId = null;
+        job.MotionProviderStatusUrl = null;
+        job.MotionProviderResponseUrl = null;
+        job.MotionInferenceTimeSeconds = null;
+        job.MotionGenerationCompletedAtUtc = null;
+        job.CurrentProviderStage = null;
+        job.ProviderStatus = null;
+        job.ProviderResultUrl = null;
+        job.ProviderSubmittedAtUtc = null;
+        job.ProviderStatusCheckedAtUtc = null;
+        job.ProviderCompletedAtUtc = null;
+        job.WebhookReceivedAtUtc = null;
+        job.ImportStartedAtUtc = null;
+        job.MediaImportCompletedAtUtc = null;
+        job.OutputVideoDurationSeconds = null;
+        job.MotionProviderCostUsd = null;
+        job.LastErrorCode = null;
+        job.LastErrorMessage = null;
+        job.RefundAttemptCount = 0;
+        job.RefundLastAttemptedAtUtc = null;
+        job.RefundLastErrorCode = null;
     }
 }

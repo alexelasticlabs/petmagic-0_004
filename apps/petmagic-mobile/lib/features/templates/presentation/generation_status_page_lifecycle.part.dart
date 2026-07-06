@@ -105,8 +105,35 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
     _activeLoadCancelToken = null;
   }
 
+  CancelToken? _startGenerationCancelRequest() {
+    if (_activeGenerationCancelToken != null) {
+      return null;
+    }
+
+    final cancelToken = CancelToken();
+    _activeGenerationCancelToken = cancelToken;
+    return cancelToken;
+  }
+
+  void _completeGenerationCancelRequest(CancelToken cancelToken) {
+    if (identical(_activeGenerationCancelToken, cancelToken)) {
+      _activeGenerationCancelToken = null;
+    }
+  }
+
+  void _cancelActiveGenerationCancel() {
+    final cancelToken = _activeGenerationCancelToken;
+    if (cancelToken != null && !cancelToken.isCancelled) {
+      cancelToken.cancel('generation_status_cancel_generation_cancelled');
+    }
+    _activeGenerationCancelToken = null;
+  }
+
   void _cancelActiveLocalMediaDownloads() {
-    unawaited(_galleryStore.cancelActiveDownloads());
+    final store = _activeGalleryStore;
+    if (store != null) {
+      unawaited(store.cancelActiveDownloads());
+    }
   }
 
   bool _canApplyLocalMediaSync() {
@@ -447,6 +474,10 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
       _showGenerationAlreadyStartedMessage();
       return;
     }
+    final cancelToken = _startGenerationCancelRequest();
+    if (cancelToken == null) {
+      return;
+    }
 
     _setPageState(() {
       _isCancellingGeneration = true;
@@ -455,8 +486,11 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
 
     final repository = ref.read(templateGenerationRepositoryProvider);
     try {
-      final result = await repository.cancelGeneration(generation.generationId);
-      if (!mounted) {
+      final result = await repository.cancelGeneration(
+        generation.generationId,
+        cancelToken: cancelToken,
+      );
+      if (!mounted || cancelToken.isCancelled) {
         return;
       }
 
@@ -485,6 +519,30 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
         message: text.generationStatusCancelQueuedSuccess,
         tone: PetMagicToastTone.success,
       );
+    } on DioException catch (error) {
+      if (CancelToken.isCancel(error) || cancelToken.isCancelled) {
+        return;
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      _setPageState(() {
+        _isCancellingGeneration = false;
+      });
+
+      if (_isGenerationAlreadyStartedCancelError(error)) {
+        _showGenerationAlreadyStartedMessage();
+        unawaited(_load(silent: true));
+        return;
+      }
+
+      PetMagicToast.show(
+        context,
+        message: text.generationStatusCancelQueuedFailed,
+        tone: PetMagicToastTone.warning,
+      );
     } catch (error) {
       if (!mounted) {
         return;
@@ -505,6 +563,8 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
         message: text.generationStatusCancelQueuedFailed,
         tone: PetMagicToastTone.warning,
       );
+    } finally {
+      _completeGenerationCancelRequest(cancelToken);
     }
   }
 
@@ -563,6 +623,10 @@ String _statusLoadErrorText(AppLocalizations text, String raw) {
     'auth.sign_in_required' => text.authSignInRequired,
     'templates.insufficient_balance' =>
       text.templateFlowInsufficientBalanceTitle,
+    'templates.premium_required' => text.templateFlowPremiumRequiredError,
+    'templates.generation_already_started' =>
+      text.templateFlowActiveGenerationLimitError,
+    'templates.generation_wait_too_long' => text.templateFlowServerError,
     'templates.network_unavailable' => text.templateFlowNetworkError,
     'templates.connection_timeout' => text.templateFlowNetworkError,
     'templates.server_unavailable' => text.templateFlowServerError,

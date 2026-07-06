@@ -172,6 +172,133 @@ void main() {
       );
     },
   );
+
+  test('support chat realtime builds hub URL from safe base origin', () async {
+    final source = await File(
+      'lib/features/support/data/support_chat_realtime_client.dart',
+    ).readAsString();
+
+    expect(source, contains('_supportChatHubUrlForBaseUrl(baseUrl)'));
+    expect(
+      source,
+      contains('String _supportChatHubUrlForBaseUrl(String baseUrl)'),
+    );
+    expect(source, contains('Uri.tryParse(baseUrl.trim())'));
+    expect(source, contains("'Invalid API base URL.'"));
+    expect(
+      source,
+      contains("return '\${uri.scheme}://\$authority/hubs/support-chat';"),
+    );
+    expect(source, isNot(contains("'\$baseUrl/hubs/support-chat'")));
+  });
+
+  test(
+    'support chat realtime validates hub conversation ids before dispatch',
+    () async {
+      final source = await File(
+        'lib/features/support/data/support_chat_realtime_client.dart',
+      ).readAsString();
+
+      expect(source, contains('static const _conversationIdMaxLength = 128;'));
+      expect(
+        source,
+        contains(
+          'if (_isDisposed || _connection == null || _eventsController.isClosed)',
+        ),
+      );
+      expect(
+        source,
+        contains(
+          "final conversationId = _normalizeConversationId(payload['conversationId']);",
+        ),
+      );
+      expect(
+        source,
+        contains('String? _normalizeConversationId(Object? value)'),
+      );
+      expect(source, contains('if (value is! String) {'));
+      expect(
+        source,
+        contains(
+          'normalized.isEmpty || normalized.length > _conversationIdMaxLength',
+        ),
+      );
+      expect(source, isNot(contains("payload['conversationId']?.toString()")));
+    },
+  );
+
+  test(
+    'support chat realtime aborts stale connect attempts after disconnect or dispose',
+    () async {
+      final source = await File(
+        'lib/features/support/data/support_chat_realtime_client.dart',
+      ).readAsString();
+
+      expect(source, contains('int _connectionVersion = 0;'));
+      expect(
+        source,
+        contains('final connectionVersion = ++_connectionVersion;'),
+      );
+      expect(
+        source,
+        contains(
+          'if (accessToken.isEmpty || _shouldAbortConnect(connectionVersion))',
+        ),
+      );
+      expect(source, contains('_connectionVersion++;'));
+      expect(
+        source,
+        contains('bool _shouldAbortConnect(int connectionVersion) =>'),
+      );
+      expect(
+        source,
+        contains('_isDisposed || connectionVersion != _connectionVersion'),
+      );
+      expect(
+        source,
+        contains(
+          'Future<void> _stopConnectionIfCurrent(HubConnection connection)',
+        ),
+      );
+      expect(source, contains('await _stopConnectionIfCurrent(connection);'));
+      expect(
+        source,
+        contains('await _stopConnectionIfCurrent(fallbackConnection);'),
+      );
+    },
+  );
+
+  test(
+    'support chat realtime keeps shared connection until last holder disconnects',
+    () async {
+      final source = await File(
+        'lib/features/support/data/support_chat_realtime_client.dart',
+      ).readAsString();
+
+      expect(source, contains('int _connectionHolders = 0;'));
+      expect(source, contains('_connectionHolders++;'));
+      expect(source, contains('if (_connectionHolders > 1) {'));
+      expect(source, contains('var connectionEstablished = false;'));
+      expect(source, contains('connectionEstablished = true;'));
+      expect(
+        source,
+        contains('if (!connectionEstablished && _connectionHolders > 0) {'),
+      );
+      expect(source, contains('if (_connectionHolders == 0) {'));
+      expect(source, contains('_connectionHolders--;'));
+      expect(source, contains('if (_connectionHolders > 0) {'));
+      expect(source, contains('await _stopConnection();'));
+      expect(source, contains('_connectionHolders = 0;'));
+      expect(
+        source,
+        isNot(
+          contains(
+            'Future<void> disconnect() async {\n    _connectionVersion++;',
+          ),
+        ),
+      );
+    },
+  );
 }
 
 class _TrackingApiBaseUrlResolver extends ApiBaseUrlResolver {

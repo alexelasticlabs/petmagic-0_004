@@ -50,6 +50,7 @@ public sealed class SafeProblemDetailsOptionsTests
         Assert.NotNull(body);
         Assert.Equal("INTERNAL_SERVER_ERROR", body!["title"]?.ToString());
         Assert.Equal("INTERNAL_SERVER_ERROR", body["code"]?.ToString());
+        Assert.False(body.ContainsKey("detail"));
         Assert.Equal("problem-correlation", body["correlationId"]?.ToString());
         Assert.False(string.IsNullOrWhiteSpace(body["traceId"]?.ToString()));
     }

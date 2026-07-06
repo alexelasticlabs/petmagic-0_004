@@ -27,7 +27,7 @@ public static partial class AdminTemplateEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.CreateImageAsync(command, cancellationToken);
@@ -69,11 +69,12 @@ public static partial class AdminTemplateEndpoints
             AnimatedPreviewAsset: request.AnimatedPreviewAsset,
             FeedLoopLowAsset: request.FeedLoopLowAsset,
             FeedLoopMediumAsset: request.FeedLoopMediumAsset,
-            DetailPreviewAsset: request.DetailPreviewAsset);
+            DetailPreviewAsset: request.DetailPreviewAsset,
+            KeepPreviewAsset: request.KeepPreviewAsset);
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.UpdateImageAsync(command, cancellationToken);
@@ -94,7 +95,7 @@ public static partial class AdminTemplateEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.CreateVideoAsync(command, cancellationToken);
@@ -141,12 +142,14 @@ public static partial class AdminTemplateEndpoints
             AnimatedPreviewAsset: request.AnimatedPreviewAsset,
             FeedLoopLowAsset: request.FeedLoopLowAsset,
             FeedLoopMediumAsset: request.FeedLoopMediumAsset,
-            DetailPreviewAsset: request.DetailPreviewAsset);
+            DetailPreviewAsset: request.DetailPreviewAsset,
+            KeepPreviewAsset: request.KeepPreviewAsset,
+            KeepReferenceMotionAsset: request.KeepReferenceMotionAsset);
 
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.UpdateVideoAsync(command, cancellationToken);
@@ -169,7 +172,7 @@ public static partial class AdminTemplateEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.ChangeStatusAsync(command, cancellationToken);
@@ -217,7 +220,8 @@ public static partial class AdminTemplateEndpoints
         TemplateAssetCommand? AnimatedPreviewAsset = null,
         TemplateAssetCommand? FeedLoopLowAsset = null,
         TemplateAssetCommand? FeedLoopMediumAsset = null,
-        TemplateAssetCommand? DetailPreviewAsset = null);
+        TemplateAssetCommand? DetailPreviewAsset = null,
+        bool KeepPreviewAsset = false);
 
     public sealed record UpdateVideoTemplateRequest(
         string Title,
@@ -246,7 +250,9 @@ public static partial class AdminTemplateEndpoints
         TemplateAssetCommand? AnimatedPreviewAsset = null,
         TemplateAssetCommand? FeedLoopLowAsset = null,
         TemplateAssetCommand? FeedLoopMediumAsset = null,
-        TemplateAssetCommand? DetailPreviewAsset = null);
+        TemplateAssetCommand? DetailPreviewAsset = null,
+        bool KeepPreviewAsset = false,
+        bool KeepReferenceMotionAsset = false);
 
     public sealed record ChangeTemplateStatusRequest(string Status);
 

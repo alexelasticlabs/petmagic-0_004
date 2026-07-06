@@ -3,6 +3,7 @@ using System.Security.Cryptography.X509Certificates;
 
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Host.Api.Observability;
 
 namespace PetMagic.Modules.Identity.Tests.Host;
@@ -28,7 +29,9 @@ public sealed class DataProtectionCertificateLoaderTests
             Assert.False(string.IsNullOrWhiteSpace(certificate.Thumbprint));
             var entry = Assert.Single(logger.Entries, x => x.LogLevel == LogLevel.Information);
             Assert.Contains("Development Data Protection certificate generated.", entry.Message, StringComparison.Ordinal);
-            Assert.Equal(certificatePath, entry.Properties["CertificatePath"]);
+            Assert.Equal(Path.GetFileName(certificatePath), entry.Properties["CertificateFileName"]);
+            Assert.Equal(SafeLogValues.StableHash(certificatePath), entry.Properties["CertificatePathHash"]);
+            Assert.DoesNotContain("CertificatePath", entry.Properties.Keys);
             Assert.Equal("PetMagic.Host.Api", entry.Properties["ApplicationName"]);
         }
         finally
@@ -58,9 +61,12 @@ public sealed class DataProtectionCertificateLoaderTests
 
             var warning = Assert.Single(logger.Entries, x => x.LogLevel == LogLevel.Warning);
             Assert.Contains("Development Data Protection certificate is unreadable and will be regenerated.", warning.Message, StringComparison.Ordinal);
-            Assert.Equal(certificatePath, warning.Properties["CertificatePath"]);
+            Assert.Equal(Path.GetFileName(certificatePath), warning.Properties["CertificateFileName"]);
+            Assert.Equal(SafeLogValues.StableHash(certificatePath), warning.Properties["CertificatePathHash"]);
+            Assert.DoesNotContain("CertificatePath", warning.Properties.Keys);
             Assert.Equal("PetMagic.Host.Api", warning.Properties["ApplicationName"]);
-            Assert.IsType<CryptographicException>(warning.Exception);
+            Assert.Equal(nameof(CryptographicException), warning.Properties["ExceptionType"]);
+            Assert.Null(warning.Exception);
 
             var info = Assert.Single(logger.Entries, x => x.LogLevel == LogLevel.Information);
             Assert.Contains("Development Data Protection certificate generated.", info.Message, StringComparison.Ordinal);

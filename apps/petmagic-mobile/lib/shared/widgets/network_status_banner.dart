@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
+import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 
 class NetworkStatusBanner extends ConsumerWidget {
@@ -23,19 +24,9 @@ class NetworkStatusBanner extends ConsumerWidget {
         ? text.globalOfflineBannerMessage
         : text.globalOnlineRestoredBannerMessage;
     final icon = isOffline ? Icons.wifi_off_rounded : Icons.wifi_rounded;
-    final palette = isOffline
-        ? (
-            base: const Color(0xFF3A1E22),
-            border: const Color(0xFFF87171),
-            iconBg: const Color(0xFF52262C),
-            iconFg: const Color(0xFFFF9AA2),
-          )
-        : (
-            base: const Color(0xFF112A21),
-            border: const Color(0xFF34D399),
-            iconBg: const Color(0xFF17392D),
-            iconFg: const Color(0xFF6EE7B7),
-          );
+    final colors = context.petMagicColors;
+    final accent = isOffline ? colors.danger : colors.accent;
+    final palette = _NetworkBannerPalette.from(colors, accent);
 
     return Material(
       color: Colors.transparent,
@@ -46,7 +37,7 @@ class NetworkStatusBanner extends ConsumerWidget {
           border: Border.all(color: palette.border.withValues(alpha: 0.82)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.28),
+              color: colors.shadow.withValues(alpha: 0.24),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -76,7 +67,7 @@ class NetworkStatusBanner extends ConsumerWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.96),
+                        color: colors.textStrong,
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
                         height: 1.1,
@@ -88,7 +79,7 @@ class NetworkStatusBanner extends ConsumerWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.88),
+                        color: colors.textSoft,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                         height: 1.25,
@@ -101,6 +92,31 @@ class NetworkStatusBanner extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _NetworkBannerPalette {
+  const _NetworkBannerPalette({
+    required this.base,
+    required this.border,
+    required this.iconBg,
+    required this.iconFg,
+  });
+
+  final Color base;
+  final Color border;
+  final Color iconBg;
+  final Color iconFg;
+
+  factory _NetworkBannerPalette.from(PetMagicColors colors, Color accent) {
+    return _NetworkBannerPalette(
+      base: Color.lerp(colors.surface, accent, 0.10) ?? colors.surface,
+      border: accent,
+      iconBg:
+          Color.lerp(colors.surfaceStrong, accent, 0.18) ??
+          colors.surfaceStrong,
+      iconFg: accent,
     );
   }
 }

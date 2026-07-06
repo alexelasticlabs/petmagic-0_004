@@ -6,6 +6,24 @@ PetMagic exports OpenTelemetry metrics from:
 - `PetMagic.Modules.Economy`
 - `PetMagic.Modules.Templates`
 
+## Local Monitoring Stack
+
+The default Docker Compose startup runs the core application services only. Prometheus, Alertmanager,
+Grafana, Tempo, and the OpenTelemetry collector are opt-in so local API/admin startup is not coupled to
+observability bind mounts or webhook credentials.
+
+Start the monitoring stack with the `monitoring` profile. The profile builds small local images with
+the checked-in monitoring config baked in, so runtime containers do not need host-file bind mounts.
+
+```bash
+docker compose --profile monitoring up -d --build
+```
+
+Required local variables for that profile include `GRAFANA_ADMIN_PASSWORD`,
+`ALERTMANAGER_WEBHOOK_URL`, and `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317`.
+Keep `OTEL_EXPORTER_OTLP_ENDPOINT` empty when running only the core compose stack so the API and
+generation worker do not try to export telemetry to a collector that is not running.
+
 ## Required Metrics
 
 API SLI:
@@ -41,6 +59,7 @@ Template generation:
 - `generation_refund_failures_total` generation refund failure counter.
 - `generation_cancel_refunds_total` generation refunds caused by queued cancellation.
 - `generation_fal_timeouts_total` FAL timeout counter by media type, stage, and model.
+- `generation_sse_delivery_failures_total` realtime delivery, persistence, or polling failure counter.
 - `generation_webhook_delivery_failures_total` provider webhook delivery or payload failures.
 - `generation_webhook_signature_failures_total` provider webhook signature failures.
 - `generation_scheduler_claim_attempts_total` scheduler claim attempts by media type and result.

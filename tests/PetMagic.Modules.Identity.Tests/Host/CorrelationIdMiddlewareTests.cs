@@ -38,6 +38,40 @@ public sealed class CorrelationIdMiddlewareTests
         Assert.True(CorrelationId.IsValid(generated));
     }
 
+    [Fact]
+    public void Middleware_ShouldHashCorrelationIdBeforeAddingLogAndActivityContext()
+    {
+        var source = File.ReadAllText(ResolveRepositoryPath(Path.Combine(
+            "src",
+            "Host",
+            "PetMagic.Host.Api",
+            "Observability",
+            "CorrelationIdMiddleware.cs")));
+
+        Assert.Contains("SafeLogValues.StableHash(correlationId)", source, StringComparison.Ordinal);
+        Assert.Contains("Activity.Current?.SetTag(\"correlation.id_hash\", correlationIdHash)", source, StringComparison.Ordinal);
+        Assert.Contains("LogContext.PushProperty(\"CorrelationIdHash\", correlationIdHash)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Activity.Current?.SetTag(\"correlation.id\", correlationId)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("LogContext.PushProperty(\"CorrelationId\", correlationId)", source, StringComparison.Ordinal);
+    }
+
+    private static string ResolveRepositoryPath(string relativePath)
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            var candidate = Path.Combine(directory.FullName, relativePath);
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+
+            directory = directory.Parent;
+        }
+
+        throw new FileNotFoundException($"Could not resolve repository file '{relativePath}'.");
+    }
+
     private static async Task<WebApplication> CreateAppAsync()
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions

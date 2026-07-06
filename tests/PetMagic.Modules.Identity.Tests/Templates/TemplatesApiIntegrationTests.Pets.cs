@@ -24,7 +24,8 @@ public sealed partial class TemplatesApiIntegrationTests
             response.StatusCode == HttpStatusCode.BadRequest,
             $"Expected 400 validation problem, got {(int)response.StatusCode} {response.StatusCode}. Body: {body}");
         Assert.Contains("Type", body, StringComparison.Ordinal);
-        Assert.Contains("Pet type must be dog, cat, or other.", body, StringComparison.Ordinal);
+        Assert.Contains("pets.type_invalid", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("Pet type must be dog, cat, or other.", body, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -49,7 +50,8 @@ public sealed partial class TemplatesApiIntegrationTests
             response.StatusCode == HttpStatusCode.BadRequest,
             $"Expected 400 validation problem, got {(int)response.StatusCode} {response.StatusCode}. Body: {body}");
         Assert.Contains("Idempotency-Key", body, StringComparison.Ordinal);
-        Assert.Contains("must be at most 256 characters", body, StringComparison.Ordinal);
+        Assert.Contains("templates.idempotency_key_invalid", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("must be at most 256 characters", body, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -75,6 +77,41 @@ public sealed partial class TemplatesApiIntegrationTests
             response.StatusCode == HttpStatusCode.BadRequest,
             $"Expected 400 problem details, got {(int)response.StatusCode} {response.StatusCode}. Body: {body}");
         Assert.Contains("pets.invalid_status", body, StringComparison.Ordinal);
-        Assert.Contains("Pet request could not be completed.", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("Pet request could not be completed.", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"detail\"", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task PetListEndpoints_ShouldReturnPrivateCacheHeaders()
+    {
+        await using var application = await TestApplication.CreateAsync();
+
+        var pet = await PostAsJsonAsync<PetResponse>(
+            application.Client,
+            "/api/pets",
+            new
+            {
+                name = "Milo",
+                type = "cat"
+            });
+
+        using var userListResponse = await application.Client.GetAsync("/api/pets");
+        userListResponse.EnsureSuccessStatusCode();
+        AssertPrivatePetResponseHeaders(userListResponse);
+
+        using var adminListResponse = await application.Client.GetAsync($"/api/admin/users/{TestUserId}/pets");
+        adminListResponse.EnsureSuccessStatusCode();
+        AssertPrivatePetResponseHeaders(adminListResponse);
+
+        var pets = await userListResponse.Content.ReadFromJsonAsync<IReadOnlyList<PetResponse>>(JsonOptions);
+        Assert.Contains(pets ?? [], item => item.Id == pet.Id);
+    }
+
+    private static void AssertPrivatePetResponseHeaders(HttpResponseMessage response)
+    {
+        Assert.Equal("no-store", response.Headers.CacheControl?.ToString());
+        Assert.Contains(response.Headers.Pragma, value => string.Equals(value.Name, "no-cache", StringComparison.OrdinalIgnoreCase));
+        Assert.True(response.Headers.TryGetValues("X-Content-Type-Options", out var contentTypeOptions));
+        Assert.Contains("nosniff", contentTypeOptions);
     }
 }

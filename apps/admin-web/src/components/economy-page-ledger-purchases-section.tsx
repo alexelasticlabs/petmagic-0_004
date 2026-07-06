@@ -21,6 +21,7 @@ import {
   humanizeProvider,
   humanizeSource,
   humanizeStatus,
+  humanizeTokenKind,
   safeText,
   shortGuid,
   statusColor,
@@ -135,11 +136,11 @@ export function EconomyPageLedgerPurchasesSection({
                       </td>
                       <td>{item.balanceAfter}</td>
                       <td>{humanizeSource(item.source, locale)}</td>
-                      <td>{safeText(item.tokenKind ?? "legacy", 64)}</td>
-                      <td>{safeText(item.operationKind ?? "-", 64)}</td>
                       <td>
-                        {item.expiresAtUtc ? formatDateTime(item.expiresAtUtc, locale) : "-"}
+                        {humanizeTokenKind(item.tokenKind, locale, text.tokenKindLegacyLabel)}
                       </td>
+                      <td>{safeText(item.operationKind ?? "-", 64)}</td>
+                      <td>{item.expiresAtUtc ? formatDateTime(item.expiresAtUtc, locale) : "-"}</td>
                       <td>{safeText(item.reason)}</td>
                       <td>{safeText(item.bucketDeltasJson ?? "-", 160)}</td>
                     </tr>

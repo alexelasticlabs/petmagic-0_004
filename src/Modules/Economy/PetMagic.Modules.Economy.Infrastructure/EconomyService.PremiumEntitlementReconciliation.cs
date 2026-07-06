@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
 using PetMagic.Modules.Identity.Application.Contracts;
@@ -67,12 +68,12 @@ public sealed partial class EconomyService
         }
 
         logger?.LogInformation(
-            "Premium entitlement synchronized from Economy to Identity. Provider={Provider} UserId={UserId} Reason={Reason} IsPremium={IsPremium} CorrelationId={CorrelationId}",
+            "Premium entitlement synchronized from Economy to Identity. Provider={Provider} UserIdHash={UserIdHash} Reason={Reason} IsPremium={IsPremium} CorrelationIdHash={CorrelationIdHash}",
             provider,
-            userId,
+            EconomyLogSanitizer.SafeUserId(userId),
             reason,
             desiredPremium,
-            CurrentCorrelationId);
+            CurrentCorrelationIdHash);
 
         return Result.Success();
     }
@@ -157,13 +158,13 @@ public sealed partial class EconomyService
             cancellationToken);
 
         logger?.LogWarning(
-            "Premium entitlement mismatch reconciled. Provider={Provider} UserId={UserId} Reason={Reason} IdentityPremium={IdentityPremium} EconomyPremium={EconomyPremium} CorrelationId={CorrelationId}",
+            "Premium entitlement mismatch reconciled. Provider={Provider} UserIdHash={UserIdHash} Reason={Reason} IdentityPremium={IdentityPremium} EconomyPremium={EconomyPremium} CorrelationIdHash={CorrelationIdHash}",
             subscription?.Provider ?? "economy",
-            userId,
+            EconomyLogSanitizer.SafeUserId(userId),
             reason,
             identityPremium,
             desiredPremium,
-            CurrentCorrelationId);
+            CurrentCorrelationIdHash);
     }
 
     private async Task AppendPremiumEntitlementEventAsync(
@@ -187,7 +188,7 @@ public sealed partial class EconomyService
             Status = status,
             ExternalEventId = externalEventId,
             ExternalSubscriptionId = externalSubscriptionId,
-            PayloadJson = payload is null ? null : JsonSerializer.Serialize(payload),
+            PayloadJson = SerializeSafeSubscriptionEventPayload(payload),
             CreatedAtUtc = DateTime.UtcNow,
             ProcessedAtUtc = DateTime.UtcNow
         };
@@ -201,12 +202,12 @@ public sealed partial class EconomyService
         catch (DbUpdateException ex)
         {
             logger?.LogWarning(
-                ex,
-                "Failed to write premium entitlement audit event. Provider={Provider} UserId={UserId} EventType={EventType} CorrelationId={CorrelationId}",
+                "Failed to write premium entitlement audit event. Provider={Provider} UserIdHash={UserIdHash} EventType={EventType} ExceptionType={ExceptionType} CorrelationIdHash={CorrelationIdHash}",
                 provider,
-                userId,
+                EconomyLogSanitizer.SafeUserId(userId),
                 eventType,
-                CurrentCorrelationId);
+                SafeLogValues.ExceptionType(ex),
+                CurrentCorrelationIdHash);
 
             dbContext.Entry(eventLog).State = EntityState.Detached;
         }

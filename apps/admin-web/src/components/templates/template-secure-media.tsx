@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { isUnsafeAdminMediaHost } from "@/lib/admin-unsafe-remote-host";
 import { clientLogger } from "@/lib/client-logger";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
@@ -34,21 +35,11 @@ function isLocalObjectUrl(url: string) {
   return url.startsWith("blob:") || url.startsWith("data:");
 }
 
-function shouldUseDirectMediaUrl(url: string) {
-  if (typeof globalThis.location === "undefined") {
-    return false;
-  }
-
+export function isUnsafeTemplateMediaUrl(url: string) {
   try {
-    const candidate = new URL(url, globalThis.location.href);
-    return candidate.origin !== globalThis.location.origin;
-  } catch (error) {
-    clientLogger.warn("templates.secure_media_origin_check_failed", {
-      errorName: getMediaFetchErrorName(error),
-      rawLength: url.length,
-      startsWithSlash: url.startsWith("/"),
-      isBlobOrData: isLocalObjectUrl(url),
-    });
+    const parsed = new URL(url, globalThis.location?.href ?? "https://admin.petmagic.app");
+    return isUnsafeMediaHost(parsed.hostname);
+  } catch {
     return false;
   }
 }
@@ -59,6 +50,14 @@ function getMediaFetchErrorName(error: unknown) {
 
 function formatTemplateMediaLogText(value: string | null | undefined, maxLength = 80) {
   return value ? sanitizeSensitiveText(value, maxLength) : undefined;
+}
+
+function getBlockedUnsafeTemplateMediaUrlDetails(url: string) {
+  return {
+    rawLength: url.length,
+    startsWithSlash: url.startsWith("/"),
+    isBlobOrData: isLocalObjectUrl(url),
+  };
 }
 
 export function TemplateSecureMedia({
@@ -81,7 +80,7 @@ export function TemplateSecureMedia({
   logContext,
 }: TemplateSecureMediaProps) {
   const localObjectUrl = isLocalObjectUrl(url) ? url : null;
-  const directMediaUrl = !localObjectUrl && shouldUseDirectMediaUrl(url) ? url : null;
+  const unsafeRemoteUrl = !localObjectUrl && isUnsafeTemplateMediaUrl(url);
   const [remoteMedia, setRemoteMedia] = useState<{
     sourceUrl: string;
     objectUrl: string | null;
@@ -89,11 +88,9 @@ export function TemplateSecureMedia({
   }>({ sourceUrl: "", objectUrl: null, failed: false });
   const activeObjectUrlRef = useRef<string | null>(null);
   const resolvedUrl =
-    localObjectUrl ??
-    directMediaUrl ??
-    (remoteMedia.sourceUrl === url ? remoteMedia.objectUrl : null);
+    localObjectUrl ?? (remoteMedia.sourceUrl === url ? remoteMedia.objectUrl : null);
   const loadFailed =
-    !localObjectUrl && !directMediaUrl && remoteMedia.sourceUrl === url && remoteMedia.failed;
+    unsafeRemoteUrl || (!localObjectUrl && remoteMedia.sourceUrl === url && remoteMedia.failed);
   const onLoadFailedRef = useRef(onLoadFailed);
   const revokeActiveObjectUrl = useCallback(() => {
     if (!activeObjectUrlRef.current) {
@@ -104,7 +101,7 @@ export function TemplateSecureMedia({
     activeObjectUrlRef.current = null;
   }, []);
   const markRemoteMediaFailed = useCallback(() => {
-    if (localObjectUrl || directMediaUrl) {
+    if (localObjectUrl) {
       onLoadFailedRef.current?.();
       return;
     }
@@ -112,14 +109,27 @@ export function TemplateSecureMedia({
     revokeActiveObjectUrl();
     setRemoteMedia({ sourceUrl: url, objectUrl: null, failed: true });
     onLoadFailedRef.current?.();
-  }, [directMediaUrl, localObjectUrl, revokeActiveObjectUrl, url]);
+  }, [localObjectUrl, revokeActiveObjectUrl, url]);
 
   useEffect(() => {
     onLoadFailedRef.current = onLoadFailed;
   }, [onLoadFailed]);
 
   useEffect(() => {
-    if (localObjectUrl || directMediaUrl) {
+    if (localObjectUrl) {
+      return;
+    }
+
+    if (unsafeRemoteUrl) {
+      clientLogger.warn("templates.secure_media_unsafe_host_blocked", {
+        templateId: formatTemplateMediaLogText(logContext?.templateId),
+        contentType: formatTemplateMediaLogText(logContext?.contentType),
+        surface: formatTemplateMediaLogText(logContext?.surface, 48),
+        kind,
+        ...getBlockedUnsafeTemplateMediaUrlDetails(url),
+      });
+      revokeActiveObjectUrl();
+      onLoadFailedRef.current?.();
       return;
     }
 
@@ -178,7 +188,6 @@ export function TemplateSecureMedia({
       }
     };
   }, [
-    directMediaUrl,
     kind,
     localObjectUrl,
     logContext?.contentType,
@@ -186,6 +195,7 @@ export function TemplateSecureMedia({
     logContext?.templateId,
     markRemoteMediaFailed,
     revokeActiveObjectUrl,
+    unsafeRemoteUrl,
     url,
   ]);
 
@@ -220,7 +230,7 @@ export function TemplateSecureMedia({
   }
 
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- Signed/local template media stays behind blob URLs; public cross-origin media can render directly.
+    // eslint-disable-next-line @next/next/no-img-element -- Signed/local template media stays behind blob URLs.
     <img
       src={resolvedUrl}
       alt={alt}
@@ -232,4 +242,8 @@ export function TemplateSecureMedia({
       onError={markRemoteMediaFailed}
     />
   );
+}
+
+function isUnsafeMediaHost(hostname: string): boolean {
+  return isUnsafeAdminMediaHost(hostname);
 }

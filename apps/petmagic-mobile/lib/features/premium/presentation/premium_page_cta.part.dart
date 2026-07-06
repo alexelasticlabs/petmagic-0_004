@@ -63,7 +63,11 @@ class _CtaButtonState extends State<_CtaButton>
       PremiumPaymentProvider.appStore => text.premiumPaymentApple,
     };
     final ctaLabel = text.paymentContinueViaProviderAction(providerLabel);
-    final btnTextColor = isDark ? const Color(0xFF13141F) : Colors.white;
+    final colors = context.petMagicColors;
+    final gradientEnd = isDark
+        ? const Color(0xFFFFB300)
+        : const Color(0xFFCC9A2D);
+    final btnTextColor = colors.on(gradientEnd);
     final glowColor = isDark
         ? const Color(0xFFFFB300)
         : const Color(0xFFE0AB33);

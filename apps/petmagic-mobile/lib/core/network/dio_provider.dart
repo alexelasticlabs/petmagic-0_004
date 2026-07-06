@@ -57,6 +57,8 @@ final dioProvider = Provider<Dio>((ref) {
     ),
   );
 
+  ref.onDispose(() => dio.close(force: true));
+
   return dio;
 });
 

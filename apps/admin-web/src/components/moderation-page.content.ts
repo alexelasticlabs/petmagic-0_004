@@ -54,11 +54,12 @@ const moderationPageText: Record<Locale, ModerationPageText> = {
   ru: {
     eyebrow: "Безопасность контента",
     title: "Модерация",
-    description: "Очередь жалоб и обратной связи по шаблонам. Решения пишутся в audit log.",
+    description:
+      "Очередь жалоб и обратной связи по шаблонам. Решения записываются в журнал аудита.",
     filtersTitle: "Фильтры",
     status: "Статус",
     search: "Поиск",
-    searchPlaceholder: "шаблон, сообщение, user/generation id",
+    searchPlaceholder: "шаблон, сообщение, ID пользователя или генерации",
     queueTitle: "Очередь",
     loading: "Загрузка очереди",
     error: "Не удалось загрузить очередь",
@@ -78,7 +79,8 @@ const moderationPageText: Record<Locale, ModerationPageText> = {
     confirmReject: "Отклонить элемент?",
     saved: "Решение сохранено",
     failed: "Не удалось сохранить решение",
-    moderationActionsForbidden: "Действия модерации доступны только Admin или Moderator.",
+    moderationActionsForbidden:
+      "Действия модерации доступны только администраторам или модераторам.",
     decisionMissing: "Выберите элемент модерации.",
     reasonRequired: "Укажите причину решения: минимум 3 символа.",
     previous: "Назад",
@@ -103,7 +105,8 @@ const moderationPageText: Record<Locale, ModerationPageText> = {
   en: {
     eyebrow: "Content safety",
     title: "Moderation",
-    description: "Complaint and feedback queue for templates. Decisions are written to the audit log.",
+    description:
+      "Complaint and feedback queue for templates. Decisions are written to the audit log.",
     filtersTitle: "Filters",
     status: "Status",
     search: "Search",
@@ -154,4 +157,3 @@ const moderationPageText: Record<Locale, ModerationPageText> = {
 export function getModerationPageText(locale: Locale): ModerationPageText {
   return moderationPageText[locale];
 }
-

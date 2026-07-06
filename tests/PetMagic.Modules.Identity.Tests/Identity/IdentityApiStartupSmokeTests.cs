@@ -94,11 +94,16 @@ public sealed class IdentityApiStartupSmokeTests
     [InlineData("POST", "/api/auth/request-password-reset")]
     [InlineData("POST", "/api/auth/verify-password-reset-code")]
     [InlineData("POST", "/api/auth/reset-password")]
+    [InlineData("POST", "/api/auth/me/password-change/request")]
     [InlineData("POST", "/api/auth/me/password-change/confirm")]
     [InlineData("POST", "/api/auth/refresh")]
     [InlineData("POST", "/api/auth/logout")]
     [InlineData("PUT", "/api/auth/me/profile")]
+    [InlineData("DELETE", "/api/auth/me")]
     [InlineData("POST", "/api/auth/me/legal-acceptance")]
+    [InlineData("POST", "/api/auth/me/linked-accounts/{provider}/prepare")]
+    [InlineData("DELETE", "/api/auth/me/linked-accounts/{provider}")]
+    [InlineData("DELETE", "/api/auth/me/avatar")]
     [InlineData("POST", "/api/auth/external/exchange")]
     [InlineData("POST", "/api/auth/external/google/native")]
     [InlineData("POST", "/api/auth/google")]
@@ -110,6 +115,21 @@ public sealed class IdentityApiStartupSmokeTests
         await using var app = await IdentityApiStartupTestApplication.CreateAsync();
 
         Assert.Equal(32 * 1024, app.GetRequestSizeLimit(method, routePattern));
+    }
+
+    [Theory]
+    [InlineData("POST", "/api/admin/users/{userId:guid}/wallet")]
+    [InlineData("PUT", "/api/admin/users/{userId:guid}/role")]
+    [InlineData("DELETE", "/api/admin/users/{userId:guid}/role")]
+    [InlineData("DELETE", "/api/admin/users/{userId:guid}")]
+    [InlineData("PUT", "/api/admin/users/{userId:guid}/active")]
+    public async Task AdminUserSmallMutationEndpoints_ShouldLimitRequestBodiesBeforeHandlerExecution(
+        string method,
+        string routePattern)
+    {
+        await using var app = await IdentityApiStartupTestApplication.CreateAsync();
+
+        Assert.Equal(8 * 1024, app.GetRequestSizeLimit(method, routePattern));
     }
 
     [Fact]

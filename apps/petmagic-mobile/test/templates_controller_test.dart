@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -13,6 +14,26 @@ import 'templates_controller_test_support.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test(
+    'templates controller does not watch realtime dependency into a field',
+    () {
+      final source = File(
+        'lib/features/templates/presentation/templates_controller.dart',
+      ).readAsStringSync();
+
+      expect(
+        source,
+        contains('_activeRealtimeClient = ref.read(realtimeClientProvider);'),
+      );
+      expect(
+        source,
+        isNot(
+          contains('_activeRealtimeClient = ref.watch(realtimeClientProvider)'),
+        ),
+      );
+    },
+  );
 
   test('does not connect realtime while internet is unavailable', () async {
     final repository = FakeTemplatesControllerRepository();
@@ -76,17 +97,45 @@ void main() {
       addTearDown(container.dispose);
 
       container.read(templatesControllerProvider);
+      await _waitUntil(() => realtimeClient.connectCalls == 1);
 
       realtimeClient.emitTemplatesFeedInvalidated();
       realtimeClient.emitTemplatesFeedInvalidated();
       realtimeClient.emitTemplatesFeedInvalidated();
 
-      await Future<void>.delayed(const Duration(milliseconds: 500));
+      await _waitUntil(() => repository.fetchFeedCalls == 1);
+      await _waitUntil(() => repository.fetchCategoriesCalls == 1);
 
       expect(repository.fetchFeedCalls, 1);
       expect(repository.fetchCategoriesCalls, 1);
     },
   );
+
+  test('ignores malformed non-empty realtime invalidation payloads', () async {
+    final repository = FakeTemplatesControllerRepository();
+    final realtimeClient = FakeTemplatesControllerRealtimeClient();
+    final networkController = _TestNetworkStatusController(true);
+    final container = ProviderContainer(
+      overrides: [
+        templatesRepositoryProvider.overrideWithValue(repository),
+        realtimeClientProvider.overrideWithValue(realtimeClient),
+        networkStatusControllerProvider.overrideWith(() => networkController),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    container.read(templatesControllerProvider);
+    await _waitUntil(() => realtimeClient.connectCalls == 1);
+
+    realtimeClient.emitTemplatesFeedInvalidated(
+      payload: const {'scope': 123, 'templateId': 'template-1'},
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 60));
+
+    expect(repository.fetchFeedCalls, 0);
+    expect(repository.fetchCategoriesCalls, 0);
+    expect(repository.fetchTemplateCalls, 0);
+  });
 
   test(
     'scoped text invalidation patches loaded card without feed reload or media churn',

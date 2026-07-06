@@ -16,12 +16,7 @@ import { clientLogger } from "@/lib/client-logger";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 export type AdminNotificationCategory =
-  | "support"
-  | "users"
-  | "templates"
-  | "economy"
-  | "promo"
-  | "system";
+  "support" | "users" | "templates" | "economy" | "promo" | "system";
 export type AdminNotificationTone = "info" | "success" | "warning" | "error";
 export type AdminNotificationPriority = "normal" | "critical";
 
@@ -140,6 +135,18 @@ function getAdminNotificationStorageErrorDetails(error: unknown): {
   };
 }
 
+function removeStoredAdminNotifications(storageFailureEvent: string): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.removeItem(ADMIN_NOTIFICATIONS_STORAGE_KEY);
+  } catch (error) {
+    clientLogger.warn(storageFailureEvent, getAdminNotificationStorageErrorDetails(error));
+  }
+}
+
 function sanitizeNotificationHref(href: unknown): string | undefined {
   if (typeof href !== "string") {
     return undefined;
@@ -187,10 +194,7 @@ export function buildAdminNotificationDedupeKey(
   );
 }
 
-function toHydratedNotificationItem(
-  rawValue: unknown,
-  now: number
-): AdminNotificationItem | null {
+function toHydratedNotificationItem(rawValue: unknown, now: number): AdminNotificationItem | null {
   if (!isRecord(rawValue)) {
     return null;
   }
@@ -263,11 +267,12 @@ function readInitialAdminNotifications(): AdminNotificationItem[] {
 
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) {
+      removeStoredAdminNotifications("admin.notifications_invalid_storage_cleanup_failed");
       return [];
     }
 
     const now = Date.now();
-    return parsed
+    const hydrated = parsed
       .map((item) => toHydratedNotificationItem(item, now))
       .filter((item): item is AdminNotificationItem => item !== null)
       .filter((item) =>
@@ -277,12 +282,18 @@ function readInitialAdminNotifications(): AdminNotificationItem[] {
         })
       )
       .slice(0, MAX_ADMIN_NOTIFICATIONS);
+
+    if (hydrated.length === 0) {
+      removeStoredAdminNotifications("admin.notifications_empty_hydration_cleanup_failed");
+    }
+
+    return hydrated;
   } catch (error) {
     clientLogger.warn(
       "admin.notifications_hydrate_failed",
       getAdminNotificationStorageErrorDetails(error)
     );
-    window.localStorage.removeItem(ADMIN_NOTIFICATIONS_STORAGE_KEY);
+    removeStoredAdminNotifications("admin.notifications_hydrate_cleanup_failed");
     return [];
   }
 }
@@ -295,6 +306,11 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
 
   useEffect(() => {
     if (typeof window === "undefined") {
+      return;
+    }
+
+    if (items.length === 0) {
+      removeStoredAdminNotifications("admin.notifications_empty_persist_cleanup_failed");
       return;
     }
 
@@ -322,7 +338,10 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
     }
 
     const now = Date.now();
-    const sanitizedTitle = sanitizeAdminNotificationText(input.title, MAX_NOTIFICATION_TITLE_LENGTH);
+    const sanitizedTitle = sanitizeAdminNotificationText(
+      input.title,
+      MAX_NOTIFICATION_TITLE_LENGTH
+    );
     const sanitizedMessage = sanitizeAdminNotificationText(
       input.message,
       MAX_NOTIFICATION_MESSAGE_LENGTH
@@ -502,12 +521,7 @@ export function useSyncFeedbackToAdminNotifications(
       tone: feedback.tone === "success" ? "success" : feedback.tone === "danger" ? "error" : "info",
       priority: feedback.tone === "danger" ? "critical" : "normal",
       href,
-      dedupeKey: buildAdminNotificationDedupeKey(
-        source,
-        feedback.tone,
-        feedback.message,
-        href
-      ),
+      dedupeKey: buildAdminNotificationDedupeKey(source, feedback.tone, feedback.message, href),
     });
   }, [addNotification, category, feedback, href, source, title]);
 }

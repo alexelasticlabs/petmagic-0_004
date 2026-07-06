@@ -53,51 +53,10 @@ String persistentSafeMediaFileName(String rawValue) {
 }
 
 String persistentSafeMediaUri(Uri uri) {
-  final keepQuery = uri.hasQuery && !_hasSensitiveMediaQuery(uri);
   return Uri(
     scheme: uri.scheme,
     host: uri.host,
     port: uri.hasPort ? uri.port : null,
     path: uri.path,
-    query: keepQuery ? uri.query : null,
   ).toString();
 }
-
-bool _hasSensitiveMediaQuery(Uri uri) {
-  for (final key in uri.queryParametersAll.keys) {
-    final normalized = key.trim().toLowerCase();
-    if (normalized.isEmpty) {
-      continue;
-    }
-
-    if (normalized.startsWith('x-amz-') ||
-        normalized.startsWith('x-goog-') ||
-        normalized.startsWith('x-oss-')) {
-      return true;
-    }
-
-    if (_sensitiveMediaQueryKeys.contains(normalized)) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-const _sensitiveMediaQueryKeys = <String>{
-  'access_key',
-  'accesskeyid',
-  'awsaccesskeyid',
-  'client_secret',
-  'credential',
-  'expires',
-  'expiresat',
-  'expires_at',
-  'googleaccessid',
-  'key',
-  'policy',
-  'secret',
-  'signature',
-  'signedheaders',
-  'token',
-};

@@ -1,8 +1,4 @@
-import type {
-  FeedbackPriority,
-  FeedbackStatus,
-  FeedbackType,
-} from "@/lib/api-client";
+import type { FeedbackPriority, FeedbackStatus, FeedbackType } from "@/lib/api-client";
 import { type Locale } from "@/lib/i18n";
 
 type FeedbackOption<T extends string> = Record<T | "All", string>;
@@ -76,8 +72,7 @@ const feedbackPageText: Record<Locale, FeedbackPageText> = {
   ru: {
     eyebrow: "Качество",
     title: "Отзывы",
-    description:
-      "Отзывы по генерациям, ошибкам, оплате и предложениям с управлением статусами.",
+    description: "Отзывы по генерациям, ошибкам, оплате и предложениям с управлением статусами.",
     filters: "Фильтры",
     table: "Заявки",
     details: "Детали",
@@ -162,8 +157,7 @@ const feedbackPageText: Record<Locale, FeedbackPageText> = {
   en: {
     eyebrow: "Quality",
     title: "Feedback",
-    description:
-      "Generation, failure, payment, and general feedback with status management.",
+    description: "Generation, failure, payment, and general feedback with status management.",
     filters: "Filters",
     table: "Feedback items",
     details: "Details",

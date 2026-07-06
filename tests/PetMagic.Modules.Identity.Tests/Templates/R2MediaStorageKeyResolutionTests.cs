@@ -48,6 +48,12 @@ public sealed class R2MediaStorageKeyResolutionTests
     [InlineData("templates-media/2026/../private.png")]
     [InlineData("https://cdn.petmagic.test/templates-media/2026/../private.png")]
     [InlineData("https://cdn.petmagic.test/templates-media/./private.png")]
+    [InlineData("templates-media/2026%2f..%2fprivate.png")]
+    [InlineData("templates-media/2026%5c..%5cprivate.png")]
+    [InlineData("templates-media/2026/%zz-private.png")]
+    [InlineData("https://cdn.petmagic.test/templates-media/2026%2f..%2fprivate.png")]
+    [InlineData("https://cdn.petmagic.test/templates-media/2026%5c..%5cprivate.png")]
+    [InlineData("https://cdn.petmagic.test/templates-media/2026/%zz-private.png")]
     public void TryResolveManagedKey_ShouldRejectTraversalLikeManagedKeys(string assetUrl)
     {
         var storage = CreateStorage();
@@ -92,6 +98,20 @@ public sealed class R2MediaStorageKeyResolutionTests
             "https://cdn.petmagic.test/templates-media/2026/../private.png",
             TimeSpan.FromMinutes(5),
             CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("templates.media_storage_failed", result.Error.Code);
+    }
+
+    [Theory]
+    [InlineData("https://cdn.petmagic.test/templates-media/2026%2f..%2fprivate.png")]
+    [InlineData("https://cdn.petmagic.test/templates-media/2026%5c..%5cprivate.png")]
+    [InlineData("https://cdn.petmagic.test/templates-media/2026/%zz-private.png")]
+    public async Task CreateReadUrlAsync_ShouldRejectEncodedOrMalformedManagedKey(string assetUrl)
+    {
+        var storage = CreateStorage();
+
+        var result = await storage.CreateReadUrlAsync(assetUrl, TimeSpan.FromMinutes(5), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("templates.media_storage_failed", result.Error.Code);

@@ -1,5 +1,3 @@
-using System.Net;
-
 using Amazon.Runtime;
 using Amazon.S3;
 
@@ -36,13 +34,17 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         var watermarkSection = section.GetSection("Watermark");
         var configuredStorageProvider = ReadValue(section, "StorageProvider", "TEMPLATES_STORAGE_PROVIDER");
         var configuredAiProvider = ReadValue(section, "AiProvider", "TEMPLATES_AI_PROVIDER");
+        var mediaReadUrlSigningOptions = new TemplateMediaReadUrlSigningOptions
+        {
+            SigningKey = configuration["Jwt:SigningKey"] ?? string.Empty
+        };
         var options = new TemplatesOptions
         {
             StorageProvider = configuredStorageProvider
                 ?? (HasR2Environment() ? TemplateStorageProviders.R2 : TemplateStorageProviders.Local),
             AiProvider = configuredAiProvider
                 ?? (HasFalEnvironment() ? TemplateAiProviders.Fal : TemplateAiProviders.Fake),
-            PublicBaseUrl = section["PublicBaseUrl"] ?? "http://localhost:5000",
+            PublicBaseUrl = section["PublicBaseUrl"] ?? string.Empty,
             LocalMediaRootPath = section["LocalMediaRootPath"] ?? Path.Combine("wwwroot", "templates-media"),
             DefaultPreprocessingPrompt = section["DefaultPreprocessingPrompt"]
                 ?? "Keep the same pet, same face, same fur, same colors, same background, same lighting and camera angle. Adjust the pet into an upright pose standing on its two hind legs like a human, with the front paws naturally positioned like arms. Make the full body clearly visible and suitable for motion transfer. Do not change the pet’s identity, breed, facial features, background, or image style.",
@@ -205,6 +207,8 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         ValidateProductionProviderConfiguration(options, services, environment, configuredStorageProvider, configuredAiProvider);
 
         services.AddSingleton(options);
+        services.AddSingleton(mediaReadUrlSigningOptions);
+        services.AddSingleton<ITemplateMediaReadUrlSigner, TemplateMediaReadUrlSigner>();
         services.AddSingleton(new TemplateSchedulerConfigComponent(
             ResolveSchedulerComponent(schedulerComponent, options)));
         services.AddSingleton<TemplateSchedulerConfigRuntimeState>();
@@ -225,6 +229,11 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             ConfigureExternalHttpClient(client);
             client.Timeout = TimeSpan.FromSeconds(5);
         })
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                AllowAutoRedirect = false
+            });
+        services.AddHttpClient(HttpGeneratedMediaImporter.HttpClientName, ConfigureExternalHttpClient)
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
             {
                 AllowAutoRedirect = false
@@ -485,11 +494,6 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
     {
         if (IsProvider(options.AiProvider, TemplateAiProviders.Fal))
         {
-            services.AddHttpClient(HttpGeneratedMediaImporter.HttpClientName, ConfigureExternalHttpClient)
-                .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
-                {
-                    AllowAutoRedirect = false
-                });
             services.AddSingleton<IGeneratedMediaImporter, HttpGeneratedMediaImporter>();
             return;
         }
@@ -582,6 +586,11 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             throw new InvalidOperationException("FAL AI provider is selected but FAL_AI_API_KEY is missing.");
         }
 
+        if (IsProvider(options.AiProvider, TemplateAiProviders.Fal))
+        {
+            ValidateProductionPublicBaseUrl(options.Fal.QueueBaseUrl, "Templates:Fal:QueueBaseUrl");
+        }
+
         if (!services.Any(descriptor => descriptor.ServiceType == typeof(IEconomyService)))
         {
             throw new InvalidOperationException("Economy-backed template generation billing must be registered in Production.");
@@ -617,9 +626,9 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             throw new InvalidOperationException($"{settingName} must not contain credentials, query strings, or fragments in Production.");
         }
 
-        if (IsLocalDevelopmentHost(uri.Host))
+        if (SafeNetworkTargetPolicy.IsPrivateNetworkTarget(uri))
         {
-            throw new InvalidOperationException($"{settingName} must not point to a local development host in Production.");
+            throw new InvalidOperationException($"{settingName} must not point to a local or private network host in Production.");
         }
     }
 
@@ -763,20 +772,6 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         || value.Contains("YOUR_", StringComparison.OrdinalIgnoreCase)
         || value.Contains("<", StringComparison.Ordinal)
         || value.Contains(">", StringComparison.Ordinal);
-
-    private static bool IsLocalDevelopmentHost(string host)
-    {
-        if (string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(host, "0.0.0.0", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(host, "[::]", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(host, "::", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        var normalizedHost = host.Trim('[', ']');
-        return IPAddress.TryParse(normalizedHost, out var address) && IPAddress.IsLoopback(address);
-    }
 
     private static bool HasR2Environment()
     {

@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:petmagic_mobile/core/performance/template_media_cache.dart';
+import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:video_player/video_player.dart';
 
 Future<VideoPlayerController> createCachedTemplatePreviewVideoController(
@@ -29,7 +30,13 @@ Future<VideoPlayerController> createCachedTemplatePreviewVideoController(
     return VideoPlayerController.file(cachedFile);
   }
 
-  return VideoPlayerController.networkUrl(fallbackUri ?? Uri.parse(previewUrl));
+  final safeFallbackUri =
+      fallbackUri ?? parseSafeGenerationMediaUri(previewUrl);
+  if (safeFallbackUri == null) {
+    throw const FormatException('unsafe_template_preview_url');
+  }
+
+  return VideoPlayerController.networkUrl(safeFallbackUri);
 }
 
 bool _isPreviewCacheInvalidation(Object error) {

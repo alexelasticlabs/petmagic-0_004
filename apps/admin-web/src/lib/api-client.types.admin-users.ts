@@ -11,6 +11,7 @@ export type UserListItem = {
   emailConfirmed: boolean;
   roles: string[];
   createdAtUtc: string;
+  lastActivityAtUtc?: string | null;
   avatar?: UserAvatar | null;
 };
 
@@ -205,4 +206,3 @@ export type AdminUserAnalytics = {
   recentWalletLedger: AdminUserWalletLedgerItem[];
   failureBreakdown: AdminUserFailureBreakdownItem[];
 };
-

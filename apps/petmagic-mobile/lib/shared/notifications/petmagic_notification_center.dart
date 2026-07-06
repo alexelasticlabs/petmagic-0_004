@@ -11,6 +11,8 @@ final class PetMagicNotificationCenter extends ChangeNotifier {
       PetMagicNotificationCenter._();
 
   static const Duration _dedupeWindow = Duration(milliseconds: 1200);
+  static const int _maxQueuedNotifications = 24;
+  static const int _maxRecentSignatures = 128;
 
   final Queue<PetMagicNotification> _queue = Queue<PetMagicNotification>();
   final Map<String, DateTime> _recentSignatures = <String, DateTime>{};
@@ -74,6 +76,8 @@ final class PetMagicNotificationCenter extends ChangeNotifier {
     _recentSignatures[signature] = now;
     _pruneRecentSignatures(now);
     _queue.add(notification);
+    _trimQueueToLimit();
+    _trimRecentSignaturesToLimit();
     _pump();
   }
 
@@ -101,6 +105,7 @@ final class PetMagicNotificationCenter extends ChangeNotifier {
     _dismissTimer?.cancel();
     _dismissTimer = null;
     _queue.clear();
+    _recentSignatures.clear();
     _current = null;
     notifyListeners();
   }
@@ -150,6 +155,18 @@ final class PetMagicNotificationCenter extends ChangeNotifier {
 
     for (final key in expiredKeys) {
       _recentSignatures.remove(key);
+    }
+  }
+
+  void _trimQueueToLimit() {
+    while (_queue.length > _maxQueuedNotifications) {
+      _queue.removeFirst();
+    }
+  }
+
+  void _trimRecentSignaturesToLimit() {
+    while (_recentSignatures.length > _maxRecentSignatures) {
+      _recentSignatures.remove(_recentSignatures.keys.first);
     }
   }
 }

@@ -6,6 +6,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.WebUtilities;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Infrastructure.Options;
 
@@ -19,6 +20,8 @@ internal sealed class FalQueueClient(
 {
     public const string HttpClientName = "FalQueue";
 
+    private const int QueueMetadataMaxChars = 16 * 1024;
+    private const int QueueResponseMaxChars = 128 * 1024;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public async Task<Result<FalQueueSubmitResult>> SubmitAsync(
@@ -47,7 +50,10 @@ internal sealed class FalQueueClient(
             submitRequest.Content = new StringContent(JsonSerializer.Serialize(input, JsonOptions), Encoding.UTF8, "application/json");
 
             await rateLimiter.WaitForPermitAsync("fal", cancellationToken);
-            using var submitResponse = await CreateClient().SendAsync(submitRequest, cancellationToken);
+            using var submitResponse = await CreateClient().SendAsync(
+                submitRequest,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken);
             if (!submitResponse.IsSuccessStatusCode)
             {
                 TemplateGenerationMetrics.RecordFalProviderSubmitFailure(
@@ -67,7 +73,10 @@ internal sealed class FalQueueClient(
                         : TemplatesErrors.AiProviderFailed);
             }
 
-            var submitBody = await submitResponse.Content.ReadAsStringAsync(cancellationToken);
+            var submitBody = await SafeHttpContentReader.ReadRawStringPrefixAsync(
+                submitResponse.Content,
+                cancellationToken,
+                QueueMetadataMaxChars);
             using var submitDocument = JsonDocument.Parse(submitBody);
             var requestId = ReadRequiredString(submitDocument.RootElement, "request_id");
             var statusUrl = ResolveQueueCallbackUri(
@@ -81,12 +90,12 @@ internal sealed class FalQueueClient(
             if (string.IsNullOrWhiteSpace(requestId) || statusUrl is null || responseUrl is null)
             {
                 logger.LogWarning(
-                    "fal queue returned an invalid submit payload. MediaType={MediaType} Stage={Stage} Model={Model} ProviderRequestId={ProviderRequestId} QueueBaseUrl={QueueBaseUrl}",
+                    "fal queue returned an invalid submit payload. MediaType={MediaType} Stage={Stage} Model={Model} ProviderRequestIdHash={ProviderRequestIdHash} QueueBaseUrl={QueueBaseUrl}",
                     stageKind.MediaType,
                     stageKind.Stage,
                     model,
-                    requestId,
-                    queueBaseUri);
+                    SafeLogValues.StableHash(requestId),
+                    SafeLogValues.SanitizeText(queueBaseUri.ToString()));
                 return ProviderFailure<FalQueueSubmitResult>("submit.parse", model, TemplatesErrors.AiProviderFailed);
             }
 
@@ -215,11 +224,11 @@ internal sealed class FalQueueClient(
             }
 
             logger.LogWarning(
-                "fal queue polling timed out. MediaType={MediaType} Stage={Stage} Model={Model} ProviderRequestId={ProviderRequestId} PollingAttempts={PollingAttempts} PollIntervalMilliseconds={PollIntervalMilliseconds}",
+                "fal queue polling timed out. MediaType={MediaType} Stage={Stage} Model={Model} ProviderRequestIdHash={ProviderRequestIdHash} PollingAttempts={PollingAttempts} PollIntervalMilliseconds={PollIntervalMilliseconds}",
                 stageKind.MediaType,
                 stageKind.Stage,
                 model,
-                requestId,
+                SafeLogValues.StableHash(requestId),
                 maxPollingAttempts,
                 options.Fal.PollIntervalMilliseconds);
             TemplateGenerationMetrics.RecordFalTimeout(stageKind.MediaType, stageKind.Stage, model);
@@ -242,7 +251,10 @@ internal sealed class FalQueueClient(
             using var request = new HttpRequestMessage(HttpMethod.Get, statusUrl);
             ApplyAuth(request);
 
-            using var response = await CreateClient().SendAsync(request, cancellationToken);
+            using var response = await CreateClient().SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 return ProviderFailure<JsonDocument>(
@@ -253,7 +265,10 @@ internal sealed class FalQueueClient(
                         : TemplatesErrors.AiProviderFailed);
             }
 
-            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            var body = await SafeHttpContentReader.ReadRawStringPrefixAsync(
+                response.Content,
+                cancellationToken,
+                QueueMetadataMaxChars);
             return Result.Success(JsonDocument.Parse(body));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -268,6 +283,10 @@ internal sealed class FalQueueClient(
         {
             return ProviderFailure<JsonDocument>("status.network", model, TemplatesErrors.AiProviderTransientFailure);
         }
+        catch (JsonException)
+        {
+            return ProviderFailure<JsonDocument>("status.parse", model, TemplatesErrors.AiProviderFailed);
+        }
     }
 
     private async Task<Result<JsonDocument>> FetchResponseAsync(Uri responseUrl, string model, CancellationToken cancellationToken)
@@ -277,7 +296,10 @@ internal sealed class FalQueueClient(
             using var request = new HttpRequestMessage(HttpMethod.Get, responseUrl);
             ApplyAuth(request);
 
-            using var response = await CreateClient().SendAsync(request, cancellationToken);
+            using var response = await CreateClient().SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 return ProviderFailure<JsonDocument>(
@@ -288,7 +310,10 @@ internal sealed class FalQueueClient(
                         : TemplatesErrors.AiProviderFailed);
             }
 
-            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            var body = await SafeHttpContentReader.ReadRawStringPrefixAsync(
+                response.Content,
+                cancellationToken,
+                QueueResponseMaxChars);
             return Result.Success(JsonDocument.Parse(body));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -302,6 +327,10 @@ internal sealed class FalQueueClient(
         catch (HttpRequestException)
         {
             return ProviderFailure<JsonDocument>("response.network", model, TemplatesErrors.AiProviderTransientFailure);
+        }
+        catch (JsonException)
+        {
+            return ProviderFailure<JsonDocument>("response.parse", model, TemplatesErrors.AiProviderFailed);
         }
     }
 

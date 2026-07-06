@@ -49,6 +49,20 @@ void main() {
     expect(blended.backgroundTop, isNot(equals(darkColors.backgroundTop)));
   });
 
+  test('PetMagicColors resolves readable foregrounds for custom tones', () {
+    final light = AppTheme.light().extension<PetMagicColors>()!;
+    final dark = AppTheme.dark().extension<PetMagicColors>()!;
+
+    for (final colors in [light, dark]) {
+      for (final background in [colors.accent, colors.gold, colors.purple]) {
+        final foreground = colors.on(background);
+        final contrast = _contrastRatio(foreground, background);
+
+        expect(contrast, greaterThanOrEqualTo(4.5));
+      }
+    }
+  });
+
   testWidgets('petMagicColors falls back safely for light ThemeData', (
     tester,
   ) async {
@@ -90,4 +104,17 @@ void main() {
     expect(colors.backgroundTop, const Color(0xFF000306));
     expect(colors.textStrong, const Color(0xFFF8FBFF));
   });
+}
+
+double _contrastRatio(Color foreground, Color background) {
+  final foregroundLuminance = foreground.computeLuminance();
+  final backgroundLuminance = background.computeLuminance();
+  final lighter = foregroundLuminance > backgroundLuminance
+      ? foregroundLuminance
+      : backgroundLuminance;
+  final darker = foregroundLuminance > backgroundLuminance
+      ? backgroundLuminance
+      : foregroundLuminance;
+
+  return (lighter + 0.05) / (darker + 0.05);
 }

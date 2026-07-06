@@ -11,7 +11,6 @@ import styles from "@/components/admin/admin-shell.module.css";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { AdminTopbar } from "@/components/admin/admin-topbar";
 import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
-import { formatSupportMessagePreview } from "@/components/support/support-message-preview";
 import { buildLocaleSwitchPath, getAdminPageMeta, stripLocalePrefix } from "@/lib/admin-navigation";
 import { shouldCreateSupportRealtimeNotification } from "@/lib/admin-notification-policy";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
@@ -109,15 +108,11 @@ export function AdminShell({ locale, children }: AdminShellProps) {
       return;
     }
 
-    const preview = formatSupportMessagePreview(event.lastMessagePreview, "");
-    const message = preview
-      ? copy.realtimeSupport.withPreview(preview)
-      : copy.realtimeSupport.fallback;
     const supportConversationPathId = encodeURIComponent(event.conversationId);
 
     addNotification({
       title: copy.realtimeSupport.title,
-      message,
+      message: copy.realtimeSupport.fallback,
       category: "support",
       source: "support-realtime",
       tone: "info",
@@ -167,6 +162,10 @@ export function AdminShell({ locale, children }: AdminShellProps) {
   useEffect(() => {
     applyAdminTheme(theme);
   }, [theme]);
+
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
 
   useEffect(() => {
     if (!isLoginPage && session === null) {

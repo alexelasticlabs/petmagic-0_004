@@ -165,14 +165,20 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
   bool _isPageActive = true;
   CancelToken? _activeLoadCancelToken;
   CancelToken? _activeMediaActionCancelToken;
+  CancelToken? _activeGenerationCancelToken;
   RealtimeClient? _activeRealtimeClient;
-  // ignore: cancel_subscriptions
   StreamSubscription<RealtimeEvent>? _realtimeSubscription;
   Future<void>? _realtimeConnectFuture;
   bool _isRealtimeConnected = false;
-  late final GenerationGalleryStore _galleryStore;
+  GenerationGalleryStore? _activeGalleryStore;
   final Set<String> _recordedTemplateOfTheDayTerminalEvents = <String>{};
   final Set<String> _recordedFeedbackPromptEvents = <String>{};
+
+  GenerationGalleryStore get _galleryStore {
+    final store = ref.read(generationGalleryStoreProvider);
+    _activeGalleryStore = store;
+    return store;
+  }
 
   void _setPageState(VoidCallback update) {
     if (mounted) {
@@ -186,7 +192,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
   @override
   void initState() {
     super.initState();
-    _galleryStore = ref.read(generationGalleryStoreProvider);
+    _activeGalleryStore = ref.read(generationGalleryStoreProvider);
     _activeRealtimeClient = ref.read(realtimeClientProvider);
     WidgetsBinding.instance.addObserver(this);
     unawaited(_load());
@@ -219,10 +225,13 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
   void dispose() {
     _isPageActive = false;
     WidgetsBinding.instance.removeObserver(this);
+    unawaited(_realtimeSubscription?.cancel());
+    _realtimeSubscription = null;
     _pauseRealtime();
     _stopPolling();
     _cancelActiveLoad();
     _cancelActiveMediaAction();
+    _cancelActiveGenerationCancel();
     _cancelActiveLocalMediaDownloads();
     super.dispose();
   }
@@ -234,6 +243,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
     _stopPolling();
     _cancelActiveLoad();
     _cancelActiveMediaAction();
+    _cancelActiveGenerationCancel();
     _cancelActiveLocalMediaDownloads();
     super.deactivate();
   }

@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Identity.Infrastructure.Options;
 
 namespace PetMagic.Modules.Identity.Infrastructure;
@@ -52,7 +53,10 @@ internal sealed class EmailDispatchWorker(
             catch (Exception exception)
             {
                 consecutiveFailures++;
-                logger.LogError(exception, "Email dispatch worker loop failed.");
+                logger.LogError(
+                    "Email dispatch worker loop failed. ConsecutiveFailures={ConsecutiveFailures} ExceptionType={ExceptionType}",
+                    consecutiveFailures,
+                    SafeLogValues.ExceptionType(exception));
                 await Task.Delay(GetBackoffDelay(options.DispatchPollIntervalMilliseconds, consecutiveFailures), stoppingToken);
             }
         }

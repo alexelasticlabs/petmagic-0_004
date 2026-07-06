@@ -297,22 +297,12 @@ class PremiumCheckoutModel {
     required this.checkoutUrl,
     required this.status,
     required this.externalSubscriptionId,
-    required this.paymentIntentClientSecret,
-    required this.customerId,
-    required this.customerEphemeralKeySecret,
-    required this.publishableKey,
   });
 
   final String paymentProvider;
   final String checkoutUrl;
   final String status;
   final String externalSubscriptionId;
-  final String? paymentIntentClientSecret;
-  final String? customerId;
-  final String? customerEphemeralKeySecret;
-  final String? publishableKey;
-
-  bool get usesPaymentSheet => false;
 
   factory PremiumCheckoutModel.fromJson(Map<String, dynamic> json) {
     return PremiumCheckoutModel(
@@ -320,10 +310,6 @@ class PremiumCheckoutModel {
       checkoutUrl: json['checkoutUrl'] as String? ?? '',
       status: json['status'] as String? ?? '',
       externalSubscriptionId: json['externalSubscriptionId'] as String? ?? '',
-      paymentIntentClientSecret: json['paymentIntentClientSecret'] as String?,
-      customerId: json['customerId'] as String?,
-      customerEphemeralKeySecret: json['customerEphemeralKeySecret'] as String?,
-      publishableKey: json['publishableKey'] as String?,
     );
   }
 }

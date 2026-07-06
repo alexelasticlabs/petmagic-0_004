@@ -29,6 +29,25 @@ void main() {
   );
 
   test(
+    'corrupted secure storage session does not crash when cleanup fails',
+    () async {
+      final secureStorage = _FakeSecureStorage({
+        AuthSessionStorage.sessionKey: '{not-valid-json',
+      })..failDelete = true;
+      final storage = AuthSessionStorage(secureStorage: secureStorage);
+
+      final session = await storage.read();
+
+      expect(session, isNull);
+      expect(
+        secureStorage.values,
+        contains(AuthSessionStorage.sessionKey),
+        reason: 'cleanup failure is logged but must not crash startup',
+      );
+    },
+  );
+
+  test(
     'ignores missing secure storage session without reviving legacy state',
     () async {
       final secureStorage = _FakeSecureStorage(<String, String>{});
@@ -52,6 +71,23 @@ void main() {
       secureStorage.values[AuthSessionStorage.sessionKey],
       contains('"refreshToken":"refresh-token"'),
     );
+  });
+
+  test('does not persist unused avatar file names in secure storage', () async {
+    final secureStorage = _FakeSecureStorage(<String, String>{});
+    final storage = AuthSessionStorage(secureStorage: secureStorage);
+
+    await storage.save(_sessionWithAvatarFileName);
+
+    final raw = secureStorage.values[AuthSessionStorage.sessionKey]!;
+    final json = jsonDecode(raw) as Map<String, dynamic>;
+    final user = json['user'] as Map<String, dynamic>;
+    final avatar = user['avatar'] as Map<String, dynamic>;
+
+    expect(avatar['url'], 'https://cdn.petmagic.app/avatar.jpg');
+    expect(avatar['contentType'], 'image/jpeg');
+    expect(avatar, isNot(contains('fileName')));
+    expect(raw, isNot(contains('alice-passport-scan.jpg')));
   });
 
   test('clear removes auth session from secure storage', () async {
@@ -98,11 +134,47 @@ final _session = AuthSession(
   ),
 );
 
+final _sessionWithAvatarFileName = AuthSession(
+  accessToken: 'access-token',
+  refreshToken: 'refresh-token',
+  expiresAtUtc: DateTime.utc(2035),
+  user: MobileUserProfile(
+    userId: 'user-1',
+    email: 'pet@example.com',
+    displayName: 'Pet Parent',
+    isPremium: false,
+    emailConfirmed: true,
+    termsOfUseAccepted: true,
+    privacyPolicyAccepted: true,
+    marketingEmailsEnabled: false,
+    legalAcceptance: const MobileLegalAcceptanceStatus(
+      termsOfUseAccepted: true,
+      termsOfUseAcceptedVersion: '1',
+      termsOfUseAcceptedAtUtc: null,
+      privacyPolicyAccepted: true,
+      privacyPolicyAcceptedVersion: '1',
+      privacyPolicyAcceptedAtUtc: null,
+      currentTermsOfUseVersion: '1',
+      currentPrivacyPolicyVersion: '1',
+      requiresAcceptance: false,
+    ),
+    roles: const ['User'],
+    avatar: MobileUserAvatar(
+      url: 'https://cdn.petmagic.app/avatar.jpg',
+      fileName: 'alice-passport-scan.jpg',
+      contentType: 'image/jpeg',
+      fileSizeBytes: 12345,
+      updatedAtUtc: DateTime.utc(2035),
+    ),
+  ),
+);
+
 class _FakeSecureStorage extends FlutterSecureStorage {
   _FakeSecureStorage(this.values);
 
   final Map<String, String> values;
   final List<String> deletedKeys = <String>[];
+  bool failDelete = false;
 
   @override
   Future<String?> read({
@@ -146,6 +218,10 @@ class _FakeSecureStorage extends FlutterSecureStorage {
     AppleOptions? mOptions,
     WindowsOptions? wOptions,
   }) async {
+    if (failDelete) {
+      throw StateError('secure storage delete failed');
+    }
+
     deletedKeys.add(key);
     values.remove(key);
   }

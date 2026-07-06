@@ -63,6 +63,27 @@ void main() {
     },
   );
 
+  test(
+    'paywall feedback scope resolver rejects unsafe storage scopes',
+    () async {
+      final resolver = PaywallFeedbackScopeResolver(
+        sessionStorage: _FakeAuthSessionStorage(
+          session: _sessionWithUserId('${'user' * 50}\nleak'),
+        ),
+      );
+
+      final scope = await resolver.resolve(isAuthenticated: true);
+
+      expect(scope, isNull);
+    },
+  );
+
+  test('paywall feedback scope normalization bounds storage key input', () {
+    expect(normalizePaywallFeedbackScope(' user-a '), 'user-a');
+    expect(normalizePaywallFeedbackScope('user\nraw'), isNull);
+    expect(normalizePaywallFeedbackScope('x' * 129), isNull);
+  });
+
   test('paywall feedback storage keys stay isolated by scope', () {
     final userAKey = buildPaywallFeedbackLastShownStorageKey('user-a');
     final userBKey = buildPaywallFeedbackLastShownStorageKey('user-b');

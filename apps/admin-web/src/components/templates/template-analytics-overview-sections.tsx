@@ -341,7 +341,10 @@ function TemplateProfileCard({
             label={text.priceLabel}
             value={getTemplateAccessLabel(template.isPremium, dictionary)}
           />
-          <SummaryRow label={text.tokenCostLabel} value={formatTokens(template.tokenCost, locale)} />
+          <SummaryRow
+            label={text.tokenCostLabel}
+            value={formatTokens(template.tokenCost, locale)}
+          />
           <SummaryRow
             label={text.estimatedTemplateCostLabel}
             value={formatUsd(template.estimatedProviderCostUsd, locale)}
@@ -550,7 +553,7 @@ function TrendChart({
       <svg
         viewBox={`0 0 ${width} ${height}`}
         className={styles.chartSvg}
-        aria-label="Template analytics trend chart"
+        aria-label={text.trendChartAriaLabel}
         role="img"
       >
         <defs>

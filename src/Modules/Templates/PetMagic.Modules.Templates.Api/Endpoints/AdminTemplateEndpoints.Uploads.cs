@@ -34,7 +34,24 @@ public static partial class AdminTemplateEndpoints
 
         {
 
-            errors[nameof(sourceImage)] = ["Source image is required."];
+            errors[nameof(sourceImage)] = ["templates.source_image_empty"];
+
+            return errors;
+
+        }
+
+
+        if (sourceImage.Length > maxSizeBytes)
+
+        {
+
+            errors[nameof(sourceImage)] = ["templates.source_image_too_large"];
+
+        }
+
+        if (errors.Count > 0)
+
+        {
 
             return errors;
 
@@ -51,16 +68,7 @@ public static partial class AdminTemplateEndpoints
 
         {
 
-            errors[nameof(sourceImage)] = ["Source image content type is not allowed."];
-
-        }
-
-
-        if (sourceImage.Length > maxSizeBytes)
-
-        {
-
-            errors[nameof(sourceImage)] = [$"Source image exceeds the maximum allowed size of {maxSizeBytes} bytes."];
+            errors[nameof(sourceImage)] = ["templates.source_image_type_not_allowed"];
 
         }
 
@@ -110,7 +118,7 @@ public static partial class AdminTemplateEndpoints
 
         {
 
-            errors[nameof(file)] = ["File is required."];
+            errors[nameof(file)] = ["templates.file_required"];
 
         }
 
@@ -119,7 +127,7 @@ public static partial class AdminTemplateEndpoints
 
         {
 
-            errors[nameof(assetKind)] = ["Asset kind is invalid."];
+            errors[nameof(assetKind)] = ["templates.asset_kind_invalid"];
 
         }
 
@@ -137,6 +145,24 @@ public static partial class AdminTemplateEndpoints
 
         var declaredContentType = file!.ContentType ?? "application/octet-stream";
 
+        var maxSize = uploadPolicy.GetMaxFileSizeBytes(kind);
+
+
+        if (file.Length > maxSize)
+
+        {
+
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+
+            {
+
+                [nameof(file)] = ["templates.file_too_large"]
+
+            });
+
+        }
+
+
         var detectedContentType = await TemplateUploadSniffer.DetectContentTypeAsync(file, cancellationToken);
 
         if (detectedContentType is null
@@ -151,25 +177,7 @@ public static partial class AdminTemplateEndpoints
 
             {
 
-                [nameof(file)] = ["File content type is not allowed for the selected asset kind."]
-
-            });
-
-        }
-
-
-        var maxSize = uploadPolicy.GetMaxFileSizeBytes(kind);
-
-
-        if (file.Length > maxSize)
-
-        {
-
-            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
-
-            {
-
-                [nameof(file)] = [$"File exceeds the maximum allowed size of {maxSize} bytes."]
+                [nameof(file)] = ["templates.file_type_not_allowed"]
 
             });
 
@@ -277,7 +285,7 @@ public static partial class AdminTemplateEndpoints
 
                     {
 
-                        [nameof(file)] = ["Preview video duration metadata is required."]
+                        [nameof(file)] = ["templates.preview_duration_required"]
 
                     });
 
@@ -294,7 +302,7 @@ public static partial class AdminTemplateEndpoints
 
                     {
 
-                        [nameof(file)] = [$"Preview video duration must be between {PreviewMinDurationSeconds:0.0} and {PreviewMaxDurationSeconds:0.0} seconds."]
+                        [nameof(file)] = ["templates.preview_duration_invalid"]
 
                     });
 

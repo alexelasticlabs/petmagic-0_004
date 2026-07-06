@@ -15,6 +15,7 @@ public sealed partial class SupportChatService(
     ISupportChatRealtimeNotifier realtimeNotifier,
     ISupportChatPushNotificationSender pushNotificationSender,
     ISupportAttachmentStorage attachmentStorage,
+    ISupportAttachmentReadUrlSigner attachmentReadUrlSigner,
     SupportAttachmentStorageOptions attachmentStorageOptions,
     ILogger<SupportChatService>? logger = null,
     IEconomyService? economyService = null,
@@ -32,6 +33,7 @@ public sealed partial class SupportChatService(
     private static readonly Error InvalidSource = new("support.source_invalid", "Support conversation source is not supported.");
     private static readonly Error InvalidPriority = new("support.priority_invalid", "Support conversation priority is not supported.");
     private static readonly Error InvalidSort = new("support.sort_invalid", "Support inbox sort is not supported.");
+    private static readonly Error InvalidQueue = new("support.queue_invalid", "Support inbox queue is not supported.");
     private static readonly Error InvalidStatusTransition = new("support.status_transition_invalid", "Support conversation status transition is not allowed.");
     private static readonly Error InvalidTags = new("support.tags_invalid", "Support conversation tags are invalid.");
 }

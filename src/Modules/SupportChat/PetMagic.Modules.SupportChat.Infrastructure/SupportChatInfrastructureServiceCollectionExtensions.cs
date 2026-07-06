@@ -110,7 +110,7 @@ public static class SupportChatInfrastructureServiceCollectionExtensions
     {
         return new SupportAttachmentStorageOptions
         {
-            PublicBaseUrl = section["PublicBaseUrl"] ?? "http://localhost:5000",
+            PublicBaseUrl = section["PublicBaseUrl"] ?? string.Empty,
             LocalMediaRootPath = section["LocalMediaRootPath"] ?? Path.Combine("wwwroot", "support-attachments"),
             MaxImageFileSizeBytes = ParsePositiveLong(section["MaxImageFileSizeBytes"], UploadedMediaPolicies.SupportImage.MaxFileSizeBytes),
             MaxVideoFileSizeBytes = ParsePositiveLong(section["MaxVideoFileSizeBytes"], UploadedMediaPolicies.SupportVideoMaxFileSizeBytes),

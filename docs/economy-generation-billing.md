@@ -8,18 +8,18 @@ This document describes how template generation spends PawSpark tokens, how the 
 2. Templates creates a `TemplateGenerationBillingCommand` in the same Templates DB save.
 3. Templates persists the job and billing command together.
 4. Templates settles the billing command by calling Economy billing through `ITemplateGenerationBilling.ChargeAsync`.
-4. Economy records a wallet debit:
+5. Economy records a wallet debit:
    - source: `generation_spend`
    - reason: `template_generation:{generationId:N}`
-5. Templates marks the billing command `succeeded` and sets `ChargedAtUtc` in the same Templates DB save.
-6. If the API process crashes after the Economy debit but before the marker save, the generation worker retries the pending/processing billing command. Economy uses the same generation reason, so the debit remains idempotent and the retry restores `ChargedAtUtc`.
-7. The generation worker only processes paid user jobs.
-8. If a charged job fails or is cancelled, Templates calls `RefundAsync`.
-9. Economy records a wallet credit:
+6. Templates marks the billing command `succeeded` and sets `ChargedAtUtc` in the same Templates DB save.
+7. If the API process crashes after the Economy debit but before the marker save, the generation worker retries the pending/processing billing command. Economy uses the same generation reason, so the debit remains idempotent and the retry restores `ChargedAtUtc`.
+8. The generation worker only processes paid user jobs.
+9. If a charged job fails or is cancelled, Templates calls `RefundAsync`.
+10. Economy records a wallet credit:
    - source: `generation_refund`
    - reason: `generation_refund:{generationId:N}`
    - idempotency key: `generation_refund:{generationId:N}`
-10. Templates sets `RefundedAtUtc`.
+11. Templates sets `RefundedAtUtc`.
 
 ## Consistency model
 

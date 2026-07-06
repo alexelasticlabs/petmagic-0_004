@@ -26,7 +26,12 @@ import { formatSupportMessagePreview } from "@/components/support/support-messag
 import { sourceLabel, statusLabel } from "@/components/support/support-status-helpers";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
-import type { AdminSupportConversationSummary, SupportConversationStatus } from "@/lib/api-client";
+import type {
+  AdminSupportConversationSummary,
+  SupportConversationPriority,
+  SupportConversationStatus,
+  SupportInboxSort,
+} from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { maskEmail } from "@/lib/sensitive-display";
 
@@ -50,15 +55,19 @@ type SupportConversationQueuePaneProps = {
   onConversationSelect?: (conversationId: string) => void;
   queueCount: number;
   queueLabels: ReturnType<typeof getSupportConversationCopy>["page"]["queue"];
+  queuePriorityFilter: "all" | SupportConversationPriority;
   queueShownEnd: number;
   queueShownStart: number;
+  queueSort: SupportInboxSort;
   queueStatusFilter: "all" | SupportConversationStatus;
   requestInboxRetry: () => void;
   requestNextQueuePage: () => void;
   requestPreviousQueuePage: () => void;
+  setExactQueuePriorityFilter: (value: "all" | SupportConversationPriority) => void;
+  setExactQueueSort: (value: SupportInboxSort) => void;
   setExactQueueStatusFilter: (value: "all" | SupportConversationStatus) => void;
-  setQueueSubFilter: (value: "all" | "unassigned" | "archive") => void;
-  subFilter: "all" | "unassigned" | "archive";
+  setQueueSubFilter: (value: "all" | "waiting" | "unassigned" | "archive") => void;
+  subFilter: "all" | "waiting" | "unassigned" | "archive";
   text: ReturnType<typeof getDictionary>;
   unassignedCount: number;
 };
@@ -106,12 +115,16 @@ export function SupportConversationQueuePane({
   onConversationSelect,
   queueCount,
   queueLabels,
+  queuePriorityFilter,
   queueShownEnd,
   queueShownStart,
+  queueSort,
   queueStatusFilter,
   requestInboxRetry,
   requestNextQueuePage,
   requestPreviousQueuePage,
+  setExactQueuePriorityFilter,
+  setExactQueueSort,
   setExactQueueStatusFilter,
   setQueueSubFilter,
   subFilter,
@@ -149,6 +162,14 @@ export function SupportConversationQueuePane({
         </button>
         <button
           type="button"
+          className={subFilter === "waiting" ? styles.queueSubFilterActive : styles.queueSubFilter}
+          disabled={isQueueControlsLocked}
+          onClick={() => setQueueSubFilter("waiting")}
+        >
+          {queueLabels.waiting}
+        </button>
+        <button
+          type="button"
           className={
             subFilter === "unassigned" ? styles.queueSubFilterActive : styles.queueSubFilter
           }
@@ -183,6 +204,41 @@ export function SupportConversationQueuePane({
               { value: "InProgress", label: statusLabel("InProgress", text) },
               { value: "WaitingForUser", label: statusLabel("WaitingForUser", text) },
               { value: "Closed", label: statusLabel("Closed", text) },
+            ]}
+          />
+        </label>
+        <label className={styles.queueToolField}>
+          <span>{queueLabels.priority}</span>
+          <Select
+            value={queuePriorityFilter}
+            disabled={isQueueControlsLocked}
+            onChange={(value) => {
+              setExactQueuePriorityFilter(value as "all" | SupportConversationPriority);
+            }}
+            showSelectedDescription={false}
+            options={[
+              { value: "all", label: queueLabels.priorityAll },
+              { value: "High", label: queueLabels.priorityHigh },
+              { value: "Normal", label: queueLabels.priorityNormal },
+              { value: "Low", label: queueLabels.priorityLow },
+            ]}
+          />
+        </label>
+        <label className={styles.queueToolField}>
+          <span>{queueLabels.sort}</span>
+          <Select
+            value={queueSort}
+            disabled={isQueueControlsLocked}
+            onChange={(value) => {
+              setExactQueueSort(value as SupportInboxSort);
+            }}
+            showSelectedDescription={false}
+            options={[
+              { value: "default", label: queueLabels.sortDefault },
+              { value: "priority", label: queueLabels.sortPriority },
+              { value: "waiting", label: queueLabels.sortWaiting },
+              { value: "updated", label: queueLabels.sortUpdated },
+              { value: "created", label: queueLabels.sortCreated },
             ]}
           />
         </label>

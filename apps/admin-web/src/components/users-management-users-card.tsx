@@ -1,6 +1,5 @@
 "use client";
 
-
 import { AdminCard, AdminStateCard } from "@/components/admin/admin-primitives";
 import { Button } from "@/components/ui/button";
 import type { UsersManagementPageText } from "@/components/users-management-page.content";
@@ -11,6 +10,7 @@ import type {
   RangeDays,
   RoleFilter,
   StatusFilter,
+  UserSortMode,
 } from "@/components/users-management-page.types";
 import { UsersManagementUsersFilters } from "@/components/users-management-users-card.filters";
 import { UsersManagementUsersTable } from "@/components/users-management-users-card.table";
@@ -55,7 +55,9 @@ type UsersManagementUsersCardProps = {
   setRoleFilter: (value: RoleFilter) => void;
   setSearch: (value: string) => void;
   setSelectedUserId: (userId: string) => void;
+  setSortMode: (value: UserSortMode) => void;
   setStatusFilter: (value: StatusFilter) => void;
+  sortMode: UserSortMode;
   statusFilter: StatusFilter;
   text: Dictionary;
   totalPages: number;
@@ -98,7 +100,9 @@ export function UsersManagementUsersCard({
   setRoleFilter,
   setSearch,
   setSelectedUserId,
+  setSortMode,
   setStatusFilter,
+  sortMode,
   statusFilter,
   text,
   totalPages,
@@ -121,7 +125,9 @@ export function UsersManagementUsersCard({
         setRangeDays={setRangeDays}
         setRoleFilter={setRoleFilter}
         setSearch={setSearch}
+        setSortMode={setSortMode}
         setStatusFilter={setStatusFilter}
+        sortMode={sortMode}
         statusFilter={statusFilter}
         text={text}
         ui={ui}

@@ -8,4 +8,8 @@ public interface IAdminUserTemplateAnalyticsReader
     Task<Result<AdminUserTemplateAnalyticsResponse>> GetAdminUserTemplateAnalyticsAsync(
         Guid userId,
         CancellationToken cancellationToken);
+
+    Task<IReadOnlyDictionary<Guid, DateTime>> GetAdminUserLastActivityAsync(
+        IReadOnlyCollection<Guid> userIds,
+        CancellationToken cancellationToken);
 }

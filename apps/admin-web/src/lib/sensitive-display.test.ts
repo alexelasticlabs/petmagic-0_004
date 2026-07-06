@@ -36,6 +36,21 @@ describe("sensitive-display", () => {
     expect(shortIdentifier("9f495f82-1234")).toBe("9f495f82");
   });
 
+  it("sanitizes explicit admin user display names", () => {
+    const displayName = getAdminUserDisplayName({
+      userId: "9f495f82-1234",
+      email: "nora@example.com",
+      displayName: "Nora receipt=ios-secret token=raw-secret nora@example.com",
+    });
+
+    expect(displayName).toContain("receipt=[redacted]");
+    expect(displayName).toContain("token=[redacted]");
+    expect(displayName).toContain("no***@e***.com");
+    expect(displayName).not.toContain("ios-secret");
+    expect(displayName).not.toContain("raw-secret");
+    expect(displayName).not.toContain("nora@example.com");
+  });
+
   it("sanitizes mixed sensitive text for audit and feedback display", () => {
     const sanitized = sanitizeSensitiveText(
       [
@@ -83,5 +98,64 @@ describe("sensitive-display", () => {
     expect(sanitized).not.toContain("raw-credential");
     expect(sanitized).not.toContain("raw-signature");
     expect(sanitized).not.toContain("raw-set-cookie");
+  });
+
+  it("redacts stable domain identifier assignments in display text", () => {
+    const sanitized = sanitizeSensitiveText(
+      [
+        "userId=user-secret",
+        "templateId: template-secret",
+        "generation_id=generation-secret",
+        "accountScope=account-scope-secret",
+        "messageId=message-secret",
+        "orderId=order-secret",
+        "requestId=request-public",
+        "correlationId=correlation-public",
+      ].join(" "),
+      500
+    );
+
+    expect(sanitized).toContain("userId=[redacted]");
+    expect(sanitized).toContain("templateId=[redacted]");
+    expect(sanitized).toContain("generation_id=[redacted]");
+    expect(sanitized).toContain("accountScope=[redacted]");
+    expect(sanitized).toContain("messageId=[redacted]");
+    expect(sanitized).toContain("orderId=[redacted]");
+    expect(sanitized).toContain("requestId=request-public");
+    expect(sanitized).toContain("correlationId=correlation-public");
+    expect(sanitized).not.toContain("user-secret");
+    expect(sanitized).not.toContain("template-secret");
+    expect(sanitized).not.toContain("generation-secret");
+    expect(sanitized).not.toContain("account-scope-secret");
+    expect(sanitized).not.toContain("message-secret");
+    expect(sanitized).not.toContain("order-secret");
+  });
+
+  it("redacts plural domain identifiers and filenames in display text", () => {
+    const sanitized = sanitizeSensitiveText(
+      [
+        "templateIds=template-secret,template-second",
+        "generationIds: generation-secret",
+        "purchaseIds=purchase-secret",
+        "fileName=alice-vet-bill.pdf",
+        "fileNames=passport-scan.png,home-address-dog.jpeg",
+        "requestIds=request-public",
+      ].join(" "),
+      500
+    );
+
+    expect(sanitized).toContain("templateIds=[redacted]");
+    expect(sanitized).toContain("generationIds=[redacted]");
+    expect(sanitized).toContain("purchaseIds=[redacted]");
+    expect(sanitized).toContain("fileName=[redacted]");
+    expect(sanitized).toContain("fileNames=[redacted]");
+    expect(sanitized).toContain("requestIds=request-public");
+    expect(sanitized).not.toContain("template-secret");
+    expect(sanitized).not.toContain("template-second");
+    expect(sanitized).not.toContain("generation-secret");
+    expect(sanitized).not.toContain("purchase-secret");
+    expect(sanitized).not.toContain("alice-vet-bill");
+    expect(sanitized).not.toContain("passport-scan");
+    expect(sanitized).not.toContain("home-address-dog");
   });
 });

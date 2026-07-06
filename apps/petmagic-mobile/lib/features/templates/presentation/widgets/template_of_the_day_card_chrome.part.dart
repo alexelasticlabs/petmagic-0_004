@@ -139,12 +139,12 @@ class _TemplateOfTheDayBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
     final background = isPremium
-        ? const Color(0xFFEFC35C).withValues(alpha: 0.9)
+        ? colors.gold.withValues(alpha: 0.9)
         : isSubtle
         ? colors.surfaceStrong.withValues(alpha: 0.72)
         : colors.accent.withValues(alpha: 0.9);
     final foreground = isPremium || !isSubtle
-        ? const Color(0xFF062316)
+        ? colors.on(background)
         : colors.textStrong;
 
     return DecoratedBox(
@@ -187,12 +187,13 @@ class _TemplateOfTheDayAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
-    final textColor = isPremium ? const Color(0xFF251102) : Colors.white;
+    final background = isPremium ? colors.gold : colors.accent;
+    final textColor = colors.on(background);
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 190),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: isPremium ? const Color(0xFFEFC35C) : colors.accent,
+          color: background,
           borderRadius: BorderRadius.circular(999),
         ),
         child: Padding(

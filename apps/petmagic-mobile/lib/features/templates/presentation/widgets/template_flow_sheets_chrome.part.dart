@@ -99,7 +99,7 @@ class _PremiumUnlockCtaButtonState extends State<_PremiumUnlockCtaButton>
   @override
   Widget build(BuildContext context) {
     final textStyle = Theme.of(context).textTheme.titleSmall;
-    const ctaTextColor = Color(0xFF251102);
+    final ctaTextColor = context.petMagicColors.on(const Color(0xFFF3C65A));
 
     return AnimatedBuilder(
       animation: _pulse,
@@ -213,7 +213,7 @@ class _PremiumTemplateUploadButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textStyle = Theme.of(context).textTheme.titleSmall;
-    const ctaTextColor = Color(0xFF251102);
+    final ctaTextColor = context.petMagicColors.on(const Color(0xFFEFCB72));
 
     return Material(
       color: Colors.transparent,
@@ -261,7 +261,7 @@ class _PremiumTemplateUploadButton extends StatelessWidget {
                       shape: BoxShape.circle,
                       border: Border.all(color: const Color(0xAAFFF0C0)),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.add_photo_alternate_outlined,
                       color: ctaTextColor,
                       size: 14,

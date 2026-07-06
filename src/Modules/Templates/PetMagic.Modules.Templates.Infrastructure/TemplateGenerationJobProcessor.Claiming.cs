@@ -53,8 +53,8 @@ internal sealed partial class TemplateGenerationJobProcessor
             await dbContext.SaveChangesAsync(cancellationToken);
             TemplateGenerationMetrics.RecordJobRequeued(staleJob);
             logger.LogWarning(
-                "Stale provider-completed template generation job recovered into media import. GenerationId={GenerationId} ProviderCompletedAtUtc={ProviderCompletedAtUtc}",
-                staleJob.Id,
+                "Stale provider-completed template generation job recovered into media import. GenerationIdHash={GenerationIdHash} ProviderCompletedAtUtc={ProviderCompletedAtUtc}",
+                TemplateLogSanitizer.SafeId(staleJob.Id),
                 staleJob.ProviderCompletedAtUtc);
             dbContext.ChangeTracker.Clear();
             return true;
@@ -63,9 +63,9 @@ internal sealed partial class TemplateGenerationJobProcessor
         if (HasProviderRequestId(staleJob))
         {
             logger.LogWarning(
-                "Stale template generation job has a saved provider request id; retry keeps provider identifiers for provider-state reconciliation. PreprocessingProviderRequestId={PreprocessingProviderRequestId} MotionProviderRequestId={MotionProviderRequestId}",
-                staleJob.PreprocessingProviderRequestId,
-                staleJob.MotionProviderRequestId);
+                "Stale template generation job has a saved provider request id; retry keeps provider identifiers for provider-state reconciliation. PreprocessingProviderRequestIdHash={PreprocessingProviderRequestIdHash} MotionProviderRequestIdHash={MotionProviderRequestIdHash}",
+                SafeLogValues.StableHash(staleJob.PreprocessingProviderRequestId),
+                SafeLogValues.StableHash(staleJob.MotionProviderRequestId));
         }
         else
         {
@@ -92,9 +92,9 @@ internal sealed partial class TemplateGenerationJobProcessor
         {
             using var staleJobScope = BeginJobScope(staleJob, ResolveJobCorrelationId(staleJob));
             logger.LogWarning(
-                exception,
-                "Stale template generation job recovery was skipped because its lock changed. ElapsedMs={ElapsedMs}",
-                ElapsedMsSince(recoveryStartedAt));
+                "Stale template generation job recovery was skipped because its lock changed. ElapsedMs={ElapsedMs} ExceptionType={ExceptionType}",
+                ElapsedMsSince(recoveryStartedAt),
+                SafeLogValues.ExceptionType(exception));
             dbContext.ChangeTracker.Clear();
         }
 
@@ -340,8 +340,8 @@ internal sealed partial class TemplateGenerationJobProcessor
         TemplateGenerationMetrics.RecordQueuedWithoutCharge(job);
         TemplateGenerationMetrics.RecordJobFailed(job, previousStatus, TemplatesErrors.GenerationQueueOrphaned.Code);
         logger.LogWarning(
-            "Orphan queued template generation job failed because it was never charged. GenerationId={GenerationId} QueuedAtUtc={QueuedAtUtc}",
-            job.Id,
+            "Orphan queued template generation job failed because it was never charged. GenerationIdHash={GenerationIdHash} QueuedAtUtc={QueuedAtUtc}",
+            TemplateLogSanitizer.SafeId(job.Id),
             job.QueuedAtUtc);
         await PublishStatusChangedAsync(job, cancellationToken);
         return true;
@@ -366,6 +366,9 @@ internal sealed partial class TemplateGenerationJobProcessor
         var now = DateTime.UtcNow;
         var backoffExponent = Math.Clamp(job.AttemptCount - 1, 0, 5);
         var delaySeconds = options.ProviderTransientRetryBaseDelaySeconds * (1 << backoffExponent);
+        var safeErrorCode = AdminFailureMessageSanitizer.SanitizeCode(error.Code)
+            ?? TemplatesErrors.AiProviderTransientFailure.Code;
+        var safeErrorMessage = AdminFailureMessageSanitizer.Sanitize(error.Message);
 
         job.Status = TemplateGenerationStatus.Queued;
         job.CurrentProviderStage = null;
@@ -373,8 +376,8 @@ internal sealed partial class TemplateGenerationJobProcessor
         job.ProviderSubmittedAtUtc = null;
         job.ProviderStatusCheckedAtUtc = null;
         job.NextAttemptEarliestAtUtc = now.AddSeconds(delaySeconds);
-        job.LastErrorCode = error.Code;
-        job.LastErrorMessage = error.Message;
+        job.LastErrorCode = safeErrorCode;
+        job.LastErrorMessage = safeErrorMessage;
         job.UpdatedAtUtc = now;
         job.LockedAtUtc = null;
         job.LockedBy = null;
@@ -386,18 +389,18 @@ internal sealed partial class TemplateGenerationJobProcessor
         catch (DbUpdateConcurrencyException exception)
         {
             logger.LogWarning(
-                exception,
-                "Transient provider failure requeue was skipped because the job lock changed. GenerationId={GenerationId}",
-                job.Id);
+                "Transient provider failure requeue was skipped because the job lock changed. GenerationIdHash={GenerationIdHash} ExceptionType={ExceptionType}",
+                TemplateLogSanitizer.SafeId(job.Id),
+                SafeLogValues.ExceptionType(exception));
             dbContext.ChangeTracker.Clear();
             return true;
         }
 
         TemplateGenerationMetrics.RecordRetryAttempt(job, "provider_transient");
         logger.LogWarning(
-            "Template generation job requeued after transient provider failure. GenerationId={GenerationId} ErrorCode={ErrorCode} AttemptCount={AttemptCount} RetryDelaySeconds={RetryDelaySeconds}",
-            job.Id,
-            error.Code,
+            "Template generation job requeued after transient provider failure. GenerationIdHash={GenerationIdHash} ErrorCode={ErrorCode} AttemptCount={AttemptCount} RetryDelaySeconds={RetryDelaySeconds}",
+            TemplateLogSanitizer.SafeId(job.Id),
+            safeErrorCode,
             job.AttemptCount,
             delaySeconds);
         await PublishStatusChangedAsync(job, cancellationToken);

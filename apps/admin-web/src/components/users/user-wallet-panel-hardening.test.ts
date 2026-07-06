@@ -43,7 +43,9 @@ describe("user wallet panel hardening", () => {
     expect(source).toContain("const [pendingAdjustment, setPendingAdjustment]");
     expect(source).toContain("setPendingAdjustment({");
     expect(source).toContain("const isWalletConfirmationOpen = pendingAdjustment !== null;");
-    expect(source).toContain("const isWalletFormLocked = isSubmitting || isWalletConfirmationOpen;");
+    expect(source).toContain(
+      "const isWalletFormLocked = isSubmitting || isWalletConfirmationOpen;"
+    );
     expect(source).toContain("!isWalletFormLocked");
     expect(source).toContain(
       "const normalizedReason = reason.trim().slice(0, USER_WALLET_REASON_MAX_LENGTH);"
@@ -55,7 +57,7 @@ describe("user wallet panel hardening", () => {
     expect(source).toContain("async function confirmWalletAdjustment()");
     expect(source).toContain("await adjustAdminUserWallet(");
     expect(source).toContain(
-      '{canAdjustWallet ? (\n          <form className={styles.controls} onSubmit={handleFormSubmit}>'
+      "{canAdjustWallet ? (\n          <form className={styles.controls} onSubmit={handleFormSubmit}>"
     );
     expect(source).toContain('<Button type="submit" disabled={!canSubmit}>');
     expect(source).not.toContain('<Button type="button" onClick={() => void handleSubmit()}');
@@ -63,7 +65,9 @@ describe("user wallet panel hardening", () => {
     expect(source).toContain("isSubmitting={isSubmitting}");
     expect(source).toContain("disabled={isWalletFormLocked}");
     expect(source).not.toContain("disabled={isSubmitting}");
-    expect(source).not.toContain("await adjustAdminUserWallet(userId, operation, parsedAmount, normalizedReason)");
+    expect(source).not.toContain(
+      "await adjustAdminUserWallet(userId, operation, parsedAmount, normalizedReason)"
+    );
   });
 
   it("passes admin-role guard to every wallet adjustment panel usage", () => {

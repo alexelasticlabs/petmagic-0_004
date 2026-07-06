@@ -1,7 +1,9 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
+using PetMagic.BuildingBlocks.Storage;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Infrastructure.Options;
@@ -11,6 +13,7 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 internal sealed class LocalFileMediaStorage(
     TemplatesOptions options,
     IHostEnvironment hostEnvironment,
+    ITemplateMediaReadUrlSigner readUrlSigner,
     ILogger<LocalFileMediaStorage>? logger = null) : IMediaStorage
 {
     private static readonly Dictionary<string, string> ImageSubtypeExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -120,13 +123,13 @@ internal sealed class LocalFileMediaStorage(
             }
 
             logger?.LogWarning(
-                exception,
-                "Local media store failed. Operation={Operation} StorageKey={StorageKey} ContentType={ContentType} ContentLength={ContentLength} HasPreferredStorageKey={HasPreferredStorageKey}",
+                "Local media store failed. Operation={Operation} StorageKeyHash={StorageKeyHash} ContentType={ContentType} ContentLength={ContentLength} HasPreferredStorageKey={HasPreferredStorageKey} ExceptionType={ExceptionType}",
                 "store",
-                normalizedRelativePath,
+                SafeLogValues.StableHash(normalizedRelativePath),
                 normalizedContentType,
                 contentLength,
-                preferredStorageKey is not null);
+                preferredStorageKey is not null,
+                SafeLogValues.ExceptionType(exception));
             return Result.Failure<StoredMediaResponse>(TemplatesErrors.MediaStorageFailed);
         }
 
@@ -227,10 +230,10 @@ internal sealed class LocalFileMediaStorage(
         catch (Exception exception)
         {
             logger?.LogWarning(
-                exception,
-                "Local media delete failed. Operation={Operation} StorageKey={StorageKey}",
+                "Local media delete failed. Operation={Operation} StorageKeyHash={StorageKeyHash} ExceptionType={ExceptionType}",
                 "delete",
-                relativePath);
+                SafeLogValues.StableHash(relativePath),
+                SafeLogValues.ExceptionType(exception));
             return Task.FromResult(Result.Failure(TemplatesErrors.MediaStorageFailed));
         }
     }
@@ -257,8 +260,10 @@ internal sealed class LocalFileMediaStorage(
             return Task.FromResult(Result.Failure<string>(TemplatesErrors.MediaStorageFailed));
         }
 
-        var baseUrl = options.PublicBaseUrl.TrimEnd('/');
-        return Task.FromResult(Result.Success($"{baseUrl}/{relativePath}"));
+        var readUrl = readUrlSigner.CreateReadUrl(relativePath, ttl);
+        return string.IsNullOrWhiteSpace(readUrl)
+            ? Task.FromResult(Result.Failure<string>(TemplatesErrors.MediaStorageFailed))
+            : Task.FromResult(Result.Success(readUrl));
     }
 
     private string? TryResolveManagedRelativePath(string assetUrl)
@@ -306,15 +311,18 @@ internal sealed class LocalFileMediaStorage(
         var segments = pathOnly
             .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (segments.Length <= 1
-            || segments.Any(segment =>
-                string.Equals(segment, ".", StringComparison.Ordinal)
-                || string.Equals(segment, "..", StringComparison.Ordinal)))
+            || segments.Any(IsUnsafeManagedPathSegment))
         {
             return false;
         }
 
         managedRelativePath = string.Join('/', segments);
         return true;
+    }
+
+    private static bool IsUnsafeManagedPathSegment(string segment)
+    {
+        return ManagedPathSegments.IsUnsafe(segment);
     }
 
     private static bool TryResolveStoredFileFormat(

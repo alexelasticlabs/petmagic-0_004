@@ -39,4 +39,72 @@ public sealed class EconomyPushNotificationLocalizerTests
         Assert.Equal(expectedTitle, EconomyPushNotificationLocalizer.BuildPremiumTitle(locale));
         Assert.Equal(expectedBody, EconomyPushNotificationLocalizer.BuildPremiumBody(locale, "active"));
     }
+
+    [Fact]
+    public void PushNotificationContracts_ShouldNotAcceptCallerProvidedNotificationCopy()
+    {
+        var root = FindRepositoryRoot();
+        var contractSource = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "Modules",
+            "Economy",
+            "PetMagic.Modules.Economy.Infrastructure",
+            "IEconomyPushNotificationSender.cs"));
+        var senderSource = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "Modules",
+            "Economy",
+            "PetMagic.Modules.Economy.Infrastructure",
+            "FcmEconomyPushNotificationSender.cs"));
+
+        var walletContract = SliceBetween(
+            contractSource,
+            "public sealed record WalletPushNotification(",
+            ");",
+            "WalletPushNotification");
+        var premiumContract = SliceBetween(
+            contractSource,
+            "public sealed record PremiumPushNotification(",
+            ");",
+            "PremiumPushNotification");
+
+        Assert.DoesNotContain("Title", walletContract, StringComparison.Ordinal);
+        Assert.DoesNotContain("Body", walletContract, StringComparison.Ordinal);
+        Assert.DoesNotContain("Title", premiumContract, StringComparison.Ordinal);
+        Assert.DoesNotContain("Body", premiumContract, StringComparison.Ordinal);
+        Assert.DoesNotContain("notification.Title", senderSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("notification.Body", senderSource, StringComparison.Ordinal);
+        Assert.Contains("EconomyPushNotificationLocalizer.BuildWalletTitle(locale)", senderSource, StringComparison.Ordinal);
+        Assert.Contains("EconomyPushNotificationLocalizer.BuildPremiumTitle(locale)", senderSource, StringComparison.Ordinal);
+    }
+
+    private static string SliceBetween(string source, string start, string end, string label)
+    {
+        var startIndex = source.IndexOf(start, StringComparison.Ordinal);
+        Assert.True(startIndex >= 0, $"{label} start marker was not found.");
+
+        var endIndex = source.IndexOf(end, startIndex, StringComparison.Ordinal);
+        Assert.True(endIndex > startIndex, $"{label} end marker was not found.");
+
+        return source[startIndex..endIndex];
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            if (Directory.Exists(Path.Combine(directory.FullName, "src"))
+                && Directory.Exists(Path.Combine(directory.FullName, "tests")))
+            {
+                return directory.FullName;
+            }
+
+            directory = directory.Parent;
+        }
+
+        throw new InvalidOperationException("Repository root could not be found.");
+    }
 }

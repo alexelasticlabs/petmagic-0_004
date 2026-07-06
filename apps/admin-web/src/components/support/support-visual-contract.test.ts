@@ -184,7 +184,11 @@ describe("support visual contract", () => {
       ".messageTick",
       "/* ── Telegram-like support chat media/composer refinements ── */"
     );
-    const composerReplyLayer = sliceBetween(paneSource, ".composerReplyPreview", ".closedComposerNotice");
+    const composerReplyLayer = sliceBetween(
+      paneSource,
+      ".composerReplyPreview",
+      ".closedComposerNotice"
+    );
 
     expect(replyStateLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
     expect(replyStateLayer).not.toContain("rgba(");
@@ -396,7 +400,9 @@ describe("support visual contract", () => {
     expect(mediaViewerLayer).toContain(
       "box-shadow: 0 24px 60px color-mix(in srgb, var(--surface-0) 46%, transparent);"
     );
-    expect(source).toContain("outline: 2px solid color-mix(in srgb, var(--success) 72%, transparent);");
+    expect(source).toContain(
+      "outline: 2px solid color-mix(in srgb, var(--success) 72%, transparent);"
+    );
     expect(source).toContain(
       "scrollbar-color: color-mix(in srgb, var(--success) 22%, transparent) transparent;"
     );
@@ -504,12 +510,12 @@ describe("support visual contract", () => {
     expect(queueSource).toContain("min-height: clamp(34rem, calc(100dvh - 9rem), 52rem);");
     expect(queueSource).toContain("height: clamp(34rem, calc(100dvh - 9rem), 52rem);");
     expect(source).toContain("@media (max-width: 1180px) {");
-    expect(source).toContain(".chatShell {\n    min-height: auto;\n    height: auto;\n    max-height: none;\n  }");
+    expect(source).toContain(
+      ".chatShell {\n    min-height: auto;\n    height: auto;\n    max-height: none;\n  }"
+    );
     expect(source).toContain("@media (max-width: 780px) {");
     expect(source).toContain("border-radius: 1rem;");
-    expect(source).not.toContain(
-      "height: clamp(42rem, calc(100dvh - 9rem), 52rem);"
-    );
+    expect(source).not.toContain("height: clamp(42rem, calc(100dvh - 9rem), 52rem);");
     expect(source).not.toContain("min-height: clamp(42rem, calc(100dvh - 9rem), 52rem);");
   });
 
@@ -574,7 +580,11 @@ describe("support visual contract", () => {
       "/* ── Telegram-like support chat media/composer refinements ── */",
       "/* Final chat readability and alignment fixes */"
     );
-    const composerPaneLayer = sliceBetween(paneSource, ".composerIconBtn {", "@media (min-width: 1600px) {");
+    const composerPaneLayer = sliceBetween(
+      paneSource,
+      ".composerIconBtn {",
+      "@media (min-width: 1600px) {"
+    );
 
     expect(mediaReplyLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
     expect(mediaReplyLayer).not.toContain("rgba(");
@@ -601,11 +611,7 @@ describe("support visual contract", () => {
 
   it("keeps refreshed support queue panel chrome on semantic theme tokens", () => {
     const source = readSupportQueuePaneStyles();
-    const queueRefreshLayer = sliceBetween(
-      source,
-      ".inboxPaneFlat {",
-      ".conversationRow {"
-    );
+    const queueRefreshLayer = sliceBetween(source, ".inboxPaneFlat {", ".conversationRow {");
 
     expect(queueRefreshLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
     expect(queueRefreshLayer).not.toContain("rgba(");
@@ -630,11 +636,7 @@ describe("support visual contract", () => {
 
   it("keeps redesigned support ticket info panel on semantic theme tokens", () => {
     const source = readSupportInfoPanelStyles();
-    const ticketPanelLayer = sliceBetween(
-      source,
-      ".infoPanelFlat",
-      "@media (max-width: 1180px)"
-    );
+    const ticketPanelLayer = sliceBetween(source, ".infoPanelFlat", "@media (max-width: 1180px)");
 
     expect(ticketPanelLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
     expect(ticketPanelLayer).not.toContain("rgba(");
@@ -689,11 +691,7 @@ describe("support visual contract", () => {
 
   it("keeps support workspace queue shell chrome on semantic theme tokens", () => {
     const source = readSupportQueuePaneStyles();
-    const queueShellLayer = sliceBetween(
-      source,
-      ".inboxPaneFlat {",
-      ".queuePaneHeader {"
-    );
+    const queueShellLayer = sliceBetween(source, ".inboxPaneFlat {", ".queuePaneHeader {");
 
     expect(queueShellLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
     expect(queueShellLayer).not.toContain("rgba(");
@@ -705,15 +703,9 @@ describe("support visual contract", () => {
     expect(queueShellLayer).toContain(
       "0 14px 30px color-mix(in srgb, var(--surface-0) 14%, transparent)"
     );
-    expect(queueShellLayer).toContain(
-      "background: linear-gradient("
-    );
-    expect(queueShellLayer).toContain(
-      "min-height: clamp(34rem, calc(100dvh - 9rem), 52rem);"
-    );
-    expect(queueShellLayer).toContain(
-      "border-radius: 24px;"
-    );
+    expect(queueShellLayer).toContain("background: linear-gradient(");
+    expect(queueShellLayer).toContain("min-height: clamp(34rem, calc(100dvh - 9rem), 52rem);");
+    expect(queueShellLayer).toContain("border-radius: 24px;");
   });
 
   it("keeps support queue counters and status pills on semantic theme tokens", () => {
@@ -769,8 +761,12 @@ describe("support visual contract", () => {
     expect(lateDarkOverrideLayer).not.toContain("rgba(");
     expect(lateDarkOverrideLayer).not.toMatch(/letter-spacing:\s*-/);
 
-    expect(queueDarkOverrideLayer).toContain(':global(:root:not([data-theme="light"])) .queueSubFilters');
-    expect(queueDarkOverrideLayer).toContain(':global(:root:not([data-theme="light"])) .conversationRow');
+    expect(queueDarkOverrideLayer).toContain(
+      ':global(:root:not([data-theme="light"])) .queueSubFilters'
+    );
+    expect(queueDarkOverrideLayer).toContain(
+      ':global(:root:not([data-theme="light"])) .conversationRow'
+    );
     expect(lateDarkOverrideLayer).toContain(
       ':global(:root:not([data-theme="light"])) .messagesWrap'
     );

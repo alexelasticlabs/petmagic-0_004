@@ -2,17 +2,9 @@ import { type Locale } from "@/lib/i18n";
 import { type AdminTheme } from "@/lib/theme";
 
 export type AdminNotificationCategory =
-  | "support"
-  | "users"
-  | "templates"
-  | "economy"
-  | "promo"
-  | "system";
+  "support" | "users" | "templates" | "economy" | "promo" | "system";
 
-export type AdminNotificationFilter =
-  | "all"
-  | "unread"
-  | AdminNotificationCategory;
+export type AdminNotificationFilter = "all" | "unread" | AdminNotificationCategory;
 
 type AdminChromeCopy = {
   rtfLocale: "ru" | "en";
@@ -24,7 +16,6 @@ type AdminChromeCopy = {
   };
   realtimeSupport: {
     title: string;
-    withPreview: (preview: string) => string;
     fallback: string;
   };
   logoutDialog: {
@@ -33,6 +24,7 @@ type AdminChromeCopy = {
     cancel: string;
   };
   sidebar: {
+    brandTitle: string;
     brandCaption: string;
     navigationLabel: string;
     supportUnreadLabel: (count: number) => string;
@@ -74,6 +66,7 @@ type AdminChromeCopy = {
   loginScreen: {
     welcomeTitle: string;
     welcomeSubtitle: string;
+    previewWindowTitle: string;
     copyright: string;
     themeLabel: string;
     toggleThemeAriaLabel: string;
@@ -102,7 +95,6 @@ const adminChromeCopy: Record<Locale, AdminChromeCopy> = {
     },
     realtimeSupport: {
       title: "Поддержка",
-      withPreview: (preview) => `Новое сообщение в поддержке: ${preview}`,
       fallback: "В поддержке появилось новое сообщение",
     },
     logoutDialog: {
@@ -111,6 +103,7 @@ const adminChromeCopy: Record<Locale, AdminChromeCopy> = {
       cancel: "Отмена",
     },
     sidebar: {
+      brandTitle: "PetMagic Admin",
       brandCaption: "Операционная админ-зона",
       navigationLabel: "Навигация админ-панели",
       supportUnreadLabel: (count) => `${count} новых сообщений в поддержке`,
@@ -175,7 +168,8 @@ const adminChromeCopy: Record<Locale, AdminChromeCopy> = {
     loginScreen: {
       welcomeTitle: "Добро пожаловать!",
       welcomeSubtitle: "Войдите в панель администратора, чтобы продолжить работу",
-      copyright: "© 2026 Admin Panel. Все права защищены.",
+      previewWindowTitle: "Дашборд",
+      copyright: "© 2026 Админ-панель. Все права защищены.",
       themeLabel: "Тема",
       toggleThemeAriaLabel: "Сменить тему",
     },
@@ -183,7 +177,7 @@ const adminChromeCopy: Record<Locale, AdminChromeCopy> = {
       emailPlaceholder: "Введите email",
       passwordPlaceholder: "Введите пароль",
       validationError: "Введите корректный email и пароль.",
-      noAccess: "Доступ к админ-панели есть только у ролей Admin или Moderator.",
+      noAccess: "Доступ к админ-панели есть только у администраторов или модераторов.",
       hidePassword: "Скрыть пароль",
       showPassword: "Показать пароль",
       contactText: "Проблемы с доступом? ",
@@ -201,7 +195,6 @@ const adminChromeCopy: Record<Locale, AdminChromeCopy> = {
     },
     realtimeSupport: {
       title: "Support",
-      withPreview: (preview) => `New support message: ${preview}`,
       fallback: "A new support message arrived",
     },
     logoutDialog: {
@@ -210,6 +203,7 @@ const adminChromeCopy: Record<Locale, AdminChromeCopy> = {
       cancel: "Cancel",
     },
     sidebar: {
+      brandTitle: "PetMagic Admin",
       brandCaption: "Operational admin workspace",
       navigationLabel: "Admin navigation",
       supportUnreadLabel: (count) => `${count} new support messages`,
@@ -218,8 +212,7 @@ const adminChromeCopy: Record<Locale, AdminChromeCopy> = {
       themeLabel: (theme) => (theme === "dark" ? "Dark" : "Light"),
       nextThemeAriaLabel: (theme) =>
         theme === "dark" ? "Switch to light theme" : "Switch to dark theme",
-      sidebarToggleLabel: (sidebarOpen) =>
-        sidebarOpen ? "Close navigation" : "Open navigation",
+      sidebarToggleLabel: (sidebarOpen) => (sidebarOpen ? "Close navigation" : "Open navigation"),
       notificationFiltersLabel: "Notification filters",
       notificationTriggerLabel: (open) => (open ? "Close notifications" : "Open notifications"),
       filterLabels: {
@@ -244,8 +237,7 @@ const adminChromeCopy: Record<Locale, AdminChromeCopy> = {
       pinned: "Pinned",
       needsAttention: "needs attention",
       supportSummaryTitle: (count) => `${count} new support messages`,
-      supportSummaryMessage:
-        "Open the support queue to process new and unread conversations.",
+      supportSummaryMessage: "Open the support queue to process new and unread conversations.",
       groupLabels: {
         today: "Today",
         yesterday: "Yesterday",
@@ -273,6 +265,7 @@ const adminChromeCopy: Record<Locale, AdminChromeCopy> = {
     loginScreen: {
       welcomeTitle: "Welcome!",
       welcomeSubtitle: "Sign in to the admin panel to continue your work",
+      previewWindowTitle: "Dashboard",
       copyright: "© 2026 Admin Panel. All rights reserved.",
       themeLabel: "Theme",
       toggleThemeAriaLabel: "Toggle theme",
@@ -294,4 +287,3 @@ const adminChromeCopy: Record<Locale, AdminChromeCopy> = {
 export function getAdminChromeCopy(locale: Locale): AdminChromeCopy {
   return adminChromeCopy[locale];
 }
-

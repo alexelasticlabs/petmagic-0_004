@@ -13,15 +13,30 @@ bool isPrivateIpv4(String address) {
     return false;
   }
 
-  final first = int.tryParse(octets[0]);
-  final second = int.tryParse(octets[1]);
-  if (first == null || second == null) {
+  final bytes = octets
+      .map((octet) {
+        if (octet.isEmpty || !RegExp(r'^\d{1,3}$').hasMatch(octet)) {
+          return null;
+        }
+
+        final value = int.tryParse(octet);
+        return value != null && value >= 0 && value <= 255 ? value : null;
+      })
+      .toList(growable: false);
+
+  if (bytes.any((value) => value == null)) {
     return false;
   }
 
-  final isClassA = first == 10;
-  final isClassB = first == 172 && second >= 16 && second <= 31;
-  final isClassC = first == 192 && second == 168;
+  final first = bytes[0]!;
+  final second = bytes[1]!;
 
-  return isClassA || isClassB || isClassC;
+  return first == 0 ||
+      first == 10 ||
+      first == 127 ||
+      (first == 100 && second >= 64 && second <= 127) ||
+      (first == 169 && second == 254) ||
+      (first == 172 && second >= 16 && second <= 31) ||
+      (first == 192 && second == 168) ||
+      first >= 224;
 }

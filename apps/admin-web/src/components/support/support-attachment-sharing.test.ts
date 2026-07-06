@@ -27,6 +27,10 @@ describe("support attachment sharing", () => {
       "function downloadSupportBlobUrl(objectUrl: string, fileName: string): void"
     );
     expect(source).toContain("link.download = fileName;");
+    expect(source).toContain("function revokeSupportBlobUrlOnFailure(");
+    expect(source).toContain("URL.revokeObjectURL(objectUrl);");
+    expect(source).toContain("scheduleSupportBlobUrlRevoke(objectUrl, 1000);");
+    expect(source).toContain("scheduleSupportBlobUrlRevoke(objectUrl, 60_000);");
     expect(source).not.toContain("mediaType: image.mediaType,\n        error");
     expect(source).not.toContain("mimeType: attachment.mimeType,\n        error");
     expect(source).not.toContain("messageId: currentFullscreenImage.messageId,\n        error");
@@ -67,7 +71,7 @@ describe("support attachment sharing", () => {
     expect(source).toContain(
       "downloadSupportBlobUrl(\n          objectUrl,\n          formatSafeSupportDownloadName(fullscreenImage.fileName, defaultFileName)"
     );
-    expect(source).toContain("window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);");
+    expect(source).toContain("scheduleSupportBlobUrlRevoke(objectUrl, 1000);");
     expect(source).not.toContain(
       "if (!opened) {\n        URL.revokeObjectURL(objectUrl);\n        return;\n      }"
     );
@@ -80,7 +84,7 @@ describe("support attachment sharing", () => {
     expect(source).toContain("reason: formatSupportLogText(reason)");
     expect(source).toContain("const objectUrl = URL.createObjectURL(blob);");
     expect(source).toContain("downloadSupportBlobUrl(objectUrl, safeFileName);");
-    expect(source).toContain("window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);");
+    expect(source).toContain("scheduleSupportBlobUrlRevoke(objectUrl, 1000);");
     expect(source).toContain(
       'if (!browserNavigator.share) {\n        fallbackToDownload("navigator_share_missing");\n        return;\n      }'
     );
@@ -94,12 +98,20 @@ describe("support attachment sharing", () => {
     const source = readSupportConversationPageLibrarySource();
 
     expect(source).toContain(
-      "downloadSupportBlobUrl(\n        objectUrl,\n        formatSafeSupportDownloadName(fullscreenImage.fileName, defaultFileName)\n      );"
+      "formatSafeSupportDownloadName(fullscreenImage.fileName, defaultFileName)"
     );
-    expect(source).toContain("window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);");
+    expect(source).toContain("scheduleSupportBlobUrlRevoke(objectUrl, 1000);");
     expect(source).not.toContain(
       "downloadSupportBlobUrl(\n        objectUrl,\n        formatSafeSupportDownloadName(fullscreenImage.fileName, defaultFileName)\n      );\n      URL.revokeObjectURL(objectUrl);"
     );
+  });
+
+  it("revokes support blob URLs immediately if action handoff throws", () => {
+    const source = readSupportConversationPageLibrarySource();
+
+    expect(source).toContain("function revokeSupportBlobUrlOnFailure(objectUrl: string");
+    expect(source).toContain("} catch (error) {\n    URL.revokeObjectURL(objectUrl);");
+    expect(source).toContain("revokeSupportBlobUrlOnFailure(objectUrl, () => {");
   });
 
   it("clears stale fullscreen and attachment action state when switching conversations", () => {

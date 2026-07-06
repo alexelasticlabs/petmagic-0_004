@@ -23,8 +23,8 @@
      Override theme-sensitive variables to fixed "phone-screen" values
      so text/badges are readable regardless of the admin colour scheme. */
   --text-inverse: var(--accent-contrast);
-  --surface-0: black;
-  --surface-2: color-mix(in srgb, black 88%, var(--accent) 12%);
+  --surface-0: var(--phone-screen-surface);
+  --surface-2: color-mix(in srgb, var(--phone-screen-surface) 88%, var(--accent) 12%);
 
   position: relative;
   aspect-ratio: var(--phone-preview-aspect-ratio, var(--template-image-aspect-ratio));
@@ -33,13 +33,12 @@
   overflow: hidden;
   border: 1px solid var(--border-soft);
   border-radius: 1.28rem;
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--surface-2) 92%, var(--accent) 8%) 0%,
-      var(--surface-2) 42%,
-      var(--surface-1) 100%
-    );
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-2) 92%, var(--accent) 8%) 0%,
+    var(--surface-2) 42%,
+    var(--surface-1) 100%
+  );
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 4%, transparent),
     0 16px 32px color-mix(in srgb, var(--surface-0) 42%, transparent);
@@ -162,13 +161,12 @@
   content: "";
   position: absolute;
   inset: 0;
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--text-inverse) 18%, transparent) 0%,
-      color-mix(in srgb, var(--text-inverse) 7%, transparent) 42%,
-      transparent 100%
-    );
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--text-inverse) 18%, transparent) 0%,
+    color-mix(in srgb, var(--text-inverse) 7%, transparent) 42%,
+    transparent 100%
+  );
   opacity: 0.72;
   pointer-events: none;
 }
@@ -575,4 +573,3 @@
     padding-inline: 0.36rem;
   }
 }
-

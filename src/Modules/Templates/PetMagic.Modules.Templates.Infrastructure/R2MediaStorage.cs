@@ -3,7 +3,9 @@ using Amazon.S3.Model;
 
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
+using PetMagic.BuildingBlocks.Storage;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Infrastructure.Options;
@@ -89,12 +91,12 @@ internal sealed class R2MediaStorage(
         {
             TemplateGenerationMetrics.RecordR2UploadFailure("store");
             logger?.LogWarning(
-                exception,
-                "R2 media store failed. Operation={Operation} StorageKey={StorageKey} ContentLength={ContentLength} HasPreferredStorageKey={HasPreferredStorageKey}",
+                "R2 media store failed. Operation={Operation} StorageKeyHash={StorageKeyHash} ContentLength={ContentLength} HasPreferredStorageKey={HasPreferredStorageKey} ExceptionType={ExceptionType}",
                 "store",
-                storageKey,
+                SafeLogValues.StableHash(storageKey),
                 contentLength,
-                !string.IsNullOrWhiteSpace(preferredStorageKey));
+                !string.IsNullOrWhiteSpace(preferredStorageKey),
+                SafeLogValues.ExceptionType(exception));
             TemplateMediaTempFiles.TryDeleteIfOwned(tempPath, logger);
             return Result.Failure<StoredMediaResponse>(TemplatesErrors.MediaStorageFailed);
         }
@@ -121,10 +123,10 @@ internal sealed class R2MediaStorage(
         catch (Exception exception)
         {
             logger?.LogWarning(
-                exception,
-                "R2 media delete failed. Operation={Operation} StorageKey={StorageKey}",
+                "R2 media delete failed. Operation={Operation} StorageKeyHash={StorageKeyHash} ExceptionType={ExceptionType}",
                 "delete",
-                storageKey);
+                SafeLogValues.StableHash(storageKey),
+                SafeLogValues.ExceptionType(exception));
             return Result.Failure(TemplatesErrors.MediaStorageFailed);
         }
     }
@@ -157,11 +159,11 @@ internal sealed class R2MediaStorage(
         catch (Exception exception)
         {
             logger?.LogWarning(
-                exception,
-                "R2 media read-url signing failed. Operation={Operation} StorageKey={StorageKey} TtlMinutes={TtlMinutes}",
+                "R2 media read-url signing failed. Operation={Operation} StorageKeyHash={StorageKeyHash} TtlMinutes={TtlMinutes} ExceptionType={ExceptionType}",
                 "sign_read_url",
-                storageKey,
-                ttl.TotalMinutes);
+                SafeLogValues.StableHash(storageKey),
+                ttl.TotalMinutes,
+                SafeLogValues.ExceptionType(exception));
             return Task.FromResult(Result.Failure<string>(TemplatesErrors.MediaStorageFailed));
         }
     }
@@ -273,9 +275,7 @@ internal sealed class R2MediaStorage(
 
         var segments = keyOnly
             .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (segments.Any(segment =>
-                string.Equals(segment, ".", StringComparison.Ordinal)
-                || string.Equals(segment, "..", StringComparison.Ordinal)))
+        if (segments.Any(IsUnsafeManagedKeySegment))
         {
             return false;
         }
@@ -288,6 +288,11 @@ internal sealed class R2MediaStorage(
 
         managedKey = normalizedKey;
         return true;
+    }
+
+    private static bool IsUnsafeManagedKeySegment(string segment)
+    {
+        return ManagedPathSegments.IsUnsafe(segment);
     }
 
     private static bool ContentTypesMatch(string detectedContentType, string declaredContentType)

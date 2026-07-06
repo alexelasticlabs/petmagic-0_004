@@ -140,6 +140,16 @@ function clearStoredAuthSession(storageFailureEvent: string, storedRaw?: string 
   }
 }
 
+function readStoredAuthSessionRaw(storageFailureEvent: string): string | null {
+  try {
+    return window.sessionStorage.getItem(AUTH_KEY);
+  } catch (storageError) {
+    resetInMemoryAuthSessionState();
+    clientLogger.warn(storageFailureEvent, getAuthStorageErrorDetails(storageError));
+    return null;
+  }
+}
+
 export function clearAdminListCaches(): void {
   cachedUsersLists.clear();
   cachedAdminUserDetails.clear();
@@ -204,7 +214,11 @@ function isValidUserProfile(value: unknown): value is UserProfile {
   );
 }
 
-function validateAuthSession(value: unknown, source: string): AuthSession {
+function validateAuthSession(
+  value: unknown,
+  source: string,
+  options: { requireAccessToken?: boolean } = {}
+): AuthSession {
   if (!isRecord(value)) {
     throw new Error(`${source} auth session is not an object.`);
   }
@@ -219,6 +233,10 @@ function validateAuthSession(value: unknown, source: string): AuthSession {
 
   if (typeof value.accessToken !== "undefined" && typeof value.accessToken !== "string") {
     throw new Error(`${source} auth session has an invalid accessToken.`);
+  }
+
+  if (options.requireAccessToken && !value.accessToken?.trim()) {
+    throw new Error(`${source} auth session is missing accessToken.`);
   }
 
   if (typeof value.refreshToken !== "undefined" && typeof value.refreshToken !== "string") {
@@ -273,7 +291,7 @@ export function getSession(): AuthSession | null {
     return null;
   }
 
-  const raw = window.sessionStorage.getItem(AUTH_KEY);
+  const raw = readStoredAuthSessionRaw("auth.session_read_failed");
   if (raw === cachedAuthRaw) {
     return cachedAuthSession;
   }
@@ -380,7 +398,7 @@ export function clearSession(): void {
   authSessionMutationVersion += 1;
 
   if (typeof window !== "undefined") {
-    const storedRaw = window.sessionStorage.getItem(AUTH_KEY);
+    const storedRaw = readStoredAuthSessionRaw("auth.session_clear_read_failed");
     const storageCleared = clearStoredAuthSession("auth.session_clear_failed", storedRaw);
     notifyAuthSessionChanged({ invalidateStoredSnapshot: storageCleared });
     return;
@@ -436,6 +454,16 @@ function sanitizeApiErrorText(value: string): string {
   return sanitizeSensitiveText(value, 240);
 }
 
+function sanitizeApiLogPath(path: string): string {
+  try {
+    const parsed = new URL(path, "https://admin.petmagic.local");
+    const safePathname = sanitizeSensitiveText(parsed.pathname, 160);
+    return parsed.search ? `${safePathname}?query=[redacted]` : safePathname;
+  } catch {
+    return sanitizeSensitiveText(path.split("?")[0] || path, 160);
+  }
+}
+
 function getApiClientErrorDetails(error: unknown): {
   errorName: string;
   errorDigest?: string;
@@ -470,7 +498,9 @@ function createApiError(message: string, code: string, detail?: string): ApiErro
 
 function isIdempotentRequestMethod(method: string | undefined): boolean {
   const normalizedMethod = (method ?? "GET").trim().toUpperCase();
-  return normalizedMethod === "GET" || normalizedMethod === "HEAD" || normalizedMethod === "OPTIONS";
+  return (
+    normalizedMethod === "GET" || normalizedMethod === "HEAD" || normalizedMethod === "OPTIONS"
+  );
 }
 
 function sanitizeSessionForStorage(session: AuthSession): AuthSession {
@@ -478,7 +508,9 @@ function sanitizeSessionForStorage(session: AuthSession): AuthSession {
 }
 
 function saveSession(session: AuthSession): void {
-  const validSession = validateAuthSession(session, "Backend");
+  const validSession = validateAuthSession(session, "Backend", {
+    requireAccessToken: true,
+  });
 
   clearAdminListCaches();
   authSessionMutationVersion += 1;
@@ -487,8 +519,18 @@ function saveSession(session: AuthSession): void {
   volatileTokenUserId = validSession.user.userId;
 
   if (typeof window !== "undefined") {
-    window.sessionStorage.setItem(AUTH_KEY, JSON.stringify(sanitizeSessionForStorage(validSession)));
-    notifyAuthSessionChanged();
+    try {
+      window.sessionStorage.setItem(
+        AUTH_KEY,
+        JSON.stringify(sanitizeSessionForStorage(validSession))
+      );
+      notifyAuthSessionChanged();
+    } catch (storageError) {
+      resetInMemoryAuthSessionState();
+      clientLogger.warn("auth.session_save_failed", getAuthStorageErrorDetails(storageError));
+      notifyAuthSessionChanged();
+      throw new Error("Unable to persist admin session.");
+    }
   }
 }
 
@@ -501,6 +543,7 @@ export async function apiRequest<TResponse>(
   const allowRefresh = options.allowRefresh ?? true;
   const timeoutMs = options.timeoutMs ?? API_REQUEST_TIMEOUT_MS;
   const session = getSession();
+  const logPath = sanitizeApiLogPath(path);
 
   const headers = new Headers(init.headers);
   if (typeof init.body !== "undefined" && !(init.body instanceof FormData)) {
@@ -514,12 +557,7 @@ export async function apiRequest<TResponse>(
     headers.set("Authorization", `Bearer ${session.accessToken}`);
   }
 
-  if (
-    requireAuth &&
-    allowRefresh &&
-    !session?.accessToken &&
-    typeof window !== "undefined"
-  ) {
+  if (requireAuth && allowRefresh && !session?.accessToken && typeof window !== "undefined") {
     const restored = await refreshSession();
     if (restored) {
       return apiRequest<TResponse>(path, init, { requireAuth, allowRefresh: false });
@@ -557,7 +595,7 @@ export async function apiRequest<TResponse>(
   } catch (error) {
     if (isTimedOut) {
       clientLogger.warn("api.request_timeout", {
-        path,
+        path: logPath,
         method: init.method ?? "GET",
         correlationId: headers.get("X-Correlation-ID"),
       });
@@ -573,7 +611,7 @@ export async function apiRequest<TResponse>(
     }
 
     clientLogger.warn("api.request_failed", {
-      path,
+      path: logPath,
       method: init.method ?? "GET",
       correlationId: headers.get("X-Correlation-ID"),
       ...getApiClientErrorDetails(error),
@@ -599,7 +637,7 @@ export async function apiRequest<TResponse>(
       }
 
       clientLogger.warn("api.auth_retry_required_after_refresh", {
-        path,
+        path: logPath,
         method: init.method ?? "GET",
         correlationId: headers.get("X-Correlation-ID"),
       });
@@ -620,7 +658,7 @@ export async function apiRequest<TResponse>(
     }
 
     clientLogger.warn("api.request_non_success", {
-      path,
+      path: logPath,
       method: init.method ?? "GET",
       status: response.status,
       correlationId: headers.get("X-Correlation-ID"),
@@ -661,7 +699,7 @@ export async function apiRequest<TResponse>(
         }
       } catch (parseError) {
         clientLogger.warn("api.error_payload_parse_failed", {
-          path,
+          path: logPath,
           method: init.method ?? "GET",
           status: response.status,
           correlationId: headers.get("X-Correlation-ID"),
@@ -686,7 +724,7 @@ export async function apiRequest<TResponse>(
     return JSON.parse(responseText) as TResponse;
   } catch (error) {
     clientLogger.warn("api.response_payload_parse_failed", {
-      path,
+      path: logPath,
       method: init.method ?? "GET",
       status: response.status,
       correlationId: headers.get("X-Correlation-ID"),

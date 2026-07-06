@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
@@ -34,10 +35,10 @@ internal sealed class FileMediaMetadataReader(
             if (!Mp4DurationReader.TryReadDurationSeconds(stream, out var durationSeconds))
             {
                 logger?.LogWarning(
-                    "Template media metadata read failed. Operation={Operation} FileName={FileName} ContentType={ContentType}",
+                    "Template media metadata read failed. Operation={Operation} FileNameHash={FileNameHash} ContentType={ContentType}",
                     "read_mp4_duration",
-                    storedMedia.FileName,
-                    storedMedia.ContentType);
+                    TemplateLogSanitizer.SafeFileName(storedMedia.FileName),
+                    TemplateLogSanitizer.SafeContentType(storedMedia.ContentType));
                 return Task.FromResult(Result.Failure<double?>(TemplatesErrors.MediaMetadataFailed));
             }
 
@@ -47,11 +48,11 @@ internal sealed class FileMediaMetadataReader(
         catch (Exception exception)
         {
             logger?.LogWarning(
-                exception,
-                "Template media metadata read threw while processing file. Operation={Operation} FileName={FileName} ContentType={ContentType}",
+                "Template media metadata read threw while processing file. Operation={Operation} FileNameHash={FileNameHash} ContentType={ContentType} ExceptionType={ExceptionType}",
                 "read_mp4_duration",
-                storedMedia.FileName,
-                storedMedia.ContentType);
+                TemplateLogSanitizer.SafeFileName(storedMedia.FileName),
+                TemplateLogSanitizer.SafeContentType(storedMedia.ContentType),
+                SafeLogValues.ExceptionType(exception));
             return Task.FromResult(Result.Failure<double?>(TemplatesErrors.MediaMetadataFailed));
         }
         finally

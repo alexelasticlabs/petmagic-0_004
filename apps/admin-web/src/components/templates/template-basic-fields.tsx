@@ -57,35 +57,35 @@ export function TemplateBasicFields({
       value: "Auto",
       label: text.promoBadgeAutoLabel,
       description: text.promoBadgeAutoHint,
-      badge: "Auto",
+      badge: text.promoBadgeAutoBadge,
       tone: "neutral",
     },
     {
       value: "New",
-      label: "NEW",
+      label: text.promoBadgeNewLabel,
       description: text.promoBadgeNewHint,
-      badge: "Fresh",
+      badge: text.promoBadgeNewBadge,
       tone: "recommended",
     },
     {
       value: "Trending",
-      label: "TRENDING",
+      label: text.promoBadgeTrendingLabel,
       description: text.promoBadgeTrendingHint,
-      badge: "Hot",
+      badge: text.promoBadgeTrendingBadge,
       tone: "premium",
     },
     {
       value: "Popular",
-      label: "POPULAR",
+      label: text.promoBadgePopularLabel,
       description: text.promoBadgePopularHint,
-      badge: "Core",
+      badge: text.promoBadgePopularBadge,
       tone: "fast",
     },
     {
       value: "Funny",
-      label: "FUNNY",
+      label: text.promoBadgeFunnyLabel,
       description: text.promoBadgeFunnyHint,
-      badge: "Mood",
+      badge: text.promoBadgeFunnyBadge,
       tone: "recommended",
     },
   ];
@@ -347,9 +347,7 @@ export function TemplateBasicFields({
                 ? text.editorGenerationResultSupported
                 : text.editorGenerationResultUnsupported}
             </span>
-            <span className={styles.accessOptionHint}>
-              {text.editorGenerationResultInputHint}
-            </span>
+            <span className={styles.accessOptionHint}>{text.editorGenerationResultInputHint}</span>
           </button>
         </div>
       </div>

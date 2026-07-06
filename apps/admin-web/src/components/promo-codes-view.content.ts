@@ -6,7 +6,7 @@ const promoCodesViewText = {
     notificationTitle: "Промокоды",
     archiveActionLabel: "Архивировать",
     archiveCancelLabel: "Отмена",
-    adminOnlyMessage: "Управление промокодами доступно только Admin.",
+    adminOnlyMessage: "Управление промокодами доступно только администратору.",
     kpiCodesLabel: "Коды",
     kpiFilteredListHint: "Текущий отфильтрованный список.",
     kpiActiveLabel: "Активные",

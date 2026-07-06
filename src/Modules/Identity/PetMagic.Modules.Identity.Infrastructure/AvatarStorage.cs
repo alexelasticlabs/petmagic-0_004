@@ -2,7 +2,9 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 using PetMagic.BuildingBlocks.Images;
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
+using PetMagic.BuildingBlocks.Storage;
 using PetMagic.Modules.Identity.Infrastructure.Options;
 
 namespace PetMagic.Modules.Identity.Infrastructure;
@@ -64,6 +66,11 @@ internal sealed class LocalAvatarStorage(
             return Result.Failure<StoredAvatarResponse>(IdentityErrors.InvalidAvatarUpload);
         }
 
+        if (contentLength > options.MaxFileSizeBytes)
+        {
+            return Result.Failure<StoredAvatarResponse>(IdentityErrors.AvatarFileTooLarge);
+        }
+
         if (!TryResolveAvatarFileFormat(avatar.ContentType, out var extension, out var normalizedContentType))
         {
             return Result.Failure<StoredAvatarResponse>(IdentityErrors.AvatarContentTypeNotAllowed);
@@ -72,11 +79,21 @@ internal sealed class LocalAvatarStorage(
         var avatarBytes = avatar.Content;
         if (avatarBytes is null)
         {
-            avatarBytes = await ReadAllBytesAsync(avatar.ContentStream, cancellationToken);
-            if (avatarBytes is null)
+            var readResult = await ReadAllBytesWithinLimitAsync(
+                avatar.ContentStream,
+                options.MaxFileSizeBytes,
+                cancellationToken);
+            if (readResult.ExceededLimit)
+            {
+                return Result.Failure<StoredAvatarResponse>(IdentityErrors.AvatarFileTooLarge);
+            }
+
+            if (readResult.Content is null)
             {
                 return Result.Failure<StoredAvatarResponse>(IdentityErrors.InvalidAvatarUpload);
             }
+
+            avatarBytes = readResult.Content;
         }
 
         var normalizedImage = UploadedImageNormalizer.NormalizeOrKeep(
@@ -109,12 +126,12 @@ internal sealed class LocalAvatarStorage(
         catch (Exception exception)
         {
             logger.LogWarning(
-                exception,
-                "Avatar storage write failed. Operation={Operation} ContentType={ContentType} OutputBytes={OutputBytes} WasNormalized={WasNormalized}",
+                "Avatar storage write failed. Operation={Operation} ContentType={ContentType} OutputBytes={OutputBytes} WasNormalized={WasNormalized} ExceptionType={ExceptionType}",
                 "store",
                 normalizedContentType,
                 normalizedImage.Content.LongLength,
-                normalizedImage.WasNormalized);
+                normalizedImage.WasNormalized,
+                SafeLogValues.ExceptionType(exception));
             return Result.Failure<StoredAvatarResponse>(IdentityErrors.AvatarStorageFailed);
         }
 
@@ -131,11 +148,14 @@ internal sealed class LocalAvatarStorage(
             physicalPath));
     }
 
-    private static async Task<byte[]?> ReadAllBytesAsync(Stream? stream, CancellationToken cancellationToken)
+    private static async Task<(byte[]? Content, bool ExceededLimit)> ReadAllBytesWithinLimitAsync(
+        Stream? stream,
+        long maxFileSizeBytes,
+        CancellationToken cancellationToken)
     {
         if (stream is null)
         {
-            return null;
+            return (null, ExceededLimit: false);
         }
 
         if (stream.CanSeek)
@@ -144,8 +164,24 @@ internal sealed class LocalAvatarStorage(
         }
 
         using var buffer = new MemoryStream();
-        await stream.CopyToAsync(buffer, cancellationToken);
-        return buffer.ToArray();
+        var copyBuffer = new byte[81920];
+        while (true)
+        {
+            var read = await stream.ReadAsync(copyBuffer.AsMemory(0, copyBuffer.Length), cancellationToken);
+            if (read == 0)
+            {
+                break;
+            }
+
+            if (buffer.Length + read > maxFileSizeBytes)
+            {
+                return (null, ExceededLimit: true);
+            }
+
+            await buffer.WriteAsync(copyBuffer.AsMemory(0, read), cancellationToken);
+        }
+
+        return (buffer.ToArray(), ExceededLimit: false);
     }
 
     public Task<Result> DeleteAsync(string? avatarUrl, CancellationToken cancellationToken)
@@ -194,10 +230,10 @@ internal sealed class LocalAvatarStorage(
         catch (Exception exception)
         {
             logger.LogWarning(
-                exception,
-                "Avatar storage delete failed. Operation={Operation} AvatarFileName={AvatarFileName}",
+                "Avatar storage delete failed. Operation={Operation} StorageKeyHash={StorageKeyHash} ExceptionType={ExceptionType}",
                 "delete",
-                Path.GetFileName(relativePath));
+                SafeLogValues.StableHash(relativePath),
+                SafeLogValues.ExceptionType(exception));
             return Task.FromResult(Result.Failure(IdentityErrors.AvatarStorageFailed));
         }
     }
@@ -258,15 +294,18 @@ internal sealed class LocalAvatarStorage(
         var segments = pathOnly
             .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (segments.Length <= 1
-            || segments.Any(segment =>
-                string.Equals(segment, ".", StringComparison.Ordinal)
-                || string.Equals(segment, "..", StringComparison.Ordinal)))
+            || segments.Any(IsUnsafeManagedPathSegment))
         {
             return false;
         }
 
         managedRelativePath = string.Join('/', segments);
         return true;
+    }
+
+    private static bool IsUnsafeManagedPathSegment(string segment)
+    {
+        return ManagedPathSegments.IsUnsafe(segment);
     }
 
     private static bool TryResolveAvatarFileFormat(string contentType, out string extension, out string normalizedContentType)

@@ -61,7 +61,7 @@ internal sealed class FcmSupportChatPushNotificationSender(
         var locale = token.Locale;
         var route = "/profile/support";
         var eventId = $"{notification.ConversationId}:{notification.MessageId}";
-        var body = BuildBody(notification, locale);
+        var body = BuildBody(notification.HasAttachment, locale);
         var data = new Dictionary<string, string>
         {
             ["type"] = "support_chat",
@@ -88,52 +88,36 @@ internal sealed class FcmSupportChatPushNotificationSender(
         };
         httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-        using var response = await httpClient.SendAsync(httpRequest, cancellationToken);
-        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+        using var response = await httpClient.SendAsync(
+            httpRequest,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
+        var eventIdHash = SafeLogValues.StableHash(eventId);
+        var tokenIdHash = SafeLogValues.StableHash(token.Id.ToString("D"));
         if (response.IsSuccessStatusCode)
         {
             logger.LogInformation(
-                "FCM send succeeded for support event. EventId={EventId} TokenId={TokenId} MessageName={MessageName} CorrelationId={CorrelationId}",
-                eventId,
-                token.Id,
-                TryReadFcmMessageName(responseBody),
-                CorrelationContext.ResolveOrCreate());
+                "FCM send succeeded for support event. EventIdHash={EventIdHash} TokenIdHash={TokenIdHash} CorrelationIdHash={CorrelationIdHash}",
+                eventIdHash,
+                tokenIdHash,
+                SafeLogValues.StableHash(CorrelationContext.ResolveOrCreate()));
             return;
         }
 
+        var responseBody = await SafeHttpContentReader.ReadStringPrefixAsync(response.Content, cancellationToken);
         logger.LogWarning(
-            "FCM send failed for support event. EventId={EventId} TokenId={TokenId} StatusCode={StatusCode} ErrorReason={ErrorReason} CorrelationId={CorrelationId}",
-            eventId,
-            token.Id,
+            "FCM send failed for support event. EventIdHash={EventIdHash} TokenIdHash={TokenIdHash} StatusCode={StatusCode} ErrorReason={ErrorReason} CorrelationIdHash={CorrelationIdHash}",
+            eventIdHash,
+            tokenIdHash,
             response.StatusCode,
             FirebaseMessagingErrorClassifier.ResolveErrorReason(responseBody),
-            CorrelationContext.ResolveOrCreate());
+            SafeLogValues.StableHash(CorrelationContext.ResolveOrCreate()));
 
         if (FirebaseMessagingErrorClassifier.ShouldDisableToken(response.StatusCode, responseBody))
         {
             token.DisabledAtUtc = DateTime.UtcNow;
             token.UpdatedAtUtc = token.DisabledAtUtc.Value;
             await dbContext.SaveChangesAsync(cancellationToken);
-        }
-    }
-
-    private static string? TryReadFcmMessageName(string body)
-    {
-        if (string.IsNullOrWhiteSpace(body))
-        {
-            return null;
-        }
-
-        try
-        {
-            using var document = JsonDocument.Parse(body);
-            return document.RootElement.TryGetProperty("name", out var name) && name.ValueKind == JsonValueKind.String
-                ? name.GetString()
-                : null;
-        }
-        catch (JsonException)
-        {
-            return null;
         }
     }
 
@@ -153,22 +137,11 @@ internal sealed class FcmSupportChatPushNotificationSender(
         return CreateCredentialFromJson(File.ReadAllText(options.ServiceAccountJsonPath));
     }
 
-    private static string BuildBody(SupportChatPushNotification notification, string? locale)
+    private static string BuildBody(bool hasAttachment, string? locale)
     {
-        var body = notification.Body?.Trim() ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(body))
-        {
-            body = SupportChatPushNotificationLocalizer.BuildFallbackBody(
-                locale,
-                notification.HasAttachment);
-        }
-
-        if (body.Length <= 120)
-        {
-            return body;
-        }
-
-        return string.Concat(body.AsSpan(0, 117), "...");
+        return SupportChatPushNotificationLocalizer.BuildFallbackBody(
+            locale,
+            hasAttachment);
     }
 
     private static GoogleCredential CreateCredentialFromJson(string json)

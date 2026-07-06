@@ -22,6 +22,7 @@ class _InsufficientBalanceBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
     final isLight = Theme.of(context).brightness == Brightness.light;
 
     return LayoutBuilder(
@@ -33,9 +34,7 @@ class _InsufficientBalanceBanner extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(22),
             border: Border.all(
-              color: const Color(
-                0xFFE0A91E,
-              ).withValues(alpha: isLight ? 0.78 : 0.9),
+              color: colors.gold.withValues(alpha: isLight ? 0.78 : 0.9),
               width: 1.15,
             ),
             gradient: LinearGradient(
@@ -51,12 +50,7 @@ class _InsufficientBalanceBanner extends StatelessWidget {
                 top: 6,
                 child: IconButton(
                   onPressed: onClose,
-                  icon: Icon(
-                    Icons.close_rounded,
-                    color: isLight
-                        ? const Color(0xFF514325)
-                        : const Color(0xFFE1DED4),
-                  ),
+                  icon: Icon(Icons.close_rounded, color: colors.textSoft),
                 ),
               ),
               Positioned(
@@ -84,18 +78,16 @@ class _InsufficientBalanceBanner extends StatelessWidget {
                           height: 44,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: const Color(
-                              0xFF140D01,
-                            ).withValues(alpha: isLight ? 0.16 : 0.36),
+                            color: colors.gold.withValues(
+                              alpha: isLight ? 0.16 : 0.22,
+                            ),
                             border: Border.all(
-                              color: const Color(
-                                0xFFE0A91E,
-                              ).withValues(alpha: 0.76),
+                              color: colors.gold.withValues(alpha: 0.76),
                             ),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.bolt_rounded,
-                            color: Color(0xFFEAB13A),
+                            color: colors.gold,
                             size: 28,
                           ),
                         ),
@@ -104,9 +96,7 @@ class _InsufficientBalanceBanner extends StatelessWidget {
                           child: Text(
                             text.templateFlowInsufficientBalanceTitle,
                             style: TextStyle(
-                              color: isLight
-                                  ? const Color(0xFF1E1608)
-                                  : const Color(0xFFEDE7D8),
+                              color: colors.textStrong,
                               fontSize: 16.5,
                               fontWeight: FontWeight.w900,
                             ),
@@ -118,9 +108,7 @@ class _InsufficientBalanceBanner extends StatelessWidget {
                     Text(
                       text.templateFlowInsufficientBalanceUpsellMessage,
                       style: TextStyle(
-                        color: isLight
-                            ? const Color(0xFF3B3324)
-                            : const Color(0xFFE3DFD2),
+                        color: colors.textSoft,
                         fontSize: 12.5,
                         height: 1.3,
                         fontWeight: FontWeight.w500,
@@ -133,9 +121,7 @@ class _InsufficientBalanceBanner extends StatelessWidget {
                         balance,
                       ),
                       style: TextStyle(
-                        color: isLight
-                            ? const Color(0xFF2F2719)
-                            : const Color(0xFFD7DFEF),
+                        color: colors.textSoft,
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                       ),
@@ -155,10 +141,7 @@ class _InsufficientBalanceBanner extends StatelessWidget {
                       child: OutlinedButton(
                         onPressed: onTopUpBalance,
                         style: OutlinedButton.styleFrom(
-                          side: const BorderSide(
-                            color: Color(0xFF0EA76A),
-                            width: 1.2,
-                          ),
+                          side: BorderSide(color: colors.accent, width: 1.2),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
                           ),
@@ -167,8 +150,8 @@ class _InsufficientBalanceBanner extends StatelessWidget {
                           fit: BoxFit.scaleDown,
                           child: Text(
                             text.templateFlowTopUpBalanceAction,
-                            style: const TextStyle(
-                              color: Color(0xFF0EA76A),
+                            style: TextStyle(
+                              color: colors.accent,
                               fontSize: 13,
                               fontWeight: FontWeight.w800,
                             ),
@@ -184,9 +167,9 @@ class _InsufficientBalanceBanner extends StatelessWidget {
                         onPressed: onLater,
                         style: OutlinedButton.styleFrom(
                           side: BorderSide(
-                            color: isLight
-                                ? const Color(0xFFBCB29B)
-                                : const Color(0xFF2A3651),
+                            color: colors.border.withValues(
+                              alpha: isLight ? 0.9 : 0.78,
+                            ),
                           ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
@@ -199,9 +182,7 @@ class _InsufficientBalanceBanner extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: isLight
-                                  ? const Color(0xFF3C3324)
-                                  : const Color(0xFFC6CEDD),
+                              color: colors.textSoft,
                               fontSize: 12.5,
                               fontWeight: FontWeight.w700,
                             ),
@@ -354,13 +335,15 @@ class _TemplateGoldShimmerButtonState extends State<_TemplateGoldShimmerButton>
   }
 
   Widget _buildButtonSurface() {
+    final foreground = context.petMagicColors.on(const Color(0xFFEAB13A));
+
     return Center(
       child: FittedBox(
         fit: BoxFit.scaleDown,
         child: Text(
           widget.label,
-          style: const TextStyle(
-            color: Color(0xFF261903),
+          style: TextStyle(
+            color: foreground,
             fontSize: 18,
             fontWeight: FontWeight.w900,
           ),

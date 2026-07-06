@@ -12,11 +12,7 @@ const EXPORT_FILENAME_MAX_ID_LENGTH = 80;
 
 export type SafeTemplateAnalyticsTemplateExport = Omit<
   AdminTemplate,
-  | "previewAsset"
-  | "referenceMotionAsset"
-  | "imagePrompt"
-  | "preprocessingPrompt"
-  | "klingPrompt"
+  "previewAsset" | "referenceMotionAsset" | "imagePrompt" | "preprocessingPrompt" | "klingPrompt"
 > & {
   hasPreviewAsset: boolean;
   previewAssetContentType?: string | null;
@@ -52,7 +48,10 @@ export function formatSafeTemplateAnalyticsExportName(templateId: string): strin
   return `template-${safeId}-analytics.json`;
 }
 
-function sanitizeAnalyticsOptionalText(value: string | undefined, maxLength?: number): string | undefined;
+function sanitizeAnalyticsOptionalText(
+  value: string | undefined,
+  maxLength?: number
+): string | undefined;
 function sanitizeAnalyticsOptionalText(
   value: string | null | undefined,
   maxLength?: number

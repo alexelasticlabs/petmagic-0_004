@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using MimeKit;
 using MimeKit.Text;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Identity.Infrastructure.Entities;
 using PetMagic.Modules.Identity.Infrastructure.Options;
@@ -57,13 +58,13 @@ internal sealed class SmtpEmailSender(EmailOptions options, ILogger<SmtpEmailSen
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             logger.LogWarning(
-                exception,
-                "SMTP email dispatch failed. Host={EmailHost} Port={EmailPort} UseSsl={UseSsl} HasCredentials={HasCredentials} RecipientDomain={RecipientDomain}",
+                "SMTP email dispatch failed. Host={EmailHost} Port={EmailPort} UseSsl={UseSsl} HasCredentials={HasCredentials} RecipientDomain={RecipientDomain} ExceptionType={ExceptionType}",
                 options.Host,
                 options.Port,
                 options.UseSsl,
                 options.HasCredentials,
-                GetRecipientDomain(job.RecipientEmail));
+                GetRecipientDomain(job.RecipientEmail),
+                SafeLogValues.ExceptionType(exception));
             return Result.Failure(IdentityErrors.EmailDispatchFailed);
         }
     }

@@ -348,46 +348,53 @@ public sealed partial class IdentityService(
     private void LogAuthInformation(string operation, Guid userId, string result)
     {
         logger?.LogInformation(
-            "Identity authentication business event. Operation={Operation} UserId={UserId} Result={Result} CorrelationId={CorrelationId}",
+            "Identity authentication business event. Operation={Operation} UserIdHash={UserIdHash} Result={Result} CorrelationIdHash={CorrelationIdHash}",
             operation,
-            userId,
+            HashUserId(userId),
             result,
-            CorrelationContext.ResolveOrCreate());
+            SafeLogValues.StableHash(CorrelationContext.ResolveOrCreate()));
     }
 
     private void LogSocialAuthInformation(string operation, string provider, Guid userId, string result, bool isNewUser = false)
     {
         logger?.LogInformation(
-            "Social authentication event. Operation={Operation} Provider={Provider} Platform={Platform} UserId={UserId} IsNewUser={IsNewUser} Result={Result} CorrelationId={CorrelationId}",
+            "Social authentication event. Operation={Operation} Provider={Provider} Platform={Platform} UserIdHash={UserIdHash} IsNewUser={IsNewUser} Result={Result} CorrelationIdHash={CorrelationIdHash}",
             operation,
             provider,
             httpContextAccessor.HttpContext?.Request.Headers["X-Client-Platform"].ToString(),
-            userId,
+            HashUserId(userId),
             isNewUser,
             result,
-            CorrelationContext.ResolveOrCreate());
+            SafeLogValues.StableHash(CorrelationContext.ResolveOrCreate()));
     }
 
     private void LogSocialAuthWarning(string operation, string? provider, Guid? userId, string reason)
     {
         logger?.LogWarning(
-            "Social authentication failure. Operation={Operation} Provider={Provider} Platform={Platform} UserId={UserId} Reason={Reason} CorrelationId={CorrelationId}",
+            "Social authentication failure. Operation={Operation} Provider={Provider} Platform={Platform} UserIdHash={UserIdHash} Reason={Reason} CorrelationIdHash={CorrelationIdHash}",
             operation,
             provider,
             httpContextAccessor.HttpContext?.Request.Headers["X-Client-Platform"].ToString(),
-            userId,
+            HashUserId(userId),
             reason,
-            CorrelationContext.ResolveOrCreate());
+            SafeLogValues.StableHash(CorrelationContext.ResolveOrCreate()));
     }
 
     private void LogAuthWarning(string operation, Guid? userId, string reason)
     {
         logger?.LogWarning(
-            "Identity authentication recoverable event. Operation={Operation} UserId={UserId} Reason={Reason} CorrelationId={CorrelationId}",
+            "Identity authentication recoverable event. Operation={Operation} UserIdHash={UserIdHash} Reason={Reason} CorrelationIdHash={CorrelationIdHash}",
             operation,
-            userId,
+            HashUserId(userId),
             reason,
-            CorrelationContext.ResolveOrCreate());
+            SafeLogValues.StableHash(CorrelationContext.ResolveOrCreate()));
+    }
+
+    private static string? HashUserId(Guid? userId)
+    {
+        return userId.HasValue
+            ? SafeLogValues.StableHash(userId.Value.ToString("D"))
+            : null;
     }
 
     private static Guid? ResolveActorUserId(HttpContext? httpContext)

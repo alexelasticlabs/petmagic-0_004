@@ -19,6 +19,7 @@ import 'package:petmagic_mobile/features/templates/data/template_generation_repo
 import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_controller.dart';
+import 'package:petmagic_mobile/features/wallet/data/wallet_store_purchase_recovery_store.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/payments/store_product_availability_cache.dart';
 
@@ -67,12 +68,19 @@ final sessionScopeResetProvider = Provider<void>((ref) {
         templateGenerationRepositoryProvider,
       );
       final generationGalleryStore = ref.read(generationGalleryStoreProvider);
+      final storePurchaseRecoveryStore = ref.read(
+        walletStorePurchaseRecoveryStoreProvider,
+      );
       final clearMediaCaches = ref.read(sessionMediaCacheCleanerProvider);
       unawaited(
         Future.wait<void>([
           templateGenerationRepository.clearLocalCache(),
           generationGalleryStore.cancelActiveDownloads(),
           generationGalleryStore.purgeAllScopes(),
+          _runBestEffortCleanup(
+            'wallet_store_purchase_recovery_state',
+            storePurchaseRecoveryStore.clearPendingPurchase,
+          ),
           _runBestEffortCleanup(
             'push_token_registration_state',
             PushTokenRegistrar.clearRegistrationState,

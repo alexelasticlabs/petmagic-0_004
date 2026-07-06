@@ -8,7 +8,7 @@ settings plus the fal.ai dashboard check recorded on 2026-07-01.
 
 - Profile: `FalConcurrency10`.
 - fal.ai account concurrency confirmed for staging: `10`.
-- API appsettings and GenerationWorker appsettings are pinned to the same scheduler values.
+- API and GenerationWorker staging environment overrides are pinned to the same scheduler values.
 - Worker layout: exactly `4` GenerationWorker replicas with `2` loops each.
 - Capacity formula: `4 * 2 = 8` worker loops, matching `GENERATION_GLOBAL_MAX_CONCURRENT=8`.
 
@@ -179,7 +179,7 @@ bundle in an external transaction, because the scheduler/provider migrations use
 Current source check:
 
 ```powershell
-rg -n "CONCURRENTLY|suppressTransaction" src\Modules\Templates\PetMagic.Modules.Templates.Infrastructure\Data\Migrations\20260630234809_AddGenerationSchedulerQueueFields.cs src\Modules\Templates\PetMagic.Modules.Templates.Infrastructure\Data\Migrations\20260701093000_AddAsyncGenerationProviderPipeline.cs
+rg -n "CONCURRENTLY|suppressTransaction" src\Modules\Templates\PetMagic.Modules.Templates.Infrastructure\Data\Migrations\20260630234809_AddGenerationSchedulerQueueFields.cs src\Modules\Templates\PetMagic.Modules.Templates.Infrastructure\Data\Migrations\20260701093000_AddAsyncGenerationProviderPipeline.cs src\Modules\Templates\PetMagic.Modules.Templates.Infrastructure\Data\Migrations\20260702234729_AddGenerationBillingReconciliationIndexes.cs
 ```
 
 Expected result: every `CONCURRENTLY` SQL call has `suppressTransaction: true`.
@@ -191,24 +191,31 @@ SELECT "MigrationId"
 FROM "__EFMigrationsHistory"
 WHERE "MigrationId" IN (
   '20260630234809_AddGenerationSchedulerQueueFields',
-  '20260701093000_AddAsyncGenerationProviderPipeline'
+  '20260701093000_AddAsyncGenerationProviderPipeline',
+  '20260702234729_AddGenerationBillingReconciliationIndexes'
 )
 ORDER BY "MigrationId";
 ```
 
-Both migration IDs must be present before smoke.
+All three migration IDs must be present before smoke when this release includes the generation
+billing reconciliation hardening.
 
 ## Secrets To Fill Manually
 
 Do not commit or paste these values:
 
 - `ConnectionStrings__DefaultConnection` / `STAGING_DATABASE_URL`.
+- `POSTGRES_PASSWORD` when running the Docker Compose staging profile.
 - `FAL_AI_API_KEY`.
 - `FAL_WEBHOOK_URL` after replacing the host with the real public staging API URL.
 - `R2_ACCOUNT_ID`, `R2_ACCESS_KEY`, `R2_SECRET_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL`.
 - `BACKEND_PUBLIC_BASE_URL`.
+- `BACKEND_ALLOWED_HOSTS`.
+- `BACKEND_HEALTHCHECK_HOST`.
+- `NEXT_PUBLIC_API_BASE_URL` and `INTERNAL_API_BASE_URL` for admin-web.
 - `JWT_SIGNING_KEY`.
 - `DATA_PROTECTION_CERTIFICATE_PASSWORD`.
+- `ALERTMANAGER_WEBHOOK_URL` and `GRAFANA_ADMIN_PASSWORD` when the monitoring profile is enabled.
 - `FIREBASE_PROJECT_ID` and `FIREBASE_SERVICE_ACCOUNT_JSON` if push notifications are enabled.
 - `STAGING_FREE_JWT`, `STAGING_PREMIUM_JWT`, optional `STAGING_ADMIN_AUTH_TOKEN`.
 

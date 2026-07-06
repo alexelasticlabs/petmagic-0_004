@@ -552,6 +552,8 @@ public sealed partial class EconomyServiceTests
         Assert.Equal("monthly", subscription.PlanId);
         Assert.Equal(777, subscription.MonthlyTokenLimit);
         Assert.Equal("Active", subscription.Status);
+        Assert.StartsWith("gpt_", subscription.ExternalTransactionId, StringComparison.Ordinal);
+        Assert.DoesNotContain("server-payload", subscription.ExternalTransactionId, StringComparison.Ordinal);
         Assert.Equal(40, subscription.MonthlyTokensGranted);
         Assert.Single(grantEntries);
         Assert.Equal(2, identityService.SetPremiumStatusCalls.Count);
@@ -738,9 +740,53 @@ public sealed partial class EconomyServiceTests
     }
 
     [Fact]
-    public async Task VerifyPremiumStorePurchaseAsync_ShouldNotDuplicateAllowanceAcrossDuplicateProviderSubscriptions()
+    public async Task PremiumEntitlementAudit_ShouldSanitizeDurablePayloadSecrets()
     {
         await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var service = CreateService(dbContext);
+        var appendMethod = typeof(EconomyService).GetMethod(
+            "AppendPremiumEntitlementEventAsync",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(appendMethod);
+
+        var task = (Task)appendMethod.Invoke(
+            service,
+            [
+                userId,
+                null,
+                "google_play",
+                "PremiumReconciliationIncident",
+                "Active",
+                "evt_safe",
+                "sub_safe",
+                new
+                {
+                    reason = "manual_check",
+                    purchaseToken = "gp-token-secret",
+                    signedPayload = "app-store-secret",
+                    api_secret = "sk_live_hidden",
+                    rawReceipt = "receipt-secret"
+                },
+                CancellationToken.None
+            ])!;
+        await task;
+
+        var eventLog = await dbContext.SubscriptionEventLogs.SingleAsync(x => x.UserId == userId);
+        Assert.NotNull(eventLog.PayloadJson);
+        Assert.Contains("manual_check", eventLog.PayloadJson);
+        Assert.DoesNotContain("gp-token-secret", eventLog.PayloadJson);
+        Assert.DoesNotContain("app-store-secret", eventLog.PayloadJson);
+        Assert.DoesNotContain("sk_live_hidden", eventLog.PayloadJson);
+        Assert.DoesNotContain("receipt-secret", eventLog.PayloadJson);
+    }
+
+    [Fact]
+    public async Task VerifyPremiumStorePurchaseAsync_ShouldNotDuplicateAllowanceAcrossDuplicateProviderSubscriptions()
+    {
+        await using var connection = await CreateSharedSqliteEconomyDatabaseAsync();
+        await using var dbContext = CreateSqliteDbContext(connection.ConnectionString);
 
         var now = DateTime.UtcNow;
         var periodStartUtc = now.AddDays(-3);
@@ -1232,10 +1278,197 @@ public sealed partial class EconomyServiceTests
         var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
 
         Assert.Equal("succeeded", order.Status);
-        Assert.Equal("gp-token-pack-1", order.ExternalPaymentId);
+        Assert.StartsWith("gpt_", order.ExternalPaymentId, StringComparison.Ordinal);
+        Assert.DoesNotContain("gp-token-pack-1", order.ExternalPaymentId, StringComparison.Ordinal);
         Assert.Equal(120, wallet.Balance);
         Assert.Single(ledgerEntries);
         Assert.Equal(120, ledgerEntries[0].Delta);
+    }
+
+    [Fact]
+    public async Task ValidateGooglePlayBillingAsync_ShouldRecognizeLegacyRawPurchaseTokenWithoutDuplicating()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var packId = Guid.NewGuid();
+        dbContext.CurrencyPacks.Add(new CurrencyPack
+        {
+            Id = packId,
+            Code = "pack100",
+            DisplayName = "Pack 100",
+            CurrencyCode = "USD",
+            PriceAmount = 4.99m,
+            GrantedSpark = 100,
+            BonusSpark = 20,
+            IsActive = true,
+            SortOrder = 1
+        });
+        dbContext.PurchaseOrders.Add(new PurchaseOrder
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            PackId = packId,
+            PaymentProvider = "google_play",
+            Status = PurchaseOrderStatus.Succeeded,
+            PriceAmount = 4.99m,
+            CurrencyCode = "USD",
+            SparkToGrant = 120,
+            ExternalPaymentId = "gp-legacy-token-pack-1",
+            CreatedAtUtc = DateTime.UtcNow,
+            ConfirmedAtUtc = DateTime.UtcNow
+        });
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext);
+
+        var result = await service.ValidateGooglePlayBillingAsync(
+            new ValidateGooglePlayBillingCommand(
+                userId,
+                "gp-legacy-token-pack-1",
+                "com.petmagic.app.tokens.google.pack100",
+                "com.petmagic.app"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("already_settled", result.Value.Status);
+        Assert.False(result.Value.TokensGranted);
+        Assert.Single(await dbContext.PurchaseOrders.ToListAsync());
+        Assert.Empty(await dbContext.WalletLedgerEntries.ToListAsync());
+    }
+
+    [Fact]
+    public async Task VerifyPackStorePurchaseAsync_ShouldStoreHashedGooglePlayPurchaseTokenAndNotGrantTwice()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var packId = AddStarterPack(dbContext);
+        EnableStoreProvider(dbContext, "google_play", "android");
+
+        var packCode = await dbContext.CurrencyPacks
+            .Where(x => x.Id == packId)
+            .Select(x => x.Code)
+            .SingleAsync();
+        var productId = BuildStoreProductId("google_play", packCode);
+        var purchaseToken = "gp-direct-pack-token-1";
+        var service = CreateService(dbContext);
+
+        var createResult = await service.CreatePackPurchaseAsync(
+            new CreatePackPurchaseCommand(userId, packId, "USD", "google_play", "android", "1.0.0", "US", "en"),
+            CancellationToken.None);
+
+        Assert.True(createResult.IsSuccess);
+
+        var command = new VerifyPackStorePurchaseCommand(
+            userId,
+            createResult.Value.OrderId,
+            "google_play",
+            productId,
+            purchaseToken,
+            null,
+            "purchase-direct-1",
+            DateTime.UtcNow.ToString("O"));
+
+        var first = await service.VerifyPackStorePurchaseAsync(command, CancellationToken.None);
+        var second = await service.VerifyPackStorePurchaseAsync(command, CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsSuccess);
+        Assert.Equal(PurchaseOrderStatus.Succeeded, first.Value.Status);
+        Assert.Equal(PurchaseOrderStatus.Succeeded, second.Value.Status);
+
+        var order = await dbContext.PurchaseOrders.SingleAsync();
+        var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
+        var ledgerEntry = await dbContext.WalletLedgerEntries.SingleAsync(x => x.UserId == userId);
+
+        Assert.StartsWith("gpt_", order.ExternalPaymentId, StringComparison.Ordinal);
+        Assert.DoesNotContain(purchaseToken, order.ExternalPaymentId, StringComparison.Ordinal);
+        Assert.Equal(120, wallet.Balance);
+        Assert.Equal(120, ledgerEntry.Delta);
+        Assert.Equal(order.ExternalPaymentId, ledgerEntry.SourceTransactionId);
+        Assert.DoesNotContain(purchaseToken, ledgerEntry.SourceTransactionId, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task VerifyPackStorePurchaseAsync_ShouldRecognizeLegacyRawGooglePlayTokenWithoutDuplicating()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var packId = AddStarterPack(dbContext);
+        EnableStoreProvider(dbContext, "google_play", "android");
+        var now = DateTime.UtcNow;
+        var purchaseToken = "gp-direct-legacy-token-1";
+        var legacyOrderId = Guid.NewGuid();
+
+        dbContext.PurchaseOrders.Add(new PurchaseOrder
+        {
+            Id = legacyOrderId,
+            UserId = userId,
+            PackId = packId,
+            PaymentProvider = "google_play",
+            Status = PurchaseOrderStatus.Succeeded,
+            PriceAmount = 4.99m,
+            CurrencyCode = "USD",
+            SparkToGrant = 120,
+            ExternalPaymentId = purchaseToken,
+            CreatedAtUtc = now,
+            ConfirmedAtUtc = now
+        });
+        dbContext.Wallets.Add(new Wallet
+        {
+            UserId = userId,
+            Balance = 120,
+            UpdatedAtUtc = now
+        });
+        dbContext.WalletLedgerEntries.Add(new WalletLedgerEntry
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Delta = 120,
+            BalanceAfter = 120,
+            Source = WalletLedgerSource.PackPurchase,
+            Reason = $"purchase:{legacyOrderId:D}",
+            TokenKind = "purchased",
+            OperationKind = "credit",
+            SourceProvider = "google_play",
+            SourceTransactionId = purchaseToken,
+            CreatedAtUtc = now
+        });
+        await dbContext.SaveChangesAsync();
+
+        var packCode = await dbContext.CurrencyPacks
+            .Where(x => x.Id == packId)
+            .Select(x => x.Code)
+            .SingleAsync();
+        var service = CreateService(dbContext);
+        var createResult = await service.CreatePackPurchaseAsync(
+            new CreatePackPurchaseCommand(userId, packId, "USD", "google_play", "android", "1.0.0", "US", "en"),
+            CancellationToken.None);
+
+        Assert.True(createResult.IsSuccess);
+
+        var verifyResult = await service.VerifyPackStorePurchaseAsync(
+            new VerifyPackStorePurchaseCommand(
+                userId,
+                createResult.Value.OrderId,
+                "google_play",
+                BuildStoreProductId("google_play", packCode),
+                purchaseToken,
+                null,
+                "purchase-direct-legacy-1",
+                DateTime.UtcNow.ToString("O")),
+            CancellationToken.None);
+
+        Assert.True(verifyResult.IsSuccess);
+        Assert.Equal(legacyOrderId, verifyResult.Value.OrderId);
+        Assert.Equal(PurchaseOrderStatus.Succeeded, verifyResult.Value.Status);
+        Assert.Equal(2, await dbContext.PurchaseOrders.CountAsync());
+        Assert.Single(await dbContext.PurchaseOrders.Where(x => x.Status == PurchaseOrderStatus.Succeeded).ToListAsync());
+        Assert.Single(await dbContext.PurchaseOrders.Where(x => x.Status == PurchaseOrderStatus.Pending).ToListAsync());
+        Assert.Equal(120, (await dbContext.Wallets.SingleAsync(x => x.UserId == userId)).Balance);
+        Assert.Single(await dbContext.WalletLedgerEntries.Where(x => x.UserId == userId).ToListAsync());
     }
 
     [Fact]
@@ -1265,6 +1498,49 @@ public sealed partial class EconomyServiceTests
         var pack = Assert.Single(result.Value, x => x.Code == "pack100");
         Assert.Equal("com.petmagic.app.tokens.google.pack100", pack.GooglePlayProductId);
         Assert.Equal("com.petmagic.app.tokens.apple.pack100", pack.AppStoreProductId);
+    }
+
+    [Fact]
+    public async Task ListPacksAsync_ShouldUseProviderSpecificStoreIdentifiers()
+    {
+        await using var dbContext = CreateDbContext();
+
+        dbContext.CurrencyPacks.Add(new CurrencyPack
+        {
+            Id = Guid.NewGuid(),
+            Code = "pack100",
+            DisplayName = "Pack 100",
+            CurrencyCode = "USD",
+            PriceAmount = 4.99m,
+            GrantedSpark = 100,
+            BonusSpark = 20,
+            IsActive = true,
+            SortOrder = 1
+        });
+        await dbContext.SaveChangesAsync();
+
+        var options = Microsoft.Extensions.Options.Options.Create(
+            new PetMagic.Modules.Economy.Infrastructure.Options.EconomyOptions
+            {
+                GooglePlayPackageName = "com.petmagic.android",
+                AppStoreBundleId = "com.petmagic.ios"
+            });
+        using var memoryCache = new Microsoft.Extensions.Caching.Memory.MemoryCache(
+            new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions());
+        var service = new EconomyService(
+            dbContext,
+            new FakePaymentGateway(),
+            new FakeStoreSubscriptionVerifier(),
+            options,
+            memoryCache,
+            storeWebhookSecurityValidator: new FakeStoreWebhookSecurityValidator(Result.Success()));
+
+        var result = await service.ListPacksAsync(CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var pack = Assert.Single(result.Value, x => x.Code == "pack100");
+        Assert.Equal("com.petmagic.android.tokens.google.pack100", pack.GooglePlayProductId);
+        Assert.Equal("com.petmagic.ios.tokens.apple.pack100", pack.AppStoreProductId);
     }
 
     private static void SetStripeRawJsonElement(Stripe.Subscription subscription, string json)
@@ -1310,8 +1586,10 @@ public sealed partial class EconomyServiceTests
 
         var order = await dbContext.PurchaseOrders.SingleAsync();
         var ledgerEntry = await dbContext.WalletLedgerEntries.SingleAsync(x => x.UserId == userId);
-        Assert.Equal("gp-sensitive-purchase-token-1", order.ExternalPaymentId);
-        Assert.Equal("gp-sensitive-purchase-token-1", ledgerEntry.SourceTransactionId);
+        Assert.StartsWith("gpt_", order.ExternalPaymentId, StringComparison.Ordinal);
+        Assert.DoesNotContain("gp-sensitive-purchase-token-1", order.ExternalPaymentId, StringComparison.Ordinal);
+        Assert.Equal(order.ExternalPaymentId, ledgerEntry.SourceTransactionId);
+        Assert.DoesNotContain("gp-sensitive-purchase-token-1", ledgerEntry.SourceTransactionId, StringComparison.Ordinal);
 
         var purchaseResponse = await service.GetPurchaseAsync(userId, order.Id, CancellationToken.None);
         var purchaseHistory = await service.GetPurchaseHistoryAsync(userId, 0, 10, CancellationToken.None);

@@ -7,6 +7,7 @@ const loginScreenStylesPath = fileURLToPath(
   new URL("./admin-login-screen.module.css", import.meta.url)
 );
 const adminIconsPath = fileURLToPath(new URL("./admin-icons.tsx", import.meta.url));
+const adminChromeContentPath = fileURLToPath(new URL("./admin-chrome.content.ts", import.meta.url));
 
 describe("admin login screen visual contract", () => {
   it("keeps dashboard preview colors on semantic theme tokens", () => {
@@ -37,5 +38,16 @@ describe("admin login screen visual contract", () => {
     expect(styles).not.toMatch(/font-size:\s*[^;]*vw/);
     expect(styles).toContain("min-height: 100dvh;");
     expect(styles).not.toContain("100vh");
+  });
+
+  it("keeps preview window title localized through admin chrome copy", () => {
+    const source = readFileSync(loginScreenPath, "utf8");
+    const contentSource = readFileSync(adminChromeContentPath, "utf8");
+
+    expect(source).toContain("<LoginDashboardPreview title={copy.previewWindowTitle} />");
+    expect(source).toContain("<span className={styles.previewWindowTitle}>{title}</span>");
+    expect(source).not.toContain("<span className={styles.previewWindowTitle}>Dashboard</span>");
+    expect(contentSource).toContain('previewWindowTitle: "Дашборд"');
+    expect(contentSource).toContain('previewWindowTitle: "Dashboard"');
   });
 });

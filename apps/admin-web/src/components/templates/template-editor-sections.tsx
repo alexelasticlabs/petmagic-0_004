@@ -98,8 +98,14 @@ export function TemplateReferenceAssetSection({
 
     setSelectionError(null);
     clearLocalReferenceUrl();
-    setLocalReference({ file, url: URL.createObjectURL(file) });
-    setReferenceFile(file);
+    const objectUrl = URL.createObjectURL(file);
+    try {
+      setLocalReference({ file, url: objectUrl });
+      setReferenceFile(file);
+    } catch (error) {
+      URL.revokeObjectURL(objectUrl);
+      throw error;
+    }
   }
 
   function handleReferenceDrop(event: DragEvent<HTMLDivElement>) {
@@ -281,16 +287,16 @@ export function TemplateVideoModelSection({
   klingModels,
 }: TemplateVideoModelSectionProps) {
   const preprocessingOptions = preprocessingModels.map((model) =>
-    buildModelOption(model, "preprocess")
+    buildModelOption(text, model, "preprocess")
   );
-  const klingOptions = klingModels.map((model) => buildModelOption(model, "motion"));
+  const klingOptions = klingModels.map((model) => buildModelOption(text, model, "motion"));
 
   return (
     <div className={styles.formSection}>
       <div className={styles.modelGrid}>
         <div className={styles.modelCard}>
           <div className={styles.modelCardHeader}>
-            <p className={styles.modelCardEyebrow}>Input shaping</p>
+            <p className={styles.modelCardEyebrow}>{text.preprocessingModelEyebrow}</p>
             <p className={styles.modelCardTitle}>{text.preprocessingModelLabel}</p>
           </div>
           <label className={styles.fieldBlock}>
@@ -333,7 +339,7 @@ export function TemplateVideoModelSection({
 
         <div className={styles.modelCard}>
           <div className={styles.modelCardHeader}>
-            <p className={styles.modelCardEyebrow}>Motion pass</p>
+            <p className={styles.modelCardEyebrow}>{text.klingModelEyebrow}</p>
             <p className={styles.modelCardTitle}>{text.klingModelLabel}</p>
           </div>
           <label className={styles.fieldBlock}>
@@ -390,14 +396,14 @@ export function TemplateImageModelSection({
   setForm,
   imageModels,
 }: TemplateImageModelSectionProps) {
-  const imageOptions = imageModels.map((model) => buildModelOption(model, "preprocess"));
+  const imageOptions = imageModels.map((model) => buildModelOption(text, model, "preprocess"));
 
   return (
     <div className={styles.formSection}>
       <div className={styles.modelGrid}>
         <div className={styles.modelCard}>
           <div className={styles.modelCardHeader}>
-            <p className={styles.modelCardEyebrow}>Image pass</p>
+            <p className={styles.modelCardEyebrow}>{text.imageModelEyebrow}</p>
             <p className={styles.modelCardTitle}>{text.imageModelLabel}</p>
           </div>
           <label className={styles.fieldBlock}>
@@ -437,7 +443,11 @@ export function TemplateImageModelSection({
   );
 }
 
-function buildModelOption(model: string, kind: "preprocess" | "motion"): SelectOption {
+function buildModelOption(
+  text: Dictionary,
+  model: string,
+  kind: "preprocess" | "motion"
+): SelectOption {
   const lower = model.toLowerCase();
 
   if (kind === "motion") {
@@ -448,8 +458,8 @@ function buildModelOption(model: string, kind: "preprocess" | "motion"): SelectO
       return {
         value: model,
         label: model,
-        description: "Motion control for highest-fidelity generation.",
-        badge: "Premium",
+        description: text.motionModelPremiumDescription,
+        badge: text.modelBadgePremium,
         tone: "premium",
         price: priceStr ?? undefined,
       };
@@ -458,8 +468,8 @@ function buildModelOption(model: string, kind: "preprocess" | "motion"): SelectO
     return {
       value: model,
       label: model,
-      description: "Motion control tuned for quicker iteration.",
-      badge: "Fast",
+      description: text.motionModelFastDescription,
+      badge: text.modelBadgeFast,
       tone: "fast",
       price: priceStr ?? undefined,
     };
@@ -472,8 +482,8 @@ function buildModelOption(model: string, kind: "preprocess" | "motion"): SelectO
     return {
       value: model,
       label: model,
-      description: "Image edit pass for balanced fidelity and consistency.",
-      badge: "Recommended",
+      description: text.imageModelRecommendedDescription,
+      badge: text.modelBadgeRecommended,
       tone: "recommended",
       price: priceStr ?? undefined,
     };
@@ -483,8 +493,8 @@ function buildModelOption(model: string, kind: "preprocess" | "motion"): SelectO
     return {
       value: model,
       label: model,
-      description: "Image edit pass focused on premium detail retention.",
-      badge: "Premium",
+      description: text.imageModelPremiumDescription,
+      badge: text.modelBadgePremium,
       tone: "premium",
       price: priceStr ?? undefined,
     };
@@ -493,8 +503,8 @@ function buildModelOption(model: string, kind: "preprocess" | "motion"): SelectO
   return {
     value: model,
     label: model,
-    description: "Image edit pass optimized for faster turnaround.",
-    badge: "Fast",
+    description: text.imageModelFastDescription,
+    badge: text.modelBadgeFast,
     tone: "fast",
     price: priceStr ?? undefined,
   };

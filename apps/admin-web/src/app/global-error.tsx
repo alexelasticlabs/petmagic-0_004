@@ -44,7 +44,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
             aria-labelledby="global-error-title"
             aria-describedby="global-error-description"
           >
-            <p className={styles.eyebrow}>PetMagic Admin</p>
+            <p className={styles.eyebrow}>{text.brandTitle}</p>
             <h1 id="global-error-title" className={styles.title}>
               {text.globalErrorTitle}
             </h1>

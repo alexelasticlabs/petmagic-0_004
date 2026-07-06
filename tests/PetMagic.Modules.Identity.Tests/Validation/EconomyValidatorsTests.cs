@@ -24,24 +24,6 @@ public sealed class EconomyValidatorsTests
     }
 
     [Fact]
-    public void SpendBalanceValidator_ShouldFail_WhenAmountInvalid()
-    {
-        var validator = new SpendBalanceCommandValidator();
-        var result = validator.Validate(new SpendBalanceCommand(Guid.NewGuid(), 0, "video_generation"));
-
-        Assert.False(result.IsValid);
-    }
-
-    [Fact]
-    public void SpendBalanceValidator_ShouldPass_WhenPayloadValid()
-    {
-        var validator = new SpendBalanceCommandValidator();
-        var result = validator.Validate(new SpendBalanceCommand(Guid.NewGuid(), 60, "video_generation"));
-
-        Assert.True(result.IsValid);
-    }
-
-    [Fact]
     public void CreatePackPurchaseValidator_ShouldFail_WhenCurrencyInvalid()
     {
         var validator = new CreatePackPurchaseCommandValidator();

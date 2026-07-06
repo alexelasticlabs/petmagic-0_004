@@ -52,7 +52,7 @@ public static partial class AdminEconomyEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.UpdatePaymentProviderConfigurationAsync(command, cancellationToken);
@@ -92,7 +92,7 @@ public static partial class AdminEconomyEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.CreatePaymentProviderConfigurationAsync(command, cancellationToken);
@@ -118,7 +118,7 @@ public static partial class AdminEconomyEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.ClonePaymentProviderConfigurationAsync(command, cancellationToken);
@@ -141,7 +141,7 @@ public static partial class AdminEconomyEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.DeletePaymentProviderConfigurationAsync(command, cancellationToken);
@@ -168,7 +168,7 @@ public static partial class AdminEconomyEndpoints
         var validation = await validator.ValidateAsync(query, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.TestPaymentProviderConfigurationMatchAsync(query, cancellationToken);

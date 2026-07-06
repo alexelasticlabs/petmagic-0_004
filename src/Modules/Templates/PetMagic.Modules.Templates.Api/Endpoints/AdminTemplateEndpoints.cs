@@ -30,6 +30,7 @@ public static partial class AdminTemplateEndpoints
     {
         var group = endpoints.MapGroup("/api/admin/templates")
             .WithTags("Admin.Templates")
+            .AddEndpointFilter(ApplyPrivateAdminTemplateResponseHeadersAsync)
             .RequireAuthorization("ModeratorOrAdmin")
             .RequireRateLimiting("admin");
 
@@ -38,7 +39,8 @@ public static partial class AdminTemplateEndpoints
         group.MapGet("/moderation", GetModerationQueueAsync);
         group.MapPost("/moderation/{eventId:guid}/decision", DecideModerationItemAsync)
             .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateSmallJsonRequestBodyBytes));
-        group.MapGet("/generations/metrics", GetGenerationDashboardMetricsAsync);
+        group.MapGet("/generations/metrics", GetGenerationDashboardMetricsAsync)
+            .RequireAuthorization("AdminOnly");
         group.MapGet("/generations", ListGenerationsAsync)
             .RequireAuthorization("AdminOnly");
         group.MapGet("/monetization/watermark", GetWatermarkSettingsAsync)
@@ -47,8 +49,16 @@ public static partial class AdminTemplateEndpoints
             .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateSmallJsonRequestBodyBytes))
             .RequireAuthorization("AdminOnly");
         group.MapPost("/generations/{generationId:guid}/grant-clean-download", GrantCleanDownloadAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateSmallJsonRequestBodyBytes))
+            .RequireAuthorization("AdminOnly");
+        group.MapPost("/generations/{generationId:guid}/cancel", CancelGenerationAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateSmallJsonRequestBodyBytes))
+            .RequireAuthorization("AdminOnly");
+        group.MapPost("/generations/{generationId:guid}/retry", RetryGenerationAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateSmallJsonRequestBodyBytes))
             .RequireAuthorization("AdminOnly");
         group.MapPost("/generations/{generationId:guid}/retry-refund", RetryGenerationRefundAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateSmallJsonRequestBodyBytes))
             .RequireAuthorization("AdminOnly");
         group.MapGet("/{templateId:guid}", GetAsync);
         group.MapGet("/{templateId:guid}/statistics", GetStatisticsAsync);
@@ -79,6 +89,7 @@ public static partial class AdminTemplateEndpoints
             .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateSmallJsonRequestBodyBytes))
             .RequireAuthorization("AdminOnly");
         group.MapDelete("/{templateId:guid}", DeleteAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateSmallJsonRequestBodyBytes))
             .RequireAuthorization("AdminOnly");
         group.MapPost("/media/upload", UploadMediaAsync)
             .RequireAuthorization("AdminOnly")
@@ -87,15 +98,18 @@ public static partial class AdminTemplateEndpoints
 
         var templateOfTheDayGroup = endpoints.MapGroup("/api/admin/template-of-the-day")
             .WithTags("Admin.TemplateOfTheDay")
+            .AddEndpointFilter(ApplyPrivateAdminTemplateResponseHeadersAsync)
             .RequireAuthorization("AdminOnly")
             .RequireRateLimiting("admin");
 
         endpoints.MapGet("/api/admin/template-of-the-day", ListTemplateOfTheDayScheduleAsync)
             .WithTags("Admin.TemplateOfTheDay")
+            .AddEndpointFilter(ApplyPrivateAdminTemplateResponseHeadersAsync)
             .RequireAuthorization("AdminOnly")
             .RequireRateLimiting("admin");
         endpoints.MapPost("/api/admin/template-of-the-day", CreateTemplateOfTheDayAsync)
             .WithTags("Admin.TemplateOfTheDay")
+            .AddEndpointFilter(ApplyPrivateAdminTemplateResponseHeadersAsync)
             .RequireAuthorization("AdminOnly")
             .RequireRateLimiting("admin")
             .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateSmallJsonRequestBodyBytes));
@@ -106,10 +120,22 @@ public static partial class AdminTemplateEndpoints
             .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateSmallJsonRequestBodyBytes));
         templateOfTheDayGroup.MapPut("/{id:guid}", UpdateTemplateOfTheDayAsync)
             .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateSmallJsonRequestBodyBytes));
-        templateOfTheDayGroup.MapDelete("/{id:guid}", DeleteTemplateOfTheDayAsync);
+        templateOfTheDayGroup.MapDelete("/{id:guid}", DeleteTemplateOfTheDayAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateSmallJsonRequestBodyBytes));
         templateOfTheDayGroup.MapPost("/auto-pick", AutoPickTemplateOfTheDayAsync)
             .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateSmallJsonRequestBodyBytes));
 
         return endpoints;
+    }
+
+    private static async ValueTask<object?> ApplyPrivateAdminTemplateResponseHeadersAsync(
+        EndpointFilterInvocationContext context,
+        EndpointFilterDelegate next)
+    {
+        context.HttpContext.Response.Headers.CacheControl = "no-store";
+        context.HttpContext.Response.Headers.Pragma = "no-cache";
+        context.HttpContext.Response.Headers.XContentTypeOptions = "nosniff";
+
+        return await next(context);
     }
 }

@@ -611,6 +611,12 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
     if (normalized.contains('attachment_file_too_large')) {
       return text.supportChatAttachmentTooLargeError;
     }
+    if (normalized.contains('attachment_file_required') ||
+        normalized.contains('attachment_file_name_required') ||
+        normalized.contains('attachment_file_name_too_long') ||
+        normalized.contains('attachment_content_type_too_long')) {
+      return text.supportChatAttachmentUnavailableError;
+    }
     if (normalized.contains('attachment_content_type_not_allowed')) {
       return text.supportChatAttachmentUnavailableError;
     }

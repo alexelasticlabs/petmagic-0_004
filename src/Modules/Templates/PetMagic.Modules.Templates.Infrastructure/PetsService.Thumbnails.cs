@@ -112,7 +112,11 @@ internal sealed partial class PetsService
             process.StartInfo.ArgumentList.Add(tempOutput);
 
             process.Start();
+            var stderrDrainTask = ProcessOutputDrainer.DrainAsync(process.StandardError, cancellationToken);
+            var stdoutDrainTask = ProcessOutputDrainer.DrainAsync(process.StandardOutput, cancellationToken);
             await process.WaitForExitAsync(cancellationToken);
+            await stderrDrainTask;
+            await stdoutDrainTask;
             if (process.ExitCode != 0 || !File.Exists(tempOutput) || new FileInfo(tempOutput).Length == 0)
             {
                 return null;
@@ -176,7 +180,11 @@ internal sealed partial class PetsService
             process.StartInfo.ArgumentList.Add(tempPng);
 
             process.Start();
+            var stderrDrainTask = ProcessOutputDrainer.DrainAsync(process.StandardError, cancellationToken);
+            var stdoutDrainTask = ProcessOutputDrainer.DrainAsync(process.StandardOutput, cancellationToken);
             await process.WaitForExitAsync(cancellationToken);
+            await stderrDrainTask;
+            await stdoutDrainTask;
             if (process.ExitCode != 0 || !File.Exists(tempPng) || new FileInfo(tempPng).Length == 0)
             {
                 return null;

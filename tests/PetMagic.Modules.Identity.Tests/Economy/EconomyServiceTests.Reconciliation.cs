@@ -1,8 +1,11 @@
+using System.Reflection;
+
 using Microsoft.EntityFrameworkCore;
 
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
 using PetMagic.Modules.Economy.Domain.Enums;
+using PetMagic.Modules.Economy.Infrastructure;
 using PetMagic.Modules.Economy.Infrastructure.Data;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
 
@@ -42,6 +45,67 @@ public sealed partial class EconomyServiceTests
         Assert.Equal("PurchaseSettlementFailed", incident.Type);
         Assert.Equal("Open", incident.Status);
         Assert.Equal(userId, incident.UserId);
+    }
+
+    [Fact]
+    public async Task EconomyIncidentDetails_ShouldSanitizeDurableSecrets()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var service = CreateService(dbContext);
+        var statsType = typeof(EconomyService).GetNestedType(
+            "ReconciliationStats",
+            BindingFlags.NonPublic);
+        Assert.NotNull(statsType);
+        var stats = Activator.CreateInstance(
+            statsType,
+            BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
+            binder: null,
+            args: [DateTime.UtcNow],
+            culture: null);
+        Assert.NotNull(stats);
+        var upsertMethod = typeof(EconomyService).GetMethod(
+            "UpsertEconomyIncidentAsync",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(upsertMethod);
+
+        var task = (Task)upsertMethod.Invoke(
+            service,
+            [
+                "WebhookProcessingFailed",
+                "Warning",
+                "privacy:test-incident-details",
+                "Synthetic privacy regression incident.",
+                stats,
+                "Open",
+                null,
+                null,
+                null,
+                "google_play",
+                "evt_safe",
+                new
+                {
+                    safe = "visible",
+                    purchaseToken = "gp-token-secret",
+                    signedPayload = "app-store-secret",
+                    api_secret = "sk_live_hidden",
+                    rawReceipt = "receipt-secret"
+                },
+                false,
+                "provider failed with token=gp-token-secret api_secret=sk_live_hidden",
+                CancellationToken.None
+            ])!;
+        await task;
+
+        var incident = await dbContext.EconomyIncidents.SingleAsync();
+        Assert.NotNull(incident.DetailsJson);
+        Assert.Contains("visible", incident.DetailsJson);
+        Assert.DoesNotContain("gp-token-secret", incident.DetailsJson);
+        Assert.DoesNotContain("app-store-secret", incident.DetailsJson);
+        Assert.DoesNotContain("sk_live_hidden", incident.DetailsJson);
+        Assert.DoesNotContain("receipt-secret", incident.DetailsJson);
+        Assert.DoesNotContain("gp-token-secret", incident.LastError);
+        Assert.DoesNotContain("sk_live_hidden", incident.LastError);
     }
 
     [Fact]

@@ -40,6 +40,14 @@ void main() {
         requestIdentitySource,
         contains('Secure random unavailable; falling back to Random.'),
       );
+      expect(
+        requestIdentitySource,
+        contains('error: kDebugMode ? error : error.runtimeType.toString()'),
+      );
+      expect(
+        requestIdentitySource,
+        contains('stackTrace: kDebugMode ? stackTrace : null'),
+      );
       expect(requestIdentitySource, isNot(contains('} catch (_) {')));
     },
   );

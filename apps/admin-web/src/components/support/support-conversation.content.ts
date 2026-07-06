@@ -19,7 +19,6 @@ type SupportConversationCopy = {
     actionsForbidden: string;
     notificationTitle: string;
     realtimeMessageFallback: string;
-    realtimeMessageWithPreview: (preview: string) => string;
     optimisticAttachmentPreview: (fileName?: string | null) => string;
   };
   page: {
@@ -45,9 +44,21 @@ type SupportConversationCopy = {
     queue: {
       title: string;
       all: string;
+      waiting: string;
       unassigned: string;
       archive: string;
       status: string;
+      priority: string;
+      priorityAll: string;
+      priorityHigh: string;
+      priorityNormal: string;
+      priorityLow: string;
+      sort: string;
+      sortDefault: string;
+      sortPriority: string;
+      sortWaiting: string;
+      sortUpdated: string;
+      sortCreated: string;
       previousPage: string;
       nextPage: string;
       newMessagesTitle: (count: number) => string;
@@ -167,16 +178,14 @@ const supportConversationCopy: Record<Locale, SupportConversationCopy> = {
       duration: "Длительность",
     },
     controller: {
-      actionsForbidden: "Действия поддержки доступны только Admin или Moderator.",
+      actionsForbidden: "Действия поддержки доступны только администраторам или модераторам.",
       notificationTitle: "Поддержка",
       realtimeMessageFallback: "Новое сообщение в поддержке",
-      realtimeMessageWithPreview: (preview) => `Новое сообщение: ${preview}`,
       optimisticAttachmentPreview: (fileName) =>
         fileName?.trim() ? `Вложение: ${fileName.trim()}` : "Вложение",
     },
     page: {
-      workspaceSubtitle:
-        "Единое рабочее пространство для очереди, переписки и действий оператора",
+      workspaceSubtitle: "Единое рабочее пространство для очереди, переписки и действий оператора",
       closedConversationReadonly: "Диалог закрыт. Чтобы продолжить, переоткройте обращение.",
       dragAndDropImage: "Перетащите фото сюда",
       loadPreviousMessages: "Загрузить предыдущие сообщения",
@@ -198,9 +207,21 @@ const supportConversationCopy: Record<Locale, SupportConversationCopy> = {
       queue: {
         title: "Очередь",
         all: "Все",
+        waiting: "Ждут ответа",
         unassigned: "Без ответств.",
         archive: "Архив",
         status: "Статус",
+        priority: "Приоритет",
+        priorityAll: "Любой",
+        priorityHigh: "Высокий",
+        priorityNormal: "Обычный",
+        priorityLow: "Низкий",
+        sort: "Сортировка",
+        sortDefault: "По умолч.",
+        sortPriority: "Приоритет",
+        sortWaiting: "Ожидание",
+        sortUpdated: "Обновлено",
+        sortCreated: "Создано",
         previousPage: "Предыдущая страница очереди",
         nextPage: "Следующая страница очереди",
         newMessagesTitle: (count) => `Новых сообщений от пользователей: ${count}`,
@@ -266,7 +287,8 @@ const supportConversationCopy: Record<Locale, SupportConversationCopy> = {
     },
     helpers: {
       justNow: "только что",
-      minutesAgo: (value, format) => (format === "verbose" ? `${value} мин назад` : `${value} мин назад`),
+      minutesAgo: (value, format) =>
+        format === "verbose" ? `${value} мин назад` : `${value} мин назад`,
       hoursAgo: (value) => `${value} ч назад`,
       daysAgo: (value) => `${value} дн назад`,
       newUserReply: "Новый ответ пользователя",
@@ -281,8 +303,7 @@ const supportConversationCopy: Record<Locale, SupportConversationCopy> = {
       accountFact: (value) => `Аккаунт ${value}`,
       messageCount: (value) =>
         `${value} ${pluralizeRu(value, "сообщение", "сообщения", "сообщений")}`,
-      purchaseCount: (value) =>
-        `${value} ${pluralizeRu(value, "покупка", "покупки", "покупок")}`,
+      purchaseCount: (value) => `${value} ${pluralizeRu(value, "покупка", "покупки", "покупок")}`,
       fileSizeUnavailable: "Размер не указан",
       kilobytes: (value) => `${value.toFixed(1)} КБ`,
       megabytes: (value) => `${value.toFixed(1)} МБ`,
@@ -305,7 +326,6 @@ const supportConversationCopy: Record<Locale, SupportConversationCopy> = {
       actionsForbidden: "Support actions are available only to Admin or Moderator.",
       notificationTitle: "Support",
       realtimeMessageFallback: "New support message",
-      realtimeMessageWithPreview: (preview) => `New support message: ${preview}`,
       optimisticAttachmentPreview: (fileName) =>
         fileName?.trim() ? `Attachment: ${fileName.trim()}` : "Attachment",
     },
@@ -332,14 +352,25 @@ const supportConversationCopy: Record<Locale, SupportConversationCopy> = {
       queue: {
         title: "Queue",
         all: "All",
+        waiting: "Waiting",
         unassigned: "Unassigned",
         archive: "Archive",
         status: "Status",
+        priority: "Priority",
+        priorityAll: "Any",
+        priorityHigh: "High",
+        priorityNormal: "Normal",
+        priorityLow: "Low",
+        sort: "Sort",
+        sortDefault: "Default",
+        sortPriority: "Priority",
+        sortWaiting: "Waiting",
+        sortUpdated: "Updated",
+        sortCreated: "Created",
         previousPage: "Previous queue page",
         nextPage: "Next queue page",
         newMessagesTitle: (count) => `New messages from users: ${count}`,
-        pageCount: (page, start, end, total) =>
-          `Page ${page}: showing ${start}-${end} of ${total}`,
+        pageCount: (page, start, end, total) => `Page ${page}: showing ${start}-${end} of ${total}`,
         userUnreadTitle: (count) => `Messages from user: ${count}`,
         adminUnreadTitle: (count) => `Unread for admin: ${count}`,
         assignedOperator: (name) => `Operator: ${name}`,
@@ -425,4 +456,3 @@ const supportConversationCopy: Record<Locale, SupportConversationCopy> = {
 export function getSupportConversationCopy(locale: Locale): SupportConversationCopy {
   return supportConversationCopy[locale];
 }
-

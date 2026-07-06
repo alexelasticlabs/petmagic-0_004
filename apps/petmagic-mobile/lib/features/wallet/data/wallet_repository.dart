@@ -179,8 +179,9 @@ class WalletRepository {
   Future<PurchaseCheckoutModel> createPurchase(
     CurrencyPackModel pack,
     WalletPaymentMethodModel paymentMethod,
-    Locale locale,
-  ) async {
+    Locale locale, {
+    CancelToken? cancelToken,
+  }) async {
     final platform = _platformValue();
     final payload = <String, Object?>{
       'packId': pack.packId,
@@ -200,6 +201,7 @@ class WalletRepository {
           session.accessToken,
           extraHeaders: {'X-PetMagic-Platform': platform},
         ),
+        cancelToken: cancelToken,
       ),
       retryTransientFailures: false,
     );
@@ -436,6 +438,7 @@ class WalletRepository {
   Future<PurchaseHistoryItem> verifyStripeCheckoutSession({
     required String orderId,
     String? stripeReferenceId,
+    CancelToken? cancelToken,
   }) async {
     final normalizedReference = stripeReferenceId?.trim();
     final payload = <String, Object?>{};
@@ -449,6 +452,7 @@ class WalletRepository {
         '/api/economy/purchases/$encodedOrderId/verify-stripe',
         data: payload,
         options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
       ),
       retryTransientFailures: false,
     );

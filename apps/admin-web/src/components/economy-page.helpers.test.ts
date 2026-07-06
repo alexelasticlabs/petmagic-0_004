@@ -87,9 +87,7 @@ function createCurrencyPack(patch: Partial<AdminCurrencyPack> = {}): AdminCurren
   };
 }
 
-function createSubscriptionPlan(
-  patch: Partial<AdminSubscriptionPlan> = {}
-): AdminSubscriptionPlan {
+function createSubscriptionPlan(patch: Partial<AdminSubscriptionPlan> = {}): AdminSubscriptionPlan {
   return {
     planId: "plan-1",
     name: "Premium",
@@ -229,9 +227,9 @@ describe("currency pack payloads", () => {
     expect(normalizeEconomyPriceInput("1e2.345")).toBe("12.345");
     expect(normalizeEconomyIntegerInput("1e2.5abc999999999")).toBe("125999999");
     expect(normalizeEconomyPackDisplayNameInput(` ${"p".repeat(90)} `)).toHaveLength(80);
-    expect(toDraft(createCurrencyPack({ displayName: ` ${"p".repeat(90)} ` })).displayName).toHaveLength(
-      80
-    );
+    expect(
+      toDraft(createCurrencyPack({ displayName: ` ${"p".repeat(90)} ` })).displayName
+    ).toHaveLength(80);
 
     expect(() =>
       toCurrencyPackPayload(

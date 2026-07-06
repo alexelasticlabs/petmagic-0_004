@@ -65,7 +65,10 @@ export function AdminLangDropdown({ locale, ruPath, enPath }: AdminLangDropdownP
         title={triggerLabel}
       >
         <GlobeIcon className={styles.localeIcon} />
-        <span>{languageOptions.find((option) => option.value === locale)?.label ?? copy.currentLanguageName}</span>
+        <span>
+          {languageOptions.find((option) => option.value === locale)?.label ??
+            copy.currentLanguageName}
+        </span>
         <CaretDownIcon className={styles.localeIcon} />
       </button>
 

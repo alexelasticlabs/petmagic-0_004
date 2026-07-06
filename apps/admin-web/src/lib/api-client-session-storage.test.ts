@@ -49,6 +49,18 @@ class RemoveFailureStorage extends MemoryStorage {
   }
 }
 
+class GetFailureStorage extends MemoryStorage {
+  override getItem(): string | null {
+    throw new Error("sessionStorage unavailable token=raw-secret");
+  }
+}
+
+class SetFailureStorage extends MemoryStorage {
+  override setItem(): void {
+    throw new Error("sessionStorage quota exceeded token=raw-secret");
+  }
+}
+
 function createSession(): StoredSession {
   return {
     accessToken: "access-secret",
@@ -186,6 +198,17 @@ describe("api-client session storage", () => {
     expect(JSON.stringify(warnSpy.mock.calls)).not.toContain("raw-secret");
   });
 
+  it("keeps admin signed out when sessionStorage reads fail", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    stubBrowser(new GetFailureStorage());
+
+    expect(getSession()).toBeNull();
+
+    const serializedLogs = JSON.stringify(warnSpy.mock.calls);
+    expect(serializedLogs).toContain("auth.session_read_failed");
+    expect(serializedLogs).not.toContain("raw-secret");
+  });
+
   it("clears malformed admin-shaped sessions before they can crash the shell", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     window.sessionStorage.setItem(
@@ -215,6 +238,7 @@ describe("api-client session storage", () => {
     const source = readFileSync(apiClientCorePath, "utf8");
 
     expect(source).toContain("function getAuthStorageErrorDetails(error: unknown)");
+    expect(source).toContain("function readStoredAuthSessionRaw(storageFailureEvent: string)");
     expect(source).toContain("function getApiClientErrorDetails(error: unknown)");
     expect(source).toContain("function getApiPayloadParseErrorDetails(error: unknown)");
     expect(source).toContain("function suppressPersistedAuthSession(raw: string | null): void");
@@ -227,7 +251,10 @@ describe("api-client session storage", () => {
       'clientLogger.warn("auth.logout_failed", getAuthStorageErrorDetails(error));'
     );
     expect(source).toContain("auth.persisted_token_session_cleanup_failed");
+    expect(source).toContain("auth.session_read_failed");
+    expect(source).toContain("auth.session_clear_read_failed");
     expect(source).toContain("auth.session_clear_failed");
+    expect(source).toContain("auth.session_save_failed");
     expect(source).not.toContain("auth.session_token_migration_failed");
     expect(source).not.toContain('clientLogger.warn("auth.session_parse_failed", { error });');
     expect(source).not.toContain(
@@ -267,6 +294,42 @@ describe("api-client session storage", () => {
     const serializedLogs = JSON.stringify(warnSpy.mock.calls);
     expect(serializedLogs).not.toContain("backend-access-secret");
     expect(serializedLogs).not.toContain("backend-refresh-secret");
+  });
+
+  it("rejects backend login sessions without an access token", async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        refreshToken: "backend-refresh-secret",
+        expiresAtUtc: new Date(Date.now() + 60_000).toISOString(),
+        user: createSession().user,
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(login("admin@example.com", "password")).rejects.toThrow(
+      "Backend auth session is missing accessToken."
+    );
+
+    expect(window.sessionStorage.getItem(AUTH_KEY)).toBeNull();
+    expect(getSession()).toBeNull();
+  });
+
+  it("clears volatile tokens when sanitized session persistence fails", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    stubBrowser(new SetFailureStorage());
+    const fetchMock = vi.fn(async () => Response.json(createSession()));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(login("admin@example.com", "password")).rejects.toThrow(
+      "Unable to persist admin session."
+    );
+
+    expect(getSession()).toBeNull();
+    const serializedLogs = JSON.stringify(warnSpy.mock.calls);
+    expect(serializedLogs).toContain("auth.session_save_failed");
+    expect(serializedLogs).not.toContain("access-secret");
+    expect(serializedLogs).not.toContain("refresh-secret");
+    expect(serializedLogs).not.toContain("raw-secret");
   });
 
   it("keeps the runtime signed out when sessionStorage removal fails during clearSession", async () => {
@@ -318,6 +381,38 @@ describe("api-client session storage", () => {
       })
     );
     expect(JSON.stringify(warnSpy.mock.calls)).not.toContain("Server error. Try again later.");
+  });
+
+  it("redacts API log path query values before writing client logs", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fetchMock = vi.fn(async () =>
+      Response.json({ detail: "Server error. Try again later." }, { status: 500 })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      apiRequest(
+        "/api/admin/users?search=alice%40example.com&token=raw-secret&take=20",
+        { method: "GET" },
+        { requireAuth: false }
+      )
+    ).rejects.toThrow("Server error. Try again later.");
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      "[client:api.request_non_success]",
+      expect.objectContaining({
+        context: expect.objectContaining({
+          path: "/api/admin/users?query=[redacted]",
+          method: "GET",
+          status: 500,
+          correlationId: expect.any(String),
+        }),
+      })
+    );
+    const serializedLogs = JSON.stringify(warnSpy.mock.calls);
+    expect(serializedLogs).not.toContain("alice%40example.com");
+    expect(serializedLogs).not.toContain("alice@example.com");
+    expect(serializedLogs).not.toContain("raw-secret");
   });
 
   it("uses fallback messages for non-JSON error responses without noisy parse logs", async () => {

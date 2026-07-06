@@ -3015,7 +3015,7 @@ abstract class AppLocalizations {
   /// No description provided for @premiumManageFailed.
   ///
   /// In en, this message translates to:
-  /// **'Billing management is not available yet for this account.'**
+  /// **'Billing management is currently unavailable for this account.'**
   String get premiumManageFailed;
 
   /// No description provided for @premiumRestoreStarted.
@@ -5433,7 +5433,7 @@ abstract class AppLocalizations {
   /// No description provided for @authPrivacySubtitle.
   ///
   /// In en, this message translates to:
-  /// **'We never sell or share your data with third parties.'**
+  /// **'We do not sell personal data. We share it only with processors needed to run PetMagic.'**
   String get authPrivacySubtitle;
 
   /// No description provided for @authRequiredTitle.
@@ -5676,7 +5676,7 @@ abstract class AppLocalizations {
   /// No description provided for @templateFlowResultUnavailable.
   ///
   /// In en, this message translates to:
-  /// **'Result is not available yet'**
+  /// **'Result is currently unavailable'**
   String get templateFlowResultUnavailable;
 
   /// No description provided for @templateFlowLoadingResult.
@@ -6081,6 +6081,12 @@ abstract class AppLocalizations {
   /// **'Service is temporarily unavailable. Please try again later.'**
   String get templateFlowServerError;
 
+  /// No description provided for @templateFlowActiveGenerationLimitError.
+  ///
+  /// In en, this message translates to:
+  /// **'You already have a generation in progress. Wait for it to finish, then start a new one.'**
+  String get templateFlowActiveGenerationLimitError;
+
   /// No description provided for @templateFlowStartFailedError.
   ///
   /// In en, this message translates to:
@@ -6204,13 +6210,13 @@ abstract class AppLocalizations {
   /// No description provided for @generationStatusResultUnavailableForSave.
   ///
   /// In en, this message translates to:
-  /// **'Result is not available for saving yet.'**
+  /// **'Result is currently unavailable for saving.'**
   String get generationStatusResultUnavailableForSave;
 
   /// No description provided for @generationStatusResultUnavailableForShare.
   ///
   /// In en, this message translates to:
-  /// **'Result is not available for sharing yet.'**
+  /// **'Result is currently unavailable for sharing.'**
   String get generationStatusResultUnavailableForShare;
 
   /// No description provided for @generationStatusSaveFileDialogTitle.
@@ -6258,7 +6264,7 @@ abstract class AppLocalizations {
   /// No description provided for @generationStatusDeleteSoonMessage.
   ///
   /// In en, this message translates to:
-  /// **'Deletion will be available soon.'**
+  /// **'Could not delete this result. Please try again.'**
   String get generationStatusDeleteSoonMessage;
 
   /// No description provided for @generationStatusRetrySoonMessage.
@@ -7471,7 +7477,7 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'{current} / {total} XP'**
-  String gamificationXpProgress(Object current, Object required, Object total);
+  String gamificationXpProgress(Object current, Object total);
 
   /// No description provided for @gamificationEvolutionEgg.
   ///

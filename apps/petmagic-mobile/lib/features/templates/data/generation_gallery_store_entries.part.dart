@@ -96,17 +96,35 @@ Future<List<GenerationGalleryMediaRecord>> _galleryReadEntriesForScope(
       }
       return const [];
     }
-    final entries = decoded
-        .whereType<Map>()
-        .map(
-          (entry) => GenerationGalleryMediaRecord.fromJson(
-            Map<String, dynamic>.from(entry),
-            accountScope: accountScope,
-          ),
-        )
-        .toList(growable: false);
+    final entries = await _gallerySanitizeLocalPathsForScope(
+      store,
+      accountScope,
+      decoded
+          .whereType<Map>()
+          .map(
+            (entry) => GenerationGalleryMediaRecord.fromJson(
+              Map<String, dynamic>.from(entry),
+              accountScope: accountScope,
+            ),
+          )
+          .toList(growable: false),
+    );
+    final sanitizedRaw = await _galleryEncodeEntriesForStorage(store, entries);
+    if (sanitizedRaw != raw) {
+      await _galleryRewriteSanitizedEntriesForScope(
+        store,
+        accountScope,
+        entries,
+      );
+    }
     if (shouldMigrateLegacy) {
-      await _galleryWriteEntriesForScope(store, accountScope, entries);
+      if (sanitizedRaw == raw) {
+        await _galleryRewriteSanitizedEntriesForScope(
+          store,
+          accountScope,
+          entries,
+        );
+      }
       await store._preferences.remove(legacyKey);
     }
     return entries;
@@ -114,6 +132,17 @@ Future<List<GenerationGalleryMediaRecord>> _galleryReadEntriesForScope(
     _galleryLogStoreFailure(store, 'read_entries', error, stackTrace);
     return const [];
   }
+}
+
+Future<void> _galleryRewriteSanitizedEntriesForScope(
+  GenerationGalleryStore store,
+  String accountScope,
+  List<GenerationGalleryMediaRecord> entries,
+) async {
+  await store._preferences.setString(
+    _galleryEntriesKeyForScope(accountScope),
+    await _galleryEncodeEntriesForStorage(store, entries),
+  );
 }
 
 Future<void> _galleryWriteEntries(
@@ -143,9 +172,7 @@ Future<void> _galleryWriteEntriesForScope(
     );
     await store._preferences.setString(
       _galleryEntriesKeyForScope(accountScope),
-      jsonEncode(
-        prunedEntries.map((entry) => entry.toJson()).toList(growable: false),
-      ),
+      await _galleryEncodeEntriesForStorage(store, prunedEntries),
     );
   } on Object catch (error, stackTrace) {
     _galleryLogStoreFailure(store, 'write_entries', error, stackTrace);
@@ -260,8 +287,18 @@ Future<List<GenerationGalleryMediaRecord>> _galleryPruneRetainedEntriesByBytes(
       continue;
     }
 
-    await _galleryDeleteLocalPath(entry.previewLocalPath);
-    await _galleryDeleteLocalPath(entry.outputLocalPath);
+    await _galleryDeleteLocalPath(
+      store,
+      accountScope,
+      entry.generationId,
+      entry.previewLocalPath,
+    );
+    await _galleryDeleteLocalPath(
+      store,
+      accountScope,
+      entry.generationId,
+      entry.outputLocalPath,
+    );
     updated.add(
       entry.copyWith(
         previewLocalPath: null,

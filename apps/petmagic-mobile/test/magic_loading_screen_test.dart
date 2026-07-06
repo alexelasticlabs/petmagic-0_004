@@ -30,6 +30,9 @@ void main() {
     expect(widgetSource, isNot(contains('class _ParticleSeed')));
     expect(widgetSource, isNot(contains('class _MagicPortal')));
     expect(widgetSource, isNot(contains('class _PawProgress')));
+    expect(widgetSource, isNot(contains('Timer.periodic')));
+    expect(widgetSource, contains('shouldAnimateRepeatingEffects(context)'));
+    expect(widgetSource, contains('void _scheduleNextMessageTick()'));
     expect(widgetSource.split('\n').length, lessThan(300));
     expect(painterSource, contains("part of 'magic_loading_screen.dart';"));
     expect(painterSource, contains('class _MagicBackgroundPainter'));

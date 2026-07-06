@@ -13,7 +13,7 @@ public static partial class AdminEconomyEndpoints
         {
             return ToAdminEconomyFilterProblem(
                 "economy.purchase_status_invalid",
-                "Query parameter status must be pending, succeeded, failed, refund_pending, refund_review, or refunded.");
+                "Purchase status filter is invalid.");
         }
 
         return ValidatePaymentProviderFilter(provider);
@@ -25,7 +25,7 @@ public static partial class AdminEconomyEndpoints
         {
             return ToAdminEconomyFilterProblem(
                 "economy.subscription_status_invalid",
-                "Query parameter status is not supported for admin subscription filtering.");
+                "Subscription status filter is invalid.");
         }
 
         return ValidatePaymentProviderFilter(provider);
@@ -37,7 +37,7 @@ public static partial class AdminEconomyEndpoints
         {
             return ToAdminEconomyFilterProblem(
                 "economy.subscription_event_status_invalid",
-                "Query parameter status is not supported for admin subscription event filtering.");
+                "Subscription event status filter is invalid.");
         }
 
         return ValidatePaymentProviderFilter(provider);
@@ -49,14 +49,14 @@ public static partial class AdminEconomyEndpoints
         {
             return ToAdminEconomyFilterProblem(
                 "economy.incident_status_invalid",
-                "Query parameter status must be open, resolved, or suppressed.");
+                "Incident status filter is invalid.");
         }
 
         if (!IsAllowedOptionalFilter(category, IncidentCategoryFilters))
         {
             return ToAdminEconomyFilterProblem(
                 "economy.incident_category_invalid",
-                "Query parameter category is not supported for admin incident filtering.");
+                "Incident category filter is invalid.");
         }
 
         return null;
@@ -71,7 +71,7 @@ public static partial class AdminEconomyEndpoints
 
         return ToAdminEconomyFilterProblem(
             "economy.payment_provider_invalid",
-            "Query parameter provider must be stripe, app_store, or google_play.");
+            "Payment provider filter is invalid.");
     }
 
     private static ProblemHttpResult ToAdminEconomyFilterProblem(string errorCode, string detail)

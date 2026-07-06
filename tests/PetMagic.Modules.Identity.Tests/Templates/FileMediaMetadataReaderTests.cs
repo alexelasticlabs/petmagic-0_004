@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Infrastructure;
 
@@ -104,7 +105,10 @@ public sealed class FileMediaMetadataReaderTests
                 logger.Entries,
                 entry => entry.Level == LogLevel.Warning
                     && entry.Message.Contains("Template media metadata read failed.", StringComparison.Ordinal)
-                    && Equals(entry.Properties["Operation"], "read_mp4_duration"));
+                    && Equals(entry.Properties["Operation"], "read_mp4_duration")
+                    && !entry.Properties.ContainsKey("FileName")
+                    && Equals(entry.Properties["FileNameHash"], SafeLogValues.StableHash("bad.mp4"))
+                    && Equals(entry.Properties["ContentType"], "video/mp4"));
         }
         finally
         {
@@ -138,7 +142,8 @@ public sealed class FileMediaMetadataReaderTests
                 entry => entry.Level == LogLevel.Warning
                     && entry.Message.Contains("Template metadata temp file cleanup failed.", StringComparison.Ordinal)
                     && Equals(entry.Properties["Operation"], "delete_owned")
-                    && Equals(entry.Properties["TempFileName"], Path.GetFileName(filePath)));
+                    && Equals(entry.Properties["TempFileName"], Path.GetFileName(filePath))
+                    && Equals(entry.Properties["ExceptionType"], "IOException"));
         }
         finally
         {

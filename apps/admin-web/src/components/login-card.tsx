@@ -33,7 +33,8 @@ function hasAcceptanceVersions(legalAcceptance: LegalAcceptanceStatus | undefine
 }
 
 function resolveLoginErrorMessage(error: unknown, fallback: string): string {
-  const status = error && typeof error === "object" ? (error as { status?: number }).status : undefined;
+  const status =
+    error && typeof error === "object" ? (error as { status?: number }).status : undefined;
   if (status === 400 || status === 401) {
     return fallback;
   }

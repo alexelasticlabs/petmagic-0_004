@@ -30,6 +30,134 @@ namespace PetMagic.Modules.Identity.Tests.Templates;
 public sealed class TemplateGenerationJobProcessorTests
 {
     [Fact]
+    public async Task ProcessNextAsync_ShouldSanitizeDurableBillingFailureDiagnostics()
+    {
+        await using var dbContext = CreateDbContext();
+        var now = DateTime.UtcNow;
+        var template = CreateReadyImageTemplate();
+        var job = CreateGenerationJob(template, TemplateGenerationStatus.Queued, now);
+        job.ChargedAtUtc = null;
+        job.CompletedAtUtc = null;
+        var billingCommand = new TemplateGenerationBillingCommand
+        {
+            Id = Guid.NewGuid(),
+            GenerationId = job.Id,
+            UserId = job.UserId,
+            TokenCost = job.TokenCost,
+            Status = TemplateGenerationBillingCommandStatuses.Pending,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        };
+        var billing = new TestTemplateGenerationBilling
+        {
+            ChargeError = new Error(
+                "economy.insufficient_balance token=charge-code-secret",
+                "charge failed token=charge-message-secret api_secret=charge-api-secret requestId=req-secret")
+        };
+
+        dbContext.TemplateItems.Add(template);
+        dbContext.TemplateGenerationJobs.Add(job);
+        dbContext.TemplateGenerationBillingCommands.Add(billingCommand);
+        await dbContext.SaveChangesAsync();
+
+        var processed = await CreateProcessor(dbContext, billing: billing)
+            .ProcessNextAsync(CancellationToken.None);
+
+        var persistedJob = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == job.Id);
+        var persistedCommand = await dbContext.TemplateGenerationBillingCommands.SingleAsync(x => x.Id == billingCommand.Id);
+        Assert.True(processed);
+        Assert.Equal(TemplateGenerationStatus.Failed, persistedJob.Status);
+        Assert.Equal(TemplateGenerationBillingCommandStatuses.Failed, persistedCommand.Status);
+        Assert.NotNull(persistedJob.LastErrorCode);
+        Assert.NotNull(persistedJob.LastErrorMessage);
+        Assert.NotNull(persistedCommand.LastErrorCode);
+        Assert.NotNull(persistedCommand.LastErrorMessage);
+        Assert.DoesNotContain("charge-code-secret", persistedJob.LastErrorCode, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("charge-message-secret", persistedJob.LastErrorMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("charge-api-secret", persistedCommand.LastErrorMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("req-secret", persistedCommand.LastErrorMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ProcessNextAsync_ShouldSanitizeDurableGenerationFailureDiagnostics()
+    {
+        await using var dbContext = CreateDbContext();
+        var now = DateTime.UtcNow;
+        var template = CreateReadyImageTemplate();
+        var job = CreateGenerationJob(template, TemplateGenerationStatus.Queued, now);
+        job.CompletedAtUtc = null;
+        var logger = new CapturingLogger<TemplateGenerationJobProcessor>();
+        var imageGenerator = new FailingImageGenerator(new Error(
+            "templates.ai_provider_failed token=provider-code-secret",
+            "provider failed token=provider-message-secret requestId=req-secret"));
+
+        dbContext.TemplateItems.Add(template);
+        dbContext.TemplateGenerationJobs.Add(job);
+        await dbContext.SaveChangesAsync();
+
+        var processed = await CreateProcessor(
+                dbContext,
+                imageGenerator: imageGenerator,
+                logger: logger)
+            .ProcessNextAsync(CancellationToken.None);
+
+        var persisted = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == job.Id);
+        Assert.True(processed);
+        Assert.Equal(TemplateGenerationStatus.Failed, persisted.Status);
+        Assert.NotNull(persisted.LastErrorCode);
+        Assert.NotNull(persisted.LastErrorMessage);
+        Assert.DoesNotContain("provider-code-secret", persisted.LastErrorCode, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("provider-message-secret", persisted.LastErrorMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("req-secret", persisted.LastErrorMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            logger.Entries,
+            entry => entry.LogLevel == LogLevel.Error
+                && entry.Properties.TryGetValue("ErrorCode", out var value)
+                && value is string errorCode
+                && !errorCode.Contains("provider-code-secret", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task RetryNextRefundAsync_ShouldSanitizeDurableRefundFailureCode()
+    {
+        await using var dbContext = CreateDbContext();
+        var now = DateTime.UtcNow;
+        var template = CreateReadyTemplate();
+        var job = CreateGenerationJob(template, TemplateGenerationStatus.Failed, now.AddMinutes(-10));
+        job.RefundAttemptCount = 1;
+        job.RefundLastErrorCode = "economy.unavailable";
+        job.RefundLastAttemptedAtUtc = now.AddMinutes(-5);
+        var billing = new TestTemplateGenerationBilling
+        {
+            RefundError = new Error("economy.refund_failed token=refund-code-secret", "refund failed")
+        };
+        var logger = new CapturingLogger<TemplateGenerationJobProcessor>();
+
+        dbContext.TemplateItems.Add(template);
+        dbContext.TemplateGenerationJobs.Add(job);
+        await dbContext.SaveChangesAsync();
+
+        var processed = await CreateProcessor(
+                dbContext,
+                billing: billing,
+                options: CreateOptions(refundRetryDelayMilliseconds: 0),
+                logger: logger)
+            .RetryNextRefundAsync(CancellationToken.None);
+
+        var persisted = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == job.Id);
+        Assert.True(processed);
+        Assert.Null(persisted.RefundedAtUtc);
+        Assert.NotNull(persisted.RefundLastErrorCode);
+        Assert.DoesNotContain("refund-code-secret", persisted.RefundLastErrorCode, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            logger.Entries,
+            entry => entry.LogLevel == LogLevel.Warning
+                && entry.Properties.TryGetValue("ErrorCode", out var value)
+                && value is string errorCode
+                && !errorCode.Contains("refund-code-secret", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task RetryNextRefundAsync_ShouldRetryPendingRefundAndPersistSuccess()
     {
         await using var dbContext = CreateDbContext();
@@ -569,6 +697,54 @@ public sealed class TemplateGenerationJobProcessorTests
         Assert.Equal(1, importer.ImageImportCount);
         Assert.Null(persisted.LockedBy);
         Assert.Null(persisted.LockedAtUtc);
+    }
+
+    [Fact]
+    public async Task ProcessNextAsync_ShouldSanitizeDurableWatermarkFailureCode()
+    {
+        await using var dbContext = CreateDbContext();
+        var template = CreateReadyImageTemplate();
+        var now = DateTime.UtcNow;
+        var job = CreateGenerationJob(template, TemplateGenerationStatus.ProviderQueued, now);
+        job.CompletedAtUtc = null;
+        job.PreprocessingProviderRequestId = "image-provider-request-watermark-failure";
+        job.PreprocessingProviderStatusUrl = "https://queue.fal.run/fal-ai/test/status/image-provider-request-watermark-failure";
+        job.PreprocessingProviderResponseUrl = "https://queue.fal.run/fal-ai/test/response/image-provider-request-watermark-failure";
+        job.CurrentProviderStage = "image_generation";
+        job.ProviderStatus = "IN_QUEUE";
+        job.UsedPreprocessingModel = template.ImageModel;
+        var imageGenerator = new AsyncSubmittingImageGenerator();
+        var importer = new TrackingGeneratedMediaImporter();
+        var logger = new CapturingLogger<TemplateGenerationJobProcessor>();
+
+        dbContext.TemplateItems.Add(template);
+        dbContext.TemplateGenerationJobs.Add(job);
+        await dbContext.SaveChangesAsync();
+
+        var processor = CreateProcessor(
+            dbContext,
+            imageGenerator: imageGenerator,
+            generatedMediaImporter: importer,
+            logger: logger,
+            watermarkRenderer: new FailingWatermarkRenderer("watermark token=watermark-code-secret"));
+
+        var webhookResult = await processor.ProcessFalWebhookAsync(
+            CreateFalWebhookCommand("image-provider-request-watermark-failure", "OK"),
+            CancellationToken.None);
+        var processed = await processor.ProcessNextAsync(CancellationToken.None);
+
+        var persisted = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == job.Id);
+        Assert.True(webhookResult.IsSuccess);
+        Assert.True(processed);
+        Assert.Equal(TemplateGenerationStatus.Completed, persisted.Status);
+        Assert.NotNull(persisted.WatermarkFailureCode);
+        Assert.DoesNotContain("watermark-code-secret", persisted.WatermarkFailureCode, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            logger.Entries,
+            entry => entry.LogLevel == LogLevel.Warning
+                && entry.Properties.TryGetValue("ErrorCode", out var value)
+                && value is string errorCode
+                && !errorCode.Contains("watermark-code-secret", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -1332,11 +1508,16 @@ public sealed class TemplateGenerationJobProcessorTests
         var entry = Assert.Single(logger.Entries, x => x.LogLevel == LogLevel.Warning);
         Assert.Contains("Template generation gamification sync failed.", entry.Message, StringComparison.Ordinal);
         Assert.Equal("notify_gamification", entry.Properties["Operation"]);
-        Assert.Equal(job.Id, entry.Properties["JobId"]);
-        Assert.Equal(userId, entry.Properties["UserId"]);
-        Assert.Equal(template.Id, entry.Properties["TemplateId"]);
+        Assert.False(entry.Properties.ContainsKey("JobId"));
+        Assert.False(entry.Properties.ContainsKey("UserId"));
+        Assert.False(entry.Properties.ContainsKey("TemplateId"));
+        Assert.Equal(SafeLogValues.StableHash(job.Id.ToString("D")), entry.Properties["JobIdHash"]);
+        Assert.Equal(SafeLogValues.StableHash(userId.ToString("D")), entry.Properties["UserIdHash"]);
+        Assert.Equal(SafeLogValues.StableHash(template.Id.ToString("D")), entry.Properties["TemplateIdHash"]);
         Assert.Equal(true, entry.Properties["HasEconomyService"]);
         Assert.Equal(true, entry.Properties["GenerationStillCompleted"]);
+        Assert.Equal("InvalidOperationException", entry.Properties["ExceptionType"]);
+        Assert.Null(entry.Exception);
     }
 
     [Fact]
@@ -1528,7 +1709,8 @@ public sealed class TemplateGenerationJobProcessorTests
         IGamificationService? gamificationService = null,
         IEconomyService? economyService = null,
         FalQueueClient? falQueueClient = null,
-        ILogger<TemplateGenerationJobProcessor>? logger = null)
+        ILogger<TemplateGenerationJobProcessor>? logger = null,
+        ITemplateWatermarkRenderer? watermarkRenderer = null)
     {
         return new TemplateGenerationJobProcessor(
             dbContext,
@@ -1546,7 +1728,7 @@ public sealed class TemplateGenerationJobProcessorTests
             options: options ?? CreateOptions(),
             logger: logger ?? NullLogger<TemplateGenerationJobProcessor>.Instance,
             falQueueClient: falQueueClient,
-            watermarkRenderer: new PassthroughWatermarkRenderer(),
+            watermarkRenderer: watermarkRenderer ?? new PassthroughWatermarkRenderer(),
             gamificationService: gamificationService,
             economyService: economyService);
     }
@@ -1643,6 +1825,18 @@ public sealed class TemplateGenerationJobProcessorTests
             CancellationToken cancellationToken)
         {
             return Task.FromResult(Result.Success(original));
+        }
+    }
+
+    private sealed class FailingWatermarkRenderer(string code) : ITemplateWatermarkRenderer
+    {
+        public Task<Result<StoredMediaResponse>> CreateWatermarkedCopyAsync(
+            StoredMediaResponse original,
+            TemplateType mediaType,
+            Guid generationId,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Failure<StoredMediaResponse>(new Error(code, "Watermark failed.")));
         }
     }
 
@@ -2117,6 +2311,13 @@ public sealed class TemplateGenerationJobProcessorTests
 
     private sealed class FailingImageGenerator : IImageGenerator
     {
+        private readonly Error failure;
+
+        public FailingImageGenerator(Error? failure = null)
+        {
+            this.failure = failure ?? TemplatesErrors.AiProviderFailed;
+        }
+
         public Task<Result<ImageGenerationResult>> CreateAsync(
             string sourceImageUrl,
             string prompt,
@@ -2124,7 +2325,7 @@ public sealed class TemplateGenerationJobProcessorTests
             int? seed,
             CancellationToken cancellationToken)
         {
-            return Task.FromResult(Result.Failure<ImageGenerationResult>(TemplatesErrors.AiProviderFailed));
+            return Task.FromResult(Result.Failure<ImageGenerationResult>(failure));
         }
     }
 
@@ -2618,15 +2819,19 @@ public sealed class TemplateGenerationJobProcessorTests
     {
         public ConcurrentBag<Guid> RefundedGenerationIds { get; } = [];
 
+        public Error? ChargeError { get; init; }
+
+        public Error? RefundError { get; init; }
+
         public Task<Result> ChargeAsync(Guid userId, Guid generationId, int tokenCost, CancellationToken cancellationToken)
         {
-            return Task.FromResult(Result.Success());
+            return Task.FromResult(ChargeError is null ? Result.Success() : Result.Failure(ChargeError));
         }
 
         public Task<Result> RefundAsync(Guid userId, Guid generationId, int tokenCost, CancellationToken cancellationToken)
         {
             RefundedGenerationIds.Add(generationId);
-            return Task.FromResult(Result.Success());
+            return Task.FromResult(RefundError is null ? Result.Success() : Result.Failure(RefundError));
         }
 
         public Task<Result<int>> SpendWatermarkUnlockAsync(Guid userId, Guid generationId, int creditCost, CancellationToken cancellationToken)

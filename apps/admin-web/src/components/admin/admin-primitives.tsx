@@ -3,13 +3,7 @@ import { type CSSProperties, type HTMLAttributes, type ReactNode } from "react";
 import styles from "@/components/admin/admin-primitives.module.css";
 
 export type AdminTone =
-  | "neutral"
-  | "primary"
-  | "info"
-  | "success"
-  | "warning"
-  | "danger"
-  | "magenta";
+  "neutral" | "primary" | "info" | "success" | "warning" | "danger" | "magenta";
 
 type AdminCardProps = {
   title?: ReactNode;

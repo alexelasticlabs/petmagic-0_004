@@ -75,7 +75,7 @@ public static partial class EconomyEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.ClaimWeeklyGrantAsync(command, cancellationToken);
@@ -103,7 +103,7 @@ public static partial class EconomyEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.ClaimAdRewardAsync(command, cancellationToken);
@@ -138,7 +138,7 @@ public static partial class EconomyEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.RegisterPushTokenAsync(command, cancellationToken);
@@ -167,7 +167,7 @@ public static partial class EconomyEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.UnregisterPushTokenAsync(command, cancellationToken);
@@ -177,35 +177,6 @@ public static partial class EconomyEndpoints
         }
 
         return TypedResults.NoContent();
-    }
-
-    private static async Task<Results<Ok<WalletOperationResponse>, ValidationProblem, ProblemHttpResult>> SpendAsync(
-        HttpContext context,
-        SpendRequest request,
-        IValidator<SpendBalanceCommand> validator,
-        IEconomyService service,
-        CancellationToken cancellationToken)
-    {
-        var (userId, _, subjectError) = TryGetSubject(context);
-        if (subjectError is not null)
-        {
-            return ToClientEconomyProblem(subjectError);
-        }
-
-        var command = new SpendBalanceCommand(userId!.Value, request.Amount, request.Reason);
-        var validation = await validator.ValidateAsync(command, cancellationToken);
-        if (!validation.IsValid)
-        {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
-        }
-
-        var result = await service.SpendAsync(command, cancellationToken);
-        if (result.IsFailure)
-        {
-            return ToClientEconomyProblem(result.Error);
-        }
-
-        return TypedResults.Ok(result.Value);
     }
 
     private static async Task<Results<Ok<RedeemCodeAppliedResponse>, ValidationProblem, ProblemHttpResult>> RedeemCodeAsync(
@@ -225,7 +196,7 @@ public static partial class EconomyEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.ApplyRedeemCodeAsync(command, cancellationToken);
@@ -274,7 +245,7 @@ public static partial class EconomyEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.ApplyReferralCodeAsync(command, cancellationToken);
@@ -378,19 +349,11 @@ public static partial class EconomyEndpoints
             _ => StatusCodes.Status503ServiceUnavailable,
         };
 
-        var detail = errorCode switch
-        {
-            "economy.pack_not_found" => "Billing product was not found.",
-            "economy.premium_plan_not_found" => "Premium plan was not found.",
-            "economy.payment_provider_unsupported" => "Payment provider is not supported for this request.",
-            "economy.payment_provider_unavailable" => "Billing is not available for this request.",
-            _ => "Billing configuration is temporarily unavailable.",
-        };
-
-        return TypedResults.Problem(title: errorCode, detail: detail, statusCode: statusCode);
+        return TypedResults.Problem(
+            title: errorCode,
+            statusCode: statusCode,
+            extensions: BuildClientEconomyProblemExtensions(errorCode));
     }
-
-    public sealed record SpendRequest(int Amount, string Reason);
 
     public sealed record RedeemCodeRequest(string Code);
 

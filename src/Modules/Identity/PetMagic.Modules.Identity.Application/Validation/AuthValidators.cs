@@ -67,7 +67,7 @@ public sealed class UpdateCurrentUserProfileCommandValidator : AbstractValidator
     {
         RuleFor(x => x.DisplayName)
             .MaximumLength(120)
-            .WithMessage("Display name cannot exceed 120 characters.");
+            .WithMessage("users.display_name_too_long");
     }
 }
 
@@ -290,7 +290,7 @@ public sealed class AssignRoleCommandValidator : AbstractValidator<AssignRoleCom
         RuleFor(x => x.Role)
             .NotEmpty()
             .Must(role => SystemRoles.All.Contains(role))
-            .WithMessage("Role is not supported.");
+            .WithMessage("users.role_not_supported");
     }
 }
 
@@ -302,15 +302,7 @@ public sealed class RevokeRoleCommandValidator : AbstractValidator<RevokeRoleCom
         RuleFor(x => x.Role)
             .NotEmpty()
             .Must(role => SystemRoles.All.Contains(role))
-            .WithMessage("Role is not supported.");
-    }
-}
-
-public sealed class SetPremiumStatusCommandValidator : AbstractValidator<SetPremiumStatusCommand>
-{
-    public SetPremiumStatusCommandValidator()
-    {
-        RuleFor(x => x.UserId).NotEmpty();
+            .WithMessage("users.role_not_supported");
     }
 }
 
@@ -332,7 +324,7 @@ public sealed class AdminAdjustUserWalletCommandValidator : AbstractValidator<Ad
         RuleFor(x => x.Operation)
             .NotEmpty()
             .Must(operation => SupportedOperations.Contains(operation, StringComparer.OrdinalIgnoreCase))
-            .WithMessage("Wallet operation is not supported.");
+            .WithMessage("economy.wallet_operation_not_supported");
         RuleFor(x => x.Amount)
             .GreaterThan(0)
             .LessThanOrEqualTo(100_000);
@@ -349,7 +341,7 @@ public sealed class SendBulkEmailCommandValidator : AbstractValidator<SendBulkEm
         RuleFor(x => x.Audience)
             .NotEmpty()
             .Must(audience => EmailAudiences.All.Contains(audience, StringComparer.OrdinalIgnoreCase))
-            .WithMessage("Audience is not supported.");
+            .WithMessage("users.bulk_email_audience_invalid");
 
         RuleFor(x => x.Subject)
             .NotEmpty()
@@ -363,7 +355,7 @@ public sealed class SendBulkEmailCommandValidator : AbstractValidator<SendBulkEm
             .Must((command, userIds) =>
                 !string.Equals(command.Audience, EmailAudiences.Selected, StringComparison.OrdinalIgnoreCase)
                 || (userIds is { Count: > 0 } && userIds.All(id => id != Guid.Empty)))
-            .WithMessage("Selected audience requires at least one user id.");
+            .WithMessage("users.bulk_email_user_ids_required");
     }
 }
 

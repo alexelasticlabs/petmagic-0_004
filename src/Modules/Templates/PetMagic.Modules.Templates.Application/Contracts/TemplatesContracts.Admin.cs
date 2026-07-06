@@ -499,7 +499,9 @@ public sealed record AdminTemplateGenerationListItemResponse(
     string? PromptBeforeVariation = null,
     string? PromptAfterVariation = null,
     Guid? PetId = null,
-    Guid? PetPhotoId = null);
+    Guid? PetPhotoId = null,
+    bool CanCancel = false,
+    bool CanRetry = false);
 
 public sealed record AdminTemplateGenerationListPageResponse(
     IReadOnlyList<AdminTemplateGenerationListItemResponse> Items,

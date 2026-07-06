@@ -13,6 +13,8 @@ export type DashboardCopy = {
     description: string;
     rangeLabel: string;
     ariaLabel: string;
+    dateHeader: string;
+    revenueHeader: string;
   };
   ordersSection: {
     title: string;
@@ -103,7 +105,7 @@ export type DashboardCopy = {
 const dashboardCopy: Record<Locale, DashboardCopy> = {
   ru: {
     hero: {
-      eyebrow: "Control center",
+      eyebrow: "Центр управления",
       title: "Обзор админки",
       description: "Актуальные метрики пользователей, монетизации и поддержки в реальном времени.",
     },
@@ -112,6 +114,8 @@ const dashboardCopy: Record<Locale, DashboardCopy> = {
       description: "Последние семь дней по успешным платежам",
       rangeLabel: "Неделя",
       ariaLabel: "График выручки",
+      dateHeader: "Дата",
+      revenueHeader: "Выручка",
     },
     ordersSection: {
       title: "Последние заказы",
@@ -134,7 +138,7 @@ const dashboardCopy: Record<Locale, DashboardCopy> = {
     },
     stats: {
       users: "Пользователи",
-      premiumUsers: "Premium пользователи",
+      premiumUsers: "Премиум-пользователи",
       activeSubscriptions: "Активные подписки",
       generationsToday: "Генерации сегодня",
       failedGenerations: "Ошибки генераций",
@@ -145,15 +149,15 @@ const dashboardCopy: Record<Locale, DashboardCopy> = {
       revenue: "Выручка",
       conversion: "Конверсия",
       usersSubtext: "новые за 7 дней к предыдущим 7",
-      premiumUsersSubtext: "по статусу Premium",
-      activeSubscriptionsSubtext: "статус Active",
+      premiumUsersSubtext: "по премиум-статусу",
+      activeSubscriptionsSubtext: "статус активной подписки",
       pendingJobsSubtext: "ожидают обработки",
       paymentSuccessFailureSubtext: "за текущие 7 дней",
-      moderationQueueSubtext: "pending элементы модерации",
+      moderationQueueSubtext: "ожидающие элементы модерации",
       ordersSubtext: "заказы за 7 дней к предыдущим 7",
       revenueSubtext: "выручка за 7 дней к предыдущим 7",
       conversionSubtext: "доля успешных заказов за 7 дней",
-      live: "live",
+      live: "онлайн",
       todayShort: "сегодня",
       weekShort: "за неделю",
       monthShort: "за 30 дней",
@@ -219,6 +223,8 @@ const dashboardCopy: Record<Locale, DashboardCopy> = {
       description: "Last seven days across successful payments",
       rangeLabel: "Week",
       ariaLabel: "Revenue chart",
+      dateHeader: "Date",
+      revenueHeader: "Revenue",
     },
     ordersSection: {
       title: "Recent orders",
@@ -282,7 +288,8 @@ const dashboardCopy: Record<Locale, DashboardCopy> = {
       ordersUnavailableDescription:
         "Dashboard KPIs loaded, but the recent payments feed did not respond.",
       noPaymentsTitle: "No payments yet",
-      noPaymentsDescription: "Recent payments will appear here after the first successful purchase.",
+      noPaymentsDescription:
+        "Recent payments will appear here after the first successful purchase.",
       activityUnavailableTitle: "Some activity is unavailable",
       activityUnavailableDescription: "Showing available events; unavailable feeds can be retried.",
       noActivityTitle: "No recent activity",

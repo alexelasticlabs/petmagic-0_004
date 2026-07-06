@@ -91,15 +91,19 @@ public sealed partial class EconomyService
         var mappedStatus = EconomyWebhookParser.MapStoreSubscriptionStatus(verification.Value.Status, verification.Value.IsActive);
         var isPremium = EconomyWebhookParser.IsStoreSubscriptionPremium(mappedStatus, verification.Value.ExpiresAtUtc);
         var externalTransactionId = string.Equals(provider, "google_play", StringComparison.Ordinal)
-            ? command.ServerVerificationData
+            ? BuildGooglePlayPurchaseTokenReference(command.ServerVerificationData)
             : command.PurchaseId;
+        var legacyExternalTransactionId = string.Equals(provider, "google_play", StringComparison.Ordinal)
+            ? command.ServerVerificationData.Trim()
+            : null;
 
         if (await StoreSubscriptionBelongsToAnotherUserAsync(
                 command.UserId,
                 provider,
                 externalSubscriptionId,
                 externalTransactionId,
-                cancellationToken))
+                cancellationToken,
+                legacyExternalTransactionId))
         {
             return Result.Failure<PremiumStoreVerificationResponse>(EconomyErrors.StorePurchaseInvalid);
         }
@@ -118,7 +122,8 @@ public sealed partial class EconomyService
             verification.Value.ExpiresAtUtc,
             false,
             plan.MonthlyTokenLimit,
-            cancellationToken);
+            cancellationToken,
+            legacyExternalTransactionId);
         if (userSubscriptionResult.IsFailure)
         {
             return Result.Failure<PremiumStoreVerificationResponse>(userSubscriptionResult.Error);
@@ -137,15 +142,15 @@ public sealed partial class EconomyService
             cancellationToken);
 
         logger?.LogInformation(
-            "Store subscription validation succeeded. Provider={Provider} UserId={UserId} ProductId={ProductId} PlanId={PlanId} Status={Status} IsPremium={IsPremium} Environment={Environment} CorrelationId={CorrelationId}",
+            "Store subscription validation succeeded. Provider={Provider} UserIdHash={UserIdHash} ProductId={ProductId} PlanId={PlanId} Status={Status} IsPremium={IsPremium} Environment={Environment} CorrelationIdHash={CorrelationIdHash}",
             provider,
-            command.UserId,
+            EconomyLogSanitizer.SafeUserId(command.UserId),
             command.ProductId,
             plan.PlanCode,
             mappedStatus,
             isPremium,
             provider == "google_play" ? options.Value.GooglePlayEnvironment : options.Value.AppStoreEnvironment,
-            CurrentCorrelationId);
+            CurrentCorrelationIdHash);
 
         if (isPremium)
         {
@@ -230,11 +235,11 @@ public sealed partial class EconomyService
         catch (Exception ex)
         {
             logger?.LogWarning(
-                ex,
-                "Failed to verify Stripe subscription {SubscriptionId} for user {UserId}. CorrelationId={CorrelationId}",
+                "Failed to verify Stripe subscription. SubscriptionIdSafe={SubscriptionIdSafe} UserIdHash={UserIdHash} ExceptionType={ExceptionType} CorrelationIdHash={CorrelationIdHash}",
                 EconomyLogSanitizer.SafeExternalId(normalizedSubscriptionId),
-                command.UserId,
-                CurrentCorrelationId);
+                EconomyLogSanitizer.SafeUserId(command.UserId),
+                SafeLogValues.ExceptionType(ex),
+                CurrentCorrelationIdHash);
 
             return Result.Failure<SubscriptionSummaryResponse>(EconomyErrors.PaymentGatewayFailed);
         }
@@ -242,12 +247,12 @@ public sealed partial class EconomyService
         if (!string.Equals(stripeSubscription.CustomerId, customer.ExternalCustomerId, StringComparison.Ordinal))
         {
             logger?.LogWarning(
-                "Stripe subscription {SubscriptionId} belongs to customer {CustomerId}, but user {UserId} is linked to {ExpectedCustomerId}. CorrelationId={CorrelationId}",
+                "Stripe subscription belongs to a different customer. SubscriptionIdSafe={SubscriptionIdSafe} CustomerIdSafe={CustomerIdSafe} UserIdHash={UserIdHash} ExpectedCustomerIdSafe={ExpectedCustomerIdSafe} CorrelationIdHash={CorrelationIdHash}",
                 EconomyLogSanitizer.SafeExternalId(normalizedSubscriptionId),
                 EconomyLogSanitizer.SafeExternalId(stripeSubscription.CustomerId),
-                command.UserId,
+                EconomyLogSanitizer.SafeUserId(command.UserId),
                 EconomyLogSanitizer.SafeExternalId(customer.ExternalCustomerId),
-                CurrentCorrelationId);
+                CurrentCorrelationIdHash);
 
             return Result.Failure<SubscriptionSummaryResponse>(EconomyErrors.PaymentGatewayFailed);
         }
@@ -264,14 +269,14 @@ public sealed partial class EconomyService
                 plan.BillingInterval))
         {
             logger?.LogWarning(
-                "Stripe subscription {SubscriptionId} did not match expected plan {PlanCode} for user {UserId}. ExpectedPriceId={ExpectedPriceId} ExpectedCurrency={ExpectedCurrency} ExpectedInterval={ExpectedInterval} CorrelationId={CorrelationId}",
+                "Stripe subscription did not match expected plan. SubscriptionIdSafe={SubscriptionIdSafe} PlanCode={PlanCode} UserIdHash={UserIdHash} ExpectedPriceIdSafe={ExpectedPriceIdSafe} ExpectedCurrency={ExpectedCurrency} ExpectedInterval={ExpectedInterval} CorrelationIdHash={CorrelationIdHash}",
                 EconomyLogSanitizer.SafeExternalId(normalizedSubscriptionId),
                 plan.PlanCode,
-                command.UserId,
+                EconomyLogSanitizer.SafeUserId(command.UserId),
                 EconomyLogSanitizer.SafeExternalId(plan.StripePriceId),
                 plan.CurrencyCode,
                 plan.BillingInterval,
-                CurrentCorrelationId);
+                CurrentCorrelationIdHash);
 
             return Result.Failure<SubscriptionSummaryResponse>(EconomyErrors.PaymentGatewayFailed);
         }

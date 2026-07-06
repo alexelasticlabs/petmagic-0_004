@@ -35,16 +35,21 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
   static const double _ledgerLoadMoreThreshold = 320;
 
   final ScrollController _scrollController = ScrollController();
-  late final WalletController _walletController;
+  WalletController? _visibleWalletController;
+  ProviderSubscription<WalletState>? _walletSubscription;
   ProviderSubscription<AppLaunchState>? _launchSubscription;
   bool _wasAuthenticated = false;
   bool _autoLoadMoreScheduled = false;
+  bool _walletPageVisible = false;
 
   @override
   void initState() {
     super.initState();
-    _walletController = ref.read(walletControllerProvider.notifier);
-    _walletController.setWalletPageVisible(true);
+    _setWalletPageVisible(true);
+    _walletSubscription = ref.listenManual<WalletState>(
+      walletControllerProvider,
+      (_, _) => _syncVisibleWalletController(),
+    );
     _scrollController.addListener(_handleScroll);
     _launchSubscription = ref.listenManual<AppLaunchState>(
       appLaunchControllerProvider,
@@ -56,21 +61,42 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
   @override
   void dispose() {
     _launchSubscription?.close();
+    _walletSubscription?.close();
+    _setStoredWalletPageVisible(false);
     _scrollController.dispose();
-    _walletController.setWalletPageVisible(false);
     super.dispose();
   }
 
   @override
   void deactivate() {
-    _walletController.setWalletPageVisible(false);
+    _setStoredWalletPageVisible(false);
     super.deactivate();
   }
 
   @override
   void activate() {
     super.activate();
-    _walletController.setWalletPageVisible(true);
+    _setWalletPageVisible(true);
+  }
+
+  void _setWalletPageVisible(bool visible) {
+    _walletPageVisible = visible;
+    _syncVisibleWalletController();
+  }
+
+  void _syncVisibleWalletController() {
+    final controller = ref.read(walletControllerProvider.notifier);
+    if (!identical(_visibleWalletController, controller)) {
+      _visibleWalletController?.setWalletPageVisible(false);
+      _visibleWalletController = controller;
+    }
+
+    controller.setWalletPageVisible(_walletPageVisible);
+  }
+
+  void _setStoredWalletPageVisible(bool visible) {
+    _walletPageVisible = visible;
+    _visibleWalletController?.setWalletPageVisible(visible);
   }
 
   void _handleLaunchState(AppLaunchState launchState) {
@@ -118,7 +144,7 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
       return;
     }
 
-    await _walletController.load(refresh: refresh);
+    await ref.read(walletControllerProvider.notifier).load(refresh: refresh);
   }
 
   Future<void> _loadMoreIfOnline({bool force = false}) async {
@@ -128,7 +154,9 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
       return;
     }
 
-    await _walletController.loadMoreLedger(force: force);
+    await ref
+        .read(walletControllerProvider.notifier)
+        .loadMoreLedger(force: force);
   }
 
   void _handleScroll() {

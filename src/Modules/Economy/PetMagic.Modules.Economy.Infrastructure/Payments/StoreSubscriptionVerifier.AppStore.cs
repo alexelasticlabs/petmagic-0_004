@@ -144,9 +144,13 @@ public sealed partial class StoreSubscriptionVerifier
     {
         try
         {
-            using var response = await CreateClient().PostAsync(
-                url,
-                new StringContent(payload, Encoding.UTF8, "application/json"),
+            using var requestMessage = new HttpRequestMessage(HttpMethod.Post, url)
+            {
+                Content = new StringContent(payload, Encoding.UTF8, "application/json")
+            };
+            using var response = await CreateClient().SendAsync(
+                requestMessage,
+                HttpCompletionOption.ResponseHeadersRead,
                 cancellationToken);
 
             if (!response.IsSuccessStatusCode)
@@ -154,8 +158,7 @@ public sealed partial class StoreSubscriptionVerifier
                 return (Result.Failure<StoreSubscriptionVerificationResponse>(EconomyErrors.StorePurchaseInvalid), false);
             }
 
-            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+            using var document = await ReadProviderJsonAsync(response.Content, cancellationToken);
             var root = document.RootElement;
             var status = root.TryGetProperty("status", out var statusElement) && statusElement.ValueKind == JsonValueKind.Number
                 ? statusElement.GetInt32()
@@ -236,19 +239,19 @@ public sealed partial class StoreSubscriptionVerifier
         catch (Exception ex)
         {
             logger?.LogWarning(
-                ex,
-                "Store subscription verification failed. Provider={Provider} Operation={Operation} Endpoint={Endpoint} UserId={UserId} PlanCode={PlanCode} ProductId={ProductId} PurchaseId={PurchaseId} VerificationDataKind={VerificationDataKind} HasLocalVerificationData={HasLocalVerificationData} HasTransactionDate={HasTransactionDate} CorrelationId={CorrelationId}",
+                "Store subscription verification failed. Provider={Provider} Operation={Operation} Endpoint={Endpoint} UserIdHash={UserIdHash} PlanCode={PlanCode} ProductId={ProductId} PurchaseIdSafe={PurchaseIdSafe} VerificationDataKind={VerificationDataKind} HasLocalVerificationData={HasLocalVerificationData} HasTransactionDate={HasTransactionDate} ExceptionType={ExceptionType} CorrelationIdHash={CorrelationIdHash}",
                 "app_store",
                 "subscription_verify",
                 ResolveAppStoreEndpointName(url),
-                request.UserId,
+                EconomyLogSanitizer.SafeUserId(request.UserId),
                 request.PlanCode,
                 request.ProductId,
                 EconomyLogSanitizer.SafeExternalId(request.PurchaseId),
                 DescribeAppStoreVerificationData(request.ServerVerificationData),
                 !string.IsNullOrWhiteSpace(request.LocalVerificationData),
                 !string.IsNullOrWhiteSpace(request.TransactionDate),
-                CorrelationContext.ResolveOrCreate());
+                SafeLogValues.ExceptionType(ex),
+                SafeLogValues.StableHash(CorrelationContext.ResolveOrCreate()));
 
             return (Result.Failure<StoreSubscriptionVerificationResponse>(EconomyErrors.StoreVerificationUnavailable), false);
         }
@@ -263,9 +266,13 @@ public sealed partial class StoreSubscriptionVerifier
     {
         try
         {
-            using var response = await CreateClient().PostAsync(
-                url,
-                new StringContent(payload, Encoding.UTF8, "application/json"),
+            using var requestMessage = new HttpRequestMessage(HttpMethod.Post, url)
+            {
+                Content = new StringContent(payload, Encoding.UTF8, "application/json")
+            };
+            using var response = await CreateClient().SendAsync(
+                requestMessage,
+                HttpCompletionOption.ResponseHeadersRead,
                 cancellationToken);
 
             if (!response.IsSuccessStatusCode)
@@ -273,8 +280,7 @@ public sealed partial class StoreSubscriptionVerifier
                 return (Result.Failure<StoreProductVerificationResponse>(EconomyErrors.StorePurchaseInvalid), false);
             }
 
-            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+            using var document = await ReadProviderJsonAsync(response.Content, cancellationToken);
             var root = document.RootElement;
             var status = root.TryGetProperty("status", out var statusElement) && statusElement.ValueKind == JsonValueKind.Number
                 ? statusElement.GetInt32()
@@ -338,18 +344,18 @@ public sealed partial class StoreSubscriptionVerifier
         catch (Exception ex)
         {
             logger?.LogWarning(
-                ex,
-                "Store product verification failed. Provider={Provider} Operation={Operation} Endpoint={Endpoint} UserId={UserId} ProductId={ProductId} PurchaseId={PurchaseId} VerificationDataKind={VerificationDataKind} HasLocalVerificationData={HasLocalVerificationData} HasTransactionDate={HasTransactionDate} CorrelationId={CorrelationId}",
+                "Store product verification failed. Provider={Provider} Operation={Operation} Endpoint={Endpoint} UserIdHash={UserIdHash} ProductId={ProductId} PurchaseIdSafe={PurchaseIdSafe} VerificationDataKind={VerificationDataKind} HasLocalVerificationData={HasLocalVerificationData} HasTransactionDate={HasTransactionDate} ExceptionType={ExceptionType} CorrelationIdHash={CorrelationIdHash}",
                 "app_store",
                 "product_verify",
                 ResolveAppStoreEndpointName(url),
-                request.UserId,
+                EconomyLogSanitizer.SafeUserId(request.UserId),
                 request.ProductId,
                 EconomyLogSanitizer.SafeExternalId(request.PurchaseId),
                 DescribeAppStoreVerificationData(request.ServerVerificationData),
                 !string.IsNullOrWhiteSpace(request.LocalVerificationData),
                 !string.IsNullOrWhiteSpace(request.TransactionDate),
-                CorrelationContext.ResolveOrCreate());
+                SafeLogValues.ExceptionType(ex),
+                SafeLogValues.StableHash(CorrelationContext.ResolveOrCreate()));
 
             return (Result.Failure<StoreProductVerificationResponse>(EconomyErrors.StoreVerificationUnavailable), false);
         }
@@ -373,11 +379,11 @@ public sealed partial class StoreSubscriptionVerifier
     {
         EconomyMetrics.RecordSandboxReceiptInProduction("app_store", operation);
         logger?.LogError(
-            "SECURITY: sandbox App Store receipt rejected in production. Operation={Operation} UserId={UserId} ProductId={ProductId} CorrelationId={CorrelationId}",
+            "SECURITY: sandbox App Store receipt rejected in production. Operation={Operation} UserIdHash={UserIdHash} ProductId={ProductId} CorrelationIdHash={CorrelationIdHash}",
             operation,
-            userId,
+            EconomyLogSanitizer.SafeUserId(userId),
             productId,
-            CorrelationContext.ResolveOrCreate());
+            SafeLogValues.StableHash(CorrelationContext.ResolveOrCreate()));
     }
 
     private bool IsValidAppStoreTransaction(
@@ -404,10 +410,10 @@ public sealed partial class StoreSubscriptionVerifier
             {
                 EconomyMetrics.RecordSandboxReceiptInProduction("app_store", "jws_environment_mismatch");
                 logger?.LogError(
-                    "SECURITY: App Store signed transaction environment mismatch in production. TransactionEnvironment={TransactionEnvironment} ProductId={ProductId} CorrelationId={CorrelationId}",
+                    "SECURITY: App Store signed transaction environment mismatch in production. TransactionEnvironment={TransactionEnvironment} ProductId={ProductId} CorrelationIdHash={CorrelationIdHash}",
                     transactionInfo.Environment,
                     transactionInfo.ProductId,
-                    CorrelationContext.ResolveOrCreate());
+                    SafeLogValues.StableHash(CorrelationContext.ResolveOrCreate()));
             }
 
             return false;

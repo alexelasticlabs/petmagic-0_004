@@ -36,6 +36,9 @@ public sealed class SupportChatPaginationHardeningTests
         Assert.Contains("support.source_invalid", source, StringComparison.Ordinal);
         Assert.Contains("support.priority_invalid", source, StringComparison.Ordinal);
         Assert.Contains("support.sort_invalid", source, StringComparison.Ordinal);
+        Assert.Contains("support.queue_invalid", source, StringComparison.Ordinal);
+        Assert.Contains("normalizedQueue == \"waiting_for_support\"", source, StringComparison.Ordinal);
+        Assert.Contains("x.Status == SupportConversationStatus.New\n                || x.Status == SupportConversationStatus.InProgress", source, StringComparison.Ordinal);
     }
 
     [Fact]

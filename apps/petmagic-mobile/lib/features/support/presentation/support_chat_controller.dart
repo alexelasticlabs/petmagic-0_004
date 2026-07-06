@@ -101,15 +101,33 @@ class SupportChatController extends _SupportChatControllerBase
     with
         _SupportChatControllerConversationMixin,
         _SupportChatControllerMessagingMixin {
+  SupportChatRepository? _activeRepository;
+  SupportChatRealtimeClient? _activeRealtimeClient;
+
   @override
-  late final SupportChatRepository _repository;
+  SupportChatRepository get _repository {
+    final repository = _activeRepository;
+    if (repository != null) {
+      return repository;
+    }
+
+    return ref.read(supportChatRepositoryProvider);
+  }
+
   @override
-  late final SupportChatRealtimeClient _realtimeClient;
+  SupportChatRealtimeClient get _realtimeClient {
+    final realtimeClient = _activeRealtimeClient;
+    if (realtimeClient != null) {
+      return realtimeClient;
+    }
+
+    return ref.read(supportChatRealtimeClientProvider);
+  }
 
   @override
   SupportChatState build() {
-    _repository = ref.watch(supportChatRepositoryProvider);
-    _realtimeClient = ref.watch(supportChatRealtimeClientProvider);
+    _activeRepository = ref.read(supportChatRepositoryProvider);
+    _activeRealtimeClient = ref.read(supportChatRealtimeClientProvider);
     _hasInternet = ref.read(networkStatusControllerProvider).hasInternet;
     ref.listen<bool>(
       networkStatusControllerProvider.select((state) => state.hasInternet),

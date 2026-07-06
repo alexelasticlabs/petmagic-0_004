@@ -1,10 +1,6 @@
 import { type Dispatch, type SetStateAction } from "react";
 
-import {
-  AdminCard,
-  AdminMetricStrip,
-  adminTableStyles,
-} from "@/components/admin/admin-primitives";
+import { AdminCard, AdminMetricStrip, adminTableStyles } from "@/components/admin/admin-primitives";
 import { type EconomyPageText } from "@/components/economy-page.content";
 import {
   ECONOMY_PACK_DISPLAY_NAME_MAX_LENGTH,

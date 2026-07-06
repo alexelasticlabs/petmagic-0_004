@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readTemplateTestPageLibrarySource } from "@/components/templates/template-test-page.test-source";
 import { clearAdminListCaches } from "@/lib/api-client.core";
 import {
+  cancelAdminTemplateGeneration,
   createTemplateOfTheDay,
   decideAdminModerationItem,
   fetchAdminModerationQueue,
@@ -26,6 +27,7 @@ import {
   normalizeAdminModerationQueueQuery,
   normalizeAdminTemplateGenerationsQuery,
   normalizeAdminTemplatesAnalyticsQuery,
+  retryAdminTemplateGeneration,
   TEMPLATE_CATALOG_SEARCH_MAX_LENGTH,
   TEMPLATE_FEEDBACK_SEARCH_MAX_LENGTH,
   updateImageTemplate,
@@ -529,6 +531,8 @@ describe("api-client.templates query normalization", () => {
 
     await fetchAdminTemplateRecentGenerations("template/one two?x", 25);
     await fetchAdminTemplateTest("generation/one two?x");
+    await cancelAdminTemplateGeneration("generation/one two?x");
+    await retryAdminTemplateGeneration("generation/one two?x");
     await decideAdminModerationItem("event/one two?x", {
       action: "reject",
       reason: "Policy",
@@ -537,8 +541,12 @@ describe("api-client.templates query normalization", () => {
     expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
       "https://api.example.com/api/admin/templates/template%2Fone%20two%3Fx/statistics/recent?take=25",
       "https://api.example.com/api/admin/templates/tests/generation%2Fone%20two%3Fx",
+      "https://api.example.com/api/admin/templates/generations/generation%2Fone%20two%3Fx/cancel",
+      "https://api.example.com/api/admin/templates/generations/generation%2Fone%20two%3Fx/retry",
       "https://api.example.com/api/admin/templates/moderation/event%2Fone%20two%3Fx/decision",
     ]);
+    expect(fetchMock.mock.calls[2]?.[1]?.method).toBe("POST");
+    expect(fetchMock.mock.calls[3]?.[1]?.method).toBe("POST");
   });
 
   it("bounds moderation decision reasons before sending audit payloads", async () => {
@@ -636,7 +644,8 @@ describe("api-client.templates query normalization", () => {
       "fetchAdminTemplateRecentGenerations(templateId, previewTake, signal)"
     );
     expect(feedbackSource).toContain("queryFn: ({ signal }) =>");
-    expect(feedbackSource).toContain("}, signal)");
+    expect(feedbackSource).toContain("fetchAdminTemplateFeedback(");
+    expect(feedbackSource).toContain("signal");
     expect(optionsSource).toContain("queryFn: ({ signal }) => fetchAdminTemplates(query, signal)");
     expect(categoriesSource).toContain(
       "queryFn: ({ signal }) => fetchAdminTemplateCategories(includeArchived, signal)"

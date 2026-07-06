@@ -24,6 +24,7 @@ void main() {
     final loadNextPageBody = _methodBody(source, '_loadNextPage');
     final markFailedBody = _methodBody(source, '_markAssetLoadFailed');
     final retryBody = _methodBody(source, '_retryInitializeAssets');
+    final didUpdateWidgetBody = _methodBody(source, 'didUpdateWidget');
 
     expect(source, contains('bool _assetLoadFailed = false;'));
     expect(
@@ -92,6 +93,24 @@ void main() {
 
     expect(retryBody, contains('_isInitialLoading = true;'));
     expect(retryBody, contains('unawaited(_initializeAssets())'));
+    expect(
+      didUpdateWidgetBody,
+      contains('oldWidget.scrollController.removeListener(_onGridScrolled)'),
+    );
+    expect(
+      didUpdateWidgetBody,
+      contains('widget.scrollController.addListener(_onGridScrolled)'),
+    );
+    expect(
+      didUpdateWidgetBody,
+      contains(
+        'if (!identical(oldWidget.scrollController, widget.scrollController))',
+      ),
+    );
+    expect(
+      source,
+      contains('widget.scrollController.removeListener(_onGridScrolled)'),
+    );
     expect(source, contains('text.supportChatUnavailableError'));
     expect(source, contains('TextButton('));
     expect(source, contains('child: Text(text.retryAction)'));

@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/lifecycle/app_lifecycle_signal.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/logging/log_correlation_context.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
@@ -81,25 +83,35 @@ class TemplateGenerationState {
 }
 
 class TemplateGenerationController extends Notifier<TemplateGenerationState> {
-  late final TemplateGenerationRepository _repository;
+  TemplateGenerationRepository get _repository =>
+      ref.read(templateGenerationRepositoryProvider);
   Timer? _pollTimer;
   bool _pollTickInFlight = false;
   bool _disposed = false;
   bool _hasInternet = true;
+  bool _isForeground = true;
   int _generationFlowEpoch = 0;
   String? _activeCorrelationId;
   CancelToken? _activeRequestCancelToken;
+  VoidCallback? _appLifecycleListener;
 
   @override
   TemplateGenerationState build() {
-    _repository = ref.watch(templateGenerationRepositoryProvider);
     _hasInternet = ref.read(networkStatusControllerProvider).hasInternet;
+    _isForeground = AppLifecycleSignal.instance.isResumed;
+    _appLifecycleListener = _handleAppLifecycleSignal;
+    AppLifecycleSignal.instance.addListener(_appLifecycleListener!);
     ref.listen<bool>(
       networkStatusControllerProvider.select((status) => status.hasInternet),
       (_, hasInternet) => _handleNetworkStatusChanged(hasInternet),
     );
     ref.onDispose(() {
       _disposed = true;
+      final lifecycleListener = _appLifecycleListener;
+      if (lifecycleListener != null) {
+        AppLifecycleSignal.instance.removeListener(lifecycleListener);
+        _appLifecycleListener = null;
+      }
       _cancelActiveRequest();
       _stopPolling();
     });
@@ -206,13 +218,14 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
     TemplateItem template,
     XFile photo,
   ) async {
+    final repository = _repository;
     CancelToken? requestCancelToken;
     try {
       requestCancelToken = _newActiveRequestCancelToken();
       if (_disposed) {
         return null;
       }
-      final generation = await _repository.startGeneration(
+      final generation = await repository.startGeneration(
         templateId: template.templateId,
         sourceImage: photo,
         expectedTemplateVersion: template.version,
@@ -222,7 +235,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
 
       if (_disposed) {
         if (!generation.isTerminal) {
-          await _repository.rememberActiveGeneration(
+          await repository.rememberActiveGeneration(
             generationId: generation.generationId,
             correlationId: _activeCorrelationId,
           );
@@ -238,7 +251,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
       );
 
       if (!generation.isTerminal) {
-        await _repository.rememberActiveGeneration(
+        await repository.rememberActiveGeneration(
           generationId: generation.generationId,
           correlationId: _activeCorrelationId,
         );
@@ -247,7 +260,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
         }
         _startPolling(generation.generationId);
       } else {
-        await _repository.clearActiveGeneration(generation.generationId);
+        await repository.clearActiveGeneration(generation.generationId);
         if (_disposed) {
           return generation;
         }
@@ -284,7 +297,10 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
 
   Future<void> refreshGeneration() async {
     final generationId = state.generation?.generationId;
-    if (generationId == null || generationId.isEmpty) {
+    if (generationId == null ||
+        generationId.isEmpty ||
+        !_hasInternet ||
+        !_isForeground) {
       return;
     }
 
@@ -292,7 +308,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
   }
 
   void _startPolling(String generationId) {
-    if (_disposed) {
+    if (_disposed || !_isForeground) {
       return;
     }
 
@@ -301,7 +317,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
   }
 
   void _scheduleNextPoll(TemplateGenerationResult? generation) {
-    if (_disposed) {
+    if (_disposed || !_isForeground) {
       return;
     }
 
@@ -337,7 +353,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
     String generationId, {
     required bool scheduleNext,
   }) async {
-    if (_disposed || !_hasInternet) {
+    if (_disposed || !_hasInternet || !_isForeground) {
       return;
     }
 
@@ -349,10 +365,11 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
     }
 
     _pollTickInFlight = true;
+    final repository = _repository;
     CancelToken? requestCancelToken;
     try {
       requestCancelToken = _newActiveRequestCancelToken();
-      final generation = await _repository.fetchGeneration(
+      final generation = await repository.fetchGeneration(
         generationId,
         correlationId: _activeCorrelationId,
         cancelToken: requestCancelToken,
@@ -370,7 +387,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
 
       if (generation.isTerminal) {
         _stopPolling();
-        await _repository.clearActiveGeneration(generation.generationId);
+        await repository.clearActiveGeneration(generation.generationId);
         if (_disposed) {
           return;
         }
@@ -430,11 +447,12 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
 
   Future<void> _restoreActiveGeneration() async {
     final restoreEpoch = _generationFlowEpoch;
-    final active = await _repository.readActiveGeneration();
+    final repository = _repository;
+    final active = await repository.readActiveGeneration();
     if (!_isRestoreCurrent(restoreEpoch) || active == null) {
       return;
     }
-    if (!_hasInternet) {
+    if (!_hasInternet || !_isForeground) {
       return;
     }
 
@@ -444,7 +462,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
     CancelToken? requestCancelToken;
     try {
       requestCancelToken = _newActiveRequestCancelToken();
-      final generation = await _repository.fetchGeneration(
+      final generation = await repository.fetchGeneration(
         active.generationId,
         correlationId: _activeCorrelationId,
         cancelToken: requestCancelToken,
@@ -461,7 +479,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
       );
 
       if (generation.isTerminal) {
-        await _repository.clearActiveGeneration(generation.generationId);
+        await repository.clearActiveGeneration(generation.generationId);
         if (!_isRestoreCurrent(restoreEpoch)) {
           return;
         }
@@ -470,7 +488,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
         return;
       }
 
-      await _repository.rememberActiveGeneration(
+      await repository.rememberActiveGeneration(
         generationId: generation.generationId,
         correlationId: _activeCorrelationId,
       );
@@ -516,6 +534,44 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
       if (state.isCreating || generation != null && !generation.isTerminal) {
         state = state.copyWith(isCreating: false, isPolling: false);
       }
+      return;
+    }
+
+    if (!_isForeground) {
+      return;
+    }
+
+    final generation = state.generation;
+    if (generation != null && !generation.isTerminal) {
+      state = state.copyWith(isPolling: true, clearError: true);
+      unawaited(_pollGeneration(generation.generationId, scheduleNext: true));
+      return;
+    }
+
+    unawaited(_restoreActiveGeneration());
+  }
+
+  void _handleAppLifecycleSignal() {
+    final isForeground = AppLifecycleSignal.instance.isResumed;
+    if (_disposed || _isForeground == isForeground) {
+      return;
+    }
+
+    _isForeground = isForeground;
+    if (!isForeground) {
+      _stopPolling();
+      if (!state.isCreating) {
+        _cancelActiveRequest();
+      }
+
+      final generation = state.generation;
+      if (generation != null && !generation.isTerminal && state.isPolling) {
+        state = state.copyWith(isPolling: false);
+      }
+      return;
+    }
+
+    if (!_hasInternet) {
       return;
     }
 

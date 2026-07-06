@@ -14,9 +14,7 @@ import {
   safeDisplayText,
 } from "@/components/templates/templates-daily-featured-page.helpers";
 import styles from "@/components/templates/templates-daily-featured-page.module.css";
-import {
-  AssignmentSummary,
-} from "@/components/templates/templates-daily-featured-page.schedule";
+import { AssignmentSummary } from "@/components/templates/templates-daily-featured-page.schedule";
 import type {
   AutoPickSettingsCardProps,
   CurrentAssignmentCardProps,
@@ -25,11 +23,11 @@ import type {
 } from "@/components/templates/templates-daily-featured-page.types";
 import { Button } from "@/components/ui/button";
 
-export function CurrentAssignmentCard({ current, text }: CurrentAssignmentCardProps) {
+export function CurrentAssignmentCard({ current, text, locale }: CurrentAssignmentCardProps) {
   return (
     <AdminCard title={text.current}>
       {current ? (
-        <AssignmentSummary assignment={current} text={text} />
+        <AssignmentSummary assignment={current} text={text} locale={locale} />
       ) : (
         <AdminStateCard description={text.noCurrent} />
       )}

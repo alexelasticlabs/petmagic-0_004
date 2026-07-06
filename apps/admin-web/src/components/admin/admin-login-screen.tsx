@@ -12,11 +12,7 @@ type AdminLoginScreenProps = {
   children: ReactNode;
 };
 
-export function AdminLoginScreen({
-  locale,
-  onToggleTheme,
-  children,
-}: AdminLoginScreenProps) {
+export function AdminLoginScreen({ locale, onToggleTheme, children }: AdminLoginScreenProps) {
   const copy = getAdminChromeCopy(locale).loginScreen;
 
   return (
@@ -25,7 +21,7 @@ export function AdminLoginScreen({
         <BrandMark className={styles.brandMark} />
         <h2 className={styles.welcome}>{copy.welcomeTitle}</h2>
         <p className={styles.tagline}>{copy.welcomeSubtitle}</p>
-        <LoginDashboardPreview />
+        <LoginDashboardPreview title={copy.previewWindowTitle} />
       </div>
 
       <div className={styles.right}>
@@ -48,14 +44,14 @@ export function AdminLoginScreen({
   );
 }
 
-function LoginDashboardPreview() {
+function LoginDashboardPreview({ title }: { title: string }) {
   return (
     <div className={styles.preview} aria-hidden="true">
       <div className={styles.previewTitlebar}>
         <span className={`${styles.previewDot} ${styles.previewDotRed}`} />
         <span className={`${styles.previewDot} ${styles.previewDotYellow}`} />
         <span className={`${styles.previewDot} ${styles.previewDotGreen}`} />
-        <span className={styles.previewWindowTitle}>Dashboard</span>
+        <span className={styles.previewWindowTitle}>{title}</span>
       </div>
 
       <div className={styles.previewBody}>

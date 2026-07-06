@@ -12,6 +12,8 @@ namespace PetMagic.Modules.Economy.Infrastructure.Payments;
 
 public sealed partial class StripePaymentGateway
 {
+    private const int StripeProviderJsonResponseMaxChars = 64 * 1024;
+
     private static bool IsStripe(string provider)
     {
         return string.Equals(provider, Provider, StringComparison.OrdinalIgnoreCase);
@@ -69,7 +71,7 @@ public sealed partial class StripePaymentGateway
         {
             using var response = await httpClientFactory
                 .CreateClient(HttpClientName)
-                .SendAsync(request, cancellationToken);
+                .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 LogGatewayWarning(
@@ -82,8 +84,11 @@ public sealed partial class StripePaymentGateway
                 return Result.Failure<string>(EconomyErrors.PaymentGatewayFailed);
             }
 
-            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+            var responseBody = await SafeHttpContentReader.ReadRawStringPrefixAsync(
+                response.Content,
+                cancellationToken,
+                StripeProviderJsonResponseMaxChars);
+            using var document = JsonDocument.Parse(responseBody);
             if (document.RootElement.TryGetProperty("secret", out var secretElement)
                 && secretElement.ValueKind == JsonValueKind.String)
             {
@@ -138,12 +143,11 @@ public sealed partial class StripePaymentGateway
         int? statusCode = null)
     {
         logger?.LogWarning(
-            exception,
-            "Stripe gateway operation failed. Provider={Provider} Operation={Operation} UserId={UserId} OrderId={OrderId} PlanCode={PlanCode} ExternalCustomerId={ExternalCustomerId} ExternalPaymentId={ExternalPaymentId} ExternalPaymentMethodId={ExternalPaymentMethodId} ExternalSetupId={ExternalSetupId} UsePaymentSheet={UsePaymentSheet} StatusCode={StatusCode} CorrelationId={CorrelationId}",
+            "Stripe gateway operation failed. Provider={Provider} Operation={Operation} UserIdHash={UserIdHash} OrderIdHash={OrderIdHash} PlanCode={PlanCode} ExternalCustomerIdSafe={ExternalCustomerIdSafe} ExternalPaymentIdSafe={ExternalPaymentIdSafe} ExternalPaymentMethodIdSafe={ExternalPaymentMethodIdSafe} ExternalSetupIdSafe={ExternalSetupIdSafe} UsePaymentSheet={UsePaymentSheet} StatusCode={StatusCode} ExceptionType={ExceptionType} CorrelationIdHash={CorrelationIdHash}",
             Provider,
             operation,
-            userId,
-            orderId,
+            EconomyLogSanitizer.SafeUserId(userId),
+            orderId.HasValue ? SafeLogValues.StableHash(orderId.Value.ToString("D")) : null,
             planCode,
             EconomyLogSanitizer.SafeExternalId(externalCustomerId),
             EconomyLogSanitizer.SafeExternalId(externalPaymentId),
@@ -151,7 +155,8 @@ public sealed partial class StripePaymentGateway
             EconomyLogSanitizer.SafeExternalId(externalSetupId),
             usePaymentSheet,
             statusCode,
-            CorrelationContext.ResolveOrCreate());
+            SafeLogValues.ExceptionType(exception),
+            SafeLogValues.StableHash(CorrelationContext.ResolveOrCreate()));
     }
 
     private void LogGatewayWarning(
@@ -168,12 +173,12 @@ public sealed partial class StripePaymentGateway
         int? statusCode = null)
     {
         logger?.LogWarning(
-            "{Summary} Provider={Provider} Operation={Operation} UserId={UserId} OrderId={OrderId} PlanCode={PlanCode} ExternalCustomerId={ExternalCustomerId} ExternalPaymentId={ExternalPaymentId} ExternalPaymentMethodId={ExternalPaymentMethodId} ExternalSetupId={ExternalSetupId} UsePaymentSheet={UsePaymentSheet} StatusCode={StatusCode} CorrelationId={CorrelationId}",
+            "{Summary} Provider={Provider} Operation={Operation} UserIdHash={UserIdHash} OrderIdHash={OrderIdHash} PlanCode={PlanCode} ExternalCustomerIdSafe={ExternalCustomerIdSafe} ExternalPaymentIdSafe={ExternalPaymentIdSafe} ExternalPaymentMethodIdSafe={ExternalPaymentMethodIdSafe} ExternalSetupIdSafe={ExternalSetupIdSafe} UsePaymentSheet={UsePaymentSheet} StatusCode={StatusCode} CorrelationIdHash={CorrelationIdHash}",
             summary,
             Provider,
             operation,
-            userId,
-            orderId,
+            EconomyLogSanitizer.SafeUserId(userId),
+            orderId.HasValue ? SafeLogValues.StableHash(orderId.Value.ToString("D")) : null,
             planCode,
             EconomyLogSanitizer.SafeExternalId(externalCustomerId),
             EconomyLogSanitizer.SafeExternalId(externalPaymentId),
@@ -181,7 +186,7 @@ public sealed partial class StripePaymentGateway
             EconomyLogSanitizer.SafeExternalId(externalSetupId),
             usePaymentSheet,
             statusCode,
-            CorrelationContext.ResolveOrCreate());
+            SafeLogValues.StableHash(CorrelationContext.ResolveOrCreate()));
     }
 
     private string ResolveApiKey(string? apiKey = null)

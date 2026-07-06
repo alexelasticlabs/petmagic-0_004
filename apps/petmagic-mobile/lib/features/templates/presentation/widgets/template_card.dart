@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
@@ -117,6 +118,11 @@ class _TemplateCardState extends State<TemplateCard> {
     super.initState();
     AppLifecycleSignal.instance.addListener(_appLifecycleListener);
     widget.playbackManager?.addListener(_playbackManagerListener);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
     _syncFeaturedCountdownTicker();
   }
 
@@ -171,10 +177,12 @@ class _TemplateCardState extends State<TemplateCard> {
 
     final state = AppLifecycleSignal.instance.state;
     if (state == AppLifecycleState.resumed) {
+      _syncFeaturedCountdownTicker();
       _resumeVisiblePreviewAfterAppResume();
       return;
     }
 
+    _featuredCountdownTimer?.cancel();
     _suspendPreviewForAppBackground();
   }
 
@@ -359,7 +367,7 @@ class _TemplateCardState extends State<TemplateCard> {
   void _syncFeaturedCountdownTicker() {
     _featuredCountdownTimer?.cancel();
     final target = widget.featuredData?.countdownTarget?.toUtc();
-    if (target == null) {
+    if (target == null || !_shouldRunFeaturedCountdownTicker) {
       return;
     }
 
@@ -368,21 +376,28 @@ class _TemplateCardState extends State<TemplateCard> {
       return;
     }
 
-    final interval = remaining <= const Duration(hours: 1)
+    final delay = remaining <= const Duration(hours: 1)
         ? const Duration(seconds: 1)
         : const Duration(minutes: 1);
-    _featuredCountdownTimer = Timer.periodic(interval, (_) {
-      if (!mounted) {
+    _featuredCountdownTimer = Timer(delay, () {
+      if (!mounted || !_shouldRunFeaturedCountdownTicker) {
+        _featuredCountdownTimer = null;
         return;
       }
 
       final nextRemaining = target.difference(DateTime.now().toUtc());
-      if (nextRemaining <= Duration.zero) {
-        _featuredCountdownTimer?.cancel();
-      }
       setState(() {});
+      _featuredCountdownTimer = null;
+      if (nextRemaining > Duration.zero) {
+        _syncFeaturedCountdownTicker();
+      }
     });
   }
+
+  bool get _shouldRunFeaturedCountdownTicker =>
+      !_disposed &&
+      AppLifecycleSignal.instance.state == AppLifecycleState.resumed &&
+      TickerMode.valuesOf(context).enabled;
 
   void _handleVisibility(VisibilityInfo info) {
     if (!mounted || _disposed) {
@@ -662,7 +677,7 @@ class _TemplateCardState extends State<TemplateCard> {
       )) {
         _videoController = null;
         _isPreviewActive = false;
-        AppLogger.info(
+        AppLogger.debug(
           feature: 'Templates.TemplateCard',
           operation: 'video_playback_fallback_to_thumbnail',
           message: 'Template card fell back to thumbnail after video failure.',

@@ -1,5 +1,4 @@
 export type OffsetPagedResponse<T> = {
-
   items: T[];
 
   skip: number;
@@ -9,7 +8,4 @@ export type OffsetPagedResponse<T> = {
   hasMore: boolean;
 
   totalCount?: number | null;
-
 };
-
-

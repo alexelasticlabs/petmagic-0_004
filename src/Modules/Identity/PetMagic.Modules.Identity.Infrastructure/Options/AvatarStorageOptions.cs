@@ -6,7 +6,7 @@ public sealed class AvatarStorageOptions
 {
     public const string SectionName = "Identity:AvatarStorage";
 
-    public string PublicBaseUrl { get; init; } = "http://localhost:5000";
+    public string PublicBaseUrl { get; init; } = string.Empty;
 
     public string LocalMediaRootPath { get; init; } = Path.Combine("wwwroot", "user-avatars");
 

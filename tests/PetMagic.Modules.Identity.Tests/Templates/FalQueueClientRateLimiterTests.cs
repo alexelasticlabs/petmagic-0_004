@@ -119,6 +119,48 @@ public sealed class FalQueueClientRateLimiterTests
         Assert.Equal(0, handler.ResponseCount);
     }
 
+    [Fact]
+    public async Task RunAsync_ShouldReturnProviderFailure_WhenStatusPayloadIsMalformed()
+    {
+        ResetLocalRateLimiterState();
+        await using var dbContext = CreateDbContext();
+        var handler = new MalformedFalHandler(statusJson: "{not-json", responseJson: """{"images":[]}""");
+        var client = CreateClient(dbContext, handler, maxRequestsPerMinute: 1);
+
+        var result = await client.RunAsync(
+            "fal-ai/test-model",
+            new { image_url = "https://cdn.example.com/pet.jpg" },
+            new FalQueueStageKind("image", FalQueueStages.ImageGeneration),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(TemplatesErrors.AiProviderFailed.Code, result.Error.Code);
+        Assert.Equal(1, handler.SubmitCount);
+        Assert.Equal(1, handler.StatusCount);
+        Assert.Equal(0, handler.ResponseCount);
+    }
+
+    [Fact]
+    public async Task RunAsync_ShouldReturnProviderFailure_WhenResponsePayloadIsMalformed()
+    {
+        ResetLocalRateLimiterState();
+        await using var dbContext = CreateDbContext();
+        var handler = new MalformedFalHandler(statusJson: """{"status":"COMPLETED"}""", responseJson: "{not-json");
+        var client = CreateClient(dbContext, handler, maxRequestsPerMinute: 1);
+
+        var result = await client.RunAsync(
+            "fal-ai/test-model",
+            new { image_url = "https://cdn.example.com/pet.jpg" },
+            new FalQueueStageKind("image", FalQueueStages.ImageGeneration),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(TemplatesErrors.AiProviderFailed.Code, result.Error.Code);
+        Assert.Equal(1, handler.SubmitCount);
+        Assert.Equal(1, handler.StatusCount);
+        Assert.Equal(1, handler.ResponseCount);
+    }
+
     private static TemplatesDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<TemplatesDbContext>()
@@ -287,6 +329,54 @@ public sealed class FalQueueClientRateLimiterTests
             {
                 ResponseCount++;
                 return JsonAsync("""{"images":[]}""");
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+        }
+
+        private static Task<HttpResponseMessage> JsonAsync(string json)
+        {
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json")
+            });
+        }
+    }
+
+    private sealed class MalformedFalHandler(string statusJson, string responseJson) : HttpMessageHandler
+    {
+        public int SubmitCount { get; private set; }
+
+        public int StatusCount { get; private set; }
+
+        public int ResponseCount { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var path = request.RequestUri?.AbsolutePath ?? string.Empty;
+            if (request.Method == HttpMethod.Post)
+            {
+                SubmitCount++;
+                return JsonAsync(
+                    """
+                    {
+                      "request_id": "fal-request-1",
+                      "status_url": "https://queue.fal.test/status/fal-request-1",
+                      "response_url": "https://queue.fal.test/response/fal-request-1"
+                    }
+                    """);
+            }
+
+            if (path.StartsWith("/status/", StringComparison.Ordinal))
+            {
+                StatusCount++;
+                return JsonAsync(statusJson);
+            }
+
+            if (path.StartsWith("/response/", StringComparison.Ordinal))
+            {
+                ResponseCount++;
+                return JsonAsync(responseJson);
             }
 
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));

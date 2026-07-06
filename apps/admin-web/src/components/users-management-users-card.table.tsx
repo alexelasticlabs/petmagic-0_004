@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 
-
 import { CaretDownIcon, MoreHorizontalIcon } from "@/components/admin/admin-icons";
 import {
   AdminBadge,
@@ -92,7 +91,7 @@ export function UsersManagementUsersTable({
             <tr>
               <th>{text.avatarLabel}</th>
               <th>{text.emailLabel}</th>
-              <th>userId</th>
+              <th>{text.userIdLabel}</th>
               <th>{text.roleLabel}</th>
               <th>{ui.accountStatus}</th>
               <th>{ui.premiumAndExpiry}</th>
@@ -131,7 +130,7 @@ export function UsersManagementUsersTable({
                       </span>
                     </div>
                   </td>
-                  <td data-label="userId" className={adminTableStyles.mono}>
+                  <td data-label={text.userIdLabel} className={adminTableStyles.mono}>
                     {shortIdentifier(user.userId)}
                   </td>
                   <td data-label={text.roleLabel}>
@@ -180,7 +179,10 @@ export function UsersManagementUsersTable({
                   </td>
                   <td data-label={ui.registeredAt}>{formatDateTime(user.createdAtUtc, locale)}</td>
                   <td data-label={ui.lastActivity}>
-                    {formatDateTime(rowAnalytics?.summary.lastActivityAtUtc ?? null, locale)}
+                    {formatDateTime(
+                      user.lastActivityAtUtc ?? rowAnalytics?.summary.lastActivityAtUtc ?? null,
+                      locale
+                    )}
                   </td>
                   <td data-label={ui.quickActions} className={styles.actionsCell}>
                     <div className={styles.actions}>
@@ -196,14 +198,16 @@ export function UsersManagementUsersTable({
                       </button>
                       {canManageRoles ? (
                         <>
-                          <button
-                            type="button"
-                            className={styles.quickActionBtn}
-                            disabled={isBusy}
-                            onClick={() => requestPremiumChange(user)}
-                          >
-                            {user.isPremium ? text.removePremium : text.makePremium}
-                          </button>
+                          {user.isPremium ? (
+                            <button
+                              type="button"
+                              className={styles.quickActionBtn}
+                              disabled={isBusy}
+                              onClick={() => requestPremiumChange(user)}
+                            >
+                              {text.removePremium}
+                            </button>
+                          ) : null}
                           <button
                             type="button"
                             className={styles.quickActionBtn}

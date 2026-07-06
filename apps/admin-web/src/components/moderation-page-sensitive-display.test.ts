@@ -115,7 +115,12 @@ describe("moderation page sensitive display", () => {
     expect(source).toContain("const text = getModerationPageText(locale);");
     expect(contentSource).toContain('eyebrow: "Безопасность контента"');
     expect(contentSource).toContain('eyebrow: "Content safety"');
-    expect(contentSource).toContain('searchPlaceholder: "шаблон, сообщение, user/generation id"');
+    expect(contentSource).toMatch(
+      /description:\s*"Очередь жалоб и обратной связи по шаблонам\. Решения записываются в журнал аудита\."/
+    );
+    expect(contentSource).toContain(
+      'searchPlaceholder: "шаблон, сообщение, ID пользователя или генерации"'
+    );
     expect(contentSource).toContain('searchPlaceholder: "template, message, user/generation id"');
     expect(contentSource).toContain('approve: "Одобрить"');
     expect(contentSource).toContain('approve: "Approve"');
@@ -125,6 +130,10 @@ describe("moderation page sensitive display", () => {
     expect(contentSource).toContain('statusPending: "Ожидает"');
     expect(contentSource).toContain('statusApproved: "Одобрено"');
     expect(contentSource).toContain('statusRejected: "Отклонено"');
+    expect(contentSource).toContain("moderationActionsForbidden:");
+    expect(contentSource).toContain(
+      '"Действия модерации доступны только администраторам или модераторам."'
+    );
     expect(contentSource).toContain('workspaceBadge: "Модератор"');
     expect(contentSource).toContain('approveItemLabel: "Одобрить элемент"');
     expect(contentSource).toContain('rejectItemLabel: "Отклонить элемент"');
@@ -137,6 +146,13 @@ describe("moderation page sensitive display", () => {
     expect(source).not.toContain("function getCopy(locale: Locale)");
     expect(source).not.toContain('const isRu = locale === "ru";');
     expect(source).not.toContain('? "template, message, user/generation id"');
+    expect(contentSource.slice(0, contentSource.indexOf("  en: {"))).not.toContain("audit log");
+    expect(contentSource.slice(0, contentSource.indexOf("  en: {"))).not.toContain(
+      "user/generation id"
+    );
+    expect(contentSource.slice(0, contentSource.indexOf("  en: {"))).not.toContain(
+      "Admin или Moderator"
+    );
     expect(source).not.toContain('next: isRu ? "Вперед" : "Next"');
     expect(source).not.toContain('badge={<AdminBadge tone="info">Moderator</AdminBadge>}');
   });

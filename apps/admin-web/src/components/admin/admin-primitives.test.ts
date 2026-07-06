@@ -2,9 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const primitivesCssPath = fileURLToPath(
-  new URL("./admin-primitives.module.css", import.meta.url)
-);
+const primitivesCssPath = fileURLToPath(new URL("./admin-primitives.module.css", import.meta.url));
 const primitivesSourcePath = fileURLToPath(new URL("./admin-primitives.tsx", import.meta.url));
 
 describe("admin primitives responsive layout", () => {
@@ -15,7 +13,7 @@ describe("admin primitives responsive layout", () => {
     expect(source).toContain(
       "const badgeClassName = className ? `${styles.statusBadge} ${className}` : styles.statusBadge;"
     );
-    expect(source).toContain('<span className={badgeClassName} style={style}>');
+    expect(source).toContain("<span className={badgeClassName} style={style}>");
   });
 
   it("keeps stat and status accents on semantic theme fallbacks", () => {
@@ -46,6 +44,7 @@ describe("admin primitives responsive layout", () => {
     expect(source).not.toMatch(/#[0-9a-fA-F]{3,8}/);
     expect(source).not.toContain("rgba(");
     expect(source).not.toContain("radial-gradient");
+    expect(source).not.toContain("var(--tone-color) 88%, white");
     expect(source).not.toMatch(/font-size:\s*[^;]*vw/);
     expect(nonZeroLetterSpacingRules).toEqual([]);
   });
@@ -86,7 +85,9 @@ describe("admin primitives responsive layout", () => {
     expect(source).toContain(
       'const stateRole = tone === "danger" || tone === "warning" ? "alert" : "status";'
     );
-    expect(source).toContain('const stateLiveMode = stateRole === "alert" ? "assertive" : "polite";');
+    expect(source).toContain(
+      'const stateLiveMode = stateRole === "alert" ? "assertive" : "polite";'
+    );
     expect(source).toContain("role={stateRole}");
     expect(source).toContain("aria-live={stateLiveMode}");
   });

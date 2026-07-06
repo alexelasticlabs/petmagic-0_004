@@ -22,7 +22,7 @@ internal sealed partial class FeedbackService
         var take = Math.Clamp(query.Take ?? DefaultTake, 1, MaxTake);
         var rows = ApplyAdminFilters(dbContext.TemplateGenerationFeedback.AsNoTracking(), query);
         var total = await rows.CountAsync(cancellationToken);
-        var items = await rows
+        var rawItems = await rows
             .OrderByDescending(x => x.CreatedAtUtc)
             .Skip(skip)
             .Take(take)
@@ -44,6 +44,14 @@ internal sealed partial class FeedbackService
                 x.Generation != null ? (x.Generation.WatermarkedResultUrl ?? x.Generation.ResultUrl ?? x.Generation.SourceImageUrl) : null,
                 x.CreatedAtUtc))
             .ToListAsync(cancellationToken);
+        var items = new List<AdminFeedbackListItemResponse>(rawItems.Count);
+        foreach (var item in rawItems)
+        {
+            items.Add(item with
+            {
+                PreviewUrl = await CreateAdminFeedbackReadUrlAsync(item.PreviewUrl, cancellationToken)
+            });
+        }
 
         return Result.Success(new AdminFeedbackPageResponse(
             items,
@@ -213,6 +221,11 @@ internal sealed partial class FeedbackService
             && generation.TokenCost > 0
             && refund is null;
 
+        var inputPreviewUrl = await CreateAdminFeedbackReadUrlAsync(generation?.SourceImageUrl, cancellationToken);
+        var resultPreviewUrl = await CreateAdminFeedbackReadUrlAsync(
+            generation?.WatermarkedResultUrl ?? generation?.ResultUrl,
+            cancellationToken);
+
         return new AdminFeedbackDetailsResponse(
             feedback.Id,
             feedback.UserId,
@@ -242,8 +255,8 @@ internal sealed partial class FeedbackService
                 generation.TemplateId,
                 generation.Template.Title,
                 generation.PetId,
-                generation.SourceImageUrl,
-                generation.WatermarkedResultUrl ?? generation.ResultUrl,
+                inputPreviewUrl,
+                resultPreviewUrl,
                 ResolveProviderName(generation),
                 generation.LastErrorCode,
                 generation.TokenCost,
@@ -251,6 +264,18 @@ internal sealed partial class FeedbackService
                 generation.RefundedAtUtc),
             canRefund,
             refund is null ? null : MapRefund(refund));
+    }
+
+    private async Task<string?> CreateAdminFeedbackReadUrlAsync(string? assetUrl, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(assetUrl))
+        {
+            return null;
+        }
+
+        var ttl = TimeSpan.FromSeconds(Math.Max(1, options.UserMediaReadUrlTtlSeconds));
+        var signed = await mediaStorage.CreateReadUrlAsync(assetUrl, ttl, cancellationToken);
+        return signed.IsSuccess ? signed.Value : null;
     }
 
     private static CreditRefundResponse MapRefund(CreditRefund refund) =>

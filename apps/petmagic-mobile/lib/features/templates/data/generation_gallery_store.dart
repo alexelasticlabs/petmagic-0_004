@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
@@ -39,7 +40,7 @@ final generationGalleryRootDirectoryResolverProvider =
     });
 
 final generationGalleryStoreProvider = Provider<GenerationGalleryStore>((ref) {
-  return GenerationGalleryStore(
+  final store = GenerationGalleryStore(
     dio: ref.watch(dioProvider),
     preferences: ref.watch(templateGenerationSharedPreferencesProvider),
     sessionStorage: ref.watch(authSessionStorageProvider),
@@ -47,6 +48,10 @@ final generationGalleryStoreProvider = Provider<GenerationGalleryStore>((ref) {
       generationGalleryRootDirectoryResolverProvider,
     ),
   );
+  ref.onDispose(() {
+    unawaited(store.cancelActiveDownloads());
+  });
+  return store;
 });
 
 class GenerationGalleryStore {

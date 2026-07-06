@@ -316,8 +316,18 @@ _galleryMaterializeGenerationMediaInternal(
   );
   final latestEntry = _galleryFindEntry(latestEntries, generation.generationId);
   if (latestEntry?.isDeletedLocally == true) {
-    await _galleryDeleteLocalPath(previewLocalPath);
-    await _galleryDeleteLocalPath(outputLocalPath);
+    await _galleryDeleteLocalPath(
+      store,
+      baseEntry.accountScope,
+      generation.generationId,
+      previewLocalPath,
+    );
+    await _galleryDeleteLocalPath(
+      store,
+      baseEntry.accountScope,
+      generation.generationId,
+      outputLocalPath,
+    );
     return latestEntry;
   }
   final refreshed = await _galleryUpdateEntry(
@@ -467,13 +477,48 @@ Future<_GalleryMaterializeFileResult> _galleryMaterializeRemoteFile(
     await tempFile.delete();
   }
 
-  await store._dio.downloadUri(
-    safeUri,
-    tempFile.path,
-    cancelToken: cancelToken,
-    deleteOnError: true,
-    options: Options(responseType: ResponseType.bytes),
-  );
+  var receivedBytes = 0;
+  String? backgroundLimitFailureCode;
+  final backgroundDownloadByteLimit = background
+      ? math.min(store._maxBackgroundFileBytes, remainingBackgroundBytes)
+      : null;
+
+  try {
+    await store._dio.downloadUri(
+      safeUri,
+      tempFile.path,
+      cancelToken: cancelToken,
+      deleteOnError: true,
+      options: Options(responseType: ResponseType.bytes),
+      onReceiveProgress: backgroundDownloadByteLimit == null
+          ? null
+          : (received, _) {
+              receivedBytes = math.max(receivedBytes, received);
+              if (received <= backgroundDownloadByteLimit ||
+                  cancelToken.isCancelled) {
+                return;
+              }
+
+              backgroundLimitFailureCode =
+                  backgroundDownloadByteLimit == store._maxBackgroundFileBytes
+                  ? 'background_file_too_large'
+                  : 'background_byte_budget_exceeded';
+              cancelToken.cancel(backgroundLimitFailureCode);
+            },
+    );
+  } on DioException catch (error) {
+    if (!CancelToken.isCancel(error) || backgroundLimitFailureCode == null) {
+      rethrow;
+    }
+    if (await tempFile.exists()) {
+      await tempFile.delete();
+    }
+    return _GalleryMaterializeFileResult(
+      downloadedBytes: receivedBytes,
+      failureCode: backgroundLimitFailureCode,
+      shouldBackoff: false,
+    );
+  }
 
   final downloadedBytes = await _galleryFileSize(tempFile);
   if (background && downloadedBytes > store._maxBackgroundFileBytes) {
@@ -618,6 +663,49 @@ Future<int> _galleryCalculateLocalBytes(Iterable<String?> paths) async {
   return total;
 }
 
+Future<String> _galleryEncodeEntriesForStorage(
+  GenerationGalleryStore store,
+  List<GenerationGalleryMediaRecord> entries,
+) async {
+  final root = await store._rootDirectoryResolver();
+  return jsonEncode(
+    entries
+        .map(
+          (entry) => entry.toJson(
+            localPathMapper: (path) => _galleryPersistedLocalPath(root, path),
+          ),
+        )
+        .toList(growable: false),
+  );
+}
+
+String? _galleryPersistedLocalPath(Directory root, String? path) {
+  final normalized = path?.trim();
+  if (normalized == null || normalized.isEmpty) {
+    return null;
+  }
+
+  final normalizedPath = _galleryNormalizedAbsolutePath(normalized);
+  final normalizedRoot = _galleryNormalizedAbsoluteDirectoryPath(root);
+  if (!normalizedPath.startsWith(normalizedRoot)) {
+    return normalized;
+  }
+
+  final rootLength = normalizedRoot.length;
+  if (normalizedPath.length <= rootLength) {
+    return null;
+  }
+
+  final absoluteOriginal = File(
+    normalized,
+  ).absolute.uri.normalizePath().toFilePath(windows: Platform.isWindows);
+  final relative = absoluteOriginal.substring(rootLength);
+  return relative
+      .split(RegExp(r'[\\/]'))
+      .where((segment) => segment.isNotEmpty)
+      .join('/');
+}
+
 bool _galleryIsValidLocalFile(String? path, {bool allowMissing = false}) {
   final normalized = path?.trim();
   if (normalized == null || normalized.isEmpty) {
@@ -661,16 +749,10 @@ Future<Directory> _galleryEnsureGenerationDirectory(
   String accountScope,
   String generationId,
 ) async {
-  final root = await store._rootDirectoryResolver();
-  final scopeSegment = _galleryScopeStorageSegment(accountScope);
-  final generationSegment = _safePathSegment(
+  final directory = await _galleryGenerationDirectory(
+    store,
+    accountScope,
     generationId,
-    fallback: 'generation',
-  );
-  final directory = Directory(
-    '${root.path}${Platform.pathSeparator}'
-    '${GenerationGalleryStore._generationScopeRoot}${Platform.pathSeparator}'
-    '$scopeSegment${Platform.pathSeparator}$generationSegment',
   );
   await directory.create(recursive: true);
   return directory;
@@ -681,20 +763,143 @@ Future<void> _galleryDeleteGenerationDirectory(
   String accountScope,
   String generationId,
 ) async {
+  final directory = await _galleryGenerationDirectory(
+    store,
+    accountScope,
+    generationId,
+  );
+  if (await directory.exists()) {
+    await directory.delete(recursive: true);
+  }
+}
+
+Future<Directory> _galleryGenerationDirectory(
+  GenerationGalleryStore store,
+  String accountScope,
+  String generationId,
+) async {
   final root = await store._rootDirectoryResolver();
   final scopeSegment = _galleryScopeStorageSegment(accountScope);
   final generationSegment = _safePathSegment(
     generationId,
     fallback: 'generation',
   );
-  final directory = Directory(
+  return Directory(
     '${root.path}${Platform.pathSeparator}'
     '${GenerationGalleryStore._generationScopeRoot}${Platform.pathSeparator}'
     '$scopeSegment${Platform.pathSeparator}$generationSegment',
   );
-  if (await directory.exists()) {
-    await directory.delete(recursive: true);
+}
+
+Future<List<GenerationGalleryMediaRecord>> _gallerySanitizeLocalPathsForScope(
+  GenerationGalleryStore store,
+  String accountScope,
+  List<GenerationGalleryMediaRecord> entries,
+) async {
+  final sanitized = <GenerationGalleryMediaRecord>[];
+  for (final entry in entries) {
+    final previewLocalPath = await _galleryTrustedLocalPathForEntry(
+      store,
+      accountScope,
+      entry.generationId,
+      entry.previewLocalPath,
+    );
+    final outputLocalPath = await _galleryTrustedLocalPathForEntry(
+      store,
+      accountScope,
+      entry.generationId,
+      entry.outputLocalPath,
+    );
+    final localPathsChanged =
+        previewLocalPath != entry.previewLocalPath ||
+        outputLocalPath != entry.outputLocalPath;
+    final localPathsRejected =
+        (entry.previewLocalPath?.trim().isNotEmpty ?? false) &&
+            previewLocalPath == null ||
+        (entry.outputLocalPath?.trim().isNotEmpty ?? false) &&
+            outputLocalPath == null;
+    sanitized.add(
+      localPathsChanged
+          ? entry.copyWith(
+              previewLocalPath: previewLocalPath,
+              outputLocalPath: outputLocalPath,
+              isDownloadComplete: localPathsRejected
+                  ? false
+                  : entry.isDownloadComplete,
+              localBytes: localPathsRejected ? 0 : entry.localBytes,
+            )
+          : entry,
+    );
   }
+  return sanitized;
+}
+
+Future<String?> _galleryTrustedLocalPathForEntry(
+  GenerationGalleryStore store,
+  String accountScope,
+  String generationId,
+  String? path,
+) async {
+  final normalized = path?.trim();
+  if (normalized == null || normalized.isEmpty) {
+    return null;
+  }
+
+  final expectedDirectory = await _galleryGenerationDirectory(
+    store,
+    accountScope,
+    generationId,
+  );
+  final resolved = await _galleryResolvePersistedLocalPath(store, normalized);
+  if (!_galleryIsPathInsideDirectory(resolved, expectedDirectory)) {
+    return null;
+  }
+
+  return resolved;
+}
+
+Future<String> _galleryResolvePersistedLocalPath(
+  GenerationGalleryStore store,
+  String path,
+) async {
+  if (File(path).isAbsolute) {
+    return path;
+  }
+
+  final segments = path
+      .split(RegExp(r'[\\/]'))
+      .map((segment) => segment.trim())
+      .where((segment) => segment.isNotEmpty)
+      .toList(growable: false);
+  if (segments.isEmpty ||
+      segments.any((segment) => segment == '.' || segment == '..')) {
+    return path;
+  }
+
+  final root = await store._rootDirectoryResolver();
+  return ([root.path, ...segments]).join(Platform.pathSeparator);
+}
+
+bool _galleryIsPathInsideDirectory(String path, Directory directory) {
+  final normalizedPath = _galleryNormalizedAbsolutePath(path);
+  final normalizedDirectory = _galleryNormalizedAbsoluteDirectoryPath(
+    directory,
+  );
+  return normalizedPath.startsWith(normalizedDirectory);
+}
+
+String _galleryNormalizedAbsoluteDirectoryPath(Directory directory) {
+  final normalized = _galleryNormalizedAbsolutePath(directory.path);
+  return normalized.endsWith(Platform.pathSeparator)
+      ? normalized
+      : '$normalized${Platform.pathSeparator}';
+}
+
+String _galleryNormalizedAbsolutePath(String path) {
+  final normalized = File(
+    path,
+  ).absolute.uri.normalizePath().toFilePath(windows: Platform.isWindows);
+  return Platform.isWindows ? normalized.toLowerCase() : normalized;
 }
 
 Future<void> _galleryDeleteScopeDirectory(
@@ -793,8 +998,18 @@ Future<void> _galleryCleanupScopeArtifactsForKnownIds(
   }
 }
 
-Future<void> _galleryDeleteLocalPath(String? path) async {
-  final normalized = path?.trim();
+Future<void> _galleryDeleteLocalPath(
+  GenerationGalleryStore store,
+  String accountScope,
+  String generationId,
+  String? path,
+) async {
+  final normalized = await _galleryTrustedLocalPathForEntry(
+    store,
+    accountScope,
+    generationId,
+    path,
+  );
   if (normalized == null || normalized.isEmpty) {
     return;
   }

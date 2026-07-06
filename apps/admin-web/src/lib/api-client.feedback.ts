@@ -30,7 +30,10 @@ function clean(value?: string): string | undefined {
   return trimmed ? trimmed.slice(0, ADMIN_FEEDBACK_FILTER_MAX_LENGTH) : undefined;
 }
 
-function cleanAllowed<const T extends string>(value: string | undefined, allowed: readonly T[]): T | undefined {
+function cleanAllowed<const T extends string>(
+  value: string | undefined,
+  allowed: readonly T[]
+): T | undefined {
   const cleaned = clean(value);
   return cleaned && allowed.includes(cleaned as T) ? (cleaned as T) : undefined;
 }
@@ -61,9 +64,12 @@ function normalizeFeedbackRefundPayload(
 
 export function normalizeAdminFeedbackQuery(query: AdminFeedbackQuery = {}): AdminFeedbackQuery {
   return {
-    status: query.status === "All" ? undefined : cleanAllowed(query.status, ADMIN_FEEDBACK_STATUSES),
+    status:
+      query.status === "All" ? undefined : cleanAllowed(query.status, ADMIN_FEEDBACK_STATUSES),
     priority:
-      query.priority === "All" ? undefined : cleanAllowed(query.priority, ADMIN_FEEDBACK_PRIORITIES),
+      query.priority === "All"
+        ? undefined
+        : cleanAllowed(query.priority, ADMIN_FEEDBACK_PRIORITIES),
     type: query.type === "All" ? undefined : cleanAllowed(query.type, ADMIN_FEEDBACK_TYPES),
     category: clean(query.category),
     generationId: clean(query.generationId),

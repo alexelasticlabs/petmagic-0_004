@@ -101,7 +101,17 @@ public sealed class TemplateFeedRealtimeServiceTests
         var realtimeEvent = await ReadNextAsync(subscription, timeout.Token);
 
         Assert.Equal(TemplateFeedRealtimeTopics.GenerationStatusChanged, realtimeEvent.Topic);
-        Assert.Contains(generation.GenerationId.ToString(), realtimeEvent.Data, StringComparison.OrdinalIgnoreCase);
+        using var payload = JsonDocument.Parse(realtimeEvent.Data);
+        Assert.Equal("generation.status_changed", payload.RootElement.GetProperty("eventType").GetString());
+        Assert.Equal(generation.UserId, payload.RootElement.GetProperty("userId").GetGuid());
+        Assert.Equal(generation.GenerationId, payload.RootElement.GetProperty("generationId").GetGuid());
+        Assert.Equal("Completed", payload.RootElement.GetProperty("status").GetString());
+        Assert.Equal(generation.UpdatedAtUtc, payload.RootElement.GetProperty("updatedAtUtc").GetDateTime());
+        Assert.True(payload.RootElement.GetProperty("requiresRefetch").GetBoolean());
+        Assert.False(payload.RootElement.TryGetProperty("outputUrl", out _));
+        Assert.False(payload.RootElement.TryGetProperty("sourceImageAsset", out _));
+        Assert.False(payload.RootElement.TryGetProperty("normalizedImageUrl", out _));
+        Assert.False(payload.RootElement.TryGetProperty("tokenCost", out _));
     }
 
     [Fact]

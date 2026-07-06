@@ -19,6 +19,11 @@ export type UsersManagementPageText = {
   filterPremium: string;
   filterActivity: string;
   filterStatus: string;
+  sortLabel: string;
+  sortCreatedDesc: string;
+  sortCreatedAsc: string;
+  sortLastActivityDesc: string;
+  sortLastActivityAsc: string;
   resetFilters: string;
   any: string;
   premiumOnly: string;
@@ -64,6 +69,7 @@ export type UsersManagementPageText = {
   sectionPremium: string;
   sectionSupport: string;
   sectionPurchases: string;
+  purchasedSparkLabel: string;
   sectionGenerations: string;
   sectionAudit: string;
   sectionDanger: string;
@@ -83,11 +89,7 @@ export type UsersManagementPageText = {
   activeChangeDescription: (userLabel: string) => string;
   deleteDescription: (userLabel: string, deleteSummary: string) => string;
   premiumChangeDescription: (userLabel: string) => string;
-  roleChangeDescription: (
-    userLabel: string,
-    role: ManageableRole,
-    hasRole: boolean
-  ) => string;
+  roleChangeDescription: (userLabel: string, role: ManageableRole, hasRole: boolean) => string;
 };
 
 const usersManagementPageText: Record<Locale, UsersManagementPageText> = {
@@ -103,11 +105,16 @@ const usersManagementPageText: Record<Locale, UsersManagementPageText> = {
     period7: "7 дней",
     period30: "30 дней",
     period90: "90 дней",
-    searchPlaceholder: "Поиск по email или userId",
+    searchPlaceholder: "Поиск по email или ID пользователя",
     filterRole: "Роль",
     filterPremium: "Premium",
     filterActivity: "Активность",
     filterStatus: "Статус",
+    sortLabel: "Сортировка",
+    sortCreatedDesc: "Сначала новые",
+    sortCreatedAsc: "Сначала старые",
+    sortLastActivityDesc: "Активные недавно",
+    sortLastActivityAsc: "Давно без активности",
     resetFilters: "Сбросить",
     any: "Все",
     premiumOnly: "Только Premium",
@@ -153,8 +160,9 @@ const usersManagementPageText: Record<Locale, UsersManagementPageText> = {
     sectionPremium: "Premium",
     sectionSupport: "Обращения в поддержку",
     sectionPurchases: "История платежей",
+    purchasedSparkLabel: "Куплено PawSpark",
     sectionGenerations: "История генераций",
-    sectionAudit: "Audit log",
+    sectionAudit: "Журнал аудита",
     sectionDanger: "Опасные действия",
     noData: "Нет данных",
     blockedBadge: "Заблокирован",
@@ -167,13 +175,13 @@ const usersManagementPageText: Record<Locale, UsersManagementPageText> = {
     confirmUnblockTitle: "Разблокировать пользователя?",
     confirmPremiumTitle: "Изменить Premium?",
     confirmRoleTitle: "Изменить роль?",
-    lastAdminProtected: "Последнего Admin нельзя понизить",
+    lastAdminProtected: "Последнего администратора нельзя понизить",
     confirmAction: "Подтвердить",
     activeChangeDescription: (userLabel) =>
-      `${userLabel}: действие будет записано в audit log и немедленно изменит доступ пользователя.`,
+      `${userLabel}: действие будет записано в журнал аудита и немедленно изменит доступ пользователя.`,
     deleteDescription: (userLabel, deleteSummary) => `${userLabel}: ${deleteSummary}`,
     premiumChangeDescription: (userLabel) =>
-      `${userLabel}: Premium-статус изменится через admin endpoint и будет записан в audit log.`,
+      `${userLabel}: Premium-статус изменится через админ-панель и будет записан в журнал аудита.`,
     roleChangeDescription: (userLabel, role, hasRole) =>
       `${userLabel}: ${hasRole ? "роль будет снята" : "роль будет назначена"} (${role}).`,
   },
@@ -194,6 +202,11 @@ const usersManagementPageText: Record<Locale, UsersManagementPageText> = {
     filterPremium: "Premium",
     filterActivity: "Activity",
     filterStatus: "Status",
+    sortLabel: "Sort",
+    sortCreatedDesc: "Newest first",
+    sortCreatedAsc: "Oldest first",
+    sortLastActivityDesc: "Recently active",
+    sortLastActivityAsc: "Least recently active",
     resetFilters: "Reset",
     any: "All",
     premiumOnly: "Premium only",
@@ -239,6 +252,7 @@ const usersManagementPageText: Record<Locale, UsersManagementPageText> = {
     sectionPremium: "Premium",
     sectionSupport: "Support tickets",
     sectionPurchases: "Payment history",
+    purchasedSparkLabel: "Purchased PawSpark",
     sectionGenerations: "Generation history",
     sectionAudit: "Audit log",
     sectionDanger: "Danger zone",

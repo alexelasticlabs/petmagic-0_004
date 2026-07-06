@@ -21,10 +21,17 @@ public sealed partial class IdentityService
         string? role,
         string? status,
         bool? isPremium,
+        string? sort,
         CancellationToken cancellationToken)
     {
         var normalizedSkip = Math.Max(0, skip);
         var normalizedTake = NormalizeTake(take, 100, 200);
+        var normalizedSort = NormalizeAdminUsersSort(sort);
+        if (normalizedSort is null)
+        {
+            return Result.Failure<UserListPageResponse>(IdentityErrors.InvalidUserSort);
+        }
+
         var query = userManager.Users.AsNoTracking();
         var normalizedSearch = search?.Trim();
         if (!string.IsNullOrWhiteSpace(normalizedSearch))
@@ -85,9 +92,18 @@ public sealed partial class IdentityService
         }
 
         var totalCount = await query.CountAsync(cancellationToken);
-        var users = await query
-            .OrderByDescending(x => x.CreatedAtUtc)
-            .ThenByDescending(x => x.Id)
+        if (IsAdminUsersLastActivitySort(normalizedSort))
+        {
+            return Result.Success(await ListUsersByLastActivityAsync(
+                query,
+                normalizedSkip,
+                normalizedTake,
+                totalCount,
+                normalizedSort,
+                cancellationToken));
+        }
+
+        var users = await ApplyAdminUsersSort(query, normalizedSort)
             .Skip(normalizedSkip)
             .Take(normalizedTake + 1)
             .ToListAsync(cancellationToken);
@@ -103,7 +119,72 @@ public sealed partial class IdentityService
             users.RemoveAt(users.Count - 1);
         }
 
+        return Result.Success(await MapAdminUsersPageAsync(users, normalizedSkip, normalizedTake, hasMore, totalCount, cancellationToken));
+    }
+
+    private async Task<UserListPageResponse> ListUsersByLastActivityAsync(
+        IQueryable<AppUser> query,
+        int normalizedSkip,
+        int normalizedTake,
+        int totalCount,
+        string normalizedSort,
+        CancellationToken cancellationToken)
+    {
+        var candidates = await query.ToListAsync(cancellationToken);
+        if (candidates.Count == 0)
+        {
+            return new UserListPageResponse([], normalizedSkip, normalizedTake, HasMore: false, totalCount);
+        }
+
+        var candidateUserIds = candidates.Select(user => user.Id).ToArray();
+        var lastActivityByUserId = await LoadAdminUserLastActivityAsync(candidateUserIds, cancellationToken);
+        var orderedUsers = normalizedSort == "last_activity_asc"
+            ? candidates
+                .OrderBy(user => ResolveAdminUserLastActivity(lastActivityByUserId, user.Id) ?? DateTime.MinValue)
+                .ThenBy(user => user.CreatedAtUtc)
+                .ThenBy(user => user.Id)
+            : candidates
+                .OrderByDescending(user => ResolveAdminUserLastActivity(lastActivityByUserId, user.Id) ?? DateTime.MinValue)
+                .ThenByDescending(user => user.CreatedAtUtc)
+                .ThenByDescending(user => user.Id);
+
+        var users = orderedUsers
+            .Skip(normalizedSkip)
+            .Take(normalizedTake + 1)
+            .ToList();
+        var hasMore = users.Count > normalizedTake;
+        if (hasMore)
+        {
+            users.RemoveAt(users.Count - 1);
+        }
+
+        return await MapAdminUsersPageAsync(
+            users,
+            normalizedSkip,
+            normalizedTake,
+            hasMore,
+            totalCount,
+            cancellationToken,
+            lastActivityByUserId);
+    }
+
+    private async Task<UserListPageResponse> MapAdminUsersPageAsync(
+        IReadOnlyList<AppUser> users,
+        int normalizedSkip,
+        int normalizedTake,
+        bool hasMore,
+        int totalCount,
+        CancellationToken cancellationToken,
+        IReadOnlyDictionary<Guid, DateTime?>? preloadedLastActivityByUserId = null)
+    {
+        if (users.Count == 0)
+        {
+            return new UserListPageResponse([], normalizedSkip, normalizedTake, HasMore: false, totalCount);
+        }
+
         var userIds = users.Select(x => x.Id).ToArray();
+        var lastActivityByUserId = preloadedLastActivityByUserId
+            ?? await LoadAdminUserLastActivityAsync(userIds, cancellationToken);
         var roleRows = await dbContext.UserRoles
             .AsNoTracking()
             .Where(x => userIds.Contains(x.UserId))
@@ -141,10 +222,11 @@ public sealed partial class IdentityService
                 ToLegalAcceptanceResponse(user),
                 rolesByUserId.GetValueOrDefault(user.Id) ?? [],
                 user.CreatedAtUtc,
-                ToAvatarResponse(user)))
+                ToAvatarResponse(user),
+                ResolveAdminUserLastActivity(lastActivityByUserId, user.Id)))
             .ToArray();
 
-        return Result.Success(new UserListPageResponse(output, normalizedSkip, normalizedTake, hasMore, totalCount));
+        return new UserListPageResponse(output, normalizedSkip, normalizedTake, hasMore, totalCount);
     }
 
     public async Task<Result<AdminUserDashboardMetricsResponse>> GetAdminUserDashboardMetricsAsync(
@@ -183,6 +265,72 @@ public sealed partial class IdentityService
             userCounters.UsersThisWeek,
             userCounters.NewUsersLast30Days,
             userCounters.NewUsersLast90Days));
+    }
+
+    private async Task<IReadOnlyDictionary<Guid, DateTime?>> LoadAdminUserLastActivityAsync(
+        IReadOnlyCollection<Guid> userIds,
+        CancellationToken cancellationToken)
+    {
+        if (userIds.Count == 0)
+        {
+            return new Dictionary<Guid, DateTime?>();
+        }
+
+        var auditActivityTask = dbContext.AuditEvents
+            .AsNoTracking()
+            .Where(auditEvent => auditEvent.SubjectUserId.HasValue && userIds.Contains(auditEvent.SubjectUserId.Value))
+            .GroupBy(auditEvent => auditEvent.SubjectUserId!.Value)
+            .Select(group => new AdminUserLastActivityRow(
+                group.Key,
+                group.Max(auditEvent => auditEvent.OccurredAtUtc)))
+            .ToListAsync(cancellationToken);
+
+        var economyAnalyticsReader = serviceProvider.GetRequiredService<IAdminUserEconomyAnalyticsReader>();
+        var templateAnalyticsReader = serviceProvider.GetRequiredService<IAdminUserTemplateAnalyticsReader>();
+        var economyActivityTask = economyAnalyticsReader.GetAdminUserLastActivityAsync(userIds, cancellationToken);
+        var templateActivityTask = templateAnalyticsReader.GetAdminUserLastActivityAsync(userIds, cancellationToken);
+
+        await Task.WhenAll(auditActivityTask, economyActivityTask, templateActivityTask);
+
+        var lastActivityByUserId = new Dictionary<Guid, DateTime?>();
+        foreach (var row in await auditActivityTask)
+        {
+            ApplyAdminUserLastActivity(lastActivityByUserId, row.UserId, row.LastActivityAtUtc);
+        }
+
+        foreach (var row in await economyActivityTask)
+        {
+            ApplyAdminUserLastActivity(lastActivityByUserId, row.Key, row.Value);
+        }
+
+        foreach (var row in await templateActivityTask)
+        {
+            ApplyAdminUserLastActivity(lastActivityByUserId, row.Key, row.Value);
+        }
+
+        return lastActivityByUserId;
+    }
+
+    private static void ApplyAdminUserLastActivity(
+        IDictionary<Guid, DateTime?> lastActivityByUserId,
+        Guid userId,
+        DateTime lastActivityAtUtc)
+    {
+        if (!lastActivityByUserId.TryGetValue(userId, out var current)
+            || !current.HasValue
+            || lastActivityAtUtc > current.Value)
+        {
+            lastActivityByUserId[userId] = lastActivityAtUtc;
+        }
+    }
+
+    private static DateTime? ResolveAdminUserLastActivity(
+        IReadOnlyDictionary<Guid, DateTime?> lastActivityByUserId,
+        Guid userId)
+    {
+        return lastActivityByUserId.TryGetValue(userId, out var lastActivityAtUtc)
+            ? lastActivityAtUtc
+            : null;
     }
 
     public async Task<Result<AdminUserDetailResponse>> GetAdminUserAsync(Guid userId, CancellationToken cancellationToken)
@@ -260,6 +408,10 @@ public sealed partial class IdentityService
         int AdminUsers,
         int ModeratorUsers,
         int RegularUsers);
+
+    private sealed record AdminUserLastActivityRow(
+        Guid UserId,
+        DateTime LastActivityAtUtc);
 
     public async Task<Result<AdminUserWalletOperationResponse>> AdjustAdminUserWalletAsync(AdminAdjustUserWalletCommand command, CancellationToken cancellationToken)
     {
@@ -658,5 +810,32 @@ public sealed partial class IdentityService
         }
 
         return Math.Min(take, max);
+    }
+
+    private static string? NormalizeAdminUsersSort(string? sort)
+    {
+        var normalizedSort = sort?.Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(normalizedSort) || normalizedSort == "default")
+        {
+            return "created_desc";
+        }
+
+        return normalizedSort is "created_desc" or "created_asc" or "last_activity_desc" or "last_activity_asc"
+            ? normalizedSort
+            : null;
+    }
+
+    private static bool IsAdminUsersLastActivitySort(string normalizedSort)
+    {
+        return normalizedSort is "last_activity_desc" or "last_activity_asc";
+    }
+
+    private static IOrderedQueryable<AppUser> ApplyAdminUsersSort(IQueryable<AppUser> query, string normalizedSort)
+    {
+        return normalizedSort switch
+        {
+            "created_asc" => query.OrderBy(user => user.CreatedAtUtc).ThenBy(user => user.Id),
+            _ => query.OrderByDescending(user => user.CreatedAtUtc).ThenByDescending(user => user.Id)
+        };
     }
 }

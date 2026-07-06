@@ -57,6 +57,35 @@ describe("users admin action hardening", () => {
     expect(contentSource).toContain("deleteDescription: (userLabel, deleteSummary) =>");
     expect(contentSource).toContain("premiumChangeDescription: (userLabel) =>");
     expect(contentSource).toContain("roleChangeDescription: (userLabel, role, hasRole) =>");
+    expect(contentSource).toContain('searchPlaceholder: "Поиск по email или ID пользователя"');
+    expect(contentSource).toContain(
+      'lastAdminProtected: "Последнего администратора нельзя понизить"'
+    );
+    expect(contentSource).toContain("Premium-статус изменится через админ-панель");
+    expect(contentSource).not.toContain('searchPlaceholder: "Поиск по email или userId"');
+    expect(contentSource).not.toContain('lastAdminProtected: "Последнего Admin нельзя понизить"');
+    expect(contentSource).not.toContain("админский endpoint");
+  });
+
+  it("keeps premium grants out of admin users actions", () => {
+    const pageSource = readUsersManagementPageLibrarySource();
+    const tableSource = readFileSync(
+      fileURLToPath(new URL("../users-management-users-card.table.tsx", import.meta.url)),
+      "utf8"
+    );
+    const apiSource = readFileSync(
+      fileURLToPath(new URL("../../lib/api-client.admin-users.ts", import.meta.url)),
+      "utf8"
+    );
+
+    expect(apiSource).not.toContain("/api/admin/users/${encodedUserId}/premium");
+    expect(apiSource).not.toContain("export async function setPremium");
+    expect(pageSource).not.toContain("setPremium(user.userId, true)");
+    expect(pageSource).toContain("if (!canManageRoles || !user.isPremium) {");
+    expect(pageSource).toContain("action: () => revokePremium(user.userId)");
+    expect(tableSource).toContain("{user.isPremium ? (");
+    expect(tableSource).toContain("{text.removePremium}");
+    expect(tableSource).not.toContain("text.makePremium");
   });
 
   it("keeps manual users retry strict so retry errors still surface in the page state", () => {
@@ -104,7 +133,7 @@ describe("users admin action hardening", () => {
     expect(pageSource).toContain("setWalletDialog(null);");
     expect(pageSource).toContain("setConfirmationDialog(null);");
     expect(pageSource).toContain("setPage(nextPage);");
-    expect(pageSource.match(/resetUsersSelection\(\);/g) ?? []).toHaveLength(7);
+    expect(pageSource.match(/resetUsersSelection\(\);/g) ?? []).toHaveLength(8);
     expect(pageSource).toContain("resetUsersSelection(Math.max(1, currentPage - 1))");
     expect(pageSource).toContain("resetUsersSelection(Math.min(totalPages, currentPage + 1))");
     expect(pageSource).not.toContain(
@@ -124,6 +153,9 @@ describe("users admin action hardening", () => {
     );
     expect(pageSource).not.toContain(
       "setRangeDays(Number.parseInt(event.target.value, 10) as RangeDays);\n              setPage(1);"
+    );
+    expect(pageSource).not.toContain(
+      "setSortMode(event.target.value as UserSortMode);\n              setPage(1);"
     );
   });
 

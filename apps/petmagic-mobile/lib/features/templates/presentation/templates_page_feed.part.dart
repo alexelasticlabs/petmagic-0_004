@@ -166,6 +166,14 @@ String _generationStartErrorText(AppLocalizations text, String raw) {
     return text.templateFlowInsufficientBalanceError;
   }
 
+  if (raw.contains('templates.generation_already_started')) {
+    return text.templateFlowActiveGenerationLimitError;
+  }
+
+  if (raw.contains('templates.generation_wait_too_long')) {
+    return text.templateFlowServerError;
+  }
+
   if (raw.contains('templates.template_unavailable')) {
     return text.templateFlowTemplateUnavailableError;
   }

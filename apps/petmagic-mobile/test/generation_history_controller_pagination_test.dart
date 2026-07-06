@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -303,6 +304,35 @@ void main() {
       expect(harness.state.hasMore, isFalse);
     },
   );
+
+  test('generation history load cancel-token cleanup is identity safe', () {
+    final contractSource = File(
+      'lib/features/templates/presentation/generation_history_controller.dart',
+    ).readAsStringSync();
+    final lifecycleSource = File(
+      'lib/features/templates/presentation/generation_history_controller_lifecycle.part.dart',
+    ).readAsStringSync();
+    final syncSource = File(
+      'lib/features/templates/presentation/generation_history_controller_sync.part.dart',
+    ).readAsStringSync();
+
+    expect(
+      contractSource,
+      contains('void _clearActiveLoadCancelToken(CancelToken cancelToken);'),
+    );
+    expect(
+      lifecycleSource,
+      contains('if (identical(_activeLoadCancelToken, cancelToken))'),
+    );
+    expect(
+      syncSource,
+      contains('_clearActiveLoadCancelToken(activeLoadCancelToken);'),
+    );
+    expect(
+      lifecycleSource,
+      isNot(contains('void _clearActiveLoadCancelToken()')),
+    );
+  });
 }
 
 class _SwitchingPaginationRepository extends FakeTemplateGenerationRepository {

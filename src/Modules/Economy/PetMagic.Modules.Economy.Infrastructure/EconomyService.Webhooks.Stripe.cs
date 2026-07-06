@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
@@ -53,9 +54,9 @@ public sealed partial class EconomyService
         catch (Exception ex)
         {
             logger?.LogWarning(
-                ex,
-                "Stripe SDK signature verification failed. Falling back to manual signature validation. CorrelationId={CorrelationId}",
-                CurrentCorrelationId);
+                "Stripe SDK signature verification failed. Falling back to manual signature validation. ExceptionType={ExceptionType} CorrelationIdHash={CorrelationIdHash}",
+                SafeLogValues.ExceptionType(ex),
+                CurrentCorrelationIdHash);
 
             var isSignatureValid = stripeWebhookSecrets.Any(
                 webhookSecret => EconomyWebhookParser.VerifyStripeSignatureFallback(command.RawBody, command.StripeSignature, webhookSecret));

@@ -3,9 +3,16 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
+if (hasHelpArg()) {
+  printHelp();
+  process.exit(0);
+}
+
 const apiBaseUrl = required("API_BASE_URL").replace(/\/+$/, "");
 const databaseUrl = required("DATABASE_URL");
-const password = process.env.WATERMARK_QA_PASSWORD ?? "PetMagicQa1!";
+const password = required("WATERMARK_QA_PASSWORD");
+const psqlCommand = process.env.WATERMARK_QA_PSQL_COMMAND ?? "psql";
+const psqlInvocation = resolvePsqlInvocation(psqlCommand);
 const emailPrefix = process.env.WATERMARK_QA_EMAIL_PREFIX ?? `watermark-qa-${Date.now()}`;
 const outputPath = process.env.WATERMARK_QA_USERS_OUTPUT ?? "artifacts/watermark-qa-users.env";
 
@@ -121,9 +128,12 @@ FROM (
 ) AS u;
 `;
 
-  const result = spawnSync("psql", [databaseUrl, "-qAt", "-c", sql], { encoding: "utf8" });
+  const result = spawnSync(
+    psqlInvocation.command,
+    [...psqlInvocation.args, databaseUrl, "-qAt", "-c", sql],
+    { encoding: "utf8" });
   if (result.status !== 0) {
-    fail(`User activation SQL failed:\n${result.stdout}\n${result.stderr}`);
+    fail(`User activation SQL failed:\n${formatCommandFailure(result)}`);
   }
 
   const line = result.stdout
@@ -207,6 +217,78 @@ function required(name) {
   }
 
   return value;
+}
+
+function hasHelpArg() {
+  return process.argv.slice(2).some((arg) => arg === "--help" || arg === "-h");
+}
+
+function resolvePsqlInvocation(command) {
+  if (process.platform !== "win32") {
+    const normalized = command.replaceAll("\\", "/").toLowerCase();
+    if (
+      normalized === "scripts/qa/psql"
+      || normalized.endsWith("/scripts/qa/psql")
+    ) {
+      return { command: "bash", args: [command] };
+    }
+
+    return { command, args: [] };
+  }
+
+  const normalized = command.replaceAll("/", "\\").toLowerCase();
+  if (
+    normalized === "scripts\\qa\\psql"
+    || normalized.endsWith("\\scripts\\qa\\psql")
+    || normalized === "scripts\\qa\\psql.cmd"
+    || normalized.endsWith("\\scripts\\qa\\psql.cmd")
+  ) {
+    const scriptPath = command.replace(/\.cmd$/i, "") + ".ps1";
+    return {
+      command: "powershell.exe",
+      args: ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath],
+    };
+  }
+
+  return { command, args: [] };
+}
+
+function printHelp() {
+  console.log(`
+Watermark QA user preparation.
+
+Usage:
+  API_BASE_URL=http://localhost:<BACKEND_HOST_PORT> \\
+  DATABASE_URL="$DATABASE_URL" \\
+  WATERMARK_QA_PASSWORD="<unique-local-qa-password>" \\
+  node scripts/qa/prepare-watermark-qa-users.mjs
+
+Required environment:
+  API_BASE_URL
+  DATABASE_URL
+  WATERMARK_QA_PASSWORD
+
+Optional environment:
+  WATERMARK_QA_EMAIL_PREFIX
+  WATERMARK_QA_USERS_OUTPUT
+  WATERMARK_QA_PSQL_COMMAND
+  FREE_EMAIL
+  NO_CREDIT_EMAIL
+  PREMIUM_EMAIL
+
+The script creates or reuses local QA users, activates them through the database,
+logs in through the API, and writes a local env file with user IDs and tokens.
+Set WATERMARK_QA_PSQL_COMMAND=scripts/qa/psql to use the local Docker wrapper.
+Use WATERMARK_QA_PSQL_COMMAND=scripts\\qa\\psql.cmd from Windows PowerShell.
+	`);
+}
+
+function formatCommandFailure(result) {
+  return [
+    result.error ? `error: ${result.error.message}` : "",
+    result.stdout ?? "",
+    result.stderr ?? "",
+  ].filter(Boolean).join("\n");
 }
 
 function fail(message) {

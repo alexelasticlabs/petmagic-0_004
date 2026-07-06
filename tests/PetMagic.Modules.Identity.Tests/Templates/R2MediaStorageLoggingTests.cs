@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Infrastructure;
 using PetMagic.Modules.Templates.Infrastructure.Options;
@@ -13,9 +14,10 @@ public sealed class R2MediaStorageLoggingTests
     {
         var logger = new CapturingLogger<R2MediaStorage>();
         var storage = CreateStorage(logger);
+        const string storageKey = "templates-media/2026/07/result.png";
 
         var result = await storage.DeleteAsync(
-            "https://cdn.petmagic.test/templates-media/2026/07/result.png",
+            $"https://cdn.petmagic.test/{storageKey}",
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -24,7 +26,9 @@ public sealed class R2MediaStorageLoggingTests
             entry => entry.Level == LogLevel.Warning
                 && entry.Message.Contains("R2 media delete failed.", StringComparison.Ordinal)
                 && Equals(entry.Properties["Operation"], "delete")
-                && Equals(entry.Properties["StorageKey"], "templates-media/2026/07/result.png"));
+                && Equals(entry.Properties["StorageKeyHash"], SafeLogValues.StableHash(storageKey))
+                && Equals(entry.Properties["ExceptionType"], "NullReferenceException")
+                && !ContainsLogValue(entry, storageKey));
     }
 
     [Fact]
@@ -32,9 +36,10 @@ public sealed class R2MediaStorageLoggingTests
     {
         var logger = new CapturingLogger<R2MediaStorage>();
         var storage = CreateStorage(logger);
+        const string storageKey = "templates-media/2026/07/result.png";
 
         var result = await storage.CreateReadUrlAsync(
-            "https://cdn.petmagic.test/templates-media/2026/07/result.png",
+            $"https://cdn.petmagic.test/{storageKey}",
             TimeSpan.FromMinutes(5),
             CancellationToken.None);
 
@@ -44,7 +49,9 @@ public sealed class R2MediaStorageLoggingTests
             entry => entry.Level == LogLevel.Warning
                 && entry.Message.Contains("R2 media read-url signing failed.", StringComparison.Ordinal)
                 && Equals(entry.Properties["Operation"], "sign_read_url")
-                && Equals(entry.Properties["StorageKey"], "templates-media/2026/07/result.png"));
+                && Equals(entry.Properties["StorageKeyHash"], SafeLogValues.StableHash(storageKey))
+                && Equals(entry.Properties["ExceptionType"], "NullReferenceException")
+                && !ContainsLogValue(entry, storageKey));
     }
 
     [Fact]
@@ -52,6 +59,7 @@ public sealed class R2MediaStorageLoggingTests
     {
         var logger = new CapturingLogger<R2MediaStorage>();
         var storage = CreateStorage(logger);
+        const string storageKey = "templates-media/tests/tiny.png";
 
         var result = await storage.StoreAsync(
             new MediaUploadCommand(
@@ -69,9 +77,18 @@ public sealed class R2MediaStorageLoggingTests
             entry => entry.Level == LogLevel.Warning
                 && entry.Message.Contains("R2 media store failed.", StringComparison.Ordinal)
                 && Equals(entry.Properties["Operation"], "store")
-                && Equals(entry.Properties["StorageKey"], "templates-media/tests/tiny.png")
+                && Equals(entry.Properties["StorageKeyHash"], SafeLogValues.StableHash(storageKey))
                 && Equals(entry.Properties["ContentLength"], TinyPngBytes.LongLength)
-                && Equals(entry.Properties["HasPreferredStorageKey"], true));
+                && Equals(entry.Properties["HasPreferredStorageKey"], true)
+                && Equals(entry.Properties["ExceptionType"], "NullReferenceException")
+                && !ContainsLogValue(entry, storageKey));
+    }
+
+    private static bool ContainsLogValue(CapturedLogEntry entry, string value)
+    {
+        return entry.Message.Contains(value, StringComparison.Ordinal)
+            || entry.Properties.Values.Any(property =>
+                property?.ToString()?.Contains(value, StringComparison.Ordinal) == true);
     }
 
     private static R2MediaStorage CreateStorage(ILogger<R2MediaStorage> logger)

@@ -341,9 +341,10 @@ class _BeforeAfterCompareViewerState extends State<_BeforeAfterCompareViewer> {
                                             child: SizedBox(
                                               width: _handleSize,
                                               height: _handleSize,
-                                              child: const Icon(
+                                              child: Icon(
                                                 Icons.drag_indicator_rounded,
-                                                color: Color(0xFF1F2937),
+                                                color: context.petMagicColors
+                                                    .on(Colors.white),
                                               ),
                                             ),
                                           ),

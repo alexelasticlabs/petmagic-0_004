@@ -59,6 +59,31 @@ public sealed class LegalAcceptanceEnforcementMiddlewareTests
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal("auth.legal_acceptance_required", problem?["title"]?.ToString());
+        Assert.Equal("auth.legal_acceptance_required", problem?["code"]?.ToString());
+        Assert.False(problem?.ContainsKey("detail"));
+    }
+
+    [Fact]
+    public void Source_ShouldHashUserSuppliedRequestIdentifiersInBlockLog()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Host",
+            "PetMagic.Host.Api",
+            "Security",
+            "LegalAcceptanceEnforcementMiddleware.cs"));
+
+        Assert.Contains("CorrelationIdHash={CorrelationIdHash}", source, StringComparison.Ordinal);
+        Assert.Contains("RequestIdHash={RequestIdHash}", source, StringComparison.Ordinal);
+        Assert.Contains("{SafePath}", source, StringComparison.Ordinal);
+        Assert.Contains("RequestLogging.ResolveSafePath(context)", source, StringComparison.Ordinal);
+        Assert.Contains("SafeLogValues.StableHash(correlationId)", source, StringComparison.Ordinal);
+        Assert.Contains("SafeLogValues.StableHash(requestId)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("{Path}", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("CorrelationId={CorrelationId}", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("RequestId={RequestId}", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("context.Request.Path.Value ?? string.Empty", source, StringComparison.Ordinal);
     }
 
     private sealed class TestApplication : IAsyncDisposable
@@ -141,6 +166,23 @@ public sealed class LegalAcceptanceEnforcementMiddlewareTests
             await app.StopAsync();
             await app.DisposeAsync();
         }
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            if (Directory.Exists(Path.Combine(directory.FullName, "src"))
+                && Directory.Exists(Path.Combine(directory.FullName, "tests")))
+            {
+                return directory.FullName;
+            }
+
+            directory = directory.Parent;
+        }
+
+        throw new InvalidOperationException("Repository root could not be found.");
     }
 
     private sealed class FakeLegalDocumentsCatalog : ILegalDocumentsCatalog

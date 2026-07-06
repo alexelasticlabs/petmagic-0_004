@@ -32,6 +32,7 @@ namespace PetMagic.Modules.Identity.Tests.Identity;
 public sealed partial class IdentityServiceProfileTests
 {
     private const string CurrentLegalVersion = "2026-05-20";
+    private const string LocalAvatarPublicBaseUrl = "http://localhost:5000";
 
     private static IdentityModuleDbContext CreateIdentityDbContext()
     {
@@ -124,7 +125,10 @@ public sealed partial class IdentityServiceProfileTests
             new StubEmailTemplateRenderer(),
             avatarStorage,
             new AvatarReadUrlSigner(
-                new AvatarStorageOptions(),
+                new AvatarStorageOptions
+                {
+                    PublicBaseUrl = LocalAvatarPublicBaseUrl
+                },
                 new AvatarReadUrlSigningOptions
                 {
                     SigningKey = new string('t', 64),
@@ -141,6 +145,7 @@ public sealed partial class IdentityServiceProfileTests
             },
             new AvatarStorageOptions
             {
+                PublicBaseUrl = LocalAvatarPublicBaseUrl,
                 MaxFileSizeBytes = maxAvatarSizeBytes
             },
             Options.Create(new JwtOptions
@@ -230,6 +235,32 @@ public sealed partial class IdentityServiceProfileTests
                 recentPurchases,
                 recentLedgerEntries,
                 recentActivity));
+        }
+
+        public async Task<IReadOnlyDictionary<Guid, DateTime>> GetAdminUserLastActivityAsync(
+            IReadOnlyCollection<Guid> userIds,
+            CancellationToken cancellationToken)
+        {
+            if (userIds.Count == 0)
+            {
+                return new Dictionary<Guid, DateTime>();
+            }
+
+            var purchases = await dbContext.PurchaseOrders
+                .AsNoTracking()
+                .Where(x => userIds.Contains(x.UserId)
+                    && string.Equals(x.Status, "succeeded", StringComparison.OrdinalIgnoreCase))
+                .ToListAsync(cancellationToken);
+            var ledgerEntries = await dbContext.WalletLedgerEntries
+                .AsNoTracking()
+                .Where(x => userIds.Contains(x.UserId))
+                .ToListAsync(cancellationToken);
+
+            return purchases
+                .Select(x => new { x.UserId, LastActivityAtUtc = x.ConfirmedAtUtc ?? x.CreatedAtUtc })
+                .Concat(ledgerEntries.Select(x => new { x.UserId, LastActivityAtUtc = x.CreatedAtUtc }))
+                .GroupBy(x => x.UserId)
+                .ToDictionary(group => group.Key, group => group.Max(x => x.LastActivityAtUtc));
         }
     }
 
@@ -331,6 +362,31 @@ public sealed partial class IdentityServiceProfileTests
                 recentTemplateEvents,
                 failureBreakdown,
                 recentActivity));
+        }
+
+        public async Task<IReadOnlyDictionary<Guid, DateTime>> GetAdminUserLastActivityAsync(
+            IReadOnlyCollection<Guid> userIds,
+            CancellationToken cancellationToken)
+        {
+            if (userIds.Count == 0)
+            {
+                return new Dictionary<Guid, DateTime>();
+            }
+
+            var generations = await dbContext.TemplateGenerationJobs
+                .AsNoTracking()
+                .Where(x => userIds.Contains(x.UserId))
+                .ToListAsync(cancellationToken);
+            var templateEvents = await dbContext.TemplateAnalyticsEvents
+                .AsNoTracking()
+                .Where(x => x.UserId.HasValue && userIds.Contains(x.UserId.Value))
+                .ToListAsync(cancellationToken);
+
+            return generations
+                .Select(x => new { x.UserId, LastActivityAtUtc = x.CreatedAtUtc })
+                .Concat(templateEvents.Select(x => new { UserId = x.UserId!.Value, LastActivityAtUtc = x.CreatedAtUtc }))
+                .GroupBy(x => x.UserId)
+                .ToDictionary(group => group.Key, group => group.Max(x => x.LastActivityAtUtc));
         }
     }
 

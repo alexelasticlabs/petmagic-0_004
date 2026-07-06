@@ -32,9 +32,9 @@ class _PetLaunchHeader extends StatelessWidget {
               ),
             ],
           ),
-          child: const Icon(
+          child: Icon(
             Icons.auto_awesome_rounded,
-            color: Colors.white,
+            color: colors.on(colors.accent),
             size: 25,
           ),
         ),

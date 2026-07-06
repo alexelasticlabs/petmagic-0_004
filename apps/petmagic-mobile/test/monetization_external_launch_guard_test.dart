@@ -33,7 +33,7 @@ void main() {
       );
       final walletCheckoutBody = _methodBody(
         walletCheckoutSource,
-        'Future<StripePaymentSheetResult> _handleCheckout(',
+        'Future<ExternalCheckoutResult> _handleCheckout(',
       );
 
       expect(premiumOpenBody, contains('var launched = false;'));
@@ -70,6 +70,39 @@ void main() {
       );
     },
   );
+
+  test('monetization checkout does not keep unreachable PaymentSheet path', () {
+    final premiumPageSource = File(
+      'lib/features/premium/presentation/premium_page.dart',
+    ).readAsStringSync();
+    final premiumModelsSource = File(
+      'lib/features/premium/data/premium_models.dart',
+    ).readAsStringSync();
+    final walletModelsSource = File(
+      'lib/features/wallet/data/wallet_models.dart',
+    ).readAsStringSync();
+    final walletCheckoutSource = File(
+      'lib/features/wallet/presentation/wallet_page_checkout.part.dart',
+    ).readAsStringSync();
+
+    expect(
+      File(
+        'lib/shared/payments/stripe_paymentsheet_coordinator.dart',
+      ).existsSync(),
+      isFalse,
+    );
+    expect(premiumModelsSource, isNot(contains('usesPaymentSheet')));
+    expect(walletModelsSource, isNot(contains('usesPaymentSheet')));
+    expect(walletCheckoutSource, isNot(contains('StripePaymentSheet')));
+    expect(
+      premiumPageSource,
+      contains('final externalUrl = checkoutState.externalUrl;'),
+    );
+    expect(
+      premiumPageSource,
+      contains('status: PremiumStripeCheckoutActionStatus.success'),
+    );
+  });
 }
 
 String _methodBody(String source, String signature) {

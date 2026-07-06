@@ -198,22 +198,31 @@ class PremiumSubscriptionManagementService {
 
   final PremiumRepository _repository;
 
-  Future<String> createManagementUrl(String manageSubscriptionAction) async {
+  Future<String> createManagementUrl(
+    String manageSubscriptionAction, {
+    CancelToken? cancelToken,
+  }) async {
     switch (manageSubscriptionAction) {
       case 'AppleSettings':
         return 'https://apps.apple.com/account/subscriptions';
       case 'GooglePlaySettings':
         return 'https://play.google.com/store/account/subscriptions';
       case 'StripeCustomerPortal':
-        final portal = await _repository.createBillingPortal();
+        final portal = await _repository.createBillingPortal(
+          cancelToken: cancelToken,
+        );
         return portal.portalUrl;
       default:
         throw const AppException('premium.manage_failed');
     }
   }
 
-  Future<PremiumSubscriptionSummaryView> requestCancelAtPeriodEnd() async {
-    final status = await _repository.cancelSubscription();
+  Future<PremiumSubscriptionSummaryView> requestCancelAtPeriodEnd({
+    CancelToken? cancelToken,
+  }) async {
+    final status = await _repository.cancelSubscription(
+      cancelToken: cancelToken,
+    );
     return PremiumSubscriptionSummaryView.fromStatus(status);
   }
 }
@@ -443,12 +452,33 @@ class PremiumState {
 abstract class _PremiumControllerBase extends Notifier<PremiumState> {
   static const int _maxStorePurchaseVerificationKeys = 32;
 
-  late PremiumRepository _repository;
-  late PremiumRefreshProfile _refreshProfile;
+  PremiumRepository? _activeRepository;
+  PremiumRefreshProfile? _activeRefreshProfile;
+
+  PremiumRepository get _repository {
+    final repository = _activeRepository;
+    if (repository != null) {
+      return repository;
+    }
+
+    return ref.read(premiumRepositoryProvider);
+  }
+
+  PremiumRefreshProfile get _refreshProfile {
+    final refreshProfile = _activeRefreshProfile;
+    if (refreshProfile != null) {
+      return refreshProfile;
+    }
+
+    return ref.read(premiumRefreshProfileProvider);
+  }
+
   Future<void>? _loadInFlight;
   Future<void>? _checkoutVerificationInFlight;
   CancelToken? _activeLoadCancelToken;
   CancelToken? _activeStatusRefreshCancelToken;
+  CancelToken? _activePremiumActionCancelToken;
+  CancelToken? _activeCheckoutVerificationCancelToken;
   final Set<String> _storePurchaseVerificationInFlightKeys = <String>{};
   final Set<String> _storePurchaseVerifiedKeys = <String>{};
   bool _premiumLifecycleStarted = false;
@@ -485,8 +515,8 @@ class PremiumController extends _PremiumControllerBase
         _PremiumControllerCheckout {
   @override
   PremiumState build() {
-    _repository = ref.watch(premiumRepositoryProvider);
-    _refreshProfile = ref.watch(premiumRefreshProfileProvider);
+    _activeRepository = ref.read(premiumRepositoryProvider);
+    _activeRefreshProfile = ref.read(premiumRefreshProfileProvider);
     _ensurePremiumLifecycleStarted();
     return const PremiumState(isLoading: true);
   }

@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Identity.Domain.Enums;
 using PetMagic.Modules.Identity.Infrastructure.Data;
 using PetMagic.Modules.Identity.Infrastructure.Entities;
@@ -33,7 +34,9 @@ internal sealed class AccountLifecycleCleanupWorker(
             }
             catch (Exception exception)
             {
-                logger.LogError(exception, "Account lifecycle cleanup cycle failed.");
+                logger.LogError(
+                    "Account lifecycle cleanup cycle failed. ExceptionType={ExceptionType}",
+                    SafeLogValues.ExceptionType(exception));
             }
 
             await Task.Delay(LoopInterval, stoppingToken);
@@ -125,9 +128,9 @@ internal sealed class AccountLifecycleCleanupWorker(
             if (!deleteResult.Succeeded)
             {
                 logger.LogWarning(
-                    "Failed to delete expired user {UserId}: {Errors}",
-                    user.Id,
-                    string.Join("; ", deleteResult.Errors.Select(x => $"{x.Code}:{x.Description}")));
+                    "Failed to delete expired user. UserIdHash={UserIdHash} ErrorCodes={ErrorCodes}",
+                    SafeLogValues.StableHash(user.Id.ToString("D")),
+                    string.Join("; ", deleteResult.Errors.Select(x => x.Code)));
             }
         }
     }

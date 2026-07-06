@@ -61,9 +61,19 @@ services:
       STRIPE_TEST_SECRET_KEY: "${STRIPE_TEST_SECRET_KEY:-}"
       STRIPE_TEST_PUBLISHABLE_KEY: "${STRIPE_TEST_PUBLISHABLE_KEY:-}"
       STRIPE_TEST_WEBHOOK_SECRET: "${STRIPE_TEST_WEBHOOK_SECRET:-}"
+      STRIPE_LIVE_SECRET_KEY: "${STRIPE_LIVE_SECRET_KEY:-}"
+      STRIPE_LIVE_PUBLISHABLE_KEY: "${STRIPE_LIVE_PUBLISHABLE_KEY:-}"
+      STRIPE_LIVE_WEBHOOK_SECRET: "${STRIPE_LIVE_WEBHOOK_SECRET:-}"
       STRIPE_CHECKOUT_SUCCESS_URL: "${STRIPE_CHECKOUT_SUCCESS_URL:-petmagic://checkout/success?session_id={CHECKOUT_SESSION_ID}}"
       STRIPE_CHECKOUT_CANCEL_URL: "${STRIPE_CHECKOUT_CANCEL_URL:-petmagic://checkout/cancel}"
       STRIPE_BILLING_PORTAL_RETURN_URL: "${STRIPE_BILLING_PORTAL_RETURN_URL:-}"
+      GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL: "${GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL:-}"
+      GOOGLE_PLAY_PRIVATE_KEY_PEM: "${GOOGLE_PLAY_PRIVATE_KEY_PEM:-}"
+      GOOGLE_PLAY_ENVIRONMENT: "${GOOGLE_PLAY_ENVIRONMENT:-production}"
+      GOOGLE_PLAY_PUBSUB_AUDIENCE: "${GOOGLE_PLAY_PUBSUB_AUDIENCE:-}"
+      GOOGLE_PLAY_PUBSUB_EXPECTED_EMAIL: "${GOOGLE_PLAY_PUBSUB_EXPECTED_EMAIL:-}"
+      APP_STORE_SHARED_SECRET: "${APP_STORE_SHARED_SECRET:-}"
+      APP_STORE_ENVIRONMENT: "${APP_STORE_ENVIRONMENT:-production}"
       FAL_AI_API_KEY: "${FAL_AI_API_KEY:-}"
       FAL_WEBHOOK_URL: "${FAL_WEBHOOK_URL:-}"
       R2_ACCOUNT_ID: "${R2_ACCOUNT_ID:-}"
@@ -84,7 +94,7 @@ services:
       Templates__ImageMaxConcurrentGenerations: "${GENERATION_IMAGE_MAX_CONCURRENT:-2}"
       Templates__ImageProtectedConcurrentGenerations: "${GENERATION_IMAGE_PROTECTED_CONCURRENT:-0}"
       Templates__VideoReservedConcurrentGenerations: "${GENERATION_VIDEO_RESERVED_CONCURRENT:-0}"
-      Templates__VideoMaxConcurrentGenerations: "${GENERATION_VIDEO_MAX_CONCURRENT:-4}"
+      Templates__VideoMaxConcurrentGenerations: "${GENERATION_VIDEO_MAX_CONCURRENT:-1}"
       Templates__VideoBorrowMaxConcurrentGenerations: "${GENERATION_VIDEO_BORROW_MAX_CONCURRENT:-0}"
       Templates__EnableElasticLaneBorrowing: "${GENERATION_ENABLE_ELASTIC_LANE_BORROWING:-false}"
       Templates__AllowVideoBorrowWhenImageQueueEmpty: "${GENERATION_ALLOW_VIDEO_BORROW_WHEN_IMAGE_QUEUE_EMPTY:-true}"
@@ -103,8 +113,8 @@ services:
       Templates__EstimatedImageGenerationSeconds: "${GENERATION_ESTIMATED_IMAGE_SECONDS:-90}"
       Templates__EstimatedVideoPreprocessingSeconds: "${GENERATION_ESTIMATED_VIDEO_PREPROCESSING_SECONDS:-90}"
       Templates__FreeImageMaxEstimatedWaitSeconds: "${GENERATION_FREE_IMAGE_MAX_WAIT_SECONDS:-1800}"
-      Templates__PremiumImageMaxEstimatedWaitSeconds: "${GENERATION_PREMIUM_IMAGE_MAX_WAIT_SECONDS:-600}"
-      Templates__PrivilegedImageMaxEstimatedWaitSeconds: "${GENERATION_PRIVILEGED_IMAGE_MAX_WAIT_SECONDS:-600}"
+      Templates__PremiumImageMaxEstimatedWaitSeconds: "${GENERATION_PREMIUM_IMAGE_MAX_WAIT_SECONDS:-900}"
+      Templates__PrivilegedImageMaxEstimatedWaitSeconds: "${GENERATION_PRIVILEGED_IMAGE_MAX_WAIT_SECONDS:-900}"
       Templates__FreeVideoMaxEstimatedWaitSeconds: "${GENERATION_FREE_VIDEO_MAX_WAIT_SECONDS:-3600}"
       Templates__PremiumVideoMaxEstimatedWaitSeconds: "${GENERATION_PREMIUM_VIDEO_MAX_WAIT_SECONDS:-1800}"
       Templates__PrivilegedVideoMaxEstimatedWaitSeconds: "${GENERATION_PRIVILEGED_VIDEO_MAX_WAIT_SECONDS:-1800}"
@@ -114,8 +124,13 @@ services:
       Templates__RealtimeEventRetentionMinutes: "${TEMPLATES_REALTIME_EVENT_RETENTION_MINUTES:-60}"
       Templates__RealtimeEventCleanupIntervalMinutes: "${TEMPLATES_REALTIME_EVENT_CLEANUP_INTERVAL_MINUTES:-10}"
       Templates__RealtimeEventCleanupBatchSize: "${TEMPLATES_REALTIME_EVENT_CLEANUP_BATCH_SIZE:-1000}"
+      Templates__MaxConcurrentJobsPerWorker: "${GENERATION_WORKER_MAX_CONCURRENT_JOBS:-1}"
       Templates__GenerationWorkerPollIntervalMilliseconds: "${GENERATION_WORKER_POLL_INTERVAL_MS:-500}"
-      Templates__RefundRetryDelayMilliseconds: "${GENERATION_REFUND_RETRY_DELAY_MS:-5000}"
+      Templates__MaxAiProviderRequestsPerMinute: "${GENERATION_PROVIDER_MAX_RPM:-60}"
+      Templates__MaxGenerationAttempts: "${GENERATION_MAX_ATTEMPTS:-3}"
+      Templates__RefundRetryDelayMilliseconds: "${GENERATION_REFUND_RETRY_DELAY_MS:-30000}"
+      Templates__JobLockTimeoutMilliseconds: "${GENERATION_JOB_LOCK_TIMEOUT_MS:-900000}"
+      Templates__OrphanQueuedJobTimeoutMilliseconds: "${GENERATION_ORPHAN_QUEUED_TIMEOUT_MS:-120000}"
       RateLimiting__Auth__PermitLimit: "${RATE_LIMIT_AUTH_PERMIT:-30}"
       RateLimiting__Economy__PermitLimit: "${RATE_LIMIT_ECONOMY_PERMIT:-60}"
       RateLimiting__Templates__PermitLimit: "${RATE_LIMIT_TEMPLATES_PERMIT:-90}"
@@ -126,12 +141,12 @@ services:
       RateLimiting__Webhooks__PermitLimit: "${RATE_LIMIT_WEBHOOKS_PERMIT:-120}"
       RateLimiting__AuthRegister__PermitLimit: "${RATE_LIMIT_AUTH_REGISTER_PERMIT:-8}"
       RateLimiting__AuthPasswordReset__PermitLimit: "${RATE_LIMIT_AUTH_PASSWORD_RESET_PERMIT:-10}"
-      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}"
-      AllowedHosts: "*"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
+      AllowedHosts: "${BACKEND_ALLOWED_HOSTS:?Set BACKEND_ALLOWED_HOSTS to the public backend host names}"
     ports:
       - "${BACKEND_HOST_PORT:-5001}:5000"
     healthcheck:
-      test: [ "CMD-SHELL", "curl --fail --silent http://localhost:5000/health >/dev/null || exit 1" ]
+      test: [ "CMD-SHELL", "curl --fail --silent --header 'Host: ${BACKEND_HEALTHCHECK_HOST:?Set BACKEND_HEALTHCHECK_HOST to a host allowed by BACKEND_ALLOWED_HOSTS}' http://localhost:5000/health >/dev/null || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -160,6 +175,22 @@ services:
       ASPNETCORE_ENVIRONMENT: "${ASPNETCORE_ENVIRONMENT:-Production}"
       DOTNET_ENVIRONMENT: "${DOTNET_ENVIRONMENT:-${ASPNETCORE_ENVIRONMENT:-Production}}"
       ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=petmagic_db;Username=petmagic_user;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env};"
+      STRIPE_TEST_SECRET_KEY: "${STRIPE_TEST_SECRET_KEY:-}"
+      STRIPE_TEST_PUBLISHABLE_KEY: "${STRIPE_TEST_PUBLISHABLE_KEY:-}"
+      STRIPE_TEST_WEBHOOK_SECRET: "${STRIPE_TEST_WEBHOOK_SECRET:-}"
+      STRIPE_LIVE_SECRET_KEY: "${STRIPE_LIVE_SECRET_KEY:-}"
+      STRIPE_LIVE_PUBLISHABLE_KEY: "${STRIPE_LIVE_PUBLISHABLE_KEY:-}"
+      STRIPE_LIVE_WEBHOOK_SECRET: "${STRIPE_LIVE_WEBHOOK_SECRET:-}"
+      STRIPE_CHECKOUT_SUCCESS_URL: "${STRIPE_CHECKOUT_SUCCESS_URL:-petmagic://checkout/success?session_id={CHECKOUT_SESSION_ID}}"
+      STRIPE_CHECKOUT_CANCEL_URL: "${STRIPE_CHECKOUT_CANCEL_URL:-petmagic://checkout/cancel}"
+      STRIPE_BILLING_PORTAL_RETURN_URL: "${STRIPE_BILLING_PORTAL_RETURN_URL:-}"
+      GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL: "${GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL:-}"
+      GOOGLE_PLAY_PRIVATE_KEY_PEM: "${GOOGLE_PLAY_PRIVATE_KEY_PEM:-}"
+      GOOGLE_PLAY_ENVIRONMENT: "${GOOGLE_PLAY_ENVIRONMENT:-production}"
+      GOOGLE_PLAY_PUBSUB_AUDIENCE: "${GOOGLE_PLAY_PUBSUB_AUDIENCE:-}"
+      GOOGLE_PLAY_PUBSUB_EXPECTED_EMAIL: "${GOOGLE_PLAY_PUBSUB_EXPECTED_EMAIL:-}"
+      APP_STORE_SHARED_SECRET: "${APP_STORE_SHARED_SECRET:-}"
+      APP_STORE_ENVIRONMENT: "${APP_STORE_ENVIRONMENT:-production}"
       FAL_AI_API_KEY: "${FAL_AI_API_KEY:-}"
       FAL_WEBHOOK_URL: "${FAL_WEBHOOK_URL:-}"
       R2_ACCOUNT_ID: "${R2_ACCOUNT_ID:-}"
@@ -181,7 +212,7 @@ services:
       Templates__ImageMaxConcurrentGenerations: "${GENERATION_IMAGE_MAX_CONCURRENT:-2}"
       Templates__ImageProtectedConcurrentGenerations: "${GENERATION_IMAGE_PROTECTED_CONCURRENT:-0}"
       Templates__VideoReservedConcurrentGenerations: "${GENERATION_VIDEO_RESERVED_CONCURRENT:-0}"
-      Templates__VideoMaxConcurrentGenerations: "${GENERATION_VIDEO_MAX_CONCURRENT:-4}"
+      Templates__VideoMaxConcurrentGenerations: "${GENERATION_VIDEO_MAX_CONCURRENT:-1}"
       Templates__VideoBorrowMaxConcurrentGenerations: "${GENERATION_VIDEO_BORROW_MAX_CONCURRENT:-0}"
       Templates__EnableElasticLaneBorrowing: "${GENERATION_ENABLE_ELASTIC_LANE_BORROWING:-false}"
       Templates__AllowVideoBorrowWhenImageQueueEmpty: "${GENERATION_ALLOW_VIDEO_BORROW_WHEN_IMAGE_QUEUE_EMPTY:-true}"
@@ -197,23 +228,23 @@ services:
       Templates__FalProviderSpendDailyLimitUsd: "${FAL_PROVIDER_SPEND_DAILY_LIMIT_USD:-0}"
       Templates__MaxAiProviderRequestsPerMinute: "${GENERATION_PROVIDER_MAX_RPM:-60}"
       Templates__MaxGenerationAttempts: "${GENERATION_MAX_ATTEMPTS:-3}"
-      Templates__RefundRetryDelayMilliseconds: "${GENERATION_REFUND_RETRY_DELAY_MS:-5000}"
-      Templates__JobLockTimeoutMilliseconds: "${GENERATION_JOB_LOCK_TIMEOUT_MS:-300000}"
+      Templates__RefundRetryDelayMilliseconds: "${GENERATION_REFUND_RETRY_DELAY_MS:-30000}"
+      Templates__JobLockTimeoutMilliseconds: "${GENERATION_JOB_LOCK_TIMEOUT_MS:-900000}"
       Templates__OrphanQueuedJobTimeoutMilliseconds: "${GENERATION_ORPHAN_QUEUED_TIMEOUT_MS:-120000}"
       Templates__QueueMaxSize: "${GENERATION_QUEUE_MAX_SIZE:-1000}"
       Templates__EstimatedVideoGenerationSeconds: "${GENERATION_ESTIMATED_VIDEO_SECONDS:-420}"
       Templates__EstimatedImageGenerationSeconds: "${GENERATION_ESTIMATED_IMAGE_SECONDS:-90}"
       Templates__EstimatedVideoPreprocessingSeconds: "${GENERATION_ESTIMATED_VIDEO_PREPROCESSING_SECONDS:-90}"
       Templates__FreeImageMaxEstimatedWaitSeconds: "${GENERATION_FREE_IMAGE_MAX_WAIT_SECONDS:-1800}"
-      Templates__PremiumImageMaxEstimatedWaitSeconds: "${GENERATION_PREMIUM_IMAGE_MAX_WAIT_SECONDS:-600}"
-      Templates__PrivilegedImageMaxEstimatedWaitSeconds: "${GENERATION_PRIVILEGED_IMAGE_MAX_WAIT_SECONDS:-600}"
+      Templates__PremiumImageMaxEstimatedWaitSeconds: "${GENERATION_PREMIUM_IMAGE_MAX_WAIT_SECONDS:-900}"
+      Templates__PrivilegedImageMaxEstimatedWaitSeconds: "${GENERATION_PRIVILEGED_IMAGE_MAX_WAIT_SECONDS:-900}"
       Templates__FreeVideoMaxEstimatedWaitSeconds: "${GENERATION_FREE_VIDEO_MAX_WAIT_SECONDS:-3600}"
       Templates__PremiumVideoMaxEstimatedWaitSeconds: "${GENERATION_PREMIUM_VIDEO_MAX_WAIT_SECONDS:-1800}"
       Templates__PrivilegedVideoMaxEstimatedWaitSeconds: "${GENERATION_PRIVILEGED_VIDEO_MAX_WAIT_SECONDS:-1800}"
       Templates__QueuePriorityAgingIntervalSeconds: "${GENERATION_PRIORITY_AGING_INTERVAL_SECONDS:-60}"
       Templates__QueuePriorityAgingBoost: "${GENERATION_PRIORITY_AGING_BOOST:-500}"
       Templates__CancelQueuedGenerationEnabled: "${GENERATION_CANCEL_QUEUED_ENABLED:-true}"
-      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
     volumes:
       - backend_template_media:/app/wwwroot/templates-media
     healthcheck:
@@ -237,13 +268,13 @@ services:
       args:
         NEXT_PUBLIC_API_BASE_URL: "${NEXT_PUBLIC_API_BASE_URL:?NEXT_PUBLIC_API_BASE_URL is required for admin web build}"
         INTERNAL_API_BASE_URL: "${INTERNAL_API_BASE_URL:?INTERNAL_API_BASE_URL is required for admin web build}"
-        ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION: "true"
-        NEXT_PUBLIC_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION: "true"
+        ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION: "${ADMIN_WEB_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION:-false}"
+        NEXT_PUBLIC_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION: "${ADMIN_WEB_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION:-false}"
     environment:
       NEXT_PUBLIC_API_BASE_URL: "${NEXT_PUBLIC_API_BASE_URL:?NEXT_PUBLIC_API_BASE_URL is required for admin web runtime}"
       INTERNAL_API_BASE_URL: "${INTERNAL_API_BASE_URL:?INTERNAL_API_BASE_URL is required for admin web runtime}"
-      ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION: "true"
-      NEXT_PUBLIC_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION: "true"
+      ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION: "${ADMIN_WEB_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION:-false}"
+      NEXT_PUBLIC_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION: "${ADMIN_WEB_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION:-false}"
     ports:
       - "${ADMIN_WEB_HOST_PORT:-3000}:3000"
     depends_on:
@@ -252,22 +283,25 @@ services:
       - petmagic-network
 
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.111.0
+    image: petmagic-otel-collector:local
+    build:
+      context: ./deploy/monitoring/otel-collector
+    profiles: ["monitoring"]
     command: ["--config=/etc/otelcol/config.yaml"]
     restart: unless-stopped
-    volumes:
-      - ./deploy/monitoring/otel-collector/config.yaml:/etc/otelcol/config.yaml:ro
     depends_on:
       - tempo
     networks:
       - petmagic-network
 
   tempo:
-    image: grafana/tempo:2.6.1
+    image: petmagic-tempo:local
+    build:
+      context: ./deploy/monitoring/tempo
+    profiles: ["monitoring"]
     command: ["-config.file=/etc/tempo/tempo.yml"]
     restart: unless-stopped
     volumes:
-      - ./deploy/monitoring/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
       - tempo_data:/var/tempo
     ports:
       - "${TEMPO_HOST_PORT:-3200}:3200"
@@ -275,14 +309,15 @@ services:
       - petmagic-network
 
   prometheus:
-    image: prom/prometheus:v2.54.1
+    image: petmagic-prometheus:local
+    build:
+      context: ./deploy/monitoring/prometheus
+    profiles: ["monitoring"]
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.retention.time=15d"
     restart: unless-stopped
     volumes:
-      - ./deploy/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./deploy/monitoring/prometheus/petmagic-alerts.yml:/etc/prometheus/rules/petmagic-alerts.yml:ro
       - prometheus_data:/prometheus
     ports:
       - "${PROMETHEUS_HOST_PORT:-9090}:9090"
@@ -293,16 +328,20 @@ services:
       - petmagic-network
 
   alertmanager:
-    image: prom/alertmanager:v0.27.0
+    image: petmagic-alertmanager:local
+    build:
+      context: ./deploy/monitoring/alertmanager
+    profiles: ["monitoring"]
+    entrypoint: ["/bin/sh", "-c"]
     command:
-      - "--config.file=/etc/alertmanager/alertmanager.yml"
-      - "--config.expand-env"
-      - "--storage.path=/alertmanager"
+      - >
+        escaped_url=$$(printf '%s' "$$ALERTMANAGER_WEBHOOK_URL" | sed 's/[\/&]/\\&/g');
+        sed "s|__ALERTMANAGER_WEBHOOK_URL__|$$escaped_url|g" /etc/alertmanager/alertmanager.yml > /tmp/alertmanager.yml;
+        exec /bin/alertmanager --config.file=/tmp/alertmanager.yml --storage.path=/alertmanager
     restart: unless-stopped
     environment:
       ALERTMANAGER_WEBHOOK_URL: "${ALERTMANAGER_WEBHOOK_URL:?Set ALERTMANAGER_WEBHOOK_URL in .env}"
     volumes:
-      - ./deploy/monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
       - alertmanager_data:/alertmanager
     ports:
       - "${ALERTMANAGER_HOST_PORT:-9093}:9093"
@@ -310,14 +349,16 @@ services:
       - petmagic-network
 
   grafana:
-    image: grafana/grafana:11.2.0
+    image: petmagic-grafana:local
+    build:
+      context: ./deploy/monitoring/grafana
+    profiles: ["monitoring"]
     restart: unless-stopped
     environment:
       GF_SECURITY_ADMIN_USER: "${GRAFANA_ADMIN_USER:-admin}"
       GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env}"
       GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
-      - ./deploy/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - grafana_data:/var/lib/grafana
     ports:
       - "${GRAFANA_HOST_PORT:-3001}:3000"

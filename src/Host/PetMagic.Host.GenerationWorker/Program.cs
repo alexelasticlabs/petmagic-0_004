@@ -2,6 +2,7 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Http;
@@ -63,15 +64,28 @@ try
     builder.Services
         .AddOpenTelemetry()
         .ConfigureResource(resource => resource.AddService("PetMagic.Host.GenerationWorker"))
-        .WithTracing(tracing => tracing
-            .AddHttpClientInstrumentation()
-            .AddOtlpExporter())
-        .WithMetrics(metrics => metrics
-            .AddHttpClientInstrumentation()
-            .AddRuntimeInstrumentation()
-            .AddMeter("PetMagic.Modules.Economy")
-            .AddMeter("PetMagic.Modules.Templates")
-            .AddOtlpExporter());
+        .WithTracing(tracing =>
+        {
+            tracing.AddHttpClientInstrumentation();
+
+            if (IsOtlpExporterConfigured(builder.Configuration))
+            {
+                tracing.AddOtlpExporter();
+            }
+        })
+        .WithMetrics(metrics =>
+        {
+            metrics
+                .AddHttpClientInstrumentation()
+                .AddRuntimeInstrumentation()
+                .AddMeter("PetMagic.Modules.Economy")
+                .AddMeter("PetMagic.Modules.Templates");
+
+            if (IsOtlpExporterConfigured(builder.Configuration))
+            {
+                metrics.AddOtlpExporter();
+            }
+        });
 
     var host = builder.Build();
 
@@ -155,3 +169,7 @@ static string ResolveBootstrapEnvironment()
         ?? Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
         ?? Environments.Production;
 }
+
+static bool IsOtlpExporterConfigured(IConfiguration configuration) =>
+    !string.IsNullOrWhiteSpace(configuration["OpenTelemetry:Otlp:Endpoint"])
+    || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT"));

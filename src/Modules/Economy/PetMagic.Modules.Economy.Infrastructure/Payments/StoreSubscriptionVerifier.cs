@@ -13,6 +13,7 @@ public sealed partial class StoreSubscriptionVerifier : IStoreSubscriptionVerifi
 {
     public const string HttpClientName = "StoreSubscriptionVerifier";
 
+    private const int ProviderJsonResponseMaxChars = 64 * 1024;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly IHttpClientFactory httpClientFactory;

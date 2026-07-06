@@ -84,6 +84,41 @@ public sealed class TemplateOfTheDayAutoPickWorkerTests
         Assert.Equal("templates.auto_pick_failed", entry.Properties["ErrorCode"]);
     }
 
+    [Fact]
+    public async Task EnsureTomorrowAutoPickAsync_ShouldSanitizeFailureErrorCode()
+    {
+        const string secret = "provider-token-secret";
+        var (templatesService, _) = FailingTemplatesServiceProxy.Create($"templates.auto_pick_failed token={secret}");
+        using var serviceProvider = new ServiceCollection()
+            .AddSingleton(templatesService)
+            .BuildServiceProvider();
+        var logger = new CapturingLogger<TemplateOfTheDayAutoPickWorker>();
+        var worker = new TemplateOfTheDayAutoPickWorker(
+            serviceProvider.GetRequiredService<IServiceScopeFactory>(),
+            new TemplatesOptions
+            {
+                PublicBaseUrl = "http://localhost:5000",
+                LocalMediaRootPath = "wwwroot/templates-media",
+                DefaultImagePrompt = "Create a themed pet portrait.",
+                DefaultPreprocessingPrompt = "Keep the same pet.",
+                DefaultKlingPrompt = "Funny dance.",
+                AllowedImageModels = ["openai/gpt-image-2/edit"],
+                AllowedPreprocessingModels = ["openai/gpt-image-2/edit"],
+                AllowedKlingModels = ["fal-ai/kling-video/v3/pro/motion-control"],
+                SupportedLocalizationLocales = ["ru"],
+                TemplateOfTheDayBusinessTimeZone = "UTC"
+            },
+            logger);
+
+        await worker.EnsureTomorrowAutoPickAsync(CancellationToken.None);
+
+        var entry = Assert.Single(logger.Entries, x => x.LogLevel == LogLevel.Warning);
+        var errorCode = Assert.IsType<string>(entry.Properties["ErrorCode"]);
+        Assert.DoesNotContain(secret, errorCode, StringComparison.Ordinal);
+        Assert.DoesNotContain(secret, entry.Message, StringComparison.Ordinal);
+        Assert.Contains("***", errorCode, StringComparison.Ordinal);
+    }
+
     private static (string TimeZoneId, DateOnly BusinessDate) ResolveBusinessDateDifferentFromUtc()
     {
         var utcDate = DateOnly.FromDateTime(DateTime.UtcNow);

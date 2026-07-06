@@ -36,6 +36,7 @@ import type {
   AdminTemplateGenerationsQuery,
   AdminWatermarkSettings,
   RemoveGenerationWatermarkResponse,
+  TemplateGenerationResponse,
   AdminTemplateRecentGeneration,
   AdminTemplateStatistics,
   AdminTemplateTestRun,
@@ -181,14 +182,21 @@ export function normalizeAdminTemplatesAnalyticsQuery(
 ): AdminTemplatesAnalyticsQuery {
   return {
     periodDays:
-      typeof query.periodDays === "number" && Number.isFinite(query.periodDays) && query.periodDays > 0
+      typeof query.periodDays === "number" &&
+      Number.isFinite(query.periodDays) &&
+      query.periodDays > 0
         ? Math.min(3650, Math.floor(query.periodDays))
         : undefined,
     templateType:
-      query.templateType === "All" ? undefined : normalizeAllowed(query.templateType, TEMPLATE_TYPES),
+      query.templateType === "All"
+        ? undefined
+        : normalizeAllowed(query.templateType, TEMPLATE_TYPES),
     category: normalizeTemplateCatalogFilter(query.category),
     status: query.status === "All" ? undefined : normalizeAllowed(query.status, TEMPLATE_STATUSES),
-    access: query.access === "all" ? undefined : normalizeAllowed(query.access, TEMPLATE_ANALYTICS_ACCESS),
+    access:
+      query.access === "all"
+        ? undefined
+        : normalizeAllowed(query.access, TEMPLATE_ANALYTICS_ACCESS),
     sort: normalizeAllowed(query.sort, TEMPLATE_ANALYTICS_SORTS),
     take:
       typeof query.take === "number" && Number.isFinite(query.take) && query.take > 0
@@ -691,13 +699,16 @@ export async function fetchAdminTemplateTestHistory(
 }
 
 export async function createImageTemplate(payload: ImageTemplatePayload): Promise<AdminTemplate> {
-  const template = await apiRequest<AdminTemplate>("/api/admin/templates/image", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  },
-  {
-    timeoutMs: 60_000,
-  });
+  const template = await apiRequest<AdminTemplate>(
+    "/api/admin/templates/image",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    {
+      timeoutMs: 60_000,
+    }
+  );
   clearAdminTemplateMutationCaches(template.templateId);
   return template;
 }
@@ -719,13 +730,16 @@ export async function updateImageTemplate(
 }
 
 export async function createVideoTemplate(payload: VideoTemplatePayload): Promise<AdminTemplate> {
-  const template = await apiRequest<AdminTemplate>("/api/admin/templates/video", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  },
-  {
-    timeoutMs: 60_000,
-  });
+  const template = await apiRequest<AdminTemplate>(
+    "/api/admin/templates/video",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    {
+      timeoutMs: 60_000,
+    }
+  );
   clearAdminTemplateMutationCaches(template.templateId);
   return template;
 }
@@ -788,13 +802,16 @@ export async function uploadTemplateMedia(
     formData.append("durationSeconds", options.durationSeconds.toString());
   }
 
-  return apiRequest<TemplateAsset>("/api/admin/templates/media/upload", {
-    method: "POST",
-    body: formData,
-  },
-  {
-    timeoutMs: 120_000,
-  });
+  return apiRequest<TemplateAsset>(
+    "/api/admin/templates/media/upload",
+    {
+      method: "POST",
+      body: formData,
+    },
+    {
+      timeoutMs: 120_000,
+    }
+  );
 }
 
 export async function fetchAdminWatermarkSettings(
@@ -821,6 +838,26 @@ export async function grantAdminGenerationCleanDownload(
   const encodedGenerationId = encodePathSegment(generationId);
   return apiRequest<RemoveGenerationWatermarkResponse>(
     `/api/admin/templates/generations/${encodedGenerationId}/grant-clean-download`,
+    { method: "POST" }
+  );
+}
+
+export async function cancelAdminTemplateGeneration(
+  generationId: string
+): Promise<TemplateGenerationResponse> {
+  const encodedGenerationId = encodePathSegment(generationId);
+  return apiRequest<TemplateGenerationResponse>(
+    `/api/admin/templates/generations/${encodedGenerationId}/cancel`,
+    { method: "POST" }
+  );
+}
+
+export async function retryAdminTemplateGeneration(
+  generationId: string
+): Promise<TemplateGenerationResponse> {
+  const encodedGenerationId = encodePathSegment(generationId);
+  return apiRequest<TemplateGenerationResponse>(
+    `/api/admin/templates/generations/${encodedGenerationId}/retry`,
     { method: "POST" }
   );
 }

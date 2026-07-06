@@ -21,6 +21,18 @@ void main() {
     expect(safeUrl, isNot(contains('viewer')));
   });
 
+  test('persistent media urls strip unknown query values', () {
+    final safeUrl = persistentSafeGenerationMediaUrl(
+      'https://cdn.petmagic.test/generated.jpg?download=1&cache_buster=raw&auth=secret#viewer',
+    );
+
+    expect(safeUrl, 'https://cdn.petmagic.test/generated.jpg');
+    expect(safeUrl, isNot(contains('download=1')));
+    expect(safeUrl, isNot(contains('cache_buster=raw')));
+    expect(safeUrl, isNot(contains('auth=secret')));
+    expect(safeUrl, isNot(contains('viewer')));
+  });
+
   test('template flow video preview is visibility-gated and cached', () async {
     final sheetSource = await File(
       'lib/features/templates/presentation/widgets/template_flow_sheets.dart',
@@ -30,6 +42,9 @@ void main() {
     ).readAsString();
     final playbackManagerSource = await File(
       'lib/features/templates/presentation/template_feed_playback_manager.dart',
+    ).readAsString();
+    final controllerSource = await File(
+      'lib/core/performance/template_preview_video_controller.dart',
     ).readAsString();
     final contentSource = await File(
       'lib/features/templates/presentation/widgets/template_flow_media_preview.part.dart',
@@ -68,6 +83,15 @@ void main() {
     expect(cardSource, contains('createTemplatePreviewVideoController('));
     expect(cardSource, contains('createCachedTemplatePreviewVideoController('));
     expect(cardSource, isNot(contains('VideoPlayerController.networkUrl(')));
+    expect(
+      controllerSource,
+      contains('parseSafeGenerationMediaUri(previewUrl)'),
+    );
+    expect(
+      controllerSource,
+      contains("FormatException('unsafe_template_preview_url')"),
+    );
+    expect(controllerSource, isNot(contains('Uri.parse(previewUrl)')));
 
     expect(
       sheetSource,
@@ -211,7 +235,10 @@ void main() {
       contains('parseSafeGenerationMediaUri(access.mediaUrl)'),
     );
     expect(actionsSource, contains('.fetchShareUrl('));
-    expect(actionsSource, contains('parseSafeExternalUri(access.shareUrl)'));
+    expect(
+      actionsSource,
+      contains('parseSafeGenerationShareUri(access.shareUrl)'),
+    );
     expect(actionsSource, contains('ClipboardData(text: safeUri.toString())'));
     expect(actionsSource, isNot(contains('ClipboardData(text: shareSafeUrl)')));
     expect(cardsSource, isNot(contains('imageUrl: previewImageUrl!')));

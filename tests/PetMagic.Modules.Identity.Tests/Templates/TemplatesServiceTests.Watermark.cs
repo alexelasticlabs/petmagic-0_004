@@ -521,6 +521,37 @@ public sealed partial class TemplatesServiceTests
         Assert.Equal(TemplatesErrors.GenerationJobNotFound.Code, hidden.Error.Code);
     }
 
+    [Theory]
+    [InlineData("<script>alert(1)</script>")]
+    [InlineData("not a valid token")]
+    [InlineData("%zz")]
+    [InlineData("%E0%A4%A")]
+    [InlineData("%2F")]
+    [InlineData("%5C")]
+    [InlineData("%00")]
+    public async Task GetPublicShareAsync_ShouldRejectMalformedShareToken(string shareToken)
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateGenerationService(dbContext);
+
+        var result = await service.GetPublicShareAsync(shareToken, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(TemplatesErrors.GenerationJobNotFound.Code, result.Error.Code);
+    }
+
+    [Fact]
+    public async Task GetPublicShareAsync_ShouldRejectOversizedShareToken()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateGenerationService(dbContext);
+
+        var result = await service.GetPublicShareAsync(new string('A', 4097), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(TemplatesErrors.GenerationJobNotFound.Code, result.Error.Code);
+    }
+
     [Fact]
     public async Task GetPublicShareAsync_ShouldKeepOlderShareTokenDurableWhileGenerationIsVisible()
     {

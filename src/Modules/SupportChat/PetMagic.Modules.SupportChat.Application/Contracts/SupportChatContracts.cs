@@ -22,7 +22,8 @@ public sealed record ListAdminSupportInboxQuery(
     int Page = 1,
     int PageSize = 50,
     string? Sort = null,
-    IReadOnlyList<string>? Statuses = null);
+    IReadOnlyList<string>? Statuses = null,
+    string? Queue = null);
 
 public sealed record SupportConversationInboxPageResponse(
     IReadOnlyList<SupportConversationSummaryResponse> Items,

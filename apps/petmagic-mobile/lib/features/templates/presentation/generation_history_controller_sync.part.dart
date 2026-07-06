@@ -23,6 +23,7 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
     _isLoadInFlight = true;
     final loadEpoch = ++_loadEpoch;
     _cancelActiveLoadMore('generation_history_initial_load_started');
+    CancelToken? loadCancelToken;
     try {
       await _resumeRealtimeIfNeeded();
       if (!ref.mounted) {
@@ -102,8 +103,8 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
         state = state.copyWith(cachedItemsByFilter: persistedCache);
       }
 
+      loadCancelToken = _startLoadCancelToken();
       try {
-        final loadCancelToken = _startLoadCancelToken();
         if (refresh) {
           await _fetchUnreadGenerationCountBestEffort(loadCancelToken);
         }
@@ -209,7 +210,10 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
         );
       }
     } finally {
-      _clearActiveLoadCancelToken();
+      final activeLoadCancelToken = loadCancelToken;
+      if (activeLoadCancelToken != null) {
+        _clearActiveLoadCancelToken(activeLoadCancelToken);
+      }
       _isLoadInFlight = false;
       _drainPendingLoad();
     }

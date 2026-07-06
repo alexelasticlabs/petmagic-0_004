@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
@@ -18,6 +19,7 @@ import 'package:petmagic_mobile/features/support/data/support_chat_realtime_clie
 import 'package:petmagic_mobile/features/templates/data/generation_gallery_store.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
+import 'package:petmagic_mobile/features/wallet/data/wallet_store_purchase_recovery_store.dart';
 import 'package:petmagic_mobile/shared/payments/store_product_availability_cache.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
@@ -336,6 +338,55 @@ void main() {
   );
 
   test(
+    'clears pending wallet store purchase recovery when startup resolves signed out',
+    () async {
+      final preferences = SharedPreferencesAsync();
+      final secureStorage = _FakeSecureStorage();
+      final recoveryStore = WalletStorePurchaseRecoveryStore(
+        preferences: preferences,
+        secureStorage: secureStorage,
+        clock: () => DateTime.utc(2026, 7, 3, 12),
+      );
+      await recoveryStore.savePendingPurchase(
+        PendingStoreWalletPurchase(
+          orderId: 'order-previous-user',
+          provider: 'google_play',
+          productId: 'com.petmagic.app.tokens.google.pack100',
+          packId: 'pack-100',
+          packCode: 'pack100',
+          createdAtUtc: DateTime.utc(2026, 7, 3, 11),
+        ),
+      );
+      expect(await recoveryStore.readPendingPurchase(), isNotNull);
+
+      final container = ProviderContainer(
+        overrides: [
+          authSessionStorageProvider.overrideWithValue(
+            _SignedOutAuthSessionStorage(),
+          ),
+          walletStorePurchaseRecoveryPreferencesProvider.overrideWithValue(
+            preferences,
+          ),
+          walletStorePurchaseRecoverySecureStorageProvider.overrideWithValue(
+            secureStorage,
+          ),
+          sessionMediaCacheCleanerProvider.overrideWithValue(() async {}),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      container.read(sessionScopeResetProvider);
+      await _waitForLaunchState(
+        container,
+        (state) => !state.isLoading && !state.isAuthenticated,
+      );
+      await _flushMicrotasks();
+
+      expect(await recoveryStore.readPendingPurchase(), isNull);
+    },
+  );
+
+  test(
     'deferred session invalidation stops quietly after container disposal',
     () async {
       final sessionStorage = _SignedOutAuthSessionStorage();
@@ -541,5 +592,57 @@ class FakeGamificationRepository extends GamificationRepository {
         isUnlocked: true,
       ),
     ];
+  }
+}
+
+class _FakeSecureStorage extends FlutterSecureStorage {
+  _FakeSecureStorage([Map<String, String>? initialValues])
+    : values = initialValues ?? <String, String>{};
+
+  final Map<String, String> values;
+
+  @override
+  Future<String?> read({
+    required String key,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    return values[key];
+  }
+
+  @override
+  Future<void> write({
+    required String key,
+    required String? value,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    if (value == null) {
+      values.remove(key);
+      return;
+    }
+
+    values[key] = value;
+  }
+
+  @override
+  Future<void> delete({
+    required String key,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    values.remove(key);
   }
 }

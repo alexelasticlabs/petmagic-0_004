@@ -537,6 +537,214 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task CancelAdminQueuedAsync_ShouldRefundPublishAuditAndReturnGeneration()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var billing = new RecordingGenerationBilling();
+        var realtime = new RecordingTemplateFeedRealtimeService();
+        var audit = new RecordingAdminAuditLog();
+        var generationService = CreateGenerationService(
+            dbContext,
+            billing: billing,
+            realtimeService: realtime,
+            adminAuditLog: audit);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Admin Cancel Portrait", "Portrait", ["cancel"]);
+        var userId = Guid.NewGuid();
+
+        var started = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                userId,
+                templateId,
+                new TemplateAssetCommand("https://cdn.example.com/source.jpg", "source.jpg", "image/jpeg", 2048, null),
+                "admin-cancel-key",
+                "admin-cancel-hash",
+                1),
+            CancellationToken.None);
+        Assert.True(started.IsSuccess);
+
+        var adminUserId = Guid.NewGuid();
+        var cancelled = await generationService.CancelAdminQueuedAsync(
+            adminUserId,
+            started.Value.GenerationId,
+            CancellationToken.None);
+
+        Assert.True(cancelled.IsSuccess);
+        Assert.Equal("Cancelled", cancelled.Value.Status);
+        Assert.False(cancelled.Value.CanCancel);
+        Assert.Equal(started.Value.GenerationId, Assert.Single(billing.RefundedGenerationIds));
+        Assert.Contains(realtime.GenerationStatusEvents, x => x.GenerationId == started.Value.GenerationId && x.Status == "Cancelled");
+        var auditEntry = Assert.Single(audit.Entries);
+        Assert.Equal("admin.template_generation.cancelled", auditEntry.Action);
+        Assert.Equal("template_generation", auditEntry.TargetType);
+        Assert.Equal(started.Value.GenerationId.ToString("D"), auditEntry.TargetId);
+        Assert.Equal(userId, auditEntry.SubjectUserId);
+        var persisted = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == started.Value.GenerationId);
+        Assert.Equal(TemplateGenerationStatus.Cancelled, persisted.Status);
+        Assert.NotNull(persisted.RefundedAtUtc);
+    }
+
+    [Fact]
+    public async Task RetryAdminGenerationAsync_ShouldRequeueUnrefundedTerminalJobWithoutNewBillingCommand()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var realtime = new RecordingTemplateFeedRealtimeService();
+        var audit = new RecordingAdminAuditLog();
+        var generationService = CreateGenerationService(
+            dbContext,
+            realtimeService: realtime,
+            adminAuditLog: audit);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Retry Portrait", "Portrait", ["retry"]);
+        var template = await dbContext.TemplateItems.SingleAsync(x => x.Id == templateId);
+        var now = DateTime.UtcNow;
+        var job = new TemplateGenerationJob
+        {
+            Id = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            TemplateId = templateId,
+            Template = template,
+            Status = TemplateGenerationStatus.Failed,
+            TokenCost = template.TokenCost,
+            QueueMediaType = TemplateGenerationQueue.MediaTypeImage,
+            QueueTier = TemplateGenerationQueue.TierFree,
+            SourceImageUrl = "https://cdn.example.com/source.jpg",
+            SourceImageFileName = "source.jpg",
+            SourceImageContentType = "image/jpeg",
+            CreatedAtUtc = now.AddMinutes(-15),
+            QueuedAtUtc = now.AddMinutes(-15),
+            StartedAtUtc = now.AddMinutes(-14),
+            CompletedAtUtc = now.AddMinutes(-12),
+            UpdatedAtUtc = now.AddMinutes(-12),
+            ChargedAtUtc = now.AddMinutes(-15),
+            AttemptCount = 3,
+            LastAttemptAtUtc = now.AddMinutes(-14),
+            LastErrorCode = TemplatesErrors.AiProviderFailed.Code,
+            LastErrorMessage = TemplatesErrors.AiProviderFailed.Message,
+            PreprocessingProviderRequestId = "fal-request",
+            ProviderStatus = "failed",
+            ProviderResultUrl = "https://provider.example.com/result.png"
+        };
+        dbContext.TemplateGenerationJobs.Add(job);
+        await dbContext.SaveChangesAsync();
+
+        var adminUserId = Guid.NewGuid();
+        var retried = await generationService.RetryAdminGenerationAsync(
+            adminUserId,
+            job.Id,
+            CancellationToken.None);
+
+        Assert.True(retried.IsSuccess);
+        Assert.Equal("Queued", retried.Value.Status);
+        Assert.True(retried.Value.CanCancel);
+        Assert.Equal(0, retried.Value.AttemptCount);
+        Assert.False(retried.Value.RefundedAtUtc.HasValue);
+        Assert.Equal(0, await dbContext.TemplateGenerationBillingCommands.CountAsync());
+        Assert.Contains(realtime.GenerationStatusEvents, x => x.GenerationId == job.Id && x.Status == "Queued");
+        var auditEntry = Assert.Single(audit.Entries);
+        Assert.Equal("admin.templates.generation.retry", auditEntry.Action);
+        Assert.Equal(adminUserId, auditEntry.SubjectUserId);
+
+        var persisted = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == job.Id);
+        Assert.Equal(TemplateGenerationStatus.Queued, persisted.Status);
+        Assert.Equal(0, persisted.AttemptCount);
+        Assert.Null(persisted.StartedAtUtc);
+        Assert.Null(persisted.CompletedAtUtc);
+        Assert.Null(persisted.LastErrorCode);
+        Assert.Null(persisted.PreprocessingProviderRequestId);
+        Assert.Null(persisted.ProviderResultUrl);
+        Assert.NotNull(persisted.ChargedAtUtc);
+        Assert.Null(persisted.RefundedAtUtc);
+    }
+
+    [Fact]
+    public async Task RetryAdminGenerationAsync_ShouldRejectRefundedTerminalJob()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var realtime = new RecordingTemplateFeedRealtimeService();
+        var generationService = CreateGenerationService(dbContext, realtimeService: realtime);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Refunded Retry Portrait", "Portrait", ["retry"]);
+        var template = await dbContext.TemplateItems.SingleAsync(x => x.Id == templateId);
+        var now = DateTime.UtcNow;
+        var job = new TemplateGenerationJob
+        {
+            Id = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            TemplateId = templateId,
+            Template = template,
+            Status = TemplateGenerationStatus.Failed,
+            TokenCost = template.TokenCost,
+            QueueMediaType = TemplateGenerationQueue.MediaTypeImage,
+            QueueTier = TemplateGenerationQueue.TierFree,
+            SourceImageUrl = "https://cdn.example.com/source.jpg",
+            SourceImageFileName = "source.jpg",
+            SourceImageContentType = "image/jpeg",
+            CreatedAtUtc = now.AddMinutes(-15),
+            QueuedAtUtc = now.AddMinutes(-15),
+            UpdatedAtUtc = now.AddMinutes(-12),
+            CompletedAtUtc = now.AddMinutes(-12),
+            ChargedAtUtc = now.AddMinutes(-15),
+            RefundedAtUtc = now.AddMinutes(-11),
+            AttemptCount = 3,
+            LastErrorCode = TemplatesErrors.AiProviderFailed.Code
+        };
+        dbContext.TemplateGenerationJobs.Add(job);
+        await dbContext.SaveChangesAsync();
+
+        var retried = await generationService.RetryAdminGenerationAsync(
+            Guid.NewGuid(),
+            job.Id,
+            CancellationToken.None);
+
+        Assert.True(retried.IsFailure);
+        Assert.Equal(TemplatesErrors.GenerationRetryNotAllowed.Code, retried.Error.Code);
+        Assert.Empty(realtime.GenerationStatusEvents);
+        var persisted = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == job.Id);
+        Assert.Equal(TemplateGenerationStatus.Failed, persisted.Status);
+        Assert.NotNull(persisted.RefundedAtUtc);
+    }
+
+    [Fact]
+    public async Task CancelAdminQueuedAsync_ShouldRejectProcessingJob()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var generationService = CreateGenerationService(dbContext);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Admin Processing Cancel Portrait", "Portrait", ["cancel"]);
+        var template = await dbContext.TemplateItems.SingleAsync(x => x.Id == templateId);
+        var job = new TemplateGenerationJob
+        {
+            Id = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            TemplateId = templateId,
+            Template = template,
+            Status = TemplateGenerationStatus.Processing,
+            TokenCost = template.TokenCost,
+            QueueMediaType = TemplateGenerationQueue.MediaTypeImage,
+            QueueTier = TemplateGenerationQueue.TierFree,
+            SourceImageUrl = "https://cdn.example.com/source.jpg",
+            SourceImageFileName = "source.jpg",
+            SourceImageContentType = "image/jpeg",
+            CreatedAtUtc = DateTime.UtcNow.AddMinutes(-5),
+            QueuedAtUtc = DateTime.UtcNow.AddMinutes(-5),
+            StartedAtUtc = DateTime.UtcNow.AddMinutes(-4),
+            UpdatedAtUtc = DateTime.UtcNow.AddMinutes(-4),
+            ChargedAtUtc = DateTime.UtcNow.AddMinutes(-5)
+        };
+        dbContext.TemplateGenerationJobs.Add(job);
+        await dbContext.SaveChangesAsync();
+
+        var cancelled = await generationService.CancelAdminQueuedAsync(
+            Guid.NewGuid(),
+            job.Id,
+            CancellationToken.None);
+
+        Assert.True(cancelled.IsFailure);
+        Assert.Equal(TemplatesErrors.GenerationCancelNotAllowed.Code, cancelled.Error.Code);
+    }
+
+    [Fact]
     public async Task CancelQueuedAsync_ShouldNotRefundAgain_WhenJobWasAlreadyRefunded()
     {
         await using var dbContext = CreateDbContext();

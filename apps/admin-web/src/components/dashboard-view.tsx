@@ -199,7 +199,10 @@ export function DashboardView({ locale }: DashboardViewProps) {
             xLabels={viewModel.revenueChart.xLabels}
             values={viewModel.revenueChart.values}
             currencyCode={viewModel.revenueChart.currencyCode}
+            locale={locale}
             ariaLabel={viewModel.revenueChart.ariaLabel}
+            dateHeader={copy.revenueChart.dateHeader}
+            revenueHeader={copy.revenueChart.revenueHeader}
           />
         </AdminCard>
 

@@ -2,6 +2,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
+
 namespace PetMagic.Modules.SupportChat.Infrastructure;
 
 internal sealed class SupportAttachmentCleanupWorker(
@@ -38,7 +40,10 @@ internal sealed class SupportAttachmentCleanupWorker(
             catch (Exception exception)
             {
                 consecutiveFailures++;
-                logger.LogError(exception, "Support attachment cleanup worker loop failed.");
+                logger.LogError(
+                    "Support attachment cleanup worker loop failed. ConsecutiveFailures={ConsecutiveFailures} ExceptionType={ExceptionType}",
+                    consecutiveFailures,
+                    SafeLogValues.ExceptionType(exception));
                 await Task.Delay(GetBackoffDelay(options.CleanupRetryDelayMilliseconds, consecutiveFailures), stoppingToken);
             }
         }

@@ -235,12 +235,14 @@ class _ProfileSettingsPageContent extends StatelessWidget {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      isLight
-                          ? const Color(0xFFF7EEF0)
-                          : const Color(0xFF151A29),
-                      isLight
-                          ? const Color(0xFFFDF7F8)
-                          : const Color(0xFF1A2236),
+                      Color.alphaBlend(
+                        colors.danger.withValues(alpha: isLight ? 0.08 : 0.18),
+                        colors.surface,
+                      ),
+                      Color.alphaBlend(
+                        colors.danger.withValues(alpha: isLight ? 0.04 : 0.14),
+                        colors.surfaceStrong,
+                      ),
                     ],
                   ),
                   border: Border.all(

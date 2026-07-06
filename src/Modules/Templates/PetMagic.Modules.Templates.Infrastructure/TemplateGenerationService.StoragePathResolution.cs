@@ -1,3 +1,5 @@
+using PetMagic.BuildingBlocks.Storage;
+
 namespace PetMagic.Modules.Templates.Infrastructure;
 
 internal sealed partial class TemplateGenerationService
@@ -63,9 +65,7 @@ internal sealed partial class TemplateGenerationService
 
         var segments = pathOnly
             .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (segments.Any(segment =>
-                string.Equals(segment, ".", StringComparison.Ordinal)
-                || string.Equals(segment, "..", StringComparison.Ordinal)))
+        if (segments.Any(IsUnsafeManagedStoragePathSegment))
         {
             return false;
         }
@@ -78,6 +78,11 @@ internal sealed partial class TemplateGenerationService
 
         managedPath = normalized;
         return true;
+    }
+
+    private static bool IsUnsafeManagedStoragePathSegment(string segment)
+    {
+        return ManagedPathSegments.IsUnsafe(segment);
     }
 
     private static string NormalizeObjectKeyPrefix(string prefix)

@@ -20,6 +20,7 @@ public static class AdminTemplateCategoryEndpoints
         var group = endpoints.MapGroup("/api/admin/templates/categories")
             .WithTags("Admin.TemplateCategories")
             .RequireAuthorization("ModeratorOrAdmin")
+            .AddEndpointFilter(ApplyPrivateAdminTemplateCategoryResponseHeadersAsync)
             .RequireRateLimiting("admin");
 
         group.MapGet("/", ListAsync);
@@ -35,9 +36,21 @@ public static class AdminTemplateCategoryEndpoints
             .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateCategoryJsonRequestBodyBytes))
             .RequireAuthorization("AdminOnly");
         group.MapDelete("/{categoryId:guid}", DeleteAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateCategoryJsonRequestBodyBytes))
             .RequireAuthorization("AdminOnly");
 
         return endpoints;
+    }
+
+    private static async ValueTask<object?> ApplyPrivateAdminTemplateCategoryResponseHeadersAsync(
+        EndpointFilterInvocationContext context,
+        EndpointFilterDelegate next)
+    {
+        context.HttpContext.Response.Headers.CacheControl = "no-store";
+        context.HttpContext.Response.Headers.Pragma = "no-cache";
+        context.HttpContext.Response.Headers.XContentTypeOptions = "nosniff";
+
+        return await next(context);
     }
 
     private static async Task<Results<Ok<AdminTemplateCategoryDiagnosticsResponse>, ProblemHttpResult>> DiagnosticsAsync(
@@ -76,7 +89,7 @@ public static class AdminTemplateCategoryEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.CreateCategoryAsync(command, cancellationToken);
@@ -99,7 +112,7 @@ public static class AdminTemplateCategoryEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.UpdateCategoryAsync(command, cancellationToken);
@@ -122,7 +135,7 @@ public static class AdminTemplateCategoryEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.ChangeCategoryArchiveStateAsync(command, cancellationToken);
@@ -164,20 +177,13 @@ public static class AdminTemplateCategoryEndpoints
     {
         return TypedResults.Problem(
             title: errorCode,
-            detail: GetCategoryProblemDetail(errorCode),
-            statusCode: ResolveCategoryFailureStatusCode(errorCode));
+            statusCode: ResolveCategoryFailureStatusCode(errorCode),
+            extensions: BuildCategoryProblemExtensions(errorCode));
     }
 
-    private static string GetCategoryProblemDetail(string errorCode)
+    private static Dictionary<string, object?> BuildCategoryProblemExtensions(string errorCode)
     {
-        return errorCode switch
-        {
-            "templates.category_not_found" => "Template category was not found.",
-            "templates.category_already_exists" => "Template category already exists.",
-            "templates.category_archived" => "Template category is archived.",
-            "templates.category_has_templates" => "Template category cannot be deleted while templates still reference it.",
-            _ => "Template category request could not be completed.",
-        };
+        return new Dictionary<string, object?> { ["code"] = errorCode };
     }
 
     public sealed record UpdateTemplateCategoryRequest(string Name);

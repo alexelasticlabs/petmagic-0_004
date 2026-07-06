@@ -12,16 +12,31 @@ describe("admin-query-keys", () => {
       "New",
       "mine",
       "",
+      "all",
+      "default",
+      "all",
       1,
       50,
     ]);
-    expect(adminQueryKeys.supportInbox("New", "mine", { search: " user ", page: 2, pageSize: 25 })).toEqual([
+    expect(
+      adminQueryKeys.supportInbox("New", "mine", {
+        search: " user ",
+        priority: "High",
+        sort: "waiting",
+        queue: "waiting_for_support",
+        page: 2,
+        pageSize: 25,
+      })
+    ).toEqual([
       "admin",
       "support",
       "inbox",
       "New",
       "mine",
       "user",
+      "High",
+      "waiting",
+      "waiting_for_support",
       2,
       25,
     ]);

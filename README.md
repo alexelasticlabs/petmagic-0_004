@@ -22,6 +22,17 @@ cp .env.example .env
 docker compose up --build
 ```
 
+This starts the core local stack: PostgreSQL, Mailpit, backend API, generation worker, and admin web.
+The observability stack is available separately through the `monitoring` profile:
+
+```bash
+docker compose --profile monitoring up --build
+```
+
+When enabling the monitoring profile, set `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317`
+in your local `.env` so the API and generation worker export telemetry to the collector. Keep it
+empty for the core stack.
+
 Scale generation workers locally:
 
 ```bash
@@ -38,6 +49,23 @@ Expected local endpoints:
 `BACKEND_HOST_PORT` defaults to `5001` in Compose. If your local `.env` overrides it to `5000`, use `http://localhost:5000`.
 
 If you change `BACKEND_HOST_PORT`, update frontend and mobile API base URLs accordingly.
+If you intentionally point Docker `admin-web` at a local HTTP backend, set
+`ADMIN_WEB_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION=true` only in your local
+uncommitted `.env`. Keep it `false` for staging, production, and production-like
+validation.
+
+For an isolated local-smoke proof without touching the default local ports, use a
+separate Compose project and `.env.local-smoke.example`:
+
+```powershell
+docker compose -p petmagic_goal_probe --env-file .env.local-smoke.example up -d --build --wait --wait-timeout 240
+curl http://localhost:5601/health
+curl "http://localhost:5601/api/templates/feed?limit=3"
+curl http://localhost:3600/ru
+```
+
+This proves a fresh build and startup path on isolated volumes/network. It is
+local development evidence only, not staging or production rollout evidence.
 
 ## Configuration
 
@@ -49,7 +77,10 @@ Important variables:
 POSTGRES_PASSWORD=replace_with_local_or_secret_value
 JWT_SIGNING_KEY=replace_with_64_byte_random_value
 BACKEND_HOST_PORT=5001
+BACKEND_ALLOWED_HOSTS=api.petmagic.app
+BACKEND_HEALTHCHECK_HOST=api.petmagic.app
 ADMIN_WEB_HOST_PORT=3000
+ADMIN_WEB_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION=false
 MAILPIT_WEB_HOST_PORT=8025
 EMAIL_HOST=mailpit
 EMAIL_PORT=1025
@@ -78,7 +109,7 @@ openssl rand -base64 64
 
 `docker compose` requires `JWT_SIGNING_KEY` to be set explicitly; there is no shared fallback signing key in the Compose file.
 
-Production startup validates unsafe defaults. Non-development environments require a non-placeholder JWT signing key, configured CORS origins, production payment/provider secrets, production-safe template providers, and no `BootstrapAdmin:Password`.
+Production startup validates unsafe defaults. Non-development environments require a non-placeholder JWT signing key, explicit non-wildcard `AllowedHosts`, configured CORS origins, production payment/provider secrets, production-safe template providers, and no `BootstrapAdmin:Password`.
 
 ## Development
 
@@ -87,6 +118,11 @@ dotnet restore PetMagic.slnx
 dotnet build PetMagic.slnx
 dotnet test PetMagic.slnx
 ```
+
+Localization and light/dark theme rules are documented in
+`docs/localization-and-theme.md`. Update that guide when supported locales,
+fallback behavior, user-facing API error contracts, or shared theme token
+locations change.
 
 Run the backend without Docker after PostgreSQL is available:
 
@@ -161,14 +197,24 @@ See `docs/OBSERVABILITY.md` and `deploy/monitoring/prometheus/petmagic-alerts.ym
 
 See `docs/SECURITY.md` for the security policy and dependency audit notes.
 
+## Release Readiness
+
+Current repo-wide production-readiness status is tracked in
+`docs/production-readiness-audit-2026-07-03.md`. Treat local green builds and
+tests as pre-release evidence only; production release still requires real
+provider-backed staging proof and signed store artifacts.
+
 ## Useful Commands
 
 ```bash
-docker compose --env-file /dev/null config
+docker compose --env-file .env.example config --quiet
+docker compose --env-file .env.local-smoke.example config --quiet
+docker compose --env-file .env.staging.local.example config --quiet
 docker compose ps
 docker compose logs backend
 docker compose logs generation-worker
 dotnet test PetMagic.slnx --no-restore
+node scripts/qa/check-markdown-local-links.mjs
 ```
 
 ## Backups

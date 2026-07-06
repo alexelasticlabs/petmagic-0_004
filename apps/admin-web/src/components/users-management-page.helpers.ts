@@ -7,7 +7,6 @@ import type {
 import type { AdminUserAnalytics, AdminUserDashboardMetrics, UserListItem } from "@/lib/api-client";
 import { getAdminUserDisplayName, sanitizeSensitiveText } from "@/lib/sensitive-display";
 
-
 const ROW_ENRICHMENT_CONCURRENCY = 4;
 
 export const accountStatusColors: Record<AccountStatus, string> = {

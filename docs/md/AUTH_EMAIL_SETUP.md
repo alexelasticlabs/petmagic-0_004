@@ -110,7 +110,7 @@ EMAIL_FROM_NAME=PetMagic
 
 ```env
 BACKEND_HOST_PORT=5001
-POSTGRES_PASSWORD=PetMagic_DevPassword123
+POSTGRES_PASSWORD=replace_with_local_postgres_password
 JWT_SIGNING_KEY=сгенерируй_длинный_секрет
 BOOTSTRAP_ADMIN_EMAIL=admin@petmagic.app
 BOOTSTRAP_ADMIN_PASSWORD=replace_with_local_admin_password
@@ -370,7 +370,7 @@ http://localhost:5001
 
 ```env
 BACKEND_HOST_PORT=5001
-POSTGRES_PASSWORD=PetMagic_DevPassword123
+POSTGRES_PASSWORD=replace_with_local_postgres_password
 JWT_SIGNING_KEY=replace_with_long_random_secret
 BOOTSTRAP_ADMIN_EMAIL=admin@petmagic.app
 BOOTSTRAP_ADMIN_PASSWORD=replace_with_local_admin_password

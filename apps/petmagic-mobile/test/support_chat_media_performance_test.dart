@@ -37,7 +37,10 @@ void main() {
       );
       expect(source, contains('CachedNetworkImage('));
       expect(source, contains('cacheKey: persistentSafeSupportMediaUrl('));
-      expect(source, contains('memCacheWidth: 512'));
+      expect(
+        source,
+        contains('memCacheWidth: _supportAttachmentGridThumbnailCacheWidth'),
+      );
       expect(
         source,
         isNot(contains('child: Image.network(\r\n            widget.imageUrl')),
@@ -97,6 +100,23 @@ void main() {
       contains('cacheKey: persistentSafeSupportMediaUrl('),
     );
     expect(dialogsSource, contains('cacheKey: persistentSafeSupportMediaUrl('));
+    expect(
+      pageSource,
+      contains('const int _supportImagePreviewDialogCacheWidth = 1440;'),
+    );
+    expect(
+      dialogsSource,
+      contains('memCacheWidth: _supportImagePreviewDialogCacheWidth'),
+    );
+    expect(
+      dialogsSource,
+      contains('maxWidthDiskCache: _supportImagePreviewDialogCacheWidth'),
+    );
+    expect(dialogsSource, contains('filterQuality: FilterQuality.medium'));
+    expect(
+      replySource,
+      contains('maxWidthDiskCache: _supportReplyThumbnailCacheWidth'),
+    );
   });
 
   test('support image previews avoid uncached Image.network widgets', () async {
@@ -259,6 +279,31 @@ void main() {
       contains('cacheHeight: _supportRecentMediaThumbnailCacheExtent'),
     );
     expect(assetTileSource, contains('filterQuality: FilterQuality.medium'));
+  });
+
+  test('support attachment grid thumbnails use bounded disk cache', () async {
+    final pageSource = await File(
+      'lib/features/support/presentation/support_chat_page.dart',
+    ).readAsString();
+    final gridSource = await File(
+      'lib/features/support/presentation/widgets/'
+      'support_chat_message_media_grid.part.dart',
+    ).readAsString();
+
+    expect(
+      pageSource,
+      contains('const int _supportAttachmentGridThumbnailCacheWidth = 512;'),
+    );
+    expect(
+      gridSource,
+      contains('memCacheWidth: _supportAttachmentGridThumbnailCacheWidth'),
+    );
+    expect(
+      gridSource,
+      contains('maxWidthDiskCache: _supportAttachmentGridThumbnailCacheWidth'),
+    );
+    expect(gridSource, contains('filterQuality: FilterQuality.medium'));
+    expect(gridSource, isNot(contains('memCacheWidth: 512')));
   });
 
   test('support chat empty states use sliver scroll surfaces', () async {

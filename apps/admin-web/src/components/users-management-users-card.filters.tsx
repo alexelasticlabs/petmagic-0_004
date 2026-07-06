@@ -10,10 +10,9 @@ import type {
   RangeDays,
   RoleFilter,
   StatusFilter,
+  UserSortMode,
 } from "@/components/users-management-page.types";
-import {
-  USER_SEARCH_MAX_LENGTH,
-} from "@/lib/api-client";
+import { USER_SEARCH_MAX_LENGTH } from "@/lib/api-client";
 import type { Dictionary } from "@/lib/i18n";
 
 type UsersManagementUsersFiltersProps = {
@@ -29,7 +28,9 @@ type UsersManagementUsersFiltersProps = {
   setRangeDays: (value: RangeDays) => void;
   setRoleFilter: (value: RoleFilter) => void;
   setSearch: (value: string) => void;
+  setSortMode: (value: UserSortMode) => void;
   setStatusFilter: (value: StatusFilter) => void;
+  sortMode: UserSortMode;
   statusFilter: StatusFilter;
   text: Dictionary;
   ui: UsersManagementPageText;
@@ -48,7 +49,9 @@ export function UsersManagementUsersFilters({
   setRangeDays,
   setRoleFilter,
   setSearch,
+  setSortMode,
   setStatusFilter,
+  sortMode,
   statusFilter,
   text,
   ui,
@@ -144,6 +147,21 @@ export function UsersManagementUsersFilters({
         <option value="7">{ui.period7}</option>
         <option value="30">{ui.period30}</option>
         <option value="90">{ui.period90}</option>
+      </select>
+
+      <select
+        className={styles.filterSelect}
+        value={sortMode}
+        onChange={(event) => {
+          setSortMode(event.target.value as UserSortMode);
+          resetUsersSelection();
+        }}
+        aria-label={ui.sortLabel}
+      >
+        <option value="created_desc">{ui.sortCreatedDesc}</option>
+        <option value="created_asc">{ui.sortCreatedAsc}</option>
+        <option value="last_activity_desc">{ui.sortLastActivityDesc}</option>
+        <option value="last_activity_asc">{ui.sortLastActivityAsc}</option>
       </select>
 
       <Button variant="ghost" size="sm" onClick={resetAllFilters}>

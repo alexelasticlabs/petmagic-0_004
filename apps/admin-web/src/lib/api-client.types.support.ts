@@ -1,27 +1,13 @@
 export type SupportConversationStatus = "New" | "InProgress" | "WaitingForUser" | "Closed";
 
-
 export type SupportConversationSource =
-
-  | "MobileChat"
-
-  | "MobileAssistant"
-
-  | "AdminCreated"
-
-  | "System"
-
-  | "Direct";
-
+  "MobileChat" | "MobileAssistant" | "AdminCreated" | "System" | "Direct";
 
 export type SupportConversationPriority = "Low" | "Normal" | "High";
 
-
 export type SupportInboxAssignmentScope = "all" | "mine" | "unassigned";
 
-
 export type AdminSupportMessageAttachment = {
-
   fileUrl: string;
 
   type: string;
@@ -43,12 +29,9 @@ export type AdminSupportMessageAttachment = {
   width?: number | null;
 
   height?: number | null;
-
 };
 
-
 export type AdminSupportMessage = {
-
   messageId: string;
 
   conversationId: string;
@@ -90,12 +73,9 @@ export type AdminSupportMessage = {
   isInternalNote: boolean;
 
   createdAtUtc: string;
-
 };
 
-
 export type AdminSupportConversationSummary = {
-
   conversationId: string;
 
   initiatorUserId: string;
@@ -155,12 +135,9 @@ export type AdminSupportConversationSummary = {
   isReadOnly: boolean;
 
   canReopen: boolean;
-
 };
 
-
 export type AdminSupportInboxPage = {
-
   items: AdminSupportConversationSummary[];
 
   page: number;
@@ -170,12 +147,9 @@ export type AdminSupportInboxPage = {
   totalCount: number;
 
   hasMore: boolean;
-
 };
 
-
 export type AdminSupportInboxMetrics = {
-
   totalConversations: number;
 
   openConversations: number;
@@ -185,12 +159,9 @@ export type AdminSupportInboxMetrics = {
   unassignedConversations: number;
 
   unreadForAdminConversations: number;
-
 };
 
-
 export type AdminSupportConversation = {
-
   conversationId: string;
 
   initiatorUserId: string;
@@ -266,12 +237,9 @@ export type AdminSupportConversation = {
   oldestLoadedMessageCreatedAtUtc?: string | null;
 
   messages: AdminSupportMessage[];
-
 };
 
-
 export type AdminSupportReplyTemplate = {
-
   templateId: string;
 
   title: string;
@@ -285,7 +253,4 @@ export type AdminSupportReplyTemplate = {
   createdAtUtc: string;
 
   updatedAtUtc: string;
-
 };
-
-

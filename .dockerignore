@@ -2,6 +2,17 @@
 .git
 .gitignore
 
+# Environment and local secrets
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+*.pfx
+*.pem
+*.key
+
 # CI/CD
 .github
 .gitlab-ci.yml
@@ -9,10 +20,11 @@
 # IDE
 .vscode
 .idea
+.vs
+.mimic
 *.swp
 
 # Documentation
-docs//Users/elasticlabs/Desktop/petmagic-0_004/.dockerignore
 README.md
 SECURITY.md
 
@@ -24,6 +36,12 @@ tests/
 bin/
 obj/
 .next/
+artifacts/
+apps/admin-web/.next/
+apps/petmagic-mobile/.dart_tool/
+apps/petmagic-mobile/build/
+apps/petmagic-mobile/android/.gradle/
+apps/petmagic-mobile/android/app/build/
 
 # Node
 node_modules/
@@ -40,3 +58,20 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Temporary and backup artifacts
+*.bak
+*.backup
+*.tmp
+*.temp
+*.old
+*.orig
+*.rej
+*.swp
+*.swo
+tmp_*
+debug_*
+backup_*
+temp/
+tmp/
+.tmp/

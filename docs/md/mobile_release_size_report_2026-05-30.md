@@ -1,5 +1,10 @@
 # Mobile Release Size Audit Report (2026-05-30)
 
+> Historical size-audit snapshot. This file preserves the May 2026 artifact
+> measurements and dependency cleanup notes. For the current release-size status,
+> use `docs/md/mobile_release_size_audit.md` and
+> `docs/production-readiness-audit-2026-07-03.md`.
+
 Project: `apps/petmagic-mobile`
 
 ## Build Artifacts (release)

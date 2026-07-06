@@ -93,7 +93,8 @@ class _LevelBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = XpProgressBar.gradientForStage(evolutionStage);
+    final stageColors = XpProgressBar.gradientForStage(evolutionStage);
+    final foreground = context.petMagicColors.on(stageColors.last);
 
     return Container(
       width: 28,
@@ -103,11 +104,11 @@ class _LevelBadge extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: colors,
+          colors: stageColors,
         ),
         boxShadow: [
           BoxShadow(
-            color: colors.last.withValues(alpha: 0.4),
+            color: stageColors.last.withValues(alpha: 0.4),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -116,10 +117,10 @@ class _LevelBadge extends StatelessWidget {
       alignment: Alignment.center,
       child: Text(
         '$level',
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w700,
-          color: Color(0xFFFFFFFF),
+          color: foreground,
         ),
       ),
     );

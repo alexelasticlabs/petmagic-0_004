@@ -46,7 +46,7 @@ export type GenerationsPageText = {
   pet: string;
   petPhoto: string;
   previewMissing: string;
-  debugTitle: string;
+  diagnosticsTitle: string;
   emptyTitle: string;
   emptyDescription: string;
   loadingTitle: string;
@@ -68,6 +68,20 @@ export type GenerationsPageText = {
   watermarkRemoved: string;
   watermarkPending: string;
   watermarkUnlockedBy: string;
+  cancelGeneration: string;
+  cancellingGeneration: string;
+  cancelGenerationError: string;
+  cancelGenerationConfirmTitle: string;
+  cancelGenerationConfirmDescription: (generationId: string) => string;
+  cancelGenerationConfirmCancel: string;
+  cancelGenerationConfirmSubmit: string;
+  retryGeneration: string;
+  retryingGeneration: string;
+  retryGenerationError: string;
+  retryGenerationConfirmTitle: string;
+  retryGenerationConfirmDescription: (generationId: string) => string;
+  retryGenerationConfirmCancel: string;
+  retryGenerationConfirmSubmit: string;
   grantClean: string;
   grantingClean: string;
   grantCleanError: string;
@@ -108,7 +122,7 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
     title: "Генерации",
     description:
       "Операционный список заданий генерации, статусов, провайдеров, попыток и кодов ошибок.",
-    adminOnly: "Только Admin",
+    adminOnly: "Только администратор",
     total: "Всего заданий",
     pending: "Ожидает",
     running: "В работе",
@@ -118,14 +132,14 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
     retrying: "Повторяется",
     allJobsScope: "Все задания",
     filtersTitle: "Фильтры",
-    filtersDescription: "Сузьте список по job id, статусу, провайдеру или user id.",
-    searchLabel: "Job id",
-    searchPlaceholder: "Поиск по generation id",
+    filtersDescription: "Сузьте список по ID задания, статусу, провайдеру или ID пользователя.",
+    searchLabel: "ID задания",
+    searchPlaceholder: "Поиск по ID генерации",
     statusLabel: "Статус",
     providerLabel: "Провайдер",
     providerPlaceholder: "fal, openai...",
-    userLabel: "User id",
-    userPlaceholder: "Фильтр по user id",
+    userLabel: "ID пользователя",
+    userPlaceholder: "Фильтр по ID пользователя",
     tableTitle: "История генераций",
     showDetails: "Показать",
     hideDetails: "Скрыть",
@@ -135,12 +149,12 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
     compareUnavailable: "Недоступно",
     compareState: "Сравнение",
     sourceType: "Источник",
-    inputAsset: "Входной asset",
-    resultAsset: "Результат asset",
+    inputAsset: "Входной медиафайл",
+    resultAsset: "Результирующий медиафайл",
     pet: "Питомец",
     petPhoto: "Фото питомца",
     previewMissing: "Превью недоступно",
-    debugTitle: "Отладка",
+    diagnosticsTitle: "Диагностика",
     emptyTitle: "Генераций не найдено",
     emptyDescription: "Измените фильтры или дождитесь новых заданий генерации.",
     loadingTitle: "Загрузка генераций",
@@ -157,15 +171,31 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
     cost: "Стоимость",
     attempts: "Попытки",
     failure: "Ошибка",
-    watermark: "Watermark",
-    watermarkApplied: "С watermark",
+    watermark: "Водяной знак",
+    watermarkApplied: "С водяным знаком",
     watermarkNotRequired: "Не требуется",
     watermarkRemoved: "Снят",
     watermarkPending: "Подготовка",
     watermarkUnlockedBy: "Разблокировал",
-    grantClean: "Выдать clean",
+    cancelGeneration: "Отменить",
+    cancellingGeneration: "Отменяем...",
+    cancelGenerationError: "Не удалось отменить генерацию.",
+    cancelGenerationConfirmTitle: "Отменить генерацию?",
+    cancelGenerationConfirmDescription: (generationId: string) =>
+      `Будет отменено только задание ${generationId}, которое ещё находится в очереди. Задания в работе через это действие не отменяются.`,
+    cancelGenerationConfirmCancel: "Назад",
+    cancelGenerationConfirmSubmit: "Отменить",
+    retryGeneration: "Запустить снова",
+    retryingGeneration: "Запускаем...",
+    retryGenerationError: "Не удалось повторно запустить генерацию.",
+    retryGenerationConfirmTitle: "Запустить генерацию снова?",
+    retryGenerationConfirmDescription: (generationId: string) =>
+      `Задание ${generationId} будет возвращено в очередь с новым бюджетом попыток. Действие доступно только если списание ещё не было возвращено пользователю.`,
+    retryGenerationConfirmCancel: "Назад",
+    retryGenerationConfirmSubmit: "Запустить снова",
+    grantClean: "Выдать чистый файл",
     grantingClean: "Выдаём...",
-    grantCleanError: "Не удалось выдать clean download.",
+    grantCleanError: "Не удалось выдать файл без водяного знака.",
     created: "Создана",
     completedAt: "Завершена",
     noFailure: "Нет",
@@ -183,7 +213,7 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
     lineageChildSingular: "дочерняя генерация",
     lineageChildPlural: "дочерних генераций",
     variationLabel: "вариация",
-    seedLabel: "seed",
+    seedLabel: "Сид",
     generationStatusOptions: {
       All: "Все",
       Pending: "Ожидает",
@@ -265,7 +295,7 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
     pet: "Pet",
     petPhoto: "Pet photo",
     previewMissing: "Preview unavailable",
-    debugTitle: "Debug",
+    diagnosticsTitle: "Diagnostics",
     emptyTitle: "No generations found",
     emptyDescription: "Adjust filters or wait for new generation jobs.",
     loadingTitle: "Loading generations",
@@ -288,6 +318,22 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
     watermarkRemoved: "Removed",
     watermarkPending: "Preparing",
     watermarkUnlockedBy: "Unlocked by",
+    cancelGeneration: "Cancel",
+    cancellingGeneration: "Cancelling...",
+    cancelGenerationError: "Failed to cancel generation.",
+    cancelGenerationConfirmTitle: "Cancel generation?",
+    cancelGenerationConfirmDescription: (generationId: string) =>
+      `Only queued generation ${generationId} will be cancelled. Running provider jobs are not cancelled by this action.`,
+    cancelGenerationConfirmCancel: "Back",
+    cancelGenerationConfirmSubmit: "Cancel generation",
+    retryGeneration: "Retry job",
+    retryingGeneration: "Retrying...",
+    retryGenerationError: "Failed to retry generation.",
+    retryGenerationConfirmTitle: "Retry generation?",
+    retryGenerationConfirmDescription: (generationId: string) =>
+      `Generation ${generationId} will be returned to the queue with a fresh attempt budget. This is only available when the original charge has not been refunded.`,
+    retryGenerationConfirmCancel: "Back",
+    retryGenerationConfirmSubmit: "Retry job",
     grantClean: "Grant clean",
     grantingClean: "Granting...",
     grantCleanError: "Failed to grant clean download.",

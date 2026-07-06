@@ -122,13 +122,14 @@ class _BalanceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
+    final localeTag = Localizations.localeOf(context).toLanguageTag();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final colors = context.petMagicColors;
     final balance = wallet?.balance ?? 0;
-    const cardAccent = Color(0xFF00F2A6);
-    final cardTextSecondary = isDark
-        ? Colors.white.withValues(alpha: 0.52)
-        : const Color(0xFF43606A);
+    final cardAccent = colors.accent;
+    final cardTextSecondary = colors.textSoft.withValues(
+      alpha: isDark ? 0.72 : 0.86,
+    );
 
     return PetMagicAccentCard(
       accentColor: cardAccent,
@@ -194,7 +195,9 @@ class _BalanceCard extends StatelessWidget {
                               fit: BoxFit.scaleDown,
                               alignment: Alignment.centerLeft,
                               child: Text(
-                                NumberFormat.decimalPattern().format(balance),
+                                NumberFormat.decimalPattern(
+                                  localeTag,
+                                ).format(balance),
                                 style: TextStyle(
                                   color: colors.textStrong,
                                   fontSize: compact ? 48 : 56,
@@ -266,12 +269,13 @@ class _PremiumUpsellCard extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final colors = context.petMagicColors;
     final textPrimary = colors.textStrong;
-    final textSecondary = isDark
-        ? Colors.white.withValues(alpha: 0.8)
-        : const Color(0xFF32485A);
-    const accent = Color(0xFFFFC107);
+    final textSecondary = colors.textSoft.withValues(
+      alpha: isDark ? 0.84 : 0.92,
+    );
+    final accent = colors.gold;
     final chipBg = accent.withValues(alpha: isDark ? 0.14 : 0.1);
     final chipBorder = accent.withValues(alpha: isDark ? 0.26 : 0.22);
+    final chipForeground = isDark ? colors.gold : colors.on(chipBg);
     final screenWidth = MediaQuery.sizeOf(context).width;
     final veryCompactScreen = screenWidth < 360;
     final compactScreen = screenWidth < 410;
@@ -346,7 +350,7 @@ class _PremiumUpsellCard extends StatelessWidget {
                           Text(
                             text.walletPremiumStatus,
                             style: TextStyle(
-                              color: const Color(0xFFFFD666),
+                              color: chipForeground,
                               fontSize: compact ? 11.0 : 11.4,
                               fontWeight: FontWeight.w800,
                             ),
@@ -398,7 +402,7 @@ class _PremiumUpsellCard extends StatelessWidget {
                           _PremiumFeaturePill(
                             icon: Icons.card_giftcard_rounded,
                             label: text.premiumUpsellWeeklyCredits,
-                            foregroundColor: const Color(0xFFFFD666),
+                            foregroundColor: chipForeground,
                             backgroundColor: chipBg,
                             borderColor: chipBorder,
                           ),

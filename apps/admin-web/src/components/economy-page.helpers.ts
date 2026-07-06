@@ -480,7 +480,10 @@ export function normalizeEconomyPriceInput(value: string): string {
 }
 
 export function normalizeEconomyCurrencyInput(value: string): string {
-  return value.replace(/[^a-z]/gi, "").toUpperCase().slice(0, 3);
+  return value
+    .replace(/[^a-z]/gi, "")
+    .toUpperCase()
+    .slice(0, 3);
 }
 
 export function normalizeEconomyPackDisplayNameInput(value: string): string {
@@ -507,9 +510,7 @@ function parseBonusTokensPercent(value: string): number | null {
 
 function parsePackDecimal(value: string): number | null {
   const trimmed = value.trim();
-  if (
-    !new RegExp(`^\\d{1,${ECONOMY_PACK_PRICE_MAX_LENGTH - 3}}(?:\\.\\d{1,2})?$`).test(trimmed)
-  ) {
+  if (!new RegExp(`^\\d{1,${ECONOMY_PACK_PRICE_MAX_LENGTH - 3}}(?:\\.\\d{1,2})?$`).test(trimmed)) {
     return null;
   }
 

@@ -190,10 +190,16 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
     const link = document.createElement("a");
     link.href = url;
     link.download = `templates-analytics-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.append(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    try {
+      document.body.append(link);
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      URL.revokeObjectURL(url);
+      throw error;
+    } finally {
+      link.remove();
+    }
   }
 
   function requestOverviewRetry() {

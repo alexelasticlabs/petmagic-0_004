@@ -8,6 +8,7 @@ const contentSource = readFileSync(
   new URL("./templates-daily-featured-page.content.ts", import.meta.url),
   "utf8"
 );
+const ruContentSource = contentSource.slice(0, contentSource.indexOf("  en: {"));
 const stylesSource = readFileSync(
   new URL("./templates-daily-featured-page.module.css", import.meta.url),
   "utf8"
@@ -86,13 +87,35 @@ describe("templates daily featured page", () => {
       "const text = useMemo(() => getTemplatesDailyFeaturedPageText(locale), [locale]);"
     );
     expect(contentSource).toContain('date: "Период"');
-    expect(contentSource).toContain('formAdminOnly: "Для изменений нужна роль Admin."');
+    expect(contentSource).toContain('formAdminOnly: "Для изменений нужна роль администратора."');
+    expect(contentSource).toContain('activeTemplatesOnly: "Статус: активные"');
+    expect(contentSource).toContain('autoMode: "Авторежим"');
+    expect(contentSource).toContain('free: "Бесплатно"');
+    expect(ruContentSource).not.toContain("Template of the Day: ручные");
+    expect(ruContentSource).not.toContain("fallback-выбором");
+    expect(ruContentSource).not.toContain("daily job");
     expect(pageSource).not.toContain('const isRu = locale === "ru";');
     expect(pageSource).not.toContain("Stable auto fallback uses active templates.");
     expect(pageSource).not.toContain("Search active templates");
     expect(pageSource).not.toContain("Admin role required.");
     expect(pageSource).not.toContain("<th>Date</th>");
     expect(pageSource).not.toContain("<th>Actions</th>");
+  });
+
+  it("formats daily featured date ranges with the active admin locale", () => {
+    expect(contentSource).toContain('intlLocale: "ru-RU"');
+    expect(contentSource).toContain('intlLocale: "en-US"');
+    expect(pageSource).toContain("getTemplatesDailyFeaturedPageIntlLocale(locale)");
+    expect(pageSource).toContain("formatDateRange(assignment, locale)");
+    expect(pageSource).toContain("Date.UTC(year, month - 1, day)");
+    expect(pageSource).toContain('timeZone: "UTC"');
+    expect(pageSource).toContain(
+      "<CurrentAssignmentCard current={current} text={text} locale={locale} />"
+    );
+    expect(pageSource).toContain("locale={locale}\n        schedule={schedule}");
+    expect(pageSource).not.toContain("`${assignment.startDate} - ${assignment.endDate}`");
+    expect(pageSource).not.toContain("{formatDateRange(assignment)}</td>");
+    expect(pageSource).not.toContain("{formatDateRange(assignment)} ·");
   });
 
   it("keeps daily featured schedule data partially recoverable when one request fails", () => {
@@ -193,6 +216,7 @@ describe("templates daily featured page", () => {
     expect(pageSource).toContain("dateOccupiedWarning");
     expect(pageSource).toContain("assignment.isManual");
     expect(pageSource).toContain("isManual: true");
+    expect(contentSource).toContain("Версия v1 поддерживает одно ручное назначение на дату.");
     expect(contentSource).toContain("v1 supports one manual assignment per date.");
   });
 

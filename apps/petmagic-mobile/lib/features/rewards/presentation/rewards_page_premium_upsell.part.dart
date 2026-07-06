@@ -8,7 +8,9 @@ class _RewardsPremiumUpsellCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
     final isLight = Theme.of(context).brightness == Brightness.light;
+    final accent = colors.gold;
 
     return Material(
       color: Colors.transparent,
@@ -22,9 +24,7 @@ class _RewardsPremiumUpsellCard extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: const Color(
-                  0xFFE0A91E,
-                ).withValues(alpha: isLight ? 0.78 : 0.88),
+                color: accent.withValues(alpha: isLight ? 0.78 : 0.88),
                 width: 1.15,
               ),
               gradient: LinearGradient(
@@ -35,8 +35,8 @@ class _RewardsPremiumUpsellCard extends StatelessWidget {
               boxShadow: [
                 BoxShadow(
                   color: isLight
-                      ? const Color(0xFFD7B35D).withValues(alpha: 0.25)
-                      : const Color(0xFF02070F).withValues(alpha: 0.55),
+                      ? accent.withValues(alpha: 0.25)
+                      : colors.shadow.withValues(alpha: 0.55),
                   blurRadius: isLight ? 12 : 18,
                   offset: const Offset(0, 8),
                 ),
@@ -87,13 +87,13 @@ class _RewardsPremiumUpsellCard extends StatelessWidget {
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(999),
                             border: Border.all(
-                              color: const Color(
-                                0xFFE0A91E,
-                              ).withValues(alpha: isLight ? 0.7 : 0.8),
+                              color: accent.withValues(
+                                alpha: isLight ? 0.7 : 0.8,
+                              ),
                             ),
-                            color: const Color(
-                              0xFF201300,
-                            ).withValues(alpha: isLight ? 0.08 : 0.24),
+                            color: accent.withValues(
+                              alpha: isLight ? 0.08 : 0.18,
+                            ),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -103,7 +103,11 @@ class _RewardsPremiumUpsellCard extends StatelessWidget {
                               Text(
                                 text.premiumLabel,
                                 style: TextStyle(
-                                  color: const Color(0xFFEABA47),
+                                  color: isLight
+                                      ? colors.on(
+                                          accent.withValues(alpha: 0.08),
+                                        )
+                                      : accent,
                                   fontSize: 10,
                                   fontWeight: FontWeight.w800,
                                 ),
@@ -117,9 +121,7 @@ class _RewardsPremiumUpsellCard extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: isLight
-                                ? const Color(0xFF1E1608)
-                                : const Color(0xFFEABF55),
+                            color: isLight ? colors.textStrong : accent,
                             fontSize: 17,
                             fontWeight: FontWeight.w900,
                           ),
@@ -130,9 +132,7 @@ class _RewardsPremiumUpsellCard extends StatelessWidget {
                           maxLines: 3,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: isLight
-                                ? const Color(0xFF3B3324)
-                                : const Color(0xFFE3DFD2),
+                            color: colors.textSoft,
                             fontSize: 11,
                             height: 1.25,
                             fontWeight: FontWeight.w500,

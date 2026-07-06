@@ -32,6 +32,10 @@ try {
   await assertSnapshotComparisonMatchesRawSamples();
   await assertSnapshotChronologyIsRequired();
   await assertSnapshotLabelsAreRequired();
+  await assertLocalPrometheusSnapshotEvidenceFails();
+  await assertLocalFeedLoadProbeEvidenceFails();
+  await assertOrdinaryDeviceLongScrollEvidenceFails();
+  await assertPromoterStyleDeviceMetadataPasses();
   console.log('template feed TZ1-8 evidence validator self-test passed');
 } catch (error) {
   console.error(error.stack || String(error));
@@ -415,13 +419,82 @@ async function assertSnapshotLabelsAreRequired() {
   assert(result.stdout.includes('[FAIL] admin.manual_qa_report_complete'), 'missing wrong-label linked admin failure');
 }
 
+async function assertLocalPrometheusSnapshotEvidenceFails() {
+  const root = createTempRepoRoot('local-prometheus-snapshot');
+  writeCommonArtifacts(root);
+  writeLatencyArtifact(root, { prometheusBaseUrl: 'http://127.0.0.1:9090' });
+  writeSseArtifact(root);
+  writeAdminQaReport(root);
+
+  const result = await runValidator(root);
+  assert(
+    result.code !== 0,
+    `local Prometheus snapshot evidence should fail, got exit 0\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+  );
+  assert(result.stdout.includes('[FAIL] staging.feed_latency_before_after_artifact'), 'missing local Prometheus latency failure');
+}
+
+async function assertLocalFeedLoadProbeEvidenceFails() {
+  const root = createTempRepoRoot('local-feed-load-probe');
+  writeCommonArtifacts(root);
+  writeLatencyArtifact(root);
+  writeSseArtifact(root);
+  writeFeedLoadProbeArtifact(root, { apiBase: 'http://localhost:5000' });
+  writeAdminQaReport(root);
+
+  const result = await runValidator(root);
+  assert(
+    result.code !== 0,
+    `local feed-load probe evidence should fail, got exit 0\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+  );
+  assert(result.stdout.includes('[FAIL] admin.manual_qa_report_complete'), 'missing local feed-load probe admin QA failure');
+}
+
+async function assertOrdinaryDeviceLongScrollEvidenceFails() {
+  const root = createTempRepoRoot('ordinary-device-long-scroll');
+  writeCommonArtifacts(root, { deviceLabel: 'ordinary device' });
+  writeLatencyArtifact(root);
+  writeSseArtifact(root);
+  writeAdminQaReport(root);
+
+  const result = await runValidator(root);
+  assert(
+    result.code !== 0,
+    `ordinary-device long-scroll evidence should fail, got exit 0\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+  );
+  assert(result.stdout.includes('[FAIL] mobile.weak_device_or_low_memory_signoff'), 'missing ordinary-device long-scroll failure');
+}
+
+async function assertPromoterStyleDeviceMetadataPasses() {
+  const root = createTempRepoRoot('promoter-style-device-metadata');
+  writeCommonArtifacts(root, {
+    deviceLabel: 'Pixel_3a_API_35 low-memory emulator',
+    deviceLinePrefix: '',
+  });
+  writeLatencyArtifact(root);
+  writeSseArtifact(root);
+  writeAdminQaReport(root);
+
+  const result = await runValidator(root);
+  assert(
+    result.code === 0,
+    `promoter-style Device metadata should pass, got exit ${result.code}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+  );
+}
+
 function createTempRepoRoot(label) {
   const root = mkdtempSync(join(tmpdir(), `template-feed-evidence-${label}-`));
   mkdirSync(join(root, 'artifacts'), { recursive: true });
   return root;
 }
 
-function writeCommonArtifacts(root) {
+function writeCommonArtifacts(
+  root,
+  {
+    deviceLabel = 'Pixel_3a_API_35 low-memory emulator',
+    deviceLinePrefix = '- ',
+  } = {}
+) {
   writeFollowupEvidence(root, 'Done');
   writeFeedLoadProbeArtifact(root);
   writeFileSync(
@@ -430,7 +503,8 @@ function writeCommonArtifacts(root) {
       '# Long scroll',
       '',
       '- memory: selected pid `15336`, 48 selected PSS samples, `plateau_likely=true`',
-      '- Weak-device release signoff: PASS',
+      `${deviceLinePrefix}Device: \`${deviceLabel}\``,
+      '- Low-memory emulator signoff: PASS',
       '- loaded items: mixed `520`, video-only `520`',
       '- active video preview average: mixed `2.0`, video-only `3.0`',
     ].join('\n')
@@ -477,6 +551,7 @@ function writeLatencyArtifact(
   {
     noMaterialRegression = true,
     runId = 'latency-run',
+    prometheusBaseUrl = 'https://prometheus.staging.example.test',
     includeMetadata = true,
     includeMeasurements = true,
     inconsistentMeasurements = false,
@@ -489,7 +564,7 @@ function writeLatencyArtifact(
   const dir = join(root, 'artifacts', 'template-feed-staging-snapshots', 'latency');
   mkdirSync(dir, { recursive: true });
   writeJson(join(dir, 'evidence.json'), {
-    ...(includeMetadata ? snapshotMetadata(runId) : {}),
+    ...(includeMetadata ? snapshotMetadata(runId, prometheusBaseUrl) : {}),
     ...(includeMetadata && reverseMetadataTimes ? reversedSnapshotMetadataTimes() : {}),
     runId,
     mode: 'latency',
@@ -532,6 +607,7 @@ function writeSseArtifact(
   {
     actionLabels = ['text_update', 'media_update', 'category_rename'],
     runId = 'sse-run',
+    prometheusBaseUrl = 'https://prometheus.staging.example.test',
     includeMetadata = true,
     includeMeasurements = true,
     inconsistentMeasurements = false,
@@ -545,7 +621,7 @@ function writeSseArtifact(
   const dir = join(root, 'artifacts', 'template-feed-staging-snapshots', 'sse');
   mkdirSync(dir, { recursive: true });
   writeJson(join(dir, 'evidence.json'), {
-    ...(includeMetadata ? snapshotMetadata(runId) : {}),
+    ...(includeMetadata ? snapshotMetadata(runId, prometheusBaseUrl) : {}),
     ...(includeMetadata && reverseMetadataTimes ? reversedSnapshotMetadataTimes() : {}),
     runId,
     mode: 'sse',
@@ -586,12 +662,12 @@ function writeSseArtifact(
   writeFileSync(join(dir, 'summary.md'), '# SSE snapshot\n\nDelta total: 0\n');
 }
 
-function snapshotMetadata(runId) {
+function snapshotMetadata(runId, prometheusBaseUrl = 'https://prometheus.staging.example.test') {
   return {
     runId,
     startedAtUtc: '2026-07-02T12:00:00.000Z',
     finishedAtUtc: '2026-07-02T12:00:05.000Z',
-    prometheusBaseUrl: 'https://prometheus.staging.example.test',
+    prometheusBaseUrl,
   };
 }
 
@@ -606,6 +682,7 @@ function writeFeedLoadProbeArtifact(
   root,
   {
     runId = 'rename-load-probe',
+    apiBase = 'https://api.staging.example.test',
     failed = 0,
     maxErrors = 0,
     reverseMetadataTimes = false,
@@ -615,9 +692,9 @@ function writeFeedLoadProbeArtifact(
   mkdirSync(dir, { recursive: true });
   writeJson(join(dir, 'evidence.json'), {
     runId,
-    apiBase: 'https://api.staging.example.test',
+    apiBase,
     path: '/api/templates/feed?take=20',
-    url: 'https://api.staging.example.test/api/templates/feed?...',
+    url: `${apiBase}/api/templates/feed?...`,
     startedAtUtc: reverseMetadataTimes ? '2026-07-02T12:03:00.000Z' : '2026-07-02T12:00:00.000Z',
     finishedAtUtc: reverseMetadataTimes ? '2026-07-02T12:00:00.000Z' : '2026-07-02T12:03:00.000Z',
     durationSeconds: 180,

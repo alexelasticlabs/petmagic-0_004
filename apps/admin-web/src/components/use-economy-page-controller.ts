@@ -191,11 +191,14 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
       eventStatus || "all"
     ),
     queryFn: ({ signal }) =>
-      fetchAdminSubscriptionEvents({
-        take: 20,
-        provider: eventProvider || undefined,
-        status: eventStatus || undefined,
-      }, signal),
+      fetchAdminSubscriptionEvents(
+        {
+          take: 20,
+          provider: eventProvider || undefined,
+          status: eventStatus || undefined,
+        },
+        signal
+      ),
     enabled: canLoadEconomy,
   });
 

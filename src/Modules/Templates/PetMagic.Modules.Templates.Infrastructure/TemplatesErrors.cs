@@ -16,7 +16,7 @@ internal static class TemplatesErrors
     public static readonly Error UpdateConflict = new("templates.update_conflict", "Template was changed while saving. Please reload and try again.");
     public static readonly Error InvalidStatus = new("templates.invalid_status", "Template status is invalid.");
     public static readonly Error InvalidGalleryCursor = new("templates.gallery_cursor_invalid", "Gallery cursor is invalid.");
-    public static readonly Error PremiumRequired = new("templates.premium_required", "Premium subscription is required for this template.");
+    public static readonly Error PremiumRequired = new("templates.premium_required", "templates.premium_required");
     public static readonly Error MissingPreview = new("templates.preview_required", "Preview asset is required before activation.");
     public static readonly Error MissingImageModel = new("templates.image_model_required", "Image model is required before activation.");
     public static readonly Error MissingReferenceMotion = new("templates.reference_motion_required", "Reference motion video is required before activation.");
@@ -48,6 +48,7 @@ internal static class TemplatesErrors
     public static readonly Error ProviderCapacityUnavailable = new("PROVIDER_CAPACITY_UNAVAILABLE", "Generation provider is temporarily unavailable. Please retry later.");
     public static readonly Error GenerationCancelDisabled = new("templates.generation_cancel_disabled", "Queued generation cancellation is disabled.");
     public static readonly Error GenerationCancelNotAllowed = new("templates.generation_cancel_not_allowed", "Only queued generations can be cancelled.");
+    public static readonly Error GenerationRetryNotAllowed = new("templates.generation_retry_not_allowed", "Only terminal charged generations that have not been refunded can be retried.");
     public static readonly Error GenerationRefundNotPending = new("templates.generation_refund_not_pending", "Generation has no pending refund to retry.");
     public static readonly Error InvalidFeedback = new("templates.invalid_feedback", "Generation feedback is invalid.");
     public static readonly Error FeedbackNotFound = new("feedback.not_found", "Feedback was not found.");

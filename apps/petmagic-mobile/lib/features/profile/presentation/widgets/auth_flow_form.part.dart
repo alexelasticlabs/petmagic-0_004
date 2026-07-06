@@ -14,20 +14,23 @@ class AuthFormCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
     final content = Container(
       width: double.infinity,
       padding: EdgeInsets.all(compact ? 12 : 16),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xB8181F26) : const Color(0xB8FFFFFF),
+        color: isDark
+            ? colors.surfaceGlass.withValues(alpha: 0.72)
+            : colors.surface.withValues(alpha: 0.72),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: isDark ? const Color(0x40789687) : const Color(0x8CB4C8BE),
+          color: colors.border.withValues(alpha: isDark ? 0.44 : 0.58),
         ),
         boxShadow: [
           BoxShadow(
             color: isDark
-                ? Colors.black.withValues(alpha: 0.35)
-                : const Color(0x1A1F2D3D),
+                ? colors.shadow.withValues(alpha: 0.35)
+                : colors.shadow.withValues(alpha: 0.18),
             blurRadius: compact ? 24 : 32,
             offset: Offset(0, compact ? 8 : 12),
           ),
@@ -112,7 +115,7 @@ class _AuthFieldState extends State<AuthField> {
     final isFocused = _focusNode.hasFocus;
     final duration = PetMotion.effectiveDuration(context, PetMotion.fast);
     final inputFill = widget.enabled
-        ? (isDark ? const Color(0xFF141C24) : const Color(0xFFFCFEFF))
+        ? (isDark ? colors.surfaceStrong : colors.surface)
         : colors.surfaceStrong.withValues(alpha: isDark ? 0.62 : 0.5);
     final iconColor = widget.enabled
         ? (isFocused ? colors.accent : colors.textSoft)
@@ -181,9 +184,7 @@ class _AuthFieldState extends State<AuthField> {
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(18),
                 borderSide: BorderSide(
-                  color: isDark
-                      ? const Color(0x665F7D70)
-                      : const Color(0xB6BAC8D2),
+                  color: colors.border.withValues(alpha: isDark ? 0.64 : 0.72),
                 ),
               ),
               focusedBorder: OutlineInputBorder(
@@ -325,7 +326,7 @@ class SocialButton extends StatelessWidget {
         foregroundColor: colors.textStrong,
         disabledForegroundColor: colors.textMuted,
         backgroundColor: isDark
-            ? const Color(0xCC111922)
+            ? colors.surfaceGlass.withValues(alpha: 0.86)
             : colors.surface.withValues(alpha: 0.92),
         disabledBackgroundColor: colors.surfaceStrong.withValues(alpha: 0.56),
         overlayColor: colors.accent.withValues(alpha: isDark ? 0.12 : 0.08),

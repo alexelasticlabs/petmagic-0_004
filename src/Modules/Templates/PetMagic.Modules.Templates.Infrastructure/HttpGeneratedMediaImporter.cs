@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
@@ -68,8 +69,12 @@ internal sealed class HttpGeneratedMediaImporter(
             return ".webm";
         }
 
-        var extension = Path.GetExtension(uri.AbsolutePath);
-        return string.IsNullOrWhiteSpace(extension) ? ".mp4" : extension;
+        if (string.Equals(contentType, "video/quicktime", StringComparison.OrdinalIgnoreCase))
+        {
+            return ".mov";
+        }
+
+        return ".mp4";
     }
 
     private static string ResolveImageExtension(string contentType, Uri uri)
@@ -84,8 +89,12 @@ internal sealed class HttpGeneratedMediaImporter(
             return ".webp";
         }
 
-        var extension = Path.GetExtension(uri.AbsolutePath);
-        return string.IsNullOrWhiteSpace(extension) ? ".png" : extension;
+        if (string.Equals(contentType, "image/gif", StringComparison.OrdinalIgnoreCase))
+        {
+            return ".gif";
+        }
+
+        return ".png";
     }
 
     private async Task<Result<StoredMediaResponse>> ImportAsync(
@@ -127,7 +136,8 @@ internal sealed class HttpGeneratedMediaImporter(
                 return Result.Failure<StoredMediaResponse>(TemplatesErrors.GeneratedMediaTooLarge);
             }
 
-            var contentType = response.Content.Headers.ContentType?.MediaType ?? defaultContentType;
+            var declaredContentType = response.Content.Headers.ContentType?.MediaType;
+            var contentType = declaredContentType ?? defaultContentType;
             if (!contentType.StartsWith(expectedContentTypePrefix, StringComparison.OrdinalIgnoreCase))
             {
                 TemplateGenerationMetrics.RecordMediaImportFailure(mediaType, "unexpected_content_type");
@@ -139,12 +149,24 @@ internal sealed class HttpGeneratedMediaImporter(
             await CopyWithLimitAsync(stream, memoryStream, maxFileSizeBytes, cancellationToken);
             memoryStream.Position = 0;
 
-            var extension = resolveExtension(contentType, uri);
-            var upload = new MediaUploadCommand($"generated-{generationId:N}{extension}", contentType, memoryStream, memoryStream.Length);
+            var detectedContentType = DetectContentType(memoryStream.GetBuffer().AsSpan(0, (int)memoryStream.Length));
+            if (detectedContentType is null
+                || !detectedContentType.StartsWith(expectedContentTypePrefix, StringComparison.OrdinalIgnoreCase)
+                || !MatchesDeclaredContentType(detectedContentType, declaredContentType))
+            {
+                TemplateGenerationMetrics.RecordMediaImportFailure(mediaType, "content_type_mismatch");
+                return Result.Failure<StoredMediaResponse>(TemplatesErrors.GeneratedMediaImportFailed);
+            }
+
+            memoryStream.Position = 0;
+            var extension = resolveExtension(detectedContentType, uri);
+            var upload = new MediaUploadCommand($"generated-{generationId:N}{extension}", detectedContentType, memoryStream, memoryStream.Length);
             var storeResult = await mediaStorage.StoreAsync(upload, cancellationToken);
             if (storeResult.IsFailure)
             {
-                TemplateGenerationMetrics.RecordMediaImportFailure(mediaType, storeResult.Error.Code);
+                var safeErrorCode = SafeStorageErrorCode(storeResult.Error.Code);
+                TemplateGenerationMetrics.RecordMediaImportFailure(mediaType, safeErrorCode);
+                return Result.Failure<StoredMediaResponse>(new Error(safeErrorCode, TemplatesErrors.MediaStorageFailed.Message));
             }
 
             return storeResult;
@@ -162,9 +184,9 @@ internal sealed class HttpGeneratedMediaImporter(
         {
             TemplateGenerationMetrics.RecordMediaImportFailure(mediaType, "exception");
             logger.LogWarning(
-                exception,
-                "Generated template media import failed. GenerationId={GenerationId}",
-                generationId);
+                "Generated template media import failed. GenerationIdHash={GenerationIdHash} ExceptionType={ExceptionType}",
+                TemplateLogSanitizer.SafeId(generationId),
+                SafeLogValues.ExceptionType(exception));
             return Result.Failure<StoredMediaResponse>(TemplatesErrors.GeneratedMediaImportFailed);
         }
     }
@@ -178,10 +200,153 @@ internal sealed class HttpGeneratedMediaImporter(
             && string.IsNullOrWhiteSpace(uri.UserInfo);
     }
 
+    private static bool MatchesDeclaredContentType(string detectedContentType, string? declaredContentType)
+    {
+        if (string.IsNullOrWhiteSpace(declaredContentType))
+        {
+            return true;
+        }
+
+        var normalizedDeclared = NormalizeContentType(declaredContentType);
+        if (string.IsNullOrWhiteSpace(normalizedDeclared)
+            || string.Equals(normalizedDeclared, "application/octet-stream", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return string.Equals(detectedContentType, normalizedDeclared, StringComparison.OrdinalIgnoreCase)
+            || (string.Equals(detectedContentType, "image/jpeg", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(normalizedDeclared, "image/jpg", StringComparison.OrdinalIgnoreCase))
+            || (string.Equals(detectedContentType, "video/mp4", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(normalizedDeclared, "application/mp4", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string NormalizeContentType(string contentType)
+    {
+        var semicolonIndex = contentType.IndexOf(';');
+        var normalized = semicolonIndex >= 0 ? contentType[..semicolonIndex] : contentType;
+        return normalized.Trim().ToLowerInvariant();
+    }
+
+    private static string? DetectContentType(ReadOnlySpan<byte> payload)
+    {
+        var header = payload[..Math.Min(payload.Length, 32)];
+        if (header.Length >= 3
+            && header[0] == 0xFF
+            && header[1] == 0xD8
+            && header[2] == 0xFF)
+        {
+            return "image/jpeg";
+        }
+
+        if (header.Length >= 8
+            && header[0] == 0x89
+            && header[1] == 0x50
+            && header[2] == 0x4E
+            && header[3] == 0x47
+            && header[4] == 0x0D
+            && header[5] == 0x0A
+            && header[6] == 0x1A
+            && header[7] == 0x0A)
+        {
+            return "image/png";
+        }
+
+        if (header.Length >= 12
+            && header[0] == 0x52
+            && header[1] == 0x49
+            && header[2] == 0x46
+            && header[3] == 0x46
+            && header[8] == 0x57
+            && header[9] == 0x45
+            && header[10] == 0x42
+            && header[11] == 0x50)
+        {
+            return "image/webp";
+        }
+
+        if (header.Length >= 6
+            && header[0] == 0x47
+            && header[1] == 0x49
+            && header[2] == 0x46
+            && header[3] == 0x38
+            && (header[4] == 0x37 || header[4] == 0x39)
+            && header[5] == 0x61)
+        {
+            return "image/gif";
+        }
+
+        if (TryReadIsoBmffBrand(header, out var brand))
+        {
+            if (string.Equals(brand, "qt  ", StringComparison.OrdinalIgnoreCase))
+            {
+                return "video/quicktime";
+            }
+
+            if (IsSupportedMp4Brand(brand))
+            {
+                return "video/mp4";
+            }
+        }
+
+        if (header.Length >= 4
+            && header[0] == 0x1A
+            && header[1] == 0x45
+            && header[2] == 0xDF
+            && header[3] == 0xA3)
+        {
+            return "video/webm";
+        }
+
+        return null;
+    }
+
+    private static bool TryReadIsoBmffBrand(ReadOnlySpan<byte> header, out string brand)
+    {
+        brand = string.Empty;
+        if (header.Length < 12
+            || header[4] != 0x66
+            || header[5] != 0x74
+            || header[6] != 0x79
+            || header[7] != 0x70)
+        {
+            return false;
+        }
+
+        brand = string.Create(4, header, static (chars, bytes) =>
+        {
+            for (var i = 0; i < chars.Length; i++)
+            {
+                chars[i] = (char)bytes[8 + i];
+            }
+        });
+        return true;
+    }
+
+    private static bool IsSupportedMp4Brand(string brand)
+    {
+        return string.Equals(brand, "mp41", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(brand, "mp42", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(brand, "isom", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(brand, "iso2", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(brand, "avc1", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(brand, "m4v ", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(brand, "m4a ", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string ResolveMetricsMediaType(string expectedContentTypePrefix)
     {
         return expectedContentTypePrefix.StartsWith("video/", StringComparison.OrdinalIgnoreCase)
             ? TemplateGenerationQueue.MediaTypeVideo
             : TemplateGenerationQueue.MediaTypeImage;
+    }
+
+    private static string SafeStorageErrorCode(string? code)
+    {
+        var trimmed = code?.Trim();
+        var sanitized = AdminFailureMessageSanitizer.SanitizeCode(trimmed);
+        return string.Equals(trimmed, sanitized, StringComparison.Ordinal)
+            ? sanitized ?? TemplatesErrors.MediaStorageFailed.Code
+            : TemplatesErrors.MediaStorageFailed.Code;
     }
 }

@@ -263,7 +263,7 @@ class AuthWordmark extends StatelessWidget {
             fontSize: compact ? 20 : 24,
             fontWeight: FontWeight.w700,
             letterSpacing: 0,
-            color: isDark ? colors.textStrong : const Color(0xFF10234A),
+            color: colors.textStrong,
           ),
         ),
       ],

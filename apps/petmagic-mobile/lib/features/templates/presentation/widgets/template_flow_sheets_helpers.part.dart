@@ -36,8 +36,12 @@ String _generationErrorText(AppLocalizations text, String raw) {
   }
 
   return switch (normalizeTemplateErrorKey(raw)) {
+    'templates.premium_required' => text.templateFlowPremiumRequiredError,
     'templates.insufficient_balance' =>
       text.templateFlowInsufficientBalanceError,
+    'templates.generation_already_started' =>
+      text.templateFlowActiveGenerationLimitError,
+    'templates.generation_wait_too_long' => text.templateFlowServerError,
     'templates.template_unavailable' =>
       text.templateFlowTemplateUnavailableError,
     'templates.template_changed' => text.templateFlowTemplateChangedError,

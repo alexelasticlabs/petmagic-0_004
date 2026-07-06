@@ -730,6 +730,7 @@ function writeLongScrollArtifact(path) {
     [
       '# Long scroll',
       '',
+      '- Device: `Pixel_3a_API_35 low-memory emulator`',
       '- memory: selected pid `15336`, 48 selected PSS samples, `plateau_likely=true`',
       '- Low-memory emulator signoff: PASS',
       '- loaded items: mixed `520`, video-only `520`',

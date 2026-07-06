@@ -80,17 +80,29 @@ describe("template form numeric hardening", () => {
     expect(TEMPLATE_PROMPT_MAX_LENGTH).toBe(1000);
     expect(source).toContain("title: normalizeTemplateText(form.title, TEMPLATE_TITLE_MAX_LENGTH)");
     expect(source).toContain("TEMPLATE_SHORT_DESCRIPTION_MAX_LENGTH");
-    expect(source).toContain("category: normalizeTemplateText(form.category, TEMPLATE_CATEGORY_MAX_LENGTH)");
-    expect(source).toContain("imageModel: normalizeTemplateText(form.imageModel, TEMPLATE_MODEL_MAX_LENGTH)");
-    expect(source).toContain("imagePrompt: normalizeTemplateText(form.imagePrompt, TEMPLATE_PROMPT_MAX_LENGTH)");
+    expect(source).toContain(
+      "category: normalizeTemplateText(form.category, TEMPLATE_CATEGORY_MAX_LENGTH)"
+    );
+    expect(source).toContain(
+      "imageModel: normalizeTemplateText(form.imageModel, TEMPLATE_MODEL_MAX_LENGTH)"
+    );
+    expect(source).toContain(
+      "imagePrompt: normalizeTemplateText(form.imagePrompt, TEMPLATE_PROMPT_MAX_LENGTH)"
+    );
     expect(source).toContain("preprocessingPrompt: normalizeTemplateText(");
     expect(source).toContain("form.preprocessingPrompt");
-    expect(source).toContain("klingPrompt: normalizeTemplateText(form.klingPrompt, TEMPLATE_PROMPT_MAX_LENGTH)");
+    expect(source).toContain(
+      "klingPrompt: normalizeTemplateText(form.klingPrompt, TEMPLATE_PROMPT_MAX_LENGTH)"
+    );
     expect(source).toContain("normalizeTemplateText(tag, TEMPLATE_TAG_MAX_LENGTH)");
     expect(source).toContain(".slice(0, TEMPLATE_TAG_MAX_COUNT)");
     expect(source).toContain("normalizeTemplateText(fileName, TEMPLATE_ASSET_METADATA_MAX_LENGTH)");
-    expect(source).toContain("normalizeTemplateText(contentType, TEMPLATE_ASSET_CONTENT_TYPE_MAX_LENGTH)");
-    expect(source).toContain("normalizeTemplateText(inferFileName(url), TEMPLATE_ASSET_METADATA_MAX_LENGTH)");
+    expect(source).toContain(
+      "normalizeTemplateText(contentType, TEMPLATE_ASSET_CONTENT_TYPE_MAX_LENGTH)"
+    );
+    expect(source).toContain(
+      "normalizeTemplateText(inferFileName(url), TEMPLATE_ASSET_METADATA_MAX_LENGTH)"
+    );
     expect(source).toContain("value > 0 ? value : undefined");
     expect(source).not.toContain("title: form.title");
     expect(source).not.toContain("imagePrompt: form.imagePrompt");
@@ -166,7 +178,9 @@ describe("template form numeric hardening", () => {
     expect(basicFieldsSource).not.toContain(">Generation result input<");
     expect(basicFieldsSource).not.toContain(">Supported<");
     expect(basicFieldsSource).not.toContain(">Not supported<");
-    expect(basicFieldsSource).not.toContain("Allows completed generation results to start this template.");
+    expect(basicFieldsSource).not.toContain(
+      "Allows completed generation results to start this template."
+    );
     expect(basicFieldsSource).not.toContain(">Recommended<");
     expect(basicFieldsSource).not.toContain(">Not recommended<");
     expect(basicFieldsSource).not.toContain("Prioritizes this template after image generation.");
@@ -175,7 +189,64 @@ describe("template form numeric hardening", () => {
     expect(basicFieldsSource).not.toContain('label: "Image"');
     expect(basicFieldsSource).not.toContain('label: "Video"');
     expect(basicFieldsSource).not.toContain('description: "Completed image result"');
-    expect(basicFieldsSource).not.toContain('description: "Reserved for future video-result input"');
+    expect(basicFieldsSource).not.toContain(
+      'description: "Reserved for future video-result input"'
+    );
+  });
+
+  it("keeps template editor promo badge options localized", () => {
+    const basicFieldsSource = readFileSync(basicFieldsPath, "utf8");
+
+    expect(basicFieldsSource).toContain("text.promoBadgeAutoLabel");
+    expect(basicFieldsSource).toContain("text.promoBadgeAutoHint");
+    expect(basicFieldsSource).toContain("text.promoBadgeAutoBadge");
+    expect(basicFieldsSource).toContain("text.promoBadgeNewLabel");
+    expect(basicFieldsSource).toContain("text.promoBadgeNewBadge");
+    expect(basicFieldsSource).toContain("text.promoBadgeTrendingLabel");
+    expect(basicFieldsSource).toContain("text.promoBadgeTrendingBadge");
+    expect(basicFieldsSource).toContain("text.promoBadgePopularLabel");
+    expect(basicFieldsSource).toContain("text.promoBadgePopularBadge");
+    expect(basicFieldsSource).toContain("text.promoBadgeFunnyLabel");
+    expect(basicFieldsSource).toContain("text.promoBadgeFunnyBadge");
+    expect(basicFieldsSource).not.toContain('label: "NEW"');
+    expect(basicFieldsSource).not.toContain('label: "TRENDING"');
+    expect(basicFieldsSource).not.toContain('label: "POPULAR"');
+    expect(basicFieldsSource).not.toContain('label: "FUNNY"');
+    expect(basicFieldsSource).not.toContain('badge: "Fresh"');
+    expect(basicFieldsSource).not.toContain('badge: "Hot"');
+    expect(basicFieldsSource).not.toContain('badge: "Core"');
+    expect(basicFieldsSource).not.toContain('badge: "Mood"');
+  });
+
+  it("keeps template editor model card captions localized", () => {
+    const editorSectionsSource = readFileSync(editorSectionsPath, "utf8");
+
+    expect(editorSectionsSource).toContain("text.preprocessingModelEyebrow");
+    expect(editorSectionsSource).toContain("text.klingModelEyebrow");
+    expect(editorSectionsSource).toContain("text.imageModelEyebrow");
+    expect(editorSectionsSource).toContain("text.motionModelPremiumDescription");
+    expect(editorSectionsSource).toContain("text.motionModelFastDescription");
+    expect(editorSectionsSource).toContain("text.imageModelRecommendedDescription");
+    expect(editorSectionsSource).toContain("text.imageModelPremiumDescription");
+    expect(editorSectionsSource).toContain("text.imageModelFastDescription");
+    expect(editorSectionsSource).toContain("text.modelBadgeRecommended");
+    expect(editorSectionsSource).toContain("text.modelBadgePremium");
+    expect(editorSectionsSource).toContain("text.modelBadgeFast");
+    expect(editorSectionsSource).not.toContain(">Input shaping<");
+    expect(editorSectionsSource).not.toContain(">Motion pass<");
+    expect(editorSectionsSource).not.toContain(">Image pass<");
+    expect(editorSectionsSource).not.toContain("Motion control for highest-fidelity generation.");
+    expect(editorSectionsSource).not.toContain("Motion control tuned for quicker iteration.");
+    expect(editorSectionsSource).not.toContain(
+      "Image edit pass for balanced fidelity and consistency."
+    );
+    expect(editorSectionsSource).not.toContain(
+      "Image edit pass focused on premium detail retention."
+    );
+    expect(editorSectionsSource).not.toContain("Image edit pass optimized for faster turnaround.");
+    expect(editorSectionsSource).not.toContain('badge: "Recommended"');
+    expect(editorSectionsSource).not.toContain('badge: "Premium"');
+    expect(editorSectionsSource).not.toContain('badge: "Fast"');
   });
 
   it("keeps template editor action logs sanitized", () => {
@@ -189,7 +260,9 @@ describe("template form numeric hardening", () => {
     expect(controllerSource).toContain("fileSizeBytes: file.size");
     expect(controllerSource).toContain("contentType: sanitizeSensitiveText(file.type, 80)");
     expect(controllerSource).toContain("...getTemplateEditorErrorDetails(error)");
-    expect(controllerSource).not.toContain("initialTemplateId,\n          templateType,\n          error");
+    expect(controllerSource).not.toContain(
+      "initialTemplateId,\n          templateType,\n          error"
+    );
     expect(controllerSource).not.toContain("fileName:");
     expect(controllerSource).not.toContain("contentType: file.type,\n        error");
   });
@@ -199,13 +272,15 @@ describe("template form numeric hardening", () => {
 
     expect(controllerSource).toContain("function getActivationReadinessError(");
     expect(controllerSource).toContain('if (targetStatus !== "Active")');
-    expect(controllerSource).toContain("const activationReadinessError = getActivationReadinessError(");
+    expect(controllerSource).toContain(
+      "const activationReadinessError = getActivationReadinessError("
+    );
     expect(controllerSource).toContain(
       'if (activationReadinessError) {\n        setToast({ type: "error", message: activationReadinessError });\n        return;\n      }'
     );
-    expect(controllerSource.indexOf("const activationReadinessError = getActivationReadinessError(")).toBeLessThan(
-      controllerSource.indexOf("await saveTemplateMutation.mutateAsync")
-    );
+    expect(
+      controllerSource.indexOf("const activationReadinessError = getActivationReadinessError(")
+    ).toBeLessThan(controllerSource.indexOf("await saveTemplateMutation.mutateAsync"));
     expect(controllerSource).toContain("missingLabels.push(text.previewAssetTitle)");
     expect(controllerSource).toContain("missingLabels.push(text.petPhotoRequirementsLabel)");
     expect(controllerSource).toContain("missingLabels.push(text.referenceMotionTitle)");
@@ -213,7 +288,7 @@ describe("template form numeric hardening", () => {
     expect(controllerSource).toContain("missingLabels.push(text.imageModelLabel)");
     expect(controllerSource).toContain("missingLabels.push(text.imagePromptLabel)");
     expect(controllerSource).toContain(
-      "return `${text.activationRequirementsMissing} ${missingLabels.join(\", \")}.`;"
+      'return `${text.activationRequirementsMissing} ${missingLabels.join(", ")}.`;'
     );
   });
 });
@@ -233,12 +308,18 @@ describe("template media asset payload hardening", () => {
     expect(formFromTemplate.referenceUrlSource).toBe("persisted");
   });
 
-  it("preserves persisted template media in save payload builders", () => {
+  it("keeps persisted template media out of save payload asset objects", () => {
     const source = readFileSync(formMappersPath, "utf8");
 
     expect(source).toContain("function buildTemplateAsset(");
-    expect(source).toContain('if (source === "none") {');
+    expect(source).toContain('if (source === "none" || source === "persisted") {');
     expect(source).toContain("return undefined;");
+    expect(source).toContain(
+      'const keepPreviewAsset = Boolean(templateId && form.previewUrlSource === "persisted");'
+    );
+    expect(source).toContain('templateId && form.referenceUrlSource === "persisted"');
+    expect(source).toContain("...(keepPreviewAsset ? { keepPreviewAsset } : {})");
+    expect(source).toContain("...(keepReferenceMotionAsset ? { keepReferenceMotionAsset } : {})");
     expect(source).toContain("const previewAsset = buildTemplateAsset(");
     expect(source).toContain("previewAsset,");
     expect(source).toContain("thumbnailAsset: previewAsset");

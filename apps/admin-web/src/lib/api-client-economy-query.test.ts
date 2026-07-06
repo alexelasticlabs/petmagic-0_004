@@ -279,9 +279,7 @@ describe("api-client.economy query normalization", () => {
     expect(source).toContain("AdminRedeemCodesPage,");
     expect(source).toContain("): Promise<AdminRedeemCodesPage>");
     expect(source).toContain("apiRequest<AdminRedeemCodesPage>");
-    expect(source).not.toContain(
-      "): Promise<OffsetPagedResponse<AdminRedeemCode>>"
-    );
+    expect(source).not.toContain("): Promise<OffsetPagedResponse<AdminRedeemCode>>");
   });
 
   it("encodes economy ids before placing them in API path segments", async () => {
@@ -367,7 +365,7 @@ describe("api-client.economy query normalization", () => {
 
     expect(source).toContain("fetchAdminEconomyLedger(");
     expect(source).toContain("signal?: AbortSignal");
-    expect(source).toContain("{ method: \"GET\", signal }");
+    expect(source).toContain('{ method: "GET", signal }');
     expect(source).toContain("fetchAdminSubscriptionPlans(\n  signal?: AbortSignal");
     expect(source).toContain("fetchAdminPaymentProviderConfigs(\n  signal?: AbortSignal");
     expect(source).toContain("fetchAdminSubscriptionEvents(");
@@ -386,14 +384,15 @@ describe("api-client.economy query normalization", () => {
     expect(source).toContain("setLedgerPage(0);");
     expect(source).toContain("const ledgerQueryParams = useMemo(");
     expect(source).toContain("setPurchaseSearch(value.slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH));");
-    expect(source).toContain("setSubscriptionSearch(value.slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH));");
+    expect(source).toContain(
+      "setSubscriptionSearch(value.slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH));"
+    );
     expect(source).toContain("queryFn: ({ signal }) =>");
     expect(source).toContain("queryKey: adminQueryKeys.economyLedger(ledgerQueryParams),");
     expect(source).toContain("fetchAdminEconomyLedger(ledgerQueryParams, signal)");
     expect(source).toContain("fetchAdminSubscriptionPlans(signal)");
     expect(source).toContain("fetchAdminPaymentProviderConfigs(signal)");
-    expect(source).toContain("fetchAdminSubscriptionEvents({");
-    expect(source).toContain("}, signal)");
+    expect(source).toMatch(/fetchAdminSubscriptionEvents\(\s*\{[\s\S]*?\},\s*signal\s*\)/);
     expect(source).toContain("fetchAdminCurrencyPacks(signal)");
     expect(source).toContain("fetchAdminEconomyDashboardMetrics(signal)");
     expect(source).toContain("adminQueryKeys.economyDashboardMetrics");
@@ -407,10 +406,18 @@ describe("api-client.economy query normalization", () => {
   it("sources economy premium KPIs from backend aggregate metrics", () => {
     const source = readFileSync(economyControllerPath, "utf8");
 
-    expect(source).toContain("const activeSubscriptions = economyDashboardMetricsQuery.data?.activeSubscriptions ?? 0;");
-    expect(source).toContain("const renewalStops = economyDashboardMetricsQuery.data?.renewalStops ?? 0;");
-    expect(source).not.toContain('subscriptionItems.filter((item) => item.status === "active").length');
-    expect(source).not.toContain("subscriptionItems.filter((item) => item.cancelAtPeriodEnd).length");
+    expect(source).toContain(
+      "const activeSubscriptions = economyDashboardMetricsQuery.data?.activeSubscriptions ?? 0;"
+    );
+    expect(source).toContain(
+      "const renewalStops = economyDashboardMetricsQuery.data?.renewalStops ?? 0;"
+    );
+    expect(source).not.toContain(
+      'subscriptionItems.filter((item) => item.status === "active").length'
+    );
+    expect(source).not.toContain(
+      "subscriptionItems.filter((item) => item.cancelAtPeriodEnd).length"
+    );
   });
 
   it("sources economy revenue KPI from backend aggregate metrics", () => {
@@ -420,18 +427,30 @@ describe("api-client.economy query normalization", () => {
       "utf8"
     );
 
-    expect(controllerSource).toContain("const grossRevenue = economyDashboardMetricsQuery.data?.revenueThisWeek ?? 0;");
-    expect(controllerSource).toContain("const revenueCurrencyCode = economyDashboardMetricsQuery.data?.currencyCode ?? \"USD\";");
-    expect(pageSource).toContain("formatCurrency(metrics.grossRevenue, locale, metrics.revenueCurrencyCode)");
-    expect(controllerSource).not.toContain("purchaseItems.reduce((sum, item) => sum + item.priceAmount, 0)");
+    expect(controllerSource).toContain(
+      "const grossRevenue = economyDashboardMetricsQuery.data?.revenueThisWeek ?? 0;"
+    );
+    expect(controllerSource).toContain(
+      'const revenueCurrencyCode = economyDashboardMetricsQuery.data?.currencyCode ?? "USD";'
+    );
+    expect(pageSource).toContain(
+      "formatCurrency(metrics.grossRevenue, locale, metrics.revenueCurrencyCode)"
+    );
+    expect(controllerSource).not.toContain(
+      "purchaseItems.reduce((sum, item) => sum + item.priceAmount, 0)"
+    );
     expect(pageSource).not.toContain('purchaseItems[0]?.currencyCode ?? "USD"');
   });
 
   it("sources economy wallet flow KPIs from backend aggregate metrics", () => {
     const source = readFileSync(economyControllerPath, "utf8");
 
-    expect(source).toContain("const credited = economyDashboardMetricsQuery.data?.totalWalletCredits ?? 0;");
-    expect(source).toContain("const debited = economyDashboardMetricsQuery.data?.totalWalletDebits ?? 0;");
+    expect(source).toContain(
+      "const credited = economyDashboardMetricsQuery.data?.totalWalletCredits ?? 0;"
+    );
+    expect(source).toContain(
+      "const debited = economyDashboardMetricsQuery.data?.totalWalletDebits ?? 0;"
+    );
     expect(source).not.toContain("ledgerItems\n      .filter((item) => item.delta > 0)");
     expect(source).not.toContain("ledgerItems\n      .filter((item) => item.delta < 0)");
     expect(source).not.toContain("reduce((sum, item) => sum + item.delta, 0)");

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.SupportChat.Application.Contracts;
 using PetMagic.Modules.SupportChat.Domain.Enums;
@@ -96,9 +97,7 @@ public sealed partial class SupportChatService
             case SupportAttachmentUploadStatus.Failed:
                 message.AttachmentUrl = null;
                 message.AttachmentFileSizeBytes = null;
-                message.AttachmentUploadErrorCode = string.IsNullOrWhiteSpace(command.AttachmentUploadErrorCode)
-                    ? SupportChatErrors.AttachmentStorageFailed.Code
-                    : command.AttachmentUploadErrorCode;
+                message.AttachmentUploadErrorCode = SafeAttachmentUploadErrorCode(command.AttachmentUploadErrorCode);
                 await ReplaceMessageAttachmentsAsync(message.Id, [], cancellationToken);
                 break;
 
@@ -199,5 +198,19 @@ public sealed partial class SupportChatService
         {
             await attachmentStorage.DeleteAsync(removedUrl, cancellationToken);
         }
+    }
+
+    private static string SafeAttachmentUploadErrorCode(string? code)
+    {
+        var trimmed = code?.Trim();
+        if (string.IsNullOrWhiteSpace(trimmed))
+        {
+            return SupportChatErrors.AttachmentStorageFailed.Code;
+        }
+
+        var sanitized = SafeLogValues.SanitizeText(trimmed, 128);
+        return string.Equals(trimmed, sanitized, StringComparison.Ordinal)
+            ? sanitized
+            : SupportChatErrors.AttachmentStorageFailed.Code;
     }
 }

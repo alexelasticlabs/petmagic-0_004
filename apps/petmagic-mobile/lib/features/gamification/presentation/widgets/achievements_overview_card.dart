@@ -22,20 +22,21 @@ class AchievementsOverviewCard extends StatelessWidget {
     final colors = context.petMagicColors;
     final text = AppLocalizations.of(context);
     final progress = total > 0 ? unlocked / total : 0.0;
+    final progressColor = colors.gold;
 
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: const Color(0xFFFFD54F).withValues(alpha: 0.24),
+          color: progressColor.withValues(alpha: 0.24),
           width: 1.1,
         ),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            const Color(0xFFFFD54F).withValues(alpha: 0.12),
+            progressColor.withValues(alpha: 0.12),
             colors.surfaceStrong.withValues(alpha: 0.98),
           ],
         ),
@@ -76,8 +77,8 @@ class AchievementsOverviewCard extends StatelessWidget {
               ),
               Text(
                 '${(progress * 100).round()}%',
-                style: const TextStyle(
-                  color: Color(0xFFFFB300),
+                style: TextStyle(
+                  color: progressColor,
                   fontSize: 18,
                   fontWeight: FontWeight.w900,
                 ),
@@ -91,9 +92,7 @@ class AchievementsOverviewCard extends StatelessWidget {
               value: progress,
               minHeight: 10,
               backgroundColor: colors.surface.withValues(alpha: 0.8),
-              valueColor: const AlwaysStoppedAnimation<Color>(
-                Color(0xFFFFC107),
-              ),
+              valueColor: AlwaysStoppedAnimation<Color>(progressColor),
             ),
           ),
           const SizedBox(height: 16),

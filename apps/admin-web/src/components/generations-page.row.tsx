@@ -140,8 +140,14 @@ export function GenerationRow({
   locale,
   text,
   onGrantClean,
+  onCancelGeneration,
+  onRetryGeneration,
   grantingGenerationId,
   grantCleanPending,
+  cancellingGenerationId,
+  cancelGenerationPending,
+  retryingGenerationId,
+  retryGenerationPending,
   isExpanded,
   onToggleDetails,
 }: {
@@ -149,8 +155,14 @@ export function GenerationRow({
   locale: Locale;
   text: GenerationsPageText;
   onGrantClean: (generationId: string) => void;
+  onCancelGeneration: (generationId: string) => void;
+  onRetryGeneration: (generationId: string) => void;
   grantingGenerationId: string | null;
   grantCleanPending: boolean;
+  cancellingGenerationId: string | null;
+  cancelGenerationPending: boolean;
+  retryingGenerationId: string | null;
+  retryGenerationPending: boolean;
   isExpanded: boolean;
   onToggleDetails: (generationId: string) => void;
 }) {
@@ -164,6 +176,8 @@ export function GenerationRow({
   const detailsPanelId = `generation-details-${item.generationId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
   const toggleDetailsLabel = `${isExpanded ? text.hideDetails : text.showDetails}: ${generationIdText}`;
   const grantCleanLabel = `${text.grantClean}: ${generationIdText}`;
+  const cancelGenerationLabel = `${text.cancelGeneration}: ${generationIdText}`;
+  const retryGenerationLabel = `${text.retryGeneration}: ${generationIdText}`;
   const parentTitle = item.parentTemplateTitle
     ? sanitizeSensitiveText(item.parentTemplateTitle, 48)
     : item.similarToGenerationId
@@ -176,7 +190,7 @@ export function GenerationRow({
         }`
       : ""
   }`;
-  const debugText =
+  const lineageMetadataText =
     item.generationMode === "similar"
       ? [
           item.variationStrength
@@ -236,6 +250,34 @@ export function GenerationRow({
             >
               {isExpanded ? text.hideDetails : text.showDetails}
             </button>
+            {item.canCancel ? (
+              <button
+                type="button"
+                className={styles.inlineAction}
+                disabled={cancelGenerationPending}
+                onClick={() => onCancelGeneration(item.generationId)}
+                aria-label={cancelGenerationLabel}
+                title={cancelGenerationLabel}
+              >
+                {cancellingGenerationId === item.generationId
+                  ? text.cancellingGeneration
+                  : text.cancelGeneration}
+              </button>
+            ) : null}
+            {item.canRetry ? (
+              <button
+                type="button"
+                className={styles.inlineAction}
+                disabled={retryGenerationPending}
+                onClick={() => onRetryGeneration(item.generationId)}
+                aria-label={retryGenerationLabel}
+                title={retryGenerationLabel}
+              >
+                {retryingGenerationId === item.generationId
+                  ? text.retryingGeneration
+                  : text.retryGeneration}
+              </button>
+            ) : null}
           </div>
         </td>
         <td className={adminTableStyles.mono}>
@@ -250,7 +292,9 @@ export function GenerationRow({
               {formatTemplateType(item.templateType, text)} / {templateIdText}
             </span>
             <span className={styles.lineage}>{lineageText}</span>
-            {debugText ? <span className={styles.lineage}>{debugText}</span> : null}
+            {lineageMetadataText ? (
+              <span className={styles.lineage}>{lineageMetadataText}</span>
+            ) : null}
           </span>
         </td>
         <td>
@@ -382,7 +426,7 @@ export function GenerationRow({
                   </strong>
                 </div>
                 <div>
-                  <span>{text.debugTitle}</span>
+                  <span>{text.diagnosticsTitle}</span>
                   <strong>{watermarkState}</strong>
                 </div>
               </div>

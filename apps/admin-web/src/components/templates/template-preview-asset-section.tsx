@@ -84,8 +84,14 @@ export function TemplatePreviewAssetSection({
 
     setSelectionError(null);
     clearLocalPreviewUrl();
-    setLocalPreview({ file, url: URL.createObjectURL(file) });
-    setPreviewFile(file);
+    const objectUrl = URL.createObjectURL(file);
+    try {
+      setLocalPreview({ file, url: objectUrl });
+      setPreviewFile(file);
+    } catch (error) {
+      URL.revokeObjectURL(objectUrl);
+      throw error;
+    }
   }
 
   function handlePreviewDrop(event: DragEvent<HTMLDivElement>) {

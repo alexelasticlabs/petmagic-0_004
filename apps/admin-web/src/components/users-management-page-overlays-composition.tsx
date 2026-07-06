@@ -1,9 +1,11 @@
 "use client";
 
-
 import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
 import { Toast } from "@/components/ui/toast";
-import { UsersManagementActionsMenu, UsersManagementWalletDialog } from "@/components/users-management-page-overlays";
+import {
+  UsersManagementActionsMenu,
+  UsersManagementWalletDialog,
+} from "@/components/users-management-page-overlays";
 import type { UsersManagementPageText } from "@/components/users-management-page.content";
 import type {
   ActionsMenuPosition,

@@ -28,9 +28,17 @@ public sealed class TemplateSchedulerConfigHealthCheck(
         if (snapshot.IsMismatchDetected)
         {
             data["mismatchDetails"] = snapshot.MismatchDetails ?? string.Empty;
-            return Task.FromResult(HealthCheckResult.Unhealthy(
-                "Template scheduler config fingerprint mismatch detected.",
-                data: data));
+            var result = string.Equals(
+                snapshot.Component,
+                TemplateSchedulerConfigFingerprint.ApiComponent,
+                StringComparison.OrdinalIgnoreCase)
+                ? HealthCheckResult.Degraded(
+                    "Template scheduler config fingerprint mismatch detected.",
+                    data: data)
+                : HealthCheckResult.Unhealthy(
+                    "Template scheduler config fingerprint mismatch detected.",
+                    data: data);
+            return Task.FromResult(result);
         }
 
         return Task.FromResult(HealthCheckResult.Healthy(

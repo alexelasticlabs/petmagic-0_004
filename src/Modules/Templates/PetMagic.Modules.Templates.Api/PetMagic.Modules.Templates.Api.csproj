@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\PetMagic.Modules.Templates.Application\PetMagic.Modules.Templates.Application.csproj" />
     <ProjectReference Include="..\..\Identity\PetMagic.Modules.Identity.Application\PetMagic.Modules.Identity.Application.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\PetMagic.BuildingBlocks\PetMagic.BuildingBlocks.csproj" />
   </ItemGroup>
 
   <ItemGroup>

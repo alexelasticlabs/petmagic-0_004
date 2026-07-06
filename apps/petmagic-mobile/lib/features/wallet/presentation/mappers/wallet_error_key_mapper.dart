@@ -20,6 +20,18 @@ const _safeWalletErrorKeys = <String>[
   'redeem_code_user_limit_reached',
 ];
 
+const _backendWalletErrorKeyAliases = <String, String>{
+  'economy.payment_provider_unsupported': 'wallet.payment_unavailable',
+  'economy.payment_provider_unavailable': 'wallet.payment_unavailable',
+  'economy.payment_provider_config_not_found': 'wallet.payment_unavailable',
+  'economy.payment_gateway_failed': 'payment_gateway_failed',
+  'economy.store_verification_unavailable': 'wallet.payment_unavailable',
+  'economy.store_purchase_invalid': 'wallet.payment_unavailable',
+  'economy.store_purchase_inactive': 'wallet.payment_unavailable',
+  'economy.payment_method_not_found': 'wallet.payment_unavailable',
+  'economy.payment_method_provider_invalid': 'wallet.payment_unavailable',
+};
+
 String? normalizeWalletErrorKey(String? raw) {
   final normalized = raw?.trim();
   if (normalized == null || normalized.isEmpty) {
@@ -27,6 +39,12 @@ String? normalizeWalletErrorKey(String? raw) {
   }
 
   final lower = normalized.toLowerCase();
+  for (final entry in _backendWalletErrorKeyAliases.entries) {
+    if (lower == entry.key || lower.contains(entry.key)) {
+      return entry.value;
+    }
+  }
+
   for (final key in _safeWalletErrorKeys) {
     if (lower == key || lower.contains(key)) {
       return key;

@@ -2,7 +2,7 @@ import { type Locale } from "@/lib/i18n";
 
 const templateEditorRuntimeText = {
   ru: {
-    actionsAdminOnly: "Управление шаблонами доступно только Admin.",
+    actionsAdminOnly: "Управление шаблонами доступно только администратору.",
   },
   en: {
     actionsAdminOnly: "Template management actions are available to Admin only.",

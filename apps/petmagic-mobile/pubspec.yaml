@@ -26,7 +26,7 @@ dependencies:
   crypto: ^3.0.7
   flutter_secure_storage: ^10.3.1
   intl: ^0.20.2
-  image_picker: ^1.2.2
+  image_picker: ^1.2.3
   image: ^4.9.1
   http_parser: ^4.1.2
   app_links:
@@ -68,7 +68,8 @@ flutter:
 
   assets:
     - assets/auth/
-    - assets/branding/
+    - assets/branding/premium-hero-dark.png
+    - assets/branding/premium-hero-light.png
     - assets/fonts/
     - assets/rewards/
 

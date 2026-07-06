@@ -1,5 +1,7 @@
 import 'dart:io';
+import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -12,6 +14,13 @@ final _store = buildGenerationGalleryStore;
 final _completedGeneration = completedGenerationForTest;
 final _generationDirectory = generationDirectoryForTest;
 final _sessionForUser = sessionForUser;
+
+String _entriesKeyForScope(String accountScope) {
+  final scopeSegment = sha256
+      .convert(utf8.encode(accountScope.trim().toLowerCase()))
+      .toString();
+  return 'generation_gallery_entries_v2:$scopeSegment';
+}
 
 void main() {
   configureGenerationGalleryStoreTestHarness();
@@ -167,6 +176,207 @@ void main() {
       expect(await store.loadPendingServerDeleteIds(), [
         'pending-delete-generation',
       ]);
+    },
+  );
+
+  test('loadLocalReadyItems sanitizes legacy v2 persisted metadata', () async {
+    final tempDir = await Directory.systemTemp.createTemp(
+      'petmagic-generation-gallery-store-test-',
+    );
+    addTearDown(() async {
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+
+    final preferences = SharedPreferencesAsync();
+    const accountScope = 'legacy-user-1';
+    final cacheKey = _entriesKeyForScope(accountScope);
+    await preferences.setString(
+      cacheKey,
+      jsonEncode([
+        {
+          'generationId': 'legacy-generation',
+          'accountScope': accountScope,
+          'userId': accountScope,
+          'status': 'completed',
+          'templateTitle': 'Legacy',
+          'templateType': 'image',
+          'updatedAtUtc': DateTime.utc(2035).toIso8601String(),
+          'previewRemoteUrl':
+              'https://cdn.petmagic.example/preview.jpg?signature=secret',
+          'outputRemoteUrl':
+              'https://cdn.petmagic.example/output.jpg?token=secret#fragment',
+          'previewLocalPath': null,
+          'outputLocalPath': null,
+          'isDeletedLocally': false,
+          'isDownloadComplete': true,
+          'lastSyncedAtUtc': DateTime.utc(2035).toIso8601String(),
+          'version': 1,
+          'pendingServerDelete': false,
+          'materializationFailureCount': 0,
+          'localBytes': 0,
+        },
+      ]),
+    );
+    final store = _store(
+      tempDir,
+      preferences: preferences,
+      session: _sessionForUser(accountScope),
+    );
+
+    final items = await store.loadLocalReadyItems();
+    final rewritten = await preferences.getString(cacheKey);
+
+    expect(items, hasLength(1));
+    expect(items.single.userId, accountScope);
+    expect(items.single.accountScope, accountScope);
+    expect(
+      items.single.previewRemoteUrl,
+      'https://cdn.petmagic.example/preview.jpg',
+    );
+    expect(
+      items.single.outputRemoteUrl,
+      'https://cdn.petmagic.example/output.jpg',
+    );
+    expect(rewritten, isNotNull);
+    expect(rewritten, isNot(contains('"accountScope"')));
+    expect(rewritten, isNot(contains('"userId"')));
+    expect(rewritten, isNot(contains('signature=secret')));
+    expect(rewritten, isNot(contains('token=secret')));
+    expect(rewritten, isNot(contains('fragment')));
+  });
+
+  test(
+    'loadLocalReadyItems rejects persisted local paths outside cache root',
+    () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'petmagic-generation-gallery-store-test-',
+      );
+      addTearDown(() async {
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+
+      final preferences = SharedPreferencesAsync();
+      const accountScope = 'user-1';
+      const generationId = 'generation-external-path';
+      final cacheKey = _entriesKeyForScope(accountScope);
+      final externalFile = File(
+        '${tempDir.path}${Platform.pathSeparator}outside-gallery.jpg',
+      );
+      await externalFile.writeAsBytes(_tinyJpegOne);
+      await preferences.setString(
+        cacheKey,
+        jsonEncode([
+          {
+            'generationId': generationId,
+            'status': 'completed',
+            'templateTitle': 'Unsafe local path',
+            'templateType': 'image',
+            'updatedAtUtc': DateTime.utc(2035).toIso8601String(),
+            'previewRemoteUrl': 'https://cdn.petmagic.example/preview.jpg',
+            'outputRemoteUrl': 'https://cdn.petmagic.example/output.jpg',
+            'previewLocalPath': externalFile.path,
+            'outputLocalPath': externalFile.path,
+            'isDeletedLocally': false,
+            'isDownloadComplete': true,
+            'lastSyncedAtUtc': DateTime.utc(2035).toIso8601String(),
+            'version': 1,
+            'pendingServerDelete': false,
+            'materializationFailureCount': 0,
+            'localBytes': _tinyJpegOne.length,
+          },
+        ]),
+      );
+      final store = _store(
+        tempDir,
+        preferences: preferences,
+        session: _sessionForUser(accountScope),
+      );
+
+      final items = await store.loadLocalReadyItems();
+      final rewritten = await preferences.getString(cacheKey);
+
+      expect(items, hasLength(1));
+      expect(items.single.previewLocalPath, isNull);
+      expect(items.single.outputLocalPath, isNull);
+      expect(items.single.isDownloadComplete, isFalse);
+      expect(items.single.localBytes, 0);
+      expect(await externalFile.exists(), isTrue);
+      expect(rewritten, isNotNull);
+      expect(rewritten, isNot(contains('outside-gallery.jpg')));
+    },
+  );
+
+  test(
+    'loadLocalReadyItems rewrites trusted absolute local paths as relative cache paths',
+    () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'petmagic-generation-gallery-store-test-',
+      );
+      addTearDown(() async {
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+
+      final preferences = SharedPreferencesAsync();
+      const accountScope = 'user-1';
+      const generationId = 'generation-local-path';
+      final cacheKey = _entriesKeyForScope(accountScope);
+      final generationDirectory = _generationDirectory(
+        tempDir,
+        accountScope,
+        generationId,
+      );
+      await generationDirectory.create(recursive: true);
+      final mediaFile = File(
+        '${generationDirectory.path}${Platform.pathSeparator}result_123.jpg',
+      );
+      await mediaFile.writeAsBytes(_tinyJpegOne);
+      await preferences.setString(
+        cacheKey,
+        jsonEncode([
+          {
+            'generationId': generationId,
+            'status': 'completed',
+            'templateTitle': 'Trusted local path',
+            'templateType': 'image',
+            'updatedAtUtc': DateTime.utc(2035).toIso8601String(),
+            'previewRemoteUrl': 'https://cdn.petmagic.example/preview.jpg',
+            'outputRemoteUrl': 'https://cdn.petmagic.example/output.jpg',
+            'previewLocalPath': mediaFile.path,
+            'outputLocalPath': mediaFile.path,
+            'isDeletedLocally': false,
+            'isDownloadComplete': true,
+            'lastSyncedAtUtc': DateTime.utc(2035).toIso8601String(),
+            'version': 1,
+            'pendingServerDelete': false,
+            'materializationFailureCount': 0,
+            'localBytes': _tinyJpegOne.length,
+          },
+        ]),
+      );
+      final store = _store(
+        tempDir,
+        preferences: preferences,
+        session: _sessionForUser(accountScope),
+      );
+
+      final items = await store.loadLocalReadyItems();
+      final rewritten = await preferences.getString(cacheKey);
+
+      expect(items, hasLength(1));
+      expect(items.single.previewLocalPath, mediaFile.path);
+      expect(items.single.outputLocalPath, mediaFile.path);
+      expect(items.single.isDownloadComplete, isTrue);
+      expect(items.single.localBytes, _tinyJpegOne.length);
+      expect(rewritten, isNotNull);
+      expect(rewritten, isNot(contains(tempDir.path)));
+      expect(rewritten, contains('generation_gallery/'));
+      expect(rewritten, contains('result_123.jpg'));
     },
   );
 

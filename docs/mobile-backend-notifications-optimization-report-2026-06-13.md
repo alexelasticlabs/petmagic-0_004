@@ -2,6 +2,11 @@
 
 Date: 2026-06-13
 
+> Historical optimization snapshot. This report records the June 2026
+> mobile/backend/notifications pass and should not be used as current release
+> evidence. For the current production-readiness gate, use
+> `production-readiness-audit-2026-07-03.md`.
+
 ## What Changed
 
 - Mobile UI performance: added shared lightweight animated/interactive widgets, reusable async/image states, unified page transitions, and reduced duplicated loading/error UI in templates/auth/startup surfaces.

@@ -27,6 +27,8 @@ class ChallengeCard extends StatelessWidget {
     final statusText = challenge.isCompleted
         ? text.gamificationChallengeComplete
         : text.gamificationStatusInProgress;
+    final completedColor = colors.accent;
+    final inProgressColor = colors.gold;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -34,7 +36,7 @@ class ChallengeCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: challenge.isCompleted
-              ? const Color(0xFF4CAF50).withValues(alpha: 0.5)
+              ? completedColor.withValues(alpha: 0.5)
               : colors.border,
           width: 1.1,
         ),
@@ -77,7 +79,7 @@ class ChallengeCard extends StatelessWidget {
                     vertical: 3,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF4CAF50).withValues(alpha: 0.15),
+                    color: completedColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -85,7 +87,7 @@ class ChallengeCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF4CAF50),
+                      color: completedColor,
                     ),
                   ),
                 ),
@@ -110,9 +112,7 @@ class ChallengeCard extends StatelessWidget {
                       alpha: 0.3,
                     ),
                     valueColor: AlwaysStoppedAnimation<Color>(
-                      challenge.isCompleted
-                          ? const Color(0xFF4CAF50)
-                          : const Color(0xFFFF6D00),
+                      challenge.isCompleted ? completedColor : inProgressColor,
                     ),
                     minHeight: 6,
                   ),
@@ -149,7 +149,7 @@ class ChallengeCard extends StatelessWidget {
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                   color: challenge.isCompleted
-                      ? const Color(0xFF4CAF50)
+                      ? completedColor
                       : colors.textSoft,
                 ),
               ),

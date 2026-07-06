@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Host.Api.Observability;
 
 namespace PetMagic.Modules.Identity.Tests.Host;
@@ -81,7 +82,8 @@ public sealed class StructuredRequestLoggingMiddlewareTests
         Assert.Equal("POST", scope["HttpMethod"]);
         Assert.Equal("/api/payments/webhook", scope["Path"]);
         Assert.Equal(StatusCodes.Status503ServiceUnavailable, scope["StatusCode"]);
-        Assert.Equal("correlation-1", scope["CorrelationId"]);
+        Assert.Equal(SafeLogValues.StableHash("correlation-1"), scope["CorrelationIdHash"]);
+        Assert.Equal(SafeLogValues.StableHash("request-1"), scope["RequestIdHash"]);
     }
 
     [Fact]
@@ -105,9 +107,61 @@ public sealed class StructuredRequestLoggingMiddlewareTests
 
         var scope = Assert.Single(entry.Scopes);
         Assert.Equal(StatusCodes.Status500InternalServerError, scope["StatusCode"]);
-        Assert.Equal("correlation-1", scope["CorrelationId"]);
+        Assert.Equal(SafeLogValues.StableHash("correlation-1"), scope["CorrelationIdHash"]);
         Assert.Equal("GET", scope["HttpMethod"]);
         Assert.Equal("/api/failing-endpoint", scope["Path"]);
+    }
+
+    [Fact]
+    public async Task Middleware_ShouldNotLogRawUnmatchedApiPath()
+    {
+        var logger = new CapturingLogger<StructuredRequestLoggingMiddleware>();
+        var context = CreateContext(
+            HttpMethods.Get,
+            "/api/admin/users/user-2/role",
+            endpointDisplayName: null);
+
+        var middleware = new StructuredRequestLoggingMiddleware(
+            _ => Task.CompletedTask,
+            logger,
+            Options.Create(new LoggingOptions { SlowRequestThresholdMs = 1000 }));
+
+        await middleware.InvokeAsync(context);
+
+        var entry = Assert.Single(logger.Entries);
+        Assert.Contains("HTTP GET /api/{unmatched} responded 200", entry.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("user-2", entry.Message, StringComparison.Ordinal);
+
+        var scope = Assert.Single(entry.Scopes);
+        Assert.Equal("/api/{unmatched}", scope["Path"]);
+        Assert.Equal(SafeLogValues.StableHash("/api/admin/users/user-2/role"), scope["PathHash"]);
+        Assert.DoesNotContain("user-2", scope["Path"]?.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Middleware_ShouldSanitizeRawEndpointDisplayName()
+    {
+        var logger = new CapturingLogger<StructuredRequestLoggingMiddleware>();
+        var context = CreateContext(
+            HttpMethods.Get,
+            "/api/admin/users/user-2/role",
+            endpointDisplayName: "GET /api/admin/users/user-2/role");
+
+        var middleware = new StructuredRequestLoggingMiddleware(
+            _ => Task.CompletedTask,
+            logger,
+            Options.Create(new LoggingOptions { SlowRequestThresholdMs = 1000 }));
+
+        await middleware.InvokeAsync(context);
+
+        var entry = Assert.Single(logger.Entries);
+        Assert.Contains("HTTP GET /api/admin/users/{id}/role responded 200", entry.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("user-2", entry.Message, StringComparison.Ordinal);
+
+        var scope = Assert.Single(entry.Scopes);
+        Assert.Equal("GET /api/admin/users/{id}/role", scope["Endpoint"]);
+        Assert.Equal("/api/admin/users/{id}/role", scope["Path"]);
+        Assert.Equal(SafeLogValues.StableHash("/api/admin/users/user-2/role"), scope["PathHash"]);
     }
 
     [Fact]
@@ -133,7 +187,10 @@ public sealed class StructuredRequestLoggingMiddlewareTests
         Assert.Contains("HTTP GET /api/di-slow responded 200", entry.Message, StringComparison.Ordinal);
     }
 
-    private static DefaultHttpContext CreateContext(string method, string path)
+    private static DefaultHttpContext CreateContext(
+        string method,
+        string path,
+        string? endpointDisplayName = "__default__")
     {
         var services = new ServiceCollection()
             .AddSingleton<IHostEnvironment>(new TestHostEnvironment())
@@ -146,6 +203,14 @@ public sealed class StructuredRequestLoggingMiddlewareTests
         context.Request.Path = path;
         context.TraceIdentifier = "request-1";
         context.Items[CorrelationId.HttpContextItemKey] = "correlation-1";
+        if (endpointDisplayName is not null)
+        {
+            context.SetEndpoint(new Endpoint(
+                _ => Task.CompletedTask,
+                new EndpointMetadataCollection(),
+                endpointDisplayName == "__default__" ? $"{method} {path}" : endpointDisplayName));
+        }
+
         return context;
     }
 

@@ -13,10 +13,10 @@ public sealed class OpenSupportConversationCommandValidator : AbstractValidator<
             .When(x => !string.IsNullOrWhiteSpace(x.InitialMessage));
         RuleFor(x => x.Priority)
             .Must(priority => Enum.IsDefined(priority))
-            .WithMessage("Support conversation priority is not supported.");
+            .WithMessage("support.conversation_priority_invalid");
         RuleFor(x => x.Source)
             .Must(source => Enum.IsDefined(source))
-            .WithMessage("Support conversation source is not supported.");
+            .WithMessage("support.conversation_source_invalid");
         RuleFor(x => x.AssistantScenario)
             .MaximumLength(64)
             .When(x => !string.IsNullOrWhiteSpace(x.AssistantScenario));
@@ -57,7 +57,7 @@ public sealed class SendSupportAttachmentsCommandValidator : AbstractValidator<S
         RuleFor(x => x.Attachments)
             .NotNull()
             .Must(attachments => attachments.Count is >= 1 and <= 5)
-            .WithMessage("Support message attachments must contain from 1 to 5 files.");
+            .WithMessage("support.message_attachments_count_invalid");
         RuleForEach(x => x.Attachments).SetValidator(new SupportMessageAttachmentInputValidator());
         RuleFor(x => x.ReplyToMessageId)
             .NotEmpty()
@@ -158,7 +158,7 @@ public sealed class UpdateSupportConversationStatusCommandValidator : AbstractVa
         RuleFor(x => x.AdminUserId).NotEmpty();
         RuleFor(x => x.Status)
             .Must(status => Enum.IsDefined(status))
-            .WithMessage("Support conversation status is not supported.");
+            .WithMessage("support.conversation_status_invalid");
     }
 }
 
@@ -171,7 +171,7 @@ public sealed class AssignSupportConversationCommandValidator : AbstractValidato
         RuleFor(x => x.AssignedAdminId)
             .NotEqual(Guid.Empty)
             .When(x => x.AssignedAdminId.HasValue)
-            .WithMessage("Assigned admin id must not be empty.");
+            .WithMessage("support.assigned_admin_id_required");
     }
 }
 
@@ -183,7 +183,7 @@ public sealed class UpdateSupportConversationMetadataCommandValidator : Abstract
         RuleFor(x => x.AdminUserId).NotEmpty();
         RuleFor(x => x.Priority)
             .Must(priority => Enum.IsDefined(priority))
-            .WithMessage("Support conversation priority is not supported.");
+            .WithMessage("support.conversation_priority_invalid");
         RuleFor(x => x.Tags)
             .NotNull();
         RuleFor(x => x.Tags.Count)

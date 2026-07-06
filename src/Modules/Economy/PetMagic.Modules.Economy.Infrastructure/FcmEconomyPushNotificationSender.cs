@@ -42,17 +42,15 @@ internal sealed class FcmEconomyPushNotificationSender(
         {
             return;
         }
-
         var accessToken = await GetAccessTokenAsync(cancellationToken);
+        var userIdHash = SafeLogValues.StableHash(userId.ToString("D"));
         foreach (var token in tokens)
         {
             var locale = token.Locale;
-            var title = notification.Title
-                ?? EconomyPushNotificationLocalizer.BuildWalletTitle(locale);
-            var body = notification.Body
-                ?? EconomyPushNotificationLocalizer.BuildWalletBody(
-                    locale,
-                    notification.SparkDelta);
+            var title = EconomyPushNotificationLocalizer.BuildWalletTitle(locale);
+            var body = EconomyPushNotificationLocalizer.BuildWalletBody(
+                locale,
+                notification.SparkDelta);
 
             var data = new Dictionary<string, string>
             {
@@ -61,7 +59,7 @@ internal sealed class FcmEconomyPushNotificationSender(
                 ["route"] = "/profile/wallet",
                 ["dedupe_key"] = notification.OrderId.HasValue
                     ? $"wallet:{notification.Status}:{notification.OrderId.Value:D}"
-                    : $"wallet:{notification.Status}:{userId:D}"
+                    : $"wallet:{notification.Status}:{userIdHash}"
             };
             if (notification.OrderId.HasValue)
             {
@@ -84,24 +82,22 @@ internal sealed class FcmEconomyPushNotificationSender(
         {
             return;
         }
-
         var accessToken = await GetAccessTokenAsync(cancellationToken);
+        var userIdHash = SafeLogValues.StableHash(userId.ToString("D"));
         foreach (var token in tokens)
         {
             var locale = token.Locale;
-            var title = notification.Title
-                ?? EconomyPushNotificationLocalizer.BuildPremiumTitle(locale);
-            var body = notification.Body
-                ?? EconomyPushNotificationLocalizer.BuildPremiumBody(
-                    locale,
-                    notification.Status);
+            var title = EconomyPushNotificationLocalizer.BuildPremiumTitle(locale);
+            var body = EconomyPushNotificationLocalizer.BuildPremiumBody(
+                locale,
+                notification.Status);
 
             var data = new Dictionary<string, string>
             {
                 ["type"] = "premium",
                 ["status"] = notification.Status,
                 ["route"] = "/profile",
-                ["dedupe_key"] = $"premium:{notification.Status}:{notification.Provider ?? "unknown"}:{notification.PlanCode ?? "unknown"}:{userId:D}"
+                ["dedupe_key"] = $"premium:{notification.Status}:{notification.Provider ?? "unknown"}:{notification.PlanCode ?? "unknown"}:{userIdHash}"
             };
             if (!string.IsNullOrWhiteSpace(notification.Provider))
             {
@@ -149,19 +145,22 @@ internal sealed class FcmEconomyPushNotificationSender(
         };
         httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-        using var response = await httpClientFactory.CreateClient(HttpClientName).SendAsync(httpRequest, cancellationToken);
-        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+        using var response = await httpClientFactory.CreateClient(HttpClientName).SendAsync(
+            httpRequest,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
         if (response.IsSuccessStatusCode)
         {
             return;
         }
 
+        var responseBody = await SafeHttpContentReader.ReadStringPrefixAsync(response.Content, cancellationToken);
         logger.LogWarning(
-            "FCM send failed for economy notification. TokenId={TokenId} StatusCode={StatusCode} ErrorReason={ErrorReason} CorrelationId={CorrelationId}",
-            token.Id,
+            "FCM send failed for economy notification. TokenIdHash={TokenIdHash} StatusCode={StatusCode} ErrorReason={ErrorReason} CorrelationIdHash={CorrelationIdHash}",
+            SafeLogValues.StableHash(token.Id.ToString("D")),
             response.StatusCode,
             FirebaseMessagingErrorClassifier.ResolveErrorReason(responseBody),
-            CorrelationContext.ResolveOrCreate());
+            SafeLogValues.StableHash(CorrelationContext.ResolveOrCreate()));
 
         if (FirebaseMessagingErrorClassifier.ShouldDisableToken(response.StatusCode, responseBody))
         {

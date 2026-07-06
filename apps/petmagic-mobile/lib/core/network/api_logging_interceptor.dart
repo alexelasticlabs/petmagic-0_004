@@ -73,7 +73,7 @@ class ApiLoggingInterceptor extends Interceptor {
         'response_via': _headerValue(response?.headers, 'via'),
         'response_cf_ray': _headerValue(response?.headers, 'cf-ray'),
         'response_ngrok': _headerValue(response?.headers, 'ngrok-trace-id'),
-        'problem_title': _problemString(response?.data, 'title'),
+        'problem_key': _problemKey(response?.data, 'title'),
         'validation_fields': _validationFields(response?.data),
         'validation_keys': _validationKeys(response?.data),
       },
@@ -135,11 +135,100 @@ class ApiLoggingInterceptor extends Interceptor {
   }
 
   String _requestPath(RequestOptions options) {
-    if (options.path.isNotEmpty) {
-      return stripQuery(options.path);
+    final rawPath = options.path.isNotEmpty ? options.path : options.uri.path;
+    return _sanitizeEndpointPath(stripQuery(_pathOnly(rawPath)));
+  }
+
+  String _pathOnly(String value) {
+    final parsed = Uri.tryParse(value);
+    if (parsed != null && parsed.hasScheme && parsed.hasAuthority) {
+      return parsed.path.isEmpty ? '/' : parsed.path;
     }
 
-    return stripQuery(options.uri.path);
+    return value;
+  }
+
+  String _sanitizeEndpointPath(String path) {
+    if (path.trim().isEmpty) {
+      return path;
+    }
+
+    final segments = path.split('/');
+    for (var index = 0; index < segments.length; index++) {
+      final segment = segments[index];
+      if (segment.isEmpty) {
+        continue;
+      }
+
+      final previousSegment = index > 0 ? segments[index - 1] : '';
+      if (_isSensitivePathValueSegment(segment, previousSegment)) {
+        segments[index] = ':id';
+      }
+    }
+
+    return segments.join('/');
+  }
+
+  bool _isSensitivePathValueSegment(String segment, String previousSegment) {
+    final decoded = Uri.decodeComponent(segment);
+    if (RegExp(
+          r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+          caseSensitive: false,
+        ).hasMatch(decoded) ||
+        RegExp(r'^[A-Za-z0-9_-]{24,}$').hasMatch(decoded) ||
+        RegExp(
+          r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b',
+        ).hasMatch(decoded)) {
+      return true;
+    }
+
+    final normalizedPrevious = previousSegment.toLowerCase().replaceAll(
+      RegExp(r'[^a-z0-9]'),
+      '',
+    );
+    return _isSensitivePathParent(normalizedPrevious) &&
+        !_isStaticEndpointSegment(decoded);
+  }
+
+  bool _isSensitivePathParent(String normalizedSegment) {
+    return normalizedSegment == 'users' ||
+        normalizedSegment == 'profiles' ||
+        normalizedSegment == 'accounts' ||
+        normalizedSegment == 'pets' ||
+        normalizedSegment == 'petphotos' ||
+        normalizedSegment == 'templates' ||
+        normalizedSegment == 'generations' ||
+        normalizedSegment == 'conversations' ||
+        normalizedSegment == 'messages' ||
+        normalizedSegment == 'tickets' ||
+        normalizedSegment == 'attachments' ||
+        normalizedSegment == 'orders' ||
+        normalizedSegment == 'purchases' ||
+        normalizedSegment == 'subscriptions' ||
+        normalizedSegment == 'feedback' ||
+        normalizedSegment == 'reports' ||
+        normalizedSegment == 'moderation';
+  }
+
+  bool _isStaticEndpointSegment(String segment) {
+    final normalized = segment.toLowerCase().replaceAll(
+      RegExp(r'[^a-z0-9]'),
+      '',
+    );
+    return normalized == 'active' ||
+        normalized == 'analytics' ||
+        normalized == 'categories' ||
+        normalized == 'catalog' ||
+        normalized == 'current' ||
+        normalized == 'daily' ||
+        normalized == 'feed' ||
+        normalized == 'me' ||
+        normalized == 'options' ||
+        normalized == 'random' ||
+        normalized == 'search' ||
+        normalized == 'summary' ||
+        normalized == 'templateoftheday' ||
+        normalized == 'validate';
   }
 
   String _requestOrigin(RequestOptions options) {
@@ -172,7 +261,7 @@ class ApiLoggingInterceptor extends Interceptor {
     return value == null || value.isEmpty ? null : value;
   }
 
-  String? _problemString(Object? data, String key) {
+  String? _problemKey(Object? data, String key) {
     if (data is! Map) {
       return null;
     }
@@ -183,7 +272,7 @@ class ApiLoggingInterceptor extends Interceptor {
     }
 
     final trimmed = value.trim();
-    return trimmed.isEmpty ? null : trimmed;
+    return NetworkErrorMapper.isSafeMessageKey(trimmed) ? trimmed : null;
   }
 
   String? _validationFields(Object? data) {

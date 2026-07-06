@@ -175,20 +175,69 @@ Future<({String generationId, String correlationId})?> _readActiveGeneration(
           TemplateGenerationRepository._activeGenerationCorrelationIdKey,
           scope,
         );
-    final generationId = await _readGenerationCacheString(
-      repository,
-      dataKey: activeGenerationIdKey,
-      legacyDataKey: legacyActiveGenerationIdKey,
+    final secureScope = await repository._secureStorage.read(
+      key: TemplateGenerationRepository._activeGenerationSecureScopeKey,
     );
+    final scopeFingerprint = _generationCacheScopeFingerprint(scope);
+    var generationId = secureScope == scopeFingerprint
+        ? await repository._secureStorage.read(
+            key: TemplateGenerationRepository
+                ._activeGenerationIdSecureStorageKey,
+          )
+        : null;
+    var migratedGenerationIdFromPreferences = false;
+    if (generationId == null || generationId.trim().isEmpty) {
+      generationId = await _readGenerationCacheString(
+        repository,
+        dataKey: activeGenerationIdKey,
+        legacyDataKey: legacyActiveGenerationIdKey,
+      );
+      if (generationId != null && generationId.trim().isNotEmpty) {
+        migratedGenerationIdFromPreferences = true;
+        await repository._secureStorage.write(
+          key: TemplateGenerationRepository._activeGenerationIdSecureStorageKey,
+          value: generationId.trim(),
+        );
+        await repository._secureStorage.write(
+          key: TemplateGenerationRepository._activeGenerationSecureScopeKey,
+          value: scopeFingerprint,
+        );
+      }
+    }
     if (generationId == null || generationId.trim().isEmpty) {
       return null;
     }
 
-    final persistedCorrelationId = await _readGenerationCacheString(
-      repository,
-      dataKey: activeGenerationCorrelationIdKey,
-      legacyDataKey: legacyActiveGenerationCorrelationIdKey,
-    );
+    var persistedCorrelationId = secureScope == scopeFingerprint
+        ? await repository._secureStorage.read(
+            key: TemplateGenerationRepository
+                ._activeGenerationCorrelationIdSecureStorageKey,
+          )
+        : null;
+    if (persistedCorrelationId == null ||
+        persistedCorrelationId.trim().isEmpty) {
+      persistedCorrelationId = await _readGenerationCacheString(
+        repository,
+        dataKey: activeGenerationCorrelationIdKey,
+        legacyDataKey: legacyActiveGenerationCorrelationIdKey,
+      );
+      if (persistedCorrelationId != null &&
+          persistedCorrelationId.trim().isNotEmpty) {
+        await repository._secureStorage.write(
+          key: TemplateGenerationRepository
+              ._activeGenerationCorrelationIdSecureStorageKey,
+          value: persistedCorrelationId.trim(),
+        );
+        await _clearActiveGenerationPreferenceKeys(
+          repository,
+          activeGenerationIdKey: activeGenerationIdKey,
+          activeGenerationCorrelationIdKey: activeGenerationCorrelationIdKey,
+          legacyActiveGenerationIdKey: legacyActiveGenerationIdKey,
+          legacyActiveGenerationCorrelationIdKey:
+              legacyActiveGenerationCorrelationIdKey,
+        );
+      }
+    }
     final normalizedGenerationId = generationId.trim();
     final correlationId =
         persistedCorrelationId == null || persistedCorrelationId.trim().isEmpty
@@ -199,6 +248,15 @@ Future<({String generationId, String correlationId})?> _readActiveGeneration(
       await repository.rememberActiveGeneration(
         generationId: normalizedGenerationId,
         correlationId: correlationId,
+      );
+    } else if (migratedGenerationIdFromPreferences) {
+      await _clearActiveGenerationPreferenceKeys(
+        repository,
+        activeGenerationIdKey: activeGenerationIdKey,
+        activeGenerationCorrelationIdKey: activeGenerationCorrelationIdKey,
+        legacyActiveGenerationIdKey: legacyActiveGenerationIdKey,
+        legacyActiveGenerationCorrelationIdKey:
+            legacyActiveGenerationCorrelationIdKey,
       );
     }
 
@@ -241,23 +299,31 @@ Future<void> _rememberActiveGeneration(
       return;
     }
 
-    await repository._preferences.setString(
-      activeGenerationIdKey,
-      normalizedGenerationId,
+    await repository._secureStorage.write(
+      key: TemplateGenerationRepository._activeGenerationSecureScopeKey,
+      value: _generationCacheScopeFingerprint(scope),
+    );
+    await repository._secureStorage.write(
+      key: TemplateGenerationRepository._activeGenerationIdSecureStorageKey,
+      value: normalizedGenerationId,
     );
     final trimmedCorrelationId = correlationId?.trim();
     final normalizedCorrelationId =
         trimmedCorrelationId == null || trimmedCorrelationId.isEmpty
         ? repository._createGenerationCorrelationId()
         : trimmedCorrelationId;
-    await repository._preferences.setString(
-      activeGenerationCorrelationIdKey,
-      normalizedCorrelationId,
+    await repository._secureStorage.write(
+      key: TemplateGenerationRepository
+          ._activeGenerationCorrelationIdSecureStorageKey,
+      value: normalizedCorrelationId,
     );
-    await _clearGenerationCacheKey(repository, legacyActiveGenerationIdKey);
-    await _clearGenerationCacheKey(
+    await _clearActiveGenerationPreferenceKeys(
       repository,
-      legacyActiveGenerationCorrelationIdKey,
+      activeGenerationIdKey: activeGenerationIdKey,
+      activeGenerationCorrelationIdKey: activeGenerationCorrelationIdKey,
+      legacyActiveGenerationIdKey: legacyActiveGenerationIdKey,
+      legacyActiveGenerationCorrelationIdKey:
+          legacyActiveGenerationCorrelationIdKey,
     );
   } on Object {
     // Keep generation flow functional even if local persistence fails.
@@ -291,24 +357,71 @@ Future<void> _clearActiveGeneration(
           TemplateGenerationRepository._activeGenerationCorrelationIdKey,
           scope,
         );
-    final current = await _readGenerationCacheString(
-      repository,
-      dataKey: activeGenerationIdKey,
-      legacyDataKey: legacyActiveGenerationIdKey,
+    final secureScope = await repository._secureStorage.read(
+      key: TemplateGenerationRepository._activeGenerationSecureScopeKey,
     );
+    final scopeFingerprint = _generationCacheScopeFingerprint(scope);
+    final secureScopeMatchesCurrentAccount = secureScope == scopeFingerprint;
+    final current = secureScopeMatchesCurrentAccount
+        ? await repository._secureStorage.read(
+            key: TemplateGenerationRepository
+                ._activeGenerationIdSecureStorageKey,
+          )
+        : await _readGenerationCacheString(
+            repository,
+            dataKey: activeGenerationIdKey,
+            legacyDataKey: legacyActiveGenerationIdKey,
+          );
     if (current != null && current != generationId) {
       return;
     }
 
-    await repository._preferences.remove(activeGenerationIdKey);
-    await repository._preferences.remove(activeGenerationCorrelationIdKey);
-    await repository._preferences.remove(legacyActiveGenerationIdKey);
-    await repository._preferences.remove(
-      legacyActiveGenerationCorrelationIdKey,
+    if (secureScopeMatchesCurrentAccount) {
+      await _clearSecureActiveGeneration(repository);
+    }
+    await _clearActiveGenerationPreferenceKeys(
+      repository,
+      activeGenerationIdKey: activeGenerationIdKey,
+      activeGenerationCorrelationIdKey: activeGenerationCorrelationIdKey,
+      legacyActiveGenerationIdKey: legacyActiveGenerationIdKey,
+      legacyActiveGenerationCorrelationIdKey:
+          legacyActiveGenerationCorrelationIdKey,
     );
   } on Object {
     // Keep cleanup best-effort.
   }
+}
+
+Future<void> _clearSecureActiveGeneration(
+  TemplateGenerationRepository repository,
+) async {
+  await Future.wait<void>([
+    repository._secureStorage.delete(
+      key: TemplateGenerationRepository._activeGenerationSecureScopeKey,
+    ),
+    repository._secureStorage.delete(
+      key: TemplateGenerationRepository._activeGenerationIdSecureStorageKey,
+    ),
+    repository._secureStorage.delete(
+      key: TemplateGenerationRepository
+          ._activeGenerationCorrelationIdSecureStorageKey,
+    ),
+  ]);
+}
+
+Future<void> _clearActiveGenerationPreferenceKeys(
+  TemplateGenerationRepository repository, {
+  required String activeGenerationIdKey,
+  required String activeGenerationCorrelationIdKey,
+  required String legacyActiveGenerationIdKey,
+  required String legacyActiveGenerationCorrelationIdKey,
+}) async {
+  await Future.wait<void>([
+    repository._preferences.remove(activeGenerationIdKey),
+    repository._preferences.remove(activeGenerationCorrelationIdKey),
+    repository._preferences.remove(legacyActiveGenerationIdKey),
+    repository._preferences.remove(legacyActiveGenerationCorrelationIdKey),
+  ]);
 }
 
 Future<void> _clearLocalCache(TemplateGenerationRepository repository) async {
@@ -332,6 +445,7 @@ Future<void> _clearLocalCache(TemplateGenerationRepository repository) async {
     for (final key in removableKeys) {
       await repository._preferences.remove(key);
     }
+    await _clearSecureActiveGeneration(repository);
   } on Object {
     // Keep best-effort semantics for logout cleanup.
   }
@@ -1051,7 +1165,7 @@ Object? _sanitizePersistentGenerationCacheValue(Object? value, {String? key}) {
 
   if (value is List) {
     return value
-        .map((item) => _sanitizePersistentGenerationCacheValue(item))
+        .map((item) => _sanitizePersistentGenerationCacheValue(item, key: key))
         .toList(growable: false);
   }
 
@@ -1066,6 +1180,7 @@ bool _isPersistentGenerationMediaUrlKey(String? key) {
 
   return normalized == 'url' ||
       normalized.endsWith('url') ||
+      normalized.endsWith('urls') ||
       normalized.endsWith('mediaurl');
 }
 

@@ -332,6 +332,7 @@ class _TypeBadge extends StatelessWidget {
     final background = isVideo
         ? colors.purple.withValues(alpha: 0.78)
         : colors.blue.withValues(alpha: 0.78);
+    final foreground = colors.on(background);
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -343,7 +344,7 @@ class _TypeBadge extends StatelessWidget {
         child: Text(
           isVideo ? text.videoLabel : text.imageLabel,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: Colors.white,
+            color: foreground,
             fontWeight: FontWeight.w800,
             letterSpacing: 0.1,
           ),
@@ -771,7 +772,7 @@ Future<void> _shareGenerationFile(
     return;
   }
 
-  final safeShareUri = parseSafeExternalUri(access.shareUrl);
+  final safeShareUri = parseSafeGenerationShareUri(access.shareUrl);
   if (safeShareUri == null) {
     _notifySoon(context, text.generationStatusResultUnavailableForShare);
     galleryState._completeMediaAction(mediaActionCancelToken);
@@ -848,7 +849,7 @@ Future<void> _copyGenerationLink(
     return;
   }
 
-  final safeUri = parseSafeExternalUri(access.shareUrl);
+  final safeUri = parseSafeGenerationShareUri(access.shareUrl);
   if (safeUri == null) {
     _notifySoon(context, text.generationStatusResultUnavailableForShare);
     galleryState._completeMediaAction(mediaActionCancelToken);

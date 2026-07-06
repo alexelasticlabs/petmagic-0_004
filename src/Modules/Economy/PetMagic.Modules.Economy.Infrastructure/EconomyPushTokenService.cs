@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
@@ -11,6 +12,7 @@ namespace PetMagic.Modules.Economy.Infrastructure;
 internal sealed class EconomyPushTokenService(EconomyDbContext dbContext) : IEconomyPushTokenService
 {
     private const int MaxTokenLength = 512;
+    private const int MaxActiveTokensPerUser = 10;
 
     public async Task<Result> RegisterAsync(RegisterEconomyPushTokenCommand command, CancellationToken cancellationToken)
     {
@@ -21,8 +23,13 @@ internal sealed class EconomyPushTokenService(EconomyDbContext dbContext) : IEco
         }
 
         var now = DateTime.UtcNow;
-        var existing = await dbContext.EconomyPushDeviceTokens
-            .FirstOrDefaultAsync(x => x.Token == token, cancellationToken);
+        var existingTokens = await dbContext.EconomyPushDeviceTokens
+            .Where(x => x.Token == token)
+            .OrderBy(x => x.DisabledAtUtc == null ? 0 : 1)
+            .ThenByDescending(x => x.LastSeenAtUtc)
+            .ThenByDescending(x => x.UpdatedAtUtc)
+            .ToListAsync(cancellationToken);
+        var existing = existingTokens.FirstOrDefault();
 
         if (existing is null)
         {
@@ -32,7 +39,7 @@ internal sealed class EconomyPushTokenService(EconomyDbContext dbContext) : IEco
                 UserId = command.UserId,
                 Token = token,
                 Platform = Normalize(command.Platform, "unknown", 32),
-                DeviceId = NormalizeNullable(command.DeviceId, 160),
+                DeviceId = NormalizeDeviceId(command.DeviceId),
                 AppVersion = NormalizeNullable(command.AppVersion, 64),
                 Locale = NormalizeNullable(command.Locale, 32),
                 LastSeenAtUtc = now,
@@ -44,14 +51,21 @@ internal sealed class EconomyPushTokenService(EconomyDbContext dbContext) : IEco
         {
             existing.UserId = command.UserId;
             existing.Platform = Normalize(command.Platform, existing.Platform, 32);
-            existing.DeviceId = NormalizeNullable(command.DeviceId, 160);
+            existing.DeviceId = NormalizeDeviceId(command.DeviceId);
             existing.AppVersion = NormalizeNullable(command.AppVersion, 64);
             existing.Locale = NormalizeNullable(command.Locale, 32);
             existing.LastSeenAtUtc = now;
             existing.UpdatedAtUtc = now;
             existing.DisabledAtUtc = null;
+
+            foreach (var duplicate in existingTokens.Skip(1))
+            {
+                duplicate.DisabledAtUtc = now;
+                duplicate.UpdatedAtUtc = now;
+            }
         }
 
+        await DisableExcessActiveTokensAsync(command.UserId, token, now, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
@@ -64,20 +78,44 @@ internal sealed class EconomyPushTokenService(EconomyDbContext dbContext) : IEco
             return Result.Failure(EconomyErrors.InvalidPushToken);
         }
 
-        var existing = await dbContext.EconomyPushDeviceTokens
-            .FirstOrDefaultAsync(
-                x => x.UserId == command.UserId && x.Token == token,
-                cancellationToken);
+        var existingTokens = await dbContext.EconomyPushDeviceTokens
+            .Where(x => x.UserId == command.UserId && x.Token == token)
+            .ToListAsync(cancellationToken);
 
-        if (existing is null)
+        if (existingTokens.Count == 0)
         {
             return Result.Success();
         }
 
-        existing.DisabledAtUtc = DateTime.UtcNow;
-        existing.UpdatedAtUtc = existing.DisabledAtUtc.Value;
+        var now = DateTime.UtcNow;
+        foreach (var existing in existingTokens)
+        {
+            existing.DisabledAtUtc = now;
+            existing.UpdatedAtUtc = now;
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
         return Result.Success();
+    }
+
+    private async Task DisableExcessActiveTokensAsync(
+        Guid userId,
+        string currentToken,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        var excessTokens = await dbContext.EconomyPushDeviceTokens
+            .Where(x => x.UserId == userId && x.Token != currentToken && x.DisabledAtUtc == null)
+            .OrderByDescending(x => x.LastSeenAtUtc)
+            .ThenByDescending(x => x.UpdatedAtUtc)
+            .Skip(MaxActiveTokensPerUser - 1)
+            .ToListAsync(cancellationToken);
+
+        foreach (var excess in excessTokens)
+        {
+            excess.DisabledAtUtc = now;
+            excess.UpdatedAtUtc = now;
+        }
     }
 
     private static string Normalize(string? value, string fallback, int maxLength)
@@ -104,5 +142,11 @@ internal sealed class EconomyPushTokenService(EconomyDbContext dbContext) : IEco
         return normalized.Length <= maxLength
             ? normalized
             : normalized[..maxLength];
+    }
+
+    private static string? NormalizeDeviceId(string? value)
+    {
+        var normalized = NormalizeNullable(value, 160);
+        return normalized is null ? null : SafeLogValues.StableHash(normalized);
     }
 }

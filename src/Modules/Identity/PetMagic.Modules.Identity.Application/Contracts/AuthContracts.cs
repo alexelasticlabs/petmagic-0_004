@@ -99,7 +99,8 @@ public sealed record UserListItemResponse(
     LegalAcceptanceStatusResponse LegalAcceptance,
     IReadOnlyList<string> Roles,
     DateTime CreatedAtUtc,
-    UserAvatarResponse? Avatar);
+    UserAvatarResponse? Avatar,
+    DateTime? LastActivityAtUtc = null);
 
 public sealed record UserListPageResponse(
     IReadOnlyList<UserListItemResponse> Items,

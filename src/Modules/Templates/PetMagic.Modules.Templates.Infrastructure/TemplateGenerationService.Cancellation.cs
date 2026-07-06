@@ -1,8 +1,11 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
+using PetMagic.Modules.Templates.Infrastructure.Entities;
 
 namespace PetMagic.Modules.Templates.Infrastructure;
 
@@ -37,6 +40,30 @@ internal sealed partial class TemplateGenerationService
             return Result.Failure<CancelQueuedGenerationResponse>(TemplatesErrors.GenerationCancelNotAllowed);
         }
 
+        var cancelResult = await CancelQueuedJobAsync(job, adminUserId: null, cancellationToken);
+        if (cancelResult.IsFailure)
+        {
+            return Result.Failure<CancelQueuedGenerationResponse>(cancelResult.Error);
+        }
+
+        return Result.Success(new CancelQueuedGenerationResponse(
+            job.Id,
+            cancelResult.Value.Status,
+            cancelResult.Value.Refunded,
+            cancelResult.Value.CancelledAtUtc));
+    }
+
+    private async Task<Result<QueuedGenerationCancelResult>> CancelQueuedJobAsync(
+        TemplateGenerationJob job,
+        Guid? adminUserId,
+        CancellationToken cancellationToken)
+    {
+        if (job.Status != TemplateGenerationStatus.Queued)
+        {
+            return Result.Failure<QueuedGenerationCancelResult>(TemplatesErrors.GenerationCancelNotAllowed);
+        }
+
+        var previousStatus = job.Status;
         var now = DateTime.UtcNow;
         job.Status = TemplateGenerationStatus.Cancelled;
         job.CancelledAtUtc = now;
@@ -51,7 +78,7 @@ internal sealed partial class TemplateGenerationService
         catch (DbUpdateConcurrencyException)
         {
             dbContext.ChangeTracker.Clear();
-            return Result.Failure<CancelQueuedGenerationResponse>(TemplatesErrors.GenerationCancelNotAllowed);
+            return Result.Failure<QueuedGenerationCancelResult>(TemplatesErrors.GenerationCancelNotAllowed);
         }
 
         var refunded = false;
@@ -62,8 +89,9 @@ internal sealed partial class TemplateGenerationService
             var refund = await billing.RefundAsync(job.UserId, job.Id, job.TokenCost, cancellationToken);
             if (refund.IsFailure)
             {
-                job.RefundLastErrorCode = refund.Error.Code;
-                TemplateGenerationMetrics.RecordRefundFailure(job, refund.Error.Code);
+                var safeErrorCode = AdminFailureMessageSanitizer.SanitizeCode(refund.Error.Code);
+                job.RefundLastErrorCode = safeErrorCode;
+                TemplateGenerationMetrics.RecordRefundFailure(job, safeErrorCode ?? "templates.refund_failed");
                 await dbContext.SaveChangesAsync(cancellationToken);
             }
             else
@@ -78,17 +106,46 @@ internal sealed partial class TemplateGenerationService
         }
 
         TemplateGenerationMetrics.RecordJobCancelled(job);
+        var response = await MapResponseWithQueueMetricsAsync(job, cancellationToken);
         if (realtimeService is not null)
         {
             await realtimeService.PublishGenerationStatusChangedAsync(
-                await MapResponseWithQueueMetricsAsync(job, cancellationToken),
+                response,
                 cancellationToken);
         }
 
-        return Result.Success(new CancelQueuedGenerationResponse(
-            job.Id,
-            ResolveApiStatus(job.Status),
-            refunded,
-            now));
+        if (adminUserId.HasValue)
+        {
+            logger?.LogWarning(
+                "ADMIN ACTION: queued generation cancelled. AdminUserIdHash={AdminUserIdHash} GenerationIdHash={GenerationIdHash} UserIdHash={UserIdHash} PreviousStatus={PreviousStatus} Refunded={Refunded} CorrelationIdHash={CorrelationIdHash}",
+                TemplateLogSanitizer.SafeId(adminUserId.Value),
+                TemplateLogSanitizer.SafeId(job.Id),
+                TemplateLogSanitizer.SafeId(job.UserId),
+                previousStatus,
+                refunded,
+                SafeLogValues.StableHash(CorrelationContext.ResolveOrCreate()));
+
+            if (adminAuditLog is not null)
+            {
+                await adminAuditLog.WriteAsync(
+                    new AdminAuditEntry(
+                        "admin.template_generation.cancelled",
+                        "template_generation",
+                        job.Id.ToString("D"),
+                        previousStatus.ToString(),
+                        job.Status.ToString(),
+                        $"Queued generation cancelled by admin. Refunded={refunded}.",
+                        job.UserId),
+                    cancellationToken);
+            }
+        }
+
+        return Result.Success(new QueuedGenerationCancelResult(ResolveApiStatus(job.Status), refunded, now, response));
     }
+
+    private sealed record QueuedGenerationCancelResult(
+        string Status,
+        bool Refunded,
+        DateTime CancelledAtUtc,
+        TemplateGenerationResponse Response);
 }

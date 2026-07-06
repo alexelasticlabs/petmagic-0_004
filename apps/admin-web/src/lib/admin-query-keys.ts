@@ -14,8 +14,7 @@ export const adminQueryKeys = {
   economyLedger: (query: unknown) => ["admin", "economy", "ledger", query] as const,
   economyDashboardMetrics: ["admin", "economy", "dashboard", "metrics"] as const,
   economyPurchases: (query: unknown) => ["admin", "economy", "purchases", query] as const,
-  economySubscriptions: (query: unknown) =>
-    ["admin", "economy", "subscriptions", query] as const,
+  economySubscriptions: (query: unknown) => ["admin", "economy", "subscriptions", query] as const,
   economyUserSubscriptionSummary: (userId: string) =>
     ["admin", "economy", "users", userId, "subscription-summary"] as const,
   economyUserSubscriptionSummaries: (userIds: readonly string[]) =>
@@ -46,13 +45,23 @@ export const adminQueryKeys = {
   supportInbox: (
     status: string,
     assignment: string,
-    options?: { search?: string; page?: number; pageSize?: number }
+    options?: {
+      search?: string;
+      priority?: string;
+      sort?: string;
+      queue?: string;
+      page?: number;
+      pageSize?: number;
+    }
   ) =>
     [
       ...supportInboxRoot,
       status,
       assignment,
       options?.search?.trim() || "",
+      options?.priority?.trim() || "all",
+      options?.sort?.trim() || "default",
+      options?.queue?.trim() || "all",
       options?.page ?? 1,
       options?.pageSize ?? 50,
     ] as const,
@@ -62,8 +71,7 @@ export const adminQueryKeys = {
   templateCategories: (includeArchived: boolean) =>
     ["admin", "templates", "categories", includeArchived ? "all" : "active"] as const,
   templateCatalogRoot: ["admin", "templates", "catalog"] as const,
-  templateCatalog: (query: unknown) =>
-    ["admin", "templates", "catalog", query] as const,
+  templateCatalog: (query: unknown) => ["admin", "templates", "catalog", query] as const,
   templateCatalogAnalyticsRows: (templateType: string) =>
     ["admin", "templates", templateType, "catalog-analytics"] as const,
   templateAnalyticsPrimary: (templateId: string) =>

@@ -552,7 +552,7 @@ class _AttachmentStatusRow extends StatelessWidget {
     final colors = context.petMagicColors;
     final text = AppLocalizations.of(context);
     final normalized = status.toLowerCase();
-    const warningColor = Color(0xFFE7A126);
+    final warningColor = colors.gold;
 
     final ({Color color, IconData icon, String label}) descriptor =
         switch (normalized) {

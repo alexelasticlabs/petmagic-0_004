@@ -133,6 +133,9 @@ class _SupportImagePreviewDialogState
                       imageUrl: widget.imageUrl,
                       cacheKey: persistentSafeSupportMediaUrl(widget.imageUrl),
                       fit: BoxFit.contain,
+                      memCacheWidth: _supportImagePreviewDialogCacheWidth,
+                      maxWidthDiskCache: _supportImagePreviewDialogCacheWidth,
+                      filterQuality: FilterQuality.medium,
                       placeholder: (context, url) {
                         return const SizedBox.shrink();
                       },

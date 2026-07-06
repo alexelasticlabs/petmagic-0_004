@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using Microsoft.EntityFrameworkCore;
 
 using PetMagic.BuildingBlocks.Results;
@@ -36,7 +38,8 @@ public sealed partial class EconomyService
         DateTime? currentPeriodEndUtc,
         bool cancelAtPeriodEnd,
         int monthlyTokenLimit,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? legacyExternalTransactionId = null)
     {
         var now = DateTime.UtcNow;
         var subscription = await dbContext.UserSubscriptions.FirstOrDefaultAsync(
@@ -55,7 +58,8 @@ public sealed partial class EconomyService
             externalSubscriptionId,
             externalTransactionId,
             subscription?.Id,
-            cancellationToken);
+            cancellationToken,
+            legacyExternalTransactionId);
         if (ownershipCheck.IsFailure)
         {
             return Result.Failure<UserSubscription>(ownershipCheck.Error);
@@ -150,7 +154,8 @@ public sealed partial class EconomyService
         string provider,
         string? externalSubscriptionId,
         string? externalTransactionId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? legacyExternalTransactionId = null)
     {
         var normalizedExternalSubscriptionId = string.IsNullOrWhiteSpace(externalSubscriptionId)
             ? null
@@ -158,8 +163,17 @@ public sealed partial class EconomyService
         var normalizedExternalTransactionId = string.IsNullOrWhiteSpace(externalTransactionId)
             ? null
             : externalTransactionId.Trim();
+        var normalizedLegacyExternalTransactionId = string.IsNullOrWhiteSpace(legacyExternalTransactionId)
+            ? null
+            : legacyExternalTransactionId.Trim();
+        if (string.Equals(normalizedLegacyExternalTransactionId, normalizedExternalTransactionId, StringComparison.Ordinal))
+        {
+            normalizedLegacyExternalTransactionId = null;
+        }
 
-        if (normalizedExternalSubscriptionId is null && normalizedExternalTransactionId is null)
+        if (normalizedExternalSubscriptionId is null
+            && normalizedExternalTransactionId is null
+            && normalizedLegacyExternalTransactionId is null)
         {
             return false;
         }
@@ -170,7 +184,8 @@ public sealed partial class EconomyService
                 x => x.Provider == provider
                     && x.UserId != userId
                     && ((normalizedExternalSubscriptionId != null && x.ExternalSubscriptionId == normalizedExternalSubscriptionId)
-                        || (normalizedExternalTransactionId != null && x.ExternalTransactionId == normalizedExternalTransactionId)),
+                        || (normalizedExternalTransactionId != null && x.ExternalTransactionId == normalizedExternalTransactionId)
+                        || (normalizedLegacyExternalTransactionId != null && x.ExternalTransactionId == normalizedLegacyExternalTransactionId)),
                 cancellationToken);
     }
 
@@ -181,7 +196,8 @@ public sealed partial class EconomyService
         string? externalSubscriptionId,
         string? externalTransactionId,
         Guid? currentSubscriptionId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? legacyExternalTransactionId = null)
     {
         var normalizedExternalCustomerId = string.IsNullOrWhiteSpace(externalCustomerId)
             ? null
@@ -192,10 +208,18 @@ public sealed partial class EconomyService
         var normalizedExternalTransactionId = string.IsNullOrWhiteSpace(externalTransactionId)
             ? null
             : externalTransactionId.Trim();
+        var normalizedLegacyExternalTransactionId = string.IsNullOrWhiteSpace(legacyExternalTransactionId)
+            ? null
+            : legacyExternalTransactionId.Trim();
+        if (string.Equals(normalizedLegacyExternalTransactionId, normalizedExternalTransactionId, StringComparison.Ordinal))
+        {
+            normalizedLegacyExternalTransactionId = null;
+        }
 
         if (normalizedExternalCustomerId is null
             && normalizedExternalSubscriptionId is null
-            && normalizedExternalTransactionId is null)
+            && normalizedExternalTransactionId is null
+            && normalizedLegacyExternalTransactionId is null)
         {
             return Result.Success();
         }
@@ -208,7 +232,8 @@ public sealed partial class EconomyService
                     && (!currentSubscriptionId.HasValue || x.Id != currentSubscriptionId.Value)
                     && ((normalizedExternalCustomerId != null && x.ExternalCustomerId == normalizedExternalCustomerId)
                         || (normalizedExternalSubscriptionId != null && x.ExternalSubscriptionId == normalizedExternalSubscriptionId)
-                        || (normalizedExternalTransactionId != null && x.ExternalTransactionId == normalizedExternalTransactionId)),
+                        || (normalizedExternalTransactionId != null && x.ExternalTransactionId == normalizedExternalTransactionId)
+                        || (normalizedLegacyExternalTransactionId != null && x.ExternalTransactionId == normalizedLegacyExternalTransactionId)),
                 cancellationToken);
         if (conflictingSubscriptionExists)
         {
@@ -289,12 +314,24 @@ public sealed partial class EconomyService
             Status = status,
             ExternalEventId = externalEventId,
             ExternalSubscriptionId = externalSubscriptionId,
-            PayloadJson = payloadJson,
+            PayloadJson = SanitizeSubscriptionEventPayloadJson(payloadJson),
             CreatedAtUtc = DateTime.UtcNow,
             ProcessedAtUtc = DateTime.UtcNow
         });
 
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private static string? SerializeSafeSubscriptionEventPayload(object? payload)
+    {
+        return payload is null
+            ? null
+            : SanitizeSubscriptionEventPayloadJson(JsonSerializer.Serialize(payload));
+    }
+
+    private static string? SanitizeSubscriptionEventPayloadJson(string? payloadJson)
+    {
+        return SanitizeWebhookPayloadSnapshot(payloadJson);
     }
 
     private static bool IsActivePremiumSubscription(UserSubscription? subscription)

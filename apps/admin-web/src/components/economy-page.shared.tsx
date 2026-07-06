@@ -90,11 +90,7 @@ export function WatermarkPreviewPanel({
             </div>
           )}
           {settings.enabled && applies ? (
-            <div
-              className={styles.watermarkPreviewBadge}
-              data-position={position}
-              data-size={size}
-            >
+            <div className={styles.watermarkPreviewBadge} data-position={position} data-size={size}>
               {settings.logoUrl ? (
                 <TemplateSecureMedia
                   url={settings.logoUrl}
@@ -143,8 +139,8 @@ export function safeText(value: string | null | undefined, maxLength = 120) {
 }
 
 export function formatTokens(value: number, locale: Locale) {
-  const intlLocale = getEconomyText(locale).intlLocale;
-  return `${new Intl.NumberFormat(intlLocale).format(value)} spark`;
+  const { intlLocale, tokensShort } = getEconomyText(locale);
+  return `${new Intl.NumberFormat(intlLocale).format(value)} ${tokensShort}`;
 }
 
 export function formatCurrency(value: number, locale: Locale, currencyCode: string) {
@@ -182,6 +178,30 @@ export function humanizeSource(value: string, locale: Locale) {
   };
 
   return labels[value]?.[locale] ?? safeText(value, 80);
+}
+
+export function humanizeTokenKind(
+  value: string | null | undefined,
+  locale: Locale,
+  legacyLabel: string
+) {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized || normalized === "legacy") {
+    return legacyLabel;
+  }
+
+  const labels: Record<string, { ru: string; en: string }> = {
+    purchased: { ru: "Купленные", en: "Purchased" },
+    bonus: { ru: "Бонусные", en: "Bonus" },
+    promo: { ru: "Промо", en: "Promo" },
+    referral: { ru: "Реферальные", en: "Referral" },
+    subscription_allowance: { ru: "Premium-лимит", en: "Premium allowance" },
+    admin_adjustment: { ru: "Админ-корректировка", en: "Admin adjustment" },
+    refund_adjustment: { ru: "Корректировка возврата", en: "Refund adjustment" },
+    mixed_spend: { ru: "Смешанное списание", en: "Mixed spend" },
+  };
+
+  return labels[normalized]?.[locale] ?? safeText(normalized, 64);
 }
 
 export function humanizeProvider(value: string, locale: Locale) {

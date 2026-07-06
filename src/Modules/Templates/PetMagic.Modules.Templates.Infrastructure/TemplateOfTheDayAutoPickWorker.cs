@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Infrastructure.Options;
@@ -55,21 +56,24 @@ internal sealed class TemplateOfTheDayAutoPickWorker(
 
             if (result.IsFailure)
             {
+                var errorCode = AdminFailureMessageSanitizer.SanitizeCode(result.Error.Code)
+                    ?? "templates.auto_pick_failed";
+
                 logger.LogWarning(
                     "Template of the Day auto-pick failed. Operation={Operation} TargetDate={TargetDate} BusinessTimeZone={BusinessTimeZone} ErrorCode={ErrorCode}",
                     "ensure_tomorrow_auto_pick",
                     targetDate,
                     options.TemplateOfTheDayBusinessTimeZone,
-                    result.Error.Code);
+                    errorCode);
                 return;
             }
 
             logger.LogInformation(
-                "Template of the Day auto-pick ensured. Operation={Operation} TargetDate={TargetDate} BusinessTimeZone={BusinessTimeZone} TemplateId={TemplateId}",
+                "Template of the Day auto-pick ensured. Operation={Operation} TargetDate={TargetDate} BusinessTimeZone={BusinessTimeZone} TemplateIdHash={TemplateIdHash}",
                 "ensure_tomorrow_auto_pick",
                 targetDate,
                 options.TemplateOfTheDayBusinessTimeZone,
-                result.Value.TemplateId);
+                TemplateLogSanitizer.SafeId(result.Value.TemplateId));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -78,10 +82,10 @@ internal sealed class TemplateOfTheDayAutoPickWorker(
         catch (Exception exception)
         {
             logger.LogWarning(
-                exception,
-                "Template of the Day auto-pick worker iteration failed. Operation={Operation} BusinessTimeZone={BusinessTimeZone}",
+                "Template of the Day auto-pick worker iteration failed. Operation={Operation} BusinessTimeZone={BusinessTimeZone} ExceptionType={ExceptionType}",
                 "ensure_tomorrow_auto_pick",
-                options.TemplateOfTheDayBusinessTimeZone);
+                options.TemplateOfTheDayBusinessTimeZone,
+                SafeLogValues.ExceptionType(exception));
         }
     }
 

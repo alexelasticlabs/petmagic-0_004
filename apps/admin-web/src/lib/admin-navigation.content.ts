@@ -42,17 +42,17 @@ const adminPageMetaCopy: Record<Locale, AdminPageMetaCopy> = {
     generations: {
       title: "Генерации",
       description:
-        "Очередь и история генераций с фильтрами по статусу, провайдеру, пользователю и job id.",
+        "Очередь и история генераций с фильтрами по статусу, провайдеру, пользователю и ID задания.",
     },
     feedback: {
-      title: "Feedback",
+      title: "Фидбек",
       description:
-        "Обратная связь по генерациям, багам, оплате и предложениям со статусами и возвратом credits.",
+        "Обратная связь по генерациям, багам, оплате и предложениям со статусами и возвратом кредитов.",
     },
     roleManagement: {
       title: "Управление ролями",
       description:
-        "Списки Admin и Moderator, назначение и снятие Moderator с журналом аудита.",
+        "Списки администраторов и модераторов, назначение и снятие модератора с журналом аудита.",
     },
     support: {
       title: "Поддержка",
@@ -60,8 +60,7 @@ const adminPageMetaCopy: Record<Locale, AdminPageMetaCopy> = {
     },
     moderation: {
       title: "Модерация",
-      description:
-        "Очередь жалоб и обратной связи по шаблонам с решением одобрить или отклонить.",
+      description: "Очередь жалоб и обратной связи по шаблонам с решением одобрить или отклонить.",
     },
     imageTemplates: {
       title: "Шаблоны изображений",
@@ -77,12 +76,11 @@ const adminPageMetaCopy: Record<Locale, AdminPageMetaCopy> = {
     },
     templateDailyFeatured: {
       title: "Шаблон дня",
-      description: "Ручные назначения и auto-pick для Template of the Day.",
+      description: "Ручные назначения и автоматический выбор шаблона дня.",
     },
     templateAnalytics: {
       title: "Аналитика шаблонов",
-      description:
-        "Общая статистика по просмотрам, генерациям, расходам и эффективности шаблонов.",
+      description: "Общая статистика по просмотрам, генерациям, расходам и эффективности шаблонов.",
     },
     templates: {
       title: "Шаблоны",
@@ -123,7 +121,8 @@ const adminPageMetaCopy: Record<Locale, AdminPageMetaCopy> = {
     },
     roleManagement: {
       title: "Role Management",
-      description: "Admin and Moderator lists with Moderator assignment and removal backed by audit log.",
+      description:
+        "Admin and Moderator lists with Moderator assignment and removal backed by audit log.",
     },
     support: {
       title: "Support",
@@ -167,4 +166,3 @@ const adminPageMetaCopy: Record<Locale, AdminPageMetaCopy> = {
 export function getAdminPageMetaCopy(locale: Locale): AdminPageMetaCopy {
   return adminPageMetaCopy[locale];
 }
-

@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Security.Claims;
 using System.Text;
 
@@ -39,7 +40,7 @@ public static partial class EconomyEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.ValidateGooglePlayBillingAsync(command, cancellationToken);
@@ -71,7 +72,7 @@ public static partial class EconomyEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.ValidateAppleAppStoreBillingAsync(command, cancellationToken);
@@ -94,7 +95,10 @@ public static partial class EconomyEndpoints
             _ => StatusCodes.Status400BadRequest,
         };
 
-        return TypedResults.Problem(title: error.Code, detail: GetClientEconomyProblemDetail(error.Code), statusCode: statusCode);
+        return TypedResults.Problem(
+            title: error.Code,
+            statusCode: statusCode,
+            extensions: BuildClientEconomyProblemExtensions(error.Code));
     }
 
     private static async Task<Results<Ok<PurchaseOrderResponse>, ProblemHttpResult>> GetPurchaseAsync(
@@ -124,15 +128,26 @@ public static partial class EconomyEndpoints
         IEconomyService service,
         CancellationToken cancellationToken)
     {
-        using var reader = new StreamReader(request.Body, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
-        var rawBody = await reader.ReadToEndAsync(cancellationToken);
+        var (rawBody, isTooLarge) = await ReadWebhookBodyWithinLimitAsync(
+            request,
+            MaxEconomyWebhookRequestBodyBytes,
+            cancellationToken);
+        if (isTooLarge)
+        {
+            return ToWebhookProblem(
+                new PetMagic.BuildingBlocks.Results.Error(
+                    InvalidWebhookPayloadCode,
+                    "Webhook request body is too large."),
+                StatusCodes.Status413PayloadTooLarge);
+        }
+
         var signature = request.Headers["Stripe-Signature"].ToString();
 
         var command = new StripeWebhookCommand(rawBody, signature);
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.HandleStripeWebhookAsync(command, cancellationToken);
@@ -151,6 +166,48 @@ public static partial class EconomyEndpoints
         return TypedResults.Ok(result.Value);
     }
 
+    private static async Task<(string RawBody, bool IsTooLarge)> ReadWebhookBodyWithinLimitAsync(
+        HttpRequest request,
+        int maxBytes,
+        CancellationToken cancellationToken)
+    {
+        if (request.ContentLength is > 0 && request.ContentLength > maxBytes)
+        {
+            return (string.Empty, true);
+        }
+
+        await using var buffer = new MemoryStream();
+        var rented = ArrayPool<byte>.Shared.Rent(8192);
+        try
+        {
+            var totalBytes = 0;
+            while (true)
+            {
+                var read = await request.Body.ReadAsync(
+                    rented.AsMemory(0, rented.Length),
+                    cancellationToken);
+                if (read == 0)
+                {
+                    break;
+                }
+
+                totalBytes += read;
+                if (totalBytes > maxBytes)
+                {
+                    return (string.Empty, true);
+                }
+
+                buffer.Write(rented, 0, read);
+            }
+
+            return (Encoding.UTF8.GetString(buffer.ToArray()), false);
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(rented);
+        }
+    }
+
     private static async Task<Results<Ok<StoreWebhookResultResponse>, ProblemHttpResult, ValidationProblem>> AppStoreServerNotificationAsync(
         AppStoreServerNotificationRequest request,
         IValidator<AppStoreServerNotificationCommand> validator,
@@ -162,7 +219,7 @@ public static partial class EconomyEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var securityValidation = securityValidator.ValidateAppStoreSignedPayload(command.SignedPayload);
@@ -206,7 +263,7 @@ public static partial class EconomyEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var securityValidation = await securityValidator.ValidateGooglePlayPushAsync(httpRequest.Headers.Authorization.ToString(), cancellationToken);
@@ -256,19 +313,8 @@ public static partial class EconomyEndpoints
     {
         return TypedResults.Problem(
             title: error.Code,
-            detail: GetWebhookProblemDetail(error.Code),
-            statusCode: statusCode);
-    }
-
-    private static string GetWebhookProblemDetail(string errorCode)
-    {
-        return errorCode switch
-        {
-            InvalidStripeSignatureCode or InvalidStoreWebhookSignatureCode => "Webhook signature validation failed.",
-            InvalidWebhookPayloadCode => "Webhook payload is invalid.",
-            "economy.store_verification_unavailable" => "Webhook verification is temporarily unavailable.",
-            _ => "Webhook request could not be processed.",
-        };
+            statusCode: statusCode,
+            extensions: BuildClientEconomyProblemExtensions(error.Code));
     }
 
 }

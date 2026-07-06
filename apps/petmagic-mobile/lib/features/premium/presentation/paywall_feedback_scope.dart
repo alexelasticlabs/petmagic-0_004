@@ -5,6 +5,7 @@ import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart'
 
 const paywallFeedbackLastShownStorageKeyPrefix =
     'feedback_paywall_last_shown_utc_v2';
+const _paywallFeedbackScopeMaxLength = 128;
 
 String buildPaywallFeedbackLastShownStorageKey(String scopeKey) {
   return '$paywallFeedbackLastShownStorageKeyPrefix:'
@@ -49,6 +50,11 @@ class PaywallFeedbackScopeResolver {
 String? normalizePaywallFeedbackScope(String? rawValue) {
   final normalized = rawValue?.trim();
   if (normalized == null || normalized.isEmpty) {
+    return null;
+  }
+
+  if (normalized.length > _paywallFeedbackScopeMaxLength ||
+      normalized.contains(RegExp(r'[\x00-\x1F\x7F]'))) {
     return null;
   }
 

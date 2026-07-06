@@ -85,8 +85,9 @@ class _FeaturedPackTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
+    final localeTag = Localizations.localeOf(context).toLanguageTag();
     final colors = context.petMagicColors;
-    final price = displayPrice ?? _formatPrice(pack);
+    final price = displayPrice ?? _formatPrice(pack, localeTag);
     final valueLabel = _valuePerCurrencyLabel(text, pack);
     final usageLabel = templatePricing.usageLabel(text, pack.totalSpark);
     final badgeLabel = isBestOffer

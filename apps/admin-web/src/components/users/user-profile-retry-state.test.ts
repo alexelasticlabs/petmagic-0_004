@@ -31,9 +31,7 @@ describe("admin user profile retry states", () => {
 
     expect(source).toContain("title={text.userAnalyticsLoadError}");
     expect(source).toContain("function requestUserProfileRetry()");
-    expect(source).toContain(
-      "if (!canViewUserProfile || isFetching) {\n      return;\n    }"
-    );
+    expect(source).toContain("if (!canViewUserProfile || isFetching) {\n      return;\n    }");
     expect(source).toContain("void refresh().catch(() => undefined)");
     expect(source).toContain("onClick={requestUserProfileRetry}");
     expect(source).toContain("disabled={!canViewUserProfile || isFetching}");
@@ -46,9 +44,7 @@ describe("admin user profile retry states", () => {
 
     expect(source).toContain("title={text.userAnalyticsLoadError}");
     expect(source).toContain("function requestUserProfileRetry()");
-    expect(source).toContain(
-      "if (!canViewUserProfile || isFetching) {\n      return;\n    }"
-    );
+    expect(source).toContain("if (!canViewUserProfile || isFetching) {\n      return;\n    }");
     expect(source).toContain("void refresh().catch(() => undefined)");
     expect(source).toContain("onClick={requestUserProfileRetry}");
     expect(source).toContain("disabled={!canViewUserProfile || isFetching}");

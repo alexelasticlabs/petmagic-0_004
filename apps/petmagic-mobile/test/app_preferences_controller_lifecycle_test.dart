@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +8,27 @@ import 'package:petmagic_mobile/app/preferences/app_preferences_controller.dart'
 import 'package:petmagic_mobile/app/preferences/app_preferences_storage.dart';
 
 void main() {
+  test('app preferences controller does not cache storage in build', () {
+    final source = File(
+      'lib/app/preferences/app_preferences_controller.dart',
+    ).readAsStringSync();
+
+    expect(
+      source,
+      isNot(contains('late final AppPreferencesStorage _storage')),
+    );
+    expect(
+      source,
+      contains(
+        'AppPreferencesStorage get _storage => ref.read(appPreferencesStorageProvider)',
+      ),
+    );
+    expect(
+      source,
+      isNot(contains('_storage = ref.watch(appPreferencesStorageProvider)')),
+    );
+  });
+
   test(
     'app preferences controller stops async loading after dispose',
     () async {

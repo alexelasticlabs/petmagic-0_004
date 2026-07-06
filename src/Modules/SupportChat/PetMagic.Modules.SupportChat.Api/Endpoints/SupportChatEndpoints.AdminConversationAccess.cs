@@ -26,6 +26,7 @@ public static partial class SupportChatEndpoints
         [FromQuery] int? page,
         [FromQuery] int? pageSize,
         [FromQuery] string? sort,
+        [FromQuery] string? queue,
         [FromServices] ISupportChatService service,
         CancellationToken cancellationToken)
     {
@@ -55,7 +56,8 @@ public static partial class SupportChatEndpoints
                 Page: requestedPage,
                 PageSize: requestedPageSize,
                 Sort: sort,
-                Statuses: status),
+                Statuses: status,
+                Queue: queue),
             "unassigned" => new ListAdminSupportInboxQuery(
                 status?.FirstOrDefault(),
                 UnassignedOnly: true,
@@ -65,7 +67,8 @@ public static partial class SupportChatEndpoints
                 Page: requestedPage,
                 PageSize: requestedPageSize,
                 Sort: sort,
-                Statuses: status),
+                Statuses: status,
+                Queue: queue),
             _ => new ListAdminSupportInboxQuery(
                 status?.FirstOrDefault(),
                 AssignedAdminId: assignedTo,
@@ -75,7 +78,8 @@ public static partial class SupportChatEndpoints
                 Page: requestedPage,
                 PageSize: requestedPageSize,
                 Sort: sort,
-                Statuses: status)
+                Statuses: status,
+                Queue: queue)
         };
 
         var result = await service.ListAdminInboxAsync(query, cancellationToken);

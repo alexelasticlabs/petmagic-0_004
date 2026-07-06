@@ -27,6 +27,7 @@ using PetMagic.Modules.SupportChat.Application.Abstractions;
 using PetMagic.Modules.SupportChat.Infrastructure;
 using PetMagic.Modules.Templates.Api;
 using PetMagic.Modules.Templates.Infrastructure;
+using PetMagic.Modules.Templates.Infrastructure.Options;
 using PetMagic.Modules.Gamification.Api;
 using PetMagic.Modules.Gamification.Infrastructure;
 
@@ -107,6 +108,7 @@ try
     var allowAnyCorsInDevelopment = builder.Environment.IsDevelopment();
     HostApiProductionConfigurationValidator.ValidateDefaultConnectionString(builder.Configuration, builder.Environment);
     HostApiProductionConfigurationValidator.ValidateJwtSigningKey(builder.Configuration, builder.Environment);
+    HostApiProductionConfigurationValidator.ValidateAllowedHosts(builder.Configuration, builder.Environment);
     HostApiProductionConfigurationValidator.ValidateCorsAllowedOrigins(allowedOrigins, builder.Environment);
     HostApiProductionConfigurationValidator.ValidatePublicMediaBaseUrls(builder.Configuration, builder.Environment);
     HostApiProductionConfigurationValidator.ValidateNoPublicServerSecrets(builder.Configuration, builder.Environment);
@@ -322,18 +324,32 @@ try
     builder.Services
         .AddOpenTelemetry()
         .ConfigureResource(resource => resource.AddService("PetMagic.Host.Api"))
-        .WithTracing(tracing => tracing
-            .AddAspNetCoreInstrumentation()
-            .AddHttpClientInstrumentation()
-            .AddOtlpExporter())
-        .WithMetrics(metrics => metrics
-            .AddAspNetCoreInstrumentation()
-            .AddHttpClientInstrumentation()
-            .AddRuntimeInstrumentation()
-            .AddMeter("PetMagic.Host.Api")
-            .AddMeter("PetMagic.Modules.Economy")
-            .AddMeter("PetMagic.Modules.Templates")
-            .AddOtlpExporter());
+        .WithTracing(tracing =>
+        {
+            tracing
+                .AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation();
+
+            if (IsOtlpExporterConfigured(builder.Configuration))
+            {
+                tracing.AddOtlpExporter();
+            }
+        })
+        .WithMetrics(metrics =>
+        {
+            metrics
+                .AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation()
+                .AddRuntimeInstrumentation()
+                .AddMeter("PetMagic.Host.Api")
+                .AddMeter("PetMagic.Modules.Economy")
+                .AddMeter("PetMagic.Modules.Templates");
+
+            if (IsOtlpExporterConfigured(builder.Configuration))
+            {
+                metrics.AddOtlpExporter();
+            }
+        });
 
     var app = builder.Build();
 
@@ -421,6 +437,24 @@ try
             avatarStorageOptions.PublicBaseUrl))
         {
             var signer = context.RequestServices.GetRequiredService<IAvatarReadUrlSigner>();
+            var query = context.Request.Query.ToDictionary(
+                pair => pair.Key,
+                pair => (string?)pair.Value.ToString(),
+                StringComparer.OrdinalIgnoreCase);
+            if (!signer.IsAuthorizedRequest(requestPath, query))
+            {
+                context.Response.StatusCode = StatusCodes.Status404NotFound;
+                return;
+            }
+        }
+
+        var templatesOptions = context.RequestServices.GetRequiredService<TemplatesOptions>();
+        if (IsManagedSignedMediaPath(
+            context.Request.Path,
+            "/templates-media",
+            templatesOptions.PublicBaseUrl))
+        {
+            var signer = context.RequestServices.GetRequiredService<ITemplateMediaReadUrlSigner>();
             var query = context.Request.Query.ToDictionary(
                 pair => pair.Key,
                 pair => (string?)pair.Value.ToString(),
@@ -664,6 +698,10 @@ static string ResolveBootstrapEnvironment()
         ?? Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT")
         ?? Environments.Production;
 }
+
+static bool IsOtlpExporterConfigured(IConfiguration configuration) =>
+    !string.IsNullOrWhiteSpace(configuration["OpenTelemetry:Otlp:Endpoint"])
+    || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT"));
 
 internal sealed record HostBuildInfo(
     string Application,

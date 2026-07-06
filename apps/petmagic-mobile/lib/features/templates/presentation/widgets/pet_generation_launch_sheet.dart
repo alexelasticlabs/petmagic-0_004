@@ -13,6 +13,7 @@ import 'package:petmagic_mobile/features/pets/presentation/pet_profile_providers
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
+import 'package:petmagic_mobile/features/templates/presentation/mappers/template_error_key_mapper.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_preview_image.dart';
 import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
@@ -536,7 +537,12 @@ String _petLaunchStartErrorText(AppLocalizations text, Object error) {
       return authMessage;
     }
 
-    final key = _normalizePetLaunchErrorKey(error.message);
+    final key =
+        _normalizePetLaunchErrorKey(error.message) ??
+        normalizeTemplateErrorKey(error.message);
+    if (key == 'templates.premium_required') {
+      return text.templateFlowPremiumRequiredError;
+    }
     if (error.statusCode == 402 ||
         key == 'templates.insufficient_balance' ||
         key == 'economy.insufficient_balance') {
@@ -544,6 +550,14 @@ String _petLaunchStartErrorText(AppLocalizations text, Object error) {
     }
     if (key == 'pets.photo_not_found' || key == 'pets.photo_required') {
       return _petLaunchSelectedPhotoMissingText(text);
+    }
+    if (key == 'templates.generation_already_started') {
+      return text.templateFlowActiveGenerationLimitError;
+    }
+    if (key == 'templates.server_unavailable' ||
+        key == 'templates.server_timeout' ||
+        key == 'templates.generation_wait_too_long') {
+      return text.templateFlowServerError;
     }
   }
 

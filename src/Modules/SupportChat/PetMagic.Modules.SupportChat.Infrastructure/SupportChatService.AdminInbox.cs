@@ -48,6 +48,19 @@ public sealed partial class SupportChatService
                 || (includeClosed && x.Status == SupportConversationStatus.Closed));
         }
 
+        var normalizedQueue = query.Queue?.Trim().ToLowerInvariant();
+        if (normalizedQueue is not (null or "" or "all" or "waiting_for_support"))
+        {
+            return Result.Failure<SupportConversationInboxPageResponse>(InvalidQueue);
+        }
+
+        if (normalizedQueue == "waiting_for_support")
+        {
+            conversationsQuery = conversationsQuery.Where(x =>
+                x.Status == SupportConversationStatus.New
+                || x.Status == SupportConversationStatus.InProgress);
+        }
+
         if (!string.IsNullOrWhiteSpace(query.Source))
         {
             if (!TryParseNamedEnum<SupportConversationSource>(query.Source, out var source))

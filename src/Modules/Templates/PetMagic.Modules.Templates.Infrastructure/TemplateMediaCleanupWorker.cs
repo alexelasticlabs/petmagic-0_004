@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Templates.Infrastructure.Options;
 
 namespace PetMagic.Modules.Templates.Infrastructure;
@@ -51,7 +52,10 @@ internal sealed class TemplateMediaCleanupWorker(
             catch (Exception exception)
             {
                 consecutiveFailures++;
-                logger.LogError(exception, "Template media cleanup worker loop failed.");
+                logger.LogError(
+                    "Template media cleanup worker loop failed. ConsecutiveFailures={ConsecutiveFailures} ExceptionType={ExceptionType}",
+                    consecutiveFailures,
+                    SafeLogValues.ExceptionType(exception));
                 await Task.Delay(GetBackoffDelay(options.MediaCleanupPollIntervalMilliseconds, consecutiveFailures), stoppingToken);
             }
         }

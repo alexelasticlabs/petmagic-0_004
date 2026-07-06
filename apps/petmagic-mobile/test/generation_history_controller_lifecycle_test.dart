@@ -20,6 +20,12 @@ void main() {
     final deleteBody = _methodBody(source, '_deleteGeneration');
     final realtimeBody = _methodBody(source, '_resumeRealtimeIfNeeded');
     final eventBody = _methodBody(source, '_handleRealtimeEvent');
+    final refetchBody = _methodBody(source, '_refetchRealtimeGeneration');
+    final pauseRealtimeBody = _methodBody(source, '_pauseRealtime');
+    final cancelRealtimeBody = _methodBody(
+      source,
+      '_cancelActiveRealtimeRefetches',
+    );
 
     expect(buildBody, contains('_isScreenVisible = false;'));
     expect(buildBody, contains('if (!ref.mounted)'));
@@ -90,6 +96,42 @@ void main() {
     expect(eventBody, contains("feature: 'Templates.GenerationHistory'"));
     expect(eventBody, contains("operation: 'realtime_event_parse'"));
     expect(eventBody, isNot(contains('} catch (_) {}')));
+    expect(
+      refetchBody,
+      contains('if (!ref.mounted || !_isScreenVisible || !_hasInternet)'),
+    );
+    expect(
+      refetchBody,
+      contains(
+        'if (_activeRealtimeRefetchCancelTokens.containsKey(generationId))',
+      ),
+    );
+    expect(refetchBody, contains('final cancelToken = CancelToken();'));
+    expect(
+      refetchBody,
+      contains(
+        '_activeRealtimeRefetchCancelTokens[generationId] = cancelToken',
+      ),
+    );
+    expect(refetchBody, contains('cancelToken: cancelToken'));
+    expect(refetchBody, contains('cancelToken.isCancelled'));
+    expect(refetchBody, contains('CancelToken.isCancel(error)'));
+    expect(refetchBody, contains('return;'));
+    expect(
+      refetchBody,
+      contains('_activeRealtimeRefetchCancelTokens.remove(generationId)'),
+    );
+    expect(
+      pauseRealtimeBody,
+      contains(
+        "_cancelActiveRealtimeRefetches('generation_history_realtime_paused')",
+      ),
+    );
+    expect(
+      cancelRealtimeBody,
+      contains('_activeRealtimeRefetchCancelTokens.clear()'),
+    );
+    expect(cancelRealtimeBody, contains('cancelToken.cancel(reason)'));
   });
 }
 

@@ -71,7 +71,7 @@ class AuthSessionStorage {
           message: 'Stored auth session is missing required tokens',
           context: {'raw_length': raw.length},
         );
-        await clear();
+        await _clearInvalidSession('deserialize_invalid_tokens_cleanup');
         return null;
       }
 
@@ -85,7 +85,7 @@ class AuthSessionStorage {
         error: error,
         stackTrace: stackTrace,
       );
-      await clear();
+      await _clearInvalidSession('deserialize_cleanup');
       return null;
     }
   }
@@ -108,5 +108,19 @@ class AuthSessionStorage {
 
   Future<void> clear() async {
     await _secureStorage.delete(key: sessionKey);
+  }
+
+  Future<void> _clearInvalidSession(String operation) async {
+    try {
+      await clear();
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Profile.AuthSession',
+        operation: operation,
+        message: 'Stored auth session cleanup failed',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
   }
 }

@@ -9,7 +9,12 @@ import { ensureAdminSession } from "@/components/admin/admin-session";
 import { getUsersManagementPageText } from "@/components/users-management-page.content";
 import { getAdminErrorMessage } from "@/lib/admin-error-message";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
-import { fetchUsers, useAuthSession, type FetchUsersQuery, type UserListPage } from "@/lib/api-client";
+import {
+  fetchUsers,
+  useAuthSession,
+  type FetchUsersQuery,
+  type UserListPage,
+} from "@/lib/api-client";
 import { clientLogger } from "@/lib/client-logger";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";

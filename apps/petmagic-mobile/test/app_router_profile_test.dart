@@ -53,6 +53,9 @@ void main() {
     final linkedAccountsSource = File(
       'lib/features/profile/presentation/widgets/profile_linked_accounts_settings_section.dart',
     ).readAsStringSync();
+    final appRouterSource = File(
+      'lib/app/router/app_router.dart',
+    ).readAsStringSync();
 
     expect(authEntrySource, contains('EmailVerificationRouteArgs('));
     expect(
@@ -83,6 +86,10 @@ void main() {
     expect(
       linkedAccountsSource,
       isNot(contains('PasswordChangePage.routePath}?email=')),
+    );
+    expect(
+      appRouterSource,
+      isNot(contains("state.uri.queryParameters['email']")),
     );
   });
 

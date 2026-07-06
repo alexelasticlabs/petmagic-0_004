@@ -21,8 +21,8 @@ import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.d
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_stripe_checkout_page.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/shared/payments/external_checkout_result.dart';
 import 'package:petmagic_mobile/shared/payments/payment_method_sheet.dart';
-import 'package:petmagic_mobile/shared/payments/stripe_paymentsheet_coordinator.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
@@ -55,15 +55,20 @@ class _WalletPageState extends ConsumerState<WalletPage>
 
   bool _shouldReloadOnResume = false;
   Timer? _autoRefreshTimer;
-  late final WalletController _walletController;
+  WalletController? _visibleWalletController;
+  ProviderSubscription<WalletState>? _walletSubscription;
   ModalRoute<dynamic>? _route;
   int _autoRefreshErrorStreak = 0;
+  bool _walletPageVisible = false;
 
   @override
   void initState() {
     super.initState();
-    _walletController = ref.read(walletControllerProvider.notifier);
-    _walletController.setWalletPageVisible(true);
+    _setWalletPageVisible(true);
+    _walletSubscription = ref.listenManual<WalletState>(
+      walletControllerProvider,
+      (_, _) => _syncVisibleWalletController(),
+    );
     WidgetsBinding.instance.addObserver(this);
     Future.microtask(() {
       if (!mounted) {
@@ -89,7 +94,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
           return;
         }
 
-        _walletController.load();
+        ref.read(walletControllerProvider.notifier).load();
       });
     });
   }
@@ -112,7 +117,8 @@ class _WalletPageState extends ConsumerState<WalletPage>
   @override
   void dispose() {
     _stopAutoRefresh();
-    _walletController.setWalletPageVisible(false);
+    _walletSubscription?.close();
+    _setStoredWalletPageVisible(false);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -120,7 +126,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
   @override
   void deactivate() {
     _stopAutoRefresh();
-    _walletController.setWalletPageVisible(false);
+    _setStoredWalletPageVisible(false);
     super.deactivate();
   }
 
@@ -133,7 +139,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
   @override
   void activate() {
     super.activate();
-    _walletController.setWalletPageVisible(true);
+    _setWalletPageVisible(true);
     if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
       _stopAutoRefresh();
       return;
@@ -153,6 +159,26 @@ class _WalletPageState extends ConsumerState<WalletPage>
 
       unawaited(_refreshVisibleWalletData(forceRefresh: true));
     });
+  }
+
+  void _setWalletPageVisible(bool visible) {
+    _walletPageVisible = visible;
+    _syncVisibleWalletController();
+  }
+
+  void _syncVisibleWalletController() {
+    final controller = ref.read(walletControllerProvider.notifier);
+    if (!identical(_visibleWalletController, controller)) {
+      _visibleWalletController?.setWalletPageVisible(false);
+      _visibleWalletController = controller;
+    }
+
+    controller.setWalletPageVisible(_walletPageVisible);
+  }
+
+  void _setStoredWalletPageVisible(bool visible) {
+    _walletPageVisible = visible;
+    _visibleWalletController?.setWalletPageVisible(visible);
   }
 
   @override
@@ -541,7 +567,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
                         const SizedBox(height: 12),
                         ProfileMessageCard(
                           message: _friendlyError(text, state.errorMessage!),
-                          tone: const Color(0xFFFFC107),
+                          tone: colors.gold,
                         ),
                       ],
                       if (isAuthenticated &&

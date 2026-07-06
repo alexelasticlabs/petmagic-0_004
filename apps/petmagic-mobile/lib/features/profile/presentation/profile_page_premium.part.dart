@@ -10,7 +10,8 @@ class _PremiumBannerCard extends StatelessWidget {
     final text = AppLocalizations.of(context);
     final isLight = Theme.of(context).brightness == Brightness.light;
     final colors = context.petMagicColors;
-    const accent = Color(0xFFFFC107);
+    final accent = colors.gold;
+    final premiumLabelColor = isLight ? colors.textStrong : colors.gold;
 
     return Material(
       color: Colors.transparent,
@@ -92,8 +93,8 @@ class _PremiumBannerCard extends StatelessWidget {
                                 const SizedBox(width: 5),
                                 Text(
                                   text.premiumLabel,
-                                  style: const TextStyle(
-                                    color: Color(0xFFFFD666),
+                                  style: TextStyle(
+                                    color: premiumLabelColor,
                                     fontSize: 10,
                                     fontWeight: FontWeight.w800,
                                   ),

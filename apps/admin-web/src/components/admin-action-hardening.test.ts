@@ -58,16 +58,33 @@ describe("admin action hardening", () => {
     expect(source).toContain("enabled: canManageRoles");
     expect(source).toContain("const normalizedSearch = debouncedSearch.trim();");
     expect(source).toContain("enabled: canManageRoles && normalizedSearch.length >= 2");
-    expect(contentSource).toContain('roleActionsAdminOnly: "Изменять роли может только Admin."');
-    expect(contentSource).toContain('assignModeratorLabel: "Назначить Moderator пользователю"');
-    expect(contentSource).toContain('revokeModeratorLabel: "Снять Moderator у пользователя"');
+    expect(contentSource).toContain(
+      'roleActionsAdminOnly: "Изменять роли может только администратор."'
+    );
+    expect(contentSource).toContain('assignModeratorLabel: "Назначить модератора пользователю"');
+    expect(contentSource).toContain('revokeModeratorLabel: "Снять модератора у пользователя"');
     expect(contentSource).toContain(
       'searchHint: "Введите минимум 2 символа. Поиск обновится автоматически."'
     );
-    expect(contentSource).toContain('adminAlreadyPrivileged: "Уже Admin"');
-    expect(contentSource).toContain('moderatorAlreadyPrivileged: "Уже Moderator"');
+    expect(contentSource).toContain('searchDescription: "Поиск по email, ID или имени."');
+    expect(contentSource).toContain('searchPlaceholder: "email, ID пользователя или имя"');
+    expect(contentSource).toContain(
+      'confirmAssignDescription: "Пользователь получит доступ к разрешенным разделам модерации."'
+    );
+    expect(contentSource).toContain(
+      '"Пользователь потеряет доступ модератора. Действие будет записано в журнал аудита."'
+    );
+    expect(contentSource.slice(0, contentSource.indexOf("  en: {"))).not.toContain("audit log");
+    expect(contentSource.slice(0, contentSource.indexOf("  en: {"))).not.toContain(
+      "moderator доступ"
+    );
+    expect(contentSource.slice(0, contentSource.indexOf("  en: {"))).not.toMatch(
+      /:\s*"[^"]*Moderator/
+    );
+    expect(contentSource).toContain('adminAlreadyPrivileged: "Уже администратор"');
+    expect(contentSource).toContain('moderatorAlreadyPrivileged: "Уже модератор"');
     expect(contentSource).toContain('eyebrow: "Контроль доступа"');
-    expect(contentSource).toContain('adminOnly: "Только Admin"');
+    expect(contentSource).toContain('adminOnly: "Только администратор"');
     expect(contentSource).toContain('adminsTitle: "Администраторы"');
     expect(contentSource).toContain('moderatorsTitle: "Модераторы"');
     expect(source).toContain("function assertCanManageRoles(): boolean");
@@ -108,7 +125,7 @@ describe("admin action hardening", () => {
     expect(source).not.toContain("sanitizeSensitiveText(error.message, 160)");
     expect(source).toContain('clientLogger.warn(\n        "roles.action_failed",');
     expect(source).not.toContain('clientLogger.warn("roles.action_failed", { error');
-    expect(source).toContain("USER_SEARCH_MAX_LENGTH,");
+    expect(source).toContain("USER_SEARCH_MAX_LENGTH");
     expect(source).toContain("setSearch(event.target.value.slice(0, USER_SEARCH_MAX_LENGTH))");
     expect(source).toContain('type="search"');
     expect(source).toContain('autoComplete="off"');
@@ -316,7 +333,7 @@ describe("admin action hardening", () => {
     const source = readUsersManagementPageLibrarySource();
     const hookSource = readFileSync(useUsersAdminPath, "utf8");
 
-    expect(source).toContain("USER_SEARCH_MAX_LENGTH,");
+    expect(source).toContain("USER_SEARCH_MAX_LENGTH");
     expect(source).toContain("setSearch(event.target.value.slice(0, USER_SEARCH_MAX_LENGTH));");
     expect(source).toContain("maxLength={USER_SEARCH_MAX_LENGTH}");
     expect(hookSource).toContain("const isLoading = usersQuery.isLoading;");
@@ -346,7 +363,7 @@ describe("admin action hardening", () => {
     expect(source).not.toContain("setSearch(event.target.value);");
   });
 
-  it("does not expose browser-only sorting on the paged users table", () => {
+  it("routes users sorting through backend query params", () => {
     const source = readUsersManagementPageLibrarySource();
 
     expect(source).toContain("const ROW_ENRICHMENT_CONCURRENCY = 4;");
@@ -358,10 +375,20 @@ describe("admin action hardening", () => {
     expect(source).toContain("fetchUserRowEnrichment<AdminUserAnalytics>");
     expect(source).toContain("fetchUserRowEnrichment<AdminEconomyUserSubscriptionSummary>");
     expect(source).not.toContain("useQueries");
-    expect(source).not.toContain("type SortMode");
-    expect(source).not.toContain("sortMode");
-    expect(source).not.toContain("sortLastActivity");
-    expect(source).not.toContain("sortCreated");
+    expect(source).toContain(
+      'const [sortMode, setSortMode] = useState<UserSortMode>("created_desc");'
+    );
+    expect(source).toContain("sort: sortMode");
+    expect(source).toContain("setSortMode={setSortMode}");
+    expect(source).toContain("sortMode={sortMode}");
+    expect(source).toContain("value={sortMode}");
+    expect(source).toContain('value="created_desc"');
+    expect(source).toContain('value="created_asc"');
+    expect(source).toContain('value="last_activity_desc"');
+    expect(source).toContain('value="last_activity_asc"');
+    expect(source).toContain("sortLastActivityDesc");
+    expect(source).toContain("sortLastActivityAsc");
+    expect(source).toContain("user.lastActivityAtUtc ?? rowAnalytics?.summary.lastActivityAtUtc");
     expect(source).not.toContain("analyticsTargetUsers");
     expect(source).toContain("const pageUsers = users;");
     expect(source).toContain("const pagedUsers = pageUsers;");
@@ -476,6 +503,10 @@ describe("admin action hardening", () => {
     );
     expect(adminChromeContentSource).toContain('navigationLabel: "Навигация админ-панели"');
     expect(adminChromeContentSource).toContain('navigationLabel: "Admin navigation"');
+    expect(adminChromeContentSource).toContain('brandTitle: "PetMagic Admin"');
+    expect(sidebarSource).toContain("const brandTitle = copy.sidebar.brandTitle;");
+    expect(sidebarSource).toContain("<span className={styles.brandName}>{brandTitle}</span>");
+    expect(sidebarSource).not.toContain(">PetMagic Admin</span>");
     expect(sidebarSource).toContain("aria-label={navigationLabel}");
     expect(sidebarSource).toContain('aria-hidden={isDrawerMode && !isOpen ? "true" : undefined}');
     expect(sidebarSource).toContain("inert={isDrawerMode && !isOpen}");

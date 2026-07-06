@@ -3,6 +3,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 
 using PetMagic.Modules.Gamification.Application.Abstractions;
@@ -15,12 +16,14 @@ public static class GamificationEndpoints
     private const string InvalidSubjectCode = "gamification.invalid_subject";
     private const string PetProgressNotFoundCode = "gamification.pet_progress_not_found";
     private const string StreakNotFoundCode = "gamification.streak_not_found";
+    private const int MaxGamificationMutationRequestBodyBytes = 8 * 1024;
 
     public static IEndpointRouteBuilder MapGamificationEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/gamification")
             .WithTags("Gamification")
             .RequireRateLimiting("economy")
+            .AddEndpointFilter(ApplyPrivateGamificationResponseHeadersAsync)
             .RequireAuthorization(policy => policy
                 .RequireAuthenticatedUser()
                 .RequireAssertion(context =>
@@ -48,12 +51,24 @@ public static class GamificationEndpoints
             .RequireAuthorization();
 
         group.MapPost("/streaks/freeze", UseStreakFreezeAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxGamificationMutationRequestBodyBytes));
 
         group.MapGet("/challenges/current", GetCurrentChallengesAsync)
             .RequireAuthorization();
 
         return endpoints;
+    }
+
+    private static async ValueTask<object?> ApplyPrivateGamificationResponseHeadersAsync(
+        EndpointFilterInvocationContext context,
+        EndpointFilterDelegate next)
+    {
+        context.HttpContext.Response.Headers.CacheControl = "no-store";
+        context.HttpContext.Response.Headers.Pragma = "no-cache";
+        context.HttpContext.Response.Headers.XContentTypeOptions = "nosniff";
+
+        return await next(context);
     }
 
     private static async Task<Results<Ok<GamificationSummaryResponse>, ProblemHttpResult>> GetSummaryAsync(
@@ -173,19 +188,20 @@ public static class GamificationEndpoints
     {
         return TypedResults.Problem(
             title: InvalidSubjectCode,
-            detail: "Authentication failed.",
-            statusCode: StatusCodes.Status401Unauthorized);
+            statusCode: StatusCodes.Status401Unauthorized,
+            extensions: BuildProblemExtensions(InvalidSubjectCode));
     }
 
     private static ProblemHttpResult NotFoundProblem(string errorCode)
     {
-        var detail = string.Equals(errorCode, StreakNotFoundCode, StringComparison.Ordinal)
-            ? "Streak was not found."
-            : "Gamification resource was not found.";
-
         return TypedResults.Problem(
             title: errorCode,
-            detail: detail,
-            statusCode: StatusCodes.Status404NotFound);
+            statusCode: StatusCodes.Status404NotFound,
+            extensions: BuildProblemExtensions(errorCode));
+    }
+
+    private static Dictionary<string, object?> BuildProblemExtensions(string errorCode)
+    {
+        return new Dictionary<string, object?> { ["code"] = errorCode };
     }
 }

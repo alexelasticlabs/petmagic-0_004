@@ -51,15 +51,52 @@ void main() {
       final registerBody = _methodBody(source, 'registerCurrentToken');
       final unregisterBody = _methodBody(source, '_unregisterCurrentToken');
       final refreshedBody = _methodBody(source, '_registerRefreshedToken');
+      final staleUnregisterBody = _methodBody(source, '_unregisterStaleToken');
       final ensureInitializedBody = _methodBody(source, '_ensureInitialized');
       final canContinueBody = _methodBody(source, '_canContinueRegistration');
 
       expect(source, contains('bool _authSessionActive = false;'));
       expect(initBody, contains('_authSessionActive = true;'));
       expect(registerBody, contains('|| !_authSessionActive'));
+      expect(
+        registerBody,
+        contains('final previousToken = _lastRegisteredToken;'),
+      );
+      final registerAttemptIndex = registerBody.indexOf(
+        'final registered = await _registerTokenWithRetry',
+      );
+      expect(registerAttemptIndex, isNonNegative);
+      expect(
+        registerBody.substring(0, registerAttemptIndex),
+        isNot(contains('_lastRegisteredToken = token;')),
+      );
+      expect(
+        registerBody.indexOf(
+          '_lastRegisteredToken = token;',
+          registerAttemptIndex,
+        ),
+        greaterThan(registerAttemptIndex),
+      );
+      expect(
+        registerBody,
+        contains('await _unregisterStaleToken(previousToken'),
+      );
       expect(unregisterBody, contains('_authSessionActive = false;'));
       expect(unregisterBody, contains('_handledInteractions.clear();'));
+      expect(unregisterBody, contains('_lastRegisteredToken = null;'));
       expect(refreshedBody, contains('!_authSessionActive'));
+      expect(source, contains('required String? previousToken'));
+      expect(
+        ensureInitializedBody,
+        isNot(contains('_lastRegisteredToken = token;')),
+      );
+      expect(refreshedBody, contains('_lastRegisteredToken = token;'));
+      expect(
+        refreshedBody,
+        contains('await _unregisterStaleToken(previousToken'),
+      );
+      expect(staleUnregisterBody, contains('clearRegistrationState: false'));
+      expect(staleUnregisterBody, contains("unregister_stale_\${stage}_token"));
       expect(ensureInitializedBody, contains('if (!_authSessionActive) {'));
       expect(canContinueBody, contains('_authSessionActive'));
     },
@@ -136,6 +173,13 @@ void main() {
       foregroundBody,
       contains('final route = _routeFromMap(message.data);'),
     );
+    expect(foregroundBody, contains('final title = _fallbackTitle(type);'));
+    expect(
+      foregroundBody,
+      contains('final messageText = _fallbackBody(type);'),
+    );
+    expect(foregroundBody, isNot(contains('message.notification?.title')));
+    expect(foregroundBody, isNot(contains('message.notification?.body')));
     expect(foregroundBody, contains('PetMagicNotificationAction('));
     expect(foregroundBody, contains('label: _openActionLabel()'));
     expect(
@@ -194,10 +238,19 @@ void main() {
 
     expect(source, contains('_handledInteractions'));
     expect(source, contains('_handledInteractionWindow'));
+    expect(source, contains('_maxHandledInteractions'));
+    expect(source, contains('_maxExternalDedupeKeyLength'));
     expect(routeBody, contains('if (!_markInteractionHandled(message))'));
-    expect(dedupeBody, contains("message.data['dedupe_key']"));
-    expect(dedupeBody, contains('message.messageId'));
+    expect(dedupeBody, contains('final key = _interactionDedupeKey(message);'));
     expect(dedupeBody, contains('_handledInteractions[key]'));
+    expect(dedupeBody, contains('_trimHandledInteractionsToLimit();'));
+    expect(
+      source,
+      contains("_safeExternalDedupeKey(message.data['dedupe_key'])"),
+    );
+    expect(source, contains('_fingerprintNotificationData(message.data)'));
+    expect(source, contains('sha256.convert'));
+    expect(source, isNot(contains('message.data.toString()')));
   });
 
   test('push bootstrap keeps lifecycle side effects out of build', () {
@@ -327,7 +380,16 @@ void main() {
         reconcileBody,
         contains('_pushTokenRegistrar.readRegisteredToken()'),
       );
+      expect(reconcileBody, contains('final cachedToken ='));
+      expect(
+        reconcileBody.indexOf('if (!mounted)'),
+        greaterThan(reconcileBody.indexOf('readRegisteredToken()')),
+      );
       expect(reconcileBody, contains('FirebaseMessaging.instance.getToken()'));
+      expect(
+        reconcileBody.indexOf('FirebaseMessaging.instance.getToken()'),
+        greaterThan(reconcileBody.indexOf('if (!mounted)')),
+      );
       expect(reconcileBody, contains('_pushTokenRegistrar.unregisterToken('));
       expect(
         reconcileBody,
@@ -375,12 +437,25 @@ void main() {
       );
       expect(
         registrarSource,
+        contains('_registrationCache.writeLastCompletedRegistrationKey('),
+      );
+      expect(
+        registrarSource,
         contains(
-          'await _registrationCache.writeLastCompletedRegistrationKey(registrationKey)',
+          '_registrationCache.writeLastCompletedRegistrationToken(token)',
         ),
+      );
+      expect(
+        registrarSource,
+        contains('_registrationCache.readLastCompletedRegistrationToken()'),
       );
       expect(registrarSource, contains('sha256.convert'));
       expect(cacheSource, contains('pushTokenRegistrationFingerprintPrefix'));
+      expect(cacheSource, contains('FlutterSecureStorage'));
+      expect(
+        cacheSource,
+        contains('petmagic_mobile_push_token_last_registration_token_v1'),
+      );
       expect(
         registrarSource,
         contains('Future<String?> readRegisteredToken()'),

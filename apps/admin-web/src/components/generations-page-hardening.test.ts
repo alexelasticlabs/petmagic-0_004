@@ -32,7 +32,7 @@ describe("generations page hardening", () => {
     expect(source).not.toContain("title={item.userId}");
   });
 
-  it("localizes generation statuses and keeps unsupported retry/cancel actions out of the UI", () => {
+  it("localizes generation statuses and exposes supported generation actions", () => {
     const source = readGenerationsPageLibrarySource();
     const contentSource = readFileSync(generationsContentPath, "utf8");
 
@@ -53,8 +53,8 @@ describe("generations page hardening", () => {
     expect(source).not.toContain('const isRu = locale === "ru";');
     expect(source).not.toContain('locale === "ru" ? "ru-RU" : "en-US"');
     expect(source).not.toContain("unsupportedActions");
-    expect(source).not.toContain("Retry/cancel не показаны");
-    expect(source).not.toContain("Retry/cancel are hidden");
+    expect(source).not.toContain("Retry не показан");
+    expect(source).not.toContain("Retry is hidden");
     expect(source).not.toContain("backend does not expose");
     expect(source).not.toContain("metaItems={[");
 
@@ -66,7 +66,8 @@ describe("generations page hardening", () => {
     );
     expect(contentSource).toContain('eyebrow: "Операции"');
     expect(contentSource).toContain('description:\n      "Операционный список заданий генерации');
-    expect(contentSource).toContain('adminOnly: "Только Admin"');
+    expect(contentSource).toContain('adminOnly: "Только администратор"');
+    expect(contentSource).not.toContain('adminOnly: "Только Admin"');
     expect(contentSource).toContain('total: "Всего заданий"');
     expect(contentSource).toContain('allJobsScope: "Все задания"');
     expect(contentSource).toContain(
@@ -80,12 +81,28 @@ describe("generations page hardening", () => {
     expect(contentSource).toContain('before: "До"');
     expect(contentSource).toContain('after: "После"');
     expect(contentSource).toContain('compareState: "Сравнение"');
-    expect(contentSource).toContain('inputAsset: "Входной asset"');
-    expect(contentSource).toContain('resultAsset: "Результат asset"');
+    expect(contentSource).toContain(
+      'filtersDescription: "Сузьте список по ID задания, статусу, провайдеру или ID пользователя."'
+    );
+    expect(contentSource).toContain('searchLabel: "ID задания"');
+    expect(contentSource).toContain('userLabel: "ID пользователя"');
+    expect(contentSource).toContain('inputAsset: "Входной медиафайл"');
+    expect(contentSource).toContain('resultAsset: "Результирующий медиафайл"');
+    expect(contentSource.slice(0, contentSource.indexOf("  en: {"))).not.toContain("Job id");
+    expect(contentSource.slice(0, contentSource.indexOf("  en: {"))).not.toContain("User id");
+    expect(contentSource.slice(0, contentSource.indexOf("  en: {"))).not.toContain("asset");
     expect(contentSource).toContain('pet: "Питомец"');
     expect(contentSource).toContain('petPhoto: "Фото питомца"');
-    expect(contentSource).toContain('debugTitle: "Отладка"');
-    expect(contentSource).toContain('grantClean: "Выдать clean"');
+    expect(contentSource).toContain('diagnosticsTitle: "Диагностика"');
+    expect(contentSource).toContain('watermark: "Водяной знак"');
+    expect(contentSource).toContain('watermarkApplied: "С водяным знаком"');
+    expect(contentSource).toContain('grantClean: "Выдать чистый файл"');
+    expect(contentSource).toContain(
+      'grantCleanError: "Не удалось выдать файл без водяного знака."'
+    );
+    expect(contentSource).toContain('seedLabel: "Сид"');
+    expect(contentSource).toContain('cancelGeneration: "Отменить"');
+    expect(contentSource).toContain('retryGeneration: "Запустить снова"');
     expect(contentSource).toContain('feedbackTab: "Отзывы"');
   });
 
@@ -247,7 +264,9 @@ describe("generations page hardening", () => {
     const source = readGenerationsPageLibrarySource();
     const contentSource = readFileSync(generationsContentPath, "utf8");
 
-    expect(contentSource).toContain('grantCleanError: "Не удалось выдать clean download."');
+    expect(contentSource).toContain(
+      'grantCleanError: "Не удалось выдать файл без водяного знака."'
+    );
     expect(source).toContain("const [grantCleanError, setGrantCleanError]");
     expect(source).toContain("setGrantCleanError(null);");
     expect(source).toContain(
@@ -335,6 +354,70 @@ describe("generations page hardening", () => {
     expect(source).not.toContain(
       "await queryClient.invalidateQueries({ queryKey: adminQueryKeys.templateGenerations(query) });"
     );
+  });
+
+  it("shows admin queued generation cancellation only when the backend marks a row cancellable", () => {
+    const source = readGenerationsPageLibrarySource();
+    const contentSource = readFileSync(generationsContentPath, "utf8");
+
+    expect(contentSource).toContain('cancelGeneration: "Отменить"');
+    expect(contentSource).toContain('cancelGenerationError: "Не удалось отменить генерацию."');
+    expect(contentSource).toContain('cancelGenerationConfirmTitle: "Отменить генерацию?"');
+    expect(contentSource).toContain(
+      "cancelGenerationConfirmDescription: (generationId: string) =>"
+    );
+    expect(source).toContain("cancelAdminTemplateGeneration,");
+    expect(source).toContain("retryAdminTemplateGeneration,");
+    expect(source).toContain("const [cancelGenerationError, setCancelGenerationError]");
+    expect(source).toContain("const [pendingCancelGenerationId, setPendingCancelGenerationId]");
+    expect(source).toContain("const [retryGenerationError, setRetryGenerationError]");
+    expect(source).toContain("const [pendingRetryGenerationId, setPendingRetryGenerationId]");
+    expect(source).toContain("mutationFn: cancelAdminTemplateGeneration");
+    expect(source).toContain("mutationFn: retryAdminTemplateGeneration");
+    expect(source).toContain("adminQueryKeys.templateGenerationMetrics");
+    expect(source).toContain(
+      "const cancellingGenerationId = cancelGenerationMutation.variables ?? null;"
+    );
+    expect(source).toContain(
+      "const isCancelGenerationLocked =\n    cancelGenerationMutation.isPending || generationsQuery.isFetching;"
+    );
+    expect(source).toContain("function requestCancelGeneration(generationId: string)");
+    expect(source).toContain(
+      "if (!canViewGenerations || isCancelGenerationLocked) {\n      return;\n    }"
+    );
+    expect(source).toContain("setPendingCancelGenerationId(generationId);");
+    expect(source).toContain("function confirmCancelGeneration()");
+    expect(source).toContain("cancelGenerationMutation.mutate(pendingCancelGenerationId);");
+    expect(source).toContain("function requestRetryGeneration(generationId: string)");
+    expect(source).toContain("retryGenerationMutation.mutate(pendingRetryGenerationId);");
+    expect(source).toContain("onCancelGeneration={requestCancelGeneration}");
+    expect(source).toContain("onRetryGeneration={requestRetryGeneration}");
+    expect(source).toContain("cancellingGenerationId={cancellingGenerationId}");
+    expect(source).toContain("cancelGenerationPending={isCancelGenerationLocked}");
+    expect(source).toContain("retryingGenerationId={retryingGenerationId}");
+    expect(source).toContain("retryGenerationPending={isRetryGenerationLocked}");
+    expect(source).toContain("onCancelGeneration: (generationId: string) => void;");
+    expect(source).toContain("onRetryGeneration: (generationId: string) => void;");
+    expect(source).toContain("cancellingGenerationId: string | null;");
+    expect(source).toContain("cancelGenerationPending: boolean;");
+    expect(source).toContain("retryingGenerationId: string | null;");
+    expect(source).toContain("retryGenerationPending: boolean;");
+    expect(source).toContain(
+      "const cancelGenerationLabel = `${text.cancelGeneration}: ${generationIdText}`;"
+    );
+    expect(source).toContain("item.canCancel ? (");
+    expect(source).toContain("disabled={cancelGenerationPending}");
+    expect(source).toContain("item.canRetry ? (");
+    expect(source).toContain("disabled={retryGenerationPending}");
+    expect(source).toContain("aria-label={retryGenerationLabel}");
+    expect(source).toContain("aria-label={cancelGenerationLabel}");
+    expect(source).toContain("title={cancelGenerationLabel}");
+    expect(source).toContain("<ConfirmationDialog");
+    expect(source).toContain("title={text.cancelGenerationConfirmTitle}");
+    expect(source).toContain("description={pendingCancelGenerationDescription}");
+    expect(source).toContain("title={text.retryGenerationConfirmTitle}");
+    expect(source).toContain("description={pendingRetryGenerationDescription}");
+    expect(source).not.toContain("window.confirm");
   });
 
   it("does not render stale placeholder rows while generation filters or pages refresh", () => {

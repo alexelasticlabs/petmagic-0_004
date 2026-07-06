@@ -32,6 +32,7 @@ mixin _WalletControllerCheckout
       ),
     );
 
+    final checkoutCancelToken = _startCheckoutCancelToken();
     try {
       if (paymentMethod.isStoreNative) {
         final expectedProductId = pack.productIdForProvider(
@@ -88,8 +89,9 @@ mixin _WalletControllerCheckout
         pack,
         paymentMethod,
         WidgetsBinding.instance.platformDispatcher.locale,
+        cancelToken: checkoutCancelToken,
       );
-      if (!ref.mounted) {
+      if (!ref.mounted || checkoutCancelToken.isCancelled) {
         return null;
       }
 
@@ -123,7 +125,7 @@ mixin _WalletControllerCheckout
       }
 
       final checkoutUrl = checkout.checkoutUrl.trim();
-      if (checkoutUrl.isEmpty && !checkout.usesPaymentSheet) {
+      if (checkoutUrl.isEmpty) {
         final payload = <String, Object>{
           'pack_id': pack.packId,
           'pack_code': pack.code,
@@ -151,10 +153,8 @@ mixin _WalletControllerCheckout
         return null;
       }
 
-      final safeCheckoutUri = checkout.usesPaymentSheet
-          ? null
-          : parseSafePremiumExternalUri(checkoutUrl);
-      if (!checkout.usesPaymentSheet && safeCheckoutUri == null) {
+      final safeCheckoutUri = parseSafePremiumExternalUri(checkoutUrl);
+      if (safeCheckoutUri == null) {
         final payload = <String, Object>{
           'pack_id': pack.packId,
           'pack_code': pack.code,
@@ -185,12 +185,42 @@ mixin _WalletControllerCheckout
       _updateStateIfMounted(
         (state) => state.copyWith(
           isBuying: false,
-          checkoutUrl: safeCheckoutUri?.toString() ?? checkoutUrl,
+          checkoutUrl: safeCheckoutUri.toString(),
           pendingCheckoutOrderId: checkout.orderId,
           clearPendingStoreProvider: true,
         ),
       );
       return checkout;
+    } on RequestCancelledException {
+      _updateStateIfMounted((state) => state.copyWith(isBuying: false));
+      return null;
+    } on DioException catch (error) {
+      if (CancelToken.isCancel(error) || checkoutCancelToken.isCancelled) {
+        _updateStateIfMounted((state) => state.copyWith(isBuying: false));
+        return null;
+      }
+
+      if (durableStorePendingOrderId != null) {
+        await _repository.clearPendingStorePurchase(
+          orderId: durableStorePendingOrderId,
+        );
+      }
+      AppLogger.error(
+        feature: 'Wallet.Checkout',
+        operation: 'checkout_failed',
+        message: 'Checkout failed',
+        context: {'pack_code': pack.code, 'provider': paymentMethod.provider},
+        error: error,
+      );
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isBuying: false,
+          clearPendingCheckout: true,
+          clearPendingStoreProvider: true,
+          errorMessage: _errorMessage(error),
+        ),
+      );
+      return null;
     } catch (error) {
       if (durableStorePendingOrderId != null) {
         await _repository.clearPendingStorePurchase(
@@ -213,6 +243,8 @@ mixin _WalletControllerCheckout
         ),
       );
       return null;
+    } finally {
+      _clearActiveCheckout(checkoutCancelToken);
     }
   }
 
@@ -361,48 +393,71 @@ mixin _WalletControllerCheckout
       ),
     );
 
+    final verificationCancelToken = _startCheckoutVerificationCancelToken();
     const maxAttempts = 6;
-    for (var attempt = 0; attempt < maxAttempts; attempt++) {
-      if (!ref.mounted) {
-        return;
-      }
-
-      try {
-        final purchase = await _repository.fetchPurchase(pendingOrderId);
-        if (!ref.mounted) {
+    try {
+      for (var attempt = 0; attempt < maxAttempts; attempt++) {
+        if (!ref.mounted || verificationCancelToken.isCancelled) {
           return;
         }
-        if (purchase.status == 'succeeded') {
-          await load(refresh: true);
+
+        try {
+          final purchase = await _repository.fetchPurchase(
+            pendingOrderId,
+            cancelToken: verificationCancelToken,
+          );
+          if (!ref.mounted || verificationCancelToken.isCancelled) {
+            return;
+          }
+          if (purchase.status == 'succeeded') {
+            await load(refresh: true);
+            _updateStateIfMounted(
+              (state) => state.copyWith(
+                checkoutVerificationState:
+                    WalletCheckoutVerificationState.succeeded,
+                checkoutGrantedSpark: purchase.sparkToGrant,
+                highlightedPurchaseOrderId: purchase.orderId,
+                clearPendingCheckout: true,
+                clearPendingStoreProvider: true,
+                clearCheckoutError: true,
+              ),
+            );
+            return;
+          }
+        } on RequestCancelledException {
+          return;
+        } on DioException catch (error) {
+          if (CancelToken.isCancel(error) ||
+              verificationCancelToken.isCancelled) {
+            return;
+          }
+
           _updateStateIfMounted(
             (state) => state.copyWith(
-              checkoutVerificationState:
-                  WalletCheckoutVerificationState.succeeded,
-              checkoutGrantedSpark: purchase.sparkToGrant,
-              highlightedPurchaseOrderId: purchase.orderId,
-              clearPendingCheckout: true,
-              clearPendingStoreProvider: true,
-              clearCheckoutError: true,
+              checkoutVerificationState: WalletCheckoutVerificationState.error,
+              checkoutErrorMessage: _errorMessage(error),
+            ),
+          );
+          return;
+        } catch (error) {
+          _updateStateIfMounted(
+            (state) => state.copyWith(
+              checkoutVerificationState: WalletCheckoutVerificationState.error,
+              checkoutErrorMessage: _errorMessage(error),
             ),
           );
           return;
         }
-      } catch (error) {
-        _updateStateIfMounted(
-          (state) => state.copyWith(
-            checkoutVerificationState: WalletCheckoutVerificationState.error,
-            checkoutErrorMessage: _errorMessage(error),
-          ),
-        );
-        return;
-      }
 
-      if (attempt < maxAttempts - 1) {
-        await Future<void>.delayed(const Duration(seconds: 1));
-        if (!ref.mounted) {
-          return;
+        if (attempt < maxAttempts - 1) {
+          await Future<void>.delayed(const Duration(seconds: 1));
+          if (!ref.mounted || verificationCancelToken.isCancelled) {
+            return;
+          }
         }
       }
+    } finally {
+      _clearActiveCheckoutVerification(verificationCancelToken);
     }
 
     _updateStateIfMounted(
@@ -449,89 +504,131 @@ mixin _WalletControllerCheckout
       ),
     );
 
+    final verificationCancelToken = _startCheckoutVerificationCancelToken();
     const maxAttempts = 5;
     final normalizedReference = _normalizeStripeCheckoutReferenceId(
       stripeReferenceId,
     );
 
-    for (var attempt = 0; attempt < maxAttempts; attempt++) {
-      if (!ref.mounted) {
-        return;
-      }
-
-      try {
-        final purchase = await _repository.verifyStripeCheckoutSession(
-          orderId: pendingOrderId,
-          stripeReferenceId: normalizedReference,
-        );
-        if (!ref.mounted) {
+    try {
+      for (var attempt = 0; attempt < maxAttempts; attempt++) {
+        if (!ref.mounted || verificationCancelToken.isCancelled) {
           return;
         }
 
-        if (purchase.status == 'succeeded') {
-          await load(refresh: true);
-          _updateStateIfMounted(
-            (state) => state.copyWith(
-              checkoutVerificationState:
-                  WalletCheckoutVerificationState.succeeded,
-              checkoutGrantedSpark: purchase.sparkToGrant,
-              highlightedPurchaseOrderId: purchase.orderId,
-              clearPendingCheckout: true,
-              clearPendingStoreProvider: true,
-              clearCheckoutError: true,
-            ),
+        try {
+          final purchase = await _repository.verifyStripeCheckoutSession(
+            orderId: pendingOrderId,
+            stripeReferenceId: normalizedReference,
+            cancelToken: verificationCancelToken,
           );
-          return;
-        }
-      } catch (error) {
-        AppLogger.warn(
-          feature: 'Wallet.Checkout',
-          operation: 'stripe_verify_attempt_failed',
-          message: 'Stripe verify attempt failed',
-          context: {
-            'order_id': pendingOrderId,
-            'attempt': attempt + 1,
-            'reference_type': _stripeReferenceType(normalizedReference),
-          },
-          error: error,
-        );
-      }
+          if (!ref.mounted || verificationCancelToken.isCancelled) {
+            return;
+          }
 
-      try {
-        final purchase = await _repository.fetchPurchase(pendingOrderId);
-        if (!ref.mounted) {
+          if (purchase.status == 'succeeded') {
+            await load(refresh: true);
+            _updateStateIfMounted(
+              (state) => state.copyWith(
+                checkoutVerificationState:
+                    WalletCheckoutVerificationState.succeeded,
+                checkoutGrantedSpark: purchase.sparkToGrant,
+                highlightedPurchaseOrderId: purchase.orderId,
+                clearPendingCheckout: true,
+                clearPendingStoreProvider: true,
+                clearCheckoutError: true,
+              ),
+            );
+            return;
+          }
+        } on RequestCancelledException {
           return;
-        }
-        if (purchase.status == 'succeeded') {
-          await load(refresh: true);
-          _updateStateIfMounted(
-            (state) => state.copyWith(
-              checkoutVerificationState:
-                  WalletCheckoutVerificationState.succeeded,
-              checkoutGrantedSpark: purchase.sparkToGrant,
-              highlightedPurchaseOrderId: purchase.orderId,
-              clearPendingCheckout: true,
-              clearPendingStoreProvider: true,
-              clearCheckoutError: true,
-            ),
+        } on DioException catch (error) {
+          if (CancelToken.isCancel(error) ||
+              verificationCancelToken.isCancelled) {
+            return;
+          }
+
+          AppLogger.warn(
+            feature: 'Wallet.Checkout',
+            operation: 'stripe_verify_attempt_failed',
+            message: 'Stripe verify attempt failed',
+            context: {
+              'order_id': pendingOrderId,
+              'attempt': attempt + 1,
+              'reference_type': _stripeReferenceType(normalizedReference),
+            },
+            error: error,
           );
-          return;
+        } catch (error) {
+          AppLogger.warn(
+            feature: 'Wallet.Checkout',
+            operation: 'stripe_verify_attempt_failed',
+            message: 'Stripe verify attempt failed',
+            context: {
+              'order_id': pendingOrderId,
+              'attempt': attempt + 1,
+              'reference_type': _stripeReferenceType(normalizedReference),
+            },
+            error: error,
+          );
         }
-      } catch (error, stackTrace) {
-        _logWalletLoadFailure(
-          'fetch_purchase_for_verification',
-          error,
-          stackTrace,
-        );
-        // Keep retrying verify endpoint; failures here should not interrupt confirmation loop.
-      }
 
-      if (attempt < maxAttempts - 1) {
-        await Future<void>.delayed(const Duration(seconds: 1));
-        if (!ref.mounted) {
+        try {
+          final purchase = await _repository.fetchPurchase(
+            pendingOrderId,
+            cancelToken: verificationCancelToken,
+          );
+          if (!ref.mounted || verificationCancelToken.isCancelled) {
+            return;
+          }
+          if (purchase.status == 'succeeded') {
+            await load(refresh: true);
+            _updateStateIfMounted(
+              (state) => state.copyWith(
+                checkoutVerificationState:
+                    WalletCheckoutVerificationState.succeeded,
+                checkoutGrantedSpark: purchase.sparkToGrant,
+                highlightedPurchaseOrderId: purchase.orderId,
+                clearPendingCheckout: true,
+                clearPendingStoreProvider: true,
+                clearCheckoutError: true,
+              ),
+            );
+            return;
+          }
+        } on RequestCancelledException {
           return;
+        } on DioException catch (error, stackTrace) {
+          if (CancelToken.isCancel(error) ||
+              verificationCancelToken.isCancelled) {
+            return;
+          }
+
+          _logWalletLoadFailure(
+            'fetch_purchase_for_verification',
+            error,
+            stackTrace,
+          );
+          // Keep retrying verify endpoint; failures here should not interrupt confirmation loop.
+        } catch (error, stackTrace) {
+          _logWalletLoadFailure(
+            'fetch_purchase_for_verification',
+            error,
+            stackTrace,
+          );
+          // Keep retrying verify endpoint; failures here should not interrupt confirmation loop.
+        }
+
+        if (attempt < maxAttempts - 1) {
+          await Future<void>.delayed(const Duration(seconds: 1));
+          if (!ref.mounted || verificationCancelToken.isCancelled) {
+            return;
+          }
         }
       }
+    } finally {
+      _clearActiveCheckoutVerification(verificationCancelToken);
     }
 
     await _performCheckoutStatusVerification();

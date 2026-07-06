@@ -101,6 +101,37 @@ public static class HostApiProductionConfigurationValidator
         }
     }
 
+    public static void ValidateAllowedHosts(IConfiguration configuration, IHostEnvironment environment)
+    {
+        if (environment.IsDevelopment())
+        {
+            return;
+        }
+
+        var allowedHosts = configuration["AllowedHosts"];
+        if (string.IsNullOrWhiteSpace(allowedHosts))
+        {
+            throw new InvalidOperationException(
+                "AllowedHosts must be configured for non-development environments.");
+        }
+
+        var hosts = allowedHosts
+            .Split([';', ','], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        if (hosts.Length == 0)
+        {
+            throw new InvalidOperationException(
+                "AllowedHosts must contain at least one host outside development.");
+        }
+
+        foreach (var host in hosts)
+        {
+            ValidateProductionAllowedHost(host);
+        }
+    }
+
     public static void ValidatePublicMediaBaseUrls(IConfiguration configuration, IHostEnvironment environment)
     {
         if (environment.IsDevelopment())
@@ -179,9 +210,53 @@ public static class HostApiProductionConfigurationValidator
             throw new InvalidOperationException("Cors:AllowedOrigins must contain origins only, without paths, query strings, fragments, or credentials outside development.");
         }
 
-        if (IsLocalDevelopmentHost(uri.Host))
+        if (IsPrivateNetworkTarget(uri))
         {
-            throw new InvalidOperationException("Cors:AllowedOrigins must not contain local development origins outside development.");
+            throw new InvalidOperationException("Cors:AllowedOrigins must not contain local or private network origins outside development.");
+        }
+
+        if (IsPlaceholderHost(uri.Host))
+        {
+            throw new InvalidOperationException("Cors:AllowedOrigins must not contain example.com placeholder origins outside development.");
+        }
+    }
+
+    private static void ValidateProductionAllowedHost(string host)
+    {
+        if (string.IsNullOrWhiteSpace(host))
+        {
+            throw new InvalidOperationException("AllowedHosts must not contain empty values outside development.");
+        }
+
+        if (host.Contains('*', StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("AllowedHosts must not contain wildcard hosts outside development.");
+        }
+
+        if (ContainsPlaceholder(host))
+        {
+            throw new InvalidOperationException("AllowedHosts contains a placeholder value and must be replaced outside development.");
+        }
+
+        if (!Uri.TryCreate($"https://{host}", UriKind.Absolute, out var uri)
+            || !string.Equals(uri.Host, host.Trim('[', ']'), StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("AllowedHosts must contain host names only outside development.");
+        }
+
+        if (!uri.IsDefaultPort)
+        {
+            throw new InvalidOperationException("AllowedHosts must not include ports outside development.");
+        }
+
+        if (IsPrivateNetworkTarget(uri))
+        {
+            throw new InvalidOperationException("AllowedHosts must not contain local or private network hosts outside development.");
+        }
+
+        if (IsPlaceholderHost(uri.Host))
+        {
+            throw new InvalidOperationException("AllowedHosts must not contain example.com placeholder hosts outside development.");
         }
     }
 
@@ -214,15 +289,22 @@ public static class HostApiProductionConfigurationValidator
             throw new InvalidOperationException($"{settingName} must not contain credentials, query strings, or fragments outside development.");
         }
 
-        if (IsLocalDevelopmentHost(uri.Host))
+        if (IsPrivateNetworkTarget(uri))
         {
-            throw new InvalidOperationException($"{settingName} must not point to a local development host outside development.");
+            throw new InvalidOperationException($"{settingName} must not point to a local or private network host outside development.");
+        }
+
+        if (IsPlaceholderHost(uri.Host))
+        {
+            throw new InvalidOperationException($"{settingName} must not use example.com placeholder hosts outside development.");
         }
     }
 
-    private static bool IsLocalDevelopmentHost(string host)
+    private static bool IsPrivateNetworkTarget(Uri uri)
     {
+        var host = uri.IdnHost;
         if (string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
+            || host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase)
             || string.Equals(host, "0.0.0.0", StringComparison.OrdinalIgnoreCase)
             || string.Equals(host, "[::]", StringComparison.OrdinalIgnoreCase)
             || string.Equals(host, "::", StringComparison.OrdinalIgnoreCase))
@@ -231,7 +313,54 @@ public static class HostApiProductionConfigurationValidator
         }
 
         var normalizedHost = host.Trim('[', ']');
-        return IPAddress.TryParse(normalizedHost, out var address) && IPAddress.IsLoopback(address);
+        return IPAddress.TryParse(normalizedHost, out var address) && IsPrivateNetworkAddress(address);
+    }
+
+    private static bool IsPrivateNetworkAddress(IPAddress address)
+    {
+        if (address.IsIPv4MappedToIPv6)
+        {
+            address = address.MapToIPv4();
+        }
+
+        if (IPAddress.IsLoopback(address)
+            || IPAddress.Any.Equals(address)
+            || IPAddress.None.Equals(address)
+            || IPAddress.IPv6Any.Equals(address)
+            || IPAddress.IPv6Loopback.Equals(address)
+            || IPAddress.IPv6None.Equals(address)
+            || address.IsIPv6LinkLocal
+            || address.IsIPv6SiteLocal
+            || address.IsIPv6Multicast
+            || IsIPv6UniqueLocalAddress(address))
+        {
+            return true;
+        }
+
+        if (address.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork)
+        {
+            return false;
+        }
+
+        var bytes = address.GetAddressBytes();
+        return bytes[0] == 10
+            || bytes[0] == 127
+            || bytes[0] == 169 && bytes[1] == 254
+            || bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31
+            || bytes[0] == 192 && bytes[1] == 168
+            || bytes[0] == 100 && bytes[1] >= 64 && bytes[1] <= 127
+            || bytes[0] >= 224;
+    }
+
+    private static bool IsIPv6UniqueLocalAddress(IPAddress address)
+    {
+        if (address.AddressFamily != System.Net.Sockets.AddressFamily.InterNetworkV6)
+        {
+            return false;
+        }
+
+        var bytes = address.GetAddressBytes();
+        return (bytes[0] & 0xfe) == 0xfc;
     }
 
     private static bool ContainsPlaceholder(string value) =>
@@ -240,6 +369,13 @@ public static class HostApiProductionConfigurationValidator
         || value.Contains("YOUR_", StringComparison.OrdinalIgnoreCase)
         || value.Contains("<", StringComparison.Ordinal)
         || value.Contains(">", StringComparison.Ordinal);
+
+    private static bool IsPlaceholderHost(string host)
+    {
+        var normalized = host.Trim('[', ']').ToLowerInvariant();
+        return normalized == "example.com"
+            || normalized.EndsWith(".example.com", StringComparison.Ordinal);
+    }
 
     private static bool IsPublicServerSecretKey(string key)
     {

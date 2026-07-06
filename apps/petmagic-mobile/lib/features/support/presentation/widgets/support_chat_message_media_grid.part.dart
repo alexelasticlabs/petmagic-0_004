@@ -245,7 +245,9 @@ class _MessageMediaGroupTile extends StatelessWidget {
                   imageUrl: safeUri!.toString(),
                   cacheKey: persistentSafeSupportMediaUrl(safeUri.toString()),
                   fit: BoxFit.cover,
-                  memCacheWidth: 512,
+                  memCacheWidth: _supportAttachmentGridThumbnailCacheWidth,
+                  maxWidthDiskCache: _supportAttachmentGridThumbnailCacheWidth,
+                  filterQuality: FilterQuality.medium,
                   placeholder: (context, url) {
                     return ColoredBox(color: colors.surface);
                   },

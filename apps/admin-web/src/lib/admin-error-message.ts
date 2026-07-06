@@ -1,6 +1,7 @@
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 type AdminDisplayError = {
+  code?: string;
   status?: number;
   message?: string;
   detail?: string;
@@ -13,7 +14,6 @@ export function getAdminErrorMessage(error: unknown, fallback: string): string {
   }
 
   const candidate = error as AdminDisplayError;
-  const statusMessage = getStatusMessage(candidate.status);
   if (Array.isArray(candidate.validationErrors) && candidate.validationErrors.length > 0) {
     const validationMessage = candidate.validationErrors
       .map(normalizeErrorText)
@@ -25,53 +25,23 @@ export function getAdminErrorMessage(error: unknown, fallback: string): string {
       return validationMessage;
     }
 
-    return statusMessage ?? fallback;
+    return fallback;
   }
 
-  const rawDetail = typeof candidate.detail === "string" ? normalizeErrorText(candidate.detail) : "";
-  if (rawDetail && !isTechnicalMessage(rawDetail)) {
+  const rawDetail =
+    typeof candidate.detail === "string" ? normalizeErrorText(candidate.detail) : "";
+  if (rawDetail && !isTechnicalMessage(rawDetail) && !isGenericApiProblemDetail(rawDetail)) {
     return sanitizeDisplayErrorText(rawDetail);
   }
 
-  const rawMessage = typeof candidate.message === "string" ? normalizeErrorText(candidate.message) : "";
-  if (rawMessage && !isTechnicalMessage(rawMessage)) {
+  const rawMessage =
+    typeof candidate.message === "string" ? normalizeErrorText(candidate.message) : "";
+  if (rawMessage && !isTechnicalMessage(rawMessage) && !isGenericApiProblemDetail(rawMessage)) {
     const message = sanitizeDisplayErrorText(rawMessage);
     return message;
   }
 
-  return statusMessage ?? fallback;
-}
-
-function getStatusMessage(status: number | undefined): string | null {
-  if (status === 400) {
-    return "Request data is invalid.";
-  }
-
-  if (status === 401) {
-    return "Session expired. Sign in again.";
-  }
-
-  if (status === 403) {
-    return "You do not have permission to perform this action.";
-  }
-
-  if (status === 404) {
-    return "Requested resource was not found.";
-  }
-
-  if (status === 409) {
-    return "This action conflicts with the current server state.";
-  }
-
-  if (status === 422) {
-    return "Request validation failed.";
-  }
-
-  if (typeof status === "number" && status >= 500) {
-    return "Server error. Try again later.";
-  }
-
-  return null;
+  return fallback;
 }
 
 function normalizeErrorText(value: string): string {
@@ -86,9 +56,33 @@ function isTechnicalMessage(value: string): boolean {
   const trimmed = value.trim();
   return (
     /^API request failed with status \d+$/i.test(trimmed) ||
+    /^(Request data is invalid|Session expired\. Sign in again|You do not have permission to perform this action|Requested resource was not found|This action conflicts with the current server state|Request validation failed|Server error\. Try again later|Request failed\. Try again)\.$/i.test(
+      trimmed
+    ) ||
     /^TypeError:/i.test(trimmed) ||
     /^[a-z0-9_.-]+$/i.test(trimmed) ||
     trimmed.startsWith("{") ||
     trimmed.startsWith("[")
+  );
+}
+
+function isGenericApiProblemDetail(value: string): boolean {
+  const normalized = normalizeErrorText(value);
+  return (
+    /^(Authentication failed|External authentication request is invalid|External authentication failed|Request failed\. Try again)\.$/i.test(
+      normalized
+    ) ||
+    /^(?:[\w\s'-]+)\b(?:is|are|was|were)\b.*\b(?:invalid|not found|unavailable|forbidden|not allowed|temporarily unavailable|already linked|not linked|expired)\.$/i.test(
+      normalized
+    ) ||
+    /^(?:At least one|Current)\b.*\b(?:must remain|must be accepted)\.$/i.test(normalized) ||
+    /^(?:Identity|Template|Generation|Billing|Payment|Premium|Support|Feedback|Pet|Gamification|Account|Session|Email|Avatar|Media|Webhook|Catalog|Resource|Operation|Action|Request)\b.*\b(?:failed|invalid|unavailable|forbidden|not found|not allowed|temporarily unavailable|could not be completed|does not allow this action)\.$/i.test(
+      normalized
+    ) ||
+    /\bReload and try again\.$/i.test(normalized) ||
+    /^(?:Requested|Selected|Associated|Current)\b.*\b(?:not found|unavailable|invalid|could not be completed)\.$/i.test(
+      normalized
+    ) ||
+    /^(?:Too many|Not enough)\b.*\b(?:try again later|complete this action)\.$/i.test(normalized)
   );
 }

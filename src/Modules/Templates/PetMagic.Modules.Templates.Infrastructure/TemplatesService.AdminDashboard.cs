@@ -128,6 +128,7 @@ internal sealed partial class TemplatesService
                 job.UpdatedAtUtc,
                 job.StartedAtUtc,
                 job.CompletedAtUtc,
+                job.ChargedAtUtc,
                 job.RefundedAtUtc,
                 job.IsWatermarkRequired,
                 job.IsWatermarkRemoved,
@@ -208,7 +209,9 @@ internal sealed partial class TemplatesService
                     row.PromptBeforeVariation,
                     row.PromptAfterVariation,
                     row.PetId,
-                    row.PetPhotoId));
+                    row.PetPhotoId,
+                    CanAdminCancelGeneration(row.Status),
+                    CanAdminRetryGeneration(row.Status, row.UserId, row.ChargedAtUtc, row.RefundedAtUtc)));
         }
 
         return Result.Success(new AdminTemplateGenerationListPageResponse(
@@ -481,6 +484,23 @@ internal sealed partial class TemplatesService
         };
     }
 
+    private static bool CanAdminCancelGeneration(TemplateGenerationStatus status)
+    {
+        return status == TemplateGenerationStatus.Queued;
+    }
+
+    private static bool CanAdminRetryGeneration(
+        TemplateGenerationStatus status,
+        Guid userId,
+        DateTime? chargedAtUtc,
+        DateTime? refundedAtUtc)
+    {
+        var canReuseCharge = userId == TemplateGenerationService.AdminTestUserId
+            || (chargedAtUtc is not null && refundedAtUtc is null);
+        return status is TemplateGenerationStatus.Failed or TemplateGenerationStatus.Cancelled
+            && canReuseCharge;
+    }
+
     private static string? ResolveAdminGenerationProvider(string? model)
     {
         var trimmed = model?.Trim();
@@ -495,13 +515,7 @@ internal sealed partial class TemplatesService
 
     private static string SanitizeAdminFailureMessage(string? value)
     {
-        var trimmed = value?.Trim();
-        if (string.IsNullOrEmpty(trimmed))
-        {
-            return string.Empty;
-        }
-
-        return trimmed.Length <= 240 ? trimmed : $"{trimmed[..240]}...";
+        return AdminFailureMessageSanitizer.Sanitize(value) ?? string.Empty;
     }
 
     private static string NormalizeQueryValue(string? value)
@@ -526,6 +540,7 @@ internal sealed partial class TemplatesService
         DateTime UpdatedAtUtc,
         DateTime? StartedAtUtc,
         DateTime? CompletedAtUtc,
+        DateTime? ChargedAtUtc,
         DateTime? RefundedAtUtc,
         bool IsWatermarkRequired,
         bool IsWatermarkRemoved,

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Economy.Infrastructure.Data;
 
 namespace PetMagic.Modules.Economy.Infrastructure;
@@ -65,11 +66,10 @@ public sealed class PremiumSubscriptionPlansHealthCheck(
         catch (Exception exception)
         {
             logger?.LogError(
-                exception,
-                "Premium subscription plan health check failed while querying SubscriptionPlans.");
+                "Premium subscription plan health check failed while querying SubscriptionPlans. ExceptionType={ExceptionType}",
+                SafeLogValues.ExceptionType(exception));
             return HealthCheckResult.Unhealthy(
-                "Failed to verify SubscriptionPlans premium catalog coverage.",
-                exception);
+                "Failed to verify SubscriptionPlans premium catalog coverage.");
         }
     }
 }

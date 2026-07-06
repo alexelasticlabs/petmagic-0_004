@@ -9,6 +9,8 @@ namespace PetMagic.Modules.Templates.Api.Endpoints;
 
 public static partial class TemplateGenerationEndpoints
 {
+    private const int MaxGenerationRealtimeEventTopicLength = 128;
+    private const int MaxGenerationRealtimeEventDataLength = 8192;
     private static readonly JsonSerializerOptions GenerationRealtimeJsonOptions = new(JsonSerializerDefaults.Web);
 
     private static async Task StreamGenerationEventsAsync(
@@ -87,10 +89,15 @@ public static partial class TemplateGenerationEndpoints
             return false;
         }
 
-        TemplateGenerationResponse? generation;
+        if (!IsSafeGenerationRealtimeData(realtimeEvent.Data))
+        {
+            return false;
+        }
+
+        GenerationRealtimeSourcePayload? sourcePayload;
         try
         {
-            generation = JsonSerializer.Deserialize<TemplateGenerationResponse>(
+            sourcePayload = JsonSerializer.Deserialize<GenerationRealtimeSourcePayload>(
                 realtimeEvent.Data,
                 GenerationRealtimeJsonOptions);
         }
@@ -99,16 +106,19 @@ public static partial class TemplateGenerationEndpoints
             return false;
         }
 
-        if (generation is null || generation.UserId != userId)
+        if (sourcePayload is null
+            || sourcePayload.UserId != userId
+            || sourcePayload.GenerationId == Guid.Empty
+            || string.IsNullOrWhiteSpace(sourcePayload.Status))
         {
             return false;
         }
 
         var payload = new GenerationRealtimeUpdatePayload(
             "generation.status_changed",
-            generation.GenerationId,
-            generation.Status,
-            generation.UpdatedAtUtc,
+            sourcePayload.GenerationId,
+            sourcePayload.Status,
+            sourcePayload.UpdatedAtUtc,
             RequiresRefetch: true);
 
         userEvent = new TemplateFeedRealtimeEvent(
@@ -122,9 +132,41 @@ public static partial class TemplateGenerationEndpoints
         TemplateFeedRealtimeEvent realtimeEvent,
         CancellationToken cancellationToken)
     {
+        if (!IsSafeGenerationRealtimeTopic(realtimeEvent.Topic) || !IsSafeGenerationRealtimeData(realtimeEvent.Data))
+        {
+            return;
+        }
+
         await httpContext.Response.WriteAsync($"event: {realtimeEvent.Topic}\n", cancellationToken);
-        await httpContext.Response.WriteAsync($"data: {realtimeEvent.Data}\n\n", cancellationToken);
+        await WriteGenerationRealtimeDataAsync(httpContext, realtimeEvent.Data, cancellationToken);
+        await httpContext.Response.WriteAsync("\n", cancellationToken);
         await httpContext.Response.Body.FlushAsync(cancellationToken);
+    }
+
+    private static bool IsSafeGenerationRealtimeTopic(string topic)
+    {
+        return !string.IsNullOrWhiteSpace(topic)
+            && topic.Length <= MaxGenerationRealtimeEventTopicLength
+            && !topic.Contains('\n')
+            && !topic.Contains('\r');
+    }
+
+    private static bool IsSafeGenerationRealtimeData(string data)
+    {
+        return data.Length <= MaxGenerationRealtimeEventDataLength;
+    }
+
+    private static async Task WriteGenerationRealtimeDataAsync(
+        HttpContext httpContext,
+        string data,
+        CancellationToken cancellationToken)
+    {
+        using var reader = new StringReader(data);
+        string? line;
+        while ((line = await reader.ReadLineAsync(cancellationToken)) is not null)
+        {
+            await httpContext.Response.WriteAsync($"data: {line}\n", cancellationToken);
+        }
     }
 
     private sealed record GenerationRealtimeUpdatePayload(
@@ -133,4 +175,10 @@ public static partial class TemplateGenerationEndpoints
         string Status,
         DateTime OccurredAtUtc,
         bool RequiresRefetch);
+
+    private sealed record GenerationRealtimeSourcePayload(
+        Guid UserId,
+        Guid GenerationId,
+        string Status,
+        DateTime UpdatedAtUtc);
 }

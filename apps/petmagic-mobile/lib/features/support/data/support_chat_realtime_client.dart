@@ -46,6 +46,7 @@ class SignalRSupportChatRealtimeClient implements SupportChatRealtimeClient {
        _requestTimeout = requestTimeout;
 
   static const _conversationUpdatedEvent = 'conversation-updated';
+  static const _conversationIdMaxLength = 128;
 
   final AuthSessionStorage _sessionStorage;
   final ApiBaseUrlResolver _apiBaseUrlResolver;
@@ -55,6 +56,8 @@ class SignalRSupportChatRealtimeClient implements SupportChatRealtimeClient {
 
   HubConnection? _connection;
   String? _connectionBaseUrl;
+  int _connectionVersion = 0;
+  int _connectionHolders = 0;
   bool _isConnecting = false;
   bool _isDisposed = false;
 
@@ -67,14 +70,21 @@ class SignalRSupportChatRealtimeClient implements SupportChatRealtimeClient {
       return;
     }
 
+    _connectionHolders++;
+    if (_connectionHolders > 1) {
+      return;
+    }
+
     if (_isConnecting) {
       return;
     }
 
     _isConnecting = true;
+    var connectionEstablished = false;
+    final connectionVersion = ++_connectionVersion;
     try {
       final accessToken = await _readAccessToken();
-      if (accessToken.isEmpty) {
+      if (accessToken.isEmpty || _shouldAbortConnect(connectionVersion)) {
         return;
       }
 
@@ -88,16 +98,35 @@ class SignalRSupportChatRealtimeClient implements SupportChatRealtimeClient {
       final attemptedBaseUrls = <String>{};
       var hasRetriableTransportFailure = false;
       for (final baseUrl in candidates) {
+        if (_shouldAbortConnect(connectionVersion)) {
+          return;
+        }
+
         attemptedBaseUrls.add(baseUrl);
         try {
           final connection = await _buildOrReuseConnection(baseUrl);
+          if (_shouldAbortConnect(connectionVersion)) {
+            await _stopConnectionIfCurrent(connection);
+            return;
+          }
+
           if (connection.state == HubConnectionState.Disconnected) {
             await connection.start();
           }
 
+          if (_shouldAbortConnect(connectionVersion)) {
+            await _stopConnectionIfCurrent(connection);
+            return;
+          }
+
           await _apiBaseUrlResolver.markSuccessful(baseUrl);
+          connectionEstablished = true;
           return;
         } catch (error) {
+          if (_shouldAbortConnect(connectionVersion)) {
+            return;
+          }
+
           lastError = error;
           final shouldInvalidate = _shouldInvalidateBaseUrlOnConnectFailure(
             error,
@@ -133,9 +162,20 @@ class SignalRSupportChatRealtimeClient implements SupportChatRealtimeClient {
       }
 
       final fallbackConnection = await _buildOrReuseConnection(fallbackBaseUrl);
+      if (_shouldAbortConnect(connectionVersion)) {
+        await _stopConnectionIfCurrent(fallbackConnection);
+        return;
+      }
+
       if (fallbackConnection.state == HubConnectionState.Disconnected) {
         await fallbackConnection.start();
+        if (_shouldAbortConnect(connectionVersion)) {
+          await _stopConnectionIfCurrent(fallbackConnection);
+          return;
+        }
+
         await _apiBaseUrlResolver.markSuccessful(fallbackBaseUrl);
+        connectionEstablished = true;
         return;
       }
 
@@ -146,11 +186,28 @@ class SignalRSupportChatRealtimeClient implements SupportChatRealtimeClient {
       throw StateError('Unable to establish support chat realtime connection.');
     } finally {
       _isConnecting = false;
+      if (!connectionEstablished && _connectionHolders > 0) {
+        _connectionHolders = 0;
+      }
     }
   }
 
   @override
   Future<void> disconnect() async {
+    if (_connectionHolders == 0) {
+      return;
+    }
+
+    _connectionHolders--;
+    if (_connectionHolders > 0) {
+      return;
+    }
+
+    await _stopConnection();
+  }
+
+  Future<void> _stopConnection() async {
+    _connectionVersion++;
     final connection = _connection;
     _connection = null;
     _connectionBaseUrl = null;
@@ -167,7 +224,8 @@ class SignalRSupportChatRealtimeClient implements SupportChatRealtimeClient {
     }
 
     _isDisposed = true;
-    await disconnect();
+    _connectionHolders = 0;
+    await _stopConnection();
     if (!_eventsController.isClosed) {
       await _eventsController.close();
     }
@@ -190,10 +248,24 @@ class SignalRSupportChatRealtimeClient implements SupportChatRealtimeClient {
     return connection;
   }
 
+  bool _shouldAbortConnect(int connectionVersion) =>
+      _isDisposed || connectionVersion != _connectionVersion;
+
+  Future<void> _stopConnectionIfCurrent(HubConnection connection) async {
+    if (identical(_connection, connection)) {
+      _connection = null;
+      _connectionBaseUrl = null;
+    }
+
+    if (connection.state != HubConnectionState.Disconnected) {
+      await connection.stop();
+    }
+  }
+
   HubConnection _buildConnection(String baseUrl) {
     final connection = HubConnectionBuilder()
         .withUrl(
-          '$baseUrl/hubs/support-chat',
+          _supportChatHubUrlForBaseUrl(baseUrl),
           options: HttpConnectionOptions(
             accessTokenFactory: _readAccessToken,
             headers: _buildConnectionHeaders(),
@@ -253,7 +325,7 @@ class SignalRSupportChatRealtimeClient implements SupportChatRealtimeClient {
   }
 
   void _handleConversationUpdated(List<Object?>? arguments) {
-    if (_eventsController.isClosed) {
+    if (_isDisposed || _connection == null || _eventsController.isClosed) {
       return;
     }
 
@@ -266,7 +338,7 @@ class SignalRSupportChatRealtimeClient implements SupportChatRealtimeClient {
       return;
     }
 
-    final conversationId = payload['conversationId']?.toString();
+    final conversationId = _normalizeConversationId(payload['conversationId']);
     if (conversationId == null || conversationId.isEmpty) {
       return;
     }
@@ -275,4 +347,27 @@ class SignalRSupportChatRealtimeClient implements SupportChatRealtimeClient {
       SupportChatRealtimeUpdate(conversationId: conversationId),
     );
   }
+
+  String? _normalizeConversationId(Object? value) {
+    if (value is! String) {
+      return null;
+    }
+
+    final normalized = value.trim();
+    if (normalized.isEmpty || normalized.length > _conversationIdMaxLength) {
+      return null;
+    }
+
+    return normalized;
+  }
+}
+
+String _supportChatHubUrlForBaseUrl(String baseUrl) {
+  final uri = Uri.tryParse(baseUrl.trim());
+  if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
+    throw ArgumentError.value(baseUrl, 'baseUrl', 'Invalid API base URL.');
+  }
+
+  final authority = uri.hasPort ? '${uri.host}:${uri.port}' : uri.host;
+  return '${uri.scheme}://$authority/hubs/support-chat';
 }

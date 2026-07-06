@@ -434,10 +434,16 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
     const link = document.createElement("a");
     link.href = url;
     link.download = formatSafeTemplateAnalyticsExportName(template.templateId);
-    document.body.append(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    try {
+      document.body.append(link);
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      URL.revokeObjectURL(url);
+      throw error;
+    } finally {
+      link.remove();
+    }
   }
 
   return (

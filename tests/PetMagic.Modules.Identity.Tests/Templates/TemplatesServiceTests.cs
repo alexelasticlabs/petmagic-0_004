@@ -177,7 +177,8 @@ public sealed partial class TemplatesServiceTests
         TemplatesOptions? options = null,
         ITemplateGenerationBilling? billing = null,
         ITemplateFeedRealtimeService? realtimeService = null,
-        ITemplateAiProviderHealthService? aiProviderHealthService = null)
+        ITemplateAiProviderHealthService? aiProviderHealthService = null,
+        IAdminAuditLog? adminAuditLog = null)
     {
         return new TemplateGenerationService(
             dbContext,
@@ -185,7 +186,8 @@ public sealed partial class TemplatesServiceTests
             new RecordingMediaStorage(),
             options ?? CreateTemplatesOptions(),
             realtimeService: realtimeService,
-            aiProviderHealthService: aiProviderHealthService);
+            aiProviderHealthService: aiProviderHealthService,
+            adminAuditLog: adminAuditLog);
     }
 
     private static TemplatesOptions CreateTemplatesOptions(

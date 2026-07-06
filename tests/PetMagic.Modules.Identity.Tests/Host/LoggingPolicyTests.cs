@@ -135,14 +135,24 @@ public sealed partial class LoggingPolicyTests
 
     private static string RepositoryPath(params string[] segments)
     {
-        return Path.GetFullPath(Path.Combine(
-            AppContext.BaseDirectory,
-            "..",
-            "..",
-            "..",
-            "..",
-            "..",
-            Path.Combine(segments)));
+        return Path.Combine([FindRepositoryRoot(), .. segments]);
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+
+        while (current is not null)
+        {
+            if (File.Exists(Path.Combine(current.FullName, ".gitignore")))
+            {
+                return current.FullName;
+            }
+
+            current = current.Parent;
+        }
+
+        throw new DirectoryNotFoundException("Could not locate repository root.");
     }
 
     private static string RelativeRepositoryPath(string path)

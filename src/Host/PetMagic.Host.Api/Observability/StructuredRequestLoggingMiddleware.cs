@@ -45,9 +45,9 @@ public sealed class StructuredRequestLoggingMiddleware(
                 logger.Log(
                     ToMicrosoftLogLevel(level),
                     null,
-                    "HTTP {HttpMethod} {Path} responded {StatusCode} in {ElapsedMs} ms.",
+                    "HTTP {HttpMethod} {SafePath} responded {StatusCode} in {ElapsedMs} ms.",
                     context.Request.Method,
-                    context.Request.Path.Value ?? string.Empty,
+                    RequestLogging.ResolveSafePath(context),
                     context.Response.StatusCode,
                     elapsedMs);
             }

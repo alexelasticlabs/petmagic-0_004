@@ -1,7 +1,18 @@
+using PetMagic.BuildingBlocks.Observability;
+
 namespace PetMagic.Modules.Economy.Infrastructure;
 
 internal static class EconomyLogSanitizer
 {
+    internal const string UnknownErrorCode = "economy.error";
+
+    internal static string? SafeUserId(Guid? userId)
+    {
+        return userId.HasValue
+            ? SafeLogValues.StableHash(userId.Value.ToString("D"))
+            : null;
+    }
+
     internal static string? SafePaymentIntentId(string? externalPaymentId)
     {
         if (string.IsNullOrWhiteSpace(externalPaymentId))
@@ -39,5 +50,19 @@ internal static class EconomyLogSanitizer
         }
 
         return $"{trimmed[..prefixLength]}***{trimmed[^suffixLength..]}";
+    }
+
+    internal static string SafeErrorCode(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return UnknownErrorCode;
+        }
+
+        var trimmed = value.Trim();
+        var sanitized = SafeLogValues.SanitizeText(trimmed, 128);
+        return string.Equals(trimmed, sanitized, StringComparison.Ordinal)
+            ? sanitized
+            : UnknownErrorCode;
     }
 }

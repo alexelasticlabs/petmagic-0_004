@@ -22,6 +22,10 @@ class TemplateMediaCache {
   static const int _maxPreviewFileReferences = 250;
   static const int _maxBlockedThumbnailCacheUrls = _maxThumbnailFileReferences;
   static const int _maxBlockedPreviewCacheUrls = _maxPreviewFileReferences;
+  static const int _maxThumbnailInFlightFetches = 64;
+  static const int _maxPreviewInFlightFetches = 32;
+  static const int _maxThumbnailDownloadBytes = 8 * 1024 * 1024;
+  static const int _maxPreviewDownloadBytes = 24 * 1024 * 1024;
   static bool _isThumbnailBudgetCleanupRunning = false;
   static bool _isPreviewBudgetCleanupRunning = false;
   static int _cacheGeneration = 0;
@@ -51,7 +55,10 @@ class TemplateMediaCache {
       stalePeriod: AppConfig.mediaCacheStalePeriod,
       maxNrOfCacheObjects: _maxThumbnailFileReferences,
       repo: JsonCacheInfoRepository(databaseName: 'templateThumbnailCache'),
-      fileService: HttpFileService(),
+      fileService: _BoundedHttpFileService(
+        maxBytes: _maxThumbnailDownloadBytes,
+        mediaKind: 'thumbnail',
+      ),
     ),
   );
 
@@ -61,9 +68,19 @@ class TemplateMediaCache {
       stalePeriod: AppConfig.mediaCacheStalePeriod,
       maxNrOfCacheObjects: _maxPreviewFileReferences,
       repo: JsonCacheInfoRepository(databaseName: 'templatePreviewVideoCache'),
-      fileService: HttpFileService(),
+      fileService: _BoundedHttpFileService(
+        maxBytes: _maxPreviewDownloadBytes,
+        mediaKind: 'preview',
+      ),
     ),
   );
+
+  @visibleForTesting
+  static int get maxThumbnailDownloadBytesForTesting =>
+      _maxThumbnailDownloadBytes;
+
+  @visibleForTesting
+  static int get maxPreviewDownloadBytesForTesting => _maxPreviewDownloadBytes;
 
   static String cacheKeyForMedia(String url, {int? mediaVersion}) {
     final normalized = persistentSafeMediaCacheKeyUrl(url);
@@ -176,7 +193,12 @@ class TemplateMediaCache {
             _thumbnailFetchesByUrl.remove(cacheKey);
           }
         });
-    _thumbnailFetchesByUrl[cacheKey] = fetch;
+    _rememberInFlightFetch(
+      _thumbnailFetchesByUrl,
+      cacheKey,
+      fetch,
+      maxEntries: _maxThumbnailInFlightFetches,
+    );
     return fetch;
   }
 
@@ -274,7 +296,12 @@ class TemplateMediaCache {
                 _previewFetchesByUrl.remove(cacheKey);
               }
             });
-    _previewFetchesByUrl[cacheKey] = fetch;
+    _rememberInFlightFetch(
+      _previewFetchesByUrl,
+      cacheKey,
+      fetch,
+      maxEntries: _maxPreviewInFlightFetches,
+    );
     return fetch;
   }
 
@@ -564,6 +591,19 @@ class TemplateMediaCache {
     }
   }
 
+  static void _rememberInFlightFetch(
+    Map<String, Future<File>> fetchesByUrl,
+    String url,
+    Future<File> fetch, {
+    required int maxEntries,
+  }) {
+    fetchesByUrl.remove(url);
+    fetchesByUrl[url] = fetch;
+    while (fetchesByUrl.length > maxEntries) {
+      fetchesByUrl.remove(fetchesByUrl.keys.first);
+    }
+  }
+
   static Future<DateTime> _cacheValidTill(
     CacheManager cacheManager,
     String url, {
@@ -717,4 +757,72 @@ class _RememberedCacheFile {
 
   final File file;
   final DateTime validTill;
+}
+
+class _BoundedHttpFileService extends FileService {
+  _BoundedHttpFileService({required this.maxBytes, required this.mediaKind}) {
+    concurrentFetches = _delegate.concurrentFetches;
+  }
+
+  final int maxBytes;
+  final String mediaKind;
+  final HttpFileService _delegate = HttpFileService();
+
+  @override
+  Future<FileServiceResponse> get(
+    String url, {
+    Map<String, String>? headers,
+  }) async {
+    final response = await _delegate.get(url, headers: headers);
+    final contentLength = response.contentLength;
+    if (contentLength != null && contentLength > maxBytes) {
+      throw StateError('template_${mediaKind}_download_too_large');
+    }
+
+    return _BoundedFileServiceResponse(
+      response,
+      maxBytes: maxBytes,
+      mediaKind: mediaKind,
+    );
+  }
+}
+
+class _BoundedFileServiceResponse implements FileServiceResponse {
+  const _BoundedFileServiceResponse(
+    this._inner, {
+    required this.maxBytes,
+    required this.mediaKind,
+  });
+
+  final FileServiceResponse _inner;
+  final int maxBytes;
+  final String mediaKind;
+
+  @override
+  Stream<List<int>> get content async* {
+    var receivedBytes = 0;
+    await for (final chunk in _inner.content) {
+      receivedBytes += chunk.length;
+      if (receivedBytes > maxBytes) {
+        throw StateError('template_${mediaKind}_download_too_large');
+      }
+
+      yield chunk;
+    }
+  }
+
+  @override
+  int? get contentLength => _inner.contentLength;
+
+  @override
+  String? get eTag => _inner.eTag;
+
+  @override
+  String get fileExtension => _inner.fileExtension;
+
+  @override
+  int get statusCode => _inner.statusCode;
+
+  @override
+  DateTime get validTill => _inner.validTill;
 }

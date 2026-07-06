@@ -9,6 +9,7 @@ namespace PetMagic.Modules.Economy.Infrastructure;
 public sealed partial class EconomyService
 {
     private string CurrentCorrelationId => CorrelationContext.ResolveOrCreate();
+    private string CurrentCorrelationIdHash => SafeLogValues.StableHash(CorrelationContext.ResolveOrCreate());
 
     private void LogPaymentWebhookReceived(
         string provider,
@@ -19,14 +20,14 @@ public sealed partial class EconomyService
         string? stripeCustomerId)
     {
         logger?.LogInformation(
-            "Payment webhook received. Provider={Provider} EventId={EventId} EventType={EventType} UserId={UserId} PaymentIntentId={PaymentIntentId} StripeCustomerId={StripeCustomerId} CorrelationId={CorrelationId}",
+            "Payment webhook received. Provider={Provider} EventIdSafe={EventIdSafe} EventType={EventType} UserIdHash={UserIdHash} PaymentIntentIdSafe={PaymentIntentIdSafe} StripeCustomerIdSafe={StripeCustomerIdSafe} CorrelationIdHash={CorrelationIdHash}",
             provider,
             EconomyLogSanitizer.SafeExternalId(eventId),
             eventType,
-            userId,
+            EconomyLogSanitizer.SafeUserId(userId),
             EconomyLogSanitizer.SafeExternalId(paymentIntentId),
             EconomyLogSanitizer.SafeExternalId(stripeCustomerId),
-            CurrentCorrelationId);
+            CurrentCorrelationIdHash);
     }
 
     private void LogPaymentWebhookProcessed(
@@ -38,14 +39,14 @@ public sealed partial class EconomyService
         string? stripeCustomerId)
     {
         logger?.LogInformation(
-            "Payment webhook processed. Provider={Provider} EventId={EventId} EventType={EventType} UserId={UserId} PaymentIntentId={PaymentIntentId} StripeCustomerId={StripeCustomerId} CorrelationId={CorrelationId}",
+            "Payment webhook processed. Provider={Provider} EventIdSafe={EventIdSafe} EventType={EventType} UserIdHash={UserIdHash} PaymentIntentIdSafe={PaymentIntentIdSafe} StripeCustomerIdSafe={StripeCustomerIdSafe} CorrelationIdHash={CorrelationIdHash}",
             provider,
             EconomyLogSanitizer.SafeExternalId(eventId),
             eventType,
-            userId,
+            EconomyLogSanitizer.SafeUserId(userId),
             EconomyLogSanitizer.SafeExternalId(paymentIntentId),
             EconomyLogSanitizer.SafeExternalId(stripeCustomerId),
-            CurrentCorrelationId);
+            CurrentCorrelationIdHash);
     }
 
     private void LogDuplicatePaymentWebhook(
@@ -57,45 +58,49 @@ public sealed partial class EconomyService
         string? stripeCustomerId = null)
     {
         logger?.LogWarning(
-            "Duplicate payment webhook ignored. Provider={Provider} EventId={EventId} EventType={EventType} UserId={UserId} PaymentIntentId={PaymentIntentId} StripeCustomerId={StripeCustomerId} CorrelationId={CorrelationId}",
+            "Duplicate payment webhook ignored. Provider={Provider} EventIdSafe={EventIdSafe} EventType={EventType} UserIdHash={UserIdHash} PaymentIntentIdSafe={PaymentIntentIdSafe} StripeCustomerIdSafe={StripeCustomerIdSafe} CorrelationIdHash={CorrelationIdHash}",
             provider,
             EconomyLogSanitizer.SafeExternalId(eventId),
             eventType,
-            userId,
+            EconomyLogSanitizer.SafeUserId(userId),
             EconomyLogSanitizer.SafeExternalId(paymentIntentId),
             EconomyLogSanitizer.SafeExternalId(stripeCustomerId),
-            CurrentCorrelationId);
+            CurrentCorrelationIdHash);
     }
 
     private void LogPaymentWebhookFailed(Error error, string stage, string? eventType)
     {
+        var errorCode = EconomyLogSanitizer.SafeErrorCode(error.Code);
+
         logger?.LogError(
-            "Payment webhook failed. Stage={Stage} EventType={EventType} ErrorCode={ErrorCode} CorrelationId={CorrelationId}",
+            "Payment webhook failed. Stage={Stage} EventType={EventType} ErrorCode={ErrorCode} CorrelationIdHash={CorrelationIdHash}",
             stage,
             eventType,
-            error.Code,
-            CurrentCorrelationId);
+            errorCode,
+            CurrentCorrelationIdHash);
     }
 
     private void LogPaymentSucceeded(PurchaseOrder order, string source)
     {
         logger?.LogInformation(
-            "Payment succeeded. Source={Source} PaymentIntentId={PaymentIntentId} UserId={UserId} CorrelationId={CorrelationId}",
+            "Payment succeeded. Source={Source} PaymentIntentIdSafe={PaymentIntentIdSafe} UserIdHash={UserIdHash} CorrelationIdHash={CorrelationIdHash}",
             source,
             EconomyLogSanitizer.SafePaymentIntentId(order.ExternalPaymentId),
-            order.UserId,
-            CurrentCorrelationId);
+            EconomyLogSanitizer.SafeUserId(order.UserId),
+            CurrentCorrelationIdHash);
     }
 
     private void LogPaymentFailed(PurchaseOrder order, Error error, string source)
     {
+        var errorCode = EconomyLogSanitizer.SafeErrorCode(error.Code);
+
         logger?.LogError(
-            "Payment failed. Source={Source} PaymentIntentId={PaymentIntentId} UserId={UserId} ErrorCode={ErrorCode} CorrelationId={CorrelationId}",
+            "Payment failed. Source={Source} PaymentIntentIdSafe={PaymentIntentIdSafe} UserIdHash={UserIdHash} ErrorCode={ErrorCode} CorrelationIdHash={CorrelationIdHash}",
             source,
             EconomyLogSanitizer.SafePaymentIntentId(order.ExternalPaymentId),
-            order.UserId,
-            error.Code,
-            CurrentCorrelationId);
+            EconomyLogSanitizer.SafeUserId(order.UserId),
+            errorCode,
+            CurrentCorrelationIdHash);
     }
 
     private void LogSubscriptionUpdated(
@@ -109,16 +114,16 @@ public sealed partial class EconomyService
         string? stripeCustomerId = null)
     {
         logger?.LogInformation(
-            "Subscription {SubscriptionOutcome}. Provider={Provider} EventId={EventId} EventType={EventType} UserId={UserId} Status={Status} PaymentIntentId={PaymentIntentId} StripeCustomerId={StripeCustomerId} CorrelationId={CorrelationId}",
+            "Subscription {SubscriptionOutcome}. Provider={Provider} EventIdSafe={EventIdSafe} EventType={EventType} UserIdHash={UserIdHash} Status={Status} PaymentIntentIdSafe={PaymentIntentIdSafe} StripeCustomerIdSafe={StripeCustomerIdSafe} CorrelationIdHash={CorrelationIdHash}",
             subscriptionOutcome,
             provider,
             EconomyLogSanitizer.SafeExternalId(eventId),
             eventType,
-            userId,
+            EconomyLogSanitizer.SafeUserId(userId),
             status,
             EconomyLogSanitizer.SafeExternalId(paymentIntentId),
             EconomyLogSanitizer.SafeExternalId(stripeCustomerId),
-            CurrentCorrelationId);
+            CurrentCorrelationIdHash);
     }
 
     private void LogStoreWebhookReceived(
@@ -128,12 +133,12 @@ public sealed partial class EconomyService
         Guid? userId = null)
     {
         logger?.LogInformation(
-            "Payment webhook received. Provider={Provider} EventId={EventId} EventType={EventType} UserId={UserId} CorrelationId={CorrelationId}",
+            "Payment webhook received. Provider={Provider} EventIdSafe={EventIdSafe} EventType={EventType} UserIdHash={UserIdHash} CorrelationIdHash={CorrelationIdHash}",
             provider,
             EconomyLogSanitizer.SafeExternalId(eventId),
             eventType,
-            userId,
-            CurrentCorrelationId);
+            EconomyLogSanitizer.SafeUserId(userId),
+            CurrentCorrelationIdHash);
     }
 
     private void LogStoreWebhookProcessed(
@@ -144,13 +149,13 @@ public sealed partial class EconomyService
         string result)
     {
         logger?.LogInformation(
-            "Payment webhook processed. Provider={Provider} EventId={EventId} EventType={EventType} UserId={UserId} Result={Result} CorrelationId={CorrelationId}",
+            "Payment webhook processed. Provider={Provider} EventIdSafe={EventIdSafe} EventType={EventType} UserIdHash={UserIdHash} Result={Result} CorrelationIdHash={CorrelationIdHash}",
             provider,
             EconomyLogSanitizer.SafeExternalId(eventId),
             eventType,
-            userId,
+            EconomyLogSanitizer.SafeUserId(userId),
             result,
-            CurrentCorrelationId);
+            CurrentCorrelationIdHash);
     }
 
     private void LogDuplicateStoreWebhook(
@@ -159,10 +164,16 @@ public sealed partial class EconomyService
         string eventType)
     {
         logger?.LogWarning(
-            "Duplicate payment webhook ignored. Provider={Provider} EventId={EventId} EventType={EventType} CorrelationId={CorrelationId}",
+            "Duplicate payment webhook ignored. Provider={Provider} EventIdSafe={EventIdSafe} EventType={EventType} CorrelationIdHash={CorrelationIdHash}",
             provider,
             EconomyLogSanitizer.SafeExternalId(eventId),
             eventType,
-            CurrentCorrelationId);
+            CurrentCorrelationIdHash);
+    }
+
+    private static InvalidOperationException BuildSafeEconomyOperationException(string operation, Error error)
+    {
+        return new InvalidOperationException(
+            $"Economy operation failed. Operation={operation} ErrorCode={EconomyLogSanitizer.SafeErrorCode(error.Code)}");
     }
 }

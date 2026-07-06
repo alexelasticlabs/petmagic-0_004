@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
 using PetMagic.Modules.Templates.Infrastructure;
@@ -976,7 +977,8 @@ public sealed partial class TemplatesServiceTests
 
         var log = Assert.Single(logger.Entries, entry => entry.Message.Contains("category_fallback_used", StringComparison.Ordinal));
         Assert.Equal(LogLevel.Warning, log.Level);
-        Assert.Equal(templateId, log.Properties["TemplateId"]);
+        Assert.Equal(SafeLogValues.StableHash(templateId.ToString("D")), log.Properties["TemplateIdHash"]);
+        Assert.False(log.Properties.ContainsKey("TemplateId"));
         Assert.Equal(" Legacy   Category ", log.Properties["Category"]);
     }
 

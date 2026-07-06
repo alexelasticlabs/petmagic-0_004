@@ -32,7 +32,8 @@ describe("template analytics export", () => {
         usedKlingModel: "video-model",
         motionProviderCostUsd: 0.12,
         failureCode: "provider.timeout token=raw-secret https://cdn.example.com/error?sig=1",
-        failureMessage: "Raw provider payload included a signed URL https://cdn.example.com/a?sig=1",
+        failureMessage:
+          "Raw provider payload included a signed URL https://cdn.example.com/a?sig=1",
         outputUrl: "https://cdn.example.com/output.mp4?X-Amz-Signature=secret",
         createdAtUtc: "2026-06-06T12:00:00Z",
         startedAtUtc: "2026-06-06T12:01:00Z",

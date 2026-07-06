@@ -94,6 +94,8 @@ class ProfileAvatarBadge extends StatelessWidget {
                           fit: BoxFit.cover,
                           memCacheWidth: avatarCacheSize,
                           memCacheHeight: avatarCacheSize,
+                          maxWidthDiskCache: avatarCacheSize,
+                          maxHeightDiskCache: avatarCacheSize,
                           placeholder: (ctx, url) => const SizedBox.shrink(),
                           errorWidget: (ctx, url, err) => Center(
                             child: Icon(

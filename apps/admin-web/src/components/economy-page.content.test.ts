@@ -5,6 +5,8 @@ import { describe, expect, it } from "vitest";
 import {
   eventStatusOptions,
   getEconomyText,
+  incidentActionOptions,
+  incidentCategoryOptions,
   ledgerSourceOptions,
   purchaseStatusOptions,
   subscriptionProviderOptions,
@@ -25,6 +27,9 @@ const subscriptionsSectionPath = fileURLToPath(
 );
 const ledgerPurchasesSectionPath = fileURLToPath(
   new URL("./economy-page-ledger-purchases-section.tsx", import.meta.url)
+);
+const incidentsSectionPath = fileURLToPath(
+  new URL("./economy-page-incidents-section.tsx", import.meta.url)
 );
 const subscriptionPlansSectionPath = fileURLToPath(
   new URL("./economy-page-subscription-plans-section.tsx", import.meta.url)
@@ -63,7 +68,7 @@ describe("economy-page content", () => {
     expect(enText.partialErrorTitle).toBe("Some data did not refresh");
     expect(ruText.providerRegionPlaceholder).toBe("US или *");
     expect(enText.providerRegionPlaceholder).toBe("US or *");
-    expect(ruText.watermarkSaved).toBe("Настройки watermark сохранены");
+    expect(ruText.watermarkSaved).toBe("Настройки водяного знака сохранены");
     expect(enText.watermarkSaved).toBe("Watermark settings saved");
     expect(ruText.intlLocale).toBe("ru-RU");
     expect(enText.intlLocale).toBe("en-US");
@@ -73,24 +78,48 @@ describe("economy-page content", () => {
 
   it("keeps Russian economy copy localized and text keys unique", () => {
     const ruText = getEconomyText("ru");
+    const enText = getEconomyText("en");
     const source = readFileSync(economyContentPath, "utf8");
 
     expect(ruText.subscriptionPlansDescription).toContain("экран оплаты");
+    expect(ruText.subscriptionsDescription).toContain("подписок Premium");
     expect(ruText.subscriptionEventsDescription).toContain("магазинов приложений");
+    expect(ruText.incidentsDescription).toContain("вебхук-событий");
+    expect(ruText.incidentWebhookTitle).toBe("Снимок вебхука");
+    expect(ruText.incidentSafePayloadLabel).toBe("Безопасный снимок полезной нагрузки");
+    expect(ruText.purchaseSearchPlaceholder).toBe("ID заказа, ID пользователя или пакет");
+    expect(ruText.subscriptionSearchPlaceholder).toBe("ID подписки, ID пользователя или план");
     expect(ruText.cancelSubscriptionDescription).toContain("журнал аудита");
     expect(ruText.refundPurchaseDescription).toContain("статус заказа сменится на возврат");
     expect(ruText.externalCheckoutFlag).toBe("Внешняя оплата");
     expect(ruText.storeDisclosureFlag).toBe("Раскрытие условий магазина");
+    expect(ruText.openIncidentsLabel).toBe("Открытые инциденты");
+    expect(ruText.incidentsTitle).toBe("Платежные инциденты");
+    expect(ruText.incidentStatusFilterLabel).toBe("Статус инцидента");
     expect(ruText.warningTitleLabel).toBe("Заголовок предупреждения");
     expect(ruText.warningMessageLabel).toBe("Текст предупреждения");
+    expect(ruText.watermarkTitle).toBe("Водяной знак");
     expect(ruText.watermarkDescription).toContain("бесплатных результатов");
+    expect(ruText.watermarkDescription).not.toContain("clean unlock");
+    expect(ruText.watermarkImagesLabel).toBe("Изображения");
+    expect(ruText.watermarkCostCreditsLabel).toBe("Стоимость в кредитах");
+    expect(ruText.watermarkPositionBottomRight).toBe("Снизу справа");
+    expect(ruText.watermarkSizeMedium).toBe("Средний");
     expect(ruText.watermarkPreviewTestVideoFrame).toBe("Тестовый кадр видео");
+    expect(ruText.tokenKindLegacyLabel).toBe("Начальный баланс");
+    expect(enText.tokenKindLegacyLabel).toBe("Opening balance");
+    expect(ruText.incidentChargedLabel).toBe("Списано");
+    expect(ruText.incidentRefundedLabel).toBe("Возвращено");
+    expect(ruText.incidentAutoResolveReason).toBe("Инцидент закрыт со страницы экономики.");
+    expect(enText.incidentAutoResolveReason).toBe("Incident resolved from the economy page.");
 
     const ruValues = Object.values(ruText).join("\n");
     expect(ruValues).not.toMatch(
-      /\b(checkout|store\/Stripe|Store disclosure|warning|audit log|refunded)\b/
+      /\b(checkout|store\/Stripe|Store disclosure|warning|audit log|refunded|legacy|incidents?|watermark|clean unlock|preview image|cost in credits|payload|order id|user id|subscription id|webhook)\b/i
     );
     expect(source.match(/cancelSubscriptionError:/g) ?? []).toHaveLength(2);
+    expect(readFileSync(economyPagePath, "utf8")).toContain("text.incidentAutoResolveReason");
+    expect(readFileSync(economyPagePath, "utf8")).not.toContain("Resolved from admin economy page");
   });
 
   it("provides expected select options for filters", () => {
@@ -126,6 +155,36 @@ describe("economy-page content", () => {
       "processed",
       "failed",
     ]);
+    expect(incidentActionOptions.ru.find((item) => item.value === "manual_revoke")?.label).toBe(
+      "Отозвать вручную"
+    );
+    expect(incidentActionOptions.ru.find((item) => item.value === "retry_settlement")?.label).toBe(
+      "Повторить закрытие платежа"
+    );
+    expect(
+      incidentActionOptions.ru.find((item) => item.value === "retry_webhook_processing")?.label
+    ).toBe("Повторить обработку вебхука");
+    expect(incidentActionOptions.ru.find((item) => item.value === "resolve_incident")?.label).toBe(
+      "Закрыть инцидент"
+    );
+    expect(incidentActionOptions.en.find((item) => item.value === "manual_revoke")?.label).toBe(
+      "Manual revoke"
+    );
+    expect(incidentCategoryOptions.ru.map((item) => item.label)).toEqual([
+      "Все категории",
+      "Ожидает",
+      "Ошибка",
+      "Спор",
+      "Ожидает возврата",
+      "Ошибка закрытия платежа",
+      "Ошибка вебхука",
+      "Нужна сверка",
+      "Ручная проверка",
+      "Закрыт",
+    ]);
+    expect(incidentCategoryOptions.ru.map((item) => item.label).join("\n")).not.toMatch(
+      /\b(Pending|Failed|Disputed|Refund pending|Settlement failed|Webhook failed|Resolved|reconciliation)\b/
+    );
   });
 
   it("surfaces sanitized backend errors for economy mutations", () => {
@@ -206,7 +265,9 @@ describe("economy-page content", () => {
     const ruText = getEconomyText("ru");
     const enText = getEconomyText("en");
 
-    expect(ruText.financialActionsAdminOnly).toBe("Финансовые действия доступны только Admin.");
+    expect(ruText.financialActionsAdminOnly).toBe(
+      "Финансовые действия доступны только администратору."
+    );
     expect(enText.financialActionsAdminOnly).toBe("Financial actions are available to Admin only.");
     expect(source).toContain("useAuthSession");
     expect(source).toContain("const session = useAuthSession();");
@@ -460,6 +521,7 @@ describe("economy-page content", () => {
     const sharedSource = readFileSync(economySharedPath, "utf8");
     const packsSource = readFileSync(packsSectionPath, "utf8");
     const ledgerSource = readFileSync(ledgerPurchasesSectionPath, "utf8");
+    const incidentsSource = readFileSync(incidentsSectionPath, "utf8");
     const subscriptionsSource = readFileSync(subscriptionsSectionPath, "utf8");
     const providerConfigsSource = readFileSync(providerConfigsSectionPath, "utf8");
     const confirmationSource = readFileSync(confirmationDialogsPath, "utf8");
@@ -468,13 +530,37 @@ describe("economy-page content", () => {
     expect(sharedSource).toContain("import { sanitizeSensitiveText }");
     expect(sharedSource).toContain("export function safeText");
     expect(sharedSource).toContain("return safeText(value, 32).slice(0, 8);");
+    expect(sharedSource).toContain("const { intlLocale, tokensShort } = getEconomyText(locale);");
+    expect(sharedSource).toContain(
+      "return `${new Intl.NumberFormat(intlLocale).format(value)} ${tokensShort}`;"
+    );
+    expect(sharedSource).not.toContain("format(value)} spark`");
     expect(packsSource).toContain("safeText(pack.code.toUpperCase(), 32)");
     expect(packsSource).toContain("safeText(pack.currencyCode.toUpperCase(), 12)");
     expect(ledgerSource).toContain("safeText(item.reason)");
+    expect(ledgerSource).toContain(
+      "humanizeTokenKind(item.tokenKind, locale, text.tokenKindLegacyLabel)"
+    );
+    expect(incidentsSource).toContain(
+      "humanizeTokenKind(item.tokenKind, locale, text.tokenKindLegacyLabel)"
+    );
+    expect(incidentsSource).toContain("incidentActionOptions[locale]");
+    expect(incidentsSource).toContain("text.incidentChargedLabel");
+    expect(incidentsSource).toContain("text.incidentRefundedLabel");
+    expect(incidentsSource).not.toContain('item.tokenKind ?? "legacy"');
+    expect(incidentsSource).not.toContain("Retry webhook processing");
+    expect(incidentsSource).not.toContain("· Charged:");
+    expect(incidentsSource).not.toContain("· Refunded:");
+    expect(ledgerSource).not.toContain('item.tokenKind ?? "legacy"');
     expect(ledgerSource).toContain("safeText(item.packDisplayName)");
     expect(sharedSource).toContain(
       "const safeCurrencyCode = safeText(currencyCode.toUpperCase(), 12)"
     );
+    expect(sharedSource).toContain("export function humanizeTokenKind");
+    expect(sharedSource).toContain(
+      'subscription_allowance: { ru: "Premium-лимит", en: "Premium allowance" }'
+    );
+    expect(sharedSource).not.toContain('subscription_allowance: { ru: "Premium allowance"');
     expect(sharedSource).toContain("return labels[value]?.[locale] ?? safeText(value, 48);");
     expect(sharedSource).toContain("currency: safeCurrencyCode");
     expect(sharedSource).toContain("Fall through to a non-throwing display");
@@ -906,6 +992,23 @@ describe("economy-page content", () => {
     expect(watermarkSource).toContain(
       "onChange={(event) => onUpdateDraft({ size: event.target.value })}"
     );
+    expect(watermarkSource).toContain(
+      '<option value="bottom-right">{text.watermarkPositionBottomRight}</option>'
+    );
+    expect(watermarkSource).toContain(
+      '<option value="bottom-left">{text.watermarkPositionBottomLeft}</option>'
+    );
+    expect(watermarkSource).toContain(
+      '<option value="top-right">{text.watermarkPositionTopRight}</option>'
+    );
+    expect(watermarkSource).toContain(
+      '<option value="top-left">{text.watermarkPositionTopLeft}</option>'
+    );
+    expect(watermarkSource).toContain('<option value="small">{text.watermarkSizeSmall}</option>');
+    expect(watermarkSource).toContain('<option value="medium">{text.watermarkSizeMedium}</option>');
+    expect(watermarkSource).toContain('<option value="large">{text.watermarkSizeLarge}</option>');
+    expect(watermarkSource).not.toContain('<option value="bottom-right">bottom-right</option>');
+    expect(watermarkSource).not.toContain('<option value="small">small</option>');
     expect(source).toContain("settings.logoUrl");
     expect(pageSource).toContain("const isSaveWatermarkDisabled =");
     expect(pageSource).toContain("function requestSaveWatermark()");
@@ -922,8 +1025,9 @@ describe("economy-page content", () => {
     expect(source).toContain("text.watermarkPreviewVideoFrameTitle");
     expect(watermarkSource).toContain("text.watermarkLoadingTitle");
     expect(watermarkSource).toContain("text.saveWatermarkAction");
-    expect(contentSource).toContain('watermarkTitle: "Watermark"');
-    expect(contentSource).toContain('watermarkLoadingTitle: "Загружаем watermark"');
+    expect(contentSource).toContain('watermarkTitle: "Водяной знак"');
+    expect(contentSource).toContain('watermarkLoadingTitle: "Загружаем водяной знак"');
+    expect(contentSource).not.toContain('watermarkLoadingTitle: "Загружаем watermark"');
     expect(contentSource).toContain('watermarkLoadingTitle: "Loading watermark settings"');
     expect(watermarkSource).not.toContain("onClick={requestSaveWatermark}");
     expect(pageSource).not.toContain("onClick={() => saveWatermarkMutation.mutate()}");

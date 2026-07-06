@@ -132,10 +132,42 @@ void main() {
     expect(source, contains('itemCount: visibleEntries.length'));
     expect(source, contains('itemBuilder: (context, index)'));
     expect(source, contains('_buildFeaturedTemplateGridEntry('));
-    expect(source, contains('_templatesController.loadMore()'));
+    expect(source, contains('.read(templatesControllerProvider.notifier)'));
+    expect(source, contains('.loadMore();'));
+    expect(source, isNot(contains('_templatesController.loadMore()')));
     expect(source, isNot(contains('GridView.count(')));
     expect(source, isNot(contains('children: state.items.map')));
   });
+
+  test(
+    'template surfaces do not cache stale notifiers across session resets',
+    () async {
+      final templatesSource = readTemplatesPageLibrarySource();
+      final gallerySource = await File(
+        'lib/features/templates/presentation/generations_gallery_page.dart',
+      ).readAsString();
+
+      expect(
+        templatesSource,
+        isNot(contains('late final TemplatesController')),
+      );
+      expect(templatesSource, isNot(contains('late final WalletController')));
+      expect(templatesSource, contains('ref.listenManual<TemplatesState>'));
+      expect(templatesSource, contains('_syncVisibleTemplatesController()'));
+      expect(
+        gallerySource,
+        isNot(contains('late final GenerationHistoryController')),
+      );
+      expect(gallerySource, isNot(contains('late final WalletController')));
+      expect(
+        gallerySource,
+        contains('ref.listenManual<GenerationHistoryState>'),
+      );
+      expect(gallerySource, contains('_syncVisibleHistoryController()'));
+      expect(gallerySource, isNot(contains('_walletController.load()')));
+      expect(gallerySource, isNot(contains('_historyController.load(')));
+    },
+  );
 
   test('template cards cache thumbnails at bounded size', () async {
     final source = await File(

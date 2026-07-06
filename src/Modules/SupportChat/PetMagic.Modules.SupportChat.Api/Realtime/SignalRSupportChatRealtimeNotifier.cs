@@ -8,22 +8,29 @@ public sealed class SignalRSupportChatRealtimeNotifier(IHubContext<SupportChatHu
 {
     public Task NotifyConversationUpdatedAsync(SupportConversationRealtimeEvent notification, CancellationToken cancellationToken)
     {
-        var payload = new
+        var adminPayload = new
         {
             conversationId = notification.ConversationId,
             initiatorUserId = notification.InitiatorUserId,
             updatedAtUtc = notification.UpdatedAtUtc,
-            lastMessagePreview = notification.LastMessagePreview,
             lastMessageAtUtc = notification.LastMessageAtUtc,
             lastMessageSenderType = notification.LastMessageSenderType,
             adminUnreadCount = notification.AdminUnreadCount,
+        };
+
+        var userPayload = new
+        {
+            conversationId = notification.ConversationId,
+            updatedAtUtc = notification.UpdatedAtUtc,
+            lastMessageAtUtc = notification.LastMessageAtUtc,
+            lastMessageSenderType = notification.LastMessageSenderType,
             userUnreadCount = notification.UserUnreadCount,
         };
 
         return Task.WhenAll(
             hubContext.Clients.Group(SupportChatHub.AdminInboxGroup)
-                .SendAsync(SupportChatHub.ConversationUpdatedEvent, payload, cancellationToken),
+                .SendAsync(SupportChatHub.ConversationUpdatedEvent, adminPayload, cancellationToken),
             hubContext.Clients.Group(SupportChatHub.UserGroup(notification.InitiatorUserId))
-                .SendAsync(SupportChatHub.ConversationUpdatedEvent, payload, cancellationToken));
+                .SendAsync(SupportChatHub.ConversationUpdatedEvent, userPayload, cancellationToken));
     }
 }

@@ -87,7 +87,8 @@ public sealed class StripePaymentGatewayCorrelationTests
         var entry = Assert.Single(logger.Entries, x => x.LogLevel == LogLevel.Warning);
         Assert.Contains("Stripe gateway operation returned non-success status.", entry.Message, StringComparison.Ordinal);
         Assert.Equal("create_payment_ephemeral_key", entry.Properties["Operation"]);
-        Assert.Equal("cus_***3456", entry.Properties["ExternalCustomerId"]);
+        Assert.Equal("cus_***3456", entry.Properties["ExternalCustomerIdSafe"]);
+        Assert.False(entry.Properties.ContainsKey("ExternalCustomerId"));
         Assert.Equal(500, entry.Properties["StatusCode"]);
         Assert.DoesNotContain(customerId, entry.Message, StringComparison.Ordinal);
         Assert.DoesNotContain(apiSecretKey, entry.Message, StringComparison.Ordinal);
@@ -127,7 +128,8 @@ public sealed class StripePaymentGatewayCorrelationTests
         var entry = Assert.Single(logger.Entries, x => x.LogLevel == LogLevel.Warning);
         Assert.Contains("Stripe gateway operation failed.", entry.Message, StringComparison.Ordinal);
         Assert.Equal("create_payment_sheet_payment_intent", entry.Properties["Operation"]);
-        Assert.Equal("cus_***3456", entry.Properties["ExternalCustomerId"]);
+        Assert.Equal("cus_***3456", entry.Properties["ExternalCustomerIdSafe"]);
+        Assert.False(entry.Properties.ContainsKey("ExternalCustomerId"));
         Assert.Equal(true, entry.Properties["UsePaymentSheet"]);
         Assert.DoesNotContain(customerId, entry.Message, StringComparison.Ordinal);
         Assert.DoesNotContain(apiSecretKey, entry.Message, StringComparison.Ordinal);
@@ -160,9 +162,12 @@ public sealed class StripePaymentGatewayCorrelationTests
         var entry = Assert.Single(logger.Entries, x => x.LogLevel == LogLevel.Warning);
         Assert.Contains("Stripe gateway operation returned non-success status.", entry.Message, StringComparison.Ordinal);
         Assert.Equal("create_saved_method_payment_intent", entry.Properties["Operation"]);
-        Assert.Equal("cus_***3456", entry.Properties["ExternalCustomerId"]);
-        Assert.Equal("pi_***1234", entry.Properties["ExternalPaymentId"]);
-        Assert.Equal("pm_***3456", entry.Properties["ExternalPaymentMethodId"]);
+        Assert.Equal("cus_***3456", entry.Properties["ExternalCustomerIdSafe"]);
+        Assert.Equal("pi_***1234", entry.Properties["ExternalPaymentIdSafe"]);
+        Assert.Equal("pm_***3456", entry.Properties["ExternalPaymentMethodIdSafe"]);
+        Assert.False(entry.Properties.ContainsKey("ExternalCustomerId"));
+        Assert.False(entry.Properties.ContainsKey("ExternalPaymentId"));
+        Assert.False(entry.Properties.ContainsKey("ExternalPaymentMethodId"));
         Assert.DoesNotContain("cus_sensitive_customer_123456", entry.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("pm_sensitive_payment_method_123456", entry.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("sk_test_super_secret_value", entry.Message, StringComparison.Ordinal);
@@ -216,7 +221,8 @@ public sealed class StripePaymentGatewayCorrelationTests
         var entry = Assert.Single(logger.Entries, x => x.LogLevel == LogLevel.Warning);
         Assert.Contains("Stripe gateway operation returned non-success status.", entry.Message, StringComparison.Ordinal);
         Assert.Equal("resolve_setup_intent_payment_method", entry.Properties["Operation"]);
-        Assert.Equal("seti_***3456", entry.Properties["ExternalSetupId"]);
+        Assert.Equal("seti_***3456", entry.Properties["ExternalSetupIdSafe"]);
+        Assert.False(entry.Properties.ContainsKey("ExternalSetupId"));
         Assert.DoesNotContain("seti_sensitive_123456", entry.Message, StringComparison.Ordinal);
     }
 

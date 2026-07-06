@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
@@ -33,12 +34,17 @@ part 'template_generation_repository_pets.part.dart';
 final templateGenerationSharedPreferencesProvider =
     Provider<SharedPreferencesAsync>((ref) => SharedPreferencesAsync());
 
+final templateGenerationSecureStorageProvider = Provider<FlutterSecureStorage>(
+  (ref) => const FlutterSecureStorage(),
+);
+
 final templateGenerationRepositoryProvider =
     Provider<TemplateGenerationRepository>((ref) {
       return TemplateGenerationRepository(
         dio: ref.watch(dioProvider),
         sessionStorage: ref.watch(authSessionStorageProvider),
         preferences: ref.watch(templateGenerationSharedPreferencesProvider),
+        secureStorage: ref.watch(templateGenerationSecureStorageProvider),
         authSessionCoordinator: ref.watch(authSessionCoordinatorProvider),
         imageUploadOptimizer: const ImageUploadOptimizer(),
       );
@@ -49,11 +55,13 @@ class TemplateGenerationRepository {
     required Dio dio,
     required AuthSessionStorage sessionStorage,
     required SharedPreferencesAsync preferences,
+    FlutterSecureStorage? secureStorage,
     ImageUploadOptimizer? imageUploadOptimizer,
     AuthSessionCoordinator? authSessionCoordinator,
   }) : _dio = dio,
        _sessionStorage = sessionStorage,
        _preferences = preferences,
+       _secureStorage = secureStorage ?? const FlutterSecureStorage(),
        _imageUploadOptimizer =
            imageUploadOptimizer ?? const ImageUploadOptimizer(),
        _authSessionCoordinator =
@@ -69,6 +77,12 @@ class TemplateGenerationRepository {
   static const _activeGenerationIdKey = 'templates_active_generation_id_v1';
   static const _activeGenerationCorrelationIdKey =
       'templates_active_generation_correlation_id_v1';
+  static const _activeGenerationSecureScopeKey =
+      'petmagic_mobile_templates_active_generation_scope_v2';
+  static const _activeGenerationIdSecureStorageKey =
+      'petmagic_mobile_templates_active_generation_id_v2';
+  static const _activeGenerationCorrelationIdSecureStorageKey =
+      'petmagic_mobile_templates_active_generation_correlation_id_v2';
   static const _maxSourceImageBytes = 12 * 1024 * 1024;
   static const _maxPetPhotoBytes = UploadMediaPolicy.petPhotoMaxBytes;
   static const _cacheAllStatusKey = 'all';
@@ -81,6 +95,7 @@ class TemplateGenerationRepository {
   final Dio _dio;
   final AuthSessionStorage _sessionStorage;
   final SharedPreferencesAsync _preferences;
+  final FlutterSecureStorage _secureStorage;
   final ImageUploadOptimizer _imageUploadOptimizer;
   final AuthSessionCoordinator _authSessionCoordinator;
   Future<String?>? _cacheScopeFuture;

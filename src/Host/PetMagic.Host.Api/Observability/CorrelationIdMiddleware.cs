@@ -11,8 +11,9 @@ public sealed class CorrelationIdMiddleware(RequestDelegate next)
     public async Task InvokeAsync(HttpContext context)
     {
         var correlationId = CorrelationId.NormalizeOrCreate(context.Request.Headers[CorrelationId.HeaderName]);
+        var correlationIdHash = SafeLogValues.StableHash(correlationId);
         context.Items[CorrelationId.HttpContextItemKey] = correlationId;
-        Activity.Current?.SetTag("correlation.id", correlationId);
+        Activity.Current?.SetTag("correlation.id_hash", correlationIdHash);
 
         context.Response.OnStarting(static state =>
         {
@@ -27,7 +28,7 @@ public sealed class CorrelationIdMiddleware(RequestDelegate next)
         }, context);
 
         using (CorrelationContext.Push(correlationId))
-        using (LogContext.PushProperty("CorrelationId", correlationId))
+        using (LogContext.PushProperty("CorrelationIdHash", correlationIdHash))
         {
             await next(context);
         }

@@ -1039,7 +1039,8 @@ public sealed partial class TemplatesApiIntegrationTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains("templates.invalid_type", body);
-        Assert.Contains("Image, Video, or all", body);
+        Assert.DoesNotContain("Template catalog type filter is invalid.", body);
+        Assert.DoesNotContain("\"detail\"", body, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -1054,7 +1055,8 @@ public sealed partial class TemplatesApiIntegrationTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains("templates.invalid_access", body);
-        Assert.Contains("all, free, or premium", body);
+        Assert.DoesNotContain("Template catalog access filter is invalid.", body);
+        Assert.DoesNotContain("\"detail\"", body, StringComparison.OrdinalIgnoreCase);
     }
 
     [Theory]
@@ -1183,7 +1185,8 @@ public sealed partial class TemplatesApiIntegrationTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains("templates.invalid_since_version", body);
-        Assert.Contains("non-negative integer", body);
+        Assert.DoesNotContain("Template catalog version filter is invalid.", body);
+        Assert.DoesNotContain("\"detail\"", body, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

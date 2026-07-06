@@ -134,6 +134,20 @@ void main() {
     expect(footerSource, contains('class _Link'));
   });
 
+  test(
+    'premium CTA foreground uses theme contrast for custom gradient tones',
+    () {
+      final ctaSource = File(
+        'lib/features/premium/presentation/premium_page_cta.part.dart',
+      ).readAsStringSync();
+
+      expect(ctaSource, contains('context.petMagicColors'));
+      expect(ctaSource, contains('colors.on(gradientEnd)'));
+      expect(ctaSource, isNot(contains('final btnTextColor = isDark')));
+      expect(ctaSource, isNot(contains('Colors.white')));
+    },
+  );
+
   testWidgets('premium page renders monthly/yearly plans and manage action', (
     tester,
   ) async {
@@ -577,18 +591,15 @@ class _FakePremiumRepository extends PremiumRepository {
   @override
   Future<PremiumCheckoutModel> createStripeCheckout(
     PremiumPlanModel plan,
-    Locale locale,
-  ) async {
+    Locale locale, {
+    CancelToken? cancelToken,
+  }) async {
     createStripeCheckoutCalls++;
     return const PremiumCheckoutModel(
       paymentProvider: 'stripe',
       checkoutUrl: 'https://checkout.stripe.com/c/pay/cs_test_123',
       status: 'pending',
       externalSubscriptionId: 'cs_test_123',
-      paymentIntentClientSecret: null,
-      customerId: null,
-      customerEphemeralKeySecret: null,
-      publishableKey: null,
     );
   }
 

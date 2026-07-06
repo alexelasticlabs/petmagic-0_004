@@ -22,7 +22,7 @@ extension _TemplatesPageLifecycle on _TemplatesPageState {
     _lastScrollSampleOffset = position.pixels;
 
     if (position.pixels > position.maxScrollExtent - 720) {
-      _templatesController.loadMore();
+      ref.read(templatesControllerProvider.notifier).loadMore();
     }
   }
 
@@ -33,7 +33,7 @@ extension _TemplatesPageLifecycle on _TemplatesPageState {
       if (!mounted) {
         return;
       }
-      _templatesController.setSearch(value);
+      ref.read(templatesControllerProvider.notifier).setSearch(value);
     });
   }
 
@@ -68,6 +68,8 @@ extension _TemplatesPageLifecycle on _TemplatesPageState {
     }
 
     _lastRefreshAt = now;
-    await _templatesController.loadInitial(forceRefresh: forceRefresh);
+    await ref
+        .read(templatesControllerProvider.notifier)
+        .loadInitial(forceRefresh: forceRefresh);
   }
 }

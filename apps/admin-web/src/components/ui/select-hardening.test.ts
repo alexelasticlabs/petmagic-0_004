@@ -34,7 +34,9 @@ describe("shared admin select hardening", () => {
   it("keeps trigger and listbox names stable even when callers omit ariaLabel", () => {
     const source = readFileSync(selectPath, "utf8");
 
-    expect(source).toContain('const effectiveAriaLabel = ariaLabel ?? selectedOption?.label ?? "Select";');
+    expect(source).toContain(
+      'const effectiveAriaLabel = ariaLabel ?? selectedOption?.label ?? "Select";'
+    );
     expect(source).toContain("aria-controls={isMenuOpen ? listboxId : undefined}");
     expect(source).toContain("aria-label={effectiveAriaLabel}");
     expect(source).toContain("title={effectiveAriaLabel}");
@@ -84,7 +86,8 @@ describe("shared admin select hardening", () => {
     const css = readFileSync(selectCssPath, "utf8");
 
     const menuBlock = css.match(/\.menu \{[\s\S]*?\n\}/)?.[0] ?? "";
-    const mobileBlock = css.match(/@media \(max-width: 720px\) \{[\s\S]*?\.menu \{[\s\S]*?\n  \}/)?.[0] ?? "";
+    const mobileBlock =
+      css.match(/@media \(max-width: 720px\) \{[\s\S]*?\.menu \{[\s\S]*?\n  \}/)?.[0] ?? "";
 
     expect(menuBlock).toContain("max-height: min(22rem, calc(100dvh - 8rem));");
     expect(menuBlock).toContain("overflow-y: auto;");

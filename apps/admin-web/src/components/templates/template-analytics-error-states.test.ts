@@ -144,6 +144,10 @@ describe("template analytics error states", () => {
   it("sanitizes template analytics detail identifiers and feedback summary labels", () => {
     const pageSource = readFileSync(templateAnalyticsPagePath, "utf8");
     const copySource = readFileSync(templateAnalyticsCopyPath, "utf8");
+    const ruCopySource = copySource.slice(
+      copySource.indexOf("  ru: {"),
+      copySource.indexOf("  en: {")
+    );
     const utilsSource = readFileSync(analyticsUtilsPath, "utf8");
 
     expect(utilsSource).toContain(
@@ -159,10 +163,22 @@ describe("template analytics error states", () => {
     expect(pageSource).toContain("label: text.feedbackSummaryNeutral,");
     expect(pageSource).toContain("label: text.feedbackSummaryNegative,");
     expect(pageSource).toContain("label: text.feedbackSummaryTopIssues,");
-    expect(copySource).toContain('feedbackSummaryTitle: "Сводка feedback"');
+    expect(copySource).toContain('feedbackSummaryTitle: "Сводка фидбека"');
     expect(copySource).toContain('feedbackSummaryTitle: "Feedback summary"');
     expect(copySource).toContain('feedbackSummaryPositive: "Позитив"');
     expect(copySource).toContain('feedbackSummaryNegative: "Negative"');
+    expect(ruCopySource).toContain('preprocessingModel: "Модель изображения"');
+    expect(ruCopySource).toContain('motionModel: "Модель движения"');
+    expect(ruCopySource).toContain('failureBreakdownTitle: "Разбивка ошибок"');
+    expect(ruCopySource).toContain("публичного API шаблонов");
+    expect(ruCopySource).toContain("модели административной статистики");
+    expect(ruCopySource).not.toContain("Сводка feedback");
+    expect(ruCopySource).not.toContain("negative feedback");
+    expect(ruCopySource).not.toContain("публичного endpoint");
+    expect(ruCopySource).not.toContain("admin statistics");
+    expect(ruCopySource).not.toContain("generation jobs");
+    expect(ruCopySource).not.toContain("Image model");
+    expect(ruCopySource).not.toContain("Motion model");
     expect(pageSource).toContain(
       ".map((issue) => `${sanitizeSensitiveText(issue.category, 80)}: ${issue.count}`)"
     );
@@ -178,6 +194,8 @@ describe("template analytics error states", () => {
       expect(source).toContain("document.body.append(link);");
       expect(source).toContain("link.remove();");
       expect(source).toContain("window.setTimeout(() => URL.revokeObjectURL(url), 1000);");
+      expect(source).toContain("} catch (error) {\n      URL.revokeObjectURL(url);");
+      expect(source).toContain("} finally {\n      link.remove();");
       expect(source).not.toContain("link.click();\n    URL.revokeObjectURL(url);");
     }
   });

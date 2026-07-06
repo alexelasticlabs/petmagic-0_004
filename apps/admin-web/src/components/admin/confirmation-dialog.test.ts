@@ -19,16 +19,22 @@ describe("admin confirmation dialog", () => {
     expect(source).toContain("const descriptionId = useId();");
     expect(source).toContain("const dialogRef = useRef<HTMLElement>(null);");
     expect(source).toContain("const cancelButtonRef = useRef<HTMLButtonElement>(null);");
-    expect(source).toContain("const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);");
-    expect(source).toContain("document.body.style.overflow = \"hidden\";");
+    expect(source).toContain(
+      "const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);"
+    );
+    expect(source).toContain('document.body.style.overflow = "hidden";');
     expect(source).toContain("document.body.style.overflow = previousOverflow;");
     expect(source).toContain("cancelButtonRef.current?.focus();");
     expect(source).toContain("previouslyFocusedElementRef.current?.focus();");
     expect(source).toContain('if (event.key !== "Tab") {');
-    expect(source).toContain("const focusableElements = dialogRef.current?.querySelectorAll<HTMLElement>(");
+    expect(source).toContain(
+      "const focusableElements = dialogRef.current?.querySelectorAll<HTMLElement>("
+    );
     expect(source).toContain("dialogRef.current?.focus();");
     expect(source).toContain("const firstElement = focusableElements[0];");
-    expect(source).toContain("const lastElement = focusableElements[focusableElements.length - 1];");
+    expect(source).toContain(
+      "const lastElement = focusableElements[focusableElements.length - 1];"
+    );
     expect(source).toContain("if (event.shiftKey && document.activeElement === firstElement)");
     expect(source).toContain("if (!event.shiftKey && document.activeElement === lastElement)");
     expect(source).toContain("lastElement.focus();");

@@ -57,6 +57,7 @@ Widget buildTemplateCardHost(
   bool hasPremiumAccess = true,
   Size size = const Size(320, 240),
   TemplateFeedPlaybackManager? playbackManager,
+  TemplateCardFeaturedData? featuredData,
 }) {
   final manager = playbackManager ?? TemplateFeedPlaybackManager();
   return MaterialApp(
@@ -73,6 +74,7 @@ Widget buildTemplateCardHost(
             hasPremiumAccess: hasPremiumAccess,
             imageCacheWidth: imageCacheWidth,
             playbackManager: manager,
+            featuredData: featuredData,
             previewControllerFactory: previewControllerFactory,
           ),
         ),
@@ -325,16 +327,21 @@ class FakePathProviderPlatform extends PathProviderPlatform {
 }
 
 class TickerModeHost extends StatefulWidget {
-  const TickerModeHost({required this.child, super.key});
+  const TickerModeHost({
+    required this.child,
+    this.initialEnabled = true,
+    super.key,
+  });
 
   final Widget child;
+  final bool initialEnabled;
 
   @override
   State<TickerModeHost> createState() => TickerModeHostState();
 }
 
 class TickerModeHostState extends State<TickerModeHost> {
-  bool _enabled = true;
+  late bool _enabled = widget.initialEnabled;
 
   void setEnabled(bool enabled) {
     setState(() {

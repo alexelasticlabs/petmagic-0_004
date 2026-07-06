@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
 
@@ -56,12 +57,13 @@ internal sealed class ImagePreviewGenerator(
                 return stored.Value;
             }
 
+            var safeErrorCode = SafeStorageErrorCode(stored.Error.Code);
             logger.LogWarning(
-                "Image preview storage failed. Operation={Operation} FileName={FileName} ContentType={ContentType} ErrorCode={ErrorCode} HasLocalPath={HasLocalPath}",
+                "Image preview storage failed. Operation={Operation} FileNameHash={FileNameHash} ContentType={ContentType} ErrorCode={ErrorCode} HasLocalPath={HasLocalPath}",
                 "store_preview",
-                original.FileName,
-                original.ContentType,
-                stored.Error.Code,
+                TemplateLogSanitizer.SafeFileName(original.FileName),
+                TemplateLogSanitizer.SafeContentType(original.ContentType),
+                safeErrorCode,
                 !string.IsNullOrWhiteSpace(original.LocalPath));
             return null;
         }
@@ -72,18 +74,27 @@ internal sealed class ImagePreviewGenerator(
         catch (Exception exception)
         {
             logger.LogWarning(
-                exception,
-                "Image preview generation failed. Operation={Operation} FileName={FileName} ContentType={ContentType} HasLocalPath={HasLocalPath}",
+                "Image preview generation failed. Operation={Operation} FileNameHash={FileNameHash} ContentType={ContentType} HasLocalPath={HasLocalPath} ExceptionType={ExceptionType}",
                 "create_preview",
-                original.FileName,
-                original.ContentType,
-                !string.IsNullOrWhiteSpace(original.LocalPath));
+                TemplateLogSanitizer.SafeFileName(original.FileName),
+                TemplateLogSanitizer.SafeContentType(original.ContentType),
+                !string.IsNullOrWhiteSpace(original.LocalPath),
+                SafeLogValues.ExceptionType(exception));
             return null;
         }
         finally
         {
             TryDelete(tempInput, original.FileName);
         }
+    }
+
+    private static string SafeStorageErrorCode(string? code)
+    {
+        var trimmed = code?.Trim();
+        var sanitized = AdminFailureMessageSanitizer.SanitizeCode(trimmed);
+        return string.Equals(trimmed, sanitized, StringComparison.Ordinal)
+            ? sanitized ?? TemplatesErrors.MediaStorageFailed.Code
+            : TemplatesErrors.MediaStorageFailed.Code;
     }
 
     private async Task<(string Path, string? TempPath)> ResolveInputPathAsync(
@@ -176,11 +187,11 @@ internal sealed class ImagePreviewGenerator(
         catch (Exception exception)
         {
             logger.LogWarning(
-                exception,
-                "Image preview temp cleanup failed. Operation={Operation} TempFileName={TempFileName} SourceFileName={SourceFileName}",
+                "Image preview temp cleanup failed. Operation={Operation} TempFileName={TempFileName} SourceFileNameHash={SourceFileNameHash} ExceptionType={ExceptionType}",
                 "delete_temp_preview_input",
                 Path.GetFileName(path),
-                string.IsNullOrWhiteSpace(sourceFileName) ? "unknown" : sourceFileName);
+                string.IsNullOrWhiteSpace(sourceFileName) ? "unknown" : TemplateLogSanitizer.SafeFileName(sourceFileName),
+                SafeLogValues.ExceptionType(exception));
         }
     }
 }

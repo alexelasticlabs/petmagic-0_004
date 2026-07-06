@@ -7,10 +7,10 @@ const errorStylesPath = fileURLToPath(
   new URL("./[locale]/admin-route-fallback.module.css", import.meta.url)
 );
 const globalErrorPagePath = fileURLToPath(new URL("./global-error.tsx", import.meta.url));
-const globalErrorStylesPath = fileURLToPath(
-  new URL("./global-error.module.css", import.meta.url)
+const globalErrorStylesPath = fileURLToPath(new URL("./global-error.module.css", import.meta.url));
+const fallbackContentPath = fileURLToPath(
+  new URL("./admin-route-fallback.content.ts", import.meta.url)
 );
-const fallbackContentPath = fileURLToPath(new URL("./admin-route-fallback.content.ts", import.meta.url));
 const loadingPagePath = fileURLToPath(new URL("./[locale]/loading.tsx", import.meta.url));
 const rootNotFoundPagePath = fileURLToPath(new URL("./not-found.tsx", import.meta.url));
 const notFoundPagePath = fileURLToPath(
@@ -34,7 +34,9 @@ describe("admin route fallbacks", () => {
     expect(errorSource).toContain("title={text.adminErrorTitle}");
     expect(errorSource).toContain("description={text.adminErrorDescription}");
     expect(errorSource).toContain('scope: "locale"');
-    expect(errorSource).toContain('import { sanitizeSensitiveText } from "@/lib/sensitive-display";');
+    expect(errorSource).toContain(
+      'import { sanitizeSensitiveText } from "@/lib/sensitive-display";'
+    );
     expect(errorSource).toContain(
       "digest: error.digest ? sanitizeSensitiveText(error.digest, 80) : undefined"
     );
@@ -49,12 +51,14 @@ describe("admin route fallbacks", () => {
     expect(errorSource).toContain('fallbackHref.endsWith("/support")');
     expect(errorSource).toContain('fallbackHref.endsWith("/dashboard")');
     expect(errorSource).toContain("text.signIn");
-    expect(errorSource).not.toContain('href={`/${locale}/dashboard`}');
+    expect(errorSource).not.toContain("href={`/${locale}/dashboard`}");
     expect(errorSource).toContain("className={styles.actionRow}");
     expect(errorSource).not.toContain('style={{ display: "flex"');
     expect(errorStyles).toContain("@media (max-width: 520px)");
 
-    expect(globalErrorSource).toContain('clientLogger.error("admin.global_error_boundary_triggered"');
+    expect(globalErrorSource).toContain(
+      'clientLogger.error("admin.global_error_boundary_triggered"'
+    );
     expect(globalErrorSource).toContain(
       'import { sanitizeSensitiveText } from "@/lib/sensitive-display";'
     );
@@ -66,6 +70,7 @@ describe("admin route fallbacks", () => {
     );
     expect(globalErrorSource).toContain("const locale = getLocaleFromCurrentPath();");
     expect(globalErrorSource).toContain("const text = getAdminRouteFallbackText(locale);");
+    expect(globalErrorSource).toContain("{text.brandTitle}");
     expect(globalErrorSource).toContain("<html lang={locale}>");
     expect(globalErrorSource).toContain('import styles from "./global-error.module.css"');
     expect(globalErrorSource).toContain("className={styles.body}");
@@ -75,8 +80,8 @@ describe("admin route fallbacks", () => {
     expect(globalErrorSource).toContain("className={styles.primaryAction}");
     expect(globalErrorSource).toContain("className={styles.secondaryAction}");
     expect(globalErrorSource).toContain("onClick={reset}");
-    expect(globalErrorSource).toContain('href={`/${locale}`}');
-    expect(globalErrorSource).not.toContain('const isRu = isRussianPath();');
+    expect(globalErrorSource).toContain("href={`/${locale}`}");
+    expect(globalErrorSource).not.toContain("const isRu = isRussianPath();");
     expect(globalErrorSource).not.toContain("{error.message}");
     expect(globalErrorSource).not.toContain("message: error.message");
     expect(globalErrorSource).not.toContain("digest: error.digest,");
@@ -101,13 +106,26 @@ describe("admin route fallbacks", () => {
     expect(fallbackContentSource).toContain(
       "const adminRouteFallbackText: Record<Locale, AdminRouteFallbackText> = {"
     );
+    expect(fallbackContentSource).toContain('brandTitle: "PetMagic Admin"');
     expect(fallbackContentSource).toContain('globalErrorTitle: "Не удалось открыть админ-панель"');
     expect(fallbackContentSource).toContain('signInActionLabel: "К входу"');
     expect(fallbackContentSource).toContain('retryActionLabel: "Retry"');
 
+    expect(errorSource).toContain(
+      'import { getAdminPageMetaCopy } from "@/lib/admin-navigation.content";'
+    );
+    expect(errorSource).toContain("const pageMeta = getAdminPageMetaCopy(locale);");
+    expect(errorSource).toContain("title={pageMeta.workspace.title}");
+    expect(errorSource).not.toContain('title="PetMagic Admin"');
     expect(loadingSource).toContain("description={text.adminLoadingDescription}");
+    expect(loadingSource).toContain(
+      'import { getAdminPageMetaCopy } from "@/lib/admin-navigation.content";'
+    );
+    expect(loadingSource).toContain("const pageMeta = getAdminPageMetaCopy(locale);");
+    expect(loadingSource).toContain("title={pageMeta.workspace.title}");
     expect(loadingSource).toContain('<AdminPage aria-busy="true" aria-live="polite">');
     expect(loadingSource).not.toContain("description={text.navDashboard}");
+    expect(loadingSource).not.toContain('title="PetMagic Admin"');
   });
 
   it("uses a role-aware not-found action instead of hardcoded dashboard navigation", () => {
@@ -123,7 +141,7 @@ describe("admin route fallbacks", () => {
     expect(notFoundSource).toContain('fallbackHref.endsWith("/support")');
     expect(notFoundSource).toContain('fallbackHref.endsWith("/dashboard")');
     expect(notFoundSource).toContain("text.signIn");
-    expect(notFoundSource).not.toContain('href={`/${locale}/dashboard`}');
+    expect(notFoundSource).not.toContain("href={`/${locale}/dashboard`}");
     expect(notFoundSource).not.toContain('const isRu = locale === "ru";');
     expect(fallbackContentSource).toContain('adminNotFoundActionTitle: "Проверьте адрес страницы"');
   });
@@ -138,7 +156,7 @@ describe("admin route fallbacks", () => {
     expect(rootNotFoundSource).not.toContain("AdminNotFoundPage");
     expect(rootNotFoundSource).not.toContain("useAuthSession()");
     expect(rootNotFoundSource).not.toContain("getDefaultAdminPath");
-    expect(rootNotFoundSource).toContain('href={`/${locale}`}');
+    expect(rootNotFoundSource).toContain("href={`/${locale}`}");
     expect(rootNotFoundSource).not.toContain('const isRu = locale === "ru";');
   });
 });

@@ -28,7 +28,7 @@ internal sealed partial class TemplatesService(
         new(dbContext, templateFeedRealtimeService);
 
     private readonly TemplateAdminAnalyticsService _templateAdminAnalyticsService =
-        new(dbContext);
+        new(dbContext, mediaStorage, options);
 
     private const int PublicFeedDefaultTake = 20;
     private const int PublicFeedMaxTake = 50;

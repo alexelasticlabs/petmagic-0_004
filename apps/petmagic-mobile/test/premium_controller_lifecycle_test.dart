@@ -22,11 +22,32 @@ void main() {
     );
     expect(lifecycleBody, contains('_handlePurchaseUpdates(purchases)'));
   });
+
+  test('store purchase verification is cancelled with premium lifecycle', () {
+    final source = readPremiumControllerLibrarySource();
+    final verifyBody = _methodBody(source, '_verifyStorePurchase');
+
+    expect(
+      verifyBody,
+      contains(
+        'final verificationCancelToken = _startCheckoutVerificationCancelToken();',
+      ),
+    );
+    expect(verifyBody, contains('cancelToken: verificationCancelToken'));
+    expect(verifyBody, contains('verificationCancelToken.isCancelled'));
+    expect(verifyBody, contains('CancelToken.isCancel(error)'));
+    expect(
+      verifyBody,
+      contains('_clearActiveCheckoutVerification(verificationCancelToken);'),
+    );
+    expect(verifyBody, contains('} on RequestCancelledException {'));
+    expect(verifyBody, contains('return;'));
+  });
 }
 
 String _methodBody(String source, String methodName) {
   final methodMatch = RegExp(
-    r'(?:@override\s+)?(?:PremiumState|void)\s+' +
+    r'(?:@override\s+)?(?:PremiumState|void|Future<[^>]+>)\s+' +
         methodName +
         r'\s*\([^)]*\)\s*(?:async\s*)?\{',
   ).firstMatch(source);

@@ -46,6 +46,52 @@ public sealed class TemplateMediaCleanupProcessorTests
     }
 
     [Fact]
+    public async Task CleanupNextExpiredTemporaryUploadAsync_ShouldSanitizeDurableFailureDiagnostics()
+    {
+        await using var dbContext = CreateDbContext();
+        var recordId = Guid.NewGuid();
+        dbContext.TemplateMediaRecords.Add(new TemplateMediaRecord
+        {
+            Id = recordId,
+            Url = "http://localhost:5000/templates-media/temp-preview.jpg",
+            FileName = "temp-preview.jpg",
+            ContentType = "image/jpeg",
+            FileSizeBytes = 1024,
+            Role = TemplateMediaRole.PreviewAsset,
+            LifecycleState = TemplateMediaLifecycleState.Temporary,
+            UploadedAtUtc = DateTime.UtcNow.AddHours(-2),
+            ExpiresAtUtc = DateTime.UtcNow.AddMinutes(-5)
+        });
+        await dbContext.SaveChangesAsync();
+
+        var logger = new CapturingLogger<TemplateMediaCleanupProcessor>();
+        var processor = CreateProcessor(
+            dbContext,
+            mediaStorage: new FailingDeleteMediaStorage(
+                "storage token=code-secret",
+                "delete failed token=raw-secret api_secret=storage-secret requestId=req-secret"),
+            logger: logger);
+
+        var processed = await processor.CleanupNextExpiredTemporaryUploadAsync(CancellationToken.None);
+
+        var record = await dbContext.TemplateMediaRecords.SingleAsync(x => x.Id == recordId);
+        Assert.True(processed);
+        Assert.Equal(TemplateMediaLifecycleState.CleanupFailed, record.LifecycleState);
+        Assert.NotNull(record.FailureCode);
+        Assert.NotNull(record.FailureMessage);
+        Assert.DoesNotContain("code-secret", record.FailureCode, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("raw-secret", record.FailureMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("storage-secret", record.FailureMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("req-secret", record.FailureMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            logger.Entries,
+            entry => entry.Level == LogLevel.Warning
+                && entry.Properties.TryGetValue("ErrorCode", out var value)
+                && value is string errorCode
+                && !errorCode.Contains("code-secret", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task CleanupNextExpiredGenerationMediaAsync_ShouldDeleteUserMediaAndKeepRefundPendingJob()
     {
         await using var dbContext = CreateDbContext();
@@ -106,6 +152,41 @@ public sealed class TemplateMediaCleanupProcessorTests
         Assert.Contains("http://localhost:5000/templates-media/output-thumb.jpg", mediaStorage.DeletedUrls);
         Assert.Contains("http://localhost:5000/templates-media/output-watermarked-thumb.jpg", mediaStorage.DeletedUrls);
         Assert.DoesNotContain("http://localhost:5000/templates-media/reference.mp4", mediaStorage.DeletedUrls);
+    }
+
+    [Fact]
+    public async Task CleanupNextExpiredGenerationMediaAsync_ShouldSanitizeDurableFailureCode()
+    {
+        await using var dbContext = CreateDbContext();
+        var template = CreateReadyTemplate();
+        var job = CreateGenerationJob(template, TemplateGenerationStatus.Failed, DateTime.UtcNow.AddDays(-10));
+        job.SourceImageUrl = "http://localhost:5000/templates-media/source.jpg";
+        job.ResultUrl = "http://localhost:5000/templates-media/output.mp4";
+
+        dbContext.TemplateItems.Add(template);
+        dbContext.TemplateGenerationJobs.Add(job);
+        await dbContext.SaveChangesAsync();
+
+        var logger = new CapturingLogger<TemplateMediaCleanupProcessor>();
+        var processor = CreateProcessor(
+            dbContext,
+            mediaStorage: new FailingDeleteMediaStorage(
+                "storage token=cleanup-code-secret",
+                "delete failed token=raw-secret"),
+            logger: logger);
+
+        var processed = await processor.CleanupNextExpiredGenerationMediaAsync(CancellationToken.None);
+
+        var persisted = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == job.Id);
+        Assert.True(processed);
+        Assert.NotNull(persisted.UserMediaCleanupFailureCode);
+        Assert.DoesNotContain("cleanup-code-secret", persisted.UserMediaCleanupFailureCode, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            logger.Entries,
+            entry => entry.Level == LogLevel.Warning
+                && entry.Properties.TryGetValue("ErrorCode", out var value)
+                && value is string errorCode
+                && !errorCode.Contains("cleanup-code-secret", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -360,6 +441,30 @@ public sealed class TemplateMediaCleanupProcessorTests
         {
             DeletedUrls.Add(assetUrl);
             return Task.FromResult(Result.Success());
+        }
+
+        public Task<Result<string>> CreateReadUrlAsync(string assetUrl, TimeSpan ttl, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success(assetUrl));
+        }
+    }
+
+    private sealed class FailingDeleteMediaStorage(string code, string message) : IMediaStorage
+    {
+        public Task<Result<StoredMediaResponse>> StoreAsync(MediaUploadCommand asset, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success(new StoredMediaResponse(
+                $"http://localhost:5000/templates-media/{asset.FileName}",
+                $"templates-media/{asset.FileName}",
+                asset.FileName,
+                asset.ContentType,
+                asset.Content?.LongLength ?? asset.ContentLengthBytes ?? 0,
+                null)));
+        }
+
+        public Task<Result> DeleteAsync(string assetUrl, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Failure(new Error(code, message)));
         }
 
         public Task<Result<string>> CreateReadUrlAsync(string assetUrl, TimeSpan ttl, CancellationToken cancellationToken)

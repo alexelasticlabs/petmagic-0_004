@@ -10,8 +10,18 @@ void main() {
 
     expect(source, contains("'path': _requestPath(err.requestOptions),"));
     expect(source, isNot(contains("'path': err.requestOptions.path,")));
-    expect(source, contains('return stripQuery(options.path);'));
-    expect(source, contains('return stripQuery(options.uri.path);'));
+    expect(
+      source,
+      contains('_sanitizeEndpointPath(stripQuery(_pathOnly(rawPath)))'),
+    );
+    expect(source, contains('String _pathOnly(String value)'));
+    expect(source, contains('parsed.hasScheme && parsed.hasAuthority'));
+    expect(source, contains('bool _isSensitivePathValueSegment'));
+    expect(source, contains("segments[index] = ':id';"));
+    expect(source, contains("normalizedSegment == 'users'"));
+    expect(source, contains("normalized == 'feed'"));
+    expect(source, isNot(contains('return stripQuery(options.path);')));
+    expect(source, isNot(contains('return stripQuery(options.uri.path);')));
   });
 
   test('API logging skips expected cancellation noise', () {
@@ -61,9 +71,19 @@ void main() {
       ).readAsStringSync();
 
       expect(source, isNot(contains("'problem_detail'")));
+      expect(source, isNot(contains("'problem_title'")));
+      expect(
+        source,
+        contains("'problem_key': _problemKey(response?.data, 'title')"),
+      );
+      expect(source, contains('NetworkErrorMapper.isSafeMessageKey(trimmed)'));
       expect(
         source,
         isNot(contains("_problemString(response?.data, 'detail')")),
+      );
+      expect(
+        source,
+        isNot(contains("_problemString(response?.data, 'title')")),
       );
     },
   );

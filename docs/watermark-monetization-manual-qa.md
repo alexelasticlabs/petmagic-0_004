@@ -40,19 +40,23 @@ To create local QA users and tokens automatically against a running backend:
 ```bash
 API_BASE_URL=http://localhost:<BACKEND_HOST_PORT> \
 DATABASE_URL="$DATABASE_URL" \
+WATERMARK_QA_PASSWORD="<unique-local-qa-password>" \
 scripts/qa/prepare-watermark-qa-users.mjs
 ```
 
 If Docker maps Postgres to a host port that conflicts with a local Postgres, use the Docker `psql` wrapper:
 
 ```bash
-PATH="$PWD/scripts/qa:$PATH" \
+WATERMARK_QA_PSQL_COMMAND=scripts/qa/psql \
 DATABASE_URL=postgresql://petmagic_user:unused@docker/petmagic_db \
 API_BASE_URL=http://localhost:<BACKEND_HOST_PORT> \
+WATERMARK_QA_PASSWORD="<unique-local-qa-password>" \
 scripts/qa/prepare-watermark-qa-users.mjs
 ```
 
-This writes `artifacts/watermark-qa-users.env` with user IDs, emails, and access tokens. Load it before the seed and backend smoke commands:
+From Windows PowerShell, use `WATERMARK_QA_PSQL_COMMAND=scripts\qa\psql.cmd` for the same Docker-backed `psql` wrapper.
+
+Use a fresh local-only password for each QA run. The helper does not provide a default password because the generated env file includes that password alongside user IDs, emails, and access tokens. Load `artifacts/watermark-qa-users.env` before the seed and backend smoke commands:
 
 ```bash
 set -a
@@ -66,6 +70,8 @@ Then prepare local media fixtures for image and video checks. On macOS, the help
 scripts/qa/prepare-watermark-manual-qa-media.sh
 ```
 
+On Windows and Linux, the preflight runner records this media step as skipped instead of failing on the macOS-only helper. For full manual QA on those hosts, place equivalent files under `src/Host/PetMagic.Host.Api/wwwroot/templates-media/manual-qa/` or provide real playable MP4 files from another machine.
+
 To use your own video files instead of generated synthetic fixtures, provide real playable MP4 files and rerun the helper:
 
 ```bash
@@ -77,7 +83,7 @@ scripts/qa/prepare-watermark-manual-qa-media.sh
 Then seed database rows:
 
 ```bash
-psql "$DATABASE_URL" \
+"${WATERMARK_QA_PSQL_COMMAND:-psql}" "$DATABASE_URL" \
   -v free_user_id="'$FREE_USER_ID'" \
   -v no_credit_user_id="'$NO_CREDIT_USER_ID'" \
   -v premium_user_id="'$PREMIUM_USER_ID'" \
@@ -108,6 +114,7 @@ ADMIN_TOKEN="<admin-access-token>" scripts/qa/run-watermark-backend-qa.mjs
 ```
 
 The smoke runner writes redacted evidence to `artifacts/watermark-backend-qa-evidence.json` by default. Override with `WATERMARK_QA_EVIDENCE_PATH=/path/to/evidence.json`.
+Run `scripts/qa/run-watermark-backend-qa.mjs --help` to print required environment variables without writing evidence or touching the database.
 
 To run the local fixture prep, backend smoke, and Flutter integration smoke as one preflight:
 
@@ -123,6 +130,7 @@ scripts/qa/run-watermark-preflight-qa.mjs
 ```
 
 The preflight runner writes `artifacts/watermark-preflight-qa-evidence.json`. Missing backend env or device IDs are recorded as skipped checks, so use `WATERMARK_QA_STRICT=1` when the run must fail on any skipped step. The preflight does not replace the manual iOS and Android walkthrough below; attach its evidence file to the final manual QA table.
+Run `scripts/qa/run-watermark-preflight-qa.mjs --help` to inspect all options without creating an evidence file.
 
 If Android is not already booted, the runner can launch an AVD and wait for `adb` readiness:
 
@@ -137,7 +145,7 @@ The AVD launch uses headless-safe defaults: `-no-window -no-audio -gpu swiftshad
 
 `WATERMARK_QA_SKIP_FIREBASE=1` passes `--dart-define=PETMAGIC_SKIP_FIREBASE=true` so local QA can run with placeholder Firebase files. Use real Firebase config and omit this flag for production-like push-notification checks.
 
-Keep placeholder Firebase API keys syntactically valid, for example `AIzaSyD00000000000000000000000000000000`, so native Firebase validation does not abort simulator startup before Dart runs.
+Keep placeholder Firebase API keys syntactically valid locally, using the `AIza` prefix plus a non-secret filler of the expected length, so native Firebase validation does not abort simulator startup before Dart runs. Do not commit literal Firebase API-key-shaped values to docs.
 
 If Flutter device discovery or a device run hangs, use explicit device IDs and adjust `WATERMARK_QA_DEVICE_DISCOVERY_TIMEOUT_MS` or `WATERMARK_QA_COMMAND_TIMEOUT_MS`. For iOS Swift Package Manager state issues, use `WATERMARK_QA_IOS_RESOLVE_PACKAGES=1`; if a local Flutter setup needs the CocoaPods path, set `flutter config --no-enable-swift-package-manager` before the run and record that in the evidence notes.
 

@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 
 using Microsoft.EntityFrameworkCore;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.SupportChat.Application.Abstractions;
 using PetMagic.Modules.SupportChat.Application.Contracts;
 using PetMagic.Modules.SupportChat.Infrastructure.Entities;
@@ -24,7 +25,6 @@ public sealed partial class SupportChatService
                     x.Id,
                     x.InitiatorUserId,
                     x.UpdatedAtUtc,
-                    x.LastMessagePreview,
                     x.LastMessageAtUtc,
                     x.LastMessageSenderType,
                     AdminUnreadCount = x.Messages.Count(message => !message.IsFromAdmin && message.ReadAtUtc == null),
@@ -42,7 +42,6 @@ public sealed partial class SupportChatService
                     snapshot.Id,
                     snapshot.InitiatorUserId,
                     snapshot.UpdatedAtUtc,
-                    snapshot.LastMessagePreview,
                     snapshot.LastMessageAtUtc,
                     snapshot.LastMessageSenderType?.ToString(),
                     snapshot.AdminUnreadCount,
@@ -56,12 +55,12 @@ public sealed partial class SupportChatService
         catch (Exception exception)
         {
             logger?.LogWarning(
-                exception,
-                "Support chat notification fan-out failed. Operation={Operation} Channel={Channel} ConversationId={ConversationId} InitiatorUserId={InitiatorUserId}",
+                "Support chat notification fan-out failed. Operation={Operation} Channel={Channel} ConversationIdHash={ConversationIdHash} InitiatorUserIdHash={InitiatorUserIdHash} ExceptionType={ExceptionType}",
                 "conversation_update",
                 "realtime",
-                conversation.Id,
-                conversation.InitiatorUserId);
+                SafeLogValues.StableHash(conversation.Id.ToString("D")),
+                SafeLogValues.StableHash(conversation.InitiatorUserId.ToString("D")),
+                SafeLogValues.ExceptionType(exception));
             // Realtime fan-out is best-effort and must not break the primary support flow.
         }
     }
@@ -78,8 +77,6 @@ public sealed partial class SupportChatService
                     conversation.Id,
                     conversation.InitiatorUserId,
                     message.MessageId,
-                    message.SenderDisplayName,
-                    message.Body,
                     message.Attachments.Count > 0 || message.PendingAttachment is not null,
                     await supportChatDbContext.ConversationMessages.CountAsync(
                         x => x.ConversationId == conversation.Id && x.IsFromAdmin && x.ReadAtUtc == null,
@@ -93,15 +90,15 @@ public sealed partial class SupportChatService
         catch (Exception exception)
         {
             logger?.LogWarning(
-                exception,
-                "Support chat notification fan-out failed. Operation={Operation} Channel={Channel} ConversationId={ConversationId} InitiatorUserId={InitiatorUserId} MessageId={MessageId} SenderType={SenderType} HasAttachments={HasAttachments}",
+                "Support chat notification fan-out failed. Operation={Operation} Channel={Channel} ConversationIdHash={ConversationIdHash} InitiatorUserIdHash={InitiatorUserIdHash} MessageIdHash={MessageIdHash} SenderType={SenderType} HasAttachments={HasAttachments} ExceptionType={ExceptionType}",
                 "message_delivery",
                 "push",
-                conversation.Id,
-                conversation.InitiatorUserId,
-                message.MessageId,
+                SafeLogValues.StableHash(conversation.Id.ToString("D")),
+                SafeLogValues.StableHash(conversation.InitiatorUserId.ToString("D")),
+                SafeLogValues.StableHash(message.MessageId.ToString("D")),
                 message.SenderType,
-                message.Attachments.Count > 0 || message.PendingAttachment is not null);
+                message.Attachments.Count > 0 || message.PendingAttachment is not null,
+                SafeLogValues.ExceptionType(exception));
             // Push delivery is best-effort and must not block support replies.
         }
     }

@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
 
+import 'package:crypto/crypto.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
@@ -41,6 +43,8 @@ class NotificationCoordinator {
   static final RegExp _routeControlCharacters = RegExp(r'[\x00-\x1F\x7F]');
   static final RegExp _safeGenerationId = RegExp(r'^[A-Za-z0-9_-]{1,128}$');
   static const Duration _handledInteractionWindow = Duration(minutes: 5);
+  static const int _maxHandledInteractions = 128;
+  static const int _maxExternalDedupeKeyLength = 160;
 
   StreamSubscription<String>? _tokenRefreshSubscription;
   StreamSubscription<RemoteMessage>? _messageOpenedSubscription;
@@ -109,10 +113,11 @@ class NotificationCoordinator {
       }
 
       final epoch = _registrationEpoch;
-      _lastRegisteredToken = token;
+      final previousToken = _lastRegisteredToken;
       final registered = await _registerTokenWithRetry(token, epoch: epoch);
       if (registered && _canContinueRegistration(epoch)) {
         _lastRegisteredToken = token;
+        await _unregisterStaleToken(previousToken, replacementToken: token);
       }
     } catch (error, stackTrace) {
       _logNotificationFailure('register_current_token', error, stackTrace);
@@ -172,19 +177,13 @@ class NotificationCoordinator {
     }
 
     final type = message.data['type'] as String?;
-    final rawTitle = message.notification?.title?.trim();
-    final rawBody = message.notification?.body?.trim();
-
-    final title = rawTitle == null || rawTitle.isEmpty ? null : rawTitle;
-    final body = rawBody == null || rawBody.isEmpty
-        ? _fallbackBody(type)
-        : rawBody;
-    final messageText = body.isEmpty ? (title ?? _fallbackTitle(type)) : body;
+    final title = _fallbackTitle(type);
+    final messageText = _fallbackBody(type);
     final dedupeKey =
-        message.data['dedupe_key'] as String? ??
-        message.data['dedupeKey'] as String? ??
-        message.messageId ??
-        '${type ?? 'update'}:${messageText.hashCode}:${title ?? ''}';
+        _safeExternalDedupeKey(message.data['dedupe_key']) ??
+        _safeExternalDedupeKey(message.data['dedupeKey']) ??
+        _safeExternalDedupeKey(message.messageId) ??
+        '${type ?? 'update'}:${messageText.hashCode}:$title';
     final route = _routeFromMap(message.data);
 
     PetMagicToast.show(
@@ -231,12 +230,18 @@ class NotificationCoordinator {
       if (token.isEmpty) {
         return;
       }
-      _lastRegisteredToken = token;
+      final previousToken = _lastRegisteredToken;
       if (!_authSessionActive) {
         return;
       }
       final epoch = _registrationEpoch;
-      unawaited(_registerRefreshedToken(token, epoch: epoch));
+      unawaited(
+        _registerRefreshedToken(
+          token,
+          previousToken: previousToken,
+          epoch: epoch,
+        ),
+      );
     });
 
     _messageOpenedSubscription ??= FirebaseMessaging.onMessageOpenedApp.listen(
@@ -278,6 +283,7 @@ class NotificationCoordinator {
 
   Future<void> _registerRefreshedToken(
     String token, {
+    required String? previousToken,
     required int epoch,
   }) async {
     try {
@@ -287,7 +293,11 @@ class NotificationCoordinator {
       if (!await _notificationsAllowed()) {
         return;
       }
-      await _registerTokenWithRetry(token, epoch: epoch);
+      final registered = await _registerTokenWithRetry(token, epoch: epoch);
+      if (registered && _canContinueRegistration(epoch)) {
+        _lastRegisteredToken = token;
+        await _unregisterStaleToken(previousToken, replacementToken: token);
+      }
     } catch (error, stackTrace) {
       _logNotificationFailure('register_refreshed_token', error, stackTrace);
     }
@@ -334,6 +344,31 @@ class NotificationCoordinator {
     return false;
   }
 
+  Future<void> _unregisterStaleToken(
+    String? staleToken, {
+    required String replacementToken,
+  }) async {
+    final normalizedStaleToken = staleToken?.trim();
+    if (normalizedStaleToken == null ||
+        normalizedStaleToken.isEmpty ||
+        normalizedStaleToken == replacementToken.trim()) {
+      return;
+    }
+
+    await _pushTokenRegistrar.unregisterToken(
+      token: normalizedStaleToken,
+      clearRegistrationState: false,
+      canContinue: () => !_isDisposed,
+      onFailure: (stage, error, stackTrace) {
+        _logNotificationFailure(
+          'unregister_stale_${stage}_token',
+          error,
+          stackTrace,
+        );
+      },
+    );
+  }
+
   bool _canContinueRegistration(int epoch) {
     return !_isDisposed && _authSessionActive && epoch == _registrationEpoch;
   }
@@ -350,12 +385,7 @@ class NotificationCoordinator {
   }
 
   bool _markInteractionHandled(RemoteMessage message) {
-    final key =
-        message.data['dedupe_key'] as String? ??
-        message.data['dedupeKey'] as String? ??
-        message.messageId ??
-        _routeFromMap(message.data) ??
-        message.data.toString();
+    final key = _interactionDedupeKey(message);
     final now = DateTime.now();
     _pruneHandledInteractions(now);
 
@@ -366,7 +396,16 @@ class NotificationCoordinator {
     }
 
     _handledInteractions[key] = now;
+    _trimHandledInteractionsToLimit();
     return true;
+  }
+
+  String _interactionDedupeKey(RemoteMessage message) {
+    return _safeExternalDedupeKey(message.data['dedupe_key']) ??
+        _safeExternalDedupeKey(message.data['dedupeKey']) ??
+        _safeExternalDedupeKey(message.messageId) ??
+        _routeFromMap(message.data) ??
+        _fingerprintNotificationData(message.data);
   }
 
   void _pruneHandledInteractions(DateTime now) {
@@ -380,6 +419,43 @@ class NotificationCoordinator {
     for (final key in expiredKeys) {
       _handledInteractions.remove(key);
     }
+  }
+
+  void _trimHandledInteractionsToLimit() {
+    while (_handledInteractions.length > _maxHandledInteractions) {
+      _handledInteractions.remove(_handledInteractions.keys.first);
+    }
+  }
+
+  static String? _safeExternalDedupeKey(Object? raw) {
+    if (raw is! String) {
+      return null;
+    }
+
+    final value = raw.trim();
+    if (value.isEmpty || _routeControlCharacters.hasMatch(value)) {
+      return null;
+    }
+
+    if (value.length <= _maxExternalDedupeKeyLength) {
+      return value;
+    }
+
+    return _fingerprintString(value);
+  }
+
+  static String _fingerprintNotificationData(Map<String, dynamic> payload) {
+    final sanitized = <String, String>{};
+    final keys = payload.keys.map((key) => key.toString()).toList()..sort();
+    for (final key in keys) {
+      sanitized[key] = payload[key].toString();
+    }
+
+    return _fingerprintString(jsonEncode(sanitized));
+  }
+
+  static String _fingerprintString(String value) {
+    return 'sha256:${sha256.convert(utf8.encode(value))}';
   }
 
   String? _routeFromMap(Map<String, dynamic> payload) {

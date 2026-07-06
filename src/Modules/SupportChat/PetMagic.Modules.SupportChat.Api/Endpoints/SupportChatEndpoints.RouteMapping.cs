@@ -24,6 +24,7 @@ public static partial class SupportChatEndpoints
         var userGroup = endpoints.MapGroup("/api/support")
             .WithTags("Support")
             .RequireRateLimiting("support-chat")
+            .AddEndpointFilter(ApplyPrivateSupportResponseHeadersAsync)
             .RequireAuthorization(policy => policy
                 .RequireAuthenticatedUser()
                 .RequireAssertion(context =>
@@ -54,10 +55,14 @@ public static partial class SupportChatEndpoints
             .DisableAntiforgery()
             .RequireRateLimiting("support-chat")
             .WithMetadata(new RequestSizeLimitAttribute(MaxSupportSingleAttachmentRequestBodyBytes));
-        userGroup.MapPost("/conversation/{conversationId:guid}/read", MarkUserReadAsync);
-        userGroup.MapPost("/conversation/{conversationId:guid}/resolve", ResolveUserConversationAsync);
-        userGroup.MapPost("/conversation/{conversationId:guid}/close", CloseUserConversationAsync);
-        userGroup.MapPost("/conversation/{conversationId:guid}/reopen", ReopenUserConversationAsync);
+        userGroup.MapPost("/conversation/{conversationId:guid}/read", MarkUserReadAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxSupportJsonRequestBodyBytes));
+        userGroup.MapPost("/conversation/{conversationId:guid}/resolve", ResolveUserConversationAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxSupportJsonRequestBodyBytes));
+        userGroup.MapPost("/conversation/{conversationId:guid}/close", CloseUserConversationAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxSupportJsonRequestBodyBytes));
+        userGroup.MapPost("/conversation/{conversationId:guid}/reopen", ReopenUserConversationAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxSupportJsonRequestBodyBytes));
         userGroup.MapPost("/conversation/{conversationId:guid}/feedback", SubmitUserConversationFeedbackAsync)
             .WithMetadata(new RequestSizeLimitAttribute(MaxSupportJsonRequestBodyBytes))
             .RequireRateLimiting("support-chat");
@@ -76,24 +81,31 @@ public static partial class SupportChatEndpoints
         var adminGroup = endpoints.MapGroup("/api/admin/support")
             .WithTags("Admin.Support")
             .RequireRateLimiting("admin")
+            .AddEndpointFilter(ApplyPrivateSupportResponseHeadersAsync)
             .RequireAuthorization("ModeratorOrAdmin");
 
         adminGroup.MapGet("/tickets", ListAdminInboxAsync);
         adminGroup.MapGet("/tickets/metrics", GetAdminInboxMetricsAsync);
         adminGroup.MapGet("/tickets/{conversationId:guid}", GetAdminConversationAsync);
         adminGroup.MapGet("/tickets/{conversationId:guid}/context", GetAdminTicketContextAsync);
-        adminGroup.MapPost("/tickets/{conversationId:guid}/assign-to-me", AssignConversationToMeAsync);
-        adminGroup.MapPost("/tickets/{conversationId:guid}/unassign", UnassignConversationAsync);
-        adminGroup.MapPost("/tickets/{conversationId:guid}/mark-waiting-for-user", MarkConversationWaitingForUserAsync);
-        adminGroup.MapPost("/tickets/{conversationId:guid}/mark-in-progress", MarkConversationInProgressAsync);
+        adminGroup.MapPost("/tickets/{conversationId:guid}/assign-to-me", AssignConversationToMeAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxSupportJsonRequestBodyBytes));
+        adminGroup.MapPost("/tickets/{conversationId:guid}/unassign", UnassignConversationAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxSupportJsonRequestBodyBytes));
+        adminGroup.MapPost("/tickets/{conversationId:guid}/mark-waiting-for-user", MarkConversationWaitingForUserAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxSupportJsonRequestBodyBytes));
+        adminGroup.MapPost("/tickets/{conversationId:guid}/mark-in-progress", MarkConversationInProgressAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxSupportJsonRequestBodyBytes));
         adminGroup.MapPut("/tickets/{conversationId:guid}/status", UpdateConversationStatusAsync)
             .WithMetadata(new RequestSizeLimitAttribute(MaxSupportJsonRequestBodyBytes));
         adminGroup.MapPut("/tickets/{conversationId:guid}/assignment", AssignConversationAsync)
             .WithMetadata(new RequestSizeLimitAttribute(MaxSupportJsonRequestBodyBytes));
         adminGroup.MapPut("/tickets/{conversationId:guid}/metadata", UpdateConversationMetadataAsync)
             .WithMetadata(new RequestSizeLimitAttribute(MaxSupportJsonRequestBodyBytes));
-        adminGroup.MapPost("/tickets/{conversationId:guid}/close", CloseAdminConversationAsync);
-        adminGroup.MapPost("/tickets/{conversationId:guid}/reopen", ReopenAdminConversationAsync);
+        adminGroup.MapPost("/tickets/{conversationId:guid}/close", CloseAdminConversationAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxSupportJsonRequestBodyBytes));
+        adminGroup.MapPost("/tickets/{conversationId:guid}/reopen", ReopenAdminConversationAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxSupportJsonRequestBodyBytes));
         adminGroup.MapPost("/tickets/{conversationId:guid}/messages", SendAdminMessageAsync)
             .WithMetadata(new RequestSizeLimitAttribute(MaxSupportJsonRequestBodyBytes))
             .RequireRateLimiting("support-chat");
@@ -109,14 +121,27 @@ public static partial class SupportChatEndpoints
             .DisableAntiforgery()
             .RequireRateLimiting("support-chat")
             .WithMetadata(new RequestSizeLimitAttribute(MaxSupportSingleAttachmentRequestBodyBytes));
-        adminGroup.MapPost("/tickets/{conversationId:guid}/read", MarkAdminReadAsync);
+        adminGroup.MapPost("/tickets/{conversationId:guid}/read", MarkAdminReadAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxSupportJsonRequestBodyBytes));
         adminGroup.MapGet("/templates", ListReplyTemplatesAsync);
         adminGroup.MapPost("/templates", CreateReplyTemplateAsync)
             .WithMetadata(new RequestSizeLimitAttribute(MaxSupportJsonRequestBodyBytes));
         adminGroup.MapPut("/templates/{templateId:guid}", UpdateReplyTemplateAsync)
             .WithMetadata(new RequestSizeLimitAttribute(MaxSupportJsonRequestBodyBytes));
-        adminGroup.MapDelete("/templates/{templateId:guid}", DeleteReplyTemplateAsync);
+        adminGroup.MapDelete("/templates/{templateId:guid}", DeleteReplyTemplateAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxSupportJsonRequestBodyBytes));
 
         return adminGroup;
+    }
+
+    private static async ValueTask<object?> ApplyPrivateSupportResponseHeadersAsync(
+        EndpointFilterInvocationContext context,
+        EndpointFilterDelegate next)
+    {
+        context.HttpContext.Response.Headers.CacheControl = "no-store";
+        context.HttpContext.Response.Headers.Pragma = "no-cache";
+        context.HttpContext.Response.Headers.XContentTypeOptions = "nosniff";
+
+        return await next(context);
     }
 }

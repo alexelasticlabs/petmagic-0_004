@@ -31,25 +31,16 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Modules\Economy\PetMagic.Modules.Economy.Api\PetMagic.Modules.Economy.Api.csproj" />
-    <ProjectReference Include="..\..\src\Modules\Economy\PetMagic.Modules.Economy.Application\PetMagic.Modules.Economy.Application.csproj" />
-    <ProjectReference Include="..\..\src\Modules\Economy\PetMagic.Modules.Economy.Domain\PetMagic.Modules.Economy.Domain.csproj" />
-    <ProjectReference Include="..\..\src\Modules\Economy\PetMagic.Modules.Economy.Infrastructure\PetMagic.Modules.Economy.Infrastructure.csproj" />
-    <ProjectReference Include="..\..\src\BuildingBlocks\PetMagic.BuildingBlocks\PetMagic.BuildingBlocks.csproj" />
-    <ProjectReference Include="..\..\src\Modules\Identity\PetMagic.Modules.Identity.Api\PetMagic.Modules.Identity.Api.csproj" />
-    <ProjectReference Include="..\..\src\Modules\Identity\PetMagic.Modules.Identity.Application\PetMagic.Modules.Identity.Application.csproj" />
-    <ProjectReference Include="..\..\src\Modules\Identity\PetMagic.Modules.Identity.Domain\PetMagic.Modules.Identity.Domain.csproj" />
-    <ProjectReference Include="..\..\src\Modules\Identity\PetMagic.Modules.Identity.Infrastructure\PetMagic.Modules.Identity.Infrastructure.csproj" />
-    <ProjectReference Include="..\..\src\Modules\Templates\PetMagic.Modules.Templates.Api\PetMagic.Modules.Templates.Api.csproj" />
-    <ProjectReference Include="..\..\src\Modules\Templates\PetMagic.Modules.Templates.Application\PetMagic.Modules.Templates.Application.csproj" />
-    <ProjectReference Include="..\..\src\Modules\Templates\PetMagic.Modules.Templates.Domain\PetMagic.Modules.Templates.Domain.csproj" />
-    <ProjectReference Include="..\..\src\Modules\Templates\PetMagic.Modules.Templates.Infrastructure\PetMagic.Modules.Templates.Infrastructure.csproj" />
-    <ProjectReference Include="..\..\src\Modules\SupportChat\PetMagic.Modules.SupportChat.Api\PetMagic.Modules.SupportChat.Api.csproj" />
-    <ProjectReference Include="..\..\src\Modules\SupportChat\PetMagic.Modules.SupportChat.Application\PetMagic.Modules.SupportChat.Application.csproj" />
-    <ProjectReference Include="..\..\src\Modules\SupportChat\PetMagic.Modules.SupportChat.Domain\PetMagic.Modules.SupportChat.Domain.csproj" />
-    <ProjectReference Include="..\..\src\Modules\SupportChat\PetMagic.Modules.SupportChat.Infrastructure\PetMagic.Modules.SupportChat.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Host\PetMagic.Host.Api\PetMagic.Host.Api.csproj" />
     <ProjectReference Include="..\..\src\Host\PetMagic.Host.GenerationWorker\PetMagic.Host.GenerationWorker.csproj" />
   </ItemGroup>
+
+  <Target Name="CopyTestHostRuntimeConfig" AfterTargets="GenerateBuildRuntimeConfigurationFiles">
+    <Copy
+      SourceFiles="$(TargetDir)$(AssemblyName).runtimeconfig.json"
+      DestinationFiles="$(TargetDir)testhost.runtimeconfig.json"
+      SkipUnchangedFiles="true"
+      Condition="Exists('$(TargetDir)$(AssemblyName).runtimeconfig.json')" />
+  </Target>
 
 </Project>

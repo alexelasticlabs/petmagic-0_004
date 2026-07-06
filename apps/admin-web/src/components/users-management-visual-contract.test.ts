@@ -82,6 +82,7 @@ describe("users management visual contract", () => {
   it("keeps users page UI copy outside the client component", () => {
     const usersSource = readUsersManagementPageLibrarySource();
     const usersContentSource = readFileSync(usersContentPath, "utf8");
+    const ruUsersContentSource = usersContentSource.slice(0, usersContentSource.indexOf("  en: {"));
 
     expect(usersSource).toContain(
       'import { getUsersManagementPageText } from "@/components/users-management-page.content";'
@@ -98,6 +99,18 @@ describe("users management visual contract", () => {
     expect(usersContentSource).toContain("export function getUsersManagementPageText");
     expect(usersContentSource).toContain('summaryTotal: "Total users"');
     expect(usersContentSource).toContain('summaryTotal: "Всего пользователей"');
+    expect(usersContentSource).toContain('sectionAudit: "Журнал аудита"');
+    expect(usersContentSource).toContain("будет записано в журнал аудита");
+    expect(ruUsersContentSource).not.toContain('sectionAudit: "Audit log"');
+  });
+
+  it("keeps users table identifier headers localized", () => {
+    const usersSource = readUsersManagementPageLibrarySource();
+
+    expect(usersSource).toContain("<th>{text.userIdLabel}</th>");
+    expect(usersSource).toContain("data-label={text.userIdLabel}");
+    expect(usersSource).not.toContain("<th>userId</th>");
+    expect(usersSource).not.toContain('data-label="userId"');
   });
 
   it("keeps inline analytics cards theme-aware", () => {

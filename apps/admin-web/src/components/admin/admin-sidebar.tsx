@@ -108,6 +108,7 @@ export function AdminSidebar({
   const copy = useMemo(() => getAdminChromeCopy(locale), [locale]);
   const navItems = useMemo(() => getAdminNavItems(locale, roles), [locale, roles]);
   const navSections = useMemo(() => buildNavSections(navItems, locale), [locale, navItems]);
+  const brandTitle = copy.sidebar.brandTitle;
   const brandCaption = copy.sidebar.brandCaption;
   const navigationLabel = copy.sidebar.navigationLabel;
 
@@ -191,7 +192,7 @@ export function AdminSidebar({
       <div className={styles.brand}>
         <BrandMark className={styles.brandMark} />
         <div>
-          <span className={styles.brandName}>PetMagic Admin</span>
+          <span className={styles.brandName}>{brandTitle}</span>
           <span className={styles.brandCaption}>{brandCaption}</span>
         </div>
       </div>

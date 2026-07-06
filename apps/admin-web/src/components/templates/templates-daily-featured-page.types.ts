@@ -1,4 +1,3 @@
-
 import type { TemplatesDailyFeaturedPageText } from "@/components/templates/templates-daily-featured-page.content";
 import type { AdminTemplateListItem, AdminTemplateOfTheDay, TemplateType } from "@/lib/api-client";
 import type { Locale } from "@/lib/i18n";
@@ -44,6 +43,7 @@ export type TemplateOption = Pick<
 export type CurrentAssignmentCardProps = {
   current: AdminTemplateOfTheDay | null;
   text: TemplatesDailyFeaturedPageText;
+  locale: Locale;
 };
 
 export type AutoPickSettingsCardProps = {
@@ -97,6 +97,7 @@ export type FeaturedPreviewCardProps = {
 
 export type TemplateScheduleCardProps = {
   text: TemplatesDailyFeaturedPageText;
+  locale: Locale;
   schedule: AdminTemplateOfTheDay[];
   canManageTemplates: boolean;
   isActionLocked: boolean;

@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.WebUtilities;
 
+using PetMagic.BuildingBlocks.Images;
 using PetMagic.Modules.Identity.Api.Authentication;
 using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Identity.Application.Contracts;
@@ -34,6 +35,7 @@ public static partial class AuthEndpoints
             return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status404NotFound);
         }
 
+        ApplySensitiveNoStoreHeaders(context);
         return TypedResults.Ok(result.Value);
     }
 
@@ -47,7 +49,7 @@ public static partial class AuthEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         if (!TryGetUserId(context, out var userId, out var invalidSubjectProblem))
@@ -61,6 +63,7 @@ public static partial class AuthEndpoints
             return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
+        ApplySensitiveNoStoreHeaders(context);
         return TypedResults.Ok(result.Value);
     }
 
@@ -94,7 +97,7 @@ public static partial class AuthEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         if (!TryGetUserId(context, out var userId, out var invalidSubjectProblem))
@@ -108,6 +111,7 @@ public static partial class AuthEndpoints
             return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
+        ApplySensitiveNoStoreHeaders(context);
         return TypedResults.Ok(result.Value);
     }
 
@@ -127,6 +131,7 @@ public static partial class AuthEndpoints
             return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status404NotFound);
         }
 
+        ApplySensitiveNoStoreHeaders(context);
         return TypedResults.Ok(result.Value);
     }
 
@@ -146,6 +151,7 @@ public static partial class AuthEndpoints
             return invalidSubjectProblem!;
         }
 
+        ApplySensitiveNoStoreHeaders(context);
         return TypedResults.Ok(new ExternalLinkPreparationResponse(
             await linkStore.CreateAsync(userId, cancellationToken)));
     }
@@ -173,6 +179,7 @@ public static partial class AuthEndpoints
             return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
+        ApplySensitiveNoStoreHeaders(context);
         return TypedResults.Ok(result.Value);
     }
 
@@ -190,7 +197,7 @@ public static partial class AuthEndpoints
         var validation = await ValidateAvatarFileAsync(file, cancellationToken);
         if (validation.Errors.Count > 0)
         {
-            return TypedResults.ValidationProblem(validation.Errors);
+            return ToAvatarValidationProblem(validation.Errors);
         }
 
         await using var stream = file!.OpenReadStream();
@@ -207,7 +214,26 @@ public static partial class AuthEndpoints
             return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
+        ApplySensitiveNoStoreHeaders(context);
         return TypedResults.Ok(result.Value);
+    }
+
+    private static ValidationProblem ToAvatarValidationProblem(Dictionary<string, string[]> errors)
+    {
+        return TypedResults.ValidationProblem(errors.ToDictionary(
+            pair => pair.Key,
+            pair => pair.Value.Select(ToSafeAvatarValidationCode).ToArray()));
+    }
+
+    private static string ToSafeAvatarValidationCode(string code)
+    {
+        return code switch
+        {
+            "users.avatar_file_required" => code,
+            "users.avatar_file_too_large" => code,
+            "users.avatar_content_type_not_allowed" => code,
+            _ => "validation.invalid"
+        };
     }
 
     private static async Task<(Dictionary<string, string[]> Errors, string? DetectedContentType)> ValidateAvatarFileAsync(
@@ -217,7 +243,13 @@ public static partial class AuthEndpoints
         var errors = new Dictionary<string, string[]>();
         if (file is null || file.Length == 0)
         {
-            errors[nameof(file)] = ["Avatar file is required."];
+            errors[nameof(file)] = ["users.avatar_file_required"];
+            return (errors, null);
+        }
+
+        if (file.Length > UploadedMediaPolicies.Avatar.MaxFileSizeBytes)
+        {
+            errors[nameof(file)] = ["users.avatar_file_too_large"];
             return (errors, null);
         }
 
@@ -226,7 +258,7 @@ public static partial class AuthEndpoints
             || !IsAllowedAvatarContentType(detectedContentType)
             || !MatchesDeclaredAvatarContentType(detectedContentType, file.ContentType))
         {
-            errors[nameof(file)] = ["Avatar content type is not allowed. Please upload JPEG, PNG, WebP, GIF, or HEIC."];
+            errors[nameof(file)] = ["users.avatar_content_type_not_allowed"];
         }
 
         return (errors, detectedContentType);
@@ -369,6 +401,7 @@ public static partial class AuthEndpoints
             return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
+        ApplySensitiveNoStoreHeaders(context);
         return TypedResults.Ok(result.Value);
     }
 

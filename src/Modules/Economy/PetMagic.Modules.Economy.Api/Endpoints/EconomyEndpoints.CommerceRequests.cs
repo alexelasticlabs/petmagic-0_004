@@ -28,23 +28,6 @@ public static partial class EconomyEndpoints
 
     public sealed record CancelPremiumSubscriptionRequest(string PaymentProvider = "stripe");
 
-    public sealed record CreateStripeTokenPurchaseRequest(
-        string TokenPackId,
-        string? CurrencyCode = null,
-        string Platform = "android",
-        string AppVersion = "1.0.0",
-        string Country = "*",
-        string Locale = "en");
-
-    public sealed record CreateStripeSubscriptionRequest(
-        string PlanId,
-        string Platform = "android",
-        string AppVersion = "1.0.0",
-        string Country = "*",
-        string Locale = "en");
-
-    public sealed record CreateStripeCustomerPortalRequest;
-
     public sealed record VerifyPremiumStorePurchaseRequest(
         string PlanCode,
         string PaymentProvider,

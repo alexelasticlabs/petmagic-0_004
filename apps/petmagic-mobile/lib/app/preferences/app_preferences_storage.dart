@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AppPreferencesStorage {
@@ -13,7 +14,7 @@ class AppPreferencesStorage {
       'light' => ThemeMode.light,
       'dark' => ThemeMode.dark,
       'system' => ThemeMode.system,
-      _ => null,
+      _ => await _clearInvalidThemeMode(rawValue),
     };
   }
 
@@ -29,16 +30,47 @@ class AppPreferencesStorage {
 
   Future<Locale?> readLocale() async {
     final rawValue = await _preferences.getString(_localeKey);
-    if (rawValue == null || rawValue.isEmpty) {
+    if (rawValue == null) {
       return null;
     }
 
-    final parts = rawValue.split('_');
-    if (parts.length == 1) {
-      return Locale(parts.first);
+    final normalizedValue = rawValue.trim().replaceAll('-', '_');
+    if (normalizedValue.isEmpty) {
+      await _preferences.remove(_localeKey);
+      return null;
     }
 
-    return Locale(parts.first, parts.last);
+    final parts = normalizedValue.split('_');
+    if (parts.length > 2 ||
+        parts.any((part) => part.isEmpty) ||
+        !_isLanguageCode(parts.first)) {
+      await _preferences.remove(_localeKey);
+      return null;
+    }
+
+    final languageCode = parts.first.toLowerCase();
+    if (!_isSupportedLanguage(languageCode)) {
+      await _preferences.remove(_localeKey);
+      return null;
+    }
+
+    String? countryCode;
+    if (parts.length == 2) {
+      if (!_isCountryCode(parts.last)) {
+        await _preferences.remove(_localeKey);
+        return null;
+      }
+      countryCode = parts.last.toUpperCase();
+    }
+
+    final persistedValue = countryCode == null
+        ? languageCode
+        : '${languageCode}_$countryCode';
+    if (persistedValue != rawValue) {
+      await _preferences.setString(_localeKey, persistedValue);
+    }
+
+    return Locale(languageCode, countryCode);
   }
 
   Future<void> saveLocale(Locale? locale) async {
@@ -52,5 +84,26 @@ class AppPreferencesStorage {
         : '${locale.languageCode}_${locale.countryCode}';
 
     await _preferences.setString(_localeKey, value);
+  }
+
+  Future<ThemeMode?> _clearInvalidThemeMode(String? rawValue) async {
+    if (rawValue != null) {
+      await _preferences.remove(_themeModeKey);
+    }
+    return null;
+  }
+
+  bool _isLanguageCode(String value) {
+    return RegExp(r'^[a-zA-Z]{2}$').hasMatch(value);
+  }
+
+  bool _isCountryCode(String value) {
+    return RegExp(r'^[a-zA-Z]{2}$').hasMatch(value);
+  }
+
+  bool _isSupportedLanguage(String languageCode) {
+    return AppLocalizations.supportedLocales.any(
+      (locale) => locale.languageCode == languageCode,
+    );
   }
 }

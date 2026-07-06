@@ -28,6 +28,7 @@ final templateThumbnailWarmupProvider =
     });
 
 const Object _templateOfTheDayUnchanged = Object();
+const int _realtimePayloadStringMaxLength = 128;
 
 class _TemplateFeedInvalidation {
   const _TemplateFeedInvalidation({
@@ -59,7 +60,7 @@ class _TemplateFeedInvalidation {
 
   static _TemplateFeedInvalidation? fromPayload(Map<String, Object?> payload) {
     if (payload.isEmpty) {
-      return null;
+      return const _TemplateFeedInvalidation(scope: 'full');
     }
 
     final scope = _readString(payload['scope']);
@@ -80,8 +81,16 @@ class _TemplateFeedInvalidation {
   }
 
   static String? _readString(Object? value) {
-    final text = value?.toString().trim();
-    return text == null || text.isEmpty ? null : text;
+    if (value is! String) {
+      return null;
+    }
+
+    final text = value.trim();
+    if (text.length > _realtimePayloadStringMaxLength) {
+      return null;
+    }
+
+    return text.isEmpty ? null : text;
   }
 
   static int? _readInt(Object? value) {
@@ -91,14 +100,21 @@ class _TemplateFeedInvalidation {
     if (value is num) {
       return value.toInt();
     }
-    return int.tryParse(value?.toString() ?? '');
+    if (value is String && value.length <= 20) {
+      return int.tryParse(value);
+    }
+    return null;
   }
 
   static bool? _readBool(Object? value) {
     if (value is bool) {
       return value;
     }
-    final normalized = value?.toString().trim().toLowerCase();
+    if (value is! String || value.length > 5) {
+      return null;
+    }
+
+    final normalized = value.trim().toLowerCase();
     if (normalized == 'true') {
       return true;
     }
@@ -265,7 +281,7 @@ class TemplatesController extends Notifier<TemplatesState> {
   @override
   TemplatesState build() {
     _activeRepository = ref.read(templatesRepositoryProvider);
-    _activeRealtimeClient = ref.watch(realtimeClientProvider);
+    _activeRealtimeClient = ref.read(realtimeClientProvider);
     _hasInternet = ref.read(networkStatusControllerProvider).hasInternet;
     ref.listen<bool>(
       networkStatusControllerProvider.select((state) => state.hasInternet),
@@ -376,7 +392,11 @@ class TemplatesController extends Notifier<TemplatesState> {
     }
 
     final invalidation = _TemplateFeedInvalidation.fromPayload(event.payload);
-    if (invalidation == null || invalidation.isFull) {
+    if (invalidation == null) {
+      return;
+    }
+
+    if (invalidation.isFull) {
       _handleFullRealtimeInvalidation();
       return;
     }
@@ -598,7 +618,7 @@ class TemplatesController extends Notifier<TemplatesState> {
       );
     }
 
-    AppLogger.info(
+    AppLogger.debug(
       feature: 'Templates.Controller',
       operation: 'mobile_media_redownload_after_sse',
       message: 'Invalidated scoped template media cache after SSE.',
@@ -693,7 +713,7 @@ class TemplatesController extends Notifier<TemplatesState> {
   }
 
   void _recordRealtimeBusyIntersection(String activeRequest) {
-    AppLogger.info(
+    AppLogger.debug(
       feature: 'Templates.Controller',
       operation: 'realtime_invalidation_during_active_request',
       message: 'Templates feed invalidation arrived during an active request.',
@@ -707,7 +727,7 @@ class TemplatesController extends Notifier<TemplatesState> {
   void _recordScopedRealtimeInvalidation(
     _TemplateFeedInvalidation invalidation,
   ) {
-    AppLogger.info(
+    AppLogger.debug(
       feature: 'Templates.Controller',
       operation: 'scoped_realtime_invalidation',
       message: 'Applying scoped templates feed invalidation.',
@@ -1420,7 +1440,7 @@ class TemplatesController extends Notifier<TemplatesState> {
     required String operation,
   }) {
     _staleResponsesDiscarded++;
-    AppLogger.info(
+    AppLogger.debug(
       feature: 'Templates.Controller',
       operation: 'stale_responses_discarded',
       message: 'Discarded stale templates feed response.',
@@ -1435,7 +1455,7 @@ class TemplatesController extends Notifier<TemplatesState> {
 
   void _recordPreloadCancellation(String reason) {
     _preloadCancellations++;
-    AppLogger.info(
+    AppLogger.debug(
       feature: 'Templates.Controller',
       operation: 'preload_cancellations',
       message: 'Cancelled stale template preview preload work.',

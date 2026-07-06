@@ -141,6 +141,7 @@ export async function saveImageTemplateFromForm(
   form: TemplateFormState,
   status: TemplateStatus
 ): Promise<AdminTemplate> {
+  const keepPreviewAsset = Boolean(templateId && form.previewUrlSource === "persisted");
   const previewAsset = buildTemplateAsset(
     form.previewUrlSource,
     form.previewUrl,
@@ -164,6 +165,7 @@ export async function saveImageTemplateFromForm(
     isQaOnly: form.isQaOnly,
     tokenCost: parseNumber(form.tokenCost),
     previewAsset,
+    ...(keepPreviewAsset ? { keepPreviewAsset } : {}),
     thumbnailAsset: previewAsset,
     feedLoopLowAsset: previewAsset,
     detailPreviewAsset: previewAsset,
@@ -182,6 +184,8 @@ export async function saveVideoTemplateFromForm(
   form: TemplateFormState,
   status: TemplateStatus
 ): Promise<AdminTemplate> {
+  const keepPreviewAsset = Boolean(templateId && form.previewUrlSource === "persisted");
+  const keepReferenceMotionAsset = Boolean(templateId && form.referenceUrlSource === "persisted");
   const previewAsset = buildTemplateAsset(
     form.previewUrlSource,
     form.previewUrl,
@@ -209,6 +213,7 @@ export async function saveVideoTemplateFromForm(
       TEMPLATE_MUSIC_DESCRIPTION_MAX_LENGTH
     ),
     previewAsset,
+    ...(keepPreviewAsset ? { keepPreviewAsset } : {}),
     thumbnailAsset: previewAsset,
     feedLoopLowAsset: previewAsset,
     detailPreviewAsset: previewAsset,
@@ -220,6 +225,7 @@ export async function saveVideoTemplateFromForm(
       form.referenceFileSizeBytes,
       form.referenceDurationSeconds
     ),
+    ...(keepReferenceMotionAsset ? { keepReferenceMotionAsset } : {}),
     preprocessingModel: normalizeTemplateText(form.preprocessingModel, TEMPLATE_MODEL_MAX_LENGTH),
     preprocessingPrompt: normalizeTemplateText(
       form.preprocessingPrompt,
@@ -266,7 +272,7 @@ function buildTemplateAsset(
   fileSizeBytes: string,
   durationSeconds?: string
 ): TemplateAssetInput | undefined {
-  if (source === "none") {
+  if (source === "none" || source === "persisted") {
     return undefined;
   }
 

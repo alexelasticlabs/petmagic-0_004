@@ -6,6 +6,7 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Host.Api.Observability;
 
 namespace PetMagic.Modules.Identity.Tests.Host;
@@ -40,13 +41,17 @@ public sealed class RequestLogContextMiddlewareTests
         Assert.Equal("PetMagic.Host.Api", scope["ApplicationName"]);
         Assert.Equal(Environments.Staging, scope["Environment"]);
         Assert.Equal("request-1", scope["TraceId"]);
-        Assert.Equal("correlation-1", scope["CorrelationId"]);
-        Assert.Equal("request-1", scope["RequestId"]);
-        Assert.Equal("user-1", scope["UserId"]);
+        Assert.Equal(SafeLogValues.StableHash("correlation-1"), scope["CorrelationIdHash"]);
+        Assert.Equal(SafeLogValues.StableHash("request-1"), scope["RequestIdHash"]);
+        Assert.Equal(SafeLogValues.StableHash("user-1"), scope["UserIdHash"]);
         Assert.Equal("Admin,Support", scope["Role"]);
         Assert.Equal("PATCH /api/admin/users/{id}/role", scope["Endpoint"]);
         Assert.Equal("PATCH", scope["HttpMethod"]);
-        Assert.Equal("/api/admin/users/user-2/role", scope["Path"]);
+        Assert.Equal("/api/admin/users/{id}/role", scope["Path"]);
+        Assert.Equal(SafeLogValues.StableHash("/api/admin/users/user-2/role"), scope["PathHash"]);
+        Assert.DoesNotContain("CorrelationId", scope.Keys);
+        Assert.DoesNotContain("RequestId", scope.Keys);
+        Assert.DoesNotContain("UserId", scope.Keys);
     }
 
     private static DefaultHttpContext CreateContext()

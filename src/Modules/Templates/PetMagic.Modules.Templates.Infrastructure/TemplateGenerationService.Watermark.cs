@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 
 using Microsoft.EntityFrameworkCore;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain;
@@ -139,10 +140,10 @@ internal sealed partial class TemplateGenerationService
             catch (Exception ex)
             {
                 logger?.LogWarning(
-                    ex,
-                    "Failed to record shared creation gamification progress. UserId={UserId} GenerationId={GenerationId}",
-                    userId,
-                    generationId);
+                    "Failed to record shared creation gamification progress. UserIdHash={UserIdHash} GenerationIdHash={GenerationIdHash} ExceptionType={ExceptionType}",
+                    TemplateLogSanitizer.SafeId(userId),
+                    TemplateLogSanitizer.SafeId(generationId),
+                    SafeLogValues.ExceptionType(ex));
             }
         }
 

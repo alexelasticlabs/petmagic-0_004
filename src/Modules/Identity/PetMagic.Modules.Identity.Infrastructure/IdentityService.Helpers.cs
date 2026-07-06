@@ -4,6 +4,7 @@ using System.Text;
 
 using Microsoft.EntityFrameworkCore;
 
+using PetMagic.BuildingBlocks.Storage;
 using PetMagic.Modules.Identity.Application.Contracts;
 using PetMagic.Modules.Identity.Domain.Enums;
 using PetMagic.Modules.Identity.Infrastructure.Entities;
@@ -133,15 +134,7 @@ public sealed partial class IdentityService
 
     private static bool IsUnsafeMediaPathSegment(string segment)
     {
-        if (string.Equals(segment, ".", StringComparison.Ordinal)
-            || string.Equals(segment, "..", StringComparison.Ordinal))
-        {
-            return true;
-        }
-
-        var decodedSegment = Uri.UnescapeDataString(segment);
-        return string.Equals(decodedSegment, ".", StringComparison.Ordinal)
-            || string.Equals(decodedSegment, "..", StringComparison.Ordinal);
+        return ManagedPathSegments.IsUnsafe(segment);
     }
 
     private LegalAcceptanceStatusResponse ToLegalAcceptanceResponse(AppUser user)

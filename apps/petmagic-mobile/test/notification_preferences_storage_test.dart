@@ -132,6 +132,71 @@ void main() {
       expect(await preferences.getKeys(), isNotEmpty);
     });
 
+    test(
+      'removes stale legacy raw user scope key when hashed value exists',
+      () async {
+        final preferences = SharedPreferencesAsync();
+        final storage = NotificationPreferencesStorage();
+        const userScope = 'stale-legacy-user-id@example.com';
+        const saved = NotificationPreferences(
+          pushPhotoReady: false,
+          pushVideoReady: true,
+          pushGenerationErrors: true,
+          pushReminders: true,
+          pushNewTemplates: true,
+          pushPurchasesAndSubscriptions: true,
+          emailOffersAndDiscounts: false,
+          emailNews: false,
+          emailAccountAlerts: true,
+        );
+        await storage.save(scope: userScope, preferences: saved);
+        await preferences.setString(
+          'petmagic_mobile_notification_preferences_v1_$userScope',
+          '{"pushPhotoReady":true,"emailNews":true}',
+        );
+
+        final restored = await storage.read(
+          scope: userScope,
+          fallbackMarketingEmails: true,
+        );
+
+        expect(restored.pushPhotoReady, isFalse);
+        expect(restored.emailNews, isFalse);
+        expect(
+          await preferences.getString(
+            'petmagic_mobile_notification_preferences_v1_$userScope',
+          ),
+          isNull,
+        );
+        final keys = await preferences.getKeys();
+        expect(keys.any((key) => key.contains(userScope)), isFalse);
+      },
+    );
+
+    test('save removes stale legacy raw user scope key', () async {
+      final preferences = SharedPreferencesAsync();
+      final storage = NotificationPreferencesStorage();
+      const userScope = 'save-cleanup-user-id@example.com';
+      await preferences.setString(
+        'petmagic_mobile_notification_preferences_v1_$userScope',
+        '{"pushPhotoReady":true}',
+      );
+
+      await storage.save(
+        scope: userScope,
+        preferences: const NotificationPreferences.defaults(),
+      );
+
+      expect(
+        await preferences.getString(
+          'petmagic_mobile_notification_preferences_v1_$userScope',
+        ),
+        isNull,
+      );
+      final keys = await preferences.getKeys();
+      expect(keys.any((key) => key.contains(userScope)), isFalse);
+    });
+
     test('removes corrupted legacy raw user scope key', () async {
       final preferences = SharedPreferencesAsync();
       final storage = NotificationPreferencesStorage();
@@ -153,6 +218,28 @@ void main() {
         ),
         isNull,
       );
+    });
+
+    test('removes corrupted hashed preferences key', () async {
+      final preferences = SharedPreferencesAsync();
+      final storage = NotificationPreferencesStorage();
+      const userScope = 'corrupted-hashed-user-id@example.com';
+      await storage.save(
+        scope: userScope,
+        preferences: const NotificationPreferences.defaults(),
+      );
+      final hashedKey = (await preferences.getKeys()).singleWhere(
+        (key) => key.startsWith('petmagic_mobile_notification_preferences_v2_'),
+      );
+      await preferences.setString(hashedKey, '{"pushPhotoReady":"not-bool"}');
+
+      final fallback = await storage.read(
+        scope: userScope,
+        fallbackMarketingEmails: false,
+      );
+
+      expect(fallback.pushPhotoReady, isTrue);
+      expect(await preferences.getString(hashedKey), isNull);
     });
 
     test(

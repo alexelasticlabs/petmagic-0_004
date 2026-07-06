@@ -34,8 +34,8 @@ public sealed class EconomyApiStartupSmokeTests
     [InlineData("POST", "/api/economy/webhooks/stripe", "webhooks")]
     [InlineData("POST", "/api/economy/webhooks/app-store", "webhooks")]
     [InlineData("POST", "/api/economy/webhooks/google-play", "webhooks")]
-    [InlineData("POST", "/api/payments/stripe/token-purchase", "economy")]
-    [InlineData("GET", "/api/payments/stripe/diagnostics", "economy")]
+    [InlineData("POST", "/api/economy/purchases/create", "economy")]
+    [InlineData("GET", "/api/economy/premium/stripe-diagnostics", "economy")]
     [InlineData("GET", "/api/admin/economy/ledger", "admin")]
     public async Task EconomyEndpoints_ShouldUseExpectedRateLimitPolicies(
         string method,
@@ -63,6 +63,18 @@ public sealed class EconomyApiStartupSmokeTests
         Assert.Empty(app.GetApiRoutesWithoutAccessPolicy());
     }
 
+    [Theory]
+    [InlineData("/api/payments/stripe/token-purchase")]
+    [InlineData("/api/payments/stripe/subscription")]
+    [InlineData("/api/payments/stripe/customer-portal")]
+    [InlineData("/api/payments/stripe/diagnostics")]
+    public async Task LegacyStripePaymentRoutes_ShouldNotBeMapped(string routePattern)
+    {
+        await using var app = await EconomyApiStartupTestApplication.CreateAsync();
+
+        Assert.False(app.HasRoute(routePattern));
+    }
+
     [Fact]
     public async Task EconomyAdminEndpoints_ShouldRequireAdminOrModeratorPolicy()
     {
@@ -73,8 +85,7 @@ public sealed class EconomyApiStartupSmokeTests
 
     [Theory]
     [InlineData("GET", "/api/economy/premium/stripe-diagnostics")]
-    [InlineData("GET", "/api/payments/stripe/diagnostics")]
-    public async Task StripeDiagnosticsEndpoints_ShouldRequireAdminOnlyPolicy(string method, string routePattern)
+    public async Task StripeDiagnosticsEndpoint_ShouldRequireAdminOnlyPolicy(string method, string routePattern)
     {
         await using var app = await EconomyApiStartupTestApplication.CreateAsync();
 
@@ -85,7 +96,8 @@ public sealed class EconomyApiStartupSmokeTests
     }
 
     [Theory]
-    [InlineData("POST", "/api/economy/wallet/spend")]
+    [InlineData("POST", "/api/economy/wallet/claim-weekly")]
+    [InlineData("POST", "/api/economy/wallet/claim-ad")]
     [InlineData("POST", "/api/economy/wallet/redeem")]
     [InlineData("PUT", "/api/economy/notifications/push-token")]
     [InlineData("DELETE", "/api/economy/notifications/push-token")]
@@ -98,12 +110,10 @@ public sealed class EconomyApiStartupSmokeTests
     [InlineData("POST", "/api/billing/apple/validate")]
     [InlineData("POST", "/api/economy/premium/verify-stripe")]
     [InlineData("POST", "/api/economy/payment-methods/setup")]
+    [InlineData("DELETE", "/api/economy/payment-methods/{paymentMethodId:guid}")]
     [InlineData("POST", "/api/economy/purchases/create")]
     [InlineData("POST", "/api/economy/purchases/{orderId:guid}/verify-stripe")]
     [InlineData("POST", "/api/economy/purchases/{orderId:guid}/verify-store")]
-    [InlineData("POST", "/api/payments/stripe/token-purchase")]
-    [InlineData("POST", "/api/payments/stripe/subscription")]
-    [InlineData("POST", "/api/payments/stripe/customer-portal")]
     public async Task EconomyJsonMutationEndpoints_ShouldLimitRequestBodiesBeforeBinding(
         string method,
         string routePattern)
@@ -133,6 +143,7 @@ public sealed class EconomyApiStartupSmokeTests
     [InlineData("PUT", "/api/admin/economy/users/{userId:guid}/premium/revoke")]
     [InlineData("PUT", "/api/admin/economy/packs/{packId:guid}")]
     [InlineData("PUT", "/api/admin/economy/subscription-plans/{planId}")]
+    [InlineData("DELETE", "/api/admin/economy/payment-provider-configs/{configurationId:guid}")]
     [InlineData("POST", "/api/admin/economy/redeem-codes")]
     [InlineData("PUT", "/api/admin/economy/redeem-codes/{redeemCodeId:guid}")]
     public async Task AdminEconomyJsonMutationEndpoints_ShouldLimitRequestBodiesBeforeBinding(
@@ -335,6 +346,15 @@ public sealed class EconomyApiStartupSmokeTests
                 .Select(endpoint => endpoint.RoutePattern.RawText!)
                 .Order(StringComparer.Ordinal)
                 .ToArray();
+        }
+
+        public bool HasRoute(string routePattern)
+        {
+            return app.Services
+                .GetRequiredService<EndpointDataSource>()
+                .Endpoints
+                .OfType<RouteEndpoint>()
+                .Any(endpoint => string.Equals(endpoint.RoutePattern.RawText, routePattern, StringComparison.Ordinal));
         }
 
         public string[] GetAuthorizationPolicies(string method, string routePattern)

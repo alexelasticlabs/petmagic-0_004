@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
@@ -17,6 +18,35 @@ import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.d
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('template generation controller does not cache repository in build', () {
+    final source = File(
+      'lib/features/templates/presentation/template_generation_controller.dart',
+    ).readAsStringSync();
+
+    expect(
+      source,
+      isNot(contains('late final TemplateGenerationRepository _repository')),
+    );
+    expect(
+      source,
+      contains(
+        'TemplateGenerationRepository get _repository =>\n'
+        '      ref.read(templateGenerationRepositoryProvider)',
+      ),
+    );
+    expect(source, contains('AppLifecycleSignal.instance.addListener'));
+    expect(source, contains('AppLifecycleSignal.instance.removeListener'));
+    expect(source, contains('void _handleAppLifecycleSignal()'));
+    expect(
+      source,
+      isNot(
+        contains(
+          '_repository = ref.watch(templateGenerationRepositoryProvider)',
+        ),
+      ),
+    );
+  });
 
   test(
     'maps backend payment required error to balance recovery state',
@@ -708,6 +738,97 @@ void main() {
       );
     },
   );
+
+  testWidgets(
+    'active generation polling pauses in background and resumes in foreground',
+    (tester) async {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      addTearDown(
+        () => tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        ),
+      );
+
+      final repository = _FakeTemplateGenerationRepository(
+        startResult: _generation(status: TemplateGenerationStatus.queued),
+      );
+      final container = ProviderContainer(
+        overrides: [
+          templateGenerationRepositoryProvider.overrideWithValue(repository),
+          walletControllerProvider.overrideWith(
+            () => _FakeWalletController(_wallet(balance: 100)),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(
+        templateGenerationControllerProvider.notifier,
+      );
+      controller.selectPhoto(XFile('pet.jpg', name: 'pet.jpg'));
+
+      await controller.startGeneration(_template(tokenCost: 50));
+      expect(
+        container.read(templateGenerationControllerProvider).isPolling,
+        true,
+      );
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump();
+      expect(
+        container.read(templateGenerationControllerProvider).isPolling,
+        false,
+      );
+
+      await controller.refreshGeneration();
+      expect(repository.fetchCalls, 0);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 20));
+
+      expect(repository.fetchCalls, 1);
+      expect(
+        repository.fetchCorrelationIds.single,
+        repository.startCorrelationIds.single,
+      );
+    },
+  );
+
+  test('manual generation refresh skips backend fetch while offline', () async {
+    final networkStatusController = _TestTemplateNetworkStatusController(true);
+    final repository = _FakeTemplateGenerationRepository(
+      startResult: _generation(status: TemplateGenerationStatus.queued),
+    );
+    final container = ProviderContainer(
+      overrides: [
+        templateGenerationRepositoryProvider.overrideWithValue(repository),
+        walletControllerProvider.overrideWith(
+          () => _FakeWalletController(_wallet(balance: 100)),
+        ),
+        networkStatusControllerProvider.overrideWith(
+          () => networkStatusController,
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(
+      templateGenerationControllerProvider.notifier,
+    );
+    controller.selectPhoto(XFile('pet.jpg', name: 'pet.jpg'));
+    await controller.startGeneration(_template(tokenCost: 50));
+
+    networkStatusController.setHasInternet(false);
+    await Future<void>.delayed(Duration.zero);
+    await controller.refreshGeneration();
+
+    final state = container.read(templateGenerationControllerProvider);
+    expect(repository.fetchCalls, 0);
+    expect(state.generation?.status, TemplateGenerationStatus.queued);
+    expect(state.isPolling, isFalse);
+    expect(state.errorMessage, isNull);
+  });
 
   test(
     'stale active generation restore does not override newly selected photo',

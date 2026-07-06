@@ -658,10 +658,16 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     const link = document.createElement("a");
     link.href = url;
     link.download = `promo-codes-${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.append(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    try {
+      document.body.append(link);
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      URL.revokeObjectURL(url);
+      throw error;
+    } finally {
+      link.remove();
+    }
     setFeedback({ tone: "info", message: text.promoCodesExported });
   }
 

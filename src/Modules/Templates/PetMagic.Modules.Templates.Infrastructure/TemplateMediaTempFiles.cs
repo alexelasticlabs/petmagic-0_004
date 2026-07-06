@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
+
 namespace PetMagic.Modules.Templates.Infrastructure;
 
 internal static class TemplateMediaTempFiles
@@ -60,10 +62,10 @@ internal static class TemplateMediaTempFiles
         catch (Exception exception)
         {
             logger?.LogWarning(
-                exception,
-                "Template metadata temp file cleanup failed. Operation={Operation} TempFileName={TempFileName}",
+                "Template metadata temp file cleanup failed. Operation={Operation} TempFileName={TempFileName} ExceptionType={ExceptionType}",
                 "delete_owned",
-                SafeFileName(path));
+                SafeFileName(path),
+                SafeLogValues.ExceptionType(exception));
             // Metadata temp files are best-effort cleanup and must not fail request handling.
         }
     }
@@ -100,11 +102,11 @@ internal static class TemplateMediaTempFiles
                 catch (Exception exception)
                 {
                     logger?.LogWarning(
-                        exception,
-                        "Template metadata temp file sweep failed. Operation={Operation} RetentionHours={RetentionHours} TempFileName={TempFileName}",
+                        "Template metadata temp file sweep failed. Operation={Operation} RetentionHours={RetentionHours} TempFileName={TempFileName} ExceptionType={ExceptionType}",
                         "sweep_expired",
                         retention.TotalHours,
-                        file.Name);
+                        file.Name,
+                        SafeLogValues.ExceptionType(exception));
                 }
             }
 
@@ -113,10 +115,10 @@ internal static class TemplateMediaTempFiles
         catch (Exception exception)
         {
             logger?.LogWarning(
-                exception,
-                "Template metadata temp file sweep failed. Operation={Operation} RetentionHours={RetentionHours}",
+                "Template metadata temp file sweep failed. Operation={Operation} RetentionHours={RetentionHours} ExceptionType={ExceptionType}",
                 "sweep_expired",
-                retention.TotalHours);
+                retention.TotalHours,
+                SafeLogValues.ExceptionType(exception));
             return false;
         }
     }

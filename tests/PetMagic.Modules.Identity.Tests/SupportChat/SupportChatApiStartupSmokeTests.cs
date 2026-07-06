@@ -102,16 +102,28 @@ public sealed class SupportChatApiStartupSmokeTests
     [Theory]
     [InlineData("POST", "/api/support/conversation/open")]
     [InlineData("POST", "/api/support/conversation/{conversationId:guid}/messages")]
+    [InlineData("POST", "/api/support/conversation/{conversationId:guid}/read")]
+    [InlineData("POST", "/api/support/conversation/{conversationId:guid}/resolve")]
+    [InlineData("POST", "/api/support/conversation/{conversationId:guid}/close")]
+    [InlineData("POST", "/api/support/conversation/{conversationId:guid}/reopen")]
     [InlineData("POST", "/api/support/conversation/{conversationId:guid}/feedback")]
     [InlineData("PUT", "/api/support/notifications/push-token")]
     [InlineData("DELETE", "/api/support/notifications/push-token")]
+    [InlineData("POST", "/api/admin/support/tickets/{conversationId:guid}/assign-to-me")]
+    [InlineData("POST", "/api/admin/support/tickets/{conversationId:guid}/unassign")]
+    [InlineData("POST", "/api/admin/support/tickets/{conversationId:guid}/mark-waiting-for-user")]
+    [InlineData("POST", "/api/admin/support/tickets/{conversationId:guid}/mark-in-progress")]
     [InlineData("PUT", "/api/admin/support/tickets/{conversationId:guid}/status")]
     [InlineData("PUT", "/api/admin/support/tickets/{conversationId:guid}/assignment")]
     [InlineData("PUT", "/api/admin/support/tickets/{conversationId:guid}/metadata")]
+    [InlineData("POST", "/api/admin/support/tickets/{conversationId:guid}/close")]
+    [InlineData("POST", "/api/admin/support/tickets/{conversationId:guid}/reopen")]
     [InlineData("POST", "/api/admin/support/tickets/{conversationId:guid}/messages")]
+    [InlineData("POST", "/api/admin/support/tickets/{conversationId:guid}/read")]
     [InlineData("POST", "/api/admin/support/templates")]
     [InlineData("PUT", "/api/admin/support/templates/{templateId:guid}")]
-    public async Task SupportChatJsonMutationEndpoints_ShouldLimitRequestBodiesBeforeJsonBinding(
+    [InlineData("DELETE", "/api/admin/support/templates/{templateId:guid}")]
+    public async Task SupportChatSmallMutationEndpoints_ShouldLimitRequestBodiesBeforeHandlerExecution(
         string method,
         string routePattern)
     {

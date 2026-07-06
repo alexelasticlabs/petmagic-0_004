@@ -23,6 +23,10 @@ describe("support info attachment links", () => {
       "function downloadSupportInfoBlobUrl(objectUrl: string, fileName: string): void"
     );
     expect(source).toContain("link.download = fileName;");
+    expect(source).toContain("function revokeSupportInfoBlobUrlOnFailure(");
+    expect(source).toContain("URL.revokeObjectURL(objectUrl);");
+    expect(source).toContain("scheduleSupportInfoBlobUrlRevoke(objectUrl, 1000);");
+    expect(source).toContain("scheduleSupportInfoBlobUrlRevoke(objectUrl, 60_000);");
     expect(source).not.toContain("mimeType: attachment.mimeType,\n        error");
   });
 
@@ -63,9 +67,17 @@ describe("support info attachment links", () => {
     expect(source).toContain(
       "downloadSupportInfoBlobUrl(objectUrl, formatSafeSupportDownloadName(attachment.fileName));"
     );
-    expect(source).toContain("window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);");
+    expect(source).toContain("scheduleSupportInfoBlobUrlRevoke(objectUrl, 1000);");
     expect(source).not.toContain(
       "if (!opened) {\n        URL.revokeObjectURL(objectUrl);\n        return;\n      }"
     );
+  });
+
+  it("revokes support info blob URLs immediately if open or fallback handoff throws", () => {
+    const source = readSupportInfoPanelLibrarySource();
+
+    expect(source).toContain("function revokeSupportInfoBlobUrlOnFailure(objectUrl: string");
+    expect(source).toContain("} catch (error) {\n    URL.revokeObjectURL(objectUrl);");
+    expect(source).toContain("revokeSupportInfoBlobUrlOnFailure(objectUrl, () => {");
   });
 });

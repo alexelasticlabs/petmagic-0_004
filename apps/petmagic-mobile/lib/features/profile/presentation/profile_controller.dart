@@ -2,17 +2,23 @@ import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/painting.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
+import 'package:petmagic_mobile/core/notifications/push_token_registrar.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_password_policy.dart';
+import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
+import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
+import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
 import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 import 'package:petmagic_mobile/shared/files/temp_media_cleanup.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
@@ -694,6 +700,7 @@ class ProfileController extends Notifier<ProfileState> {
     final repository = _repository;
     final externalAuthRepository = ref.read(externalAuthRepositoryProvider);
     try {
+      await _unregisterPushTokenBeforeLogout();
       await repository.logout();
       if (!ref.mounted) {
         return;
@@ -727,6 +734,49 @@ class ProfileController extends Notifier<ProfileState> {
     }
   }
 
+  Future<void> _unregisterPushTokenBeforeLogout() async {
+    try {
+      final registrar = PushTokenRegistrar(
+        templateRepository: ref.read(templateGenerationRepositoryProvider),
+        supportRepository: ref.read(supportChatRepositoryProvider),
+        walletRepository: ref.read(walletRepositoryProvider),
+      );
+      final cachedToken = await registrar.readRegisteredToken();
+      if (!ref.mounted) {
+        return;
+      }
+
+      final token = cachedToken ?? await _readFirebaseToken();
+      if (token == null || token.isEmpty) {
+        return;
+      }
+
+      await registrar.unregisterToken(
+        token: token,
+        canContinue: () => ref.mounted,
+        onFailure: (stage, error, stackTrace) {
+          _logProfileFailure(
+            'logout_push_token_${stage}_cleanup',
+            error,
+            stackTrace,
+          );
+        },
+      );
+    } catch (error, stackTrace) {
+      _logProfileFailure('logout_push_token_cleanup', error, stackTrace);
+    }
+  }
+
+  Future<String?> _readFirebaseToken() async {
+    if (Firebase.apps.isEmpty) {
+      return null;
+    }
+
+    final token = await FirebaseMessaging.instance.getToken();
+    final normalized = token?.trim();
+    return normalized == null || normalized.isEmpty ? null : normalized;
+  }
+
   Future<void> deleteAccount() async {
     if (!_ensureNetworkForAction()) {
       return;
@@ -744,6 +794,10 @@ class ProfileController extends Notifier<ProfileState> {
     final externalAuthRepository = ref.read(externalAuthRepositoryProvider);
     final mutationCancelToken = _startProfileMutation();
     try {
+      await _unregisterPushTokenBeforeLogout();
+      if (!ref.mounted || mutationCancelToken.isCancelled) {
+        return;
+      }
       await repository.deleteCurrentAccount(cancelToken: mutationCancelToken);
       if (!ref.mounted || mutationCancelToken.isCancelled) {
         return;

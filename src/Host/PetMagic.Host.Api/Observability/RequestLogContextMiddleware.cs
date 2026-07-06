@@ -3,6 +3,8 @@ using System.Security.Claims;
 
 using Microsoft.Extensions.Hosting;
 
+using PetMagic.BuildingBlocks.Observability;
+
 namespace PetMagic.Host.Api.Observability;
 
 public sealed class RequestLogContextMiddleware(
@@ -17,25 +19,28 @@ public sealed class RequestLogContextMiddleware(
 
     internal static Dictionary<string, object?> CreateScope(HttpContext httpContext)
     {
-        var path = httpContext.Request.Path.Value ?? string.Empty;
-        var endpoint = httpContext.GetEndpoint()?.DisplayName ?? path;
+        var rawPath = httpContext.Request.Path.Value ?? string.Empty;
+        var safePath = RequestLogging.ResolveSafePath(httpContext);
+        var endpoint = RequestLogging.ResolveSafeEndpoint(httpContext);
         var traceId = Activity.Current?.TraceId.ToString() ?? httpContext.TraceIdentifier;
         var correlationId = httpContext.Items.TryGetValue(CorrelationId.HttpContextItemKey, out var value)
             ? value?.ToString()
             : null;
+        var userId = ResolveUserId(httpContext);
 
         return new Dictionary<string, object?>
         {
             ["ApplicationName"] = "PetMagic.Host.Api",
             ["Environment"] = httpContext.RequestServices.GetRequiredService<IHostEnvironment>().EnvironmentName,
             ["TraceId"] = traceId,
-            ["CorrelationId"] = string.IsNullOrWhiteSpace(correlationId) ? "unknown" : correlationId,
-            ["RequestId"] = httpContext.TraceIdentifier,
-            ["UserId"] = ResolveUserId(httpContext),
+            ["CorrelationIdHash"] = SafeLogValues.StableHash(correlationId),
+            ["RequestIdHash"] = SafeLogValues.StableHash(httpContext.TraceIdentifier),
+            ["UserIdHash"] = SafeLogValues.StableHash(userId),
             ["Role"] = ResolveRole(httpContext),
             ["Endpoint"] = endpoint,
             ["HttpMethod"] = httpContext.Request.Method,
-            ["Path"] = path
+            ["Path"] = safePath,
+            ["PathHash"] = SafeLogValues.StableHash(rawPath)
         };
     }
 

@@ -6,6 +6,7 @@ import {
   formatSafeSupportDownloadName,
   getMessageAttachments,
 } from "@/components/support/support-conversation-helpers";
+import { isUnsafeSupportMediaUrl } from "@/components/support/support-secure-media";
 
 import { readSupportConversationPageLibrarySource } from "./support-conversation-page.test-source";
 import { readSupportInfoPanelLibrarySource } from "./support-info-panel.test-source";
@@ -15,6 +16,9 @@ const supportHelpersPath = fileURLToPath(
 );
 const supportContentPath = fileURLToPath(
   new URL("./support-conversation.content.ts", import.meta.url)
+);
+const supportMutationsPath = fileURLToPath(
+  new URL("./support-conversation-controller.mutations.ts", import.meta.url)
 );
 const supportSecureMediaPath = fileURLToPath(
   new URL("./support-secure-media.tsx", import.meta.url)
@@ -165,6 +169,24 @@ describe("support sensitive display", () => {
     expect(attachments[0]?.mimeType).toBe("application/octet-stream");
   });
 
+  it("sanitizes optimistic support attachment filenames before caching them", () => {
+    const mutationsSource = readFileSync(supportMutationsPath, "utf8");
+
+    expect(mutationsSource).toMatch(
+      /const safeSelectedAttachmentName = selectedAttachment\s+\? sanitizeSensitiveText\(selectedAttachment\.name, 120\)\s+: undefined;/
+    );
+    expect(mutationsSource).toContain(
+      "trimmedReply || optimisticAttachmentPreview(safeSelectedAttachmentName)"
+    );
+    expect(mutationsSource).toContain("attachmentFileName: safeSelectedAttachmentName ?? null");
+    expect(mutationsSource).toContain('fileName: safeSelectedAttachmentName ?? "attachment"');
+    expect(mutationsSource).not.toContain(
+      "trimmedReply || optimisticAttachmentPreview(selectedAttachment?.name)"
+    );
+    expect(mutationsSource).not.toContain("attachmentFileName: selectedAttachment?.name ?? null");
+    expect(mutationsSource).not.toContain("fileName: selectedAttachment.name");
+  });
+
   it("keeps support secure media telemetry sanitized", () => {
     const secureMediaSource = readFileSync(supportSecureMediaPath, "utf8");
 
@@ -181,6 +203,9 @@ describe("support sensitive display", () => {
     expect(secureMediaSource).toContain("onError={markRemoteMediaFailed}");
     expect(secureMediaSource).toContain("function formatSupportMediaLogText(");
     expect(secureMediaSource).toContain("function getSupportMediaErrorDetails(error: unknown)");
+    expect(secureMediaSource).toContain("function getBlockedUnsafeSupportMediaUrlDetails(");
+    expect(secureMediaSource).toContain("export function isUnsafeSupportMediaUrl(");
+    expect(secureMediaSource).toContain('"support.secure_media_unsafe_host_blocked"');
     expect(secureMediaSource).toContain(
       'errorName: error instanceof Error ? error.name : "UnknownError"'
     );
@@ -194,5 +219,24 @@ describe("support sensitive display", () => {
     expect(secureMediaSource).not.toContain(
       "mimeType: logContext?.mimeType,\n          kind,\n          error"
     );
+    expect(secureMediaSource).not.toContain(
+      'clientLogger.warn("support.secure_media_unsafe_host_blocked", { url'
+    );
+  });
+
+  it("blocks unsafe support media URLs before fetching them", () => {
+    expect(isUnsafeSupportMediaUrl("https://localhost/support/file.jpg")).toBe(true);
+    expect(isUnsafeSupportMediaUrl("https://api.localhost/support/file.jpg")).toBe(true);
+    expect(isUnsafeSupportMediaUrl("https://host.docker.internal/support/file.jpg")).toBe(true);
+    expect(isUnsafeSupportMediaUrl("https://backend:5000/support/file.jpg")).toBe(true);
+    expect(isUnsafeSupportMediaUrl("https://0.0.0.0/support/file.jpg")).toBe(true);
+    expect(isUnsafeSupportMediaUrl("https://192.168.1.5/support/file.jpg")).toBe(true);
+    expect(isUnsafeSupportMediaUrl("https://10.0.0.5/support/file.jpg")).toBe(true);
+    expect(isUnsafeSupportMediaUrl("https://169.254.169.254/support/file.jpg")).toBe(true);
+    expect(isUnsafeSupportMediaUrl("https://[::1]/support/file.jpg")).toBe(true);
+    expect(isUnsafeSupportMediaUrl("https://[::]/support/file.jpg")).toBe(true);
+    expect(isUnsafeSupportMediaUrl("https://[fd00::1]/support/file.jpg")).toBe(true);
+    expect(isUnsafeSupportMediaUrl("https://cdn.example.com/support/file.jpg")).toBe(true);
+    expect(isUnsafeSupportMediaUrl("https://cdn.petmagic.ai/support/file.jpg")).toBe(false);
   });
 });

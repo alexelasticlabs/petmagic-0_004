@@ -10,9 +10,9 @@ import {
 describe("template analytics display utilities", () => {
   it("sanitizes backend supplied analytics dimensions and model labels", () => {
     expect(formatAnalyticsValue("ios_app token=raw-token")).toBe("ios app token=[redacted]");
-    expect(formatAnalyticsValue("https://cdn.example.com/source?X-Amz-Signature=secret")).not.toContain(
-      "X-Amz-Signature=secret"
-    );
+    expect(
+      formatAnalyticsValue("https://cdn.example.com/source?X-Amz-Signature=secret")
+    ).not.toContain("X-Amz-Signature=secret");
 
     expect(formatModelValue("provider/team/model token=raw-model-secret")).toBe(
       "team/model token=[redacted]"

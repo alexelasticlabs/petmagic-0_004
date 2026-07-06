@@ -4,10 +4,13 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
+using PetMagic.Host.Api.Observability;
 using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Identity.Infrastructure;
 using PetMagic.Modules.Identity.Infrastructure.Entities;
@@ -40,7 +43,7 @@ public sealed class LegalAcceptanceEnforcementMiddleware(
     ];
 
     private const string LegalAcceptanceRequiredCode = "auth.legal_acceptance_required";
-    private const string LegalAcceptanceRequiredMessage = "Current legal documents must be accepted before using this endpoint.";
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
 
     public async Task InvokeAsync(HttpContext context, UserManager<AppUser> userManager, ILegalDocumentsCatalog legalDocumentsCatalog)
@@ -86,23 +89,26 @@ public sealed class LegalAcceptanceEnforcementMiddleware(
             : context.TraceIdentifier;
 
         logger.LogWarning(
-            "Legal acceptance required blocked {Method} {Path} with {StatusCode}. ProblemCode={ProblemCode} CorrelationId={CorrelationId} RequestId={RequestId}",
+            "Legal acceptance required blocked {Method} {SafePath} with {StatusCode}. ProblemCode={ProblemCode} CorrelationIdHash={CorrelationIdHash} RequestIdHash={RequestIdHash}",
             context.Request.Method,
-            context.Request.Path.Value ?? string.Empty,
+            RequestLogging.ResolveSafePath(context),
             StatusCodes.Status403Forbidden,
             LegalAcceptanceRequiredCode,
-            string.IsNullOrWhiteSpace(correlationId) ? "unknown" : correlationId,
-            string.IsNullOrWhiteSpace(requestId) ? context.TraceIdentifier : requestId);
+            string.IsNullOrWhiteSpace(correlationId) ? "unknown" : SafeLogValues.StableHash(correlationId),
+            string.IsNullOrWhiteSpace(requestId)
+                ? SafeLogValues.StableHash(context.TraceIdentifier)
+                : SafeLogValues.StableHash(requestId));
 
         context.Response.StatusCode = StatusCodes.Status403Forbidden;
         context.Response.ContentType = "application/problem+json";
-        var payload = JsonSerializer.Serialize(new
+        var problem = new ProblemDetails
         {
-            title = LegalAcceptanceRequiredCode,
-            detail = LegalAcceptanceRequiredMessage,
-            status = StatusCodes.Status403Forbidden
-        });
-        await context.Response.WriteAsync(payload, context.RequestAborted);
+            Title = LegalAcceptanceRequiredCode,
+            Status = StatusCodes.Status403Forbidden
+        };
+        problem.Extensions["code"] = LegalAcceptanceRequiredCode;
+
+        await context.Response.WriteAsync(JsonSerializer.Serialize(problem, JsonOptions), context.RequestAborted);
     }
 
     private static bool IsAllowedPath(PathString path)

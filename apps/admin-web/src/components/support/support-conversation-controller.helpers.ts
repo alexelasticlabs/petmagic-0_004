@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react";
 
 import { getSupportConversationCopy } from "@/components/support/support-conversation.content";
-import { formatSupportMessagePreview } from "@/components/support/support-message-preview";
 import {
   SUPPORT_INBOX_SEARCH_MAX_LENGTH,
   SUPPORT_MESSAGE_BODY_MAX_LENGTH,
   type AdminSupportConversation,
   type SupportConversationStatus,
   type SupportInboxAssignmentScope,
+  type SupportInboxQueue,
 } from "@/lib/api-client";
 import { type Locale } from "@/lib/i18n";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
@@ -31,7 +31,8 @@ export type ToastState = {
   message: string;
 };
 
-export type SupportQueueFilter = "all" | SupportConversationStatus | "mine" | "unassigned";
+export type SupportQueueFilter =
+  "all" | SupportConversationStatus | "mine" | "unassigned" | "waiting";
 
 export type SidePanelTab = "user" | "activity" | "dialog" | "attachments";
 
@@ -45,6 +46,7 @@ export const statusOptions: SupportConversationStatus[] = [
   "Closed",
 ];
 export const supportPollingIntervalMs = 8_000;
+export const supportRealtimeHealthyPollingIntervalMs = 60_000;
 export const supportInboxStaleTimeMs = supportPollingIntervalMs;
 export const supportSubjectContextStaleTimeMs = 30_000;
 export const supportConversationMessagesTake = 80;
@@ -52,9 +54,13 @@ export const supportConversationMessagesTake = 80;
 export function resolveQueueFilter(filter: SupportQueueFilter): {
   status?: SupportConversationStatus;
   assignment: SupportInboxAssignmentScope;
+  queue?: SupportInboxQueue;
 } {
   if (filter === "all") {
     return { status: undefined, assignment: "all" };
+  }
+  if (filter === "waiting") {
+    return { status: undefined, assignment: "all", queue: "waiting_for_support" };
   }
   if (filter === "mine") {
     return { status: undefined, assignment: "mine" };
@@ -76,18 +82,9 @@ export function useDebouncedValue(value: string, delayMs: number) {
   return debounced;
 }
 
-export function buildSupportRealtimeToastMessage(
-  event: { lastMessagePreview?: string | null },
-  locale: Locale
-): string {
+export function buildSupportRealtimeToastMessage(locale: Locale): string {
   const copy = getSupportConversationCopy(locale);
-  const fallback = copy.controller.realtimeMessageFallback;
-  const preview = formatSupportMessagePreview(event.lastMessagePreview, "");
-  if (!preview) {
-    return fallback;
-  }
-
-  return copy.controller.realtimeMessageWithPreview(preview);
+  return copy.controller.realtimeMessageFallback;
 }
 
 export function isUserSupportMessageEvent(event: {

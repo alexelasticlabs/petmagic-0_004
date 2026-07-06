@@ -27,10 +27,11 @@ public sealed class GlobalExceptionMiddlewareTests
         await using var app = builder.Build();
         app.UseMiddleware<CorrelationIdMiddleware>();
         app.UseMiddleware<GlobalExceptionMiddleware>();
-        app.MapGet("/boom", static IResult () => throw new InvalidOperationException("secret-provider-token"));
+        app.MapGet("/api/users/{userId:guid}/boom", static IResult (Guid userId) => throw new InvalidOperationException("secret-provider-token"));
         await app.StartAsync();
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/boom");
+        var sensitiveUserId = Guid.Parse("c8249f11-33de-47dc-b7dd-b3206ae421a9");
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/users/{sensitiveUserId:D}/boom");
         request.Headers.Add(CorrelationId.HeaderName, "global-exception-correlation");
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
@@ -48,7 +49,47 @@ public sealed class GlobalExceptionMiddlewareTests
         Assert.DoesNotContain(nameof(InvalidOperationException), rawBody);
         Assert.NotNull(body);
         Assert.Equal("INTERNAL_SERVER_ERROR", body!["title"]?.ToString());
+        Assert.Equal("INTERNAL_SERVER_ERROR", body["code"]?.ToString());
+        Assert.False(body.ContainsKey("detail"));
         Assert.Equal("global-exception-correlation", body["correlationId"]?.ToString());
         Assert.False(string.IsNullOrWhiteSpace(body["traceId"]?.ToString()));
+        Assert.True(body.TryGetValue("instance", out var instance));
+        Assert.DoesNotContain(sensitiveUserId.ToString("D"), instance?.ToString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void MiddlewareLogs_ShouldNotSerializeRawExceptions()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Host",
+            "PetMagic.Host.Api",
+            "Observability",
+            "GlobalExceptionMiddleware.cs"));
+
+        Assert.DoesNotContain("logger.LogError(\r\n                exception,", source, StringComparison.Ordinal);
+        Assert.Contains("ExceptionType={ExceptionType}", source, StringComparison.Ordinal);
+        Assert.Contains("{SafePath}", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("{RequestPath}", source, StringComparison.Ordinal);
+        Assert.Contains("SafeLogValues.ExceptionType(exception)", source, StringComparison.Ordinal);
+        Assert.Contains("RequestLogging.ResolveSafePath(context)", source, StringComparison.Ordinal);
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        while (current is not null)
+        {
+            if (Directory.Exists(Path.Combine(current.FullName, "src"))
+                && Directory.Exists(Path.Combine(current.FullName, "tests")))
+            {
+                return current.FullName;
+            }
+
+            current = current.Parent;
+        }
+
+        throw new InvalidOperationException("Could not locate repository root.");
     }
 }

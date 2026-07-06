@@ -7,7 +7,7 @@ import {
   readFileSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -15,6 +15,11 @@ const repoRoot = resolve(scriptDir, "../..");
 const mobileDir = resolve(repoRoot, "apps/petmagic-mobile");
 const env = { ...process.env };
 augmentAndroidToolPath();
+
+if (hasHelpArg()) {
+  printUsage();
+  process.exit(0);
+}
 
 const evidencePath =
   env.WATERMARK_QA_PREFLIGHT_EVIDENCE_PATH ??
@@ -44,6 +49,11 @@ loadOptionalEnvFile(
 
 if (env.WATERMARK_QA_SKIP_MEDIA === "1") {
   skip("media fixtures", "WATERMARK_QA_SKIP_MEDIA=1");
+} else if (process.platform !== "darwin") {
+  skip(
+    "media fixtures",
+    "scripts/qa/prepare-watermark-manual-qa-media.sh requires macOS sips and Swift/AVFoundation; provide fixtures manually or run on macOS",
+  );
 } else {
   run("media fixtures", "scripts/qa/prepare-watermark-manual-qa-media.sh", [], {
     cwd: repoRoot,
@@ -157,6 +167,43 @@ function runFlutterDevice(name, deviceId, { skipReason } = {}) {
   );
 }
 
+function hasHelpArg() {
+  return process.argv.slice(2).some((arg) => arg === "--help" || arg === "-h");
+}
+
+function printUsage() {
+  console.log(`
+Watermark preflight QA runner.
+
+Usage:
+  node scripts/qa/run-watermark-preflight-qa.mjs
+
+Optional environment:
+  WATERMARK_QA_USERS_ENV                 Env file path, default artifacts/watermark-qa-users.env.
+  WATERMARK_QA_PREFLIGHT_EVIDENCE_PATH  Evidence JSON path, default artifacts/watermark-preflight-qa-evidence.json.
+  WATERMARK_QA_SKIP_MEDIA=1             Skip media fixture preparation. Non-macOS hosts skip this step automatically.
+  WATERMARK_QA_SKIP_BACKEND=1           Skip backend smoke checks.
+  WATERMARK_QA_STRICT=1                 Fail when any check is skipped.
+  WATERMARK_QA_AUTO_DEVICES=1           Auto-select connected Flutter devices.
+  WATERMARK_QA_ANDROID_DEVICE           Android device id for integration test.
+  WATERMARK_QA_IOS_DEVICE               iOS device id for integration test.
+  WATERMARK_QA_ANDROID_EMULATOR         Android emulator id to launch before testing.
+  WATERMARK_QA_SKIP_FIREBASE=1          Pass PETMAGIC_SKIP_FIREBASE=true to Flutter.
+  WATERMARK_QA_FLUTTER_NO_PUB=1         Pass --no-pub to Flutter test.
+  WATERMARK_QA_FLUTTER_ARGS             Extra args forwarded to Flutter test.
+
+Backend smoke environment, required unless WATERMARK_QA_SKIP_BACKEND=1:
+  API_BASE_URL
+  DATABASE_URL
+  FREE_USER_ID
+  NO_CREDIT_USER_ID
+  PREMIUM_USER_ID
+  FREE_TOKEN
+  NO_CREDIT_TOKEN
+  PREMIUM_TOKEN
+`.trim());
+}
+
 async function launchAndroidEmulator(emulatorId) {
   const emulator = findCommand("emulator");
   const adb = findCommand("adb");
@@ -190,6 +237,7 @@ async function launchAndroidEmulator(emulatorId) {
   spawn(emulator, emulatorArgs, {
     detached: true,
     env,
+    shell: process.platform === "win32",
     stdio: ["ignore", out, err],
   }).unref();
 
@@ -198,6 +246,7 @@ async function launchAndroidEmulator(emulatorId) {
     const boot = spawnSync(adb, ["-e", "shell", "getprop", "sys.boot_completed"], {
       env,
       encoding: "utf8",
+      shell: process.platform === "win32",
       timeout: 5000,
     }).stdout.trim();
 
@@ -229,6 +278,7 @@ function detectFlutterDevices() {
     cwd: mobileDir,
     env,
     encoding: "utf8",
+    shell: process.platform === "win32",
     timeout: deviceDiscoveryTimeoutMs,
   });
 
@@ -261,28 +311,31 @@ function run(name, command, args, { cwd }) {
     cwd,
     env,
     encoding: "utf8",
+    shell: process.platform === "win32",
     timeout: commandTimeoutMs,
   });
   recordCommand(name, result, { command, args, cwd });
 }
 
 function augmentAndroidToolPath() {
-  const home = env.HOME;
+  const home = env.HOME || env.USERPROFILE;
   const sdkRoots = [
     env.ANDROID_HOME,
     env.ANDROID_SDK_ROOT,
-    home ? `${home}/Library/Android/sdk` : undefined,
+    env.LOCALAPPDATA ? join(env.LOCALAPPDATA, "Android", "Sdk") : undefined,
+    home ? join(home, "Library", "Android", "sdk") : undefined,
   ].filter(Boolean);
   const additions = [];
   for (const sdkRoot of sdkRoots) {
-    additions.push(`${sdkRoot}/platform-tools`, `${sdkRoot}/emulator`);
+    additions.push(join(sdkRoot, "platform-tools"), join(sdkRoot, "emulator"));
   }
 
-  env.PATH = [...additions, env.PATH].filter(Boolean).join(":");
+  env.PATH = [...additions, env.PATH].filter(Boolean).join(delimiter);
 }
 
 function findCommand(command) {
-  const result = spawnSync("which", [command], {
+  const locator = process.platform === "win32" ? "where.exe" : "which";
+  const result = spawnSync(locator, [command], {
     env,
     encoding: "utf8",
     timeout: 5000,

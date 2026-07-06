@@ -22,11 +22,11 @@ public sealed partial class EconomyService
         if (!TryParseStoreTransactionDate(transactionDate, out var purchasedAtUtc))
         {
             logger?.LogWarning(
-                "Store receipt transaction date could not be parsed. Provider={Provider} Operation={Operation} UserId={UserId} CorrelationId={CorrelationId}",
+                "Store receipt transaction date could not be parsed. Provider={Provider} Operation={Operation} UserIdHash={UserIdHash} CorrelationIdHash={CorrelationIdHash}",
                 provider,
                 operation,
-                userId,
-                CurrentCorrelationId);
+                EconomyLogSanitizer.SafeUserId(userId),
+                CurrentCorrelationIdHash);
             return Result.Failure(EconomyErrors.StorePurchaseInvalid);
         }
 
@@ -34,12 +34,12 @@ public sealed partial class EconomyService
         if (purchasedAtUtc > now.Add(StoreReceiptFutureSkew))
         {
             logger?.LogWarning(
-                "Store receipt transaction date is in the future. Provider={Provider} Operation={Operation} UserId={UserId} PurchasedAtUtc={PurchasedAtUtc} CorrelationId={CorrelationId}",
+                "Store receipt transaction date is in the future. Provider={Provider} Operation={Operation} UserIdHash={UserIdHash} PurchasedAtUtc={PurchasedAtUtc} CorrelationIdHash={CorrelationIdHash}",
                 provider,
                 operation,
-                userId,
+                EconomyLogSanitizer.SafeUserId(userId),
                 purchasedAtUtc,
-                CurrentCorrelationId);
+                CurrentCorrelationIdHash);
             return Result.Failure(EconomyErrors.StorePurchaseInvalid);
         }
 
@@ -48,14 +48,14 @@ public sealed partial class EconomyService
         if (receiptAge > maxAge)
         {
             logger?.LogWarning(
-                "Store receipt transaction date exceeded the replay window. Provider={Provider} Operation={Operation} UserId={UserId} PurchasedAtUtc={PurchasedAtUtc} AgeHours={AgeHours:F2} MaxAgeHours={MaxAgeHours} CorrelationId={CorrelationId}",
+                "Store receipt transaction date exceeded the replay window. Provider={Provider} Operation={Operation} UserIdHash={UserIdHash} PurchasedAtUtc={PurchasedAtUtc} AgeHours={AgeHours:F2} MaxAgeHours={MaxAgeHours} CorrelationIdHash={CorrelationIdHash}",
                 provider,
                 operation,
-                userId,
+                EconomyLogSanitizer.SafeUserId(userId),
                 purchasedAtUtc,
                 receiptAge.TotalHours,
                 options.Value.MaxStoreReceiptAgeHours,
-                CurrentCorrelationId);
+                CurrentCorrelationIdHash);
             return Result.Failure(EconomyErrors.StorePurchaseInvalid);
         }
 

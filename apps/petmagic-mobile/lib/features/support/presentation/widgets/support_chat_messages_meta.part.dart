@@ -93,6 +93,7 @@ class _MessageDeliveryStatusIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
     final iconColor =
         tintColor ?? (compact ? Colors.white.withValues(alpha: 0.88) : null);
     final composerTone = _supportComposerSendGreen(context);
@@ -115,7 +116,7 @@ class _MessageDeliveryStatusIcon extends StatelessWidget {
         key: const ValueKey<String>('failed'),
         Icons.error_outline_rounded,
         size: compact ? 12 : 12.5,
-        color: const Color(0xFFFF6B6B),
+        color: colors.danger,
       );
     } else if (message.isRead) {
       statusIcon = Icon(

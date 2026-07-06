@@ -61,14 +61,12 @@ class _FullscreenResultViewerState extends State<_FullscreenResultViewer> {
 
       final controller = VideoPlayerController.networkUrl(safeUri);
       _videoController = controller;
-      await controller.setLooping(true);
       await _initializeFullscreenVideo(requestVersion, mediaUrl, controller);
       return;
     }
 
     final controller = VideoPlayerController.file(localFile);
     _videoController = controller;
-    await controller.setLooping(true);
     await _initializeFullscreenVideo(requestVersion, mediaUrl, controller);
   }
 
@@ -77,11 +75,18 @@ class _FullscreenResultViewerState extends State<_FullscreenResultViewer> {
     String mediaUrl,
     VideoPlayerController controller,
   ) async {
-    if (_videoController != controller) {
+    if (!_isCurrentVideoRequest(requestVersion, mediaUrl, controller)) {
+      await controller.dispose();
       return;
     }
 
     try {
+      await controller.setLooping(true);
+      if (!_isCurrentVideoRequest(requestVersion, mediaUrl, controller)) {
+        await controller.dispose();
+        return;
+      }
+
       await controller.initialize();
       if (!_isCurrentVideoRequest(requestVersion, mediaUrl, controller)) {
         await controller.dispose();

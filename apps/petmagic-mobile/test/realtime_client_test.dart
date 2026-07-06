@@ -61,6 +61,16 @@ void main() {
     },
   );
 
+  test('polling realtime client uses disposable one-shot timers', () {
+    final source = File(
+      'lib/core/realtime/realtime_client.dart',
+    ).readAsStringSync();
+
+    expect(source, contains('void _scheduleNextPoll()'));
+    expect(source, contains('Timer(interval, ()'));
+    expect(source, isNot(contains('Timer.periodic')));
+  });
+
   test(
     'server-sent events realtime client keeps active base URL on non-200 endpoint responses',
     () async {
@@ -170,6 +180,145 @@ void main() {
       );
     },
   );
+
+  test(
+    'server-sent events realtime client keeps event stream subscriptions across reconnects',
+    () async {
+      var requestCount = 0;
+      final client = ServerSentEventsRealtimeClient(
+        apiBaseUrlResolver: _TrackingApiBaseUrlResolver(const [
+          'https://api.example',
+        ]),
+        sessionStorage: _StaticAuthSessionStorage(),
+        httpClient: _FakeHttpClient(
+          onGetUrl: (_) async {
+            requestCount++;
+            return _FakeHttpClientRequest(
+              response: _FakeHttpClientResponse(
+                HttpStatus.ok,
+                body: 'event: templates.feed.invalidated\n\n',
+              ),
+            );
+          },
+        ),
+        reconnectDelay: const Duration(hours: 1),
+      );
+      addTearDown(client.dispose);
+
+      final events = <RealtimeEvent>[];
+      final subscription = client.events.listen(events.add);
+      addTearDown(subscription.cancel);
+
+      await client.connect();
+      await _waitUntil(() => events.length == 1);
+
+      await client.disconnect();
+      await client.connect();
+      await _waitUntil(() => events.length == 2);
+
+      expect(requestCount, 2);
+      expect(
+        events.map((event) => event.topic),
+        everyElement(RealtimeTopics.templatesFeedInvalidated),
+      );
+    },
+  );
+
+  test(
+    'server-sent events realtime client cancels active response on disconnect',
+    () async {
+      var requestCount = 0;
+      final responseController = StreamController<List<int>>();
+      final client = ServerSentEventsRealtimeClient(
+        apiBaseUrlResolver: _TrackingApiBaseUrlResolver(const [
+          'https://api.example',
+        ]),
+        sessionStorage: _StaticAuthSessionStorage(),
+        httpClient: _FakeHttpClient(
+          onGetUrl: (_) async {
+            requestCount++;
+            return _FakeHttpClientRequest(
+              response: _FakeHttpClientResponse(
+                HttpStatus.ok,
+                stream: responseController.stream,
+              ),
+            );
+          },
+        ),
+        reconnectDelay: const Duration(hours: 1),
+      );
+      addTearDown(() async {
+        await client.dispose();
+        if (!responseController.isClosed) {
+          await responseController.close();
+        }
+      });
+
+      await client.connect();
+      await _waitUntil(() => requestCount == 1);
+      await _waitUntil(() => responseController.hasListener);
+
+      await client.disconnect().timeout(const Duration(seconds: 1));
+
+      expect(responseController.hasListener, isFalse);
+    },
+  );
+
+  test(
+    'server-sent events realtime client drops oversized event payloads',
+    () async {
+      var requestCount = 0;
+      final client = ServerSentEventsRealtimeClient(
+        apiBaseUrlResolver: _TrackingApiBaseUrlResolver(const [
+          'https://api.example',
+        ]),
+        sessionStorage: _StaticAuthSessionStorage(),
+        httpClient: _FakeHttpClient(
+          onGetUrl: (_) async {
+            requestCount++;
+            return _FakeHttpClientRequest(
+              response: _FakeHttpClientResponse(
+                HttpStatus.ok,
+                body:
+                    'event: templates.feed.invalidated\n'
+                    'data: ${'x' * 9000}\n\n',
+              ),
+            );
+          },
+        ),
+        reconnectDelay: const Duration(hours: 1),
+      );
+      addTearDown(client.dispose);
+
+      final events = <RealtimeEvent>[];
+      final subscription = client.events.listen(events.add);
+      addTearDown(subscription.cancel);
+
+      await client.connect();
+      await _waitUntil(() => requestCount == 1);
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+
+      expect(events, isEmpty);
+    },
+  );
+
+  test('server-sent events realtime logs safe base URL origin only', () {
+    final source = File(
+      'lib/core/realtime/realtime_client.dart',
+    ).readAsStringSync();
+
+    expect(
+      source,
+      contains("'base_url_origin': _realtimeLogSafeBaseUrlOrigin(baseUrl)"),
+    );
+    expect(
+      source,
+      contains('String _realtimeLogSafeBaseUrlOrigin(String baseUrl)'),
+    );
+    expect(source, contains("return 'invalid';"));
+    expect(source, contains("return '\${uri.scheme}://\${uri.host}\$port';"));
+    expect(source, isNot(contains("context: {'base_url': baseUrl}")));
+  });
 
   test(
     'lifecycle realtime client disconnects in background and resumes',
@@ -352,10 +501,15 @@ class _FakeHttpHeaders implements HttpHeaders {
 
 class _FakeHttpClientResponse extends Stream<List<int>>
     implements HttpClientResponse {
-  _FakeHttpClientResponse(this.statusCode, {String body = ''})
-    : _stream = Stream<List<int>>.fromIterable(
-        body.isEmpty ? const <List<int>>[] : [utf8.encode(body)],
-      );
+  _FakeHttpClientResponse(
+    this.statusCode, {
+    String body = '',
+    Stream<List<int>>? stream,
+  }) : _stream =
+           stream ??
+           Stream<List<int>>.fromIterable(
+             body.isEmpty ? const <List<int>>[] : [utf8.encode(body)],
+           );
 
   @override
   final int statusCode;

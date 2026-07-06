@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,6 +15,42 @@ import 'support_chat_test_support.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('support chat controller does not cache dependencies in build', () {
+    final source = File(
+      'lib/features/support/presentation/support_chat_controller.dart',
+    ).readAsStringSync();
+
+    expect(source, isNot(contains('late final SupportChatRepository')));
+    expect(source, isNot(contains('late final SupportChatRealtimeClient')));
+    expect(source, contains('SupportChatRepository? _activeRepository;'));
+    expect(
+      source,
+      contains('SupportChatRealtimeClient? _activeRealtimeClient;'),
+    );
+    expect(
+      source,
+      contains('_activeRepository = ref.read(supportChatRepositoryProvider);'),
+    );
+    expect(
+      source,
+      contains(
+        '_activeRealtimeClient = ref.read(supportChatRealtimeClientProvider);',
+      ),
+    );
+    expect(
+      source,
+      isNot(contains('_repository = ref.watch(supportChatRepositoryProvider)')),
+    );
+    expect(
+      source,
+      isNot(
+        contains(
+          '_realtimeClient = ref.watch(supportChatRealtimeClientProvider)',
+        ),
+      ),
+    );
+  });
 
   test(
     'refresh clears loading after unexpected failure and allows retry',

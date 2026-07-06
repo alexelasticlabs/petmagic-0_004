@@ -411,7 +411,9 @@ class _PetProgressDot extends StatelessWidget {
           : Text(
               '${index + 1}',
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: isActive ? Colors.black : colors.textMuted,
+                color: isActive
+                    ? Theme.of(context).colorScheme.onPrimary
+                    : colors.textMuted,
                 fontWeight: FontWeight.w900,
               ),
             ),

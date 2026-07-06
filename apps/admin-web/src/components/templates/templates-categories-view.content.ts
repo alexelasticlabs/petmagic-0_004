@@ -2,7 +2,7 @@ import { type Locale } from "@/lib/i18n";
 
 const templatesCategoriesViewText = {
   ru: {
-    actionsAdminOnly: "Управление категориями доступно только Admin.",
+    actionsAdminOnly: "Управление категориями доступно только администратору.",
     notificationTitle: "Категории шаблонов",
     createSuccess: "Категория создана.",
     createError: "Не удалось создать категорию.",
@@ -17,7 +17,7 @@ const templatesCategoriesViewText = {
     heroTitle: "Категории шаблонов",
     heroDescription:
       "Управляйте списком категорий, архивом и переименованием. Переименование категории автоматически обновляет связанные шаблоны.",
-    crudEnabled: "CRUD подключен",
+    crudEnabled: "Управление включено",
     readOnly: "Только просмотр",
     activeTab: "Активные",
     archiveTab: "Архив",
@@ -35,13 +35,13 @@ const templatesCategoriesViewText = {
     newCategoryTitle: "Новая категория",
     newCategoryDescription:
       "Сначала создайте категорию здесь, затем она появится в редакторах шаблонов.",
-    categoryPlaceholder: "Например, Portrait Pets",
+    categoryPlaceholder: "Например, портреты питомцев",
     addCategory: "Добавить категорию",
     categoriesTitle: "Категории",
     archivedDescription:
       "Архивные категории остаются в статистике и в связанных шаблонах, но не предлагаются для новых шаблонов.",
     activeDescription:
-      "Переименование категории синхронно обновляет поле category у связанных шаблонов.",
+      "Переименование категории синхронно обновляет поле категории у связанных шаблонов.",
     empty: "Категории не найдены.",
     state: "Состояние",
     total: "Всего",
@@ -59,7 +59,7 @@ const templatesCategoriesViewText = {
     deleteDialogDescription: (name: string) =>
       `Удалить категорию "${name}"? Категория удаляется только если в ней нет шаблонов.`,
     videoCategoryLabel: (name: string) => `Открыть видео-шаблоны категории ${name}`,
-    imageCategoryLabel: (name: string) => `Открыть image-шаблоны категории ${name}`,
+    imageCategoryLabel: (name: string) => `Открыть шаблоны изображений категории ${name}`,
     editCategoryLabel: (name: string) => `Переименовать категорию ${name}`,
     archiveCategoryLabel: (name: string) => `Архивировать категорию ${name}`,
     restoreCategoryLabel: (name: string) => `Вернуть категорию ${name}`,

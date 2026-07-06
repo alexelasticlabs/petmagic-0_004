@@ -11,13 +11,13 @@ import type { TemplateTestPageText } from "@/components/templates/template-test-
 import {
   formatDateTime,
   formatTemplateTestDisplayText,
+  formatTokenCost,
 } from "@/components/templates/template-test-page.helpers";
 import styles from "@/components/templates/template-test-page.module.css";
 import type { DetailItem, TimelineItem } from "@/components/templates/template-test-page.types";
 import type { AdminTemplateTestRun } from "@/lib/api-client";
 import type { Locale } from "@/lib/i18n";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
-
 
 export function TemplateTestPageHeader({
   canManageTemplates,
@@ -208,7 +208,9 @@ export function TemplateTestHistorySection({
                   <span>
                     {pageText.attempt}: {item.attemptCount}
                   </span>
-                  <span>PawSpark: {item.tokenCost}</span>
+                  <span>
+                    {pageText.petMagicBilling}: {formatTokenCost(item.tokenCost)}
+                  </span>
                   <span>
                     {pageText.started}: {formatDateTime(item.startedAtUtc, locale, true)}
                   </span>

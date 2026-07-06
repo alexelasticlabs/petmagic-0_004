@@ -14,6 +14,8 @@ mixin _PremiumControllerLifecycle on _PremiumControllerBase {
       ref.onDispose(() {
         _cancelActiveLoad();
         _cancelActiveStatusRefresh();
+        _cancelActivePremiumAction();
+        _cancelActiveCheckoutVerification();
       });
     }
 
@@ -48,10 +50,14 @@ mixin _PremiumControllerLifecycle on _PremiumControllerBase {
 
     _cancelActiveLoad();
     _cancelActiveStatusRefresh();
+    _cancelActivePremiumAction();
+    _cancelActiveCheckoutVerification();
     _loadInFlight = null;
     _updateStateIfMounted(
       (state) => state.copyWith(
         isLoading: false,
+        isBuying: false,
+        isManaging: false,
         checkoutVerificationState: state.isAwaitingCheckoutVerification
             ? PremiumCheckoutVerificationState.error
             : state.checkoutVerificationState,
@@ -102,6 +108,48 @@ mixin _PremiumControllerLifecycle on _PremiumControllerBase {
   void _clearActiveStatusRefresh(CancelToken cancelToken) {
     if (identical(_activeStatusRefreshCancelToken, cancelToken)) {
       _activeStatusRefreshCancelToken = null;
+    }
+  }
+
+  CancelToken _startPremiumActionCancelToken() {
+    _cancelActivePremiumAction();
+    final cancelToken = CancelToken();
+    _activePremiumActionCancelToken = cancelToken;
+    return cancelToken;
+  }
+
+  void _cancelActivePremiumAction() {
+    final cancelToken = _activePremiumActionCancelToken;
+    if (cancelToken != null && !cancelToken.isCancelled) {
+      cancelToken.cancel('premium_action_cancelled');
+    }
+    _activePremiumActionCancelToken = null;
+  }
+
+  void _clearActivePremiumAction(CancelToken cancelToken) {
+    if (identical(_activePremiumActionCancelToken, cancelToken)) {
+      _activePremiumActionCancelToken = null;
+    }
+  }
+
+  CancelToken _startCheckoutVerificationCancelToken() {
+    _cancelActiveCheckoutVerification();
+    final cancelToken = CancelToken();
+    _activeCheckoutVerificationCancelToken = cancelToken;
+    return cancelToken;
+  }
+
+  void _cancelActiveCheckoutVerification() {
+    final cancelToken = _activeCheckoutVerificationCancelToken;
+    if (cancelToken != null && !cancelToken.isCancelled) {
+      cancelToken.cancel('premium_checkout_verification_cancelled');
+    }
+    _activeCheckoutVerificationCancelToken = null;
+  }
+
+  void _clearActiveCheckoutVerification(CancelToken cancelToken) {
+    if (identical(_activeCheckoutVerificationCancelToken, cancelToken)) {
+      _activeCheckoutVerificationCancelToken = null;
     }
   }
 

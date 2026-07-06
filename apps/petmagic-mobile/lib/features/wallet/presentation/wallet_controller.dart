@@ -200,14 +200,15 @@ abstract class _WalletControllerBase extends Notifier<WalletState> {
   static const int walletLedgerPageSize = 24;
   static const int _maxStorePurchaseVerificationKeys = 32;
 
-  late final WalletRepository _repository;
-  bool _repositoryInitialized = false;
+  WalletRepository get _repository => ref.read(walletRepositoryProvider);
   Future<void>? _loadInFlight;
   Future<void>? _checkoutVerificationInFlight;
   Future<void>? _storePurchaseRecoveryInFlight;
   CancelToken? _activeLoadCancelToken;
   CancelToken? _activeWalletSyncCancelToken;
   CancelToken? _activeLedgerLoadMoreCancelToken;
+  CancelToken? _activeCheckoutCancelToken;
+  CancelToken? _activeCheckoutVerificationCancelToken;
   final Set<String> _storePurchaseVerificationInFlightKeys = <String>{};
   final Set<String> _storePurchaseVerifiedKeys = <String>{};
   bool _isWalletSyncInFlight = false;
@@ -265,10 +266,6 @@ class WalletController extends _WalletControllerBase
         _WalletControllerCheckout {
   @override
   WalletState build() {
-    if (!_repositoryInitialized) {
-      _repository = ref.read(walletRepositoryProvider);
-      _repositoryInitialized = true;
-    }
     _ensureWalletLifecycleStarted();
     return const WalletState(isLoading: true);
   }

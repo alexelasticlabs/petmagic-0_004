@@ -952,6 +952,9 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ChargedAtUtc")
+                        .HasDatabaseName("IX_tgj_ChargedAtUtc");
+
                     b.HasIndex("HiddenByUserAtUtc");
 
                     b.HasIndex("InputMediaAssetId");
@@ -974,11 +977,17 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                         .HasDatabaseName("UX_tgj_PreprocessingProviderRequestId")
                         .HasFilter(" \"PreprocessingProviderRequestId\" IS NOT NULL ");
 
+                    b.HasIndex("RefundedAtUtc")
+                        .HasDatabaseName("IX_tgj_RefundedAtUtc");
+
                     b.HasIndex("ResultMediaAssetId");
 
                     b.HasIndex("SimilarToGenerationId");
 
                     b.HasIndex("UserMediaDeletedAtUtc");
+
+                    b.HasIndex("CreatedAtUtc", "Id")
+                        .HasDatabaseName("IX_tgj_CreatedAtUtc_Id");
 
                     b.HasIndex("Status", "CompletedAtUtc");
 
@@ -989,6 +998,9 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                         .HasDatabaseName("IX_tgj_Status_ProviderStatusCheckedAtUtc");
 
                     b.HasIndex("Status", "QueuedAtUtc");
+
+                    b.HasIndex("UpdatedAtUtc", "Id")
+                        .HasDatabaseName("IX_tgj_UpdatedAtUtc_Id");
 
                     b.HasIndex("UserId", "CreatedAtUtc");
 

@@ -648,6 +648,59 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task UpdateImageAsync_ShouldKeepExistingPreview_WhenKeepPreviewAssetIsRequested()
+    {
+        await using var dbContext = CreateDbContext();
+        var storage = new RecordingMediaStorage();
+        var service = CreateService(dbContext, storage);
+        const string previewUrl = "http://localhost:5000/templates-media/2026/05/keep-preview.jpg";
+
+        var created = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Portrait",
+                "Cozy portrait",
+                "Portrait",
+                ["cozy"],
+                false,
+                20,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset(previewUrl, "keep-preview.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet."),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+
+        var updated = await service.UpdateImageAsync(
+            new UpdateImageTemplateCommand(
+                created.Value.TemplateId,
+                "Portrait updated",
+                "Cozy portrait",
+                "Portrait",
+                ["cozy"],
+                false,
+                20,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                null,
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                KeepPreviewAsset: true),
+            CancellationToken.None);
+
+        Assert.True(updated.IsSuccess);
+        Assert.Equal(previewUrl, updated.Value.PreviewAsset?.Url);
+        Assert.Empty(storage.DeletedUrls);
+
+        var persisted = await dbContext.TemplateItems
+            .Include(x => x.Assets)
+            .SingleAsync(x => x.Id == created.Value.TemplateId);
+        Assert.Equal(previewUrl, persisted.Assets.Single(x => x.AssetKind == TemplateAssetKind.Preview).Url);
+        Assert.Equal(previewUrl, persisted.Assets.Single(x => x.AssetKind == TemplateAssetKind.Thumbnail).Url);
+        Assert.Equal(previewUrl, persisted.Assets.Single(x => x.AssetKind == TemplateAssetKind.FeedLoopLow).Url);
+        Assert.Equal(previewUrl, persisted.Assets.Single(x => x.AssetKind == TemplateAssetKind.DetailPreview).Url);
+    }
+
+    [Fact]
     public async Task UpdateImageAsync_ShouldRetryPreviewChange_WhenFirstSaveHitsConcurrency()
     {
         var concurrency = new OneShotConcurrencyInterceptor();
@@ -794,6 +847,65 @@ public sealed partial class TemplatesServiceTests
         Assert.True(updated.IsSuccess);
         Assert.Single(storage.DeletedUrls);
         Assert.Equal("http://localhost:5000/templates-media/2026/05/reference.mp4", storage.DeletedUrls[0]);
+    }
+
+    [Fact]
+    public async Task UpdateVideoAsync_ShouldKeepExistingReference_WhenKeepReferenceMotionAssetIsRequested()
+    {
+        await using var dbContext = CreateDbContext();
+        var storage = new RecordingMediaStorage();
+        var service = CreateService(dbContext, storage);
+        const string previewUrl = "http://localhost:5000/templates-media/2026/05/keep-preview.mp4";
+        const string referenceUrl = "http://localhost:5000/templates-media/2026/05/keep-reference.mp4";
+
+        var created = await service.CreateVideoAsync(
+            new CreateVideoTemplateCommand(
+                "Viral Dance",
+                "Funny dance template",
+                "Dance",
+                ["viral", "dance"],
+                true,
+                60,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                "Meme soundtrack",
+                CreatePreviewAsset(previewUrl, "keep-preview.mp4", "video/mp4"),
+                CreateReferenceAsset(9.8, referenceUrl),
+                "openai/gpt-image-2/edit",
+                "keep pet",
+                "fal-ai/kling-video/v3/pro/motion-control",
+                "funny dance",
+                true),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+
+        var updated = await service.UpdateVideoAsync(
+            new UpdateVideoTemplateCommand(
+                created.Value.TemplateId,
+                "Viral Dance updated",
+                "Funny dance template",
+                "Dance",
+                ["viral", "dance"],
+                true,
+                60,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                "Meme soundtrack",
+                null,
+                null,
+                "openai/gpt-image-2/edit",
+                "keep pet",
+                "fal-ai/kling-video/v3/pro/motion-control",
+                "funny dance",
+                true,
+                KeepPreviewAsset: true,
+                KeepReferenceMotionAsset: true),
+            CancellationToken.None);
+
+        Assert.True(updated.IsSuccess);
+        Assert.Equal(previewUrl, updated.Value.PreviewAsset?.Url);
+        Assert.Equal(referenceUrl, updated.Value.ReferenceMotionAsset?.Url);
+        Assert.Equal(9.8, updated.Value.ReferenceVideoDurationSeconds);
+        Assert.Empty(storage.DeletedUrls);
     }
 
     [Fact]

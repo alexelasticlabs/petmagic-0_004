@@ -79,7 +79,7 @@ public static partial class AdminEconomyEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.RefundAdminPurchaseAsync(command, cancellationToken);
@@ -120,7 +120,7 @@ public static partial class AdminEconomyEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.AdminRevokePremiumSubscriptionAsync(command, cancellationToken);
@@ -270,7 +270,7 @@ public static partial class AdminEconomyEndpoints
         {
             return TypedResults.ValidationProblem(new Dictionary<string, string[]>
             {
-                ["resolutionNote"] = ["Resolution note is required."]
+                ["resolutionNote"] = ["economy.incident_resolution_note_required"]
             });
         }
 
@@ -293,7 +293,7 @@ public static partial class AdminEconomyEndpoints
         {
             return TypedResults.ValidationProblem(new Dictionary<string, string[]>
             {
-                ["reason"] = ["Reason is required."]
+                ["reason"] = ["economy.incident_reopen_reason_required"]
             });
         }
 
@@ -322,7 +322,7 @@ public static partial class AdminEconomyEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.ApplyAdminEconomyIncidentActionAsync(command, cancellationToken);
@@ -353,7 +353,7 @@ public static partial class AdminEconomyEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.UpdateCurrencyPackAsync(command, cancellationToken);
@@ -388,7 +388,7 @@ public static partial class AdminEconomyEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.UpdateSubscriptionPlanAsync(command, cancellationToken);

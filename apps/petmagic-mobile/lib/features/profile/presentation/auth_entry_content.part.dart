@@ -225,10 +225,10 @@ class _AuthFlowContentSection extends StatelessWidget {
               minimumSize: Size.fromHeight(compactLayout ? 52 : 54),
               padding: EdgeInsets.symmetric(vertical: compactLayout ? 13 : 14),
               backgroundColor: colors.accent,
-              foregroundColor: isDark ? const Color(0xFF03130C) : Colors.white,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
               disabledBackgroundColor: isDark
                   ? colors.surfaceStrong.withValues(alpha: 0.78)
-                  : const Color(0xFFD6E2DC),
+                  : colors.surfaceStrong.withValues(alpha: 0.62),
               disabledForegroundColor: colors.textMuted,
               shadowColor: colors.accent.withValues(
                 alpha: isDark ? 0.22 : 0.28,

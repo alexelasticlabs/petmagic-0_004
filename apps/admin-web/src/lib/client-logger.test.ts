@@ -113,4 +113,21 @@ describe("clientLogger", () => {
     expect(serialized).not.toContain("AKIA-raw-credential");
     expect(serialized).not.toContain("raw-signature");
   });
+
+  it("sanitizes event names before writing console labels and payloads", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    clientLogger.warn("support token=raw-secret alice@example.com", {
+      status: 500,
+    });
+
+    expect(warnSpy).toHaveBeenCalledOnce();
+    const [label, payload] = warnSpy.mock.calls[0] ?? [];
+    const serialized = JSON.stringify({ label, payload });
+
+    expect(serialized).not.toContain("raw-secret");
+    expect(serialized).not.toContain("alice@example.com");
+    expect(serialized).toContain("[client:redacted]");
+    expect(serialized).toContain('"event":"redacted"');
+  });
 });

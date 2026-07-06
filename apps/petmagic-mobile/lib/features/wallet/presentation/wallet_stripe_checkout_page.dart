@@ -49,9 +49,12 @@ class _WalletStripeCheckoutPageState
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final localeTag = Localizations.localeOf(context).toLanguageTag();
     final price = NumberFormat.simpleCurrency(
+      locale: localeTag,
       name: widget.pack.currencyCode,
     ).format(widget.pack.priceAmount);
+    final submitForegroundColor = Theme.of(context).colorScheme.onPrimary;
     final hasInternet = ref.watch(
       networkStatusControllerProvider.select((status) => status.hasInternet),
     );
@@ -118,17 +121,18 @@ class _WalletStripeCheckoutPageState
                 onPressed: canSubmit ? _submit : null,
                 style: FilledButton.styleFrom(
                   backgroundColor: context.petMagicColors.accent,
+                  foregroundColor: submitForegroundColor,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
                 icon: _isSubmitting
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 16,
                         height: 16,
                         child: CircularProgressIndicator(
                           strokeWidth: 2.5,
-                          color: Colors.white,
+                          color: submitForegroundColor,
                         ),
                       )
                     : const Icon(Icons.lock_outline_rounded, size: 20),

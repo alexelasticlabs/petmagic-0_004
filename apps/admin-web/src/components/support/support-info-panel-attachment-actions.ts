@@ -24,6 +24,19 @@ function downloadSupportInfoBlobUrl(objectUrl: string, fileName: string): void {
   link.remove();
 }
 
+function scheduleSupportInfoBlobUrlRevoke(objectUrl: string, delayMs: number): void {
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), delayMs);
+}
+
+function revokeSupportInfoBlobUrlOnFailure(objectUrl: string, action: () => void): void {
+  try {
+    action();
+  } catch (error) {
+    URL.revokeObjectURL(objectUrl);
+    throw error;
+  }
+}
+
 function formatSupportInfoLogText(value: string | null | undefined, maxLength = 80) {
   return value ? sanitizeSensitiveText(value, maxLength) : undefined;
 }
@@ -126,14 +139,16 @@ export function useSupportInfoPanelAttachmentActions({
 
       const blob = await response.blob();
       const objectUrl = URL.createObjectURL(blob);
-      const opened = window.open(objectUrl, "_blank", "noopener,noreferrer");
-      if (!opened) {
-        downloadSupportInfoBlobUrl(objectUrl, formatSafeSupportDownloadName(attachment.fileName));
-        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-        return;
-      }
+      revokeSupportInfoBlobUrlOnFailure(objectUrl, () => {
+        const opened = window.open(objectUrl, "_blank", "noopener,noreferrer");
+        if (!opened) {
+          downloadSupportInfoBlobUrl(objectUrl, formatSafeSupportDownloadName(attachment.fileName));
+          scheduleSupportInfoBlobUrlRevoke(objectUrl, 1000);
+          return;
+        }
 
-      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+        scheduleSupportInfoBlobUrlRevoke(objectUrl, 60_000);
+      });
     } catch (error) {
       if (controller.signal.aborted) {
         return;

@@ -320,10 +320,11 @@ public sealed class StoreSubscriptionVerifierCorrelationTests
 
         var entry = Assert.Single(logger.Entries, x => x.LogLevel == LogLevel.Warning);
         Assert.Contains("Store product verification failed.", entry.Message, StringComparison.Ordinal);
-        Assert.Contains("Provider=google_play", entry.Message, StringComparison.Ordinal);
-        Assert.Contains("Operation=product_verify", entry.Message, StringComparison.Ordinal);
-        Assert.Contains("VerificationDataKind=token", entry.Message, StringComparison.Ordinal);
-        Assert.Contains("PurchaseId=GPA.***4567", entry.Message, StringComparison.Ordinal);
+        Assert.Equal("google_play", entry.Properties["Provider"]);
+        Assert.Equal("product_verify", entry.Properties["Operation"]);
+        Assert.Equal("token", entry.Properties["VerificationDataKind"]);
+        Assert.Equal("GPA.***4567", entry.Properties["PurchaseIdSafe"]);
+        Assert.False(entry.Properties.ContainsKey("PurchaseId"));
         Assert.DoesNotContain(purchaseId, entry.Message, StringComparison.Ordinal);
         Assert.DoesNotContain(verificationData, entry.Message, StringComparison.Ordinal);
     }
@@ -361,11 +362,12 @@ public sealed class StoreSubscriptionVerifierCorrelationTests
 
         var entry = Assert.Single(logger.Entries, x => x.LogLevel == LogLevel.Warning);
         Assert.Contains("Store subscription verification failed.", entry.Message, StringComparison.Ordinal);
-        Assert.Contains("Provider=app_store", entry.Message, StringComparison.Ordinal);
-        Assert.Contains("Operation=subscription_verify", entry.Message, StringComparison.Ordinal);
-        Assert.Contains("Endpoint=production", entry.Message, StringComparison.Ordinal);
-        Assert.Contains("VerificationDataKind=receipt", entry.Message, StringComparison.Ordinal);
-        Assert.Contains("PurchaseId=1000***7890", entry.Message, StringComparison.Ordinal);
+        Assert.Equal("app_store", entry.Properties["Provider"]);
+        Assert.Equal("subscription_verify", entry.Properties["Operation"]);
+        Assert.Equal("production", entry.Properties["Endpoint"]);
+        Assert.Equal("receipt", entry.Properties["VerificationDataKind"]);
+        Assert.Equal("1000***7890", entry.Properties["PurchaseIdSafe"]);
+        Assert.False(entry.Properties.ContainsKey("PurchaseId"));
         Assert.DoesNotContain(purchaseId, entry.Message, StringComparison.Ordinal);
         Assert.DoesNotContain(verificationData, entry.Message, StringComparison.Ordinal);
     }
@@ -555,11 +557,18 @@ public sealed class StoreSubscriptionVerifierCorrelationTests
             Exception? exception,
             Func<TState, Exception?, string> formatter)
         {
-            Entries.Add(new CapturedLogEntry(logLevel, formatter(state, exception), exception));
+            var properties = state is IEnumerable<KeyValuePair<string, object?>> values
+                ? values.ToDictionary(x => x.Key, x => x.Value)
+                : new Dictionary<string, object?>();
+            Entries.Add(new CapturedLogEntry(logLevel, formatter(state, exception), exception, properties));
         }
     }
 
-    private sealed record CapturedLogEntry(LogLevel LogLevel, string Message, Exception? Exception);
+    private sealed record CapturedLogEntry(
+        LogLevel LogLevel,
+        string Message,
+        Exception? Exception,
+        IReadOnlyDictionary<string, object?> Properties);
 
     private sealed class NullScope : IDisposable
     {

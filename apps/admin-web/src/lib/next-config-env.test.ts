@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { apiImageRemotePatterns } from "../../next.config";
 
 const adminDockerfilePath = fileURLToPath(new URL("../../Dockerfile", import.meta.url));
+const adminRootLayoutPath = fileURLToPath(new URL("../app/layout.tsx", import.meta.url));
 const adminEnvExamplePath = fileURLToPath(new URL("../../.env.example", import.meta.url));
 const adminDevEnvExamplePath = fileURLToPath(
   new URL("../../.env.development.example", import.meta.url)
@@ -16,7 +17,15 @@ const adminProductionEnvExamplePath = fileURLToPath(
   new URL("../../.env.production.example", import.meta.url)
 );
 const rootEnvExamplePath = fileURLToPath(new URL("../../../../.env.example", import.meta.url));
-const rootDockerComposePath = fileURLToPath(new URL("../../../../docker-compose.yml", import.meta.url));
+const rootLocalSmokeEnvExamplePath = fileURLToPath(
+  new URL("../../../../.env.local-smoke.example", import.meta.url)
+);
+const rootStagingEnvExamplePath = fileURLToPath(
+  new URL("../../../../.env.staging.local.example", import.meta.url)
+);
+const rootDockerComposePath = fileURLToPath(
+  new URL("../../../../docker-compose.yml", import.meta.url)
+);
 
 function readActiveEnvLines(path: string): string[] {
   return readFileSync(path, "utf8")
@@ -32,15 +41,21 @@ describe("next admin env config", () => {
     );
   });
 
-  it("rejects localhost and non-HTTPS production API URLs", () => {
+  it("rejects local/private and non-HTTPS production API URLs", () => {
     expect(() => apiImageRemotePatterns("http://localhost:5000", "production")).toThrow(
-      /localhost/
+      /local or private/
     );
     expect(() => apiImageRemotePatterns("https://[::1]:5000", "production")).toThrow(
-      /localhost/
+      /local or private/
     );
     expect(() => apiImageRemotePatterns("https://0.0.0.0:5000", "production")).toThrow(
-      /localhost/
+      /local or private/
+    );
+    expect(() => apiImageRemotePatterns("https://192.168.1.20:5000", "production")).toThrow(
+      /local or private/
+    );
+    expect(() => apiImageRemotePatterns("https://backend:5000", "production")).toThrow(
+      /local or private/
     );
     expect(() => apiImageRemotePatterns("http://api.example.com", "production")).toThrow(/HTTPS/);
   });
@@ -97,8 +112,14 @@ describe("next admin env config", () => {
 
     expect(dockerfile).toContain("RUN npm run build");
     expect(dockerfile).toContain('CMD ["npm", "run", "start"');
-    expect(dockerfile).not.toContain("npm\", \"run\", \"dev");
+    expect(dockerfile).not.toContain('npm", "run", "dev');
     expect(dockerfile).not.toContain("next dev");
+  });
+
+  it("keeps production builds independent from Google Fonts network fetches", () => {
+    const rootLayout = readFileSync(adminRootLayoutPath, "utf8");
+
+    expect(rootLayout).not.toContain("next/font/google");
   });
 
   it("keeps active root env example values free of localhost frontend defaults", () => {
@@ -128,8 +149,8 @@ describe("next admin env config", () => {
       "INTERNAL_API_BASE_URL=http://localhost:5001",
     ]);
     expect(stagingLines).toEqual([
-      "NEXT_PUBLIC_API_BASE_URL=https://api-staging.petmagic.app",
-      "INTERNAL_API_BASE_URL=https://api-staging.petmagic.app",
+      "NEXT_PUBLIC_API_BASE_URL=https://api.staging.petmagic.app",
+      "INTERNAL_API_BASE_URL=https://api.staging.petmagic.app",
     ]);
     expect(productionLines).toEqual([
       "NEXT_PUBLIC_API_BASE_URL=https://api.petmagic.app",
@@ -142,17 +163,48 @@ describe("next admin env config", () => {
     );
   });
 
+  it("keeps admin and root staging API hosts aligned", () => {
+    const adminStagingLines = readActiveEnvLines(adminStagingEnvExamplePath);
+    const rootStagingLines = readActiveEnvLines(rootStagingEnvExamplePath);
+
+    const adminPublicApiBaseUrl = adminStagingLines.find((line) =>
+      line.startsWith("NEXT_PUBLIC_API_BASE_URL=")
+    );
+    const rootPublicApiBaseUrl = rootStagingLines.find((line) =>
+      line.startsWith("NEXT_PUBLIC_API_BASE_URL=")
+    );
+
+    expect(adminPublicApiBaseUrl).toBe(rootPublicApiBaseUrl);
+  });
+
   it("passes admin API URLs into docker build without local production defaults", () => {
     const compose = readFileSync(rootDockerComposePath, "utf8");
 
     expect(compose).toContain("args:");
     expect(compose).toContain("NEXT_PUBLIC_API_BASE_URL:");
     expect(compose).toContain("INTERNAL_API_BASE_URL:");
-    expect(compose).not.toContain('NEXT_PUBLIC_API_BASE_URL:-http://localhost:5000');
+    expect(compose).not.toContain("NEXT_PUBLIC_API_BASE_URL:-http://localhost:5000");
     expect(compose).not.toContain("INTERNAL_API_BASE_URL:-http://backend:5000");
     expect(compose).not.toContain("INTERNAL_API_BASE_URL:-http://localhost:5000");
     expect(compose).not.toContain("BACKEND_PUBLIC_BASE_URL:-http://localhost:5000");
+    expect(compose).not.toContain('ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION: "true"');
+    expect(compose).not.toContain('NEXT_PUBLIC_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION: "true"');
+    expect(compose).toContain("ADMIN_WEB_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION:-false");
     expect(compose).toContain("BACKEND_PUBLIC_BASE_URL is required for public backend media URLs");
     expect(compose).toContain("BACKEND_PUBLIC_BASE_URL is required for public template media URLs");
+  });
+
+  it("points Docker local-smoke server calls at the compose backend service", () => {
+    const localSmokeLines = readActiveEnvLines(rootLocalSmokeEnvExamplePath);
+
+    expect(localSmokeLines).toContain("ASPNETCORE_ENVIRONMENT=Development");
+    expect(localSmokeLines).toContain("DOTNET_ENVIRONMENT=Development");
+    expect(localSmokeLines).toContain(
+      "DATA_PROTECTION_CERTIFICATE_PASSWORD=replace_with_local_smoke_data_protection_password"
+    );
+    expect(localSmokeLines).toContain("NEXT_PUBLIC_API_BASE_URL=http://localhost:5601");
+    expect(localSmokeLines).toContain("INTERNAL_API_BASE_URL=http://backend:5000");
+    expect(localSmokeLines).toContain("ADMIN_WEB_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION=true");
+    expect(localSmokeLines.join("\n")).not.toContain("INTERNAL_API_BASE_URL=http://api:5000");
   });
 });

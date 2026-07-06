@@ -1,5 +1,8 @@
 part of 'pet_generation_launch_sheet.dart';
 
+const int _petLaunchSelectedPhotoPreviewCacheWidth = 760;
+const int _petLaunchPhotoThumbnailCacheWidth = 180;
+
 class _PetLaunchTemplatePreview extends StatelessWidget {
   const _PetLaunchTemplatePreview({required this.template});
 
@@ -58,9 +61,10 @@ class _PetLaunchSelectedPhotoPreview extends StatelessWidget {
               if (imageUrl != null)
                 CachedNetworkImage(
                   imageUrl: imageUrl,
-                  cacheKey: persistentSafeProfileAvatarUrl(imageUrl),
+                  cacheKey: persistentSafeGenerationMediaUrl(imageUrl),
                   fit: BoxFit.cover,
-                  memCacheWidth: 760,
+                  memCacheWidth: _petLaunchSelectedPhotoPreviewCacheWidth,
+                  maxWidthDiskCache: _petLaunchSelectedPhotoPreviewCacheWidth,
                   filterQuality: FilterQuality.medium,
                   placeholder: (_, _) => _PetLaunchMagicFallback(iconSize: 34),
                   errorWidget: (_, _, _) =>
@@ -165,9 +169,10 @@ class _PetLaunchPhotoThumbnail extends StatelessWidget {
               ? _PetLaunchMagicFallback(iconSize: 20)
               : CachedNetworkImage(
                   imageUrl: imageUrl,
-                  cacheKey: persistentSafeProfileAvatarUrl(imageUrl),
+                  cacheKey: persistentSafeGenerationMediaUrl(imageUrl),
                   fit: BoxFit.cover,
-                  memCacheWidth: 180,
+                  memCacheWidth: _petLaunchPhotoThumbnailCacheWidth,
+                  maxWidthDiskCache: _petLaunchPhotoThumbnailCacheWidth,
                   filterQuality: FilterQuality.medium,
                   placeholder: (_, _) => _PetLaunchMagicFallback(iconSize: 20),
                   errorWidget: (_, _, _) =>

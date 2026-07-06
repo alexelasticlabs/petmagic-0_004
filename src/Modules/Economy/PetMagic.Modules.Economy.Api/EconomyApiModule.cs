@@ -15,7 +15,6 @@ public static class EconomyApiModule
     {
         services.AddScoped<IValidator<ClaimWeeklyGrantCommand>, ClaimWeeklyGrantCommandValidator>();
         services.AddScoped<IValidator<ClaimAdRewardCommand>, ClaimAdRewardCommandValidator>();
-        services.AddScoped<IValidator<SpendBalanceCommand>, SpendBalanceCommandValidator>();
         services.AddScoped<IValidator<CreditBalanceCommand>, CreditBalanceCommandValidator>();
         services.AddScoped<IValidator<CreatePackPurchaseCommand>, CreatePackPurchaseCommandValidator>();
         services.AddScoped<IValidator<CreatePremiumCheckoutCommand>, CreatePremiumCheckoutCommandValidator>();

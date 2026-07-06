@@ -925,7 +925,7 @@ public sealed partial class EconomyService
             Reason = NormalizeIncidentResolutionNote(reason) ?? string.Empty,
             OldStatus = oldStatus,
             NewStatus = newStatus,
-            DetailsJson = details is null ? null : Truncate(JsonSerializer.Serialize(details), 4000),
+            DetailsJson = SerializeSafeIncidentDetails(details, maxChars: 4000),
             CreatedAtUtc = DateTime.UtcNow
         });
 
@@ -998,7 +998,14 @@ public sealed partial class EconomyService
         return normalized.Length <= 120 ? normalized : normalized[..120];
     }
 
-    private static string? SanitizeWebhookPayloadSnapshot(string? payloadJson)
+    private static string? SerializeSafeIncidentDetails(object? details, int maxChars)
+    {
+        return details is null
+            ? null
+            : SanitizeWebhookPayloadSnapshot(JsonSerializer.Serialize(details), maxChars);
+    }
+
+    private static string? SanitizeWebhookPayloadSnapshot(string? payloadJson, int maxChars = 4000)
     {
         if (string.IsNullOrWhiteSpace(payloadJson))
         {
@@ -1009,11 +1016,11 @@ public sealed partial class EconomyService
         {
             using var document = JsonDocument.Parse(payloadJson);
             var sanitized = SanitizeJsonElement(document.RootElement, depth: 0);
-            return Truncate(JsonSerializer.Serialize(sanitized), 4000);
+            return Truncate(JsonSerializer.Serialize(sanitized), maxChars);
         }
         catch (JsonException)
         {
-            return Truncate(payloadJson, 500);
+            return SafeLogValues.SanitizeText(payloadJson, Math.Min(maxChars, 500));
         }
     }
 
@@ -1038,7 +1045,7 @@ public sealed partial class EconomyService
                 .Select(value => SanitizeJsonElement(value, depth + 1))
                 .ToArray(),
             JsonValueKind.String => Truncate(element.GetString(), 240),
-            JsonValueKind.Number => element.GetRawText(),
+            JsonValueKind.Number => SanitizeJsonNumber(element),
             JsonValueKind.True => true,
             JsonValueKind.False => false,
             _ => null
@@ -1058,6 +1065,21 @@ public sealed partial class EconomyService
             || normalized.Contains("signedpayload", StringComparison.Ordinal)
             || normalized.Contains("signedtransaction", StringComparison.Ordinal)
             || normalized.Contains("raw", StringComparison.Ordinal);
+    }
+
+    private static object SanitizeJsonNumber(JsonElement element)
+    {
+        if (element.TryGetInt64(out var longValue))
+        {
+            return longValue;
+        }
+
+        if (element.TryGetDecimal(out var decimalValue))
+        {
+            return decimalValue;
+        }
+
+        return element.GetDouble();
     }
 
     private static string? Truncate(string? value, int maxLength)

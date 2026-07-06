@@ -64,9 +64,10 @@ public sealed partial class SupportChatEndpointsIntegrationTests
             openResponse.Messages,
             message => message.SenderType == "User" && message.Body == "Need help with premium");
 
-        var fetched = await GetFromJsonAsync<SupportConversationDetailResponse>(
-            application.CreateClient(UserId, "User"),
-            "/api/support/conversation");
+        using var fetchedResponse = await application.CreateClient(UserId, "User").GetAsync("/api/support/conversation");
+        await AssertSuccessAsync(fetchedResponse);
+        AssertPrivateSupportResponseHeaders(fetchedResponse);
+        var fetched = (await fetchedResponse.Content.ReadFromJsonAsync<SupportConversationDetailResponse>(JsonOptions))!;
 
         Assert.Equal(openResponse.ConversationId, fetched.ConversationId);
         Assert.Contains(
@@ -125,9 +126,10 @@ public sealed partial class SupportChatEndpointsIntegrationTests
         using var regularUserInbox = await application.CreateClient(UserId, "User").GetAsync("/api/admin/support/tickets");
         Assert.Equal(HttpStatusCode.Forbidden, regularUserInbox.StatusCode);
 
-        var moderatorInbox = await GetFromJsonAsync<SupportConversationInboxPageResponse>(
-            application.CreateClient(ModeratorId, "Moderator"),
-            "/api/admin/support/tickets");
+        using var moderatorInboxResponse = await application.CreateClient(ModeratorId, "Moderator").GetAsync("/api/admin/support/tickets");
+        await AssertSuccessAsync(moderatorInboxResponse);
+        AssertPrivateSupportResponseHeaders(moderatorInboxResponse);
+        var moderatorInbox = (await moderatorInboxResponse.Content.ReadFromJsonAsync<SupportConversationInboxPageResponse>(JsonOptions))!;
 
         Assert.Equal(1, moderatorInbox.TotalCount);
         Assert.False(moderatorInbox.HasMore);
@@ -544,6 +546,14 @@ public sealed partial class SupportChatEndpointsIntegrationTests
         return (await response.Content.ReadFromJsonAsync<TResponse>(JsonOptions))!;
     }
 
+    private static void AssertPrivateSupportResponseHeaders(HttpResponseMessage response)
+    {
+        Assert.Equal("no-store", response.Headers.CacheControl?.ToString());
+        Assert.Contains(response.Headers.Pragma, value => string.Equals(value.Name, "no-cache", StringComparison.OrdinalIgnoreCase));
+        Assert.True(response.Headers.TryGetValues("X-Content-Type-Options", out var contentTypeOptions));
+        Assert.Contains("nosniff", contentTypeOptions);
+    }
+
     private static async Task AssertSuccessAsync(HttpResponseMessage response)
     {
         if (response.IsSuccessStatusCode)
@@ -572,6 +582,7 @@ public sealed partial class SupportChatEndpointsIntegrationTests
         private const string TestJwtIssuer = "petmagic-support-chat-tests";
         private const string TestJwtAudience = "petmagic-support-chat-tests";
         private const string TestJwtSigningKey = "support-chat-tests-jwt-signing-key-64-bytes-minimum-secret-value";
+        private const string LocalSupportAttachmentPublicBaseUrl = "http://localhost:5000";
 
         private readonly WebApplication app;
 
@@ -663,7 +674,10 @@ public sealed partial class SupportChatEndpointsIntegrationTests
             });
             builder.Services.AddSingleton<ISupportAttachmentReadUrlSigner, SupportAttachmentReadUrlSigner>();
             builder.Services.AddSingleton<ISupportChatPushNotificationSender, NoopSupportChatPushNotificationSender>();
-            builder.Services.AddSingleton(new SupportAttachmentStorageOptions());
+            builder.Services.AddSingleton(new SupportAttachmentStorageOptions
+            {
+                PublicBaseUrl = LocalSupportAttachmentPublicBaseUrl
+            });
             builder.Services.AddScoped<SupportChatService>();
             builder.Services.AddScoped<ISupportChatService>(serviceProvider => serviceProvider.GetRequiredService<SupportChatService>());
             builder.Services.AddScoped<ISupportReplyTemplateCatalogService, SupportReplyTemplateCatalogService>();
@@ -987,6 +1001,28 @@ public sealed partial class SupportChatEndpointsIntegrationTests
 
         public int StoreCallCount { get; private set; }
         public int DeleteCallCount { get; private set; }
+        private string? nextStoreFailureCode;
+
+        public void FailNextStore(string errorCode)
+        {
+            nextStoreFailureCode = errorCode;
+        }
+
+        public long? ResolveMaxFileSizeBytes(string declaredContentType)
+        {
+            var normalizedContentType = NormalizeContentType(declaredContentType);
+            if (normalizedContentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase))
+            {
+                return 50L * 1024 * 1024;
+            }
+
+            if (normalizedContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+            {
+                return 10L * 1024 * 1024;
+            }
+
+            return null;
+        }
 
         public Task<Result> DeleteAsync(string? attachmentUrl, CancellationToken cancellationToken)
         {
@@ -999,6 +1035,13 @@ public sealed partial class SupportChatEndpointsIntegrationTests
             CancellationToken cancellationToken)
         {
             StoreCallCount++;
+            if (!string.IsNullOrWhiteSpace(nextStoreFailureCode))
+            {
+                var failureCode = nextStoreFailureCode;
+                nextStoreFailureCode = null;
+                return Task.FromResult(Result.Failure<StoredSupportAttachmentResponse>(
+                    new Error(failureCode, "Storage failed.")));
+            }
 
             var normalizedContentType = NormalizeContentType(attachment.ContentType);
             if (!AllowedContentTypes.Contains(normalizedContentType))

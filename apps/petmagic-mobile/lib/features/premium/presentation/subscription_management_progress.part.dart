@@ -14,7 +14,7 @@ class _TokenGrantProgressBar extends StatefulWidget {
 }
 
 class _TokenGrantProgressBarState extends State<_TokenGrantProgressBar>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController _controller;
   late Animation<double> _progressAnim;
   Timer? _ticker;
@@ -34,6 +34,7 @@ class _TokenGrantProgressBarState extends State<_TokenGrantProgressBar>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
@@ -48,19 +49,96 @@ class _TokenGrantProgressBarState extends State<_TokenGrantProgressBar>
       }
     });
     _controller.forward();
+  }
 
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncTickerWithVisibility();
+  }
+
+  @override
+  void didUpdateWidget(covariant _TokenGrantProgressBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.nextGrantUtc != widget.nextGrantUtc) {
+      _ticker?.cancel();
+      _now = DateTime.now().toUtc();
+      _scheduleNextTick();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
       if (mounted) {
         setState(() => _now = DateTime.now().toUtc());
       }
-    });
+      _syncTickerWithVisibility();
+      return;
+    }
+
+    _ticker?.cancel();
+    _ticker = null;
   }
 
   @override
   void dispose() {
-    _controller.dispose();
     _ticker?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    _controller.dispose();
     super.dispose();
+  }
+
+  void _syncTickerWithVisibility() {
+    _ticker?.cancel();
+    _ticker = null;
+    _scheduleNextTick();
+  }
+
+  void _scheduleNextTick() {
+    _ticker?.cancel();
+    _ticker = null;
+    if (!_shouldRunTicker()) {
+      return;
+    }
+
+    final interval = _nextTickInterval();
+    if (interval == null) {
+      return;
+    }
+
+    _ticker = Timer(interval, () {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() => _now = DateTime.now().toUtc());
+      _scheduleNextTick();
+    });
+  }
+
+  Duration? _nextTickInterval() {
+    final next = widget.nextGrantUtc;
+    if (next == null) {
+      return null;
+    }
+
+    final remaining = next.difference(_now);
+    if (remaining <= Duration.zero) {
+      return null;
+    }
+
+    if (remaining > const Duration(hours: 1)) {
+      return const Duration(minutes: 1);
+    }
+
+    return const Duration(seconds: 1);
+  }
+
+  bool _shouldRunTicker() {
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    return TickerMode.valuesOf(context).enabled &&
+        (lifecycle == null || lifecycle == AppLifecycleState.resumed);
   }
 
   String _buildCountdown(AppLocalizations text) {

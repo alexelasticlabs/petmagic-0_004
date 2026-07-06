@@ -28,13 +28,17 @@ npm run build
 - `src/app/[locale]` - локализованные routes и общий `AdminShell` layout.
 - `src/components/admin` - shell, sidebar, topbar, icons и reusable admin primitives.
 - `src/components/templates` - catalog, categories и editor-компоненты для image/video templates.
-- `src/lib/api-client.ts` - единственный frontend API-клиент к backend.
+- `src/lib/api-client*.ts` - доменные HTTP API-клиенты и типы для backend; прямой DB-доступ запрещён guard-тестом.
 - `src/lib/admin-navigation.ts` - nav items, active matching, locale path switching и page meta.
 - `src/lib/i18n.ts` - RU/EN словари интерфейса.
 
 ## UI Rules
 
-См. [../../md/ADMIN_STYLE_GUIDE.md](../../md/ADMIN_STYLE_GUIDE.md) перед добавлением новых вкладок, таблиц, карточек, форм или глобальных стилей.
+См. [../../docs/md/ADMIN_STYLE_GUIDE.md](../../docs/md/ADMIN_STYLE_GUIDE.md) перед добавлением новых вкладок, таблиц, карточек, форм или глобальных стилей.
+Правила локализации и light/dark theme зафиксированы в
+[../../docs/localization-and-theme.md](../../docs/localization-and-theme.md).
+Новый пользовательский текст добавляйте через typed dictionaries в
+`src/lib/i18n.*.ts`, а цвета - через существующие CSS tokens/theme helpers.
 
 ## Validation
 

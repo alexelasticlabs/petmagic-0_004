@@ -5,6 +5,8 @@ export type Locale = (typeof locales)[number];
 export const defaultLocale: Locale = "ru";
 
 export type Dictionary = {
+  adminMetadataTitle: string;
+  adminMetadataDescription: string;
   loginTitle: string;
   loginHint: string;
   emailLabel: string;
@@ -35,6 +37,7 @@ export type Dictionary = {
   openLabel: string;
   emailConfirmedLabel: string;
   createdAtLabel: string;
+  userIdLabel: string;
   userDetailOpen: string;
   userInlineAnalyticsTitle: string;
   userInlineAnalyticsDescription: string;
@@ -278,7 +281,6 @@ export type Dictionary = {
   deactivate: string;
   archive: string;
   moveToDraft: string;
-  makePremium: string;
   removePremium: string;
   assignModerator: string;
   revokeModerator: string;
@@ -303,10 +305,19 @@ export type Dictionary = {
   promoBadgeLabel: string;
   promoBadgeAutoLabel: string;
   promoBadgeAutoHint: string;
+  promoBadgeAutoBadge: string;
+  promoBadgeNewLabel: string;
   promoBadgeNewHint: string;
+  promoBadgeNewBadge: string;
+  promoBadgeTrendingLabel: string;
   promoBadgeTrendingHint: string;
+  promoBadgeTrendingBadge: string;
+  promoBadgePopularLabel: string;
   promoBadgePopularHint: string;
+  promoBadgePopularBadge: string;
+  promoBadgeFunnyLabel: string;
   promoBadgeFunnyHint: string;
+  promoBadgeFunnyBadge: string;
   tagsLabel: string;
   tokenCostLabel: string;
   previewAssetTitle: string;
@@ -321,12 +332,23 @@ export type Dictionary = {
   referenceUrlLabel: string;
   referenceDurationLabel: string;
   characterOrientationLabel: string;
+  preprocessingModelEyebrow: string;
   preprocessingModelLabel: string;
   preprocessingPromptLabel: string;
+  imageModelEyebrow: string;
   imageModelLabel: string;
   imagePromptLabel: string;
+  klingModelEyebrow: string;
   klingModelLabel: string;
   klingPromptLabel: string;
+  modelBadgeRecommended: string;
+  modelBadgePremium: string;
+  modelBadgeFast: string;
+  motionModelPremiumDescription: string;
+  motionModelFastDescription: string;
+  imageModelRecommendedDescription: string;
+  imageModelPremiumDescription: string;
+  imageModelFastDescription: string;
   keepOriginalSoundLabel: string;
   computedValueHint: string;
   saveTemplate: string;

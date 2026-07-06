@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -35,6 +36,44 @@ void main() {
           contains('"profileNotificationsDeviceMicrophone"'),
           reason: '$path is missing profileNotificationsDeviceMicrophone',
         );
+      }
+    },
+  );
+
+  test(
+    'profile notification status copy does not advertise future controls',
+    () async {
+      const arbFiles = <String>[
+        'lib/l10n/app_en.arb',
+        'lib/l10n/app_ru.arb',
+        'lib/l10n/app_de.arb',
+        'lib/l10n/app_es.arb',
+        'lib/l10n/app_fr.arb',
+        'lib/l10n/app_it.arb',
+        'lib/l10n/app_pl.arb',
+      ];
+      final unfinishedCopyPattern = RegExp(
+        r'(will appear|appear here|later|sp[aä]ter|más adelante|plus tard|in seguito|później|позже)',
+        caseSensitive: false,
+      );
+
+      for (final path in arbFiles) {
+        final arb =
+            jsonDecode(await File(path).readAsString()) as Map<String, Object?>;
+        for (final key in const [
+          'profileDetailsNotificationsStatusEnabled',
+          'profileDetailsNotificationsStatusDisabled',
+          'profileDetailsNotificationsNext',
+        ]) {
+          final value = arb[key] as String?;
+          expect(value, isNotNull, reason: '$path is missing $key');
+          expect(
+            value,
+            isNot(matches(unfinishedCopyPattern)),
+            reason:
+                '$path $key should describe the current notification state.',
+          );
+        }
       }
     },
   );

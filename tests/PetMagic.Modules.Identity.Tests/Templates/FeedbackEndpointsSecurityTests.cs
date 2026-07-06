@@ -17,12 +17,15 @@ public sealed class FeedbackEndpointsSecurityTests
         Assert.Contains("private static ProblemHttpResult ToProblem(Error error)", source, StringComparison.Ordinal);
         Assert.Contains("\"templates.invalid_subject\" => StatusCodes.Status401Unauthorized", source, StringComparison.Ordinal);
         Assert.Contains("\"feedback.refund_unavailable\" => StatusCodes.Status409Conflict", source, StringComparison.Ordinal);
-        Assert.Contains("\"Authentication failed.\"", source, StringComparison.Ordinal);
-        Assert.Contains("\"Feedback refund is not available.\"", source, StringComparison.Ordinal);
-        Assert.Contains("\"Feedback refund amount is invalid.\"", source, StringComparison.Ordinal);
-        Assert.Contains("detail: GetProblemDetail(error.Code, statusCode)", source, StringComparison.Ordinal);
-        Assert.Contains("private static string GetProblemDetail(string errorCode, int statusCode)", source, StringComparison.Ordinal);
+        Assert.Contains("extensions: BuildProblemExtensions(error.Code)", source, StringComparison.Ordinal);
+        Assert.Contains("private static Dictionary<string, object?> BuildProblemExtensions(string errorCode)", source, StringComparison.Ordinal);
+        Assert.Contains("[\"code\"] = errorCode", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Invalid access token subject.", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Feedback refund is not available.", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Feedback refund amount is invalid.", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Feedback was submitted too frequently.", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Too many feedback requests", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("detail: GetProblemDetail", source, StringComparison.Ordinal);
         Assert.DoesNotContain("detail: error.Message", source, StringComparison.Ordinal);
         Assert.DoesNotContain("detail: subjectError.Message", source, StringComparison.Ordinal);
     }
@@ -83,6 +86,50 @@ public sealed class FeedbackEndpointsSecurityTests
         Assert.Equal(
             2,
             CountOccurrences(source, ".WithMetadata(new RequestSizeLimitAttribute(MaxAdminFeedbackMutationRequestBodyBytes));"));
+    }
+
+    [Fact]
+    public void FeedbackEndpoints_ShouldApplyPrivateCacheHeadersToAuthenticatedResponses()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Api",
+            "Endpoints",
+            "FeedbackEndpoints.cs"));
+
+        Assert.Contains("private static async ValueTask<object?> ApplyPrivateFeedbackResponseHeadersAsync", source, StringComparison.Ordinal);
+        Assert.Contains("Headers.CacheControl = \"no-store\";", source, StringComparison.Ordinal);
+        Assert.Contains("Headers.Pragma = \"no-cache\";", source, StringComparison.Ordinal);
+        Assert.Contains("Headers.XContentTypeOptions = \"nosniff\";", source, StringComparison.Ordinal);
+        Assert.Equal(3, CountOccurrences(source, ".AddEndpointFilter(ApplyPrivateFeedbackResponseHeadersAsync)"));
+        Assert.Contains(".RequireAuthorization()", source, StringComparison.Ordinal);
+        Assert.Contains(".RequireAuthorization(\"ModeratorOrAdmin\")", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FeedbackDetails_ShouldHideRefundContextFromNonAdminViewers()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Api",
+            "Endpoints",
+            "FeedbackEndpoints.cs"));
+
+        Assert.Equal(2, CountOccurrences(source, "RestrictAdminFeedbackDetailsForRole(context, result.Value)"));
+        Assert.Contains(
+            "private static AdminFeedbackDetailsResponse RestrictAdminFeedbackDetailsForRole(",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains("context.User.IsInRole(\"Admin\")", source, StringComparison.Ordinal);
+        Assert.Contains("details with { CanRefund = false, Refund = null }", source, StringComparison.Ordinal);
+        Assert.Contains("GetAdminFeedbackAsync(", source, StringComparison.Ordinal);
+        Assert.Contains("HttpContext context,", source, StringComparison.Ordinal);
     }
 
     private static string FindRepositoryRoot()

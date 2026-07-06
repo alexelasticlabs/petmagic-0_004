@@ -31,6 +31,7 @@ public sealed class TemplatesInfrastructureConfigurationTests
 
         Assert.Equal(TemplateStorageProviders.Local, options.StorageProvider);
         Assert.Equal(TemplateAiProviders.Fake, options.AiProvider);
+        Assert.Equal(string.Empty, options.PublicBaseUrl);
         Assert.False(options.SeedSampleTemplates);
         Assert.True(options.GenerationWorkerEnabled);
         Assert.Equal(1_000, options.GenerationWorkerPollIntervalMilliseconds);
@@ -308,6 +309,20 @@ public sealed class TemplatesInfrastructureConfigurationTests
     }
 
     [Fact]
+    public void AddTemplatesInfrastructure_ShouldConfigureGeneratedMediaHttpClient_WhenUsingFakeProvider()
+    {
+        var services = CreateServices();
+        var configuration = CreateConfiguration([]);
+
+        services.AddTemplatesInfrastructure(configuration);
+
+        using var provider = services.BuildServiceProvider();
+        var httpClientFactory = provider.GetRequiredService<IHttpClientFactory>();
+
+        Assert.Equal(TimeSpan.FromSeconds(30), httpClientFactory.CreateClient(HttpGeneratedMediaImporter.HttpClientName).Timeout);
+    }
+
+    [Fact]
     public void TemplateHttpClientsThatProbeMedia_ShouldNotFollowRedirects()
     {
         var source = File.ReadAllText(Path.Combine(
@@ -351,6 +366,213 @@ public sealed class TemplatesInfrastructureConfigurationTests
             Assert.Contains("SafeNetworkTargetPolicy.IsPrivateNetworkTarget", source, StringComparison.Ordinal);
             Assert.DoesNotContain("static bool IsPrivateNetworkAddress", source, StringComparison.Ordinal);
             Assert.DoesNotContain("IPAddress.TryParse", source, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void TemplateExternalAndRealtimeLogs_ShouldNotSerializeRawExceptions()
+    {
+        var root = FindRepositoryRoot();
+        foreach (var relativePath in new[]
+        {
+            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Api", "FalWebhookSignatureVerifier.cs"),
+            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "FalProviderHealthService.cs"),
+            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "TemplateFeedRealtimeService.cs"),
+            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "TemplateGenerationJobProcessor.ProviderPipeline.cs"),
+            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "TemplateMediaCleanupWorker.cs")
+        })
+        {
+            var source = File.ReadAllText(Path.Combine(root, relativePath));
+
+            Assert.DoesNotContain("LogWarning(exception", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("LogError(exception", source, StringComparison.Ordinal);
+            Assert.Contains("ExceptionType={ExceptionType}", source, StringComparison.Ordinal);
+            Assert.Contains("SafeLogValues.ExceptionType(exception)", source, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void FalWebhookJwksFailureLogs_ShouldSanitizeConfiguredUrl()
+    {
+        var root = FindRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Api",
+            "FalWebhookSignatureVerifier.cs"));
+
+        Assert.Contains("JwksUrl={JwksUrl}", source, StringComparison.Ordinal);
+        Assert.Contains("SafeLogValues.SanitizeText(jwksUrl)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("JwksUrl={jwksUrl}", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TemplateExternalJsonReads_ShouldBeBounded()
+    {
+        var root = FindRepositoryRoot();
+        foreach (var relativePath in new[]
+        {
+            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Api", "FalWebhookSignatureVerifier.cs"),
+            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "FalProviderHealthService.cs"),
+            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "TemplateLocalizationTranslator.cs")
+        })
+        {
+            var source = File.ReadAllText(Path.Combine(root, relativePath));
+
+            Assert.Contains("HttpCompletionOption.ResponseHeadersRead", source, StringComparison.Ordinal);
+            Assert.Contains("SafeHttpContentReader.ReadRawStringPrefixAsync(", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("JsonDocument.ParseAsync(stream", source, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void TemplateMediaProcessingLogs_ShouldNotSerializeRawExceptionsOrRawToolOutput()
+    {
+        var root = FindRepositoryRoot();
+        foreach (var relativePath in new[]
+        {
+            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "FileMediaMetadataReader.cs"),
+            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "HttpGeneratedMediaImporter.cs"),
+            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "ImagePreviewGenerator.cs"),
+            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "VideoThumbnailGenerator.cs"),
+            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "TemplateWatermarkRenderer.cs"),
+            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "TemplateMediaTempFiles.cs")
+        })
+        {
+            var source = File.ReadAllText(Path.Combine(root, relativePath));
+
+            Assert.DoesNotContain("LogWarning(\r\n                exception,", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("LogWarning(\r\n                    exception,", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("LogWarning(\r\n                ex,", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("ErrorPreview", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("ReadToEndAsync(cancellationToken)", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("FileName={FileName}", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("GenerationId={GenerationId}", source, StringComparison.Ordinal);
+            Assert.Contains("ExceptionType={ExceptionType}", source, StringComparison.Ordinal);
+            Assert.Contains("SafeLogValues.ExceptionType(exception)", source, StringComparison.Ordinal);
+
+            if (sourceFileNeedsProcessDrainContract(relativePath))
+            {
+                Assert.Contains("ProcessOutputDrainer.", source, StringComparison.Ordinal);
+            }
+        }
+
+        static bool sourceFileNeedsProcessDrainContract(string path)
+        {
+            return path.EndsWith("VideoThumbnailGenerator.cs", StringComparison.Ordinal)
+                || path.EndsWith("TemplateWatermarkRenderer.cs", StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void TemplateGenerationJobProcessorLogs_ShouldNotExposeRawSensitiveIdentifiers()
+    {
+        var root = FindRepositoryRoot();
+        var processorRoot = Path.Combine(
+            root,
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Infrastructure");
+        var sources = Directory
+            .EnumerateFiles(processorRoot, "TemplateGenerationJobProcessor*.cs", SearchOption.TopDirectoryOnly)
+            .Select(File.ReadAllText)
+            .ToArray();
+
+        Assert.NotEmpty(sources);
+
+        foreach (var source in sources)
+        {
+            Assert.DoesNotContain("JobId={JobId}", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("UserId={UserId}", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("TemplateId={TemplateId}", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("GenerationId={GenerationId}", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("PreprocessingProviderRequestId={PreprocessingProviderRequestId}", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("MotionProviderRequestId={MotionProviderRequestId}", source, StringComparison.Ordinal);
+        }
+
+        var combinedSource = string.Concat(sources);
+        Assert.Contains("JobIdHash={JobIdHash}", combinedSource, StringComparison.Ordinal);
+        Assert.Contains("UserIdHash={UserIdHash}", combinedSource, StringComparison.Ordinal);
+        Assert.Contains("TemplateIdHash={TemplateIdHash}", combinedSource, StringComparison.Ordinal);
+        Assert.Contains("GenerationIdHash={GenerationIdHash}", combinedSource, StringComparison.Ordinal);
+        Assert.Contains("PreprocessingProviderRequestIdHash={PreprocessingProviderRequestIdHash}", combinedSource, StringComparison.Ordinal);
+        Assert.Contains("MotionProviderRequestIdHash={MotionProviderRequestIdHash}", combinedSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TemplateGenerationServiceLogs_ShouldNotExposeRawSensitiveIdentifiers()
+    {
+        var root = FindRepositoryRoot();
+        foreach (var relativePath in new[]
+        {
+            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "TemplateGenerationService.Admin.cs"),
+            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "TemplateGenerationService.Cancellation.cs"),
+            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "TemplateGenerationService.Visibility.cs"),
+            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "TemplateGenerationService.Watermark.cs")
+        })
+        {
+            var source = File.ReadAllText(Path.Combine(root, relativePath));
+
+            Assert.DoesNotContain("AdminUserId={AdminUserId}", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("UserId={UserId}", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("GenerationId={GenerationId}", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("TemplateId={TemplateId}", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("CorrelationId={CorrelationId}", source, StringComparison.Ordinal);
+            Assert.Contains("Hash={", source, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void TemplateThumbnailProcesses_ShouldDrainRedirectedOutput()
+    {
+        var root = FindRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Infrastructure",
+            "PetsService.Thumbnails.cs"));
+
+        Assert.Contains("RedirectStandardError = true", source, StringComparison.Ordinal);
+        Assert.Contains("RedirectStandardOutput = true", source, StringComparison.Ordinal);
+        Assert.Contains("ProcessOutputDrainer.DrainAsync(process.StandardError, cancellationToken)", source, StringComparison.Ordinal);
+        Assert.Contains("ProcessOutputDrainer.DrainAsync(process.StandardOutput, cancellationToken)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ReadToEndAsync(cancellationToken)", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TemplatesInfrastructureLogs_ShouldNotSerializeRawExceptions()
+    {
+        var root = FindRepositoryRoot();
+        var infrastructureRoot = Path.Combine(
+            root,
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Infrastructure");
+        var sourceFiles = Directory
+            .EnumerateFiles(infrastructureRoot, "*.cs", SearchOption.AllDirectories)
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}Data{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.NotEmpty(sourceFiles);
+
+        foreach (var sourceFile in sourceFiles)
+        {
+            var source = File.ReadAllText(sourceFile);
+            Assert.DoesNotContain("LogWarning(\r\n                ex,", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("LogWarning(\r\n                    ex,", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("LogWarning(\r\n                exception,", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("LogWarning(\r\n                    exception,", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("LogError(\r\n                ex,", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("LogError(\r\n                    ex,", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("LogError(\r\n                exception,", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("LogError(\r\n                    exception,", source, StringComparison.Ordinal);
         }
     }
 
@@ -620,6 +842,8 @@ public sealed class TemplatesInfrastructureConfigurationTests
     [InlineData("http://localhost:5000")]
     [InlineData("https://127.0.0.1:5000")]
     [InlineData("https://[::1]:5000")]
+    [InlineData("https://10.0.0.5/templates")]
+    [InlineData("https://169.254.169.254/templates")]
     [InlineData("https://cdn.petmagic.app/templates?token=secret")]
     public void AddTemplatesInfrastructure_ShouldRejectUnsafePublicBaseUrl_InProduction(string publicBaseUrl)
     {
@@ -650,6 +874,8 @@ public sealed class TemplatesInfrastructureConfigurationTests
     [Theory]
     [InlineData("http://localhost:5000")]
     [InlineData("https://127.0.0.1:5000")]
+    [InlineData("https://10.0.0.5/r2")]
+    [InlineData("https://169.254.169.254/r2")]
     [InlineData("https://cdn.petmagic.app/r2#assets")]
     public void AddTemplatesInfrastructure_ShouldRejectUnsafeR2PublicBaseUrl_InProduction(string r2PublicBaseUrl)
     {
@@ -675,6 +901,39 @@ public sealed class TemplatesInfrastructureConfigurationTests
         var exception = Assert.Throws<InvalidOperationException>(() => services.AddTemplatesInfrastructure(configuration, environment));
 
         Assert.Contains("Templates:R2:PublicBaseUrl", exception.Message);
+    }
+
+    [Theory]
+    [InlineData("http://queue.fal.run")]
+    [InlineData("https://localhost:5000")]
+    [InlineData("https://10.0.0.5/fal")]
+    [InlineData("https://169.254.169.254/fal")]
+    [InlineData("https://queue.fal.run?token=secret")]
+    public void AddTemplatesInfrastructure_ShouldRejectUnsafeFalQueueBaseUrl_InProduction(string queueBaseUrl)
+    {
+        var services = CreateServices();
+        services.AddScoped<IEconomyService>(_ => throw new NotSupportedException("Test stub"));
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["Templates:PublicBaseUrl"] = "https://cdn.petmagic.app/templates",
+            ["Templates:StorageProvider"] = TemplateStorageProviders.R2,
+            ["Templates:AiProvider"] = TemplateAiProviders.Fal,
+            ["Templates:R2:AccountId"] = "test-account",
+            ["Templates:R2:AccessKey"] = "test-access-key",
+            ["Templates:R2:SecretKey"] = "test-secret-key",
+            ["Templates:R2:BucketName"] = "petmagic-test",
+            ["Templates:R2:PublicBaseUrl"] = "https://cdn.petmagic.app/r2",
+            ["Templates:Fal:ApiKey"] = "test-fal-key",
+            ["Templates:Fal:QueueBaseUrl"] = queueBaseUrl
+        });
+        var environment = new TestHostEnvironment(Directory.GetCurrentDirectory())
+        {
+            EnvironmentName = Environments.Production
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(() => services.AddTemplatesInfrastructure(configuration, environment));
+
+        Assert.Contains("Templates:Fal:QueueBaseUrl", exception.Message);
     }
 
     [Fact]
@@ -772,7 +1031,7 @@ public sealed class TemplatesInfrastructureConfigurationTests
         var defaults = new Dictionary<string, string?>
         {
             ["ConnectionStrings:DefaultConnection"] = "Host=localhost;Database=petmagic_tests;Username=test;Password=test",
-            ["Templates:PublicBaseUrl"] = "http://localhost:5000",
+            ["Templates:PublicBaseUrl"] = string.Empty,
             ["Templates:LocalMediaRootPath"] = "wwwroot/templates-media"
         };
 

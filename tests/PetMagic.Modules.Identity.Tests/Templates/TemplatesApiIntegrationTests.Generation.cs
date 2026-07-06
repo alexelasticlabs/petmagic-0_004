@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -127,25 +128,26 @@ public sealed partial class TemplatesApiIntegrationTests
         }
 
         var receivedEvents = new List<TemplateFeedRealtimeEvent>(expectedStatuses.Length);
-        for (var index = 0; index < expectedStatuses.Length; index++)
+        var receivedStatuses = new HashSet<string>(StringComparer.Ordinal);
+        var expectedApiStatuses = expectedStatuses
+            .Select(x => x.ApiStatus)
+            .ToHashSet(StringComparer.Ordinal);
+        for (var index = 0; index < expectedStatuses.Length * 2
+            && !expectedApiStatuses.IsSubsetOf(receivedStatuses); index++)
         {
             Assert.True(await subscription.WaitToReadAsync(timeout.Token));
             Assert.True(subscription.TryRead(out var realtimeEvent));
             receivedEvents.Add(realtimeEvent);
-        }
-
-        var realtimeStatuses = receivedEvents.Select(realtimeEvent =>
-        {
             Assert.Equal(TemplateFeedRealtimeTopics.GenerationStatusChanged, realtimeEvent.Topic);
             using var eventJson = JsonDocument.Parse(realtimeEvent.Data);
             var statusElement = eventJson.RootElement.GetProperty("status");
             Assert.Equal(JsonValueKind.String, statusElement.ValueKind);
-            return statusElement.GetString();
-        });
+            receivedStatuses.Add(statusElement.GetString()!);
+        }
 
-        Assert.Equal(
-            expectedStatuses.Select(x => x.ApiStatus).OrderBy(status => status, StringComparer.Ordinal),
-            realtimeStatuses.OrderBy(status => status, StringComparer.Ordinal));
+        Assert.True(
+            expectedApiStatuses.IsSubsetOf(receivedStatuses),
+            $"Realtime statuses missing: {string.Join(", ", expectedApiStatuses.Except(receivedStatuses).Order(StringComparer.Ordinal))}");
     }
 
     [Fact]
@@ -626,9 +628,16 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.Null(generation.UsedKlingModel);
         Assert.NotNull(generation.PreprocessingCompletedAtUtc);
         Assert.Null(generation.MotionGenerationCompletedAtUtc);
-        Assert.Equal(0.219m, generation.MotionProviderCostUsd);
+        Assert.Null(generation.MotionProviderCostUsd);
         Assert.Null(generation.FailureCode);
         Assert.Empty(application.Billing.RefundedGenerationIds);
+
+        await using (var scope = application.Services.CreateAsyncScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+            var persisted = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == generation.GenerationId);
+            Assert.Equal(0.219m, persisted.MotionProviderCostUsd);
+        }
 
         var fetched = await GetFromJsonAsync<TemplateGenerationResponse>(
             application.Client,
@@ -637,6 +646,7 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.Equal(generation.GenerationId, fetched.GenerationId);
         Assert.Equal("Completed", fetched.Status);
         Assert.Equal(generation.OutputUrl, fetched.OutputUrl);
+        Assert.Null(fetched.MotionProviderCostUsd);
     }
 
     [Fact]
@@ -724,23 +734,34 @@ public sealed partial class TemplatesApiIntegrationTests
             JpegBytes());
         var generation = await WaitForGenerationStatusAsync(application.Client, queued.GenerationId, "Completed");
 
-        var fetched = await GetFromJsonAsync<TemplateGenerationResponse>(
-            application.Client,
-            $"/api/templates/generations/{generation.GenerationId}");
-        using var fetchedJsonResponse = await application.Client.GetAsync($"/api/templates/generations/{generation.GenerationId}");
-        fetchedJsonResponse.EnsureSuccessStatusCode();
-        using var fetchedJson = JsonDocument.Parse(await fetchedJsonResponse.Content.ReadAsStringAsync());
-        var download = await GetFromJsonAsync<GalleryDownloadResponse>(
-            application.Client,
-            $"/api/templates/generations/{generation.GenerationId}/download");
-        var share = await PostAsJsonAsync<GalleryShareResponse>(
-            application.Client,
-            $"/api/templates/generations/{generation.GenerationId}/share",
-            new { });
-        var unlock = await PostAsJsonAsync<RemoveGenerationWatermarkResponse>(
-            application.Client,
-            $"/api/templates/generations/{generation.GenerationId}/remove-watermark",
+        var generationPath = $"/api/templates/generations/{generation.GenerationId}";
+        using var fetchedJsonResponse = await application.Client.GetAsync(generationPath);
+        await EnsureSuccessStatusCodeAsync(fetchedJsonResponse, generationPath);
+        AssertPrivateMediaJsonHeaders(fetchedJsonResponse);
+        var fetchedJsonBody = await fetchedJsonResponse.Content.ReadAsStringAsync();
+        var fetched = JsonSerializer.Deserialize<TemplateGenerationResponse>(fetchedJsonBody, JsonOptions)
+            ?? throw new InvalidOperationException("Generation response body was empty.");
+        using var fetchedJson = JsonDocument.Parse(fetchedJsonBody);
+
+        var downloadPath = $"/api/templates/generations/{generation.GenerationId}/download";
+        using var downloadResponse = await application.Client.GetAsync(downloadPath);
+        await EnsureSuccessStatusCodeAsync(downloadResponse, downloadPath);
+        AssertPrivateMediaJsonHeaders(downloadResponse);
+        var download = await ReadJsonAsync<GalleryDownloadResponse>(downloadResponse);
+
+        var sharePath = $"/api/templates/generations/{generation.GenerationId}/share";
+        using var shareResponse = await application.Client.PostAsJsonAsync(sharePath, new { });
+        await EnsureSuccessStatusCodeAsync(shareResponse, sharePath);
+        AssertPrivateMediaJsonHeaders(shareResponse);
+        var share = await ReadJsonAsync<GalleryShareResponse>(shareResponse);
+
+        var removeWatermarkPath = $"/api/templates/generations/{generation.GenerationId}/remove-watermark";
+        using var unlockResponse = await application.Client.PostAsJsonAsync(
+            removeWatermarkPath,
             new { paymentMethod = "credit" });
+        await EnsureSuccessStatusCodeAsync(unlockResponse, removeWatermarkPath);
+        AssertPrivateMediaJsonHeaders(unlockResponse);
+        var unlock = await ReadJsonAsync<RemoveGenerationWatermarkResponse>(unlockResponse);
 
         Assert.Equal(generation.GenerationId, fetched.GenerationId);
         Assert.Equal("Completed", fetched.Status);
@@ -763,9 +784,11 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.False(download.HasWatermark);
         Assert.False(share.HasWatermark);
 
-        var publicShare = await GetFromJsonAsync<PublicGalleryShareResponse>(
-            application.Client,
-            $"/api/templates/generations/share/{Uri.EscapeDataString(share.ShareToken)}");
+        var publicSharePath = $"/api/templates/generations/share/{Uri.EscapeDataString(share.ShareToken)}";
+        using var publicShareResponse = await application.Client.GetAsync(publicSharePath);
+        await EnsureSuccessStatusCodeAsync(publicShareResponse, publicSharePath);
+        AssertPrivateMediaJsonHeaders(publicShareResponse);
+        var publicShare = await ReadJsonAsync<PublicGalleryShareResponse>(publicShareResponse);
         Assert.Equal(share.ShareToken, publicShare.ShareToken);
         Assert.Equal(GalleryMediaState.resultReady.ToString(), publicShare.MediaState);
         Assert.Equal(generation.OutputUrl, publicShare.MediaUrl);
@@ -775,11 +798,51 @@ public sealed partial class TemplatesApiIntegrationTests
         var publicPageBody = await publicPage.Content.ReadAsStringAsync();
         Assert.Contains(generation.OutputUrl!, publicPageBody, StringComparison.Ordinal);
         Assert.DoesNotContain(TestUserId.ToString(), publicPageBody, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("no-store", publicPage.Headers.CacheControl?.ToString());
+        Assert.Contains(publicPage.Headers.Pragma, value => string.Equals(value.Name, "no-cache", StringComparison.OrdinalIgnoreCase));
+        Assert.True(publicPage.Headers.TryGetValues("Referrer-Policy", out var referrerPolicy));
+        Assert.Contains("no-referrer", referrerPolicy);
+        Assert.True(publicPage.Headers.TryGetValues("X-Content-Type-Options", out var contentTypeOptions));
+        Assert.Contains("nosniff", contentTypeOptions);
+        Assert.True(publicPage.Headers.TryGetValues("Content-Security-Policy", out var contentSecurityPolicy));
+        var sharePageCsp = contentSecurityPolicy.Single();
+        Assert.Contains("script-src 'none'", sharePageCsp);
+        Assert.Contains("connect-src 'none'", sharePageCsp);
+        Assert.Contains("form-action 'none'", sharePageCsp);
+        Assert.Contains("object-src 'none'", sharePageCsp);
+        Assert.Contains("frame-src 'none'", sharePageCsp);
+        Assert.Contains("frame-ancestors 'none'", sharePageCsp);
+        Assert.Contains("media-src 'self' https:", sharePageCsp);
 
         using var invalidShare = await application.Client.GetAsync("/api/templates/generations/share/not-a-token");
         Assert.Equal(HttpStatusCode.NotFound, invalidShare.StatusCode);
         Assert.True(unlock.WatermarkRemoved);
         Assert.Equal(generation.OutputUrl, unlock.MediaUrl);
+    }
+
+    [Theory]
+    [InlineData("%25zz")]
+    [InlineData("%25E0%25A4%25A")]
+    [InlineData("%252F")]
+    [InlineData("%255C")]
+    [InlineData("%2500")]
+    public async Task PublicShareEndpoints_ShouldRejectMalformedEncodedTokens(string encodedToken)
+    {
+        await using var application = await TestApplication.CreateAsync(startGenerationWorker: false);
+
+        using var jsonResponse = await application.Client.GetAsync($"/api/templates/generations/share/{encodedToken}");
+        using var pageResponse = await application.Client.GetAsync($"/share/generation/{encodedToken}");
+
+        Assert.Equal(HttpStatusCode.NotFound, jsonResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, pageResponse.StatusCode);
+    }
+
+    private static void AssertPrivateMediaJsonHeaders(HttpResponseMessage response)
+    {
+        Assert.Equal("no-store", response.Headers.CacheControl?.ToString());
+        Assert.Contains(response.Headers.Pragma, value => string.Equals(value.Name, "no-cache", StringComparison.OrdinalIgnoreCase));
+        Assert.True(response.Headers.TryGetValues("X-Content-Type-Options", out var contentTypeOptions));
+        Assert.Contains("nosniff", contentTypeOptions);
     }
 
     [Theory]

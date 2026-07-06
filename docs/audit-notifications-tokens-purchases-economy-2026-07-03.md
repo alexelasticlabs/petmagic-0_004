@@ -2,15 +2,16 @@
 
 Дата аудита: 2026-07-03  
 Режим: статический аудит текущего dirty worktree без изменения бизнес-кода  
+Обновлено: 2026-07-03 в рамках release-hardening после внедрения durable generation billing command, reconciliation indexes и повторного backend/admin validation.
 Область: backend, mobile, admin-web, БД, контракты, уведомления, токены, покупки, контроль экономики
 
 ## 1. Краткий вывод
 
-Система экономики уже имеет много production-механизмов: отдельный модуль `Economy`, ledger, уникальные ключи идемпотентности, serializable-транзакции для wallet mutations, webhook dedupe, push-token storage, admin-инциденты, reconciliation worker и typed API boundary для admin-web. Это сильная база.
+Система экономики уже имеет много production-механизмов: отдельный модуль `Economy`, ledger, уникальные ключи идемпотентности, serializable-транзакции для wallet mutations, webhook dedupe, push-token storage, admin-инциденты, reconciliation worker, durable generation billing command и typed API boundary для admin-web. Это сильная база.
 
-Главный production-блокер остается на межмодульной границе Templates -> Economy: generation job сохраняется в Templates DB, затем токены списываются через Economy, и только после этого в Templates DB проставляется `ChargedAtUtc`. Это не единая атомарная операция. Если списание успешно, а запись `ChargedAtUtc` не сохранилась, воркеры и refund-логика могут не увидеть задание как оплаченное. Факт подтвержден в `src/Modules/Templates/PetMagic.Modules.Templates.Infrastructure/TemplateGenerationService.StartUserUpload.cs:147`, `:166`, `:180-182` и `src/Modules/Templates/PetMagic.Modules.Templates.Infrastructure/EconomyTemplateGenerationBilling.cs:10-22`.
+Старый production-блокер на межмодульной границе Templates -> Economy больше не описывается как незакрытая primary-path дыра: generation job и `TemplateGenerationBillingCommand` теперь сохраняются вместе в Templates DB, charge settlement вынесен в retryable command flow, а Economy charge остается идемпотентным по stable generation reason. Если процесс падает после списания, повторная обработка command должна восстановить `ChargedAtUtc`, а reconciliation дополнительно создает incident для `GenerationChargeMarkerMissing` и дает operator action `restore_generation_charge_marker` или `refund_generation_spend`. Текущие факты: `src/Modules/Templates/PetMagic.Modules.Templates.Infrastructure/TemplateGenerationService.StartUserUpload.cs:143`, `TemplateGenerationService.Billing.cs`, `TemplateGenerationBillingReconciliationService.cs`, `EconomyService.Reconciliation.cs`, `EconomyService.IncidentTooling.cs`.
 
-Второй важный риск: реальные внешние провайдеры не проверены этим аудитом. Stripe, Google Play Billing, App Store Server API, FCM, реальные push-токены, deep links и покупки требуют sandbox/device validation перед production-выводом. В коде есть контуры обработки, но результат провайдера без credentials и устройства остается `needs verification`.
+Главный оставшийся production-блокер: реальные внешние провайдеры не проверены этим аудитом. Stripe, Google Play Billing, App Store Server API, FCM, реальные push-токены, deep links и покупки требуют sandbox/device validation перед production-выводом. В коде есть контуры обработки, но результат провайдера без credentials и устройства остается `needs verification`.
 
 ## 2. Проверенные факты
 
@@ -68,17 +69,19 @@ flowchart TD
 ```mermaid
 flowchart TD
   A["Mobile generation start"] --> B["Templates API creates TemplateGenerationJob"]
-  B --> C["Templates DB SaveChanges"]
-  C --> D["Economy billing ChargeAsync"]
+  B --> C["Templates DB saves job + TemplateGenerationBillingCommand"]
+  C --> D["Billing command settlement calls Economy ChargeAsync"]
   D --> E["Economy SpendAsync ledger debit"]
-  E --> F["Templates DB sets ChargedAtUtc"]
+  E --> F["Templates marks command succeeded + sets ChargedAtUtc"]
   F --> G["Generation worker processes charged job"]
   G --> H{"Terminal status"}
   H --> I["Completed: push + history"]
   H --> J["Failed/Cancelled: refund retry"]
+  D --> K["Retry command after crash/failure"]
+  K --> D
 ```
 
-Риск: шаги C, D, F не являются одной транзакцией. Economy DB защищает ledger, но Templates DB не получает гарантированное подтверждение оплаты. Это главный gap для токенов.
+Граница все еще cross-module и не является одной DB-транзакцией, но primary path теперь защищен durable billing command + idempotent Economy debit. Reconciliation остается обязательной safety net: она ищет spend без `ChargedAtUtc`, charged job без ledger, missing refunds, duplicate ledger mutations и stale unpaid generations.
 
 ## 4. Endpoint inventory
 
@@ -90,7 +93,6 @@ flowchart TD
 | `GET /api/economy/wallet/ledger` | Ledger пользователя | Auth, `economy` | `EconomyEndpoints.cs:48` |
 | `POST /api/economy/wallet/claim-weekly` | Weekly grant | Auth | `EconomyEndpoints.cs:51` |
 | `POST /api/economy/wallet/claim-ad` | Ad reward | Auth | `EconomyEndpoints.cs:54` |
-| `POST /api/economy/wallet/spend` | Списание | Auth | `EconomyEndpoints.cs:57` |
 | `POST /api/economy/wallet/redeem` | Redeem code | Auth | `EconomyEndpoints.cs:61` |
 | `PUT/DELETE /api/economy/notifications/push-token` | Push token economy | Auth | `EconomyEndpoints.cs:65-69` |
 | `GET /api/economy/packs` | Token packs | Auth | `EconomyEndpoints.cs:80` |
@@ -107,14 +109,16 @@ flowchart TD
 | `POST /api/economy/webhooks/app-store` | App Store webhook | Webhook validation | `EconomyEndpoints.cs:171` |
 | `POST /api/economy/webhooks/google-play` | Google Play webhook | Webhook validation | `EconomyEndpoints.cs:182` |
 
-Legacy payment endpoints still exist:
+Legacy payment endpoints were removed after this audit found no mobile/admin consumers:
 
 - `/api/payments/stripe/token-purchase`
 - `/api/payments/stripe/subscription`
 - `/api/payments/stripe/customer-portal`
 - `/api/payments/stripe/diagnostics`
 
-Risk: если они сохранены только для backward compatibility, это нужно явно документировать и покрыть deprecation/removal plan. Если mobile/admin их уже не используют, их следует удалить после migration window.
+Canonical billing routes remain under `/api/economy/...`: purchases create/verify, premium checkout/manage/cancel, and admin-only Stripe diagnostics.
+
+Direct wallet spend is not exposed as a client API. Token spends are controlled by backend use cases such as template generation billing, watermark unlocks, and admin wallet debits.
 
 ### 4.2 Admin economy endpoints
 
@@ -264,8 +268,8 @@ Gaps:
 | Webhook event обрабатывается один раз | Есть | `ProcessedWebhookEvents` unique + claim | Runtime replay test needed |
 | Purchase paid -> wallet credited once | Частично есть | confirm flow + reconciliation | Needs sandbox provider E2E |
 | Refund -> wallet debit once or manual review | Есть в economy | refund reservation/manual review | Needs support runbook |
-| Failed/cancelled charged generation -> refund | Есть retry loop | generation worker refund queries | Межмодульная charge marker gap |
-| Job saved + charge successful + marker save failed | Не закрыто полностью | `StartUserUpload.cs:147`, `:166`, `:180-182` | Нужен outbox/saga/reconciliation |
+| Failed/cancelled charged generation -> refund | Есть retry loop | generation worker refund queries | Needs staging/provider evidence |
+| Job saved + charge successful + marker save failed | Закрыто primary path + reconciliation | durable billing command, idempotent generation spend, `GenerationChargeMarkerMissing` incident | Нужен deployed crash/reconciliation drill |
 | Push token invalid -> disabled | Есть | FCM senders disable invalid token | Needs FCM runtime test |
 | Admin never uses DB directly | Есть по admin-web | typed API client | Keep enforced by tests/lint |
 
@@ -273,15 +277,15 @@ Gaps:
 
 ### Critical
 
-1. Межмодульное списание токенов при генерации не атомарно.
-   - Где: `TemplateGenerationService.StartUserUpload.cs:147`, `:166`, `:180-182`; аналогичные start flows есть в `StartFromResult`, `StartPetAndAdmin`, `StartSimilar`.
-   - Почему критично: возможно списание в Economy без корректного `ChargedAtUtc` в Templates.
-   - Что сделать: outbox/saga с transactional command record, либо явный reconciliation `ledger GenerationSpend without charged job marker`, либо перенос charge marker в устойчивую двухфазную модель.
-
-2. Внешние provider flows не подтверждены runtime-аудитом.
+1. Внешние provider flows не подтверждены runtime-аудитом.
    - Где: Stripe webhooks/verify, Google/App Store verify, FCM.
    - Почему критично: статический код не доказывает production-ready интеграцию с sandbox credentials, signing, package/bundle ids и device behavior.
    - Что сделать: обязательный sandbox E2E checklist.
+
+2. Generation billing safety net еще не доказан на deployed staging.
+   - Где: durable command и reconciliation есть в code path, но нет provider/staging crash drill evidence.
+   - Почему критично: static/unit evidence не доказывает, что deployed workers, reconciliation interval, admin actions и alerts включены именно в production-like окружении.
+   - Что сделать: staging drill для crash-after-charge, `restore_generation_charge_marker`, `refund_generation_spend`, alert/support evidence.
 
 ### High
 
@@ -293,9 +297,9 @@ Gaps:
    - `selectedPaymentMethod` выбирает только Stripe.
    - Нужно проверить фактический UI для Google Play/App Store на Android/iOS.
 
-3. Legacy payment endpoints остаются в API.
-   - Если они реально не используются, нужен deprecation/removal plan.
-   - Если используются, нужен явный compatibility contract.
+3. External payment E2E is still not production-proven.
+   - Legacy `/api/payments/stripe/*` endpoints were removed and are covered by route absence tests.
+   - Stripe sandbox, Google Play, and App Store paid -> credited-once flows still need provider-backed evidence.
 
 ### Medium
 
@@ -313,7 +317,7 @@ Gaps:
 
 1. Нет единого developer-facing notification contract document.
 2. Нет одной схемы событий для всех push payloads.
-3. Нужно регулярно чистить legacy routes после migration windows.
+3. После каждого migration window нужен route-contract scan, чтобы не возвращались compatibility wrappers без владельца.
 
 ## 10. Тесты и валидация
 
@@ -324,7 +328,7 @@ Gaps:
 - Mobile tests: `notification_coordinator_lifecycle_test.dart`, `push_token_registrar_test.dart`, `wallet_controller_lifecycle_test.dart`, `wallet_page_test.dart`, `stripe_checkout_submit_guard_test.dart`, `store_product_availability_cache_test.dart`.
 - Admin tests: `api-client-economy-query.test.ts`, `economy-page.content.test.ts`, `users-admin-actions-hardening.test.ts`, `admin-notifications.test.ts`.
 
-В этом аудите тесты не запускались: задача была на систематизацию и статический аудит. Для release gate нужно отдельно прогнать backend tests, admin tests, Flutter tests и sandbox/manual E2E.
+Изначальный аудит был статическим. Последующий release-hardening прогнал backend/admin проверки (`dotnet test PetMagic.slnx --no-restore`, admin `npm run lint`, `npm test`, `npm run build`) и обновил выводы по generation billing. Для финального release gate все равно нужны Flutter full-suite rerun после последних mobile изменений и sandbox/manual E2E с реальными provider callbacks.
 
 ## 11. Observability и support
 
@@ -347,14 +351,13 @@ Needs verification:
 
 ### Phase 1 - Production blockers
 
-- Закрыть Templates -> Economy charge consistency.
 - Провести sandbox E2E для Stripe token pack, Stripe subscription, Google Play token pack, App Store token pack, FCM terminal generation, FCM wallet, FCM support.
+- Провести staging drill для generation billing command/reconciliation: crash-after-charge, marker restore, refund spend, duplicate prevention.
 - Зафиксировать provider credentials/package/bundle/env checks в release checklist.
 
 ### Phase 2 - Support and reconciliation
 
 - Проверить `EconomyReconciliationEnabled` на staging/prod.
-- Добавить reconciliation check для generation spends без matching charged job marker.
 - Описать support runbook для incidents.
 - Добавить admin view для связанных ledger entries/order/webhook events в одной карточке incident detail.
 
@@ -366,7 +369,7 @@ Needs verification:
 
 ### Phase 4 - Cleanup and contract hardening
 
-- Удалить или явно задокументировать legacy payment endpoints.
+- Поддерживать route-contract tests для уже удаленных legacy payment endpoints.
 - Расширить mobile ledger DTO/UI для support-critical полей.
 - Сверить redeem reward kinds между backend/admin/mobile.
 - Добавить contract tests на admin API DTOs и mobile DTO parsing.
@@ -375,13 +378,12 @@ Needs verification:
 
 | Задача | Где менять | Зачем | Definition of done | Риск |
 | --- | --- | --- | --- | --- |
-| Добавить generation charge reconciliation | Templates + Economy | Найти списания без `ChargedAtUtc` | Admin incident создается и auto/manual resolution покрыт тестами | Critical |
-| Перевести generation charge на outbox/saga | Templates infrastructure, Economy billing | Убрать неатомарную межмодульную операцию | Crash test между charge и marker не теряет деньги | Critical |
+| Staging drill generation billing reconciliation | Templates + Economy + deploy | Доказать durable command/reconciliation вне unit tests | Crash-after-charge creates/retries/restores marker or refunds idempotently; incident audit visible | Critical |
 | Sandbox E2E Stripe token pack | Backend + mobile + Stripe sandbox | Доказать paid -> credited once | Order succeeded, ledger once, push received, webhook replay ignored | Critical |
 | Sandbox E2E Google/App Store token pack | Mobile + backend provider verifiers | Доказать store purchase/restore | Native purchase credited once, restore works after reinstall | Critical |
 | Проверить FCM на устройстве | Mobile + backend | Доказать terminal push delivery | generation/wallet/support push opens safe route | High |
 | Проверить store-native UI selection | Mobile wallet UI | Убедиться, что store methods доступны | Android/iOS видят native purchase path when configured | High |
-| Документировать/deprecate legacy payment endpoints | Economy API/docs/mobile/admin | Снизить contract noise | Usage search clean or compatibility doc exists | High |
+| Удержать legacy payment endpoints удаленными | Economy API/docs/mobile/admin | Не возвращать contract noise | Route absence tests pass and usage search stays clean | High |
 | Расширить ledger response/UI | Economy DTO + mobile/admin | Улучшить support transparency | User/admin видят token kind/source/refund relation без sensitive ids | Medium |
 | Проверить deployed reconciliation config | Deployment/env/docs | Инциденты должны создаваться автоматически | `/health`/config evidence confirms worker enabled | Medium |
 | Сверить redeem reward kinds | Backend/admin/mobile | Убрать mismatch | Единственный список reward kinds покрыт tests | Medium |
@@ -389,6 +391,6 @@ Needs verification:
 
 ## 14. Итоговая оценка
 
-Economy-модуль близок к production-ready по внутренней целостности wallet/purchases: ledger, уникальные ключи, webhook dedupe, serializable retries, incidents и admin tools уже есть. Основная незакрытая зона - не внутренняя wallet-математика, а границы между доменами и внешними провайдерами: Templates -> Economy charge consistency, sandbox verification и единая поддерживаемая модель уведомлений.
+Economy-модуль близок к production-ready по внутренней целостности wallet/purchases: ledger, уникальные ключи, webhook dedupe, serializable retries, durable generation billing command, incidents и admin tools уже есть. Основная незакрытая зона - не внутренняя wallet-математика, а runtime-доказательство внешних провайдеров и deployed safety nets: sandbox verification, staging reconciliation drill, FCM/device evidence и единая поддерживаемая модель уведомлений.
 
-До production release нельзя считать систему полностью готовой без закрытия Critical пунктов и без ручного/sandbox E2E с реальными provider callbacks и устройствами.
+До production release нельзя считать систему полностью готовой без закрытия Critical пунктов и без ручного/sandbox E2E с реальными provider callbacks, устройствами и staging-доказательством generation billing reconciliation.

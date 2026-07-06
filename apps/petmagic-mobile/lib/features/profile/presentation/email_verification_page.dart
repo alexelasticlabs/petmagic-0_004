@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
+import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
@@ -40,12 +41,14 @@ class EmailVerificationRouteArgs {
   final bool startResendCooldown;
 }
 
-class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
+class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage>
+    with WidgetsBindingObserver {
   static const _resendCooldown = Duration(seconds: 60);
 
   final _codeController = TextEditingController();
   Timer? _resendCooldownTimer;
   CancelToken? _activeRequestCancelToken;
+  DateTime? _resendCooldownEndsAtUtc;
   bool _isBusy = false;
   int _resendSecondsRemaining = 0;
   String? _error;
@@ -54,6 +57,7 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (widget.startResendCooldown) {
       _startResendCooldown();
     }
@@ -62,14 +66,27 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
   @override
   void dispose() {
     _resendCooldownTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _cancelActiveRequest();
     _codeController.dispose();
     super.dispose();
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _syncResendCooldownAfterResume();
+      return;
+    }
+
+    _resendCooldownTimer?.cancel();
+    _resendCooldownTimer = null;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
     final hasInternet = ref.watch(
       networkStatusControllerProvider.select((status) => status.hasInternet),
     );
@@ -124,9 +141,9 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
               ),
             ),
             if (!hasInternet)
-              Text(offlineMessage, style: const TextStyle(color: Colors.red)),
+              Text(offlineMessage, style: TextStyle(color: colors.error)),
             if (_error != null)
-              Text(_error!, style: const TextStyle(color: Colors.red)),
+              Text(_error!, style: TextStyle(color: colors.error)),
             if (_info != null) Text(_info!),
             const SizedBox(height: 12),
             FilledButton(
@@ -183,9 +200,9 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
       _info = null;
     });
 
+    final cancelToken = _startRequestCancelToken();
     try {
       final repository = ref.read(profileRepositoryProvider);
-      final cancelToken = _startRequestCancelToken();
       final session = await repository.verifyEmailCode(
         email: widget.email,
         code: _codeController.text,
@@ -213,7 +230,7 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
         _error = _mapVerificationError(error, text);
       });
     } finally {
-      _clearActiveRequest();
+      _clearActiveRequest(cancelToken);
       if (mounted) {
         setState(() {
           _isBusy = false;
@@ -245,9 +262,9 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
       _info = null;
     });
 
+    final cancelToken = _startRequestCancelToken();
     try {
       final repository = ref.read(profileRepositoryProvider);
-      final cancelToken = _startRequestCancelToken();
       await repository.resendEmailVerificationCode(
         email: widget.email,
         cancelToken: cancelToken,
@@ -267,7 +284,7 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
         _error = _mapVerificationError(error, text);
       });
     } finally {
-      _clearActiveRequest();
+      _clearActiveRequest(cancelToken);
       if (mounted) {
         setState(() {
           _isBusy = false;
@@ -291,8 +308,10 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
     _activeRequestCancelToken = null;
   }
 
-  void _clearActiveRequest() {
-    _activeRequestCancelToken = null;
+  void _clearActiveRequest(CancelToken cancelToken) {
+    if (identical(_activeRequestCancelToken, cancelToken)) {
+      _activeRequestCancelToken = null;
+    }
   }
 
   String _mapVerificationError(Object error, AppLocalizations text) {
@@ -303,18 +322,27 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
   }
 
   void _startResendCooldown() {
+    _resendCooldownEndsAtUtc = DateTime.now().toUtc().add(_resendCooldown);
     _resendCooldownTimer?.cancel();
     setState(() {
       _resendSecondsRemaining = _resendCooldown.inSeconds;
     });
-    _resendCooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    _scheduleResendCooldownTick();
+  }
+
+  void _scheduleResendCooldownTick() {
+    _resendCooldownTimer?.cancel();
+    _resendCooldownTimer = null;
+    if (_resendSecondsRemaining <= 0) {
+      return;
+    }
+    _resendCooldownTimer = Timer(const Duration(seconds: 1), () {
       if (!mounted) {
-        timer.cancel();
         return;
       }
 
       if (_resendSecondsRemaining <= 1) {
-        timer.cancel();
+        _resendCooldownEndsAtUtc = null;
         setState(() {
           _resendSecondsRemaining = 0;
         });
@@ -324,7 +352,50 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
       setState(() {
         _resendSecondsRemaining--;
       });
+      _scheduleResendCooldownTick();
     });
+  }
+
+  void _syncResendCooldownAfterResume() {
+    final secondsRemaining = _remainingResendCooldownSeconds();
+    if (!mounted) {
+      return;
+    }
+
+    if (secondsRemaining <= 0) {
+      _resendCooldownEndsAtUtc = null;
+      _resendCooldownTimer?.cancel();
+      _resendCooldownTimer = null;
+      if (_resendSecondsRemaining != 0) {
+        setState(() {
+          _resendSecondsRemaining = 0;
+        });
+      }
+      return;
+    }
+
+    if (_resendSecondsRemaining != secondsRemaining) {
+      setState(() {
+        _resendSecondsRemaining = secondsRemaining;
+      });
+    }
+    _scheduleResendCooldownTick();
+  }
+
+  int _remainingResendCooldownSeconds() {
+    final endsAt = _resendCooldownEndsAtUtc;
+    if (endsAt == null) {
+      return 0;
+    }
+
+    final millisecondsRemaining = endsAt
+        .difference(DateTime.now().toUtc())
+        .inMilliseconds;
+    if (millisecondsRemaining <= 0) {
+      return 0;
+    }
+
+    return (millisecondsRemaining + 999) ~/ 1000;
   }
 
   String _resendButtonLabel(AppLocalizations text) {

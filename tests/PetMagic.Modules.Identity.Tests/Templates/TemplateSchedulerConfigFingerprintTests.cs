@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -130,6 +131,7 @@ public sealed class TemplateSchedulerConfigFingerprintTests
 
         Assert.True(runtimeState.Snapshot.Initialized);
         Assert.False(runtimeState.Snapshot.IsMismatchDetected);
+        await startupService.StopAsync(CancellationToken.None);
         await using var verificationScope = provider.CreateAsyncScope();
         var verificationDbContext = verificationScope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
         var latestApi = await verificationDbContext.TemplateRuntimeConfigFingerprints
@@ -137,6 +139,130 @@ public sealed class TemplateSchedulerConfigFingerprintTests
             .OrderByDescending(x => x.StartedAtUtc)
             .FirstAsync();
         Assert.False(latestApi.MismatchDetected);
+    }
+
+    [Fact]
+    public async Task StartupService_ShouldIgnoreStaleSuccessfulRows_WhenCounterpartIsNotCurrentlyAlive()
+    {
+        var services = new ServiceCollection();
+        var databaseName = $"scheduler-config-stale-success-{Guid.NewGuid():N}";
+        services.AddDbContext<TemplatesDbContext>(options => options.UseInMemoryDatabase(databaseName));
+        await using var provider = services.BuildServiceProvider();
+        var now = DateTime.UtcNow;
+        var options = CreateOptions();
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+            dbContext.TemplateRuntimeConfigFingerprints.Add(new TemplateRuntimeConfigFingerprint
+            {
+                Id = Guid.NewGuid(),
+                Component = TemplateSchedulerConfigFingerprint.GenerationWorkerComponent,
+                ProfileName = Environments.Development,
+                Checksum = "stale-successful-worker-checksum",
+                ConfigJson = "{}",
+                StartedAtUtc = now.AddMinutes(-10),
+                LastSeenAtUtc = now.AddMinutes(-10),
+                MismatchDetected = false
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        var runtimeState = new TemplateSchedulerConfigRuntimeState();
+        var startupService = new TemplateSchedulerConfigStartupService(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            options,
+            new TemplateSchedulerConfigComponent(TemplateSchedulerConfigFingerprint.ApiComponent),
+            new TestHostEnvironment(Environments.Development),
+            runtimeState,
+            NullLogger<TemplateSchedulerConfigStartupService>.Instance);
+
+        await startupService.StartAsync(CancellationToken.None);
+
+        Assert.True(runtimeState.Snapshot.Initialized);
+        Assert.False(runtimeState.Snapshot.IsMismatchDetected);
+        await startupService.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task StartupService_ShouldDetectActiveCounterpartMismatch()
+    {
+        var services = new ServiceCollection();
+        var databaseName = $"scheduler-config-active-mismatch-{Guid.NewGuid():N}";
+        services.AddDbContext<TemplatesDbContext>(options => options.UseInMemoryDatabase(databaseName));
+        await using var provider = services.BuildServiceProvider();
+        var now = DateTime.UtcNow;
+        var options = CreateOptions();
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+            dbContext.TemplateRuntimeConfigFingerprints.Add(new TemplateRuntimeConfigFingerprint
+            {
+                Id = Guid.NewGuid(),
+                Component = TemplateSchedulerConfigFingerprint.GenerationWorkerComponent,
+                ProfileName = Environments.Development,
+                Checksum = "active-worker-checksum",
+                ConfigJson = "{}",
+                StartedAtUtc = now,
+                LastSeenAtUtc = now,
+                MismatchDetected = false
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        var runtimeState = new TemplateSchedulerConfigRuntimeState();
+        var startupService = new TemplateSchedulerConfigStartupService(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            options,
+            new TemplateSchedulerConfigComponent(TemplateSchedulerConfigFingerprint.ApiComponent),
+            new TestHostEnvironment(Environments.Development),
+            runtimeState,
+            NullLogger<TemplateSchedulerConfigStartupService>.Instance);
+
+        await startupService.StartAsync(CancellationToken.None);
+
+        Assert.True(runtimeState.Snapshot.Initialized);
+        Assert.True(runtimeState.Snapshot.IsMismatchDetected);
+        Assert.Contains("active-worker-checksum", runtimeState.Snapshot.MismatchDetails, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task HealthCheck_ShouldReportApiMismatchAsDegraded()
+    {
+        var runtimeState = new TemplateSchedulerConfigRuntimeState();
+        runtimeState.MarkMismatch(
+            TemplateSchedulerConfigFingerprint.ApiComponent,
+            Environments.Development,
+            "api-checksum",
+            "current=api:api-checksum; other=generation-worker:worker-checksum; profile=Development");
+        var healthCheck = new TemplateSchedulerConfigHealthCheck(runtimeState);
+
+        var result = await healthCheck.CheckHealthAsync(new HealthCheckContext());
+
+        Assert.Equal(HealthStatus.Degraded, result.Status);
+        Assert.Equal(true, result.Data["initialized"]);
+        Assert.Equal(TemplateSchedulerConfigFingerprint.ApiComponent, result.Data["component"]);
+        Assert.Equal("api-checksum", result.Data["checksum"]);
+        Assert.Contains("worker-checksum", Assert.IsType<string>(result.Data["mismatchDetails"]), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task HealthCheck_ShouldReportGenerationWorkerMismatchAsUnhealthy()
+    {
+        var runtimeState = new TemplateSchedulerConfigRuntimeState();
+        runtimeState.MarkMismatch(
+            TemplateSchedulerConfigFingerprint.GenerationWorkerComponent,
+            Environments.Development,
+            "worker-checksum",
+            "current=generation-worker:worker-checksum; other=api:api-checksum; profile=Development");
+        var healthCheck = new TemplateSchedulerConfigHealthCheck(runtimeState);
+
+        var result = await healthCheck.CheckHealthAsync(new HealthCheckContext());
+
+        Assert.Equal(HealthStatus.Unhealthy, result.Status);
+        Assert.Equal(true, result.Data["initialized"]);
+        Assert.Equal(TemplateSchedulerConfigFingerprint.GenerationWorkerComponent, result.Data["component"]);
+        Assert.Equal("worker-checksum", result.Data["checksum"]);
+        Assert.Contains("api-checksum", Assert.IsType<string>(result.Data["mismatchDetails"]), StringComparison.Ordinal);
     }
 
     private static TemplatesOptions CreateOptions(

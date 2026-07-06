@@ -1,5 +1,6 @@
 using System.Text.Json;
 
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -8,11 +9,16 @@ using PetMagic.Modules.Identity.Infrastructure.Entities;
 
 namespace PetMagic.Modules.Identity.Api.Authentication;
 
-public sealed class ExternalAccountLinkStore(IServiceScopeFactory serviceScopeFactory)
+public sealed class ExternalAccountLinkStore(
+    IServiceScopeFactory serviceScopeFactory,
+    IDataProtectionProvider dataProtectionProvider)
 {
     private const string Purpose = "external_account_link";
     private static readonly TimeSpan TicketLifetime = TimeSpan.FromMinutes(5);
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly IDataProtector _payloadProtector = ExternalAuthTicketPayloadProtection.CreateProtector(
+        dataProtectionProvider,
+        Purpose);
 
     public async Task<string> CreateAsync(Guid userId, CancellationToken cancellationToken)
     {
@@ -25,7 +31,9 @@ public sealed class ExternalAccountLinkStore(IServiceScopeFactory serviceScopeFa
         {
             Ticket = ticket,
             Purpose = Purpose,
-            PayloadJson = JsonSerializer.Serialize(userId, JsonOptions),
+            PayloadJson = ExternalAuthTicketPayloadProtection.ProtectJson(
+                _payloadProtector,
+                JsonSerializer.Serialize(userId, JsonOptions)),
             CreatedAtUtc = now,
             ExpiresAtUtc = now.Add(TicketLifetime)
         });
@@ -56,8 +64,38 @@ public sealed class ExternalAccountLinkStore(IServiceScopeFactory serviceScopeFa
             return null;
         }
 
-        persisted.ConsumedAtUtc = now;
-        await dbContext.SaveChangesAsync(cancellationToken);
-        return JsonSerializer.Deserialize<Guid>(persisted.PayloadJson, JsonOptions);
+        var payloadJson = ExternalAuthTicketPayloadProtection.UnprotectJsonOrLegacy(
+            _payloadProtector,
+            persisted.PayloadJson);
+        Guid userId;
+        try
+        {
+            userId = JsonSerializer.Deserialize<Guid>(payloadJson, JsonOptions);
+        }
+        catch (JsonException)
+        {
+            await ConsumeAndClearAsync(dbContext, persisted, now, cancellationToken);
+            return null;
+        }
+
+        if (userId == Guid.Empty)
+        {
+            await ConsumeAndClearAsync(dbContext, persisted, now, cancellationToken);
+            return null;
+        }
+
+        await ConsumeAndClearAsync(dbContext, persisted, now, cancellationToken);
+        return userId;
+    }
+
+    private static Task ConsumeAndClearAsync(
+        IdentityDbContext dbContext,
+        ExternalAuthTicket ticket,
+        DateTime consumedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        ticket.ConsumedAtUtc = consumedAtUtc;
+        ticket.PayloadJson = "\"\"";
+        return dbContext.SaveChangesAsync(cancellationToken);
     }
 }

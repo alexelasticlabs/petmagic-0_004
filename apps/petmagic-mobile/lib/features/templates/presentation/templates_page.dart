@@ -84,8 +84,8 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
   final _scrollController = ScrollController();
   final _searchController = TextEditingController();
   final _imagePicker = ImagePicker();
-  late final TemplatesController _templatesController;
-  late final WalletController _walletController;
+  TemplatesController? _visibleTemplatesController;
+  ProviderSubscription<TemplatesState>? _templatesSubscription;
   TemplatesRepository? _activeRandomTemplateRepository;
   Timer? _searchDebounce;
   DateTime? _lastRefreshAt;
@@ -94,6 +94,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
   bool _isAppResumed = true;
   bool _isPetPhotoPickerActive = false;
   bool? _isTabActive;
+  bool _templatesScreenVisible = false;
   bool _shouldRefreshAccessOnReconnect = false;
   Future<void>? _walletAccessRefreshInFlight;
   Future<void>? _profileAccessRefreshInFlight;
@@ -113,8 +114,10 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
   @override
   void initState() {
     super.initState();
-    _templatesController = ref.read(templatesControllerProvider.notifier);
-    _walletController = ref.read(walletControllerProvider.notifier);
+    _templatesSubscription = ref.listenManual<TemplatesState>(
+      templatesControllerProvider,
+      (_, _) => _syncVisibleTemplatesController(),
+    );
     WidgetsBinding.instance.addObserver(_lifecycleObserver);
     _scrollController.addListener(_handleScroll);
     _runAfterBuild(() {
@@ -137,7 +140,8 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
   @override
   void dispose() {
     _disposed = true;
-    _templatesController.setScreenVisible(false);
+    _templatesSubscription?.close();
+    _setStoredTemplatesScreenVisible(false);
     WidgetsBinding.instance.removeObserver(_lifecycleObserver);
     _cancelPendingSearchDebounce();
     _cancelPendingRandomTemplateRequest(clearLoadingState: false);
@@ -177,7 +181,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
       ref
           .read(templateFeedPlaybackManagerProvider)
           .disposeAll(reason: 'templates_app_background');
-      _templatesController.setScreenVisible(false);
+      _setTemplatesScreenVisible(false);
     });
   }
 
@@ -203,7 +207,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
   }
 
   void _handleScreenBecameVisible({required bool fromAppResume}) {
-    _templatesController.setScreenVisible(true);
+    _setTemplatesScreenVisible(true);
     _refreshAccessForAuthenticatedUser(forceRefresh: fromAppResume);
 
     final state = ref.read(templatesControllerProvider);
@@ -240,7 +244,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
         ref
             .read(templateFeedPlaybackManagerProvider)
             .disposeAll(reason: 'templates_tab_hidden');
-        _templatesController.setScreenVisible(false);
+        _setTemplatesScreenVisible(false);
         return;
       }
 
@@ -282,9 +286,11 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
 
     final Future<void> refresh;
     if (hasHydratedWallet) {
-      refresh = _walletController.syncSnapshot(forceRefresh: forceRefresh);
+      refresh = ref
+          .read(walletControllerProvider.notifier)
+          .syncSnapshot(forceRefresh: forceRefresh);
     } else {
-      refresh = _walletController.load();
+      refresh = ref.read(walletControllerProvider.notifier).load();
     }
 
     _walletAccessRefreshInFlight = refresh;
@@ -295,6 +301,43 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
         }
       }),
     );
+  }
+
+  void _setTemplatesScreenVisible(bool visible) {
+    final controller = ref.read(templatesControllerProvider.notifier);
+    final controllerChanged = !identical(
+      _visibleTemplatesController,
+      controller,
+    );
+    if (!controllerChanged && _templatesScreenVisible == visible) {
+      return;
+    }
+
+    _templatesScreenVisible = visible;
+    if (controllerChanged) {
+      _visibleTemplatesController?.setScreenVisible(false);
+      _visibleTemplatesController = controller;
+    }
+
+    controller.setScreenVisible(visible);
+  }
+
+  void _syncVisibleTemplatesController() {
+    final controller = ref.read(templatesControllerProvider.notifier);
+    if (!identical(_visibleTemplatesController, controller)) {
+      _visibleTemplatesController?.setScreenVisible(false);
+      _visibleTemplatesController = controller;
+      controller.setScreenVisible(_templatesScreenVisible);
+    }
+  }
+
+  void _setStoredTemplatesScreenVisible(bool visible) {
+    if (_templatesScreenVisible == visible) {
+      return;
+    }
+
+    _templatesScreenVisible = visible;
+    _visibleTemplatesController?.setScreenVisible(visible);
   }
 
   void _refreshProfileAccessForAuthenticatedUser() {

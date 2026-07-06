@@ -1,6 +1,7 @@
 import { type Locale } from "@/lib/i18n";
 
 export type AdminRouteFallbackText = {
+  brandTitle: string;
   notFoundTitle: string;
   notFoundDescription: string;
   adminNotFoundActionTitle: string;
@@ -14,6 +15,7 @@ export type AdminRouteFallbackText = {
 
 const adminRouteFallbackText: Record<Locale, AdminRouteFallbackText> = {
   ru: {
+    brandTitle: "PetMagic Admin",
     notFoundTitle: "Страница не найдена",
     notFoundDescription: "Такого раздела в админ-панели нет или ссылка устарела.",
     adminNotFoundActionTitle: "Проверьте адрес страницы",
@@ -28,6 +30,7 @@ const adminRouteFallbackText: Record<Locale, AdminRouteFallbackText> = {
     retryActionLabel: "Повторить",
   },
   en: {
+    brandTitle: "PetMagic Admin",
     notFoundTitle: "Page not found",
     notFoundDescription: "This admin section does not exist or the link is no longer valid.",
     adminNotFoundActionTitle: "Check the page address",

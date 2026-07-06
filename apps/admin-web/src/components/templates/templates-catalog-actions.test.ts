@@ -29,6 +29,10 @@ describe("templates catalog actions", () => {
     expect(source).toContain("() => getTemplatesCatalogViewText(locale, templateType)");
     expect(source).not.toContain('const isRu = locale === "ru";');
     expect(contentSource).toContain("const templatesCatalogLocaleText = {");
+    expect(contentSource).toContain(
+      'templateActionsAdminOnly: "Управление шаблонами доступно только администратору."'
+    );
+    expect(contentSource.slice(0, contentSource.indexOf("  en: {"))).not.toContain("только Admin");
     expect(contentSource).toContain('sortNewestDescription: "Сначала свежие шаблоны"');
     expect(contentSource).toContain('tableTemplate: "Шаблон"');
     expect(contentSource).toContain("archiveConfirmDescription: (templateLabel: string) =>");
@@ -111,6 +115,14 @@ describe("templates catalog actions", () => {
     expect(source).toContain("description={copy.analyticsUnavailableDescription}");
     expect(contentSource).toContain(
       'analyticsUnavailableTitle: "Метрики шаблонов временно недоступны"'
+    );
+    expect(contentSource).toContain(
+      'videoDescription: "Каталог видео-шаблонов, статусы, категории и параметры доступа."'
+    );
+    expect(contentSource).toContain('qaOnlyLabel: "Только QA"');
+    expect(contentSource.slice(0, contentSource.indexOf("  en: {"))).not.toContain("QA only");
+    expect(contentSource.slice(0, contentSource.indexOf("  en: {"))).not.toContain(
+      "motion-шаблонов"
     );
     expect(contentSource).toContain(
       'analyticsUnavailableDescription:\n      "The catalog is still available, but views, generations, and error metrics may be incomplete."'

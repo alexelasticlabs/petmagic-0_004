@@ -1,3 +1,10 @@
+using System.Diagnostics;
+using System.Text.Json;
+
+using Microsoft.AspNetCore.Mvc;
+
+using PetMagic.Host.Api.Observability;
+
 namespace PetMagic.Host.Api.Middleware;
 
 public sealed class RequestDrainingMiddleware
@@ -15,18 +22,42 @@ public sealed class RequestDrainingMiddleware
     {
         if (_coordinator.IsStopping)
         {
+            var correlationId = ResolveCorrelationId(context);
+            var traceId = Activity.Current?.TraceId.ToString() ?? context.TraceIdentifier;
             context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            context.Response.ContentType = "application/problem+json";
+            context.Response.Headers[CorrelationId.HeaderName] = correlationId;
             context.Response.Headers.RetryAfter = "10";
-            await context.Response.WriteAsJsonAsync(new
+            var problem = new ProblemDetails
             {
-                type = "https://httpstatuses.com/503",
-                title = "Service Unavailable",
-                status = 503,
-                detail = "The server is shutting down. Please retry your request."
-            });
+                Status = StatusCodes.Status503ServiceUnavailable,
+                Title = "SERVICE_DRAINING",
+                Instance = RequestLogging.ResolveSafePath(context)
+            };
+            problem.Extensions["code"] = "SERVICE_DRAINING";
+            problem.Extensions["traceId"] = traceId;
+            problem.Extensions["correlationId"] = correlationId;
+
+            await JsonSerializer.SerializeAsync(
+                context.Response.Body,
+                problem,
+                new JsonSerializerOptions(JsonSerializerDefaults.Web),
+                context.RequestAborted);
             return;
         }
 
         await _next(context);
+    }
+
+    private static string ResolveCorrelationId(HttpContext context)
+    {
+        if (context.Items.TryGetValue(CorrelationId.HttpContextItemKey, out var value)
+            && value is string correlationId
+            && CorrelationId.IsValid(correlationId))
+        {
+            return correlationId;
+        }
+
+        return CorrelationId.NormalizeOrCreate(context.Request.Headers[CorrelationId.HeaderName]);
     }
 }

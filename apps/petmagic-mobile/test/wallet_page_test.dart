@@ -493,10 +493,26 @@ void main() {
       final transactionsSource = File(
         'lib/features/wallet/presentation/all_transactions_page.dart',
       ).readAsStringSync();
+      final overviewSource = File(
+        'lib/features/wallet/presentation/widgets/wallet_page_overview_chrome.part.dart',
+      ).readAsStringSync();
 
       expect(helpersSource, contains('text.premiumPaymentOther'));
       expect(helpersSource, isNot(contains('_ => method.provider')));
       expect(helpersSource, contains('text.walletSourceOther'));
+      expect(helpersSource, contains('NumberFormat.decimalPatternDigits('));
+      expect(helpersSource, contains('locale: text.localeName'));
+      expect(helpersSource, contains('decimalDigits: 1'));
+      expect(helpersSource, isNot(contains("NumberFormat('0.0')")));
+      expect(helpersSource, contains('String _formatPrice('));
+      expect(helpersSource, contains('locale: localeTag'));
+      expect(helpersSource, isNot(contains('_formatPrice(pack);')));
+      expect(overviewSource, contains('Localizations.localeOf(context)'));
+      expect(overviewSource, contains('NumberFormat.decimalPattern('));
+      expect(
+        overviewSource,
+        isNot(contains('NumberFormat.decimalPattern().format')),
+      );
       expect(transactionsSource, contains('text.walletSourceOther'));
       expect(transactionsSource, isNot(contains('_ => source')));
     },

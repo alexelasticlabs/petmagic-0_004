@@ -32,6 +32,8 @@ const _safeProfileFeedbackKeys = <String>[
   'auth.email_verification_failed',
   'auth.email_verification_resend_failed',
   'auth.request_failed',
+  'users.avatar_file_required',
+  'users.avatar_content_type_not_allowed',
   'network.unavailable',
   'network.timeout',
   'templates.network_unavailable',
@@ -138,6 +140,9 @@ String mapProfileFeedbackMessage(String raw, AppLocalizations text) {
       return text.authRequestFailed;
     case 'auth.request_failed':
       return text.authRequestFailed;
+    case 'users.avatar_file_required':
+    case 'users.avatar_content_type_not_allowed':
+      return text.profileAvatarCropError;
     case 'network.unavailable':
     case 'network.timeout':
     case 'templates.network_unavailable':

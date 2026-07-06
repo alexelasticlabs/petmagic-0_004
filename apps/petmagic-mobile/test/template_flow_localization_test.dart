@@ -49,80 +49,170 @@ void main() {
     },
   );
 
-  test(
-    'template flow premium gates use localized copy instead of ru branches',
-    () async {
-      final sheetSource = readTemplateFlowSheetsLibrarySource();
-      final contentSource = await File(
-        'lib/features/templates/presentation/widgets/template_flow_sheets_content.part.dart',
-      ).readAsString();
-      final generationSource = await File(
-        'lib/features/templates/presentation/widgets/template_flow_sheets_generation.part.dart',
-      ).readAsString();
-      final cardSource = await File(
-        'lib/features/templates/presentation/widgets/template_card.dart',
-      ).readAsString();
-      final cardPresentationSource = await File(
-        'lib/features/templates/presentation/widgets/template_card_presentation.part.dart',
-      ).readAsString();
-      final cardBadgesSource = await File(
-        'lib/features/templates/presentation/widgets/template_card_badges.part.dart',
-      ).readAsString();
-      final fullCardSource =
-          '$cardSource\n$cardPresentationSource\n$cardBadgesSource';
+  test('template flow premium gates use localized copy instead of ru branches', () async {
+    final sheetSource = readTemplateFlowSheetsLibrarySource();
+    final contentSource = await File(
+      'lib/features/templates/presentation/widgets/template_flow_sheets_content.part.dart',
+    ).readAsString();
+    final generationSource = await File(
+      'lib/features/templates/presentation/widgets/template_flow_sheets_generation.part.dart',
+    ).readAsString();
+    final chromeSource = await File(
+      'lib/features/templates/presentation/widgets/template_flow_sheets_chrome.part.dart',
+    ).readAsString();
+    final blockedSource = await File(
+      'lib/features/templates/presentation/widgets/template_flow_sheets_blocked.part.dart',
+    ).readAsString();
+    final cardSource = await File(
+      'lib/features/templates/presentation/widgets/template_card.dart',
+    ).readAsString();
+    final cardPresentationSource = await File(
+      'lib/features/templates/presentation/widgets/template_card_presentation.part.dart',
+    ).readAsString();
+    final cardBadgesSource = await File(
+      'lib/features/templates/presentation/widgets/template_card_badges.part.dart',
+    ).readAsString();
+    final fullCardSource =
+        '$cardSource\n$cardPresentationSource\n$cardBadgesSource';
 
-      expect(
-        sheetSource,
-        isNot(contains("languageCode.toLowerCase() == 'ru'")),
-      );
-      expect(
-        contentSource,
-        isNot(contains("languageCode.toLowerCase() == 'ru'")),
-      );
-      expect(
-        generationSource,
-        isNot(contains("languageCode.toLowerCase() == 'ru'")),
-      );
-      expect(cardSource, isNot(contains("languageCode.toLowerCase() == 'ru'")));
-      expect(
-        sheetSource,
-        contains('templateFlowInsufficientBalanceUpsellMessage'),
-      );
-      expect(
-        sheetSource,
-        contains("part 'template_flow_sheets_generation.part.dart';"),
-      );
-      expect(
-        contentSource,
-        isNot(contains('class _TemplateGenerationProgressContent')),
-      );
-      expect(
-        generationSource,
-        contains('class _TemplateGenerationProgressContent'),
-      );
-      expect(
-        generationSource,
-        contains('templateFlowCompletedPremiumHeadline'),
-      );
-      expect(generationSource, contains('templateFlowCompletedPremiumMessage'));
-      expect(cardSource, contains("part 'template_card_badges.part.dart';"));
-      expect(
-        cardSource,
-        contains("part 'template_card_presentation.part.dart';"),
-      );
-      expect(cardSource, isNot(contains('class _TemplateShadeOverlay')));
-      expect(cardPresentationSource, isNot(contains('class _PromoBadge')));
-      expect(cardBadgesSource, contains("part of 'template_card.dart';"));
-      expect(cardBadgesSource, contains('class _PromoBadge'));
-      expect(cardBadgesSource, contains('class _AccessTag'));
-      expect(fullCardSource, contains('templateFlowPreviewUnavailable'));
-      expect(fullCardSource, contains('supportChatTodayLabel'));
-      expect(fullCardSource, isNot(contains('Preview unavailable')));
-      expect(fullCardSource, isNot(contains('Превью недоступно')));
-      expect(generationSource, isNot(contains('Video is ready! 🎉')));
-      expect(generationSource, isNot(contains('Видео готово! 🎉')));
-    },
-  );
+    expect(sheetSource, isNot(contains("languageCode.toLowerCase() == 'ru'")));
+    expect(
+      contentSource,
+      isNot(contains("languageCode.toLowerCase() == 'ru'")),
+    );
+    expect(
+      generationSource,
+      isNot(contains("languageCode.toLowerCase() == 'ru'")),
+    );
+    expect(cardSource, isNot(contains("languageCode.toLowerCase() == 'ru'")));
+    expect(
+      sheetSource,
+      contains('templateFlowInsufficientBalanceUpsellMessage'),
+    );
+    expect(
+      sheetSource,
+      contains("part 'template_flow_sheets_generation.part.dart';"),
+    );
+    expect(
+      contentSource,
+      isNot(contains('class _TemplateGenerationProgressContent')),
+    );
+    expect(
+      generationSource,
+      contains('class _TemplateGenerationProgressContent'),
+    );
+    expect(generationSource, contains('templateFlowCompletedPremiumHeadline'));
+    expect(generationSource, contains('templateFlowCompletedPremiumMessage'));
+    expect(cardSource, contains("part 'template_card_badges.part.dart';"));
+    expect(
+      cardSource,
+      contains("part 'template_card_presentation.part.dart';"),
+    );
+    expect(cardSource, isNot(contains('class _TemplateShadeOverlay')));
+    expect(cardPresentationSource, isNot(contains('class _PromoBadge')));
+    expect(cardBadgesSource, contains("part of 'template_card.dart';"));
+    expect(cardBadgesSource, contains('class _PromoBadge'));
+    expect(cardBadgesSource, contains('class _AccessTag'));
+    expect(cardBadgesSource, contains('colors.on(tone)'));
+    expect(
+      cardBadgesSource,
+      contains('colors.on(isFeatured ? colors.gold : colors.accent)'),
+    );
+    expect(
+      cardPresentationSource,
+      contains('final foregroundColor = usePremiumStyle'),
+    );
+    expect(cardPresentationSource, contains('accent: colors.accent'));
+    expect(cardPresentationSource, contains('accent: colors.gold'));
+    expect(cardPresentationSource, contains(': colors.on(colors.accent);'));
+    expect(cardPresentationSource, contains('color: foregroundColor'));
+    expect(cardBadgesSource, contains('color: colors.blue'));
+    expect(cardBadgesSource, contains('colors.gold.withValues(alpha: 0.5)'));
+    expect(cardBadgesSource, contains('color: colors.gold'));
+    expect(
+      cardBadgesSource,
+      isNot(contains('color: Colors.white,\n            fontSize: 9,')),
+    );
+    expect(cardBadgesSource, isNot(contains('color: Color(0xFF052317)')));
+    expect(
+      cardPresentationSource,
+      isNot(contains('const premiumTextColor = Color(0xFF251102)')),
+    );
+    expect(cardPresentationSource, isNot(contains('const Color(0xFF22D394)')));
+    expect(cardPresentationSource, isNot(contains('const Color(0xFFF5D679)')));
+    expect(cardPresentationSource, isNot(contains('const Color(0xFF082313)')));
+    expect(cardBadgesSource, isNot(contains('Color(0xFF46B0FF)')));
+    expect(cardBadgesSource, isNot(contains('const Color(0xFFFFE89E)')));
+    expect(fullCardSource, contains('templateFlowPreviewUnavailable'));
+    expect(fullCardSource, contains('supportChatTodayLabel'));
+    expect(
+      cardBadgesSource,
+      contains('Localizations.localeOf(context).toLanguageTag()'),
+    );
+    expect(
+      cardBadgesSource,
+      contains(
+        'NumberFormat.decimalPattern(localeTag).format(popularityCount)',
+      ),
+    );
+    expect(
+      cardBadgesSource,
+      contains(
+        'NumberFormat.compact(locale: localeTag).format(popularityCount)',
+      ),
+    );
+    expect(cardBadgesSource, isNot(contains("toStringAsFixed(1)")));
+    expect(cardBadgesSource, isNot(contains("}k'")));
+    expect(fullCardSource, isNot(contains('Preview unavailable')));
+    expect(fullCardSource, isNot(contains('Превью недоступно')));
+    expect(generationSource, isNot(contains('Video is ready! 🎉')));
+    expect(generationSource, isNot(contains('Видео готово! 🎉')));
+    expect(
+      sheetSource,
+      contains('context.petMagicColors.on(const Color(0xFFEAB13A))'),
+    );
+    expect(
+      chromeSource,
+      contains('context.petMagicColors.on(const Color(0xFFF3C65A))'),
+    );
+    expect(
+      chromeSource,
+      contains('context.petMagicColors.on(const Color(0xFFEFCB72))'),
+    );
+    expect(blockedSource, isNot(contains('color: Color(0xFF261903)')));
+    expect(generationSource, isNot(contains('color: Color(0xFF261903)')));
+    expect(chromeSource, isNot(contains('const ctaTextColor = Color')));
+    expect(blockedSource, contains('final colors = context.petMagicColors;'));
+    expect(
+      generationSource,
+      contains('final colors = context.petMagicColors;'),
+    );
+    expect(blockedSource, contains('color: colors.textStrong'));
+    expect(generationSource, contains('color: colors.textStrong'));
+    expect(blockedSource, contains('color: colors.textSoft'));
+    expect(generationSource, contains('color: colors.textSoft'));
+    expect(blockedSource, contains('color: colors.accent'));
+    expect(blockedSource, contains('color: colors.gold'));
+    for (final rawColor in const [
+      'const Color(0xFF514325)',
+      'const Color(0xFFE1DED4)',
+      'const Color(0xFF1E1608)',
+      'const Color(0xFFEDE7D8)',
+      'const Color(0xFF3B3324)',
+      'const Color(0xFFE3DFD2)',
+      'const Color(0xFF2F2719)',
+      'const Color(0xFFD7DFEF)',
+      'const Color(0xFF0EA76A)',
+      'const Color(0xFFBCB29B)',
+      'const Color(0xFF2A3651)',
+      'const Color(0xFF3C3222)',
+      'const Color(0xFF3C3324)',
+      'const Color(0xFFC6CEDD)',
+    ]) {
+      expect(blockedSource, isNot(contains(rawColor)));
+      expect(generationSource, isNot(contains(rawColor)));
+    }
+  });
 
   test('template flow high-load rejection uses dedicated safe UX copy', () async {
     final sheetSource = readTemplateFlowSheetsLibrarySource();
@@ -311,6 +401,10 @@ void main() {
     );
     expect(templateOfDaySource, contains('templateOfTheDayLoadFailed'));
     expect(templateOfDaySource, contains('walletBalanceUnit'));
+    expect(templateOfDayChromeSource, contains('colors.gold'));
+    expect(templateOfDayChromeSource, contains('colors.on(background)'));
+    expect(templateOfDayChromeSource, isNot(contains('Color(0xFF251102)')));
+    expect(templateOfDayChromeSource, isNot(contains('Color(0xFFEFC35C)')));
     expect(statusSource, contains('walletBalanceUnit'));
     expect(activeStatusCardSource, contains('walletBalanceUnit'));
     expect(galleryCardsSource, contains('walletBalanceUnit'));
@@ -383,6 +477,7 @@ void main() {
         'templateFlowGenerationWaitTooLongMessage',
         'templateFlowGenerationWaitTooLongRetryAfter',
         'templateFlowGenerationWaitTooLongPremiumHint',
+        'templateFlowActiveGenerationLimitError',
         'generationStatusCancelledTitle',
         'generationStatusCancelledMessage',
         'generationStatusCancelQueuedHint',

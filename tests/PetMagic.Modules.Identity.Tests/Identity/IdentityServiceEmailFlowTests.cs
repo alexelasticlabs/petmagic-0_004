@@ -94,6 +94,8 @@ public sealed class IdentityServiceEmailFlowTests
             CancellationToken.None);
 
         Assert.True(loginResult.IsSuccess);
+        var expectedUserIdHash = SafeLogValues.StableHash(user.Id.ToString("D"));
+        var expectedCorrelationIdHash = SafeLogValues.StableHash("auth-business-correlation");
 
         var invalidLoginResult = await service.LoginAsync(
             new LoginCommand("missing.user@petmagic.app", "WrongPassword123"),
@@ -105,24 +107,40 @@ public sealed class IdentityServiceEmailFlowTests
             entry.Level == LogLevel.Information
             && entry.Properties.TryGetValue("Operation", out var operation)
             && Equals(operation, "registration")
+            && entry.Properties.TryGetValue("UserIdHash", out var userIdHash)
+            && Equals(userIdHash, expectedUserIdHash)
+            && !entry.Properties.ContainsKey("UserId")
             && entry.Properties.TryGetValue("Result", out var result)
             && Equals(result, "pending_email_verification")
-            && entry.Properties.TryGetValue("CorrelationId", out var correlationId)
-            && Equals(correlationId, "auth-business-correlation"));
+            && !entry.Properties.ContainsKey("CorrelationId")
+            && entry.Properties.TryGetValue("CorrelationIdHash", out var correlationIdHash)
+            && Equals(correlationIdHash, expectedCorrelationIdHash));
 
         Assert.Contains(logger.Entries, entry =>
             entry.Level == LogLevel.Information
             && entry.Properties.TryGetValue("Operation", out var operation)
             && Equals(operation, "login")
+            && entry.Properties.TryGetValue("UserIdHash", out var userIdHash)
+            && Equals(userIdHash, expectedUserIdHash)
+            && !entry.Properties.ContainsKey("UserId")
             && entry.Properties.TryGetValue("Result", out var result)
-            && Equals(result, "succeeded"));
+            && Equals(result, "succeeded")
+            && !entry.Properties.ContainsKey("CorrelationId")
+            && entry.Properties.TryGetValue("CorrelationIdHash", out var correlationIdHash)
+            && Equals(correlationIdHash, expectedCorrelationIdHash));
 
         Assert.Contains(logger.Entries, entry =>
             entry.Level == LogLevel.Warning
             && entry.Properties.TryGetValue("Operation", out var operation)
             && Equals(operation, "login")
+            && entry.Properties.TryGetValue("UserIdHash", out var userIdHash)
+            && userIdHash is null
+            && !entry.Properties.ContainsKey("UserId")
             && entry.Properties.TryGetValue("Reason", out var reason)
-            && Equals(reason, "invalid_credentials"));
+            && Equals(reason, "invalid_credentials")
+            && !entry.Properties.ContainsKey("CorrelationId")
+            && entry.Properties.TryGetValue("CorrelationIdHash", out var correlationIdHash)
+            && Equals(correlationIdHash, expectedCorrelationIdHash));
 
         var serializedLogs = string.Join('\n', logger.Entries.Select(entry => entry.Message));
         Assert.DoesNotContain("logs.user@petmagic.app", serializedLogs);

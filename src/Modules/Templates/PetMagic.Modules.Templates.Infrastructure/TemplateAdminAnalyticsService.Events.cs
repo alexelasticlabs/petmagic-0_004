@@ -149,12 +149,14 @@ internal sealed partial class TemplateAdminAnalyticsService
             return Result.Failure(TemplatesErrors.NotFound);
         }
 
+        var generationId = await ResolveAnalyticsGenerationIdAsync(command, cancellationToken);
+
         dbContext.TemplateAnalyticsEvents.Add(new TemplateAnalyticsEvent
         {
             Id = Guid.NewGuid(),
             TemplateId = command.TemplateId,
             UserId = command.UserId,
-            GenerationId = command.GenerationId,
+            GenerationId = generationId,
             EventType = NormalizeAnalyticsValue(command.EventType, TemplateAnalyticsEventTypes.View, 64),
             Source = NormalizeAnalyticsValue(command.Source, "direct", 64),
             DeviceClass = NormalizeAnalyticsValue(command.DeviceClass, "unknown", 32),
@@ -166,5 +168,28 @@ internal sealed partial class TemplateAdminAnalyticsService
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
+    }
+
+    private async Task<Guid?> ResolveAnalyticsGenerationIdAsync(
+        RecordTemplateAnalyticsEventCommand command,
+        CancellationToken cancellationToken)
+    {
+        if (command.GenerationId is not Guid generationId)
+        {
+            return null;
+        }
+
+        var query = dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .Where(x => x.Id == generationId && x.TemplateId == command.TemplateId);
+
+        if (command.UserId is Guid userId)
+        {
+            query = query.Where(x => x.UserId == userId);
+        }
+
+        return await query
+            .Select(x => (Guid?)x.Id)
+            .FirstOrDefaultAsync(cancellationToken);
     }
 }

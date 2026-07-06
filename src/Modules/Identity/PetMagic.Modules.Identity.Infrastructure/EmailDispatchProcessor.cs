@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Identity.Domain.Enums;
 using PetMagic.Modules.Identity.Infrastructure.Data;
 using PetMagic.Modules.Identity.Infrastructure.Entities;
@@ -141,8 +142,9 @@ internal sealed class EmailDispatchProcessor(
     private async Task MarkFailedAsync(EmailDispatchJob job, string errorCode, string errorMessage, CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
-        job.FailureCode = errorCode;
-        job.FailureMessage = errorMessage;
+        var safeErrorCode = SafeLogValues.SanitizeText(errorCode, 128);
+        job.FailureCode = safeErrorCode;
+        job.FailureMessage = SafeLogValues.SanitizeText(errorMessage, 2000);
         job.UpdatedAtUtc = now;
 
         if (job.AttemptCount >= options.MaxDispatchAttempts)
@@ -150,18 +152,18 @@ internal sealed class EmailDispatchProcessor(
             job.Status = EmailDispatchStatus.Failed;
             job.NextAttemptAtUtc = null;
             logger.LogWarning(
-                "Email dispatch exhausted attempts. EmailJobId={EmailJobId} ErrorCode={ErrorCode}",
-                job.Id,
-                errorCode);
+                "Email dispatch exhausted attempts. EmailJobIdHash={EmailJobIdHash} ErrorCode={ErrorCode}",
+                SafeLogValues.StableHash(job.Id.ToString("D")),
+                safeErrorCode);
         }
         else
         {
             job.Status = EmailDispatchStatus.Queued;
             job.NextAttemptAtUtc = now.AddSeconds(options.RetryDelaySeconds);
             logger.LogWarning(
-                "Email dispatch failed. EmailJobId={EmailJobId} ErrorCode={ErrorCode}",
-                job.Id,
-                errorCode);
+                "Email dispatch failed. EmailJobIdHash={EmailJobIdHash} ErrorCode={ErrorCode}",
+                SafeLogValues.StableHash(job.Id.ToString("D")),
+                safeErrorCode);
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);

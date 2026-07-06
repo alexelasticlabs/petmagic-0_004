@@ -220,6 +220,14 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.HasIndex(x => new { x.Status, x.CompletedAtUtc });
             entity.HasIndex(x => new { x.Status, x.RefundedAtUtc, x.RefundLastAttemptedAtUtc })
                 .HasDatabaseName("IX_tgj_Status_RefundedAtUtc_RefundLastAttemptedAtUtc");
+            entity.HasIndex(x => new { x.CreatedAtUtc, x.Id })
+                .HasDatabaseName("IX_tgj_CreatedAtUtc_Id");
+            entity.HasIndex(x => new { x.UpdatedAtUtc, x.Id })
+                .HasDatabaseName("IX_tgj_UpdatedAtUtc_Id");
+            entity.HasIndex(x => x.ChargedAtUtc)
+                .HasDatabaseName("IX_tgj_ChargedAtUtc");
+            entity.HasIndex(x => x.RefundedAtUtc)
+                .HasDatabaseName("IX_tgj_RefundedAtUtc");
             entity.HasIndex(x => new { x.UserId, x.CreatedAtUtc });
             entity.HasIndex(x => new { x.UserId, x.HiddenByUserAtUtc, x.CreatedAtUtc })
                 .HasDatabaseName("IX_tgj_UserId_HiddenByUserAtUtc_CreatedAtUtc");

@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Infrastructure.Data;
@@ -88,7 +89,14 @@ internal sealed class TemplateFeedRealtimeService(
 
     public ValueTask PublishGenerationStatusChangedAsync(TemplateGenerationResponse generation, CancellationToken cancellationToken = default)
     {
-        var data = JsonSerializer.Serialize(generation, RealtimeJsonOptions);
+        var payload = new TemplateGenerationRealtimeStatusPayload(
+            "generation.status_changed",
+            generation.UserId,
+            generation.GenerationId,
+            generation.Status,
+            generation.UpdatedAtUtc,
+            RequiresRefetch: true);
+        var data = JsonSerializer.Serialize(payload, RealtimeJsonOptions);
         return PublishAsync(new TemplateFeedRealtimeEvent(TemplateFeedRealtimeTopics.GenerationStatusChanged, data), cancellationToken);
     }
 
@@ -130,9 +138,9 @@ internal sealed class TemplateFeedRealtimeService(
         {
             TemplateGenerationMetrics.RecordSseDeliveryFailure(realtimeEvent.Topic);
             logger.LogWarning(
-                exception,
-                "Template realtime event persistence failed. Topic={Topic}",
-                realtimeEvent.Topic);
+                "Template realtime event persistence failed. Topic={Topic} ExceptionType={ExceptionType}",
+                realtimeEvent.Topic,
+                SafeLogValues.ExceptionType(exception));
             return null;
         }
     }
@@ -176,7 +184,9 @@ internal sealed class TemplateFeedRealtimeService(
         catch (Exception exception)
         {
             TemplateGenerationMetrics.RecordSseDeliveryFailure("cleanup");
-            logger.LogWarning(exception, "Template realtime event cleanup failed.");
+            logger.LogWarning(
+                "Template realtime event cleanup failed. ExceptionType={ExceptionType}",
+                SafeLogValues.ExceptionType(exception));
         }
     }
 
@@ -220,7 +230,9 @@ internal sealed class TemplateFeedRealtimeService(
             catch (Exception exception)
             {
                 TemplateGenerationMetrics.RecordSseDeliveryFailure("polling");
-                logger.LogWarning(exception, "Template realtime event polling failed.");
+                logger.LogWarning(
+                    "Template realtime event polling failed. ExceptionType={ExceptionType}",
+                    SafeLogValues.ExceptionType(exception));
             }
 
             try
@@ -324,4 +336,12 @@ internal sealed class TemplateFeedRealtimeService(
             }
         }
     }
+
+    private sealed record TemplateGenerationRealtimeStatusPayload(
+        string EventType,
+        Guid UserId,
+        Guid GenerationId,
+        string Status,
+        DateTime UpdatedAtUtc,
+        bool RequiresRefetch);
 }

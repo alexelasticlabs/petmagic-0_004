@@ -40,14 +40,21 @@ class TemplateFeedMediaPreloadQueue {
     TemplateFeedPreviewCacheLookup? previewCacheLookup,
     TemplateFeedPreviewFetch? previewFetch,
     int maxVideoPreloads = 2,
+    int maxTrafficBytesPerFeedSession = _defaultMaxTrafficBytesPerFeedSession,
   }) : _previewCacheLookup =
            previewCacheLookup ?? TemplateMediaCache.getCachedPreviewFile,
        _previewFetch = previewFetch ?? TemplateMediaCache.fetchPreviewFile,
-       _maxVideoPreloads = maxVideoPreloads.clamp(0, 2);
+       _maxVideoPreloads = maxVideoPreloads.clamp(0, 2),
+       _maxTrafficBytesPerFeedSession = maxTrafficBytesPerFeedSession < 0
+           ? 0
+           : maxTrafficBytesPerFeedSession;
+
+  static const _defaultMaxTrafficBytesPerFeedSession = 24 * 1024 * 1024;
 
   final TemplateFeedPreviewCacheLookup _previewCacheLookup;
   final TemplateFeedPreviewFetch _previewFetch;
   final int _maxVideoPreloads;
+  final int _maxTrafficBytesPerFeedSession;
   final Set<String> _activeCacheKeys = <String>{};
   int _generation = 0;
   int _mediaCacheHits = 0;
@@ -88,7 +95,7 @@ class TemplateFeedMediaPreloadQueue {
   void cancelAll({required String reason}) {
     if (_activeCacheKeys.isNotEmpty) {
       _videoPreloadCancellations += _activeCacheKeys.length;
-      AppLogger.info(
+      AppLogger.debug(
         feature: 'Templates.FeedMediaPreload',
         operation: 'video_preload_cancellations',
         message: 'Template feed media preload queue was cancelled.',
@@ -142,6 +149,11 @@ class TemplateFeedMediaPreloadQueue {
         return;
       }
 
+      if (_trafficBytesThisFeedSession >= _maxTrafficBytesPerFeedSession) {
+        _logTrafficBudgetSkipped(candidate, reason: reason);
+        return;
+      }
+
       _mediaCacheMisses++;
       final file = await _previewFetch(
         candidate.url,
@@ -178,7 +190,7 @@ class TemplateFeedMediaPreloadQueue {
     required String reason,
   }) {
     _videoPreloadCancellations++;
-    AppLogger.info(
+    AppLogger.debug(
       feature: 'Templates.FeedMediaPreload',
       operation: 'video_preload_cancellations',
       message: 'Template feed stale video preload was discarded.',
@@ -198,10 +210,27 @@ class TemplateFeedMediaPreloadQueue {
     }
   }
 
+  void _logTrafficBudgetSkipped(
+    TemplateFeedMediaPreloadCandidate candidate, {
+    required String reason,
+  }) {
+    AppLogger.debug(
+      feature: 'Templates.FeedMediaPreload',
+      operation: 'traffic_budget_skip',
+      message: 'Template feed media preload was skipped after traffic budget.',
+      context: {
+        'templateId': candidate.templateId,
+        'reason': reason,
+        'trafficBytes': _trafficBytesThisFeedSession,
+        'maxTrafficBytes': _maxTrafficBytesPerFeedSession,
+      },
+    );
+  }
+
   void _logCacheMetrics({required String reason}) {
     final total = _mediaCacheHits + _mediaCacheMisses;
     final hitRate = total == 0 ? 0 : _mediaCacheHits / total;
-    AppLogger.info(
+    AppLogger.debug(
       feature: 'Templates.FeedMediaPreload',
       operation: 'media_cache_hit_rate',
       message: 'Template feed media cache metrics updated.',
@@ -213,7 +242,7 @@ class TemplateFeedMediaPreloadQueue {
         'trafficBytes': _trafficBytesThisFeedSession,
       },
     );
-    AppLogger.info(
+    AppLogger.debug(
       feature: 'Templates.FeedMediaPreload',
       operation: 'traffic_per_feed_session',
       message: 'Template feed media traffic budget updated.',

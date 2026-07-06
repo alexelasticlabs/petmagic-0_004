@@ -53,7 +53,8 @@ class AppLaunchState {
 }
 
 class AppLaunchController extends Notifier<AppLaunchState> {
-  late final GuestLaunchStorage _guestLaunchStorage;
+  GuestLaunchStorage get _guestLaunchStorage =>
+      ref.read(guestLaunchStorageProvider);
   static const _onboardingReadTimeout = Duration(seconds: 3);
   static final Object _disposedReadSentinel = Object();
   final Completer<void> _disposed = Completer<void>();
@@ -74,7 +75,6 @@ class AppLaunchController extends Notifier<AppLaunchState> {
 
   @override
   AppLaunchState build() {
-    _guestLaunchStorage = ref.watch(guestLaunchStorageProvider);
     ref.onDispose(() {
       _onboardingReadTimeoutTimer?.cancel();
       _onboardingReadTimeoutTimer = null;

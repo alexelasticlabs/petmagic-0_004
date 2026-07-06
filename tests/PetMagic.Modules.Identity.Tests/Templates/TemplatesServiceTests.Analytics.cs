@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain;
 using PetMagic.Modules.Templates.Domain.Enums;
+using PetMagic.Modules.Templates.Infrastructure;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
 
 namespace PetMagic.Modules.Identity.Tests.Templates;
@@ -136,7 +137,8 @@ public sealed partial class TemplatesServiceTests
     public async Task GetAdminAnalyticsAsync_ShouldReturnTrendRecentRunsAndFailureBreakdown()
     {
         await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext);
+        var mediaStorage = new RecordingMediaStorage(signReadUrls: true);
+        var service = CreateService(dbContext, mediaStorage);
 
         var created = await service.CreateVideoAsync(
             new CreateVideoTemplateCommand(
@@ -243,12 +245,84 @@ public sealed partial class TemplatesServiceTests
         Assert.Equal(failedId, recent.Value[1].GenerationId);
         Assert.Equal(2, recent.Value[1].AttemptCount);
         Assert.Equal("Completed", recent.Value[2].Status);
+        Assert.Equal("https://cdn.example.com/output-1.mp4?signed=1", recent.Value[2].OutputUrl);
+        Assert.Contains("https://cdn.example.com/output-1.mp4", mediaStorage.ReadUrls);
 
         Assert.True(failures.IsSuccess);
         var failure = Assert.Single(failures.Value);
         Assert.Equal("templates.ai_provider_failed", failure.FailureCode);
         Assert.Equal(1, failure.Count);
         Assert.Equal(now.AddMinutes(-6), failure.LastOccurredAtUtc);
+    }
+
+    [Fact]
+    public async Task GetAdminAnalyticsAsync_ShouldNotExposeRawGenerationUrls_WhenSigningFails()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, new FailingReadMediaStorage());
+
+        var created = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Private Analytics Portrait",
+                "Template with private output",
+                "Portrait",
+                ["analytics"],
+                false,
+                20,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset("https://cdn.example.com/private-preview.jpg", "private-preview.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "keep pet",
+                TemplateStatus.Active.ToString()),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+
+        var generationId = Guid.NewGuid();
+        dbContext.TemplateGenerationJobs.AddRange(
+            new TemplateGenerationJob
+            {
+                Id = generationId,
+                UserId = Guid.NewGuid(),
+                TemplateId = created.Value.TemplateId,
+                Status = TemplateGenerationStatus.Completed,
+                TokenCost = 20,
+                SourceImageUrl = "templates-media/private/source.jpg",
+                SourceImageFileName = "source.jpg",
+                SourceImageContentType = "image/jpeg",
+                ResultUrl = "templates-media/private/result.png",
+                CreatedAtUtc = DateTime.UtcNow.AddMinutes(-2),
+                QueuedAtUtc = DateTime.UtcNow.AddMinutes(-2),
+                CompletedAtUtc = DateTime.UtcNow.AddMinutes(-1),
+                UpdatedAtUtc = DateTime.UtcNow.AddMinutes(-1)
+            },
+            new TemplateGenerationJob
+            {
+                Id = Guid.NewGuid(),
+                UserId = TemplateGenerationService.AdminTestUserId,
+                TemplateId = created.Value.TemplateId,
+                Status = TemplateGenerationStatus.Completed,
+                TokenCost = 0,
+                SourceImageUrl = "templates-media/private/admin-source.jpg",
+                SourceImageFileName = "admin-source.jpg",
+                SourceImageContentType = "image/jpeg",
+                ResultUrl = "templates-media/private/admin-result.png",
+                CreatedAtUtc = DateTime.UtcNow.AddMinutes(-3),
+                QueuedAtUtc = DateTime.UtcNow.AddMinutes(-3),
+                CompletedAtUtc = DateTime.UtcNow.AddMinutes(-2),
+                UpdatedAtUtc = DateTime.UtcNow.AddMinutes(-2)
+            });
+        await dbContext.SaveChangesAsync();
+
+        var recent = await service.GetAdminRecentGenerationsAsync(created.Value.TemplateId, 10, CancellationToken.None);
+        var testHistory = await service.GetAdminTestHistoryAsync(created.Value.TemplateId, 10, CancellationToken.None);
+
+        Assert.True(recent.IsSuccess);
+        Assert.Null(recent.Value.Single(x => x.GenerationId == generationId).OutputUrl);
+        Assert.True(testHistory.IsSuccess);
+        var adminTest = Assert.Single(testHistory.Value);
+        Assert.Null(adminTest.OutputUrl);
+        Assert.Null(adminTest.SourceImageAsset);
     }
 
     [Fact]
@@ -323,7 +397,28 @@ public sealed partial class TemplatesServiceTests
 
         Assert.True(created.IsSuccess);
 
+        var userId = Guid.NewGuid();
         var generationId = Guid.NewGuid();
+        var now = new DateTime(2026, 6, 14, 12, 0, 0, DateTimeKind.Utc);
+        dbContext.TemplateGenerationJobs.Add(new TemplateGenerationJob
+        {
+            Id = generationId,
+            UserId = userId,
+            TemplateId = created.Value.TemplateId,
+            Status = TemplateGenerationStatus.Completed,
+            TokenCost = 20,
+            SourceImageUrl = "https://cdn.example.com/daily-source.jpg",
+            SourceImageFileName = "daily-source.jpg",
+            SourceImageContentType = "image/jpeg",
+            ResultUrl = "https://cdn.example.com/daily-result.jpg",
+            CreatedAtUtc = now,
+            QueuedAtUtc = now,
+            StartedAtUtc = now.AddMinutes(1),
+            CompletedAtUtc = now.AddMinutes(3),
+            UpdatedAtUtc = now.AddMinutes(3)
+        });
+        await dbContext.SaveChangesAsync();
+
         var eventTypes = new[]
         {
             TemplateAnalyticsEventTypes.TemplateOfTheDayViewed,
@@ -343,7 +438,7 @@ public sealed partial class TemplatesServiceTests
                     "manual",
                     "ios",
                     "us",
-                    Guid.NewGuid(),
+                    userId,
                     generationId,
                     MetadataJson: """
                     {"templateId":"daily-template","type":"image","source":"manual","isPremium":true,"userPlan":"premium","date":"2026-06-14","screen":"templates"}
@@ -367,6 +462,71 @@ public sealed partial class TemplatesServiceTests
             Assert.Contains("\"screen\":\"templates\"", item.MetadataJson);
             Assert.Contains("\"date\":\"2026-06-14\"", item.MetadataJson);
         });
+    }
+
+    [Fact]
+    public async Task RecordAnalyticsEventAsync_ShouldIgnoreGenerationIdThatDoesNotMatchTemplateOrUser()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var created = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Analytics Ownership",
+                "Template with generation ownership checks",
+                "Portrait",
+                ["analytics"],
+                false,
+                20,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset("https://cdn.example.com/ownership.jpg", "ownership.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "keep pet",
+                TemplateStatus.Active.ToString()),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+
+        var ownerUserId = Guid.NewGuid();
+        var otherUserId = Guid.NewGuid();
+        var generationId = Guid.NewGuid();
+        var now = new DateTime(2026, 6, 14, 12, 0, 0, DateTimeKind.Utc);
+        dbContext.TemplateGenerationJobs.Add(new TemplateGenerationJob
+        {
+            Id = generationId,
+            UserId = ownerUserId,
+            TemplateId = created.Value.TemplateId,
+            Status = TemplateGenerationStatus.Completed,
+            TokenCost = 20,
+            SourceImageUrl = "https://cdn.example.com/owner-source.jpg",
+            SourceImageFileName = "owner-source.jpg",
+            SourceImageContentType = "image/jpeg",
+            ResultUrl = "https://cdn.example.com/owner-result.jpg",
+            CreatedAtUtc = now,
+            QueuedAtUtc = now,
+            StartedAtUtc = now.AddMinutes(1),
+            CompletedAtUtc = now.AddMinutes(3),
+            UpdatedAtUtc = now.AddMinutes(3)
+        });
+        await dbContext.SaveChangesAsync();
+
+        var result = await service.RecordAnalyticsEventAsync(
+            new RecordTemplateAnalyticsEventCommand(
+                created.Value.TemplateId,
+                TemplateAnalyticsEventTypes.Feedback,
+                "gallery",
+                "ios",
+                "us",
+                otherUserId,
+                generationId,
+                "feedback for unrelated generation"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var stored = await dbContext.TemplateAnalyticsEvents.SingleAsync();
+        Assert.Null(stored.GenerationId);
+        Assert.Equal(otherUserId, stored.UserId);
     }
 
     [Fact]

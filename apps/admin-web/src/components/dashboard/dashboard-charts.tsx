@@ -1,4 +1,6 @@
+import { getDashboardIntlLocale } from "@/components/dashboard-view.content";
 import styles from "@/components/dashboard-view.module.css";
+import { type Locale } from "@/lib/i18n";
 
 type DonutChartItem = {
   color: string;
@@ -9,12 +11,18 @@ export function RevenueChart({
   xLabels,
   values,
   currencyCode,
+  locale,
   ariaLabel,
+  dateHeader,
+  revenueHeader,
 }: {
   xLabels: string[];
   values: number[];
   currencyCode: string;
+  locale: Locale;
   ariaLabel: string;
+  dateHeader: string;
+  revenueHeader: string;
 }) {
   const xPositions = [50, 130, 210, 305, 390, 472, 560];
   const normalizedValues = xPositions.map((_, index) => values[index] ?? 0);
@@ -29,7 +37,7 @@ export function RevenueChart({
   const areaPoints = `${points} 560,196 50,196`;
   const yLabels = [1, 2 / 3, 1 / 3, 0].map((ratio) => ({
     y: 196 - 178 * ratio,
-    label: formatCompactCurrency(maxValue * ratio, currencyCode),
+    label: formatCompactCurrency(maxValue * ratio, currencyCode, locale),
   }));
 
   return (
@@ -105,15 +113,23 @@ export function RevenueChart({
       <table className={styles.chartDataTable} aria-label={ariaLabel}>
         <thead>
           <tr>
-            <th scope="col">Date</th>
-            <th scope="col">Revenue</th>
+            <th scope="col">{dateHeader}</th>
+            <th scope="col">{revenueHeader}</th>
           </tr>
         </thead>
         <tbody>
           {normalizedValues.map((value, index) => (
             <tr key={`${xLabels[index]}-${index}`}>
               <td>{xLabels[index]}</td>
-              <td>{formatChartCurrencyAmount(value, normalizeChartCurrencyCode(currencyCode), "standard", 2)}</td>
+              <td>
+                {formatChartCurrencyAmount(
+                  value,
+                  normalizeChartCurrencyCode(currencyCode),
+                  "standard",
+                  2,
+                  locale
+                )}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -158,18 +174,18 @@ export function DonutChart({
     <svg viewBox="0 0 180 180" className={styles.donutSvg} aria-hidden="true">
       <circle cx="90" cy="90" r="65" stroke="var(--border-soft)" strokeWidth="22" fill="none" />
       {segments.map((segment, index) => (
-          <circle
-            key={`${segment.color}-${index}`}
-            cx="90"
-            cy="90"
-            r="65"
-            stroke={segment.color}
-            strokeWidth="22"
-            fill="none"
-            strokeDasharray={`${segment.length} ${circumference - segment.length}`}
-            strokeDashoffset={String(-segment.offset)}
-          />
-        ))}
+        <circle
+          key={`${segment.color}-${index}`}
+          cx="90"
+          cy="90"
+          r="65"
+          stroke={segment.color}
+          strokeWidth="22"
+          fill="none"
+          strokeDasharray={`${segment.length} ${circumference - segment.length}`}
+          strokeDashoffset={String(-segment.offset)}
+        />
+      ))}
       <text
         x="90"
         y="86"
@@ -195,18 +211,19 @@ export function DonutChart({
   );
 }
 
-function formatCompactCurrency(value: number, currencyCode: string) {
+function formatCompactCurrency(value: number, currencyCode: string, locale: Locale) {
   const amount = Number.isFinite(value) ? value : 0;
   const safeCurrencyCode = normalizeChartCurrencyCode(currencyCode);
   if (value <= 0) {
-    return formatChartCurrencyAmount(0, safeCurrencyCode, "standard", 0);
+    return formatChartCurrencyAmount(0, safeCurrencyCode, "standard", 0, locale);
   }
 
   return formatChartCurrencyAmount(
     amount,
     safeCurrencyCode,
     amount >= 1000 ? "compact" : "standard",
-    amount >= 1000 ? 1 : 0
+    amount >= 1000 ? 1 : 0,
+    locale
   );
 }
 
@@ -214,17 +231,20 @@ function formatChartCurrencyAmount(
   value: number,
   safeCurrencyCode: string,
   notation: "compact" | "standard",
-  maximumFractionDigits: number
+  maximumFractionDigits: number,
+  locale: Locale
 ) {
+  const intlLocale = getDashboardIntlLocale(locale);
+
   try {
-    return new Intl.NumberFormat("en-US", {
+    return new Intl.NumberFormat(intlLocale, {
       style: "currency",
       currency: safeCurrencyCode,
       notation,
       maximumFractionDigits,
     }).format(value);
   } catch {
-    return `${new Intl.NumberFormat("en-US", {
+    return `${new Intl.NumberFormat(intlLocale, {
       notation,
       maximumFractionDigits,
     }).format(value)} ${safeCurrencyCode}`;

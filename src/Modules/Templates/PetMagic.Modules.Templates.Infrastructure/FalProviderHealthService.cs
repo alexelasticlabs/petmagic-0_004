@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Domain.Enums;
 using PetMagic.Modules.Templates.Infrastructure.Data;
@@ -23,6 +24,7 @@ internal sealed class FalProviderHealthService(
     public const string HttpClientName = "FalPlatformApi";
 
     private const string BalanceCacheKey = "templates:fal:provider-balance";
+    private const int BalanceResponseMaxChars = 16 * 1024;
     private static readonly TimeSpan BalanceCacheTtl = TimeSpan.FromSeconds(60);
 
     public async Task<Result> EnsureCanAcceptGenerationAsync(
@@ -103,7 +105,7 @@ internal sealed class FalProviderHealthService(
 
             using var response = await httpClientFactory
                 .CreateClient(HttpClientName)
-                .SendAsync(request, cancellationToken);
+                .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
             {
                 logger.LogWarning("fal account billing API rejected the configured API key. StatusCode={StatusCode}", response.StatusCode);
@@ -118,8 +120,11 @@ internal sealed class FalProviderHealthService(
                 return null;
             }
 
-            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+            var body = await SafeHttpContentReader.ReadRawStringPrefixAsync(
+                response.Content,
+                cancellationToken,
+                BalanceResponseMaxChars);
+            using var document = JsonDocument.Parse(body);
             var balance = ReadBalanceUsd(document.RootElement);
             memoryCache.Set(BalanceCacheKey, balance, BalanceCacheTtl);
             return balance;
@@ -130,7 +135,9 @@ internal sealed class FalProviderHealthService(
         }
         catch (Exception exception)
         {
-            logger.LogWarning(exception, "fal account billing API check failed.");
+            logger.LogWarning(
+                "fal account billing API check failed. ExceptionType={ExceptionType}",
+                SafeLogValues.ExceptionType(exception));
             memoryCache.Set<decimal?>(BalanceCacheKey, null, TimeSpan.FromSeconds(15));
             return null;
         }

@@ -81,8 +81,8 @@ describe("dashboard production data handling", () => {
     expect(contentSource).toContain('retry: "Retry"');
     expect(contentSource).toContain('noPaymentsTitle: "No payments yet"');
     expect(contentSource).toContain('noActivityTitle: "No recent activity"');
-    expect(contentSource).toContain(
-      'noPaymentsDescription: "Recent payments will appear here after the first successful purchase."'
+    expect(contentSource).toMatch(
+      /noPaymentsDescription:\s*"Recent payments will appear here after the first successful purchase\."/
     );
     expect(source).not.toContain("when the backend returns purchases");
     expect(source).not.toContain("Когда backend вернет покупки");
@@ -108,6 +108,10 @@ describe("dashboard production data handling", () => {
   it("sources moderation queue KPI from the moderation backend, not support tickets", () => {
     const source = readDashboardViewLibrarySource();
     const contentSource = readFileSync(dashboardContentPath, "utf8");
+    const ruContentSource = contentSource.slice(
+      contentSource.indexOf("  ru: {"),
+      contentSource.indexOf("  en: {")
+    );
 
     expect(source).toContain("fetchAdminModerationQueue");
     expect(source).toContain("async function fetchPendingModerationQueueCount");
@@ -116,6 +120,12 @@ describe("dashboard production data handling", () => {
     expect(source).toContain("return Math.max(0, response.totalCount);");
     expect(source).toContain("moderationQueueCount");
     expect(contentSource).toContain('moderationQueueSubtext: "pending moderation items"');
+    expect(contentSource).toContain('moderationQueueSubtext: "ожидающие элементы модерации"');
+    expect(contentSource).toContain('eyebrow: "Центр управления"');
+    expect(contentSource).toContain('live: "онлайн"');
+    expect(ruContentSource).not.toContain('eyebrow: "Control center"');
+    expect(ruContentSource).not.toContain('live: "live"');
+    expect(ruContentSource).not.toContain("pending элементы");
     expect(source).not.toContain("const maxPages = 20");
     expect(source).not.toContain("count += response.items.length");
     expect(source).not.toContain(
@@ -187,14 +197,28 @@ describe("dashboard production data handling", () => {
     );
     expect(chartSource).toContain("function normalizeChartCurrencyCode(value: string)");
     expect(chartSource).toContain("function formatChartCurrencyAmount(");
+    expect(chartSource).toContain("locale: Locale");
+    expect(chartSource).toContain("getDashboardIntlLocale(locale)");
+    expect(chartSource).toContain("const intlLocale = getDashboardIntlLocale(locale);");
+    expect(chartSource).toContain("new Intl.NumberFormat(intlLocale");
     expect(chartSource).toContain("className={styles.chartDataTable}");
-    expect(chartSource).toContain('<th scope="col">Date</th>');
-    expect(chartSource).toContain('<th scope="col">Revenue</th>');
-    expect(chartSource).toContain(
-      'formatChartCurrencyAmount(value, normalizeChartCurrencyCode(currencyCode), "standard", 2)'
+    expect(source).toContain("locale={locale}");
+    expect(source).toContain("dateHeader={copy.revenueChart.dateHeader}");
+    expect(source).toContain("revenueHeader={copy.revenueChart.revenueHeader}");
+    expect(contentSource).toContain('dateHeader: "Дата"');
+    expect(contentSource).toContain('revenueHeader: "Выручка"');
+    expect(contentSource).toContain('dateHeader: "Date"');
+    expect(contentSource).toContain('revenueHeader: "Revenue"');
+    expect(chartSource).toContain('<th scope="col">{dateHeader}</th>');
+    expect(chartSource).toContain('<th scope="col">{revenueHeader}</th>');
+    expect(chartSource).not.toContain('<th scope="col">Date</th>');
+    expect(chartSource).not.toContain('<th scope="col">Revenue</th>');
+    expect(chartSource).toMatch(
+      /formatChartCurrencyAmount\(\s*value,\s*normalizeChartCurrencyCode\(currencyCode\),\s*"standard",\s*2,\s*locale\s*\)/
     );
     expect(source).not.toContain("currency: currencyCode,");
     expect(chartSource).not.toContain("currency: currencyCode,");
+    expect(chartSource).not.toContain('return new Intl.NumberFormat("en-US"');
   });
 
   it("keeps dashboard chart and status colors theme-token based", () => {

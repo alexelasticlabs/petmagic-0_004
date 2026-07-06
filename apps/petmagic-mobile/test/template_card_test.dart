@@ -586,6 +586,29 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  test('TemplateCard featured countdown is gated by visibility lifecycle', () {
+    final source = File(
+      'lib/features/templates/presentation/widgets/template_card.dart',
+    ).readAsStringSync();
+    final initStateBody = _methodBody(source, 'void initState()');
+    final lifecycleBody = _methodBody(
+      source,
+      'void _handleAppLifecycleChanged()',
+    );
+    final tickerGuardBody = _getterBody(
+      source,
+      'bool get _shouldRunFeaturedCountdownTicker',
+    );
+
+    expect(initStateBody, isNot(contains('_syncFeaturedCountdownTicker();')));
+    expect(source, contains('void didChangeDependencies()'));
+    expect(source, isNot(contains('Timer.periodic')));
+    expect(source, contains('_featuredCountdownTimer = Timer(delay, ()'));
+    expect(lifecycleBody, contains('_featuredCountdownTimer?.cancel();'));
+    expect(tickerGuardBody, contains('AppLifecycleState.resumed'));
+    expect(tickerGuardBody, contains('TickerMode.valuesOf(context).enabled'));
+  });
+
   testWidgets('TemplateCard limits concurrent visible video previews', (
     tester,
   ) async {
@@ -903,4 +926,34 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+}
+
+String _methodBody(String source, String signature) {
+  final start = source.indexOf(signature);
+  expect(start, isNonNegative, reason: 'Missing method $signature');
+  final openBrace = source.indexOf('{', start);
+  expect(openBrace, isNonNegative, reason: 'Missing body for $signature');
+
+  var depth = 0;
+  for (var index = openBrace; index < source.length; index++) {
+    final character = source[index];
+    if (character == '{') {
+      depth++;
+    } else if (character == '}') {
+      depth--;
+      if (depth == 0) {
+        return source.substring(openBrace + 1, index);
+      }
+    }
+  }
+
+  fail('Unterminated body for $signature');
+}
+
+String _getterBody(String source, String signature) {
+  final start = source.indexOf(signature);
+  expect(start, isNonNegative, reason: 'Missing getter $signature');
+  final end = source.indexOf(';', start);
+  expect(end, isNonNegative, reason: 'Missing getter terminator $signature');
+  return source.substring(start, end);
 }

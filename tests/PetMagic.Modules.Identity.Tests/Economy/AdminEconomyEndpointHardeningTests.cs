@@ -14,12 +14,25 @@ public sealed class AdminEconomyEndpointHardeningTests
         Assert.DoesNotContain("detail: result.Error.Message", overviewAndSubscriptions);
         Assert.DoesNotContain("detail: result.Error.Message", redeemCodes);
         Assert.DoesNotContain("detail: result.Error.Message", filters);
+        Assert.DoesNotContain("Query parameter", redeemCodes, StringComparison.Ordinal);
+        Assert.DoesNotContain("Query parameter", filters, StringComparison.Ordinal);
 
         Assert.Contains("ToAdminEconomyProblem(result.Error", paymentProviderConfigs);
         Assert.Contains("ToAdminEconomyProblem(result.Error", overviewAndSubscriptions);
         Assert.Contains("ToAdminEconomyProblem(result.Error", redeemCodes);
         Assert.Contains("ToAdminEconomyFilterProblem(", filters);
         Assert.Contains("ToAdminEconomyProblem(\n                new Error(", redeemCodes, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AdminEconomyEndpoints_ShouldApplyPrivateCacheHeaders()
+    {
+        var source = ReadEndpointSource("AdminEconomyEndpoints.cs");
+
+        Assert.Contains(".AddEndpointFilter(ApplyPrivateAdminEconomyResponseHeadersAsync)", source, StringComparison.Ordinal);
+        Assert.Contains("context.HttpContext.Response.Headers.CacheControl = \"no-store\";", source, StringComparison.Ordinal);
+        Assert.Contains("context.HttpContext.Response.Headers.Pragma = \"no-cache\";", source, StringComparison.Ordinal);
+        Assert.Contains("context.HttpContext.Response.Headers.XContentTypeOptions = \"nosniff\";", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -65,19 +78,15 @@ public sealed class AdminEconomyEndpointHardeningTests
         Assert.Contains("\"economy.payment_provider_config_exists\" => StatusCodes.Status409Conflict", source, StringComparison.Ordinal);
         Assert.Contains("\"economy.redeem_code_not_found\" => StatusCodes.Status404NotFound", source, StringComparison.Ordinal);
         Assert.Contains("\"economy.redeem_code_exists\" => StatusCodes.Status409Conflict", source, StringComparison.Ordinal);
-        Assert.Contains("\"economy.purchase_status_invalid\" => \"Query parameter status must be pending, succeeded, failed, refund_pending, refund_review, or refunded.\"", source, StringComparison.Ordinal);
-        Assert.Contains("\"economy.subscription_status_invalid\" => \"Query parameter status is not supported for admin subscription filtering.\"", source, StringComparison.Ordinal);
-        Assert.Contains("\"economy.subscription_event_status_invalid\" => \"Query parameter status is not supported for admin subscription event filtering.\"", source, StringComparison.Ordinal);
-        Assert.Contains("\"economy.payment_provider_invalid\" => \"Query parameter provider must be stripe, app_store, or google_play.\"", source, StringComparison.Ordinal);
-        Assert.Contains("\"economy.incident_category_invalid\" => \"Query parameter category is not supported for admin incident filtering.\"", source, StringComparison.Ordinal);
         Assert.Contains("\"economy.incident_action_invalid\" => StatusCodes.Status409Conflict", source, StringComparison.Ordinal);
-        Assert.Contains("\"economy.incident_action_reason_required\" => \"Incident action reason is required.\"", source, StringComparison.Ordinal);
-        Assert.Contains("\"economy.redeem_code_status_invalid\" => \"Query parameter status must be all, draft, scheduled, active, paused, exhausted, expired, or archived.\"", source, StringComparison.Ordinal);
-        Assert.Contains("\"economy.redeem_code_reward_kind_invalid\" => \"Query parameter rewardKind must be all or spark.\"", source, StringComparison.Ordinal);
-        Assert.Contains("\"economy.redeem_code_sort_invalid\" => \"Query parameter sort must be updated, usage, reward, code, or expiry.\"", source, StringComparison.Ordinal);
         Assert.Contains("\"economy.payment_gateway_failed\" => StatusCodes.Status502BadGateway", source, StringComparison.Ordinal);
-        Assert.Contains("\"Billing gateway is temporarily unavailable.\"", source, StringComparison.Ordinal);
+        Assert.Contains("extensions: BuildAdminEconomyProblemExtensions(error.Code)", source, StringComparison.Ordinal);
+        Assert.Contains("return new Dictionary<string, object?> { [\"code\"] = errorCode };", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("GetAdminEconomyProblemDetail", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("detail:", source, StringComparison.Ordinal);
         Assert.DoesNotContain("detail: error.Message", source);
+        Assert.DoesNotContain("Query parameter", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Billing gateway is temporarily unavailable.", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -92,8 +101,11 @@ public sealed class AdminEconomyEndpointHardeningTests
         Assert.Contains(".RequireAuthorization(\"AdminOnly\")", routesSource, StringComparison.Ordinal);
         Assert.Contains("IValidator<AdminEconomyIncidentActionCommand> validator", handlersSource, StringComparison.Ordinal);
         Assert.Contains("request?.Reason ?? string.Empty", handlersSource, StringComparison.Ordinal);
-        Assert.Contains("TypedResults.ValidationProblem(validation.ToDictionary())", handlersSource, StringComparison.Ordinal);
-        Assert.Contains("Resolution note is required.", handlersSource, StringComparison.Ordinal);
+        Assert.Contains("TypedResults.ValidationProblem(validation.ToValidationCodeDictionary())", handlersSource, StringComparison.Ordinal);
+        Assert.Contains("economy.incident_resolution_note_required", handlersSource, StringComparison.Ordinal);
+        Assert.Contains("economy.incident_reopen_reason_required", handlersSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("Resolution note is required.", handlersSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("Reason is required.", handlersSource, StringComparison.Ordinal);
     }
 
     [Fact]

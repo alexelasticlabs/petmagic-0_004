@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 
@@ -16,6 +17,7 @@ class StreakCounter extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
     final text = AppLocalizations.of(context);
+    final streakColor = colors.gold;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -31,9 +33,7 @@ class StreakCounter extends StatelessWidget {
               style: TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.w800,
-                color: currentStreak > 0
-                    ? const Color(0xFFFF6D00)
-                    : colors.textSoft,
+                color: currentStreak > 0 ? streakColor : colors.textSoft,
                 height: 1,
               ),
             ),
@@ -65,9 +65,13 @@ class StreakCalendar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final streakColor = colors.gold;
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final startOfWeek = today.subtract(Duration(days: today.weekday - 1));
+    final weekdayFormatter = DateFormat.E(
+      Localizations.localeOf(context).toLanguageTag(),
+    );
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -76,7 +80,7 @@ class StreakCalendar extends StatelessWidget {
         final dateStr = date.toIso8601String().split('T').first;
         final isActive = activeDays.contains(dateStr);
         final isToday = date == today;
-        final dayLabel = _dayLabel(date.weekday);
+        final dayLabel = weekdayFormatter.format(date);
 
         return Column(
           mainAxisSize: MainAxisSize.min,
@@ -96,10 +100,10 @@ class StreakCalendar extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: isActive
-                    ? const Color(0xFFFF6D00)
+                    ? streakColor
                     : colors.surfaceStrong.withValues(alpha: 0.3),
                 border: isToday
-                    ? Border.all(color: const Color(0xFFFF6D00), width: 2)
+                    ? Border.all(color: streakColor, width: 2)
                     : null,
               ),
               alignment: Alignment.center,
@@ -118,26 +122,5 @@ class StreakCalendar extends StatelessWidget {
         );
       }),
     );
-  }
-
-  static String _dayLabel(int weekday) {
-    switch (weekday) {
-      case 1:
-        return 'M';
-      case 2:
-        return 'T';
-      case 3:
-        return 'W';
-      case 4:
-        return 'T';
-      case 5:
-        return 'F';
-      case 6:
-        return 'S';
-      case 7:
-        return 'S';
-      default:
-        return '';
-    }
   }
 }

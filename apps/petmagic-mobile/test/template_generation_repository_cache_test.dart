@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
@@ -124,6 +125,7 @@ void main() {
         dio: dio,
         sessionStorage: TestSessionStorage(sessionFixture()),
         preferences: preferences,
+        secureStorage: _FakeSecureStorage(),
       );
 
       final live = await repository.fetchGenerations(status: 'completed');
@@ -166,6 +168,55 @@ void main() {
         cached?.single.sourceImageAsset?.url,
         'https://cdn.petmagic.test/input.jpg',
       );
+    },
+  );
+
+  test(
+    'generation cache strips signed media URL secrets from list fields on read',
+    () async {
+      final preferences = SharedPreferencesAsync();
+      await preferences.setString(
+        'templates_generations_v1:user-1:completed',
+        jsonEncode([
+          {
+            ...generationJson(
+              generationId: 'generation-signed-list',
+              status: 'completed',
+              updatedAtUtc: '2026-06-14T12:00:00Z',
+            ),
+            'referenceImageUrls': [
+              'https://cdn.petmagic.test/ref-1.jpg?X-Amz-Signature=secret&token=raw#fragment',
+              'https://cdn.petmagic.test/ref-2.jpg?signature=secret',
+            ],
+          },
+        ]),
+      );
+      final repository = TemplateGenerationRepository(
+        dio: Dio(BaseOptions(baseUrl: 'https://api.petmagic.test')),
+        sessionStorage: TestSessionStorage(sessionFixture()),
+        preferences: preferences,
+      );
+
+      final cached = await repository.readCachedGenerations(
+        status: 'completed',
+      );
+      final keys = await preferences.getKeys();
+      final migratedCacheKey = keys.singleWhere(
+        (key) =>
+            key.startsWith('templates_generations_v1:') &&
+            key.endsWith(':completed'),
+      );
+      final raw = await preferences.getString(migratedCacheKey);
+
+      expect(cached?.single.generationId, 'generation-signed-list');
+      expect(migratedCacheKey, isNot(contains('user-1')));
+      expect(raw, isNotNull);
+      expect(raw, isNot(contains('X-Amz-Signature')));
+      expect(raw, isNot(contains('token=raw')));
+      expect(raw, isNot(contains('signature=secret')));
+      expect(raw, isNot(contains('fragment')));
+      expect(raw, contains('https://cdn.petmagic.test/ref-1.jpg'));
+      expect(raw, contains('https://cdn.petmagic.test/ref-2.jpg'));
     },
   );
 
@@ -603,4 +654,241 @@ void main() {
 
     expect(cached, isNull);
   });
+
+  test(
+    'active generation identifiers are stored outside shared preferences',
+    () async {
+      final preferences = SharedPreferencesAsync();
+      final secureStorage = _FakeSecureStorage();
+      final repository = TemplateGenerationRepository(
+        dio: Dio(BaseOptions(baseUrl: 'https://api.petmagic.test')),
+        sessionStorage: TestSessionStorage(sessionFixture()),
+        preferences: preferences,
+        secureStorage: secureStorage,
+      );
+
+      await repository.rememberActiveGeneration(
+        generationId: 'generation-active-secret-1',
+        correlationId: 'generation-correlation-secret-1',
+      );
+      final restored = await repository.readActiveGeneration();
+      final preferenceKeys = await preferences.getKeys();
+
+      expect(restored?.generationId, 'generation-active-secret-1');
+      expect(restored?.correlationId, 'generation-correlation-secret-1');
+      expect(
+        preferenceKeys.where(
+          (key) => key.startsWith('templates_active_generation_'),
+        ),
+        isEmpty,
+      );
+      expect(
+        secureStorage.values.values,
+        contains('generation-active-secret-1'),
+      );
+      expect(
+        secureStorage.values.values,
+        contains('generation-correlation-secret-1'),
+      );
+    },
+  );
+
+  test(
+    'legacy active generation prefs are migrated to secure storage',
+    () async {
+      final preferences = SharedPreferencesAsync();
+      final secureStorage = _FakeSecureStorage();
+      await preferences.setString(
+        'templates_active_generation_id_v1:user-1',
+        'legacy-generation-active-1',
+      );
+      await preferences.setString(
+        'templates_active_generation_correlation_id_v1:user-1',
+        'legacy-generation-correlation-1',
+      );
+      final repository = TemplateGenerationRepository(
+        dio: Dio(BaseOptions(baseUrl: 'https://api.petmagic.test')),
+        sessionStorage: TestSessionStorage(sessionFixture()),
+        preferences: preferences,
+        secureStorage: secureStorage,
+      );
+
+      final restored = await repository.readActiveGeneration();
+      final preferenceKeys = await preferences.getKeys();
+
+      expect(restored?.generationId, 'legacy-generation-active-1');
+      expect(restored?.correlationId, 'legacy-generation-correlation-1');
+      expect(
+        preferenceKeys.where(
+          (key) => key.startsWith('templates_active_generation_'),
+        ),
+        isEmpty,
+      );
+      expect(
+        secureStorage.values.values,
+        contains('legacy-generation-active-1'),
+      );
+      expect(
+        secureStorage.values.values,
+        contains('legacy-generation-correlation-1'),
+      );
+    },
+  );
+
+  test(
+    'partial active generation migration clears legacy identifier preferences',
+    () async {
+      final preferences = SharedPreferencesAsync();
+      final secureStorage = _FakeSecureStorage({
+        'petmagic_mobile_templates_active_generation_scope_v2':
+            'c6c289e49e9c05b2145860387b73bcb18df43fb09a1e4a4a9713c76c88bb541b',
+        'petmagic_mobile_templates_active_generation_correlation_id_v2':
+            'secure-generation-correlation-1',
+      });
+      await preferences.setString(
+        'templates_active_generation_id_v1:user-1',
+        'legacy-generation-active-1',
+      );
+      final repository = TemplateGenerationRepository(
+        dio: Dio(BaseOptions(baseUrl: 'https://api.petmagic.test')),
+        sessionStorage: TestSessionStorage(sessionFixture()),
+        preferences: preferences,
+        secureStorage: secureStorage,
+      );
+
+      final restored = await repository.readActiveGeneration();
+      final preferenceKeys = await preferences.getKeys();
+
+      expect(restored?.generationId, 'legacy-generation-active-1');
+      expect(restored?.correlationId, 'secure-generation-correlation-1');
+      expect(
+        preferenceKeys.where(
+          (key) => key.startsWith('templates_active_generation_'),
+        ),
+        isEmpty,
+      );
+      expect(
+        secureStorage.values.values,
+        contains('legacy-generation-active-1'),
+      );
+    },
+  );
+
+  test(
+    'clearing active generation preserves secure state for another account',
+    () async {
+      final preferences = SharedPreferencesAsync();
+      final secureStorage = _FakeSecureStorage({
+        'petmagic_mobile_templates_active_generation_scope_v2':
+            'c6c289e49e9c05b2145860387b73bcb18df43fb09a1e4a4a9713c76c88bb541b',
+        'petmagic_mobile_templates_active_generation_id_v2':
+            'user-1-generation-active',
+        'petmagic_mobile_templates_active_generation_correlation_id_v2':
+            'user-1-generation-correlation',
+      });
+      final repository = TemplateGenerationRepository(
+        dio: Dio(BaseOptions(baseUrl: 'https://api.petmagic.test')),
+        sessionStorage: TestSessionStorage(sessionFixtureFor('user-2')),
+        preferences: preferences,
+        secureStorage: secureStorage,
+      );
+
+      await repository.clearActiveGeneration('user-2-generation-active');
+
+      expect(
+        secureStorage
+            .values['petmagic_mobile_templates_active_generation_scope_v2'],
+        'c6c289e49e9c05b2145860387b73bcb18df43fb09a1e4a4a9713c76c88bb541b',
+      );
+      expect(
+        secureStorage
+            .values['petmagic_mobile_templates_active_generation_id_v2'],
+        'user-1-generation-active',
+      );
+      expect(
+        secureStorage
+            .values['petmagic_mobile_templates_active_generation_correlation_id_v2'],
+        'user-1-generation-correlation',
+      );
+    },
+  );
+
+  test('clear local cache removes secure active generation state', () async {
+    final preferences = SharedPreferencesAsync();
+    final secureStorage = _FakeSecureStorage();
+    final repository = TemplateGenerationRepository(
+      dio: Dio(BaseOptions(baseUrl: 'https://api.petmagic.test')),
+      sessionStorage: TestSessionStorage(sessionFixture()),
+      preferences: preferences,
+      secureStorage: secureStorage,
+    );
+    await repository.rememberActiveGeneration(
+      generationId: 'generation-active-secret-1',
+      correlationId: 'generation-correlation-secret-1',
+    );
+
+    await repository.clearLocalCache();
+
+    expect(await repository.readActiveGeneration(), isNull);
+    expect(
+      secureStorage.values.values,
+      isNot(contains('generation-active-secret-1')),
+    );
+    expect(
+      secureStorage.values.values,
+      isNot(contains('generation-correlation-secret-1')),
+    );
+  });
+}
+
+class _FakeSecureStorage extends FlutterSecureStorage {
+  _FakeSecureStorage([Map<String, String>? initialValues])
+    : values = initialValues ?? <String, String>{};
+
+  final Map<String, String> values;
+
+  @override
+  Future<String?> read({
+    required String key,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    return values[key];
+  }
+
+  @override
+  Future<void> write({
+    required String key,
+    required String? value,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    if (value == null) {
+      values.remove(key);
+      return;
+    }
+
+    values[key] = value;
+  }
+
+  @override
+  Future<void> delete({
+    required String key,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    values.remove(key);
+  }
 }

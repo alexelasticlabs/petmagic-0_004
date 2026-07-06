@@ -80,6 +80,19 @@ export function TemplateTestMediaActions({
     anchor.remove();
   }
 
+  function schedulePreviewBlobUrlRevoke(objectUrl: string, delayMs: number): void {
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), delayMs);
+  }
+
+  function revokePreviewBlobUrlOnFailure(objectUrl: string, action: () => void): void {
+    try {
+      action();
+    } catch (error) {
+      URL.revokeObjectURL(objectUrl);
+      throw error;
+    }
+  }
+
   async function handleDownload() {
     if (!canManageTemplates || !previewUrl || pendingMediaAction) {
       return;
@@ -96,8 +109,10 @@ export function TemplateTestMediaActions({
       }
 
       const objectUrl = URL.createObjectURL(blob);
-      downloadPreviewBlobUrl(objectUrl);
-      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+      revokePreviewBlobUrlOnFailure(objectUrl, () => {
+        downloadPreviewBlobUrl(objectUrl);
+        schedulePreviewBlobUrlRevoke(objectUrl, 1000);
+      });
     } finally {
       if (mediaActionAbortControllerRef.current === controller) {
         mediaActionAbortControllerRef.current = null;
@@ -122,14 +137,16 @@ export function TemplateTestMediaActions({
       }
 
       const objectUrl = URL.createObjectURL(blob);
-      const opened = window.open(objectUrl, "_blank", "noopener,noreferrer");
-      if (!opened) {
-        downloadPreviewBlobUrl(objectUrl);
-        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-        return;
-      }
+      revokePreviewBlobUrlOnFailure(objectUrl, () => {
+        const opened = window.open(objectUrl, "_blank", "noopener,noreferrer");
+        if (!opened) {
+          downloadPreviewBlobUrl(objectUrl);
+          schedulePreviewBlobUrlRevoke(objectUrl, 1000);
+          return;
+        }
 
-      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+        schedulePreviewBlobUrlRevoke(objectUrl, 60_000);
+      });
     } finally {
       if (mediaActionAbortControllerRef.current === controller) {
         mediaActionAbortControllerRef.current = null;

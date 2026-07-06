@@ -1,0 +1,84 @@
+name: repo-hygiene-ci
+
+on:
+  pull_request:
+    paths:
+      - README.md
+      - docs/**
+      - scripts/**
+      - .github/workflows/**
+  push:
+    branches:
+      - main
+      - master
+      - develop
+    paths:
+      - README.md
+      - docs/**
+      - scripts/**
+      - .github/workflows/**
+
+permissions:
+  contents: read
+
+jobs:
+  repo-hygiene:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Validate JS script syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r script; do
+            node --check "$script"
+          done < <(find scripts -type f \( -name '*.js' -o -name '*.mjs' \) | sort)
+
+      - name: Validate shell script syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r script; do
+            bash -n "$script"
+          done < <(find scripts -type f -name '*.sh' | sort)
+
+      - name: Validate Python script syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r script; do
+            python -m py_compile "$script"
+          done < <(find scripts -type f -name '*.py' | sort)
+
+      - name: Validate PowerShell script syntax
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Get-ChildItem -LiteralPath scripts -Recurse -Filter *.ps1 | ForEach-Object {
+            $errors = $null
+            [System.Management.Automation.PSParser]::Tokenize((Get-Content -LiteralPath $_.FullName -Raw), [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              throw "PowerShell parser errors in $($_.FullName): $($errors | ConvertTo-Json -Compress)"
+            }
+          }
+
+      - name: Validate script safety inventory
+        run: node scripts/qa/test-script-safety-inventory.mjs
+
+      - name: Validate markdown local links
+        run: |
+          node scripts/qa/test-markdown-local-links.mjs
+          node scripts/qa/check-markdown-local-links.mjs

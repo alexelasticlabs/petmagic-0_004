@@ -79,7 +79,8 @@ public sealed record UpdateImageTemplateCommand(
     TemplateAssetCommand? AnimatedPreviewAsset = null,
     TemplateAssetCommand? FeedLoopLowAsset = null,
     TemplateAssetCommand? FeedLoopMediumAsset = null,
-    TemplateAssetCommand? DetailPreviewAsset = null);
+    TemplateAssetCommand? DetailPreviewAsset = null,
+    bool KeepPreviewAsset = false);
 
 public sealed record CreateVideoTemplateCommand(
     string Title,
@@ -140,7 +141,9 @@ public sealed record UpdateVideoTemplateCommand(
     TemplateAssetCommand? AnimatedPreviewAsset = null,
     TemplateAssetCommand? FeedLoopLowAsset = null,
     TemplateAssetCommand? FeedLoopMediumAsset = null,
-    TemplateAssetCommand? DetailPreviewAsset = null);
+    TemplateAssetCommand? DetailPreviewAsset = null,
+    bool KeepPreviewAsset = false,
+    bool KeepReferenceMotionAsset = false);
 
 public sealed record ChangeTemplateStatusCommand(Guid TemplateId, string Status);
 

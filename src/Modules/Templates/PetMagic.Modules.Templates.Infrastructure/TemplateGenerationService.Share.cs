@@ -13,6 +13,8 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 
 internal sealed partial class TemplateGenerationService
 {
+    private const int MaxGenerationShareTokenLength = 4096;
+
     private string CreateGenerationShareToken(Guid ownerUserId, Guid generationId, bool cleanAccess)
     {
         var payload = new GenerationShareTokenPayload(generationId, ownerUserId, cleanAccess, DateTime.UtcNow);
@@ -23,7 +25,8 @@ internal sealed partial class TemplateGenerationService
 
     private Result<GenerationShareTokenPayload> TryReadGenerationShareToken(string shareToken)
     {
-        if (string.IsNullOrWhiteSpace(shareToken))
+        if (string.IsNullOrWhiteSpace(shareToken)
+            || shareToken.Length > MaxGenerationShareTokenLength)
         {
             return Result.Failure<GenerationShareTokenPayload>(TemplatesErrors.GenerationJobNotFound);
         }
@@ -55,12 +58,38 @@ internal sealed partial class TemplateGenerationService
 
     private static byte[] DecodeShareToken(string shareToken)
     {
-        var token = Uri.UnescapeDataString(shareToken.Trim())
+        var trimmed = shareToken.Trim();
+        if (trimmed.Length > MaxGenerationShareTokenLength)
+        {
+            throw new FormatException("Generation share token is too long.");
+        }
+
+        var unescaped = Uri.UnescapeDataString(trimmed);
+        if (unescaped.Length > MaxGenerationShareTokenLength || !IsSafeShareTokenText(unescaped))
+        {
+            throw new FormatException("Generation share token contains unsupported characters.");
+        }
+
+        var token = unescaped
             .Replace('-', '+')
             .Replace('_', '/');
 
         token = token.PadRight(token.Length + ((4 - token.Length % 4) % 4), '=');
         return Convert.FromBase64String(token);
+    }
+
+    private static bool IsSafeShareTokenText(string token)
+    {
+        foreach (var character in token)
+        {
+            if (!char.IsAsciiLetterOrDigit(character)
+                && character is not '-' and not '_' and not '+' and not '/' and not '=')
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private string BuildGenerationShareUrl(string shareToken)

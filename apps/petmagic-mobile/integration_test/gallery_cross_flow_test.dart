@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:integration_test/integration_test.dart';
@@ -146,18 +147,35 @@ void main() {
     await tester.tap(find.text('Pet portrait').first);
     await _pumpUntil(tester, () => find.text('Upload').evaluate().isNotEmpty);
     expect(find.text('Upload'), findsOneWidget);
+    final text = AppLocalizations.of(tester.element(find.text('Upload')));
 
     await tester.tap(find.text('Upload'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await _pumpUntil(
+      tester,
+      () => find.text(text.templateFlowCreateMagicAction).evaluate().isNotEmpty,
+    );
 
-    await tester.tap(find.text('Start'));
+    await tester.tap(find.text(text.templateFlowCreateMagicAction));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(generationRepository.lastPetId, 'pet-42');
     expect(generationRepository.lastPetPhotoId, 'photo-7');
     expect(find.text('status:generation-pet-1'), findsOneWidget);
+
+    generationRepository.addGalleryMatrixItems();
+    expect(
+      generationRepository.createdCreations.map(
+        (item) => item.galleryMedia.state,
+      ),
+      containsAll([
+        GalleryMediaState.resultReady,
+        GalleryMediaState.processing,
+        GalleryMediaState.expired,
+        GalleryMediaState.storageUnavailable,
+        GalleryMediaState.failed,
+      ]),
+    );
 
     router.go(GenerationsGalleryPage.routePath);
     await tester.pump();
@@ -167,9 +185,48 @@ void main() {
     expect(find.byType(GenerationsGalleryPage), findsOneWidget);
     expect(find.text('Pet portrait'), findsOneWidget);
 
-    final text = AppLocalizations.of(
-      tester.element(find.byType(GenerationsGalleryPage)),
+    await _tapGalleryFilter(
+      tester,
+      text.generationStatusFilterActive,
+      GenerationHistoryFilter.active,
+      historyController,
     );
+    expect(historyController.state.items.map((item) => item.templateTitle), [
+      'Active video',
+    ]);
+    expect(find.text('Active video'), findsOneWidget);
+
+    await _tapGalleryFilter(
+      tester,
+      text.generationStatusFilterReady,
+      GenerationHistoryFilter.ready,
+      historyController,
+    );
+    expect(
+      historyController.state.items.map((item) => item.templateTitle),
+      containsAll(['Pet portrait', 'Ready video']),
+    );
+    expect(find.text('Pet portrait'), findsOneWidget);
+    expect(find.text('Ready video'), findsOneWidget);
+
+    await _tapGalleryFilter(
+      tester,
+      text.generationStatusFilterFailed,
+      GenerationHistoryFilter.failed,
+      historyController,
+    );
+    expect(historyController.state.items.map((item) => item.templateTitle), [
+      'Failed portrait',
+    ]);
+
+    await _tapGalleryFilter(
+      tester,
+      text.allFilter,
+      GenerationHistoryFilter.all,
+      historyController,
+    );
+    expect(find.text('Pet portrait'), findsOneWidget);
+
     await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
@@ -193,9 +250,10 @@ void main() {
     await _pumpUntil(tester, () => mediaActions.saveCalls.isNotEmpty);
 
     expect(mediaActions.saveCalls, [
-      'https://cdn.petmagic.app/generated-bella.jpg',
+      'https://cdn.petmagic.app/fresh-download-bella.jpg?sig=download',
     ]);
     expect(mediaActions.saveLocalPaths, [null]);
+    expect(generationRepository.downloadCalls, ['generation-pet-1']);
 
     await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
     await tester.pump();
@@ -204,9 +262,29 @@ void main() {
     await _pumpUntil(tester, () => mediaActions.shareCalls.isNotEmpty);
 
     expect(mediaActions.shareCalls, [
-      'https://cdn.petmagic.app/generated-bella.jpg',
+      'https://cdn.petmagic.app/fresh-share-bella.jpg?sig=share',
     ]);
     expect(mediaActions.shareLocalPaths, [null]);
+    expect(mediaActions.shareTexts, [
+      'https://app.petmagic.test/share/generation/generation-pet-1',
+    ]);
+    expect(generationRepository.shareCalls, ['generation-pet-1']);
+
+    await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await _tapSheetAction(tester, text.generationStatusCopyLinkAction);
+    await _pumpUntil(tester, () => generationRepository.shareCalls.length == 2);
+    final copied = await Clipboard.getData('text/plain');
+
+    expect(
+      copied?.text,
+      'https://app.petmagic.test/share/generation/generation-pet-1',
+    );
+    expect(generationRepository.shareCalls, [
+      'generation-pet-1',
+      'generation-pet-1',
+    ]);
 
     await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
     await tester.pump();
@@ -216,11 +294,16 @@ void main() {
       tester,
       () =>
           historyController.deleteCalls.isNotEmpty &&
-          generationRepository.createdCreations.isEmpty,
+          generationRepository.createdCreations.every(
+            (item) => item.generationId != 'generation-pet-1',
+          ),
     );
 
     expect(historyController.deleteCalls, ['generation-pet-1']);
-    expect(generationRepository.createdCreations, isEmpty);
+    expect(
+      generationRepository.createdCreations.map((item) => item.generationId),
+      isNot(contains('generation-pet-1')),
+    );
     expect(find.text('Pet portrait'), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -232,6 +315,22 @@ Future<void> _tapSheetAction(WidgetTester tester, String label) async {
   await tester.ensureVisible(action);
   await tester.tap(action);
   await tester.pump();
+}
+
+Future<void> _tapGalleryFilter(
+  WidgetTester tester,
+  String label,
+  GenerationHistoryFilter expectedFilter,
+  _PetFlowHistoryController historyController,
+) async {
+  final filter = find.widgetWithText(ChoiceChip, label);
+  expect(filter, findsOneWidget);
+  await tester.ensureVisible(filter);
+  await tester.tap(filter);
+  await _pumpUntil(
+    tester,
+    () => historyController.state.filter == expectedFilter,
+  );
 }
 
 Future<void> _pumpUntil(
@@ -251,6 +350,7 @@ class _RecordingGenerationStatusMediaActions
   final shareCalls = <String>[];
   final saveLocalPaths = <String?>[];
   final shareLocalPaths = <String?>[];
+  final shareTexts = <String?>[];
 
   @override
   Future<bool> saveToGallery({
@@ -277,6 +377,7 @@ class _RecordingGenerationStatusMediaActions
   }) async {
     shareCalls.add(mediaUrl);
     shareLocalPaths.add(localPath);
+    shareTexts.add(shareText);
   }
 }
 
@@ -442,6 +543,78 @@ class _CrossGalleryPetFlowRepository extends TemplateGenerationRepository {
   String? lastPetId;
   String? lastPetPhotoId;
   final createdCreations = <TemplateGenerationResult>[];
+  final downloadCalls = <String>[];
+  final shareCalls = <String>[];
+
+  void addGalleryMatrixItems() {
+    final now = DateTime.utc(2035, 1, 1, 12);
+    createdCreations.addAll([
+      _generation(
+        id: 'generation-video-ready',
+        title: 'Ready video',
+        status: TemplateGenerationStatus.completed,
+        templateType: 'video',
+        outputUrl: 'https://cdn.petmagic.app/ready-video.mp4',
+        completedAtUtc: now.add(const Duration(minutes: 2)),
+        galleryMedia: const GalleryMedia(
+          state: GalleryMediaState.resultReady,
+          mediaType: 'video',
+          previewUrl: 'https://cdn.petmagic.app/ready-video-thumb.jpg',
+          resultUrl: 'https://cdn.petmagic.app/ready-video.mp4',
+          canDownload: true,
+          canShare: true,
+        ),
+      ),
+      _generation(
+        id: 'generation-active-video',
+        title: 'Active video',
+        status: TemplateGenerationStatus.providerProcessing,
+        templateType: 'video',
+        progressPercent: 52,
+        stage: 'provider_processing',
+        galleryMedia: const GalleryMedia(
+          state: GalleryMediaState.processing,
+          mediaType: 'video',
+          retryAfterSeconds: 10,
+        ),
+      ),
+      _generation(
+        id: 'generation-expired',
+        title: 'Expired portrait',
+        status: TemplateGenerationStatus.completed,
+        galleryMedia: const GalleryMedia(
+          state: GalleryMediaState.expired,
+          mediaType: 'image',
+          reasonCode: 'media_expired',
+          userMessageKey: 'generation.media_expired',
+        ),
+      ),
+      _generation(
+        id: 'generation-unavailable',
+        title: 'Unavailable portrait',
+        status: TemplateGenerationStatus.completed,
+        galleryMedia: const GalleryMedia(
+          state: GalleryMediaState.storageUnavailable,
+          mediaType: 'image',
+          reasonCode: 'storage_unavailable',
+          userMessageKey: 'generation.storage_unavailable',
+        ),
+      ),
+      _generation(
+        id: 'generation-failed',
+        title: 'Failed portrait',
+        status: TemplateGenerationStatus.failed,
+        failureCode: 'provider_failed',
+        failureMessage: 'Provider failed',
+        galleryMedia: const GalleryMedia(
+          state: GalleryMediaState.failed,
+          mediaType: 'image',
+          reasonCode: 'provider_failed',
+          userMessageKey: 'generation.media_failed',
+        ),
+      ),
+    ]);
+  }
 
   @override
   Future<({String correlationId, String generationId})?>
@@ -531,6 +704,14 @@ class _CrossGalleryPetFlowRepository extends TemplateGenerationRepository {
           outputUrl: 'https://cdn.petmagic.app/generated-bella.jpg',
           resultPreviewUrl:
               'https://cdn.petmagic.app/generated-bella-thumb.jpg',
+          galleryMedia: const GalleryMedia(
+            state: GalleryMediaState.resultReady,
+            mediaType: 'image',
+            previewUrl: 'https://cdn.petmagic.app/generated-bella-thumb.jpg',
+            resultUrl: 'https://cdn.petmagic.app/generated-bella.jpg',
+            canDownload: true,
+            canShare: true,
+          ),
           completedAtUtc: now.add(const Duration(minutes: 1)),
           updatedAtUtc: now.add(const Duration(minutes: 1)),
           isUnread: true,
@@ -544,6 +725,70 @@ class _CrossGalleryPetFlowRepository extends TemplateGenerationRepository {
     required String generationId,
     String? correlationId,
   }) async {}
+
+  @override
+  Future<GenerationMediaAccessResult> fetchDownloadUrl(
+    String generationId, {
+    CancelToken? cancelToken,
+  }) async {
+    downloadCalls.add(generationId);
+    return const GenerationMediaAccessResult(
+      mediaUrl:
+          'https://cdn.petmagic.app/fresh-download-bella.jpg?sig=download',
+      hasWatermark: false,
+      fileName: 'fresh-download-bella.jpg',
+    );
+  }
+
+  @override
+  Future<GenerationMediaAccessResult> fetchShareUrl(
+    String generationId, {
+    CancelToken? cancelToken,
+  }) async {
+    shareCalls.add(generationId);
+    return GenerationMediaAccessResult(
+      mediaUrl: 'https://cdn.petmagic.app/fresh-share-bella.jpg?sig=share',
+      hasWatermark: false,
+      fileName: 'fresh-share-bella.jpg',
+      shareUrl: 'https://app.petmagic.test/share/generation/$generationId',
+    );
+  }
+
+  TemplateGenerationResult _generation({
+    required String id,
+    required String title,
+    required TemplateGenerationStatus status,
+    required GalleryMedia galleryMedia,
+    String templateType = 'image',
+    String? outputUrl,
+    String? failureCode,
+    String? failureMessage,
+    String? stage,
+    int? progressPercent,
+    DateTime? completedAtUtc,
+  }) {
+    final now = DateTime.utc(2035, 1, 1, 12);
+    return TemplateGenerationResult(
+      generationId: id,
+      userId: 'user-1',
+      templateId: 'template-pet',
+      status: status,
+      tokenCost: 1,
+      attemptCount: 1,
+      createdAtUtc: now,
+      updatedAtUtc: completedAtUtc ?? now,
+      completedAtUtc: completedAtUtc,
+      userMediaExpired: galleryMedia.state == GalleryMediaState.expired,
+      templateTitle: title,
+      templateType: templateType,
+      outputUrl: outputUrl,
+      failureCode: failureCode,
+      failureMessage: failureMessage,
+      stage: stage,
+      progressPercent: progressPercent,
+      galleryMedia: galleryMedia,
+    );
+  }
 }
 
 class _PetFlowHistoryController extends GenerationHistoryController {

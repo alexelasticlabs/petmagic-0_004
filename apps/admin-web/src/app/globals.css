@@ -1,5 +1,10 @@
 :root {
   color-scheme: dark;
+  --font-admin-body:
+    "Segoe UI", "Helvetica Neue", Arial, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-admin-heading:
+    "Segoe UI Variable Display", "Segoe UI", "Helvetica Neue", Arial, system-ui, -apple-system,
+    BlinkMacSystemFont, sans-serif;
   --font-body: var(--font-admin-body);
   --font-heading: var(--font-admin-heading);
   --font-manrope: var(--font-body);
@@ -24,6 +29,7 @@
   --accent: #8ab4f8;
   --accent-strong: #669df6;
   --accent-contrast: #f6f8fa;
+  --phone-screen-surface: #000000;
   --brand: #81c995;
   --brand-strong: #57bb8a;
   --info: #8ab4f8;

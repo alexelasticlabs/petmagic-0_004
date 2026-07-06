@@ -7,6 +7,9 @@ import { readTemplatesAnalyticsHubPageLibrarySource } from "./templates-analytic
 const hubStylesPath = fileURLToPath(
   new URL("./templates-analytics-hub-page.module.css", import.meta.url)
 );
+const hubContentPath = fileURLToPath(
+  new URL("./templates-analytics-hub-page.content.ts", import.meta.url)
+);
 
 describe("templates analytics hub visual contract", () => {
   it("keeps chart and funnel colors on semantic theme tokens", () => {
@@ -58,6 +61,8 @@ describe("templates analytics hub visual contract", () => {
 
   it("keeps access filter options unique", () => {
     const source = readTemplatesAnalyticsHubPageLibrarySource();
+    const contentSource = readFileSync(hubContentPath, "utf8");
+    const ruContentSource = contentSource.slice(0, contentSource.indexOf("  en: {"));
     const accessFilterBlock = source.slice(
       source.indexOf("label={text.accessFilter}"),
       source.indexOf("label={text.sortFilter}")
@@ -65,6 +70,12 @@ describe("templates analytics hub visual contract", () => {
 
     expect(accessFilterBlock.match(/value: "free"/g) ?? []).toHaveLength(1);
     expect(accessFilterBlock.match(/value: "premium"/g) ?? []).toHaveLength(1);
+    expect(contentSource).toContain('free: "Бесплатно"');
+    expect(contentSource).toContain("Количество жалоб; ниже доступен список самих обращений.");
+    expect(contentSource).toContain("Последние жалобы и фидбек по выбранным шаблонам");
+    expect(ruContentSource).not.toContain('free: "Free"');
+    expect(ruContentSource).not.toContain("Количество complaint событий");
+    expect(ruContentSource).not.toContain("Последние complaint и feedback события");
   });
 
   it("bounds analytics bar widths so backend outliers cannot overflow panels", () => {

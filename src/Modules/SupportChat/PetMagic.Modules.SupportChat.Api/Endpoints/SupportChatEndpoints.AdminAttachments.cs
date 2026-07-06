@@ -33,8 +33,14 @@ public static partial class SupportChatEndpoints
         {
             return TypedResults.ValidationProblem(new Dictionary<string, string[]>
             {
-                [nameof(file)] = ["Support attachment file is required."]
+                [nameof(file)] = ["support.attachment_file_required"]
             });
+        }
+
+        var metadataValidationErrors = ValidateSingleAttachmentMetadata(file, attachmentStorage);
+        if (metadataValidationErrors.Count > 0)
+        {
+            return TypedResults.ValidationProblem(metadataValidationErrors);
         }
 
         var formValidationErrors = ValidateSingleAttachmentFormFields(body, replyToMessageId, out var parsedReplyToMessageId);
@@ -43,9 +49,10 @@ public static partial class SupportChatEndpoints
             return TypedResults.ValidationProblem(formValidationErrors);
         }
 
-        var requestedContentType = file.ContentType ?? "application/octet-stream";
+        var fileName = NormalizeAttachmentFileName(file);
+        var requestedContentType = NormalizeAttachmentContentType(file);
         var normalizedBody = string.IsNullOrWhiteSpace(body)
-            ? Path.GetFileName(file.FileName)
+            ? fileName
             : body.Trim();
 
         var createMessageResult = await service.CreateAttachmentMessageAsync(
@@ -54,7 +61,7 @@ public static partial class SupportChatEndpoints
                 userId,
                 normalizedBody,
                 IsAdmin: true,
-                AttachmentFileName: Path.GetFileName(file.FileName),
+                AttachmentFileName: fileName,
                 AttachmentContentType: requestedContentType,
                 ReplyToMessageId: parsedReplyToMessageId),
             cancellationToken);
@@ -71,7 +78,7 @@ public static partial class SupportChatEndpoints
                 userId,
                 IsAdmin: true,
                 AttachmentUploadStatus: SupportAttachmentUploadStatus.Uploading,
-                AttachmentFileName: Path.GetFileName(file.FileName),
+                AttachmentFileName: fileName,
                 AttachmentContentType: requestedContentType),
             cancellationToken);
 
@@ -83,8 +90,8 @@ public static partial class SupportChatEndpoints
         await using var stream = file.OpenReadStream();
         var storeResult = await attachmentStorage.StoreAsync(
             new SupportAttachmentUploadCommand(
-                Path.GetFileName(file.FileName),
-                file.ContentType ?? "application/octet-stream",
+                fileName,
+                requestedContentType,
                 stream,
                 file.Length),
             cancellationToken);
@@ -98,7 +105,7 @@ public static partial class SupportChatEndpoints
                     userId,
                     IsAdmin: true,
                     AttachmentUploadStatus: SupportAttachmentUploadStatus.Failed,
-                    AttachmentUploadErrorCode: storeResult.Error.Code),
+                    AttachmentUploadErrorCode: SafeAttachmentUploadErrorCode(storeResult.Error.Code)),
                 cancellationToken);
 
             if (failedStatusResult.IsFailure)
@@ -134,12 +141,12 @@ public static partial class SupportChatEndpoints
                     userId,
                     IsAdmin: true,
                     AttachmentUploadStatus: SupportAttachmentUploadStatus.Failed,
-                    AttachmentUploadErrorCode: completeStatusResult.Error.Code),
+                    AttachmentUploadErrorCode: SafeAttachmentUploadErrorCode(completeStatusResult.Error.Code)),
                 cancellationToken);
 
             if (failedStatusResult.IsFailure)
             {
-                return ToProblem(completeStatusResult.Error);
+                return ToProblem(failedStatusResult.Error);
             }
 
             return TypedResults.Ok(SignAttachmentUrls(failedStatusResult.Value, attachmentReadUrlSigner));
@@ -187,11 +194,18 @@ public static partial class SupportChatEndpoints
         {
             return TypedResults.ValidationProblem(new Dictionary<string, string[]>
             {
-                [nameof(file)] = ["Support attachment file is required."]
+                [nameof(file)] = ["support.attachment_file_required"]
             });
         }
 
-        var requestedContentType = file.ContentType ?? "application/octet-stream";
+        var metadataValidationErrors = ValidateSingleAttachmentMetadata(file, attachmentStorage);
+        if (metadataValidationErrors.Count > 0)
+        {
+            return TypedResults.ValidationProblem(metadataValidationErrors);
+        }
+
+        var fileName = NormalizeAttachmentFileName(file);
+        var requestedContentType = NormalizeAttachmentContentType(file);
 
         var retryStatusResult = await service.UpdateAttachmentMessageAsync(
             new UpdateSupportAttachmentMessageCommand(
@@ -200,7 +214,7 @@ public static partial class SupportChatEndpoints
                 userId,
                 IsAdmin: true,
                 AttachmentUploadStatus: SupportAttachmentUploadStatus.Retry,
-                AttachmentFileName: Path.GetFileName(file.FileName),
+                AttachmentFileName: fileName,
                 AttachmentContentType: requestedContentType),
             cancellationToken);
 
@@ -216,7 +230,7 @@ public static partial class SupportChatEndpoints
                 userId,
                 IsAdmin: true,
                 AttachmentUploadStatus: SupportAttachmentUploadStatus.Uploading,
-                AttachmentFileName: Path.GetFileName(file.FileName),
+                AttachmentFileName: fileName,
                 AttachmentContentType: requestedContentType),
             cancellationToken);
 
@@ -228,7 +242,7 @@ public static partial class SupportChatEndpoints
         await using var stream = file.OpenReadStream();
         var storeResult = await attachmentStorage.StoreAsync(
             new SupportAttachmentUploadCommand(
-                Path.GetFileName(file.FileName),
+                fileName,
                 requestedContentType,
                 stream,
                 file.Length),
@@ -243,7 +257,7 @@ public static partial class SupportChatEndpoints
                     userId,
                     IsAdmin: true,
                     AttachmentUploadStatus: SupportAttachmentUploadStatus.Failed,
-                    AttachmentUploadErrorCode: storeResult.Error.Code),
+                    AttachmentUploadErrorCode: SafeAttachmentUploadErrorCode(storeResult.Error.Code)),
                 cancellationToken);
 
             if (failedStatusResult.IsFailure)
@@ -279,12 +293,12 @@ public static partial class SupportChatEndpoints
                     userId,
                     IsAdmin: true,
                     AttachmentUploadStatus: SupportAttachmentUploadStatus.Failed,
-                    AttachmentUploadErrorCode: completeStatusResult.Error.Code),
+                    AttachmentUploadErrorCode: SafeAttachmentUploadErrorCode(completeStatusResult.Error.Code)),
                 cancellationToken);
 
             if (failedStatusResult.IsFailure)
             {
-                return ToProblem(completeStatusResult.Error);
+                return ToProblem(failedStatusResult.Error);
             }
 
             return TypedResults.Ok(SignAttachmentUrls(failedStatusResult.Value, attachmentReadUrlSigner));

@@ -31,6 +31,18 @@ function getThemeStorageErrorDetails(error: unknown) {
   };
 }
 
+function removeStoredAdminTheme(storageFailureEvent: string): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.removeItem(ADMIN_THEME_STORAGE_KEY);
+  } catch (error) {
+    clientLogger.warn(storageFailureEvent, getThemeStorageErrorDetails(error));
+  }
+}
+
 export function readStoredAdminTheme(): AdminTheme | null {
   if (typeof window === "undefined") {
     return null;
@@ -38,7 +50,15 @@ export function readStoredAdminTheme(): AdminTheme | null {
 
   try {
     const raw = window.localStorage.getItem(ADMIN_THEME_STORAGE_KEY);
-    return isAdminTheme(raw) ? raw : null;
+    if (isAdminTheme(raw)) {
+      return raw;
+    }
+
+    if (raw !== null) {
+      removeStoredAdminTheme("theme.storage_invalid_cleanup_failed");
+    }
+
+    return null;
   } catch (error) {
     clientLogger.warn("theme.storage_read_failed", getThemeStorageErrorDetails(error));
     return null;

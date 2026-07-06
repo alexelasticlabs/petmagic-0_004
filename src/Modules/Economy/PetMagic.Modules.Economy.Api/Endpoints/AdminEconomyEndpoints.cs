@@ -96,6 +96,7 @@ public static partial class AdminEconomyEndpoints
     {
         var group = endpoints.MapGroup("/api/admin/economy")
             .WithTags("Admin.Economy")
+            .AddEndpointFilter(ApplyPrivateAdminEconomyResponseHeadersAsync)
             .RequireRateLimiting("admin")
             .RequireAuthorization("AdminOnly");
 
@@ -135,6 +136,7 @@ public static partial class AdminEconomyEndpoints
             .WithMetadata(new RequestSizeLimitAttribute(MaxAdminEconomyProviderConfigurationRequestBodyBytes))
             .RequireAuthorization("AdminOnly");
         group.MapDelete("/payment-provider-configs/{configurationId:guid}", DeletePaymentProviderConfigurationAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminEconomyMutationRequestBodyBytes))
             .RequireAuthorization("AdminOnly");
         group.MapPost("/payment-provider-configs/test-match", TestPaymentProviderConfigurationMatchAsync)
             .WithMetadata(new RequestSizeLimitAttribute(MaxAdminEconomyProviderConfigurationRequestBodyBytes))
@@ -159,5 +161,16 @@ public static partial class AdminEconomyEndpoints
             .RequireAuthorization("AdminOnly");
 
         return endpoints;
+    }
+
+    private static async ValueTask<object?> ApplyPrivateAdminEconomyResponseHeadersAsync(
+        EndpointFilterInvocationContext context,
+        EndpointFilterDelegate next)
+    {
+        context.HttpContext.Response.Headers.CacheControl = "no-store";
+        context.HttpContext.Response.Headers.Pragma = "no-cache";
+        context.HttpContext.Response.Headers.XContentTypeOptions = "nosniff";
+
+        return await next(context);
     }
 }

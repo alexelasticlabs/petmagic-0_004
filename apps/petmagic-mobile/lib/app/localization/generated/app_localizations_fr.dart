@@ -9,7 +9,7 @@ class AppLocalizationsFr extends AppLocalizations {
   AppLocalizationsFr([String locale = 'fr']) : super(locale);
 
   @override
-  String get navTemplates => 'Modeles';
+  String get navTemplates => 'Modèles';
 
   @override
   String get navCreations => 'Galerie';
@@ -60,13 +60,13 @@ class AppLocalizationsFr extends AppLocalizations {
       'Une erreur s\'est produite. Veuillez réessayer.';
 
   @override
-  String get createMagicTitle => 'Creer la magie';
+  String get createMagicTitle => 'Créer de la magie';
 
   @override
-  String get pickTemplateSubtitle => 'Choisissez un modele pour votre animal';
+  String get pickTemplateSubtitle => 'Choisissez un modèle pour votre animal';
 
   @override
-  String get searchTemplates => 'Rechercher des modeles';
+  String get searchTemplates => 'Rechercher des modèles';
 
   @override
   String get randomTemplateAction => 'Modèle aléatoire';
@@ -166,7 +166,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get trendingFilter => '🔥 Tendances';
 
   @override
-  String get funnyFilter => '😂 Drole';
+  String get funnyFilter => '😂 Drôle';
 
   @override
   String get danceFilter => '🕺 Danse';
@@ -181,7 +181,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get filtersTooltip => 'Filtres';
 
   @override
-  String get giftTooltip => 'Recompenses';
+  String get giftTooltip => 'Récompenses';
 
   @override
   String get addTokensTooltip => 'Ajouter PawSpark';
@@ -280,7 +280,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get profileSignedOut => 'Déconnecté sur cet appareil.';
 
   @override
-  String get profileAccountDeleted => 'Votre compte a ete supprime.';
+  String get profileAccountDeleted => 'Votre compte a été supprimé.';
 
   @override
   String get profileAccountCenterTitle => 'Centre du compte';
@@ -461,7 +461,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String petsStatsPhotos(Object count) {
-    return 'Photos';
+    return '$count photos';
   }
 
   @override
@@ -1206,7 +1206,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String walletBalanceAfter(Object count) {
-    return 'Bal. $count';
+    return 'Solde : $count';
   }
 
   @override
@@ -1357,7 +1357,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get profileStatsSectionTitle => 'Statistiques du compte';
 
   @override
-  String get profileStatBalanceLabel => 'Équilibre';
+  String get profileStatBalanceLabel => 'Solde';
 
   @override
   String get profileStatPlanLabel => 'Plan';
@@ -1653,7 +1653,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get premiumManageFailed =>
-      'La gestion de la facturation n\'est pas encore disponible pour ce compte.';
+      'La gestion de la facturation est actuellement indisponible pour ce compte.';
 
   @override
   String get premiumRestoreStarted =>
@@ -1913,15 +1913,15 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get profileDetailsNotificationsStatusEnabled =>
-      'Les mises à jour de produits et les offres sont activées pour ce profil. Des commandes push supplémentaires apparaîtront ici plus tard.';
+      'Les notifications sont activées pour ce profil.';
 
   @override
   String get profileDetailsNotificationsStatusDisabled =>
-      'Les e-mails marketing sont actuellement désactivés pour ce profil. Des commandes push supplémentaires apparaîtront ici plus tard.';
+      'Les notifications sont désactivées pour ce profil.';
 
   @override
   String get profileDetailsNotificationsNext =>
-      'Vous pouvez déjà consulter les préférences de courrier électronique actuelles ici. Des boutons poussoirs dédiés seront ajoutés dans une tranche de produit ultérieure.';
+      'Vous pouvez modifier les préférences push et e-mail à tout moment.';
 
   @override
   String get profileNotificationsLoading =>
@@ -2260,7 +2260,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get supportChatResolvedStatusHint =>
-      'Cette demande a été marquée comme résolue. Vous pouvez le rouvrir pendant 7 jours.';
+      'Cette demande a été marquée comme résolue. Vous pouvez la rouvrir pendant 7 jours.';
 
   @override
   String get supportChatClosedStatusHint =>
@@ -2512,7 +2512,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get supportChatReopenAction => 'Écrire à nouveau';
 
   @override
-  String get supportChatArchiveAction => 'Archive';
+  String get supportChatArchiveAction => 'Archiver';
 
   @override
   String get supportChatRateTitle => 'Évaluez la réponse de l\'assistance';
@@ -2672,7 +2672,7 @@ class AppLocalizationsFr extends AppLocalizations {
   }
 
   @override
-  String get magicLoadingPreparing => 'Preparation de la magie...';
+  String get magicLoadingPreparing => 'Préparation de la magie...';
 
   @override
   String get magicLoadingCutestAngle =>
@@ -2683,10 +2683,10 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get magicLoadingCreatingAdorable =>
-      'Creation de quelque chose d\'adorable...';
+      'Création de quelque chose d\'adorable...';
 
   @override
-  String get magicLoadingAlmostReady => 'Presque pret...';
+  String get magicLoadingAlmostReady => 'Presque prêt...';
 
   @override
   String get videoLabel => 'Vidéo';
@@ -2695,7 +2695,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get imageLabel => 'Image';
 
   @override
-  String get templatesErrorTitle => 'Les modeles n\'ont pas charge';
+  String get templatesErrorTitle => 'Les modèles n\'ont pas chargé';
 
   @override
   String get retryAction => 'Réessayer';
@@ -2704,7 +2704,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get closeAction => 'Fermer';
 
   @override
-  String get emptyTemplatesTitle => 'Aucun modele pour le moment';
+  String get emptyTemplatesTitle => 'Aucun modèle pour le moment';
 
   @override
   String get emptyTemplatesMessage =>
@@ -3053,7 +3053,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get authPrivacySubtitle =>
-      'Nous ne vendons ni ne partageons jamais vos données avec des tiers.';
+      'Nous ne vendons pas les données personnelles. Nous les partageons seulement avec les sous-traitants nécessaires à PetMagic.';
 
   @override
   String get authRequiredTitle => 'Connectez-vous pour débloquer cette action';
@@ -3104,10 +3104,10 @@ class AppLocalizationsFr extends AppLocalizations {
       'Vérifiez les détails avant de créer';
 
   @override
-  String get templateFlowTemplateLabel => 'Modele';
+  String get templateFlowTemplateLabel => 'Modèle';
 
   @override
-  String get templateFlowCostLabel => 'Cout';
+  String get templateFlowCostLabel => 'Coût';
 
   @override
   String get templateFlowBalanceLabel => 'Votre solde';
@@ -3150,7 +3150,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get templateFlowInsufficientBalanceUpsellMessage =>
-      'Achetez des PawSpark une fois ou passez a Premium avec 40 PawSpark chaque semaine.';
+      'Achetez des PawSpark une fois ou passez à Premium avec 40 PawSpark chaque semaine.';
 
   @override
   String get templateFlowChooseAnotherTemplateAction =>
@@ -3177,7 +3177,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get templateFlowStepAnalyzePet => 'Analyser un animal de compagnie';
 
   @override
-  String get templateFlowStepCreateMagic => 'Creation de la magie';
+  String get templateFlowStepCreateMagic => 'Création de la magie';
 
   @override
   String get templateFlowStepFinalTouches => 'Finitions';
@@ -3193,14 +3193,14 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get templateFlowResultUnavailable =>
-      'Le resultat n\'est pas encore disponible';
+      'Le résultat est temporairement indisponible';
 
   @override
   String get templateFlowLoadingResult => 'Chargement du résultat...';
 
   @override
   String get templateFlowResultLoadFailed =>
-      'Impossible de charger le resultat';
+      'Impossible de charger le résultat';
 
   @override
   String get templateFlowCreateMoreAction => 'Créer plus';
@@ -3309,11 +3309,11 @@ class AppLocalizationsFr extends AppLocalizations {
   String get galleryPremiumUpsellSubtitle => 'Premium retire le logo PetMagic';
 
   @override
-  String get templateFlowCompletedPremiumHeadline => 'Vous voulez creer plus ?';
+  String get templateFlowCompletedPremiumHeadline => 'Vous voulez créer plus ?';
 
   @override
   String get templateFlowCompletedPremiumMessage =>
-      'Premium vous donne 40 PawSpark chaque semaine, des modeles Premium et un export sans filigrane.';
+      'Premium vous donne 40 PawSpark chaque semaine, des modèles Premium et un export sans filigrane.';
 
   @override
   String get templateDetailHeroImageTitle =>
@@ -3432,17 +3432,21 @@ class AppLocalizationsFr extends AppLocalizations {
       'Le service est temporairement indisponible. Veuillez réessayer plus tard.';
 
   @override
+  String get templateFlowActiveGenerationLimitError =>
+      'Vous avez déjà une génération en cours. Attendez qu\'elle se termine, puis lancez-en une nouvelle.';
+
+  @override
   String get templateFlowStartFailedError =>
       'Impossible de démarrer la génération. Veuillez réessayer.';
 
   @override
-  String get generationStatusTitle => 'Statut de generation';
+  String get generationStatusTitle => 'Statut de génération';
 
   @override
-  String get generationStatusCreatedLabel => 'Cree';
+  String get generationStatusCreatedLabel => 'Créé';
 
   @override
-  String get generationStatusStartedLabel => 'Demarre';
+  String get generationStatusStartedLabel => 'Démarré';
 
   @override
   String get generationStatusTypeLabel => 'Type de contenu';
@@ -3457,10 +3461,10 @@ class AppLocalizationsFr extends AppLocalizations {
   String get generationStatusDetailsTitle => 'Informations';
 
   @override
-  String get generationStatusFeedbackTitle => 'Que pensez-vous du resultat ?';
+  String get generationStatusFeedbackTitle => 'Que pensez-vous du résultat ?';
 
   @override
-  String get generationStatusFeedbackExcellent => 'Excellent resultat';
+  String get generationStatusFeedbackExcellent => 'Excellent résultat';
 
   @override
   String get generationStatusFeedbackOkay => 'Correct';
@@ -3475,14 +3479,14 @@ class AppLocalizationsFr extends AppLocalizations {
   String get generationStatusDeleteAction => 'Supprimer';
 
   @override
-  String get generationStatusReportProblemAction => 'Signaler un probleme';
+  String get generationStatusReportProblemAction => 'Signaler un problème';
 
   @override
   String get generationStatusPickAnotherPhotoAction =>
       'Choisir une autre photo';
 
   @override
-  String get generationStatusRetryAction => 'Reessayer';
+  String get generationStatusRetryAction => 'Réessayer';
 
   @override
   String get generationStatusContactSupportAction => 'Contacter le support';
@@ -3495,77 +3499,77 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get generationStatusResultUnavailableForSave =>
-      'Le resultat n\'est pas encore disponible pour l\'enregistrement.';
+      'Le résultat est temporairement indisponible pour l\'enregistrement.';
 
   @override
   String get generationStatusResultUnavailableForShare =>
-      'Le resultat n\'est pas encore disponible pour le partage.';
+      'Le résultat est temporairement indisponible pour le partage.';
 
   @override
   String get generationStatusSaveFileDialogTitle => 'Enregistrer le fichier';
 
   @override
   String get generationStatusFileSavedMessage =>
-      'Fichier enregistre sur l\'appareil.';
+      'Fichier enregistré sur l\'appareil.';
 
   @override
   String get generationStatusFileSaveFailedMessage =>
-      'Impossible d\'enregistrer le fichier. Veuillez reessayer.';
+      'Impossible d\'enregistrer le fichier. Veuillez réessayer.';
 
   @override
   String get generationStatusSavedToGalleryMessage =>
-      'Enregistre dans la galerie';
+      'Enregistré dans la galerie';
 
   @override
-  String get generationStatusLinkCopiedMessage => 'Lien copie';
+  String get generationStatusLinkCopiedMessage => 'Lien copié';
 
   @override
-  String get generationStatusDeletedMessage => 'Supprime';
+  String get generationStatusDeletedMessage => 'Supprimé';
 
   @override
   String get generationStatusFullscreenControlsHint =>
-      'Appuyez pour masquer/afficher les controles';
+      'Appuyez pour masquer/afficher les contrôles';
 
   @override
   String get generationStatusDeleteSoonMessage =>
-      'La suppression sera disponible prochainement.';
+      'Impossible de supprimer ce résultat. Réessayez.';
 
   @override
   String get generationStatusRetrySoonMessage =>
-      'Choisissez une autre photo et relancez la generation.';
+      'Choisissez une autre photo et relancez la génération.';
 
   @override
   String get generationStatusFeedbackThanksMessage =>
-      'Merci ! Votre retour aide a ameliorer PetMagic.';
+      'Merci ! Votre retour aide à améliorer PetMagic.';
 
   @override
-  String get generationStatusResultTitle => 'Resultat PetMagic';
+  String get generationStatusResultTitle => 'Résultat PetMagic';
 
   @override
   String get generationStatusNonTerminalHint =>
-      'Cela prend generalement quelques minutes. Vous pouvez continuer a utiliser l\'application.';
+      'Cela prend généralement quelques minutes. Vous pouvez continuer à utiliser l\'application.';
 
   @override
   String get generationStatusStageQueued => 'En file d\'attente';
 
   @override
-  String get generationStatusStageDone => 'Termine';
+  String get generationStatusStageDone => 'Terminé';
 
   @override
-  String get generationStatusVideoReady => 'La video est prete';
+  String get generationStatusVideoReady => 'La vidéo est prête';
 
   @override
-  String get generationStatusShareVideoAction => 'Partager la video';
+  String get generationStatusShareVideoAction => 'Partager la vidéo';
 
   @override
-  String get generationStatusFailedTitle => 'Impossible de creer le resultat';
+  String get generationStatusFailedTitle => 'Impossible de créer le résultat';
 
   @override
   String get generationStatusTokensRefundedHint =>
-      'Les PawSpark ont ete recredites sur votre solde.';
+      'Les PawSpark ont été recrédités sur votre solde.';
 
   @override
-  String get generationStatusTokensRefundedShort => 'PawSpark rembourses';
+  String get generationStatusTokensRefundedShort => 'PawSpark remboursés';
 
   @override
   String get generationStatusSupportHint =>
@@ -3573,10 +3577,10 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get generationStatusBackgroundHint =>
-      'La generation continue sur le serveur. Nous afficherons le resultat dans la Galerie lorsqu\'il sera pret.';
+      'La génération continue sur le serveur. Nous afficherons le résultat dans la Galerie lorsqu\'il sera prêt.';
 
   @override
-  String get generationStatusDownloadAction => 'Telecharger';
+  String get generationStatusDownloadAction => 'Télécharger';
 
   @override
   String get generationStatusContinueInAppAction =>
@@ -3584,37 +3588,37 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get generationStatusFeedbackImproveTitle =>
-      'Que pouvons-nous ameliorer ?';
+      'Que pouvons-nous améliorer ?';
 
   @override
   String get generationStatusFeedbackCommentLabel => 'Commentaire';
 
   @override
   String get generationStatusFeedbackCommentHint =>
-      'Dites-nous brievement ce qui n\'a pas fonctionne';
+      'Dites-nous brièvement ce qui n\'a pas fonctionné';
 
   @override
   String get generationStatusFeedbackSubmitAction => 'Envoyer le retour';
 
   @override
   String get generationStatusFeedbackReasonPetNotSimilar =>
-      'L\'animal ne ressemble pas a lui-meme';
+      'L\'animal ne ressemble pas à lui-même';
 
   @override
   String get generationStatusFeedbackReasonFaceDistorted =>
-      'Le visage ou le museau est deforme';
+      'Le visage ou le museau est déformé';
 
   @override
   String get generationStatusFeedbackReasonStrangeMotion =>
-      'Le mouvement parait etrange';
+      'Le mouvement paraît étrange';
 
   @override
   String get generationStatusFeedbackReasonPreviewMismatch =>
-      'Le resultat differe de l\'apercu';
+      'Le résultat diffère de l\'aperçu';
 
   @override
   String get generationStatusFeedbackReasonLowQuality =>
-      'La qualite est trop faible';
+      'La qualité est trop faible';
 
   @override
   String get generationStatusFeedbackReasonStyleDisliked =>
@@ -3632,17 +3636,17 @@ class AppLocalizationsFr extends AppLocalizations {
   String get generationStatusEtaQueued => 'En attente dans la file';
 
   @override
-  String get generationStatusEtaFinalizing => 'Presque pret';
+  String get generationStatusEtaFinalizing => 'Presque prêt';
 
   @override
   String get generationStatusEtaDefault => 'Encore environ 1-2 min';
 
   @override
-  String get generationStatusEtaStartsSoon => 'Demarrera dans quelques minutes';
+  String get generationStatusEtaStartsSoon => 'Démarrera dans quelques minutes';
 
   @override
   String get generationStatusEtaNotifyHint =>
-      'Nous vous informerons lorsque le resultat sera pret.';
+      'Nous vous informerons lorsque le résultat sera prêt.';
 
   @override
   String get generationStatusCancelledTitle => 'Génération annulée';
@@ -3666,7 +3670,7 @@ class AppLocalizationsFr extends AppLocalizations {
       'Cela fonctionne uniquement tant que la génération est encore en file. Si des PawSpark ont été réservés, ils reviendront automatiquement dans votre solde.';
 
   @override
-  String get generationStatusCancelQueuedKeepAction => 'Continuer a attendre';
+  String get generationStatusCancelQueuedKeepAction => 'Continuer à attendre';
 
   @override
   String get generationStatusCancelQueuedConfirmAction =>
@@ -3685,54 +3689,54 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get generationStatusQueuedVideoHint =>
-      'La video prend generalement plus de temps que les photos et peut demander quelques minutes.';
+      'La vidéo prend généralement plus de temps que les photos et peut demander quelques minutes.';
 
   @override
   String get generationStatusFailurePhotoHint =>
-      'La photo ne convient pas a ce modele. Essayez une photo ou l\'animal est clairement visible.';
+      'La photo ne convient pas à ce modèle. Essayez une photo où l\'animal est clairement visible.';
 
   @override
   String get generationStatusFailureTechnicalHint =>
-      'Impossible de creer le resultat en raison d\'un probleme technique. Les PawSpark ont ete recredites sur votre solde.';
+      'Impossible de créer le résultat en raison d\'un problème technique. Les PawSpark ont été recrédités sur votre solde.';
 
   @override
-  String get generationStatusStatusCompleted => 'Votre resultat est pret';
+  String get generationStatusStatusCompleted => 'Votre résultat est prêt';
 
   @override
-  String get generationStatusStatusFailed => 'Impossible de creer le resultat';
+  String get generationStatusStatusFailed => 'Impossible de créer le résultat';
 
   @override
-  String get generationStatusStatusCreatingMagic => 'Creation de la magie...';
+  String get generationStatusStatusCreatingMagic => 'Création de la magie...';
 
   @override
   String get generationStatusTerminalRefundedHint =>
-      'Les PawSpark ont ete rembourses automatiquement.';
+      'Les PawSpark ont été remboursés automatiquement.';
 
   @override
   String get generationStatusTerminalFailureHint =>
-      'Un probleme technique a ete enregistre.';
+      'Un problème technique a été enregistré.';
 
   @override
   String get generationStatusTerminalSuccessHint =>
-      'Ouvrez le resultat, partagez-le ou laissez un retour.';
+      'Ouvrez le résultat, partagez-le ou laissez un retour.';
 
   @override
   String get generationStatusSectionActive => 'En cours';
 
   @override
-  String get generationStatusSectionReady => 'Pret';
+  String get generationStatusSectionReady => 'Prêt';
 
   @override
-  String get generationStatusSectionFailed => 'Echec';
+  String get generationStatusSectionFailed => 'Échec';
 
   @override
   String get generationStatusFilterActive => 'En cours';
 
   @override
-  String get generationStatusFilterReady => 'Pret';
+  String get generationStatusFilterReady => 'Prêt';
 
   @override
-  String get generationStatusFilterFailed => 'Echec';
+  String get generationStatusFilterFailed => 'Échec';
 
   @override
   String generationStatusShowMoreAction(Object hiddenCount) {
@@ -3744,39 +3748,39 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get generationStatusLoadMoreFailed =>
-      'Impossible de charger plus de resultats.';
+      'Impossible de charger plus de résultats.';
 
   @override
-  String get generationStatusMediaPreparingMessage => 'Preparation du media...';
+  String get generationStatusMediaPreparingMessage => 'Préparation du média...';
 
   @override
   String get generationStatusMediaPreviewOnlyMessage =>
-      'L\'apercu est disponible pendant la preparation du fichier final.';
+      'L\'aperçu est disponible pendant la préparation du fichier final.';
 
   @override
   String get generationStatusMediaWatermarkPreparingMessage =>
-      'Preparation de la version propre...';
+      'Préparation de la version propre...';
 
   @override
-  String get generationStatusMediaExpiredMessage => 'Ce media a expire.';
+  String get generationStatusMediaExpiredMessage => 'Ce média a expiré.';
 
   @override
   String get generationStatusMediaUnavailableMessage =>
-      'Le media est indisponible.';
+      'Le média est indisponible.';
 
   @override
   String get generationStatusMediaFailedMessage =>
-      'Le traitement du media a echoue.';
+      'Le traitement du média a échoué.';
 
   @override
-  String get generationStatusMediaHiddenMessage => 'Le media est masque.';
+  String get generationStatusMediaHiddenMessage => 'Le média est masqué.';
 
   @override
-  String get generationStatusCollapseAction => 'Reduire ▲';
+  String get generationStatusCollapseAction => 'Réduire ▲';
 
   @override
   String get generationStatusActiveInfoHint =>
-      'La generation continue sur le serveur. Nous afficherons le resultat dans la Galerie lorsqu\'il sera pret.';
+      'La génération continue sur le serveur. Nous afficherons le résultat dans la Galerie lorsqu\'il sera prêt.';
 
   @override
   String generationStatusUnreadCount(Object count) {
@@ -3784,23 +3788,23 @@ class AppLocalizationsFr extends AppLocalizations {
   }
 
   @override
-  String get generationStatusEmptyTitle => 'Vos resultats apparaitront ici';
+  String get generationStatusEmptyTitle => 'Vos résultats apparaîtront ici';
 
   @override
   String get generationStatusEmptyMessage =>
-      'Choisissez un modele, televersez une photo de votre animal et creez votre premiere creation magique.';
+      'Choisissez un modèle, téléversez une photo de votre animal et créez votre première création magique.';
 
   @override
-  String get generationStatusSubtitleAll => 'Vos creations magiques';
+  String get generationStatusSubtitleAll => 'Vos créations magiques';
 
   @override
-  String get generationStatusSubtitleActive => 'Generations actives';
+  String get generationStatusSubtitleActive => 'Générations actives';
 
   @override
-  String get generationStatusSubtitleReady => 'Vos resultats prets';
+  String get generationStatusSubtitleReady => 'Vos résultats prêts';
 
   @override
-  String get generationStatusSubtitleFailed => 'Problemes de generation';
+  String get generationStatusSubtitleFailed => 'Problèmes de génération';
 
   @override
   String get generationStatusOfflineBannerTitle => 'Vous êtes hors ligne';
@@ -3838,11 +3842,11 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String shellActiveGenerationLabel(Object templateTitle) {
-    return '✨ Creation de $templateTitle';
+    return '✨ Création de $templateTitle';
   }
 
   @override
-  String get shellActiveGenerationFallback => 'resultat';
+  String get shellActiveGenerationFallback => 'résultat';
 
   @override
   String get walletStripeCardBrandsLabel => 'Visa • Mastercard';
@@ -4029,7 +4033,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get premiumPaywallFeedbackTitle =>
-      'Qu est-ce qui vous a empeche de vous abonner ?';
+      'Qu’est-ce qui vous a empêché de vous abonner ?';
 
   @override
   String get premiumPaywallFeedbackCommentLabel => 'Commentaire';
@@ -4043,7 +4047,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get premiumPaywallFeedbackThanksMessage =>
-      'Merci ! Votre retour aide a ameliorer Premium.';
+      'Merci ! Votre retour aide à améliorer Premium.';
 
   @override
   String get premiumPaywallFeedbackOptionExpensive => 'Trop cher';
@@ -4053,7 +4057,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get premiumPaywallFeedbackOptionPaymentProblem =>
-      'Probleme de paiement';
+      'Problème de paiement';
 
   @override
   String get premiumPaywallFeedbackOptionJustBrowsing =>
@@ -4206,7 +4210,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get appUnavailableServerMessage =>
-      'PetMagic ne peut pas joindre le backend pour le moment. Reessayez dans un instant.';
+      'PetMagic ne peut pas joindre le backend pour le moment. Réessayez dans un instant.';
 
   @override
   String get localBackendAndroidHintTitle => 'Backend local sur Android';
@@ -4243,8 +4247,8 @@ class AppLocalizationsFr extends AppLocalizations {
   }
 
   @override
-  String gamificationXpProgress(Object current, Object required, Object total) {
-    return '$current/$required XP';
+  String gamificationXpProgress(Object current, Object total) {
+    return '$current / $total XP';
   }
 
   @override
@@ -4621,7 +4625,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get profileSettingsFeedbackSubtitle =>
-      'Idee, bug, paiement ou commentaire general';
+      'Idée, bug, paiement ou commentaire général';
 
   @override
   String get profileSettingsFeedbackSheetTitle => 'Envoyer un retour';
@@ -4631,63 +4635,63 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get profileSettingsFeedbackMessageHint =>
-      'Ajoutez des details si vous le souhaitez';
+      'Ajoutez des détails si vous le souhaitez';
 
   @override
   String get profileSettingsFeedbackSubmitAction => 'Envoyer';
 
   @override
   String get profileSettingsFeedbackThanksMessage =>
-      'Merci ! Votre retour aide a ameliorer PetMagic.';
+      'Merci ! Votre retour aide à améliorer PetMagic.';
 
   @override
-  String get profileSettingsFeedbackOptionGeneral => 'Demande generale';
+  String get profileSettingsFeedbackOptionGeneral => 'Demande générale';
 
   @override
   String get profileSettingsFeedbackOptionFeatureRequest =>
-      'Demande de fonctionnalite';
+      'Demande de fonctionnalité';
 
   @override
-  String get profileSettingsFeedbackOptionBug => 'Probleme';
+  String get profileSettingsFeedbackOptionBug => 'Problème';
 
   @override
   String get profileSettingsFeedbackOptionPayment => 'Paiement';
 
   @override
   String get profileNotificationsPushPhotoReadySubtitle =>
-      'Quand une photo IA est prete a etre consultee';
+      'Quand une photo IA est prête à être consultée';
 
   @override
   String get profileNotificationsPushVideoReadySubtitle =>
-      'Quand une video IA termine son traitement';
+      'Quand une vidéo IA termine son traitement';
 
   @override
   String get profileNotificationsPushGenerationErrorsSubtitle =>
-      'Si une generation se termine avec une erreur';
+      'Si une génération se termine avec une erreur';
 
   @override
   String get profileNotificationsPushRemindersSubtitle =>
-      'Rappels pour utiliser l application';
+      'Rappels pour utiliser l\'application';
 
   @override
   String get profileNotificationsPushNewTemplatesSubtitle =>
-      'Nouveaux styles et modeles de generation';
+      'Nouveaux styles et modèles de génération';
 
   @override
   String get profileNotificationsPushPurchasesAndSubscriptionsSubtitle =>
-      'Confirmations de paiement et statut de l abonnement';
+      'Confirmations de paiement et statut de l\'abonnement';
 
   @override
   String get profileNotificationsEmailOffersSubtitle =>
-      'Reductions, promotions et offres speciales';
+      'Réductions, promotions et offres spéciales';
 
   @override
   String get profileNotificationsEmailNewsSubtitle =>
-      'Mises a jour de l application et nouvelles fonctionnalites';
+      'Mises à jour de l\'application et nouvelles fonctionnalités';
 
   @override
   String get profileNotificationsEmailAccountAlertsSubtitle =>
-      'Alertes de securite et modifications du compte';
+      'Alertes de sécurité et modifications du compte';
 
   @override
   String get passwordChangeStepRequestCode => 'Demander le code';
@@ -4722,11 +4726,11 @@ class AppLocalizationsFr extends AppLocalizations {
   }
 
   @override
-  String get subscriptionGrantReadyLabel => 'Pret a etre credite !';
+  String get subscriptionGrantReadyLabel => 'Prêt à être crédité !';
 
   @override
   String subscriptionGrantNextLabel(String countdown) {
-    return 'Prochain credit : $countdown';
+    return 'Prochain crédit : $countdown';
   }
 
   @override
@@ -4735,18 +4739,18 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get subscriptionBenefitFirstBonusDescription =>
-      'Instantanement apres l achat';
+      'Instantanément après l\'achat';
 
   @override
   String get subscriptionBenefitTemplatesDescription =>
-      'Tous les scenarios debloques';
+      'Tous les scénarios débloqués';
 
   @override
   String get subscriptionBenefitPriorityGenerationDescription =>
-      'Vos taches sont prioritaires';
+      'Vos tâches sont prioritaires';
 
   @override
-  String get subscriptionBenefitNoWatermarkDescription => 'Resultat propre';
+  String get subscriptionBenefitNoWatermarkDescription => 'Résultat propre';
 
   @override
   String generationStatusQueuePositionWithWait(int position, String wait) {
@@ -4772,18 +4776,18 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get templateFlowGenerationWaitTooLongTitle =>
-      'Charge elevee en ce moment';
+      'Charge élevée en ce moment';
 
   @override
   String get templateFlowGenerationWaitTooLongMessage =>
-      'Le temps d\'attente estime pour cette generation est trop long. Reessayez plus tard ou choisissez une generation photo, generalement plus rapide.';
+      'Le temps d\'attente estimé pour cette génération est trop long. Réessayez plus tard ou choisissez une génération photo, généralement plus rapide.';
 
   @override
   String templateFlowGenerationWaitTooLongRetryAfter(String value) {
-    return 'Reessayez dans environ $value.';
+    return 'Réessayez dans environ $value.';
   }
 
   @override
   String get templateFlowGenerationWaitTooLongPremiumHint =>
-      'Les demandes Premium sont prioritaires quand le service est tres sollicite et peuvent attendre moins.';
+      'Les demandes Premium sont prioritaires quand le service est très sollicité et peuvent attendre moins.';
 }

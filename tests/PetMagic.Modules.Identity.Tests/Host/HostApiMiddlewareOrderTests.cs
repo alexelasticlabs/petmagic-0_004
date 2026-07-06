@@ -31,6 +31,8 @@ public sealed class HostApiMiddlewareOrderTests
         Assert.Contains("ResolvePublicBasePath(", source, StringComparison.Ordinal);
         Assert.Contains("\"/support-attachments\"", source, StringComparison.Ordinal);
         Assert.Contains("\"/user-avatars\"", source, StringComparison.Ordinal);
+        Assert.Contains("\"/templates-media\"", source, StringComparison.Ordinal);
+        Assert.Contains("GetRequiredService<ITemplateMediaReadUrlSigner>()", source, StringComparison.Ordinal);
         Assert.Contains("requestPath.StartsWithSegments(managedPrefix)", source, StringComparison.Ordinal);
         Assert.DoesNotContain(
             "requestPath.Contains(\"/support-attachments\", StringComparison.OrdinalIgnoreCase)",

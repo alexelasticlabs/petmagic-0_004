@@ -325,4 +325,3 @@ export type AdminRedeemCodeMetrics = {
   usesLast7d: number;
   grantedLast7d: number;
 };
-

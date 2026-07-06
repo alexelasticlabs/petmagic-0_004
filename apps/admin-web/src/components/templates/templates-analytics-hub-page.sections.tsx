@@ -2,12 +2,7 @@
 
 import Link from "next/link";
 
-import {
-  ChartIcon,
-  DashboardIcon,
-  ImageIcon,
-  VideoIcon,
-} from "@/components/admin/admin-icons";
+import { ChartIcon, DashboardIcon, ImageIcon, VideoIcon } from "@/components/admin/admin-icons";
 import { AdminSelectField, type AdminTone } from "@/components/admin/admin-primitives";
 import {
   getTemplateAccessLabel,
@@ -32,10 +27,7 @@ import { getDictionary, type Locale as AppLocale } from "@/lib/i18n";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 export type TrendMetricKey =
-  | "totalViews"
-  | "totalGenerationStarts"
-  | "completedGenerations"
-  | "totalProviderCostUsd";
+  "totalViews" | "totalGenerationStarts" | "completedGenerations" | "totalProviderCostUsd";
 
 export function formatAnalyticsDisplayText(value: string, maxLength = 120) {
   return sanitizeSensitiveText(value, maxLength);

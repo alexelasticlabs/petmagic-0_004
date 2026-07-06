@@ -4,6 +4,8 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
+using PetMagic.BuildingBlocks.Observability;
+
 namespace PetMagic.Modules.Templates.Infrastructure;
 
 internal static class TemplateLocalizationTranslator
@@ -14,6 +16,7 @@ internal static class TemplateLocalizationTranslator
     private const string SourceLocale = "en";
     private const string NewlineToken = "___PM_NL___";
     private const string SegmentSeparator = "___PM_SEG_BREAK___";
+    private const int TranslationResponseMaxChars = 64 * 1024;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public static async Task<string?> GenerateAsync(
@@ -216,14 +219,20 @@ internal static class TemplateLocalizationTranslator
 
         try
         {
-            using var response = await httpClient.GetAsync(requestUri, cancellationToken);
+            using var response = await httpClient.GetAsync(
+                requestUri,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 return null;
             }
 
-            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+            var responseBody = await SafeHttpContentReader.ReadRawStringPrefixAsync(
+                response.Content,
+                cancellationToken,
+                TranslationResponseMaxChars);
+            using var document = JsonDocument.Parse(responseBody);
 
             if (document.RootElement.ValueKind != JsonValueKind.Array || document.RootElement.GetArrayLength() == 0)
             {
@@ -307,14 +316,20 @@ internal static class TemplateLocalizationTranslator
 
         try
         {
-            using var response = await httpClient.GetAsync(requestUri, cancellationToken);
+            using var response = await httpClient.GetAsync(
+                requestUri,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 return null;
             }
 
-            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+            var responseBody = await SafeHttpContentReader.ReadRawStringPrefixAsync(
+                response.Content,
+                cancellationToken,
+                TranslationResponseMaxChars);
+            using var document = JsonDocument.Parse(responseBody);
 
             if (document.RootElement.ValueKind != JsonValueKind.Array || document.RootElement.GetArrayLength() == 0)
             {

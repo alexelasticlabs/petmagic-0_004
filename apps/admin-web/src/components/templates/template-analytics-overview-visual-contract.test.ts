@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 const overviewPath = fileURLToPath(
   new URL("./template-analytics-overview-sections.tsx", import.meta.url)
 );
+const copyPath = fileURLToPath(new URL("./template-analytics-copy.ts", import.meta.url));
 const pagePath = fileURLToPath(new URL("./template-analytics-page.tsx", import.meta.url));
 const stylesPath = fileURLToPath(new URL("./template-analytics-page.module.css", import.meta.url));
 
@@ -27,6 +28,16 @@ describe("template analytics overview visual contract", () => {
     expect(source).not.toContain("conic-gradient(#1f3651 0 100%)");
   });
 
+  it("keeps trend chart accessibility copy localized", () => {
+    const source = readFileSync(overviewPath, "utf8");
+    const copySource = readFileSync(copyPath, "utf8");
+
+    expect(source).toContain("aria-label={text.trendChartAriaLabel}");
+    expect(source).not.toContain('aria-label="Template analytics trend chart"');
+    expect(copySource).toContain('trendChartAriaLabel: "График динамики запусков шаблона"');
+    expect(copySource).toContain('trendChartAriaLabel: "Template analytics trend chart"');
+  });
+
   it("keeps detail tabs and chart summaries usable on phone screens", () => {
     const styles = readFileSync(stylesPath, "utf8");
 
@@ -37,7 +48,9 @@ describe("template analytics overview visual contract", () => {
     expect(styles).toContain(".chartTab,\n  .chartTabActive");
     expect(styles).toContain("flex: 1 1 min(10rem, 100%);");
     expect(styles).toContain("min-width: 0;");
-    expect(styles).toContain(".chartSummaryRow {\n    grid-template-columns: repeat(2, minmax(0, 1fr));");
+    expect(styles).toContain(
+      ".chartSummaryRow {\n    grid-template-columns: repeat(2, minmax(0, 1fr));"
+    );
   });
 
   it("shows disabled detail analytics controls consistently during refreshes", () => {
@@ -79,6 +92,8 @@ describe("template analytics overview visual contract", () => {
     expect(styles).not.toMatch(/\.feedbackSearchInput:focus(?!-visible)/);
     expect(styles).toContain(".feedbackItem {");
     expect(styles).toContain("border-radius: var(--radius-sm);");
-    expect(styles).not.toMatch(/border-radius:\s*(?:0\.7rem|0\.8rem|0\.9rem|1rem|1[2-9]px|[2-9][0-9]px)/);
+    expect(styles).not.toMatch(
+      /border-radius:\s*(?:0\.7rem|0\.8rem|0\.9rem|1rem|1[2-9]px|[2-9][0-9]px)/
+    );
   });
 });

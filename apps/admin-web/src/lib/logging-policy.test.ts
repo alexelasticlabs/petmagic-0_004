@@ -25,16 +25,21 @@ describe("admin logging policy", () => {
     expect(source).not.toContain("console.debug");
   });
 
-  it("does not use render, click, state, or full response console logging in app source", () => {
+  it("routes console output through the centralized client logger only", () => {
     const violations = sourceFiles(sourceRoot)
       .filter((path) => !/\.test\.(ts|tsx)$/.test(path))
+      .filter((path) => path !== clientLoggerPath)
       .flatMap((path) => {
         const source = readFileSync(path, "utf8");
-        const matches = source.match(/\bconsole\.(log|debug|info)\s*\(/g) ?? [];
+        const matches = source.match(/\bconsole\.(log|debug|info|warn|error)\s*\(/g) ?? [];
         return matches.map((match) => `${relative(sourceRoot, path)} uses ${match}`);
       });
 
     expect(violations).toEqual([]);
+
+    const clientLoggerSource = readFileSync(clientLoggerPath, "utf8");
+    expect(clientLoggerSource).toContain("console.error");
+    expect(clientLoggerSource).toContain("console.warn");
   });
 });
 

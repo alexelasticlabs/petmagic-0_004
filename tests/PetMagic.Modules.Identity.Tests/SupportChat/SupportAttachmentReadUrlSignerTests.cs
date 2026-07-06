@@ -32,6 +32,24 @@ public sealed class SupportAttachmentReadUrlSignerTests
     }
 
     [Fact]
+    public void CreateReadUrl_ShouldStripLegacyQueryAndFragmentFromManagedSupportAttachments()
+    {
+        var signer = CreateSigner();
+
+        var signedUrl = signer.CreateReadUrl(
+            "https://api.petmagic.app/support-media/support-attachments/2026/06/test.png?token=raw&signature=legacy#preview");
+        var uri = new Uri(signedUrl);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+
+        Assert.Equal("/support-media/support-attachments/2026/06/test.png", uri.AbsolutePath);
+        Assert.True(query.ContainsKey("pmexp"));
+        Assert.True(query.ContainsKey("pmsig"));
+        Assert.False(query.ContainsKey("token"));
+        Assert.False(query.ContainsKey("signature"));
+        Assert.Equal(string.Empty, uri.Fragment);
+    }
+
+    [Fact]
     public void CreateReadUrl_ShouldLeaveNonManagedUrlsUnchanged()
     {
         var signer = CreateSigner();
@@ -76,6 +94,9 @@ public sealed class SupportAttachmentReadUrlSignerTests
     [Theory]
     [InlineData("https://api.petmagic.app/support-media/support-attachments/2026/../private.png")]
     [InlineData("https://api.petmagic.app/support-media/support-attachments/2026/%2e%2e/private.png")]
+    [InlineData("https://api.petmagic.app/support-media/support-attachments/2026%2f..%2fprivate.png")]
+    [InlineData("https://api.petmagic.app/support-media/support-attachments/2026%5c..%5cprivate.png")]
+    [InlineData("https://api.petmagic.app/support-media/support-attachments/2026/%zz/private.png")]
     public void CreateReadUrl_ShouldHideTraversalLikeManagedUrl(string fileUrl)
     {
         var signer = CreateSigner();
@@ -140,6 +161,9 @@ public sealed class SupportAttachmentReadUrlSignerTests
     [Theory]
     [InlineData("/support-attachments/2026/../private.png")]
     [InlineData("/support-media/support-attachments/2026/%2e%2e/private.png")]
+    [InlineData("/support-attachments/2026%2f..%2fprivate.png")]
+    [InlineData("/support-attachments/2026%5c..%5cprivate.png")]
+    [InlineData("/support-attachments/2026/%zz/private.png")]
     public void IsAuthorizedRequest_ShouldRejectTraversalLikeManagedPath(string requestPath)
     {
         var signer = CreateSigner();

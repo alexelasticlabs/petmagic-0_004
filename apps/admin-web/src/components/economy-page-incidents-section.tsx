@@ -10,12 +10,18 @@ import {
   adminTableStyles,
 } from "@/components/admin/admin-primitives";
 import {
+  incidentActionOptions,
   incidentCategoryOptions,
   incidentStatusOptions,
   type EconomyPageText,
 } from "@/components/economy-page.content";
 import styles from "@/components/economy-page.module.css";
-import { safeText, shortGuid, statusColor } from "@/components/economy-page.shared";
+import {
+  humanizeTokenKind,
+  safeText,
+  shortGuid,
+  statusColor,
+} from "@/components/economy-page.shared";
 import { Button } from "@/components/ui/button";
 import {
   ECONOMY_QUERY_FILTER_MAX_LENGTH,
@@ -88,22 +94,7 @@ export function EconomyPageIncidentsSection({
   const [amount, setAmount] = useState("");
   const [externalReferenceId, setExternalReferenceId] = useState("");
   const selectedIncident = selectedIncidentDetail?.incident ?? null;
-  const actionOptions = useMemo(
-    () => [
-      { value: "retry_webhook_processing", label: "Retry webhook processing" },
-      { value: "retry_settlement", label: "Retry settlement" },
-      { value: "manual_settle", label: "Manual settle" },
-      { value: "manual_revoke", label: "Manual revoke" },
-      { value: "manual_refund_mark", label: "Manual refund mark" },
-      { value: "manual_bonus_grant", label: "Manual bonus grant" },
-      { value: "manual_wallet_correction", label: "Manual wallet correction" },
-      { value: "restore_generation_charge_marker", label: "Restore generation charge marker" },
-      { value: "refund_generation_spend", label: "Refund generation spend" },
-      { value: "resolve_incident", label: text.resolveIncidentAction },
-      { value: "reopen_incident", label: text.reopenIncidentAction },
-    ],
-    [text.reopenIncidentAction, text.resolveIncidentAction]
-  );
+  const actionOptions = useMemo(() => incidentActionOptions[locale], [locale]);
 
   const submitAction = () => {
     if (!selectedIncident || !reason.trim()) {
@@ -212,9 +203,7 @@ export function EconomyPageIncidentsSection({
                       <div className={styles.packMeta}>
                         <strong>{String(item.retryCount)}</strong>
                         <span>
-                          {item.nextRetryAtUtc
-                            ? formatDateTime(item.nextRetryAtUtc, locale)
-                            : "-"}
+                          {item.nextRetryAtUtc ? formatDateTime(item.nextRetryAtUtc, locale) : "-"}
                         </span>
                       </div>
                     </td>
@@ -375,9 +364,7 @@ function IncidentLinks({
         </span>
         <span>
           {text.purchaseFilterLabel}:{" "}
-          <strong>
-            {detail.purchaseOrder ? shortGuid(detail.purchaseOrder.orderId) : "-"}
-          </strong>
+          <strong>{detail.purchaseOrder ? shortGuid(detail.purchaseOrder.orderId) : "-"}</strong>
         </span>
         <span>
           {text.subscriptionEventsTitle}:{" "}
@@ -399,9 +386,19 @@ function IncidentLinks({
         </span>
         {detail.generation ? (
           <span>
-            {text.tokensShort}: <strong>{detail.generation.tokenCost}</strong> · Charged:{" "}
-            <strong>{detail.generation.chargedAtUtc ? formatDateTime(detail.generation.chargedAtUtc, locale) : "-"}</strong> · Refunded:{" "}
-            <strong>{detail.generation.refundedAtUtc ? formatDateTime(detail.generation.refundedAtUtc, locale) : "-"}</strong>
+            {text.tokensShort}: <strong>{detail.generation.tokenCost}</strong> ·{" "}
+            {text.incidentChargedLabel}:{" "}
+            <strong>
+              {detail.generation.chargedAtUtc
+                ? formatDateTime(detail.generation.chargedAtUtc, locale)
+                : "-"}
+            </strong>{" "}
+            · {text.incidentRefundedLabel}:{" "}
+            <strong>
+              {detail.generation.refundedAtUtc
+                ? formatDateTime(detail.generation.refundedAtUtc, locale)
+                : "-"}
+            </strong>
           </span>
         ) : null}
       </div>
@@ -426,7 +423,7 @@ function IncidentLinks({
                 <tr key={item.entryId}>
                   <td>{formatDateTime(item.createdAtUtc, locale)}</td>
                   <td>{safeText(item.source, 64)}</td>
-                  <td>{safeText(item.tokenKind ?? "legacy", 64)}</td>
+                  <td>{humanizeTokenKind(item.tokenKind, locale, text.tokenKindLegacyLabel)}</td>
                   <td>{item.delta}</td>
                   <td>{item.balanceAfter}</td>
                   <td>{safeText(item.reason, 160)}</td>
@@ -451,7 +448,9 @@ function IncidentLinks({
               {formatDateTime(event.createdAtUtc, locale)}
             </span>
             {event.payloadSnapshotJson ? (
-              <code>{text.incidentSafePayloadLabel}: {safeText(event.payloadSnapshotJson, 500)}</code>
+              <code>
+                {text.incidentSafePayloadLabel}: {safeText(event.payloadSnapshotJson, 500)}
+              </code>
             ) : null}
           </div>
         ))

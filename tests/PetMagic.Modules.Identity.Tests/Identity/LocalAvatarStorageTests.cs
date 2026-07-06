@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Identity.Infrastructure;
 using PetMagic.Modules.Identity.Infrastructure.Options;
 
@@ -117,12 +118,18 @@ public sealed class LocalAvatarStorageTests
             Directory.GetParent(rootPath)!.FullName,
             $"petmagic-avatar-escape-{Guid.NewGuid():N}.jpg");
         var rootFilePath = Path.Combine(rootPath, "escape-avatar.jpg");
+        var encodedSeparatorFilePath = Path.Combine(rootPath, "2026%2f..%2fencoded-avatar.jpg");
+        var malformedPercentDirectory = Path.Combine(rootPath, "2026");
+        var malformedPercentFilePath = Path.Combine(malformedPercentDirectory, "%zz-private-avatar.jpg");
         var storage = CreateStorage(rootPath);
 
         try
         {
             await File.WriteAllTextAsync(siblingPath, "outside-root");
             await File.WriteAllTextAsync(rootFilePath, "inside-root");
+            await File.WriteAllTextAsync(encodedSeparatorFilePath, "encoded-separator");
+            Directory.CreateDirectory(malformedPercentDirectory);
+            await File.WriteAllTextAsync(malformedPercentFilePath, "malformed-percent");
 
             var siblingDelete = await storage.DeleteAsync(
                 "user-avatars/../" + Path.GetFileName(siblingPath),
@@ -130,11 +137,21 @@ public sealed class LocalAvatarStorageTests
             var rootDelete = await storage.DeleteAsync(
                 "http://localhost:5000/user-avatars/2026/../escape-avatar.jpg?pmexp=123&pmsig=abc",
                 CancellationToken.None);
+            var encodedSeparatorDelete = await storage.DeleteAsync(
+                "http://localhost:5000/user-avatars/2026%2f..%2fencoded-avatar.jpg",
+                CancellationToken.None);
+            var malformedPercentDelete = await storage.DeleteAsync(
+                "http://localhost:5000/user-avatars/2026/%zz-private-avatar.jpg",
+                CancellationToken.None);
 
             Assert.True(siblingDelete.IsSuccess);
             Assert.True(rootDelete.IsSuccess);
+            Assert.True(encodedSeparatorDelete.IsSuccess);
+            Assert.True(malformedPercentDelete.IsSuccess);
             Assert.True(File.Exists(siblingPath));
             Assert.True(File.Exists(rootFilePath));
+            Assert.True(File.Exists(encodedSeparatorFilePath));
+            Assert.True(File.Exists(malformedPercentFilePath));
         }
         finally
         {
@@ -168,6 +185,38 @@ public sealed class LocalAvatarStorageTests
     }
 
     [Fact]
+    public async Task StoreAsync_ShouldRejectOversizedStreamBeforeReadingBody()
+    {
+        var rootPath = CreateTempDirectory();
+        var storage = new LocalAvatarStorage(
+            new AvatarStorageOptions
+            {
+                PublicBaseUrl = "http://localhost:5000",
+                LocalMediaRootPath = rootPath,
+                MaxFileSizeBytes = 128
+            },
+            new TestHostEnvironment(rootPath),
+            NullLogger<LocalAvatarStorage>.Instance);
+
+        try
+        {
+            await using var stream = new ThrowingReadStream();
+
+            var stored = await storage.StoreAsync(
+                new AvatarUploadCommand("avatar.png", "image/png", stream, contentLengthBytes: 129),
+                CancellationToken.None);
+
+            Assert.True(stored.IsFailure);
+            Assert.Equal("users.avatar_file_too_large", stored.Error.Code);
+            Assert.False(stream.ReadAttempted);
+        }
+        finally
+        {
+            Directory.Delete(rootPath, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task StoreAsync_ShouldLogWarning_WhenDirectoryCreationOrWriteFails()
     {
         var rootPath = Path.Combine(Path.GetTempPath(), $"petmagic-avatar-root-file-{Guid.NewGuid():N}");
@@ -188,7 +237,10 @@ public sealed class LocalAvatarStorageTests
                 entry => entry.Level == LogLevel.Warning
                     && entry.Message.Contains("Avatar storage write failed.", StringComparison.Ordinal)
                     && Equals(entry.Properties["Operation"], "store")
-                    && Equals(entry.Properties["ContentType"], "image/jpeg"));
+                    && Equals(entry.Properties["ContentType"], "image/jpeg")
+                    && Equals(entry.Properties["ExceptionType"], "IOException")
+                    && entry.Exception is null
+                    && !ContainsLogValue(entry, rootPath));
         }
         finally
         {
@@ -226,12 +278,25 @@ public sealed class LocalAvatarStorageTests
                 entry => entry.Level == LogLevel.Warning
                     && entry.Message.Contains("Avatar storage delete failed.", StringComparison.Ordinal)
                     && Equals(entry.Properties["Operation"], "delete")
-                    && Equals(entry.Properties["AvatarFileName"], Path.GetFileName(stored.Value.StorageKey)));
+                    && Equals(entry.Properties["StorageKeyHash"], SafeLogValues.StableHash(stored.Value.StorageKey))
+                    && Equals(entry.Properties["ExceptionType"], "IOException")
+                    && entry.Exception is null
+                    && !entry.Properties.ContainsKey("AvatarFileName")
+                    && !ContainsLogValue(entry, stored.Value.StorageKey)
+                    && !ContainsLogValue(entry, stored.Value.LocalPath!));
         }
         finally
         {
             Directory.Delete(rootPath, recursive: true);
         }
+    }
+
+    private static bool ContainsLogValue(CapturedLogEntry entry, string value)
+    {
+        return entry.Message.Contains(value, StringComparison.Ordinal)
+            || entry.Properties.Values.Any(property =>
+                property?.ToString()?.Contains(value, StringComparison.Ordinal) == true)
+            || entry.Exception?.ToString().Contains(value, StringComparison.Ordinal) == true;
     }
 
     private static LocalAvatarStorage CreateStorage(
@@ -286,6 +351,41 @@ public sealed class LocalAvatarStorageTests
         public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
     }
 
+    private sealed class ThrowingReadStream : Stream
+    {
+        public bool ReadAttempted { get; private set; }
+
+        public override bool CanRead => true;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            ReadAttempted = true;
+            throw new InvalidOperationException("The oversized stream body should not be read.");
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
     private sealed class CapturingLogger<T> : ILogger<T>
     {
         public List<CapturedLogEntry> Entries { get; } = [];
@@ -311,7 +411,7 @@ public sealed class LocalAvatarStorageTests
                     .ToDictionary(x => x.Key, x => x.Value)
                 : [];
 
-            Entries.Add(new CapturedLogEntry(logLevel, formatter(state, exception), properties));
+            Entries.Add(new CapturedLogEntry(logLevel, formatter(state, exception), exception, properties));
         }
 
         private sealed class NullScope : IDisposable
@@ -327,5 +427,6 @@ public sealed class LocalAvatarStorageTests
     private sealed record CapturedLogEntry(
         LogLevel Level,
         string Message,
+        Exception? Exception,
         IReadOnlyDictionary<string, object?> Properties);
 }

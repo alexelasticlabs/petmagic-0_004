@@ -96,25 +96,41 @@ describe("admin-navigation", () => {
   });
 
   it("keeps Russian page meta free of editorial English labels", () => {
+    expect(getAdminPageMeta("ru", "/feedback", "Admin").title).toBe("Фидбек");
+    expect(getAdminPageMeta("ru", "/feedback", "Admin").description).toBe(
+      "Обратная связь по генерациям, багам, оплате и предложениям со статусами и возвратом кредитов."
+    );
     expect(getAdminPageMeta("ru", "/generations", "Admin").description).toBe(
-      "Очередь и история генераций с фильтрами по статусу, провайдеру, пользователю и job id."
+      "Очередь и история генераций с фильтрами по статусу, провайдеру, пользователю и ID задания."
     );
     expect(getAdminPageMeta("ru", "/roles", "Admin").description).toBe(
-      "Списки Admin и Moderator, назначение и снятие Moderator с журналом аудита."
+      "Списки администраторов и модераторов, назначение и снятие модератора с журналом аудита."
     );
     expect(getAdminPageMeta("ru", "/moderation", "Admin").description).toBe(
       "Очередь жалоб и обратной связи по шаблонам с решением одобрить или отклонить."
+    );
+    expect(getAdminPageMeta("ru", "/templates/daily-featured", "Admin").description).toBe(
+      "Ручные назначения и автоматический выбор шаблона дня."
     );
   });
 
   it("sources admin page meta copy from a centralized content module", () => {
     const source = readFileSync(adminNavigationPath, "utf8");
     const contentSource = readFileSync(adminNavigationContentPath, "utf8");
+    const ruContentSource = contentSource.slice(
+      contentSource.indexOf("  ru: {"),
+      contentSource.indexOf("  en: {")
+    );
 
-    expect(source).toContain('import { getAdminPageMetaCopy } from "@/lib/admin-navigation.content";');
+    expect(source).toContain(
+      'import { getAdminPageMetaCopy } from "@/lib/admin-navigation.content";'
+    );
     expect(source).toContain("const copy = getAdminPageMetaCopy(locale);");
     expect(contentSource).toContain('title: "Дашборд"');
     expect(contentSource).toContain('title: "Dashboard"');
+    expect(contentSource).toContain('title: "Фидбек"');
+    expect(ruContentSource).not.toContain('title: "Feedback",');
+    expect(ruContentSource).not.toContain("auto-pick для Template of the Day");
     expect(contentSource).toContain('fallbackAdministratorName: "администратор"');
     expect(contentSource).toContain('fallbackAdministratorName: "administrator"');
     expect(source).not.toContain('title: locale === "ru" ? "Дашборд" : "Dashboard"');

@@ -402,9 +402,9 @@ internal sealed partial class TemplateGenerationJobProcessor(
         catch (Exception exception)
         {
             logger.LogError(
-                exception,
-                "Template generation job failed with unhandled exception. ElapsedMs={ElapsedMs}",
-                ElapsedMsSince(startedAt));
+                "Template generation job failed with unhandled exception. ElapsedMs={ElapsedMs} ExceptionType={ExceptionType}",
+                ElapsedMsSince(startedAt),
+                SafeLogValues.ExceptionType(exception));
             await MarkFailedAsync(job, TemplatesErrors.AiProviderFailed, CancellationToken.None);
         }
     }
@@ -428,15 +428,18 @@ internal sealed partial class TemplateGenerationJobProcessor(
         if (requireClaim && !hasClaim)
         {
             logger.LogWarning(
-                "Template generation job failure was ignored because it is no longer claimed. GenerationId={GenerationId}",
-                job.Id);
+                "Template generation job failure was ignored because it is no longer claimed. GenerationIdHash={GenerationIdHash}",
+                TemplateLogSanitizer.SafeId(job.Id));
             return false;
         }
 
         var previousStatus = job.Status;
+        var safeErrorCode = AdminFailureMessageSanitizer.SanitizeCode(error.Code)
+            ?? TemplatesErrors.AiProviderFailed.Code;
+        var safeErrorMessage = AdminFailureMessageSanitizer.Sanitize(error.Message);
         job.Status = TemplateGenerationStatus.Failed;
-        job.LastErrorCode = error.Code;
-        job.LastErrorMessage = error.Message;
+        job.LastErrorCode = safeErrorCode;
+        job.LastErrorMessage = safeErrorMessage;
         job.UpdatedAtUtc = DateTime.UtcNow;
         job.CompletedAtUtc = job.UpdatedAtUtc;
 
@@ -450,10 +453,10 @@ internal sealed partial class TemplateGenerationJobProcessor(
             return false;
         }
 
-        TemplateGenerationMetrics.RecordJobFailed(job, previousStatus, error.Code);
+        TemplateGenerationMetrics.RecordJobFailed(job, previousStatus, safeErrorCode);
         logger.LogError(
             "Template generation job failed. ErrorCode={ErrorCode} ElapsedMs={ElapsedMs}",
-            error.Code,
+            safeErrorCode,
             ElapsedMsBetween(job.StartedAtUtc, job.CompletedAtUtc));
 
         AddAnalyticsEvent(job, TemplateAnalyticsEventTypes.GenerationFailed);
@@ -531,8 +534,8 @@ internal sealed partial class TemplateGenerationJobProcessor(
         if (string.IsNullOrWhiteSpace(job.LockedBy))
         {
             logger.LogWarning(
-                "Template generation job update was ignored because it is no longer claimed. GenerationId={GenerationId}",
-                job.Id);
+                "Template generation job update was ignored because it is no longer claimed. GenerationIdHash={GenerationIdHash}",
+                TemplateLogSanitizer.SafeId(job.Id));
             return Task.FromResult(false);
         }
 
@@ -563,9 +566,9 @@ internal sealed partial class TemplateGenerationJobProcessor(
         catch (DbUpdateConcurrencyException exception)
         {
             logger.LogWarning(
-                exception,
-                "Template generation job update was skipped because its lock changed. GenerationId={GenerationId}",
-                job.Id);
+                "Template generation job update was skipped because its lock changed. GenerationIdHash={GenerationIdHash} ExceptionType={ExceptionType}",
+                TemplateLogSanitizer.SafeId(job.Id),
+                SafeLogValues.ExceptionType(exception));
             dbContext.ChangeTracker.Clear();
             return false;
         }
@@ -595,11 +598,12 @@ internal sealed partial class TemplateGenerationJobProcessor(
             return true;
         }
 
-        job.RefundLastErrorCode = refund.Error.Code;
-        TemplateGenerationMetrics.RecordRefundFailure(job, refund.Error.Code);
+        var safeErrorCode = AdminFailureMessageSanitizer.SanitizeCode(refund.Error.Code);
+        job.RefundLastErrorCode = safeErrorCode;
+        TemplateGenerationMetrics.RecordRefundFailure(job, safeErrorCode ?? "templates.refund_failed");
         logger.LogWarning(
             "Template generation refund failed. ErrorCode={ErrorCode} ElapsedMs={ElapsedMs}",
-            refund.Error.Code,
+            safeErrorCode,
             ElapsedMsSince(startedAt));
 
         if (job.RefundAttemptCount >= options.MaxRefundAttempts)
@@ -607,7 +611,7 @@ internal sealed partial class TemplateGenerationJobProcessor(
             logger.LogError(
                 "Template generation refund failed after all retries. RefundAttemptCount={RefundAttemptCount} ErrorCode={ErrorCode} ElapsedMs={ElapsedMs}",
                 job.RefundAttemptCount,
-                refund.Error.Code,
+                safeErrorCode,
                 ElapsedMsSince(startedAt));
         }
 
@@ -688,14 +692,14 @@ internal sealed partial class TemplateGenerationJobProcessor(
         catch (Exception ex)
         {
             logger.LogWarning(
-                ex,
-                "Template generation gamification sync failed. Operation={Operation} JobId={JobId} UserId={UserId} TemplateId={TemplateId} HasEconomyService={HasEconomyService} GenerationStillCompleted={GenerationStillCompleted}",
+                "Template generation gamification sync failed. Operation={Operation} JobIdHash={JobIdHash} UserIdHash={UserIdHash} TemplateIdHash={TemplateIdHash} HasEconomyService={HasEconomyService} GenerationStillCompleted={GenerationStillCompleted} ExceptionType={ExceptionType}",
                 "notify_gamification",
-                job.Id,
-                job.UserId,
-                job.TemplateId,
+                SafeLogValues.StableHash(job.Id.ToString("D")),
+                SafeLogValues.StableHash(job.UserId.ToString("D")),
+                SafeLogValues.StableHash(job.TemplateId.ToString("D")),
                 economyService is not null,
-                true);
+                true,
+                SafeLogValues.ExceptionType(ex));
         }
     }
 

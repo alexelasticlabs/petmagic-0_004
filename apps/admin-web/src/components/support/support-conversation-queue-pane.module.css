@@ -112,7 +112,7 @@
 
 .queueFiltersGrid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(7.2rem, 1fr));
   gap: 0.44rem;
   align-items: end;
   padding: 0.44rem;
@@ -653,7 +653,7 @@
 
 @media (max-width: 1280px) {
   .queueFiltersGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(7.2rem, 1fr));
   }
 }
 

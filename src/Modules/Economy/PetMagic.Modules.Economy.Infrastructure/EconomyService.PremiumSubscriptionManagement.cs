@@ -49,10 +49,10 @@ public sealed partial class EconomyService
         catch (Exception ex)
         {
             logger?.LogWarning(
-                ex,
-                "Failed to request cancel_at_period_end for Stripe subscription {SubscriptionId}. CorrelationId={CorrelationId}",
+                "Failed to request cancel_at_period_end for Stripe subscription. SubscriptionIdSafe={SubscriptionIdSafe} ExceptionType={ExceptionType} CorrelationIdHash={CorrelationIdHash}",
                 EconomyLogSanitizer.SafeExternalId(subscription.ExternalSubscriptionId),
-                CurrentCorrelationId);
+                SafeLogValues.ExceptionType(ex),
+                CurrentCorrelationIdHash);
 
             return Result.Failure<SubscriptionSummaryResponse>(EconomyErrors.PaymentGatewayFailed);
         }
@@ -124,10 +124,10 @@ public sealed partial class EconomyService
             catch (Exception ex)
             {
                 logger?.LogWarning(
-                    ex,
-                    "Failed to immediately cancel Stripe subscription {SubscriptionId} for admin premium revoke. CorrelationId={CorrelationId}",
+                    "Failed to immediately cancel Stripe subscription for admin premium revoke. SubscriptionIdSafe={SubscriptionIdSafe} ExceptionType={ExceptionType} CorrelationIdHash={CorrelationIdHash}",
                     EconomyLogSanitizer.SafeExternalId(subscription.ExternalSubscriptionId),
-                    CurrentCorrelationId);
+                    SafeLogValues.ExceptionType(ex),
+                    CurrentCorrelationIdHash);
 
                 return Result.Failure<SubscriptionSummaryResponse>(EconomyErrors.PaymentGatewayFailed);
             }

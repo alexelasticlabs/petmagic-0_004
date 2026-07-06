@@ -63,6 +63,31 @@ void main() {
   });
 
   testWidgets(
+    'email verification cooldown pauses timer while app is backgrounded',
+    (tester) async {
+      final repository = _DuplicateGuardProfileRepository();
+      await _pumpVerificationPage(
+        tester,
+        repository,
+        startResendCooldown: true,
+      );
+
+      expect(find.text('Send code again (60s)'), findsOneWidget);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 5));
+
+      expect(find.text('Send code again (60s)'), findsOneWidget);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+
+      expect(find.text('Send code again (60s)'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'email verification keeps verify and resend offline until reconnect',
     (tester) async {
       final repository = _DuplicateGuardProfileRepository();
@@ -183,11 +208,49 @@ void main() {
       expect(find.text('Send code again (60s)'), findsNothing);
     },
   );
+
+  testWidgets(
+    'email verification keeps newer verify request cancellable after stale cancellation completes',
+    (tester) async {
+      final repository = _SequencedEmailVerificationProfileRepository();
+      final networkController = _TestEmailVerificationNetworkStatusController(
+        true,
+      );
+      await _pumpVerificationPage(
+        tester,
+        repository,
+        networkStatusController: networkController,
+      );
+
+      await tester.tap(find.byType(FilledButton));
+      await tester.pump();
+      expect(repository.verifyCancelTokens, hasLength(1));
+
+      networkController.setHasInternet(false);
+      await tester.pump();
+      expect(repository.verifyCancelTokens[0].isCancelled, isTrue);
+
+      networkController.setHasInternet(true);
+      await tester.pump();
+      await tester.tap(find.byType(FilledButton));
+      await tester.pump();
+      expect(repository.verifyCancelTokens, hasLength(2));
+      expect(repository.verifyCancelTokens[1].isCancelled, isFalse);
+
+      repository.completeVerify(0);
+      await tester.pump();
+
+      networkController.setHasInternet(false);
+      await tester.pump();
+
+      expect(repository.verifyCancelTokens[1].isCancelled, isTrue);
+    },
+  );
 }
 
 Future<void> _pumpVerificationPage(
   WidgetTester tester,
-  _DuplicateGuardProfileRepository repository, {
+  ProfileRepository repository, {
   bool startResendCooldown = false,
   NetworkStatusController? networkStatusController,
 }) async {
@@ -255,6 +318,33 @@ class _DuplicateGuardProfileRepository extends ProfileRepository {
   void completeResend() {
     if (!_resendCompleter.isCompleted) {
       _resendCompleter.complete();
+    }
+  }
+}
+
+class _SequencedEmailVerificationProfileRepository extends ProfileRepository {
+  _SequencedEmailVerificationProfileRepository()
+    : super(dio: Dio(), sessionStorage: AuthSessionStorage());
+
+  final verifyCancelTokens = <CancelToken>[];
+  final _verifyCompleters = <Completer<AuthSession>>[];
+
+  @override
+  Future<AuthSession> verifyEmailCode({
+    required String email,
+    required String code,
+    CancelToken? cancelToken,
+  }) {
+    verifyCancelTokens.add(cancelToken!);
+    final completer = Completer<AuthSession>();
+    _verifyCompleters.add(completer);
+    return completer.future;
+  }
+
+  void completeVerify(int index) {
+    final completer = _verifyCompleters[index];
+    if (!completer.isCompleted) {
+      completer.complete(_authSession());
     }
   }
 }

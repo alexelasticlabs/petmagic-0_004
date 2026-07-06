@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/shared/payments/store_product_availability_cache.dart';
@@ -232,6 +233,84 @@ void main() {
       );
 
       expect(loadCalls, 2);
+    },
+  );
+
+  test(
+    'store product availability cache normalizes equivalent scope keys',
+    () async {
+      var loadCalls = 0;
+      final cache = StoreProductAvailabilityCache();
+
+      Future<StoreProductAvailabilitySnapshot> loader(
+        Set<String> productIds,
+      ) async {
+        loadCalls++;
+        return StoreProductAvailabilitySnapshot(
+          isAvailable: true,
+          productIds: productIds,
+          productPrices: {
+            for (final productId in productIds) productId: '\$7.99',
+          },
+        );
+      }
+
+      await cache.read(
+        {'premium.month'},
+        scopeKey: ' App_Store ',
+        loader: loader,
+      );
+      await cache.read(
+        {'premium.month'},
+        scopeKey: 'app_store',
+        loader: loader,
+      );
+
+      expect(loadCalls, 1);
+    },
+  );
+
+  test('store product availability cache fingerprints scope keys', () {
+    final source = File(
+      'lib/shared/payments/store_product_availability_cache.dart',
+    ).readAsStringSync();
+
+    expect(
+      source,
+      contains('final normalizedScopeKey = _normalizeScopeKey(scopeKey);'),
+    );
+    expect(source, contains('scopeKey: normalizedScopeKey'));
+    expect(source, contains("return 'sha256:"));
+    expect(source, isNot(contains('return value;')));
+  });
+
+  test(
+    'store product availability cache bounds completed entries by recent use',
+    () async {
+      var loadCalls = 0;
+      final cache = StoreProductAvailabilityCache(maxEntries: 2);
+
+      Future<StoreProductAvailabilitySnapshot> loader(
+        Set<String> productIds,
+      ) async {
+        loadCalls++;
+        return StoreProductAvailabilitySnapshot(
+          isAvailable: true,
+          productIds: productIds,
+          productPrices: {
+            for (final productId in productIds) productId: '\$1.99',
+          },
+        );
+      }
+
+      await cache.read({'pack.a'}, loader: loader);
+      await cache.read({'pack.b'}, loader: loader);
+      await cache.read({'pack.a'}, loader: loader);
+      await cache.read({'pack.c'}, loader: loader);
+      await cache.read({'pack.b'}, loader: loader);
+      await cache.read({'pack.a'}, loader: loader);
+
+      expect(loadCalls, 5);
     },
   );
 }

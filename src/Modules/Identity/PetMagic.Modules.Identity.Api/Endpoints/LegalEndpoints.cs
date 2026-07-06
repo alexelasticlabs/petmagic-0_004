@@ -63,7 +63,7 @@ public static class LegalEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         if (!AuthEndpoints.TryGetUserId(context, out var userId, out var invalidSubjectProblem))
@@ -77,6 +77,15 @@ public static class LegalEndpoints
             return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
+        ApplySensitiveNoStoreHeaders(context);
         return TypedResults.Ok(result.Value);
+    }
+
+    private static void ApplySensitiveNoStoreHeaders(HttpContext context)
+    {
+        context.Response.Headers.CacheControl = "no-store, no-cache, max-age=0";
+        context.Response.Headers.Pragma = "no-cache";
+        context.Response.Headers.Expires = "0";
+        context.Response.Headers.XContentTypeOptions = "nosniff";
     }
 }

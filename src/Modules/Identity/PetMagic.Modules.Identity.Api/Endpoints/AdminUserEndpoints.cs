@@ -24,8 +24,9 @@ public static class AdminUserEndpoints
     {
         var group = endpoints.MapGroup("/api/admin/users")
             .WithTags("Admin.Users")
+            .AddEndpointFilter(ApplyPrivateAdminUserResponseHeadersAsync)
             .RequireRateLimiting("admin")
-            .RequireAuthorization("ModeratorOrAdmin");
+            .RequireAuthorization("AdminOnly");
 
         group.MapGet("", ListUsersAsync);
         group.MapGet("/dashboard/metrics", GetDashboardMetricsAsync);
@@ -43,8 +44,7 @@ public static class AdminUserEndpoints
         group.MapDelete("/{userId:guid}/role", RevokeRoleAsync)
             .RequireAuthorization("AdminOnly")
             .WithMetadata(new RequestSizeLimitAttribute(MaxAdminUserMutationRequestBodyBytes));
-        group.MapDelete("/{userId:guid}", DeleteUserAsync).RequireAuthorization("AdminOnly");
-        group.MapPut("/{userId:guid}/premium", SetPremiumStatusAsync)
+        group.MapDelete("/{userId:guid}", DeleteUserAsync)
             .RequireAuthorization("AdminOnly")
             .WithMetadata(new RequestSizeLimitAttribute(MaxAdminUserMutationRequestBodyBytes));
         group.MapPut("/{userId:guid}/active", SetActiveStatusAsync)
@@ -54,6 +54,17 @@ public static class AdminUserEndpoints
         return endpoints;
     }
 
+    private static async ValueTask<object?> ApplyPrivateAdminUserResponseHeadersAsync(
+        EndpointFilterInvocationContext context,
+        EndpointFilterDelegate next)
+    {
+        context.HttpContext.Response.Headers.CacheControl = "no-store";
+        context.HttpContext.Response.Headers.Pragma = "no-cache";
+        context.HttpContext.Response.Headers.XContentTypeOptions = "nosniff";
+
+        return await next(context);
+    }
+
     private static async Task<Results<Ok<UserListPageResponse>, ProblemHttpResult>> ListUsersAsync(
         [FromQuery] int skip,
         [FromQuery] int take,
@@ -61,6 +72,7 @@ public static class AdminUserEndpoints
         [FromQuery] string? role,
         [FromQuery] string? status,
         [FromQuery] bool? isPremium,
+        [FromQuery] string? sort,
         HttpContext httpContext,
         IIdentityService service,
         CancellationToken cancellationToken)
@@ -72,6 +84,7 @@ public static class AdminUserEndpoints
             role,
             status,
             isPremium,
+            sort,
             cancellationToken);
         if (result.IsFailure)
         {
@@ -109,7 +122,7 @@ public static class AdminUserEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.AdjustAdminUserWalletAsync(command, cancellationToken);
@@ -161,7 +174,7 @@ public static class AdminUserEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         if (command.Role is SystemRoles.Admin or SystemRoles.Moderator)
@@ -184,29 +197,6 @@ public static class AdminUserEndpoints
         return TypedResults.NoContent();
     }
 
-    private static async Task<Results<NoContent, ValidationProblem, ProblemHttpResult>> SetPremiumStatusAsync(
-        [FromRoute] Guid userId,
-        [FromBody] SetPremiumStatusRequest request,
-        [FromServices] IValidator<SetPremiumStatusCommand> validator,
-        [FromServices] IIdentityService service,
-        CancellationToken cancellationToken)
-    {
-        var command = new SetPremiumStatusCommand(userId, request.IsPremium);
-        var validation = await validator.ValidateAsync(command, cancellationToken);
-        if (!validation.IsValid)
-        {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
-        }
-
-        var result = await service.SetPremiumStatusAsync(command, cancellationToken);
-        if (result.IsFailure)
-        {
-            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
-        }
-
-        return TypedResults.NoContent();
-    }
-
     private static async Task<Results<NoContent, ValidationProblem, ProblemHttpResult>> RevokeRoleAsync(
         [FromRoute] Guid userId,
         [FromBody] RevokeRoleRequest request,
@@ -218,7 +208,7 @@ public static class AdminUserEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.RevokeRoleAsync(command, cancellationToken);
@@ -241,7 +231,7 @@ public static class AdminUserEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.SetUserActiveStatusAsync(command, cancellationToken);
@@ -263,7 +253,7 @@ public static class AdminUserEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.DeleteAdminUserAsync(command, cancellationToken);
@@ -285,7 +275,7 @@ public static class AdminUserEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
         var result = await service.SendBulkEmailAsync(command, cancellationToken);
@@ -319,8 +309,6 @@ public static class AdminUserEndpoints
     public sealed record AssignRoleRequest(string? Role);
 
     public sealed record RevokeRoleRequest(string? Role);
-
-    public sealed record SetPremiumStatusRequest(bool IsPremium);
 
     public sealed record SetActiveStatusRequest(bool IsActive);
 

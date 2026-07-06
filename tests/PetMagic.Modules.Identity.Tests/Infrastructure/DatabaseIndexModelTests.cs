@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 
@@ -73,6 +75,10 @@ public sealed class DatabaseIndexModelTests
         AssertHasIndex<TemplateGenerationJob>(dbContext, ["Status", "RefundedAtUtc", "RefundLastAttemptedAtUtc"]);
         AssertHasIndex<TemplateGenerationJob>(dbContext, ["Status", "QueueMediaType", "QueueTier", "QueuedAtUtc"]);
         AssertHasIndex<TemplateGenerationJob>(dbContext, ["Status", "QueueMediaType", "StartedAtUtc"]);
+        AssertHasIndex<TemplateGenerationJob>(dbContext, ["ChargedAtUtc"]);
+        AssertHasIndex<TemplateGenerationJob>(dbContext, ["RefundedAtUtc"]);
+        AssertHasIndex<TemplateGenerationJob>(dbContext, ["CreatedAtUtc", "Id"]);
+        AssertHasIndex<TemplateGenerationJob>(dbContext, ["UpdatedAtUtc", "Id"]);
         AssertHasUniqueIndex<TemplateGenerationJob>(dbContext, ["UserId", "IdempotencyKey"]);
         AssertHasUniqueIndex<TemplateGenerationJob>(dbContext, ["UserId", "RequestHash"]);
         AssertHasUniqueIndex<TemplateGenerationWatermarkUnlock>(dbContext, ["UserId", "GenerationJobId"]);
@@ -111,6 +117,79 @@ public sealed class DatabaseIndexModelTests
         Assert.Contains("DROP INDEX CONCURRENTLY IF EXISTS", migration);
         Assert.Contains("suppressTransaction: true", migration);
         Assert.DoesNotContain("migrationBuilder.CreateIndex(", migration);
+    }
+
+    [Fact]
+    public void GenerationBillingReconciliationIndexesMigration_ShouldUseConcurrentIndexesOutsideTransaction()
+    {
+        var migration = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Infrastructure",
+            "Data",
+            "Migrations",
+            "20260702234729_AddGenerationBillingReconciliationIndexes.cs"));
+
+        Assert.Contains("CREATE INDEX CONCURRENTLY IF NOT EXISTS", migration);
+        Assert.Contains("DROP INDEX CONCURRENTLY IF EXISTS", migration);
+        Assert.Contains("suppressTransaction: true", migration);
+        Assert.DoesNotContain("migrationBuilder.CreateIndex(", migration);
+    }
+
+    [Fact]
+    public void ConcurrentIndexMigrations_ShouldSuppressEfTransactions()
+    {
+        var migrationsRoot = Path.Combine(FindRepositoryRoot(), "src", "Modules");
+        var unsafeMigrations = Directory
+            .EnumerateFiles(migrationsRoot, "*.cs", SearchOption.AllDirectories)
+            .Where(path => path.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            .Select(path => new
+            {
+                Path = path,
+                Source = File.ReadAllText(path)
+            })
+            .Where(migration => migration.Source.Contains("CONCURRENTLY", StringComparison.Ordinal))
+            .SelectMany(migration => Regex
+                .Matches(migration.Source, "migrationBuilder\\.Sql\\(\\s*\"\"\"(?<sql>.*?)\"\"\"(?<args>.*?)\\);", RegexOptions.Singleline)
+                .Select(match => new
+                {
+                    migration.Path,
+                    Sql = match.Groups["sql"].Value,
+                    Args = match.Groups["args"].Value
+                }))
+            .Where(sqlCall =>
+                sqlCall.Sql.Contains("CONCURRENTLY", StringComparison.Ordinal)
+                && !sqlCall.Args.Contains("suppressTransaction: true", StringComparison.Ordinal))
+            .Select(sqlCall =>
+                $"{Path.GetRelativePath(FindRepositoryRoot(), sqlCall.Path)} contains a CONCURRENTLY SQL call without suppressTransaction: true")
+            .ToArray();
+
+        Assert.Empty(unsafeMigrations);
+    }
+
+    [Fact]
+    public void ConcurrentIndexMigrations_ShouldKeepConcurrentSqlInRawMigrationCalls()
+    {
+        var migrationsRoot = Path.Combine(FindRepositoryRoot(), "src", "Modules");
+        var unsafeMigrations = Directory
+            .EnumerateFiles(migrationsRoot, "*.cs", SearchOption.AllDirectories)
+            .Where(path => path.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            .Select(path => new
+            {
+                Path = path,
+                Source = File.ReadAllText(path)
+            })
+            .Where(migration => migration.Source.Contains("CONCURRENTLY", StringComparison.Ordinal))
+            .Where(migration => !Regex
+                .Matches(migration.Source, "migrationBuilder\\.Sql\\(\\s*\"\"\"(?<sql>.*?)\"\"\"(?<args>.*?)\\);", RegexOptions.Singleline)
+                .Any(match => match.Groups["sql"].Value.Contains("CONCURRENTLY", StringComparison.Ordinal)))
+            .Select(migration =>
+                $"{Path.GetRelativePath(FindRepositoryRoot(), migration.Path)} mentions CONCURRENTLY but no raw migrationBuilder.Sql call contains it")
+            .ToArray();
+
+        Assert.Empty(unsafeMigrations);
     }
 
     [Fact]
