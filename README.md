@@ -22,6 +22,23 @@ cp .env.example .env
 docker compose up --build
 ```
 
+If those host ports are already occupied (5432, 5000/5001, 1025, 3000), use:
+
+```powershell
+pwsh scripts/docker/compose-up-portfree.ps1 -Build
+```
+
+or override manually:
+
+```powershell
+$env:POSTGRES_HOST_PORT='5433'
+$env:BACKEND_HOST_PORT='5601'
+$env:MAILPIT_SMTP_HOST_PORT='2525'
+$env:MAILPIT_WEB_HOST_PORT='9025'
+$env:ADMIN_WEB_HOST_PORT='4000'
+docker compose up --build --wait --wait-timeout 240
+```
+
 This starts the core local stack: PostgreSQL, Mailpit, backend API, generation worker, and admin web.
 The observability stack is available separately through the `monitoring` profile:
 
@@ -120,7 +137,7 @@ dotnet test PetMagic.slnx
 ```
 
 Localization and light/dark theme rules are documented in
-`docs/localization-and-theme.md`. Update that guide when supported locales,
+[docs/localization-and-theme.md](docs/localization-and-theme.md). Update that guide when supported locales,
 fallback behavior, user-facing API error contracts, or shared theme token
 locations change.
 
@@ -180,13 +197,13 @@ k6 run -e BASE_URL=http://localhost:<BACKEND_HOST_PORT> \
   scripts/k6/template-generation-load-test.js
 ```
 
-See `docs/LOAD_TESTING.md` for profiles, environment variables, and baseline capture notes.
+See [docs/LOAD_TESTING.md](docs/LOAD_TESTING.md) for profiles, environment variables, and baseline capture notes.
 
 ## Observability
 
 OpenTelemetry metrics and Prometheus alert rules cover API latency/error SLIs, Stripe webhook failures, template generation queue health, lifecycle stages, retry exhaustion, and AI provider errors.
 
-See `docs/OBSERVABILITY.md` and `deploy/monitoring/prometheus/petmagic-alerts.yml`.
+See [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md) and `deploy/monitoring/prometheus/petmagic-alerts.yml`.
 
 ## Security
 
@@ -195,14 +212,42 @@ See `docs/OBSERVABILITY.md` and `deploy/monitoring/prometheus/petmagic-alerts.ym
 - If a credential is committed, rotate or revoke it, remove it from history, and rerun the secret scan.
 - Production problem responses hide exception details and include correlation identifiers.
 
-See `docs/SECURITY.md` for the security policy and dependency audit notes.
+See [docs/SECURITY.md](docs/SECURITY.md) for the security policy and dependency audit notes.
 
 ## Release Readiness
 
 Current repo-wide production-readiness status is tracked in
-`docs/production-readiness-audit-2026-07-03.md`. Treat local green builds and
+[docs/production-readiness-audit-2026-07-03.md](docs/production-readiness-audit-2026-07-03.md). Treat local green builds and
 tests as pre-release evidence only; production release still requires real
 provider-backed staging proof and signed store artifacts.
+
+## Documentation Map
+
+- [API contracts](docs/API_CONTRACTS.md) - backend, mobile, and admin contract notes.
+- [Authentication and registration](docs/md/AUTHENTICATION_AND_REGISTRATION.md) - auth flows and account setup behavior.
+- [Payments sandbox checklist](docs/payments-sandbox-checklist.md) and [economy billing](docs/economy-generation-billing.md) - Stripe/store purchase validation and billing behavior.
+- [Notifications contract](docs/notifications-contract.md) - push payload contracts shared by backend and clients.
+- [Generation media lifecycle audit](docs/generation-media-lifecycle-audit.md), [template content hygiene](docs/template-content-hygiene.md), and [scheduler rollout](docs/generation-scheduler-rollout.md) - generation/media operations.
+- [Admin web follow-ups](docs/admin-web-production-followups.md) and [admin style guide](docs/md/ADMIN_STYLE_GUIDE.md) - admin panel production and UI conventions.
+- [Staging FAL rollout checklist](docs/staging-fal-rollout-checklist.md) and [gallery release prep](docs/gallery-release-branch-prep-2026-07-03.md) - provider-backed rollout evidence.
+- [Observability logging](docs/observability/logging.md) and [generation release gate](docs/observability/generation-release-gate.md) - production monitoring checks.
+- Historical audit and QA evidence:
+  [security audit](docs/security-audit-2026-06-17.md),
+  [notifications/tokens/purchases audit](docs/audit-notifications-tokens-purchases-economy-2026-07-03.md),
+  [economy release gate](docs/economy-release-gate-2026-07-03.md),
+  [economy technical validation](docs/economy-technical-validation-final.md),
+  [mobile backend notifications optimization](docs/mobile-backend-notifications-optimization-report-2026-06-13.md),
+  [mobile gallery behavior](docs/mobile-gallery-current-behavior-2026-06-14.md),
+  [mobile release size audit](docs/md/mobile_release_size_audit.md),
+  [mobile release size report](docs/md/mobile_release_size_report_2026-05-30.md),
+  [mobile background crash playbook](docs/md/MOBILE_BACKGROUND_CRASH_PLAYBOOK.md),
+  [template feed stability QA](docs/template-feed-stability-qa-2026-06-14.md),
+  [template feed TZ1-8 staging QA](docs/templates-feed-tz1-8-staging-qa.md),
+  [watermark monetization manual QA](docs/watermark-monetization-manual-qa.md),
+  [templates preview content profile](docs/md/TEMPLATES_PREVIEW_CONTENT_PROFILE.md),
+  [AI agent rules](docs/ai-agent-rules.md),
+  [auth email setup](docs/md/AUTH_EMAIL_SETUP.md), and
+  [logging standard](docs/md/LOGGING_STANDARD.md).
 
 ## Useful Commands
 
