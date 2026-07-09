@@ -1,11 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:app_links/app_links.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
@@ -119,7 +120,6 @@ void main() {
         dio: dio,
         sessionStorage: _InMemoryAuthSessionStorage(),
         appLinks: AppLinks(),
-        googleSignInInitializeDelegate: (_) async {},
         googleSignInDelegate: (googleSignIn) async {
           googleSignInCalls++;
           return null;
@@ -142,9 +142,112 @@ void main() {
   );
 
   test(
-    'google auth reinitializes native sdk when server client id changes',
+    'native google auth keeps google sign-in cancellation in native flow',
     () async {
-      final initializeCalls = <String?>[];
+      var nativeExchangeCalls = 0;
+      var launchCalls = 0;
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+        ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+          if (options.path == '/api/auth/external/google/mobile-config') {
+            return ResponseBody.fromString(
+              jsonEncode(const {'serverClientId': 'server-client-id'}),
+              200,
+              headers: {
+                Headers.contentTypeHeader: [Headers.jsonContentType],
+              },
+            );
+          }
+
+          if (options.path == '/api/auth/external/google/native') {
+            nativeExchangeCalls++;
+          }
+
+          throw StateError('Unexpected path: ${options.path}');
+        });
+
+      final repository = MobileExternalAuthRepository(
+        dio: dio,
+        sessionStorage: _InMemoryAuthSessionStorage(),
+        appLinks: AppLinks(),
+        launchUrlDelegate: (Uri uri, LaunchMode mode) async {
+          launchCalls++;
+          return false;
+        },
+        googleSignInDelegate: (_) async {
+          throw PlatformException(code: GoogleSignIn.kSignInCanceledError);
+        },
+      );
+
+      await expectLater(
+        repository.authenticate(ExternalAuthProvider.google),
+        throwsA(
+          isA<AppException>().having(
+            (error) => error.message,
+            'message',
+            'auth.external_cancelled',
+          ),
+        ),
+      );
+
+      expect(nativeExchangeCalls, 0);
+      expect(launchCalls, 0);
+    },
+  );
+
+  test(
+    'native google auth does not exchange when google sign-in fails',
+    () async {
+      var nativeExchangeCalls = 0;
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+        ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+          if (options.path == '/api/auth/external/google/mobile-config') {
+            return ResponseBody.fromString(
+              jsonEncode(const {'serverClientId': 'server-client-id'}),
+              200,
+              headers: {
+                Headers.contentTypeHeader: [Headers.jsonContentType],
+              },
+            );
+          }
+
+          if (options.path == '/api/auth/external/google/native') {
+            nativeExchangeCalls++;
+          }
+
+          throw StateError('Unexpected path: ${options.path}');
+        });
+
+      final repository = MobileExternalAuthRepository(
+        dio: dio,
+        sessionStorage: _InMemoryAuthSessionStorage(),
+        appLinks: AppLinks(),
+        googleSignInDelegate: (_) async {
+          throw PlatformException(
+            code: GoogleSignIn.kSignInFailedError,
+            message: 'sign-in failed',
+          );
+        },
+      );
+
+      await expectLater(
+        repository.authenticate(ExternalAuthProvider.google),
+        throwsA(
+          isA<AppException>().having(
+            (error) => error.message,
+            'message',
+            'auth.external_invalid',
+          ),
+        ),
+      );
+
+      expect(nativeExchangeCalls, 0);
+    },
+  );
+
+  test(
+    'google auth recreates native sdk when server client id changes',
+    () async {
+      final factoryCalls = <String?>[];
 
       Dio createDio(String serverClientId) {
         return Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
@@ -167,8 +270,9 @@ void main() {
         dio: createDio('server-client-a'),
         sessionStorage: _InMemoryAuthSessionStorage(),
         appLinks: AppLinks(),
-        googleSignInInitializeDelegate: (serverClientId) async {
-          initializeCalls.add(serverClientId);
+        googleSignInFactory: (serverClientId) {
+          factoryCalls.add(serverClientId);
+          return GoogleSignIn(serverClientId: serverClientId);
         },
         googleSignInDelegate: (googleSignIn) async => null,
       );
@@ -189,8 +293,9 @@ void main() {
         dio: createDio('server-client-b'),
         sessionStorage: _InMemoryAuthSessionStorage(),
         appLinks: AppLinks(),
-        googleSignInInitializeDelegate: (serverClientId) async {
-          initializeCalls.add(serverClientId);
+        googleSignInFactory: (serverClientId) {
+          factoryCalls.add(serverClientId);
+          return GoogleSignIn(serverClientId: serverClientId);
         },
         googleSignInDelegate: (googleSignIn) async => null,
       );
@@ -206,21 +311,24 @@ void main() {
         ),
       );
 
-      expect(initializeCalls, ['server-client-a', 'server-client-b']);
+      expect(factoryCalls, ['server-client-a', 'server-client-b']);
     },
   );
 
   test(
-    'external auth logs google initialization failures instead of swallowing them',
+    'external auth logs google sdk failures instead of swallowing them',
     () async {
       final source = await File(
         'lib/features/profile/data/external_auth_repository.dart',
       ).readAsString();
 
       expect(source, contains('AppLogger.warn('));
-      expect(source, contains("feature: 'Auth.External'"));
-      expect(source, contains("operation: 'initialize_google_sign_in'"));
-      expect(source, contains('hasServerClientId'));
+      expect(
+        source,
+        contains("operation: 'authenticate_native_google_sign_in'"),
+      );
+      expect(source, contains('has_message'));
+      expect(source, contains('provider_status_code'));
       expect(source, isNot(contains('} catch (_) {')));
     },
   );

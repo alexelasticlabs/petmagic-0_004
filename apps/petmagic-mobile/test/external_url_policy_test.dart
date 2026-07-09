@@ -20,17 +20,36 @@ void main() {
     test('rejects private and local https urls before external handoff', () {
       for (final host in const [
         'localhost',
+        'media.localhost',
         '127.0.0.1',
         '0.0.0.0',
+        '0.0.0.1',
         '10.0.0.42',
         '100.64.0.1',
         '169.254.169.254',
         '192.168.1.25',
+        '2130706433',
+        '0x7f000001',
+        '0177.0.0.1',
+        '127.1',
+        '127.0.1',
+        '0300.0250.0001.0001',
         '[::1]',
         '[::]',
+        '[0:0:0:0:0:0:0:0]',
+        '[0:0:0:0:0:0:0:1]',
         '[fd00::1]',
+        '[fe90::1]',
+        '[fec0::1]',
+        '[ff02::1]',
         '[fe80::1]',
         '[::ffff:127.0.0.1]',
+        '[::127.0.0.1]',
+        '[::7f00:1]',
+        '[0:0:0:0:0:ffff:7f00:1]',
+        '[0:0:0:0:0:ffff:127.0.0.1]',
+        '[0:0:0:0:0:0:7f00:1]',
+        '[0:0:0:0:0:0:127.0.0.1]',
         '[::ffff:10.0.0.5]',
       ]) {
         expect(
@@ -95,14 +114,22 @@ void main() {
         isNull,
       );
       expect(parseSafeExternalUri('http://224.0.0.1:5000/health'), isNull);
+      expect(
+        parseSafeExternalUri('http://[0:0:0:0:0:0:0:1]:5000/health'),
+        isNull,
+      );
+      expect(parseSafeExternalUri('http://2130706433:5000/health'), isNull);
+      expect(parseSafeExternalUri('http://0x7f000001:5000/health'), isNull);
       expect(parseSafeExternalUri('http://example.com/unsafe'), isNull);
     });
 
     test('rejects every local debug http host when local http is disabled', () {
       for (final localHost in const [
         'localhost',
+        'media.localhost',
         '127.0.0.1',
         '0.0.0.0',
+        '0.0.0.1',
         '10.0.2.2',
         '10.0.3.2',
         'host.docker.internal',
@@ -111,6 +138,13 @@ void main() {
         '100.64.0.1',
         '169.254.169.254',
         '224.0.0.1',
+        '2130706433',
+        '0x7f000001',
+        '0177.0.0.1',
+        '127.1',
+        '127.0.1',
+        '0300.0250.0001.0001',
+        '[ff02::1]',
       ]) {
         expect(
           parseSafeExternalUri(
@@ -284,6 +318,14 @@ void main() {
       );
     });
   });
+
+  test(
+    'allows public legacy IPv4 numeric encodings when no host allowlist is provided',
+    () {
+      expect(parseSafeExternalUri('https://134744072/public'), isNotNull);
+      expect(parseSafeExternalUri('https://0x08080808/public'), isNotNull);
+    },
+  );
 }
 
 bool hostsContainsCoreAvatarOrigins(Set<String> hosts) {

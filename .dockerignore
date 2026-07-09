@@ -16,6 +16,8 @@
 # CI/CD
 .github
 .gitlab-ci.yml
+.agents
+skills-lock.json
 
 # IDE
 .vscode
@@ -27,6 +29,11 @@
 # Documentation
 README.md
 SECURITY.md
+docs/
+
+# Workspace apps not copied by root backend/generation Dockerfiles
+apps/admin-web/
+apps/petmagic-mobile/
 
 # Tests (excluded from image)
 tests/

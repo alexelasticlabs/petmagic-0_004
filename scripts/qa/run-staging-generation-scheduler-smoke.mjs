@@ -1721,12 +1721,43 @@ function isLocalApiTarget(value) {
 }
 
 function isLocalDatabaseTarget(value) {
-  const normalized = String(value).toLowerCase();
-  return normalized.includes('localhost')
-    || normalized.includes('127.0.0.1')
-    || normalized.includes('host=postgres')
-    || normalized.includes('database=petmagic_db')
-    || normalized.includes('/petmagic_db');
+  const host = extractDatabaseHost(value);
+  if (!host) {
+    return true;
+  }
+
+  const normalized = host.trim().toLowerCase().replace(/^\[|\]$/g, '');
+  return [
+    'localhost',
+    '127.0.0.1',
+    '::1',
+    '0.0.0.0',
+    'host.docker.internal',
+    'postgres',
+    'db',
+    'petmagic-postgres'
+  ].includes(normalized) || normalized.endsWith('.localhost');
+}
+
+function extractDatabaseHost(value) {
+  const trimmed = String(value || '').trim();
+  try {
+    return new URL(trimmed).hostname;
+  } catch {
+    // Non-URL connection strings are handled below.
+  }
+
+  const hostMatch = trimmed.match(/(?:^|;)\s*Host\s*=\s*([^;]+)/i);
+  if (hostMatch) {
+    return hostMatch[1].trim();
+  }
+
+  const serverMatch = trimmed.match(/(?:^|;)\s*(?:Server|Data Source)\s*=\s*([^;]+)/i);
+  if (serverMatch) {
+    return serverMatch[1].trim();
+  }
+
+  return null;
 }
 
 function sanitizeLabel(value) {

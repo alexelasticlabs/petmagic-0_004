@@ -148,6 +148,23 @@ void main() {
     },
   );
 
+  test('premium CTA keeps localized provider labels inside button bounds', () {
+    final ctaSource = File(
+      'lib/features/premium/presentation/premium_page_cta.part.dart',
+    ).readAsStringSync();
+
+    expect(ctaSource, contains('Flexible('));
+    expect(ctaSource, contains('maxLines: 1'));
+    expect(ctaSource, contains('overflow: TextOverflow.ellipsis'));
+    expect(
+      ctaSource,
+      contains(
+        'padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18)',
+      ),
+    );
+    expect(ctaSource, isNot(contains('letterSpacing: -0.2')));
+  });
+
   testWidgets('premium page renders monthly/yearly plans and manage action', (
     tester,
   ) async {

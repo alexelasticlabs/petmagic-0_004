@@ -47,6 +47,28 @@ dotnet_diagnostic.IDE0005.severity = none
 dotnet_diagnostic.IDE0300.severity = none
 dotnet_diagnostic.CA1861.severity = none
 
+[*.{js,jsx,ts,tsx}]
+indent_style = space
+indent_size = 2
+charset = utf-8
+
+[*.{json,jsonc,yaml,yml}]
+indent_style = space
+indent_size = 2
+charset = utf-8
+
+[*.md]
+indent_style = space
+indent_size = 2
+trim_trailing_whitespace = false
+
+[*.dart]
+indent_style = space
+indent_size = 2
+
 # These startup hosts intentionally use explicit authorization option configuration for fixture readability.
 [tests/**/*.cs]
 dotnet_diagnostic.ASP0025.severity = none
+# xUnit v3 recommends passing TestContext.Current.CancellationToken through async test calls;
+# the existing suite omits cancellation tokens broadly, so keep this as an explicit cleanup lane.
+dotnet_diagnostic.xUnit1051.severity = none

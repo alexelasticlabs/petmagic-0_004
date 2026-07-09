@@ -426,7 +426,9 @@ fal.ai dashboard evidence for launch planning:
 
 The scheduler must not consume the entire fal.ai limit. Keep headroom for retries, admin tests,
 manual operations, and provider-side variance. Configure API and GenerationWorker with the same
-queue and wait values. Only `Templates:GenerationWorkerEnabled` should differ by process role.
+queue and wait values. Host role flags such as `Templates:GenerationWorkerEnabled`,
+`Templates:MediaCleanupWorkerEnabled`, and `Templates:TemplateOfTheDayAutoPickWorkerEnabled` may
+differ by process role to keep background job ownership single-writer.
 
 Current selected staging profile after the 2026-07-01 fal.ai dashboard check:
 

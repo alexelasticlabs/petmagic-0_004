@@ -51,6 +51,56 @@ void main() {
   });
 
   testWidgets(
+    'wallet hero cards keep mascot art visible and premium headline readable',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(320, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await pumpWalletPage(
+        tester,
+        repository: FakeWalletRepository(
+          wallet: walletStateFixture,
+          ledger: ledgerItemsFixture,
+          packs: packsFixture,
+          purchases: purchasesFixture,
+        ),
+      );
+
+      final walletContext = tester.element(find.byType(WalletPage));
+      final text = AppLocalizations.of(walletContext);
+
+      expect(
+        find.byWidgetPredicate((widget) {
+          final child = widget is Opacity ? widget.child : null;
+          final image = child is Image ? child.image : null;
+          return widget is Opacity &&
+              widget.opacity >= 0.7 &&
+              image is AssetImage &&
+              image.assetName == 'assets/rewards/wallet-hero-logo.png';
+        }),
+        findsOneWidget,
+      );
+      expect(
+        find.byWidgetPredicate((widget) {
+          final child = widget is Opacity ? widget.child : null;
+          final image = child is Image ? child.image : null;
+          return widget is Opacity &&
+              widget.opacity >= 0.8 &&
+              image is AssetImage &&
+              image.assetName == 'assets/rewards/premium-upsell-dog.png';
+        }),
+        findsOneWidget,
+      );
+
+      final headline = tester.widget<Text>(
+        find.text(text.premiumUpsellHeadline),
+      );
+      expect(headline.maxLines, 2);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'wallet page stays stable on narrow screens and shows featured pricing',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(320, 900));

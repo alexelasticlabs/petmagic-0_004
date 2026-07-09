@@ -237,6 +237,19 @@ public sealed class BackendEnvironmentContractTests
     }
 
     [Fact]
+    public void DockerComposeBackend_ShouldNotRunTemplateOfTheDayAutoPickWorkerByDefault()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var dockerCompose = File.ReadAllText(Path.Combine(repositoryRoot, "docker-compose.yml"));
+        var backendEnvironment = ExtractBackendEnvironmentBlock(dockerCompose);
+
+        Assert.Contains(
+            "Templates__TemplateOfTheDayAutoPickWorkerEnabled: \"${TEMPLATES_TEMPLATE_OF_THE_DAY_AUTO_PICK_WORKER_ENABLED:-false}\"",
+            backendEnvironment,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void EnvExampleGenerationSchedulerValues_ShouldMatchComposeReleaseFallbacks()
     {
         var repositoryRoot = FindRepositoryRoot();

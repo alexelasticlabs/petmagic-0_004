@@ -94,6 +94,22 @@ void main() {
     expect(sheetBody, contains('controller: controller,'));
     expect(sheetBody, contains(').whenComplete(controller.dispose);'));
   });
+
+  test(
+    'paywall feedback sheet uses stable option grid instead of wrapping chips',
+    () {
+      final pageSource = File(
+        'lib/features/premium/presentation/premium_page.dart',
+      ).readAsStringSync();
+      final sheetBody = _methodBody(pageSource, '_showPaywallFeedbackSheet');
+
+      expect(sheetBody, contains('_PaywallFeedbackOptions('));
+      expect(pageSource, contains('class _PaywallFeedbackOptionButton'));
+      expect(pageSource, contains('SliverGridDelegateWithFixedCrossAxisCount'));
+      expect(pageSource, contains('mainAxisExtent: 46'));
+      expect(sheetBody, isNot(contains('ChoiceChip(')));
+    },
+  );
 }
 
 String _methodBody(String source, String methodName) {

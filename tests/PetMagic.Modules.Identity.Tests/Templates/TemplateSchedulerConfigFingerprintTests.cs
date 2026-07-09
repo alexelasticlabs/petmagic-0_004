@@ -226,6 +226,48 @@ public sealed class TemplateSchedulerConfigFingerprintTests
     }
 
     [Fact]
+    public async Task StartupService_ShouldThrow_WhenGenerationWorkerDetectsActiveCounterpartMismatch()
+    {
+        var services = new ServiceCollection();
+        var databaseName = $"scheduler-config-worker-active-mismatch-{Guid.NewGuid():N}";
+        services.AddDbContext<TemplatesDbContext>(options => options.UseInMemoryDatabase(databaseName));
+        await using var provider = services.BuildServiceProvider();
+        var now = DateTime.UtcNow;
+        var options = CreateOptions();
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+            dbContext.TemplateRuntimeConfigFingerprints.Add(new TemplateRuntimeConfigFingerprint
+            {
+                Id = Guid.NewGuid(),
+                Component = TemplateSchedulerConfigFingerprint.ApiComponent,
+                ProfileName = Environments.Development,
+                Checksum = "active-api-checksum",
+                ConfigJson = "{}",
+                StartedAtUtc = now,
+                LastSeenAtUtc = now,
+                MismatchDetected = false
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        var runtimeState = new TemplateSchedulerConfigRuntimeState();
+        var startupService = new TemplateSchedulerConfigStartupService(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            options,
+            new TemplateSchedulerConfigComponent(TemplateSchedulerConfigFingerprint.GenerationWorkerComponent),
+            new TestHostEnvironment(Environments.Development),
+            runtimeState,
+            NullLogger<TemplateSchedulerConfigStartupService>.Instance);
+
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => startupService.StartAsync(CancellationToken.None));
+
+        Assert.True(runtimeState.Snapshot.Initialized);
+        Assert.True(runtimeState.Snapshot.IsMismatchDetected);
+        Assert.Contains("active-api-checksum", runtimeState.Snapshot.MismatchDetails, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task HealthCheck_ShouldReportApiMismatchAsDegraded()
     {
         var runtimeState = new TemplateSchedulerConfigRuntimeState();

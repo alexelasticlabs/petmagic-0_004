@@ -31,7 +31,7 @@ dependencies:
   http_parser: ^4.1.2
   app_links:
     path: third_party/flutter_plugins/app_links
-  google_sign_in: ^7.2.0
+  google_sign_in: ^6.3.0
   sign_in_with_apple:
     path: third_party/flutter_plugins/sign_in_with_apple
   url_launcher: ^6.3.2

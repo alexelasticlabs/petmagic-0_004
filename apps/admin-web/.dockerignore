@@ -6,5 +6,7 @@ Dockerfile
 .gitignore
 .env
 .env.local
+.env.*
+.npmrc
 coverage
 dist

@@ -30,6 +30,7 @@ RUN --mount=type=cache,id=nuget-api,sharing=locked,target=/root/.nuget/packages 
       -p:PublishReadyToRun=true
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
+ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libgssapi-krb5-2 curl ffmpeg \
     && rm -rf /var/lib/apt/lists/* \

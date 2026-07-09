@@ -71,7 +71,8 @@ public sealed class FcmPushPayloadContractTests
     {
         var source = File.ReadAllText(ResolveRepositoryPath(relativePath));
 
-        Assert.Contains("GoogleCredential.FromJson(json)", source, StringComparison.Ordinal);
+        Assert.Contains("CredentialFactory.FromJson(json, credentialType: null)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("GoogleCredential.FromJson(", source, StringComparison.Ordinal);
         Assert.DoesNotContain("FromJsonParameters(", source, StringComparison.Ordinal);
         Assert.DoesNotContain("#pragma warning disable CS0618", source, StringComparison.Ordinal);
     }

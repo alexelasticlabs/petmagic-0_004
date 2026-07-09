@@ -4,8 +4,10 @@ using System.Threading.RateLimiting;
 
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -76,10 +78,16 @@ try
     builder.Services.AddTransient<CorrelationIdDelegatingHandler>();
     builder.Services.ConfigureAll<HttpClientFactoryOptions>(CorrelationIdHttpClientFactoryOptions.AddCorrelationIdHandler);
 
-    var dataProtectionKeysPath = Path.Combine(
+    var defaultDataProtectionKeysPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
         ".aspnet",
         "DataProtection-Keys");
+    var dataProtectionKeysPath = builder.Configuration["DataProtection:KeysPath"] ?? string.Empty;
+    if (string.IsNullOrWhiteSpace(dataProtectionKeysPath))
+    {
+        dataProtectionKeysPath = defaultDataProtectionKeysPath;
+    }
+
     var dataProtectionBuilder = builder.Services.AddDataProtection()
         .SetApplicationName("PetMagic.Host.Api")
         .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
@@ -358,6 +366,14 @@ try
     Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "wwwroot", "support-attachments"));
     Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "wwwroot", "user-avatars"));
     Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "wwwroot", "templates-media"));
+    var extraStaticWebRootPath = app.Configuration["StaticFiles:ExtraWebRootPath"];
+    if (!string.IsNullOrWhiteSpace(extraStaticWebRootPath))
+    {
+        Directory.CreateDirectory(extraStaticWebRootPath);
+        Directory.CreateDirectory(Path.Combine(extraStaticWebRootPath, "support-attachments"));
+        Directory.CreateDirectory(Path.Combine(extraStaticWebRootPath, "user-avatars"));
+        Directory.CreateDirectory(Path.Combine(extraStaticWebRootPath, "templates-media"));
+    }
 
     app.UseForwardedHeaders(new ForwardedHeadersOptions
     {
@@ -471,51 +487,17 @@ try
 
     app.UseStaticFiles(new StaticFileOptions
     {
-        OnPrepareResponse = static staticFileContext =>
-        {
-            staticFileContext.Context.Response.Headers.XContentTypeOptions = "nosniff";
-
-            var requestPath = staticFileContext.Context.Request.Path;
-            var contentType = staticFileContext.Context.Response.ContentType ?? string.Empty;
-            var isSupportAttachmentsPath = IsManagedStaticMediaPath(requestPath, "/support-attachments");
-            var isUserAvatarsPath = IsManagedStaticMediaPath(requestPath, "/user-avatars");
-            var isTemplatesMediaPath = IsManagedStaticMediaPath(requestPath, "/templates-media");
-            var isManagedMediaPath = isSupportAttachmentsPath
-                || isUserAvatarsPath
-                || isTemplatesMediaPath;
-
-            if (!isManagedMediaPath)
-            {
-                return;
-            }
-
-            if (isTemplatesMediaPath)
-            {
-                staticFileContext.Context.Response.Headers.CacheControl = "public,max-age=31536000,immutable";
-            }
-            else
-            {
-                staticFileContext.Context.Response.Headers.CacheControl = "no-store";
-                staticFileContext.Context.Response.Headers.Pragma = "no-cache";
-            }
-
-            var isImage = contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
-            var isVideo = contentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase);
-
-            if (isSupportAttachmentsPath && !isImage)
-            {
-                staticFileContext.Context.Response.Headers.ContentDisposition = "attachment";
-                return;
-            }
-
-            if (isTemplatesMediaPath
-                && !isImage
-                && !isVideo)
-            {
-                staticFileContext.Context.Response.Headers.ContentDisposition = "attachment";
-            }
-        }
+        OnPrepareResponse = PrepareManagedStaticFileResponse
     });
+    if (!string.IsNullOrWhiteSpace(extraStaticWebRootPath))
+    {
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            FileProvider = new PhysicalFileProvider(extraStaticWebRootPath),
+            OnPrepareResponse = PrepareManagedStaticFileResponse
+        });
+    }
+
     app.UseAuthentication();
     app.UseRateLimiter();
     app.UseMiddleware<LegalAcceptanceEnforcementMiddleware>();
@@ -678,6 +660,51 @@ static bool IsManagedSignedMediaPath(PathString requestPath, string managedPathP
 static bool IsManagedStaticMediaPath(PathString requestPath, string managedPathPrefix)
 {
     return requestPath.StartsWithSegments(new PathString(managedPathPrefix));
+}
+
+static void PrepareManagedStaticFileResponse(StaticFileResponseContext staticFileContext)
+{
+    staticFileContext.Context.Response.Headers.XContentTypeOptions = "nosniff";
+
+    var requestPath = staticFileContext.Context.Request.Path;
+    var contentType = staticFileContext.Context.Response.ContentType ?? string.Empty;
+    var isSupportAttachmentsPath = IsManagedStaticMediaPath(requestPath, "/support-attachments");
+    var isUserAvatarsPath = IsManagedStaticMediaPath(requestPath, "/user-avatars");
+    var isTemplatesMediaPath = IsManagedStaticMediaPath(requestPath, "/templates-media");
+    var isManagedMediaPath = isSupportAttachmentsPath
+        || isUserAvatarsPath
+        || isTemplatesMediaPath;
+
+    if (!isManagedMediaPath)
+    {
+        return;
+    }
+
+    if (isTemplatesMediaPath)
+    {
+        staticFileContext.Context.Response.Headers.CacheControl = "public,max-age=31536000,immutable";
+    }
+    else
+    {
+        staticFileContext.Context.Response.Headers.CacheControl = "no-store";
+        staticFileContext.Context.Response.Headers.Pragma = "no-cache";
+    }
+
+    var isImage = contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
+    var isVideo = contentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase);
+
+    if (isSupportAttachmentsPath && !isImage)
+    {
+        staticFileContext.Context.Response.Headers.ContentDisposition = "attachment";
+        return;
+    }
+
+    if (isTemplatesMediaPath
+        && !isImage
+        && !isVideo)
+    {
+        staticFileContext.Context.Response.Headers.ContentDisposition = "attachment";
+    }
 }
 
 static string ResolvePublicBasePath(string publicBaseUrl)

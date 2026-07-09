@@ -731,57 +731,63 @@ Future<_PaywallFeedbackResult?> _showPaywallFeedbackSheet(
                 top: false,
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        copy.title,
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(
-                              color: textColor,
-                              fontWeight: FontWeight.w800,
-                            ),
-                      ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.sizeOf(context).height * 0.82,
+                    ),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          for (final option in copy.options)
-                            ChoiceChip(
-                              selected: selected == option,
-                              label: Text(option.$2),
-                              onSelected: (_) =>
-                                  setState(() => selected = option),
+                          Text(
+                            copy.title,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  color: textColor,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0,
+                                ),
+                          ),
+                          const SizedBox(height: 16),
+                          _PaywallFeedbackOptions(
+                            options: copy.options,
+                            selected: selected,
+                            isDark: isDark,
+                            textColor: textColor,
+                            onSelected: (option) =>
+                                setState(() => selected = option),
+                          ),
+                          const SizedBox(height: 16),
+                          TextField(
+                            controller: controller,
+                            minLines: 2,
+                            maxLines: 4,
+                            decoration: InputDecoration(
+                              labelText: copy.commentLabel,
+                              hintText: copy.commentHint,
                             ),
+                          ),
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            height: 56,
+                            child: FilledButton(
+                              onPressed: () {
+                                Navigator.of(context).pop(
+                                  _PaywallFeedbackResult(
+                                    selected.$1,
+                                    controller.text.trim().isEmpty
+                                        ? null
+                                        : controller.text.trim(),
+                                  ),
+                                );
+                              },
+                              child: Text(copy.submit),
+                            ),
+                          ),
                         ],
                       ),
-                      const SizedBox(height: 14),
-                      TextField(
-                        controller: controller,
-                        minLines: 2,
-                        maxLines: 4,
-                        decoration: InputDecoration(
-                          labelText: copy.commentLabel,
-                          hintText: copy.commentHint,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      FilledButton(
-                        onPressed: () {
-                          Navigator.of(context).pop(
-                            _PaywallFeedbackResult(
-                              selected.$1,
-                              controller.text.trim().isEmpty
-                                  ? null
-                                  : controller.text.trim(),
-                            ),
-                          );
-                        },
-                        child: Text(copy.submit),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -791,6 +797,119 @@ Future<_PaywallFeedbackResult?> _showPaywallFeedbackSheet(
       );
     },
   ).whenComplete(controller.dispose);
+}
+
+class _PaywallFeedbackOptions extends StatelessWidget {
+  const _PaywallFeedbackOptions({
+    required this.options,
+    required this.selected,
+    required this.isDark,
+    required this.textColor,
+    required this.onSelected,
+  });
+
+  final List<(String, String)> options;
+  final (String, String) selected;
+  final bool isDark;
+  final Color textColor;
+  final ValueChanged<(String, String)> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columnCount = constraints.maxWidth >= 360 ? 2 : 1;
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columnCount,
+            mainAxisExtent: 46,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+          ),
+          itemCount: options.length,
+          itemBuilder: (context, index) {
+            final option = options[index];
+            return _PaywallFeedbackOptionButton(
+              label: option.$2,
+              selected: selected == option,
+              isDark: isDark,
+              textColor: textColor,
+              onPressed: () => onSelected(option),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _PaywallFeedbackOptionButton extends StatelessWidget {
+  const _PaywallFeedbackOptionButton({
+    required this.label,
+    required this.selected,
+    required this.isDark,
+    required this.textColor,
+    required this.onPressed,
+  });
+
+  final String label;
+  final bool selected;
+  final bool isDark;
+  final Color textColor;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedColor = isDark
+        ? const Color(0xFF385842)
+        : const Color(0xFFDCEFE3);
+    final borderColor = selected
+        ? selectedColor
+        : (isDark ? _kDarkBorder : _kLightBorder);
+
+    return Material(
+      color: selected ? selectedColor : Colors.transparent,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(12),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: borderColor),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  child: selected
+                      ? Icon(Icons.check_rounded, size: 18, color: textColor)
+                      : null,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: textColor,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _PremiumBodySlot extends ConsumerWidget {

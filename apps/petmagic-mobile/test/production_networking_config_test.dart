@@ -100,7 +100,10 @@ void main() {
       'lib/core/network/dio_provider.dart',
     ).readAsStringSync();
 
-    expect(dioProvider, contains('ref.onDispose(() => dio.close(force: true));'));
+    expect(
+      dioProvider,
+      contains('ref.onDispose(() => dio.close(force: true));'),
+    );
   });
 
   test('API base URL resolver logs only sanitized origins', () {

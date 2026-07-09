@@ -20,6 +20,8 @@ internal sealed class TemplateSchedulerConfigStartupService(
 {
     private static readonly TimeSpan ActiveFingerprintMaxAge = TimeSpan.FromMinutes(2);
     private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan StartupFingerprintRetryBaseDelay = TimeSpan.FromSeconds(2);
+    private const int StartupFingerprintMaxPersistenceAttempts = 6;
 
     private CancellationTokenSource? heartbeatCancellationTokenSource;
     private Task? heartbeatTask;
@@ -31,8 +33,6 @@ internal sealed class TemplateSchedulerConfigStartupService(
             ? Environments.Production
             : environment.EnvironmentName.Trim();
         var fingerprint = TemplateSchedulerConfigFingerprint.Create(options, profileName, component);
-        var now = DateTime.UtcNow;
-
         logger.LogInformation(
             "Template scheduler config startup fingerprint. Component={Component} ProfileName={ProfileName} Checksum={Checksum} Config={ConfigJson}",
             component,
@@ -42,66 +42,11 @@ internal sealed class TemplateSchedulerConfigStartupService(
 
         try
         {
-            using var scope = scopeFactory.CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
-
-            var otherComponent = component == TemplateSchedulerConfigFingerprint.ApiComponent
-                ? TemplateSchedulerConfigFingerprint.GenerationWorkerComponent
-                : TemplateSchedulerConfigFingerprint.ApiComponent;
-            var other = await dbContext.TemplateRuntimeConfigFingerprints
-                .AsNoTracking()
-                .Where(x => x.Component == otherComponent && x.ProfileName == profileName)
-                .Where(x => !x.MismatchDetected)
-                .Where(x => x.LastSeenAtUtc >= now.Subtract(ActiveFingerprintMaxAge))
-                .OrderByDescending(x => x.StartedAtUtc)
-                .ThenByDescending(x => x.Id)
-                .FirstOrDefaultAsync(cancellationToken);
-            var isMismatch = other is not null
-                && !string.Equals(other.Checksum, fingerprint.Checksum, StringComparison.Ordinal);
-            var mismatchDetails = isMismatch
-                ? $"current={component}:{fingerprint.Checksum}; other={other!.Component}:{other.Checksum}; profile={profileName}"
-                : null;
-
-            var currentFingerprintId = Guid.NewGuid();
-            dbContext.TemplateRuntimeConfigFingerprints.Add(new TemplateRuntimeConfigFingerprint
-            {
-                Id = currentFingerprintId,
-                Component = component,
-                ProfileName = profileName,
-                Checksum = fingerprint.Checksum,
-                ConfigJson = fingerprint.SanitizedDumpJson,
-                StartedAtUtc = now,
-                LastSeenAtUtc = now,
-                MismatchDetected = isMismatch,
-                MismatchDetails = mismatchDetails
-            });
-
-            await dbContext.SaveChangesAsync(cancellationToken);
-
-            if (isMismatch)
-            {
-                runtimeState.MarkMismatch(component, profileName, fingerprint.Checksum, mismatchDetails!);
-                logger.LogCritical(
-                    "Template scheduler config fingerprint mismatch. Component={Component} ProfileName={ProfileName} Checksum={Checksum} OtherComponent={OtherComponent} OtherChecksum={OtherChecksum}",
-                    component,
-                    profileName,
-                    fingerprint.Checksum,
-                    other!.Component,
-                    other.Checksum);
-
-                if (component == TemplateSchedulerConfigFingerprint.GenerationWorkerComponent)
-                {
-                    throw new InvalidOperationException(
-                        $"Template scheduler config fingerprint mismatch is fatal for GenerationWorker. {mismatchDetails}");
-                }
-
-                return;
-            }
-
-            runtimeState.MarkHealthy(component, profileName, fingerprint.Checksum);
-            StartHeartbeat(currentFingerprintId);
+            await PersistStartupFingerprintWithRetryAsync(component, profileName, fingerprint, cancellationToken);
         }
-        catch (Exception exception) when (environment.IsDevelopment() && exception is not InvalidOperationException)
+        catch (Exception exception) when (environment.IsDevelopment()
+            && exception is not InvalidOperationException
+            && !cancellationToken.IsCancellationRequested)
         {
             runtimeState.MarkMismatch(
                 component,
@@ -112,6 +57,109 @@ internal sealed class TemplateSchedulerConfigStartupService(
                 "Template scheduler config startup fingerprint persistence failed in Development. ExceptionType={ExceptionType}",
                 SafeLogValues.ExceptionType(exception));
         }
+    }
+
+    private async Task PersistStartupFingerprintWithRetryAsync(
+        string component,
+        string profileName,
+        TemplateSchedulerConfigFingerprintResult fingerprint,
+        CancellationToken cancellationToken)
+    {
+        for (var attempt = 1; attempt <= StartupFingerprintMaxPersistenceAttempts; attempt++)
+        {
+            try
+            {
+                await PersistStartupFingerprintAsync(component, profileName, fingerprint, cancellationToken);
+                return;
+            }
+            catch (TemplateSchedulerConfigMismatchException)
+            {
+                throw;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception) when (attempt < StartupFingerprintMaxPersistenceAttempts)
+            {
+                var delay = TimeSpan.FromMilliseconds(StartupFingerprintRetryBaseDelay.TotalMilliseconds * attempt);
+                logger.LogWarning(
+                    "Template scheduler config startup fingerprint persistence failed; retrying. Attempt={Attempt} MaxAttempts={MaxAttempts} RetryDelayMilliseconds={RetryDelayMilliseconds} ExceptionType={ExceptionType}",
+                    attempt,
+                    StartupFingerprintMaxPersistenceAttempts,
+                    (int)delay.TotalMilliseconds,
+                    SafeLogValues.ExceptionType(exception));
+
+                await Task.Delay(delay, cancellationToken);
+            }
+        }
+    }
+
+    private async Task PersistStartupFingerprintAsync(
+        string component,
+        string profileName,
+        TemplateSchedulerConfigFingerprintResult fingerprint,
+        CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        using var scope = scopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+
+        var otherComponent = component == TemplateSchedulerConfigFingerprint.ApiComponent
+            ? TemplateSchedulerConfigFingerprint.GenerationWorkerComponent
+            : TemplateSchedulerConfigFingerprint.ApiComponent;
+        var other = await dbContext.TemplateRuntimeConfigFingerprints
+            .AsNoTracking()
+            .Where(x => x.Component == otherComponent && x.ProfileName == profileName)
+            .Where(x => !x.MismatchDetected)
+            .Where(x => x.LastSeenAtUtc >= now.Subtract(ActiveFingerprintMaxAge))
+            .OrderByDescending(x => x.StartedAtUtc)
+            .ThenByDescending(x => x.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        var isMismatch = other is not null
+            && !string.Equals(other.Checksum, fingerprint.Checksum, StringComparison.Ordinal);
+        var mismatchDetails = isMismatch
+            ? $"current={component}:{fingerprint.Checksum}; other={other!.Component}:{other.Checksum}; profile={profileName}"
+            : null;
+
+        var currentFingerprintId = Guid.NewGuid();
+        dbContext.TemplateRuntimeConfigFingerprints.Add(new TemplateRuntimeConfigFingerprint
+        {
+            Id = currentFingerprintId,
+            Component = component,
+            ProfileName = profileName,
+            Checksum = fingerprint.Checksum,
+            ConfigJson = fingerprint.SanitizedDumpJson,
+            StartedAtUtc = now,
+            LastSeenAtUtc = now,
+            MismatchDetected = isMismatch,
+            MismatchDetails = mismatchDetails
+        });
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        if (isMismatch)
+        {
+            runtimeState.MarkMismatch(component, profileName, fingerprint.Checksum, mismatchDetails!);
+            logger.LogCritical(
+                "Template scheduler config fingerprint mismatch. Component={Component} ProfileName={ProfileName} Checksum={Checksum} OtherComponent={OtherComponent} OtherChecksum={OtherChecksum}",
+                component,
+                profileName,
+                fingerprint.Checksum,
+                other!.Component,
+                other.Checksum);
+
+            if (component == TemplateSchedulerConfigFingerprint.GenerationWorkerComponent)
+            {
+                throw new TemplateSchedulerConfigMismatchException(
+                    $"Template scheduler config fingerprint mismatch is fatal for GenerationWorker. {mismatchDetails}");
+            }
+
+            return;
+        }
+
+        runtimeState.MarkHealthy(component, profileName, fingerprint.Checksum);
+        StartHeartbeat(currentFingerprintId);
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
@@ -176,4 +224,6 @@ internal sealed class TemplateSchedulerConfigStartupService(
                 SafeLogValues.ExceptionType(exception));
         }
     }
+
+    private sealed class TemplateSchedulerConfigMismatchException(string message) : InvalidOperationException(message);
 }

@@ -715,6 +715,17 @@ class FakeProfileRepository extends ProfileRepository {
   }
 }
 
+class CancelledLoginProfileRepository extends FakeProfileRepository {
+  @override
+  Future<AuthSession> login({
+    required String email,
+    required String password,
+    CancelToken? cancelToken,
+  }) async {
+    throw const RequestCancelledException();
+  }
+}
+
 class UnavailableLegalDocumentsProfileRepository extends FakeProfileRepository {
   @override
   Future<MobileLegalDocuments> fetchCurrentLegalDocuments({
@@ -824,4 +835,25 @@ class ThrowingExternalAuthRepository implements ExternalAuthRepository {
   Future<void> clearSession(ExternalAuthProvider provider) async {
     throw Exception('external account sign-out failed unexpectedly');
   }
+}
+
+class CancelledExternalAuthRepository implements ExternalAuthRepository {
+  @override
+  Future<AuthSession> authenticate(
+    ExternalAuthProvider provider, {
+    CancelToken? cancelToken,
+  }) async {
+    throw const RequestCancelledException();
+  }
+
+  @override
+  Future<List<MobileLinkedAccount>> link(
+    ExternalAuthProvider provider, {
+    CancelToken? cancelToken,
+  }) async {
+    throw const RequestCancelledException();
+  }
+
+  @override
+  Future<void> clearSession(ExternalAuthProvider provider) async {}
 }

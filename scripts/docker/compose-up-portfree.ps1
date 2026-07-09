@@ -4,6 +4,7 @@ param(
     [int]$MailpitSmtpHostPort = 2525,
     [int]$MailpitWebHostPort = 9025,
     [int]$AdminWebHostPort = 4000,
+    [string]$ProjectName = "petmagic-0_004",
     [string]$WaitTimeout = "240",
     [switch]$Build
 )
@@ -16,11 +17,12 @@ if (-not $env:MAILPIT_SMTP_HOST_PORT) { $env:MAILPIT_SMTP_HOST_PORT = $MailpitSm
 if (-not $env:MAILPIT_WEB_HOST_PORT) { $env:MAILPIT_WEB_HOST_PORT = $MailpitWebHostPort.ToString() }
 if (-not $env:ADMIN_WEB_HOST_PORT) { $env:ADMIN_WEB_HOST_PORT = $AdminWebHostPort.ToString() }
 
-$composeArgs = @("up", "-d")
+$composeArgs = @("-p", $ProjectName, "up", "-d")
 if ($Build) { $composeArgs += "--build" }
 $composeArgs += @("--wait", "--wait-timeout", $WaitTimeout)
 
 Write-Host "Starting docker compose with mapped ports:"
+Write-Host "  COMPOSE_PROJECT_NAME=$ProjectName"
 Write-Host "  POSTGRES_HOST_PORT=$($env:POSTGRES_HOST_PORT)"
 Write-Host "  BACKEND_HOST_PORT=$($env:BACKEND_HOST_PORT)"
 Write-Host "  MAILPIT_SMTP_HOST_PORT=$($env:MAILPIT_SMTP_HOST_PORT)"

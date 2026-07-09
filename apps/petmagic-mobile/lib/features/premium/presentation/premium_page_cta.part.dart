@@ -115,7 +115,7 @@ class _CtaButtonState extends State<_CtaButton>
           backgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
           foregroundColor: btnTextColor,
-          padding: const EdgeInsets.symmetric(vertical: 18),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
@@ -131,16 +131,24 @@ class _CtaButtonState extends State<_CtaButton>
               )
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.max,
                 children: [
                   PremiumCrownIcon(size: 26, opacity: btnTextColor.a),
                   const SizedBox(width: 8),
-                  Text(
-                    ctaLabel,
-                    style: TextStyle(
-                      color: btnTextColor,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.2,
+                  Flexible(
+                    child: Text(
+                      ctaLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      softWrap: false,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: btnTextColor,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0,
+                        height: 1.1,
+                      ),
                     ),
                   ),
                 ],

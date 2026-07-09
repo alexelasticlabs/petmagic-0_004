@@ -14,6 +14,7 @@ const expectedScriptFiles = [
   'scripts/audit_mobile_release_size.ps1',
   'scripts/backup-postgres.ps1',
   'scripts/db/capture-hot-query-plans.sh',
+  'scripts/docker/compose-up-portfree.ps1',
   'scripts/docker/run-dotnet-app.cmd',
   'scripts/docker/run-dotnet-app.sh',
   'scripts/generate-brand-icons.ps1',
@@ -22,6 +23,10 @@ const expectedScriptFiles = [
   'scripts/load/run-template-generation-baseline.sh',
   'scripts/qa/audit-android-kotlin-legacy.ps1',
   'scripts/qa/check-markdown-local-links.mjs',
+  'scripts/qa/check-repository-sensitive-files.mjs',
+  'scripts/qa/check-render-blueprint.mjs',
+  'scripts/qa/check-staging-env-readiness.mjs',
+  'scripts/qa/clean-local-generated-artifacts.mjs',
   'scripts/qa/create-template-feed-admin-qa-report-draft.mjs',
   'scripts/qa/prepare-watermark-manual-qa-media.sh',
   'scripts/qa/prepare-watermark-qa-users.mjs',
@@ -31,6 +36,9 @@ const expectedScriptFiles = [
   'scripts/qa/psql.ps1',
   'scripts/qa/run-economy-staging-infra-gate.mjs',
   'scripts/qa/run-local-generation-scheduler-smoke.mjs',
+  'scripts/qa/run-render-postdeploy-smoke.mjs',
+  'scripts/qa/run-render-predeploy-gate.mjs',
+  'scripts/qa/run-render-docker-build-smoke.mjs',
   'scripts/qa/run-staging-generation-scheduler-smoke.mjs',
   'scripts/qa/run-template-feed-device-qa.ps1',
   'scripts/qa/run-template-feed-device-qa.sh',
@@ -79,6 +87,7 @@ const expectedWorkflowActionUses = [
   '.github/workflows/mobile-ci.yml:actions/checkout@v4',
   '.github/workflows/mobile-ci.yml:subosito/flutter-action@v2',
   '.github/workflows/repo-hygiene-ci.yml:actions/checkout@v4',
+  '.github/workflows/repo-hygiene-ci.yml:actions/setup-dotnet@v4',
   '.github/workflows/repo-hygiene-ci.yml:actions/setup-node@v4',
   '.github/workflows/repo-hygiene-ci.yml:actions/setup-python@v5',
 ].sort();
@@ -262,6 +271,74 @@ assertNoUnapprovedPattern(/\brm\s+-rf\s+["'][^"']+["']/g, allowedRmRf, 'recursiv
 assertNoUnapprovedPattern(/\bRemove-Item\b[^\r\n]*/g, allowedRemoveItem, 'PowerShell delete');
 assertNoUnapprovedPattern(/\bDELETE\s+FROM\s+[A-Za-z0-9_".]+/gi, allowedDeleteFrom, 'SQL delete');
 
+const gitignore = read('.gitignore');
+assert(
+  gitignore.includes('.agents/') && gitignore.includes('skills-lock.json'),
+  '.gitignore must keep local agent skill caches out of GitHub candidates',
+);
+assert(
+  gitignore.includes('!.env.*.example') && gitignore.includes('!**/.env.*.example'),
+  '.gitignore must keep environment example files visible to Git',
+);
+
+const gitattributes = read('.gitattributes');
+for (const binaryPattern of ['*.png binary', '*.jpg binary', '*.ttf binary', '*.jar binary', '*.keystore binary']) {
+  assert(
+    gitattributes.includes(binaryPattern),
+    `.gitattributes must keep ${binaryPattern} so binary assets are not normalized as text`,
+  );
+}
+
+const dockerignore = read('.dockerignore');
+assert(
+  dockerignore.includes('.agents') && dockerignore.includes('skills-lock.json'),
+  '.dockerignore must keep local agent skill caches out of Docker build contexts',
+);
+
+const adminDockerignore = read('apps/admin-web/.dockerignore');
+assert(
+  adminDockerignore.includes('.npmrc') && adminDockerignore.includes('.env.*'),
+  'admin-web Docker context must ignore local npm config and env files',
+);
+
+const repositorySensitiveFilesCheck = read('scripts/qa/check-repository-sensitive-files.mjs');
+assert(
+  repositorySensitiveFilesCheck.includes('git')
+    && repositorySensitiveFilesCheck.includes('ls-files')
+    && repositorySensitiveFilesCheck.includes('--exclude-standard'),
+  'repository sensitive-file check must scan tracked and untracked non-ignored Git candidates',
+);
+assert(
+  repositorySensitiveFilesCheck.includes('key')
+    && repositorySensitiveFilesCheck.includes('properties')
+    && repositorySensitiveFilesCheck.includes('keystore')
+    && repositorySensitiveFilesCheck.includes('.npmrc'),
+  'repository sensitive-file check must guard signing material and npm credentials',
+);
+assert(
+  repositorySensitiveFilesCheck.includes('google-services.json')
+    && repositorySensitiveFilesCheck.includes('GoogleService-Info.plist'),
+  'repository sensitive-file check must guard Firebase config files',
+);
+
+const localGeneratedArtifactsCleanup = read('scripts/qa/clean-local-generated-artifacts.mjs');
+assert(
+  localGeneratedArtifactsCleanup.includes('Dry run only. Pass --apply')
+    && localGeneratedArtifactsCleanup.includes('--include-node-modules'),
+  'local generated artifacts cleanup must stay dry-run by default and explicit for node_modules',
+);
+assert(
+  localGeneratedArtifactsCleanup.includes('Refusing to remove protected path')
+    && localGeneratedArtifactsCleanup.includes('Refusing to remove path outside repository')
+    && localGeneratedArtifactsCleanup.includes('tracked files exist under it'),
+  'local generated artifacts cleanup must keep path safety guards',
+);
+assert(
+  localGeneratedArtifactsCleanup.includes('.env.staging.local')
+    && localGeneratedArtifactsCleanup.includes('.projects/vault'),
+  'local generated artifacts cleanup must not remove local secrets or project vault state',
+);
+
 for (const forbidden of [
   /\bdocker(?:-compose|\s+compose)\s+down\s+(-v|--volumes)\b/i,
   /\bdropdb\b/i,
@@ -290,6 +367,67 @@ assert(
 assert(
   stagingSmoke.includes("smokeMode === 'local' ? 'local mode allows localhost/local compose' : 'staging mode rejects localhost/local compose'"),
   'staging scheduler smoke must keep explicit local-vs-staging target policy evidence',
+);
+assert(
+  stagingSmoke.includes('function extractDatabaseHost(value)'),
+  'staging scheduler smoke must determine local database targets from the host, not the database name',
+);
+assert(
+  !stagingSmoke.includes("normalized.includes('/petmagic_db')"),
+  'staging scheduler smoke must not reject Render staging solely because the database name is petmagic_db',
+);
+
+const stagingEnvReadiness = read('scripts/qa/check-staging-env-readiness.mjs');
+assert(
+  stagingEnvReadiness.includes('Staging env readiness checker.'),
+  'staging env readiness checker must keep help text for operator use',
+);
+assert(
+  stagingEnvReadiness.includes('The default mode validates that a local operator .env.staging.local file'),
+  'staging env readiness checker must document that it validates local operator inputs',
+);
+
+const renderDockerBuildSmoke = read('scripts/qa/run-render-docker-build-smoke.mjs');
+assert(
+  renderDockerBuildSmoke.includes('Render Docker build smoke.'),
+  'Render Docker build smoke must keep help text for operator use',
+);
+assert(
+  renderDockerBuildSmoke.includes('It does not pass secrets as Docker build args.'),
+  'Render Docker build smoke must document that secrets are not passed as build args',
+);
+
+const renderPostdeploySmoke = read('scripts/qa/run-render-postdeploy-smoke.mjs');
+assert(
+  renderPostdeploySmoke.includes('Render post-deploy smoke.'),
+  'Render post-deploy smoke must keep help text for operator use',
+);
+assert(
+  renderPostdeploySmoke.includes('The smoke is read-only: it checks API /health and admin /ru'),
+  'Render post-deploy smoke must document its read-only scope',
+);
+
+const renderPredeployGate = read('scripts/qa/run-render-predeploy-gate.mjs');
+assert(
+  renderPredeployGate.includes('Render predeploy gate.'),
+  'Render predeploy gate must keep help text for operator use',
+);
+assert(
+  renderPredeployGate.includes('check-render-blueprint.mjs'),
+  'Render predeploy gate must run Blueprint validation',
+);
+assert(
+  renderPredeployGate.includes('check-staging-env-readiness.mjs'),
+  'Render predeploy gate must run staging env example validation',
+);
+assert(
+  renderPredeployGate.includes('compose_staging_example_config')
+    && renderPredeployGate.includes("'compose', '--env-file', '.env.staging.local.example', 'config', '--quiet'"),
+  'Render predeploy gate must preserve Compose config validation evidence',
+);
+assert(
+  renderPredeployGate.includes('--with-docker-build'),
+  'Render predeploy gate must keep Docker build smoke opt-in documented',
 );
 
 const economyStagingGate = read('scripts/qa/run-economy-staging-infra-gate.mjs');

@@ -75,6 +75,19 @@ class PerformanceGuard {
         TickerMode.valuesOf(context).enabled;
   }
 
+  static bool shouldAnimateLoadingIndicators(BuildContext context) {
+    final mediaQuery = MediaQuery.maybeOf(context);
+    if (mediaQuery != null && mediaQuery.disableAnimations) {
+      return false;
+    }
+
+    final features =
+        SchedulerBinding.instance.platformDispatcher.accessibilityFeatures;
+    return !features.disableAnimations &&
+        !features.accessibleNavigation &&
+        TickerMode.valuesOf(context).enabled;
+  }
+
   static FlutterView? _primaryView() {
     final dispatcher = SchedulerBinding.instance.platformDispatcher;
     final implicitView = dispatcher.implicitView;

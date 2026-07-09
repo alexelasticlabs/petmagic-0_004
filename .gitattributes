@@ -1,2 +1,22 @@
 # Keep repository text files aligned with .editorconfig on every platform.
 * text=auto eol=lf
+
+# Binary assets and generated packages must never be line-ending normalized.
+*.avif binary
+*.gif binary
+*.ico binary
+*.jpeg binary
+*.jpg binary
+*.png binary
+*.webp binary
+*.pdf binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.jar binary
+*.zip binary
+*.p12 binary
+*.pfx binary
+*.jks binary
+*.keystore binary

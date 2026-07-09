@@ -39,19 +39,46 @@ public static class SafeNetworkTargetPolicy
             return true;
         }
 
+        if (TryMapIPv4CompatibleToIPv4(address, out var compatibleAddress))
+        {
+            return IsPrivateNetworkAddress(compatibleAddress);
+        }
+
         if (address.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork)
         {
             return false;
         }
 
         var bytes = address.GetAddressBytes();
-        return bytes[0] == 10
+        return bytes[0] == 0
+            || bytes[0] == 10
             || bytes[0] == 127
             || bytes[0] == 169 && bytes[1] == 254
             || bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31
             || bytes[0] == 192 && bytes[1] == 168
             || bytes[0] == 100 && bytes[1] >= 64 && bytes[1] <= 127
             || bytes[0] >= 224;
+    }
+
+    private static bool TryMapIPv4CompatibleToIPv4(IPAddress address, out IPAddress ipv4Address)
+    {
+        ipv4Address = IPAddress.None;
+        if (address.AddressFamily != System.Net.Sockets.AddressFamily.InterNetworkV6)
+        {
+            return false;
+        }
+
+        var bytes = address.GetAddressBytes();
+        for (var index = 0; index < 12; index++)
+        {
+            if (bytes[index] != 0)
+            {
+                return false;
+            }
+        }
+
+        ipv4Address = new IPAddress([bytes[12], bytes[13], bytes[14], bytes[15]]);
+        return true;
     }
 
     private static bool IsIPv6UniqueLocalAddress(IPAddress address)

@@ -1,3 +1,5 @@
+name: petmagic-0_004
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -87,6 +89,7 @@ services:
       Templates__StorageProvider: "${TEMPLATES_STORAGE_PROVIDER:?Set TEMPLATES_STORAGE_PROVIDER to R2 or Local explicitly}"
       Templates__AiProvider: "${TEMPLATES_AI_PROVIDER:?Set TEMPLATES_AI_PROVIDER to Fal or Fake explicitly}"
       Templates__Watermark__Enabled: "${TEMPLATES_WATERMARK_ENABLED:-false}"
+      Templates__TemplateOfTheDayAutoPickWorkerEnabled: "${TEMPLATES_TEMPLATE_OF_THE_DAY_AUTO_PICK_WORKER_ENABLED:-false}"
       PETMAGIC_LOCAL_SMOKE_FAST_FAKE_COMPLETION: "${PETMAGIC_LOCAL_SMOKE_FAST_FAKE_COMPLETION:?Set PETMAGIC_LOCAL_SMOKE_FAST_FAKE_COMPLETION to false for production or true only for local smoke}"
       Templates__GenerationWorkerEnabled: "false"
       Templates__GlobalMaxConcurrentGenerations: "${GENERATION_GLOBAL_MAX_CONCURRENT:-3}"
@@ -205,6 +208,7 @@ services:
       PETMAGIC_LOCAL_SMOKE_FAST_FAKE_COMPLETION: "${PETMAGIC_LOCAL_SMOKE_FAST_FAKE_COMPLETION:?Set PETMAGIC_LOCAL_SMOKE_FAST_FAKE_COMPLETION to false for production or true only for local smoke}"
       Templates__GenerationWorkerEnabled: "true"
       Templates__MediaCleanupWorkerEnabled: "false"
+      Templates__TemplateOfTheDayAutoPickWorkerEnabled: "false"
       Templates__MaxConcurrentJobsPerWorker: "${GENERATION_WORKER_MAX_CONCURRENT_JOBS:-1}"
       Templates__GenerationWorkerPollIntervalMilliseconds: "${GENERATION_WORKER_POLL_INTERVAL_MS:-500}"
       Templates__GlobalMaxConcurrentGenerations: "${GENERATION_GLOBAL_MAX_CONCURRENT:-3}"
@@ -277,6 +281,12 @@ services:
       NEXT_PUBLIC_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION: "${ADMIN_WEB_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION:-false}"
     ports:
       - "${ADMIN_WEB_HOST_PORT:-3000}:3000"
+    healthcheck:
+      test: [ "CMD-SHELL", "node -e \"const http=require('node:http');const req=http.get('http://127.0.0.1:3000/ru',res=>{res.resume();process.exit(res.statusCode>=200&&res.statusCode<500?0:1);});req.on('error',()=>process.exit(1));req.setTimeout(5000,()=>{req.destroy();process.exit(1);});\"" ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     depends_on:
       - backend
     networks:

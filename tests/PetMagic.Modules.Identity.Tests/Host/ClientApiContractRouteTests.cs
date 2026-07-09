@@ -239,14 +239,7 @@ public sealed class ClientApiContractRouteTests
     {
         await using var app = await ClientApiContractTestApplication.CreateAsync();
 
-        var missingRoutes = MobileClientRoutes
-            .Cast<object[]>()
-            .Select(route => new
-            {
-                Method = (string)route[0],
-                RoutePattern = (string)route[1],
-                Scenario = (string)route[2],
-            })
+        var missingRoutes = EnumerateRoutes(MobileClientRoutes)
             .Where(route => !app.HasRoute(route.Method, route.RoutePattern))
             .Select(route => $"{route.Method} {route.RoutePattern} ({route.Scenario})")
             .ToArray();
@@ -267,14 +260,7 @@ public sealed class ClientApiContractRouteTests
     {
         await using var app = await ClientApiContractTestApplication.CreateAsync();
 
-        var missingRoutes = AdminClientRoutes
-            .Cast<object[]>()
-            .Select(route => new
-            {
-                Method = (string)route[0],
-                RoutePattern = (string)route[1],
-                Scenario = (string)route[2],
-            })
+        var missingRoutes = EnumerateRoutes(AdminClientRoutes)
             .Where(route => !app.HasRoute(route.Method, route.RoutePattern))
             .Select(route => $"{route.Method} {route.RoutePattern} ({route.Scenario})")
             .ToArray();
@@ -287,14 +273,7 @@ public sealed class ClientApiContractRouteTests
     {
         await using var app = await ClientApiContractTestApplication.CreateAsync();
 
-        var unprotectedRoutes = AdminClientRoutes
-            .Cast<object[]>()
-            .Select(route => new
-            {
-                Method = (string)route[0],
-                RoutePattern = (string)route[1],
-                Scenario = (string)route[2],
-            })
+        var unprotectedRoutes = EnumerateRoutes(AdminClientRoutes)
             .Where(route => route.RoutePattern.StartsWith("/api/admin/", StringComparison.Ordinal))
             .Select(route => new
             {
@@ -309,6 +288,20 @@ public sealed class ClientApiContractRouteTests
 
         Assert.Empty(unprotectedRoutes);
     }
+
+    private static IReadOnlyList<ClientRouteContract> EnumerateRoutes(TheoryData<string, string, string> routes)
+    {
+        var result = new List<ClientRouteContract>(routes.Count);
+        foreach (var route in routes)
+        {
+            var (method, routePattern, scenario) = route.Data;
+            result.Add(new ClientRouteContract(method, routePattern, scenario));
+        }
+
+        return result;
+    }
+
+    private sealed record ClientRouteContract(string Method, string RoutePattern, string Scenario);
 
     [Fact]
     public async Task ApiRoutes_ShouldDeclareExplicitAccessPolicy()

@@ -1,14 +1,16 @@
 # Environment
 .env
-.env.local
-.env.local-smoke
-.env.*.local
+.env.*
 **/.env
-**/.env.local
-**/.env.local-smoke
-**/.env.*.local
+**/.env.*
 !.env.example
+!.env.*.example
 !**/.env.example
+!**/.env.*.example
+
+# Package manager credentials/config
+.npmrc
+**/.npmrc
 
 # Build outputs
 bin/
@@ -31,6 +33,8 @@ node_modules/
 .flutter-plugins
 .flutter-plugins-dependencies
 .pub-cache/
+**/android/app/src/debug/google-services.json
+**/android/app/src/profile/google-services.json
 **/ios/Pods/
 **/ios/.symlinks/
 **/ios/SourcePackages/
@@ -88,3 +92,13 @@ backup_*
 
 # Docker Compose volumes
 postgres_data/
+
+# Local project provisioning state
+.projects/cache
+.projects/vault
+.projects/state.test.json
+.projects/state.local.test.json
+
+# Local agent/tooling caches
+.agents/
+skills-lock.json

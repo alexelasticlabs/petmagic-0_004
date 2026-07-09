@@ -189,7 +189,7 @@ internal sealed class FcmEconomyPushNotificationSender(
 
     private static GoogleCredential CreateCredentialFromJson(string json)
     {
-        return GoogleCredential.FromJson(json);
+        return CredentialFactory.FromJson(json, credentialType: null);
     }
 
     private static string NormalizeJson(string value)

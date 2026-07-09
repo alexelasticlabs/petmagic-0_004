@@ -30,7 +30,8 @@ class _MagicLoadingScreenState extends State<MagicLoadingScreen>
   late final AnimationController _controller;
   Timer? _messageTimer;
   int _messageIndex = 0;
-  bool _usesStaticEffects = false;
+  bool _usesStaticDecorations = false;
+  bool _animatesLoadingSignal = true;
 
   @override
   void initState() {
@@ -62,7 +63,8 @@ class _MagicLoadingScreenState extends State<MagicLoadingScreen>
     final messages = _resolveMessages(text);
     final message = messages[_messageIndex % messages.length];
     final title = widget.title?.trim();
-    final useStaticEffects = _usesStaticEffects;
+    final useStaticDecorations = _usesStaticDecorations;
+    final animateLoadingSignal = _animatesLoadingSignal;
 
     final child = Semantics(
       container: true,
@@ -72,7 +74,7 @@ class _MagicLoadingScreenState extends State<MagicLoadingScreen>
         fit: StackFit.expand,
         children: [
           ExcludeSemantics(
-            child: useStaticEffects
+            child: useStaticDecorations
                 ? CustomPaint(
                     painter: _MagicBackgroundPainter(
                       colors: colors,
@@ -116,7 +118,7 @@ class _MagicLoadingScreenState extends State<MagicLoadingScreen>
                         ),
                         const SizedBox(height: 8),
                       ],
-                      if (useStaticEffects)
+                      if (!animateLoadingSignal)
                         Text(
                           message,
                           maxLines: 2,
@@ -209,20 +211,14 @@ class _MagicLoadingScreenState extends State<MagicLoadingScreen>
   }
 
   void _syncAnimationMode() {
-    final nextUsesStaticEffects =
+    final nextUsesStaticDecorations =
         !PerformanceGuard.shouldAnimateRepeatingEffects(context);
-    if (_usesStaticEffects == nextUsesStaticEffects) {
-      if (!nextUsesStaticEffects && !_controller.isAnimating) {
-        _controller.repeat();
-      }
-      if (!nextUsesStaticEffects && _messageTimer == null) {
-        _scheduleNextMessageTick();
-      }
-      return;
-    }
+    final nextAnimatesLoadingSignal =
+        PerformanceGuard.shouldAnimateLoadingIndicators(context);
+    _usesStaticDecorations = nextUsesStaticDecorations;
+    _animatesLoadingSignal = nextAnimatesLoadingSignal;
 
-    _usesStaticEffects = nextUsesStaticEffects;
-    if (_usesStaticEffects) {
+    if (!nextAnimatesLoadingSignal) {
       _messageTimer?.cancel();
       _messageTimer = null;
       _messageIndex = 0;
@@ -232,16 +228,18 @@ class _MagicLoadingScreenState extends State<MagicLoadingScreen>
       return;
     }
 
-    _controller.repeat();
-    _messageTimer?.cancel();
-    _messageTimer = null;
-    _scheduleNextMessageTick();
+    if (!_controller.isAnimating) {
+      _controller.repeat();
+    }
+    if (_messageTimer == null) {
+      _scheduleNextMessageTick();
+    }
   }
 
   void _scheduleNextMessageTick() {
     _messageTimer?.cancel();
     _messageTimer = Timer(const Duration(milliseconds: 1700), () {
-      if (!mounted || _usesStaticEffects) {
+      if (!mounted || !_animatesLoadingSignal) {
         return;
       }
 

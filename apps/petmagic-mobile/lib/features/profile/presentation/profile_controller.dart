@@ -269,6 +269,16 @@ class ProfileController extends Notifier<ProfileState> {
     }
   }
 
+  void _handleCancelledAuthRequest(CancelToken cancelToken) {
+    if (!identical(_activeAuthCancelToken, cancelToken)) {
+      return;
+    }
+
+    _updateStateIfMounted(
+      (state) => state.copyWith(isSaving: false, clearError: true),
+    );
+  }
+
   CancelToken _startProfileMutation() {
     _cancelActiveProfileMutation();
     final cancelToken = CancelToken();
@@ -502,7 +512,7 @@ class ProfileController extends Notifier<ProfileState> {
             requiresLegalAcceptance: profile.legalAcceptance.requiresAcceptance,
           );
     } on RequestCancelledException {
-      return;
+      _handleCancelledAuthRequest(authCancelToken);
     } on AppException catch (error) {
       _setFailure(message: error.message);
     } catch (error, stackTrace) {
@@ -588,7 +598,7 @@ class ProfileController extends Notifier<ProfileState> {
         ),
       );
     } on RequestCancelledException {
-      return;
+      _handleCancelledAuthRequest(authCancelToken);
     } on AppException catch (error) {
       _setFailure(message: error.message);
     } catch (error, stackTrace) {
@@ -642,7 +652,7 @@ class ProfileController extends Notifier<ProfileState> {
                 session.user.legalAcceptance.requiresAcceptance,
           );
     } on RequestCancelledException {
-      return;
+      _handleCancelledAuthRequest(authCancelToken);
     } on AppException catch (error) {
       _setFailure(message: error.message);
     } catch (error, stackTrace) {
@@ -674,7 +684,7 @@ class ProfileController extends Notifier<ProfileState> {
       ref.invalidate(linkedAccountsProvider);
       _updateStateIfMounted((state) => state.copyWith(isSaving: false));
     } on RequestCancelledException {
-      return;
+      _handleCancelledAuthRequest(authCancelToken);
     } on AppException catch (error) {
       _setFailure(message: error.message);
     } catch (error, stackTrace) {
@@ -709,7 +719,7 @@ class ProfileController extends Notifier<ProfileState> {
       ref.invalidate(linkedAccountsProvider);
       _updateStateIfMounted((state) => state.copyWith(isSaving: false));
     } on RequestCancelledException {
-      return;
+      _handleCancelledAuthRequest(authCancelToken);
     } on AppException catch (error) {
       _setFailure(message: error.message);
     } catch (error, stackTrace) {

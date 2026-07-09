@@ -628,6 +628,67 @@ void main() {
     },
   );
 
+  test('cancelled regular login clears saving state', () async {
+    SharedPreferences.setMockInitialValues(const {onboardingSeenKey: true});
+
+    final container = ProviderContainer(
+      overrides: [
+        profileRepositoryProvider.overrideWith(
+          (ref) => CancelledLoginProfileRepository(),
+        ),
+        externalAuthRepositoryProvider.overrideWith(
+          (ref) => FakeExternalAuthRepository(),
+        ),
+        authSessionStorageProvider.overrideWith(
+          (ref) => TestAuthSessionStorage(),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    container.read(appLaunchControllerProvider);
+    final controller = container.read(profileControllerProvider.notifier);
+
+    await controller.initialize();
+    controller
+      ..updateEmail('pet@example.com')
+      ..updatePassword('Password123');
+    await controller.login();
+
+    final state = container.read(profileControllerProvider);
+    expect(state.isSaving, isFalse);
+    expect(state.isAuthenticated, isFalse);
+  });
+
+  test('cancelled external sign-in clears saving state', () async {
+    SharedPreferences.setMockInitialValues(const {onboardingSeenKey: true});
+
+    final container = ProviderContainer(
+      overrides: [
+        profileRepositoryProvider.overrideWith(
+          (ref) => FakeProfileRepository(),
+        ),
+        externalAuthRepositoryProvider.overrideWith(
+          (ref) => CancelledExternalAuthRepository(),
+        ),
+        authSessionStorageProvider.overrideWith(
+          (ref) => TestAuthSessionStorage(),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    container.read(appLaunchControllerProvider);
+    final controller = container.read(profileControllerProvider.notifier);
+
+    await controller.initialize();
+    await controller.authenticateWithProvider(ExternalAuthProvider.google);
+
+    final state = container.read(profileControllerProvider);
+    expect(state.isSaving, isFalse);
+    expect(state.isAuthenticated, isFalse);
+  });
+
   test('logout clears cached google session', () async {
     SharedPreferences.setMockInitialValues(const {onboardingSeenKey: true});
 

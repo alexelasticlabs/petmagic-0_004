@@ -7,6 +7,7 @@
   ],
   "settings": {
     "dotnet.defaultSolution": "PetMagic.slnx",
+    "dart.flutterSdkPath": "D:\\dev\\sdk\\flutter",
     "editor.formatOnSave": true,
     "files.exclude": {
       "**/bin": true,
@@ -31,6 +32,9 @@
       "**/ios/Flutter/ephemeral": true,
       "**/ios/SourcePackages": true
     },
+    "[dart]": {
+      "editor.defaultFormatter": "Dart-Code.dart-code"
+    },
     "[csharp]": {
       "editor.defaultFormatter": "ms-dotnettools.csharp"
     },
@@ -40,8 +44,20 @@
     "[javascript]": {
       "editor.defaultFormatter": "esbenp.prettier-vscode"
     },
-    "[dart]": {
-      "editor.defaultFormatter": "Dart-Code.dart-code"
+    "[json]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "yaml.schemas": {
+      "https://json.schemastore.org/github-workflow.json": [
+        ".github/workflows/*.yml",
+        ".github/workflows/*.yaml"
+      ],
+      "https://raw.githubusercontent.com/compose-spec/compose-spec/master/schema/compose-spec.json": [
+        "docker-compose.yml",
+        "docker-compose.yaml",
+        "docker-compose.*.yml",
+        "docker-compose.*.yaml"
+      ]
     }
   }
 }
