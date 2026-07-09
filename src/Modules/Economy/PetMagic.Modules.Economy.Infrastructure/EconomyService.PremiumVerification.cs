@@ -97,6 +97,26 @@ public sealed partial class EconomyService
             ? command.ServerVerificationData.Trim()
             : null;
 
+        var alreadyLinkedToSameUser = await dbContext.UserSubscriptions
+            .AsNoTracking()
+            .AnyAsync(
+                x => x.UserId == command.UserId
+                    && x.Provider == provider
+                    && ((!string.IsNullOrWhiteSpace(externalSubscriptionId)
+                            && x.ExternalSubscriptionId == externalSubscriptionId)
+                        || (!string.IsNullOrWhiteSpace(externalTransactionId)
+                            && x.ExternalTransactionId == externalTransactionId)
+                        || (!string.IsNullOrWhiteSpace(legacyExternalTransactionId)
+                            && x.ExternalTransactionId == legacyExternalTransactionId)),
+                cancellationToken);
+        var bindingError = ResolveStoreAccountBindingError(
+            verification.Value.AccountBindingState,
+            alreadyLinkedToSameUser);
+        if (bindingError is not null)
+        {
+            return Result.Failure<PremiumStoreVerificationResponse>(bindingError);
+        }
+
         if (await StoreSubscriptionBelongsToAnotherUserAsync(
                 command.UserId,
                 provider,
@@ -165,6 +185,14 @@ public sealed partial class EconomyService
                 DateTime.UtcNow,
                 cancellationToken);
         }
+
+        await _pushNotificationSender.NotifyPremiumUpdateAsync(
+            command.UserId,
+            new PremiumPushNotification(
+                Status: isPremium ? "active" : "inactive",
+                Provider: provider,
+                PlanCode: plan.PlanCode),
+            cancellationToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);
 

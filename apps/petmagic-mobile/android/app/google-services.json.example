@@ -9,7 +9,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:000000000000:android:0000000000000000000000",
         "android_client_info": {
-          "package_name": "com.petmagic.app"
+          "package_name": "APP_PACKAGE_NAME"
         }
       },
       "oauth_client": [
@@ -17,7 +17,7 @@
           "client_id": "replace-with-android-oauth-client-id.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.petmagic.app",
+            "package_name": "APP_PACKAGE_NAME",
             "certificate_hash": "replace-with-release-certificate-sha1"
           }
         },
@@ -42,7 +42,7 @@
               "client_id": "replace-with-ios-oauth-client-id.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "com.petmagic.app"
+                "bundle_id": "APP_PACKAGE_NAME"
               }
             }
           ]

@@ -72,6 +72,7 @@ export function useSupportConversationController({
   const canManageSupportWorkspace =
     sessionUserRoles.includes("Admin") || sessionUserRoles.includes("Moderator");
   const supportActionsForbidden = copy.controller.actionsForbidden;
+  const supportOwnershipRequired = copy.controller.ownershipRequired;
   const [queueFilter, setQueueFilter] = useState<SupportQueueFilter>("all");
   const [queuePriorityFilter, setQueuePriorityFilter] = useState<
     "all" | SupportConversationPriority
@@ -375,6 +376,7 @@ export function useSupportConversationController({
   const isAssignedToCurrentAdmin = Boolean(
     sessionUserId && conversation?.assignedAdminId === sessionUserId
   );
+  const canMutateConversation = canManageSupportWorkspace && isAssignedToCurrentAdmin;
   const subjectUserId = conversation?.initiatorUserId ?? null;
   const { analyticsQuery, isSubjectUserDeleted, purchasesQuery, subscriptionQuery, userQuery } =
     useSupportConversationSubjectQueries({
@@ -539,8 +541,9 @@ export function useSupportConversationController({
     statusMutation,
   } = useSupportConversationMutations({
     conversationId,
-    canManageSupportWorkspace,
+    canMutateConversation,
     supportActionsForbidden,
+    supportOwnershipRequired,
     assertCanManageSupportWorkspace,
     reply,
     selectedAttachment,
@@ -591,19 +594,19 @@ export function useSupportConversationController({
 
   const setOperatorPriority = useCallback(
     (priority: SupportConversationPriority) => {
-      if (!conversation || !canManageSupportWorkspace || metadataMutation.isPending) {
+      if (!conversation || !canMutateConversation || metadataMutation.isPending) {
         return;
       }
 
       const currentTags = conversation.tags ?? [];
       metadataMutation.mutate({ priority, tags: currentTags });
     },
-    [canManageSupportWorkspace, conversation, metadataMutation]
+    [canMutateConversation, conversation, metadataMutation]
   );
 
   const addOperatorTag = useCallback(
     (rawTag: string) => {
-      if (!conversation || !canManageSupportWorkspace || metadataMutation.isPending) {
+      if (!conversation || !canMutateConversation || metadataMutation.isPending) {
         return false;
       }
 
@@ -625,12 +628,12 @@ export function useSupportConversationController({
 
       return true;
     },
-    [canManageSupportWorkspace, conversation, metadataMutation]
+    [canMutateConversation, conversation, metadataMutation]
   );
 
   const removeOperatorTag = useCallback(
     (tagToRemove: string) => {
-      if (!conversation || !canManageSupportWorkspace || metadataMutation.isPending) {
+      if (!conversation || !canMutateConversation || metadataMutation.isPending) {
         return;
       }
 
@@ -645,7 +648,7 @@ export function useSupportConversationController({
         tags: nextTags,
       });
     },
-    [canManageSupportWorkspace, conversation, metadataMutation]
+    [canMutateConversation, conversation, metadataMutation]
   );
 
   const recentUserPurchases = purchasesQuery.data ?? [];
@@ -704,6 +707,7 @@ export function useSupportConversationController({
     filteredInboxItems,
     canViewSubjectUserContext,
     canManageSupportWorkspace,
+    canMutateConversation,
     canGoToNextQueuePage,
     canGoToPreviousQueuePage,
     hasComposerAttachment,

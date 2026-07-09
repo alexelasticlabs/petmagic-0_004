@@ -252,19 +252,15 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             {
                 AllowAutoRedirect = false
             });
-        services.AddScoped<NoopTemplateGenerationPushNotificationSender>();
         services.AddHttpClient<FcmTemplateGenerationPushNotificationSender>(ConfigureExternalHttpClient)
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
             {
                 AllowAutoRedirect = false
             });
-        services.AddScoped<ITemplateGenerationPushNotificationSender>(serviceProvider =>
-        {
-            var pushOptions = serviceProvider.GetRequiredService<TemplatesOptions>().FirebasePush;
-            return pushOptions.IsConfigured
-                ? serviceProvider.GetRequiredService<FcmTemplateGenerationPushNotificationSender>()
-                : serviceProvider.GetRequiredService<NoopTemplateGenerationPushNotificationSender>();
-        });
+        services.AddScoped<ITemplateGenerationPushDeliverySender>(serviceProvider =>
+            serviceProvider.GetRequiredService<FcmTemplateGenerationPushNotificationSender>());
+        services.AddScoped<ITemplateGenerationPushNotificationSender, TemplateGenerationPushNotificationOutbox>();
+        services.AddScoped<TemplatePushOutboxProcessor>();
         services.AddScoped<ITemplateMediaLifecycleService, TemplateMediaLifecycleService>();
         services.AddScoped<ITemplateVisibilityPolicy, TemplateVisibilityPolicy>();
         services.AddScoped<ITemplatesService, TemplatesService>();
@@ -281,6 +277,15 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         if (options.GenerationWorkerEnabled)
         {
             services.AddHostedService<TemplateGenerationWorker>();
+        }
+
+        if (options.FirebasePush.IsConfigured
+            && string.Equals(
+                ResolveSchedulerComponent(schedulerComponent, options),
+                TemplateSchedulerConfigFingerprint.GenerationWorkerComponent,
+                StringComparison.Ordinal))
+        {
+            services.AddHostedService<TemplatePushOutboxWorker>();
         }
 
         if (options.MediaCleanupWorkerEnabled)

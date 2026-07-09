@@ -114,6 +114,8 @@ try
 
     var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
     var allowAnyCorsInDevelopment = builder.Environment.IsDevelopment();
+    var forwardedHeadersTrustSettings = ForwardedHeadersTrustSettings.Read(builder.Configuration);
+    ForwardedHeadersTrust.Validate(forwardedHeadersTrustSettings, builder.Environment);
     HostApiProductionConfigurationValidator.ValidateDefaultConnectionString(builder.Configuration, builder.Environment);
     HostApiProductionConfigurationValidator.ValidateJwtSigningKey(builder.Configuration, builder.Environment);
     HostApiProductionConfigurationValidator.ValidateAllowedHosts(builder.Configuration, builder.Environment);
@@ -327,7 +329,8 @@ try
         .AddCheck("self", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy())
         .AddCheck<PremiumSubscriptionPlansHealthCheck>("economy_subscription_plans")
         .AddCheck<TemplateContentHealthCheck>("templates_content")
-        .AddCheck<TemplateSchedulerConfigHealthCheck>("templates_scheduler_config");
+        .AddCheck<TemplateSchedulerConfigHealthCheck>("templates_scheduler_config")
+        .AddCheck<PushOutboxHealthCheck>("push_outbox");
 
     builder.Services
         .AddOpenTelemetry()
@@ -351,7 +354,8 @@ try
                 .AddRuntimeInstrumentation()
                 .AddMeter("PetMagic.Host.Api")
                 .AddMeter("PetMagic.Modules.Economy")
-                .AddMeter("PetMagic.Modules.Templates");
+                .AddMeter("PetMagic.Modules.Templates")
+                .AddMeter("PetMagic.Notifications");
 
             if (IsOtlpExporterConfigured(builder.Configuration))
             {
@@ -375,10 +379,10 @@ try
         Directory.CreateDirectory(Path.Combine(extraStaticWebRootPath, "templates-media"));
     }
 
-    app.UseForwardedHeaders(new ForwardedHeadersOptions
+    if (forwardedHeadersTrustSettings.Enabled)
     {
-        ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
-    });
+        app.UseForwardedHeaders(ForwardedHeadersTrust.BuildOptions(forwardedHeadersTrustSettings));
+    }
 
     app.UseMiddleware<CorrelationIdMiddleware>();
     app.UseMiddleware<GlobalExceptionMiddleware>();
@@ -529,6 +533,8 @@ try
             await app.Services.EnsureSupportChatSeedDataAsync();
             await app.Services.EnsureTemplatesSeedDataAsync();
             await app.Services.EnsureGamificationSeedDataAsync();
+            await PostgreSqlIndexIntegrityValidator.ValidateAsync(
+                app.Configuration.GetConnectionString("DefaultConnection"));
         },
         acquireTimeout: TimeSpan.FromMinutes(5));
 

@@ -12,7 +12,8 @@ internal static class TemplateGenerationJobStatusSets
         TemplateGenerationStatus.SubmittingToProvider,
         TemplateGenerationStatus.ProviderQueued,
         TemplateGenerationStatus.ProviderProcessing,
-        TemplateGenerationStatus.ImportingMedia
+        TemplateGenerationStatus.ImportingMedia,
+        TemplateGenerationStatus.CancellationRequested
     ];
 
     public static readonly TemplateGenerationStatus[] Processing =

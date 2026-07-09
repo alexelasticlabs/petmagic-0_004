@@ -29,7 +29,8 @@ internal sealed partial class TemplateGenerationService(
     ITemplateAiProviderHealthService? aiProviderHealthService = null,
     ITemplateVisibilityPolicy? visibilityPolicy = null,
     IDataProtectionProvider? dataProtectionProvider = null,
-    IAdminAuditLog? adminAuditLog = null) : ITemplateGenerationService
+    IAdminAuditLog? adminAuditLog = null,
+    FalQueueClient? falQueueClient = null) : ITemplateGenerationService
 {
     private readonly ITemplateVisibilityPolicy _visibilityPolicy =
         visibilityPolicy ?? new TemplateVisibilityPolicy();
@@ -164,7 +165,10 @@ internal sealed partial class TemplateGenerationService(
             EstimatedCompletionAtUtc: queueEstimate?.EstimatedCompletionAtUtc,
             QueueReason: queueEstimate?.Reason,
             RetryAfterSeconds: queueEstimate?.RetryAfterSeconds,
-            CanCancel: job.Status == TemplateGenerationStatus.Queued);
+            CanCancel: job.Status == TemplateGenerationStatus.Queued
+                || (job.Status is TemplateGenerationStatus.ProviderQueued or TemplateGenerationStatus.ProviderProcessing
+                    && (!string.IsNullOrWhiteSpace(job.PreprocessingProviderCancelUrl)
+                        || !string.IsNullOrWhiteSpace(job.MotionProviderCancelUrl))));
     }
 
     private static string? ResolvePublicFailureMessage(string? failureCode)

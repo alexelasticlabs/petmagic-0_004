@@ -39,23 +39,23 @@ public static class SupportChatInfrastructureServiceCollectionExtensions
         services.AddSingleton<ISupportAttachmentReadUrlSigner, SupportAttachmentReadUrlSigner>();
         services.AddScoped<SupportAttachmentCleanupProcessor>();
         services.AddScoped<ISupportPushTokenService, SupportPushTokenService>();
-        services.AddScoped<NoopSupportChatPushNotificationSender>();
         services.AddHttpClient<FcmSupportChatPushNotificationSender>(client =>
             client.Timeout = PushHttpClientTimeout)
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
             {
                 AllowAutoRedirect = false
             });
-        services.AddScoped<ISupportChatPushNotificationSender>(serviceProvider =>
-        {
-            var options = serviceProvider.GetRequiredService<SupportChatPushOptions>();
-            return options.IsConfigured
-                ? serviceProvider.GetRequiredService<FcmSupportChatPushNotificationSender>()
-                : serviceProvider.GetRequiredService<NoopSupportChatPushNotificationSender>();
-        });
+        services.AddScoped<ISupportChatPushDeliverySender>(serviceProvider =>
+            serviceProvider.GetRequiredService<FcmSupportChatPushNotificationSender>());
+        services.AddScoped<ISupportChatPushNotificationSender, SupportChatPushNotificationOutbox>();
+        services.AddScoped<SupportChatPushOutboxProcessor>();
         services.AddScoped<ISupportChatService, SupportChatService>();
         services.AddScoped<ISupportReplyTemplateCatalogService, SupportReplyTemplateCatalogService>();
         services.AddHostedService<SupportAttachmentCleanupWorker>();
+        if (pushOptions.IsConfigured)
+        {
+            services.AddHostedService<SupportChatPushOutboxWorker>();
+        }
 
         return services;
     }

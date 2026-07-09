@@ -79,7 +79,8 @@ try
                 .AddHttpClientInstrumentation()
                 .AddRuntimeInstrumentation()
                 .AddMeter("PetMagic.Modules.Economy")
-                .AddMeter("PetMagic.Modules.Templates");
+                .AddMeter("PetMagic.Modules.Templates")
+                .AddMeter("PetMagic.Notifications");
 
             if (IsOtlpExporterConfigured(builder.Configuration))
             {
@@ -92,6 +93,7 @@ try
     Directory.CreateDirectory(Path.Combine(host.Services.GetRequiredService<IHostEnvironment>().ContentRootPath, "wwwroot"));
     Directory.CreateDirectory(Path.Combine(host.Services.GetRequiredService<IHostEnvironment>().ContentRootPath, "wwwroot", "templates-media"));
 
+    await GenerationWorkerSchemaGate.WaitUntilReadyAsync(host.Services, TimeSpan.FromMinutes(5));
     await host.RunAsync();
 }
 catch (Exception exception)

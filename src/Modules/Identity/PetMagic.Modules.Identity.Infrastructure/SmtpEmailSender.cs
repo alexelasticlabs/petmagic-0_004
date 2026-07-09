@@ -26,6 +26,7 @@ internal sealed class SmtpEmailSender(EmailOptions options, ILogger<SmtpEmailSen
         message.From.Add(new MailboxAddress(options.FromName, options.FromAddress));
         message.To.Add(MailboxAddress.Parse(job.RecipientEmail));
         message.Subject = job.Subject;
+        message.MessageId = BuildDeterministicMessageId(job.Id, options.FromAddress);
 
         var textBody = string.IsNullOrWhiteSpace(job.TextBody)
             ? StripHtml(job.HtmlBody)
@@ -106,5 +107,16 @@ internal sealed class SmtpEmailSender(EmailOptions options, ILogger<SmtpEmailSen
         }
 
         return email[(atIndex + 1)..];
+    }
+
+    private static string BuildDeterministicMessageId(Guid jobId, string fromAddress)
+    {
+        var domain = GetRecipientDomain(fromAddress);
+        if (string.Equals(domain, "unknown", StringComparison.Ordinal))
+        {
+            domain = "petmagic.app";
+        }
+
+        return $"<{jobId:N}@{domain.ToLowerInvariant()}>";
     }
 }

@@ -35,6 +35,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
     conversationTimeline,
     destructiveStatusAction,
     canManageSupportWorkspace,
+    canMutateConversation,
     canViewSubjectUserContext,
     lastActivityAtUtc,
     operatorPriority,
@@ -48,6 +49,8 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
     setOperatorPriority,
     sidePanelTabs,
     statusMutation,
+    assignmentMutation,
+    isAssignedToCurrentAdmin,
     text,
     totalPurchases,
     userQuery,
@@ -97,7 +100,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
   }
 
   const handleAddTag = () => {
-    if (!canManageSupportWorkspace) {
+    if (!canMutateConversation) {
       return;
     }
 
@@ -114,7 +117,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
   };
 
   const confirmPendingStatusChange = async () => {
-    if (!canManageSupportWorkspace || !pendingStatusConfirm || statusMutation.isPending) {
+    if (!canMutateConversation || !pendingStatusConfirm || statusMutation.isPending) {
       return;
     }
 
@@ -127,7 +130,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
   };
 
   const requestStatusChange = (status: SupportConversationStatus) => {
-    if (!canManageSupportWorkspace || statusMutation.isPending || conversation.status === status) {
+    if (!canMutateConversation || statusMutation.isPending || conversation.status === status) {
       return;
     }
 
@@ -155,9 +158,12 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
             analyticsQuery={analyticsQuery}
             attachmentPreviewEntries={attachmentPreviewEntries}
             canManageSupportWorkspace={canManageSupportWorkspace}
+            canMutateConversation={canMutateConversation}
             canViewSubjectUserContext={canViewSubjectUserContext}
             confirmPendingStatusChange={confirmPendingStatusChange}
             conversation={conversation}
+            assignmentMutation={assignmentMutation}
+            isAssignedToCurrentAdmin={isAssignedToCurrentAdmin}
             destructiveStatusAction={destructiveStatusAction}
             handleAddTag={handleAddTag}
             isTagEditorOpen={isTagEditorOpen}

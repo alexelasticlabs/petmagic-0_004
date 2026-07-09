@@ -17,6 +17,7 @@ type SupportConversationCopy = {
   };
   controller: {
     actionsForbidden: string;
+    ownershipRequired: string;
     notificationTitle: string;
     realtimeMessageFallback: string;
     optimisticAttachmentPreview: (fileName?: string | null) => string;
@@ -85,6 +86,10 @@ type SupportConversationCopy = {
   infoPanel: {
     panelTabsLabel: string;
     ticketInformation: string;
+    assignedOperator: string;
+    claimTicket: string;
+    unassignTicket: string;
+    ownedByAnotherOperator: string;
     updated: string;
     attachmentsTitle: (count: number) => string;
     viewAll: string;
@@ -179,6 +184,7 @@ const supportConversationCopy: Record<Locale, SupportConversationCopy> = {
     },
     controller: {
       actionsForbidden: "Действия поддержки доступны только администраторам или модераторам.",
+      ownershipRequired: "Сначала назначьте тикет на себя.",
       notificationTitle: "Поддержка",
       realtimeMessageFallback: "Новое сообщение в поддержке",
       optimisticAttachmentPreview: (fileName) =>
@@ -249,6 +255,10 @@ const supportConversationCopy: Record<Locale, SupportConversationCopy> = {
     infoPanel: {
       panelTabsLabel: "Разделы панели",
       ticketInformation: "Информация о тикете",
+      assignedOperator: "Ответственный",
+      claimTicket: "Взять тикет",
+      unassignTicket: "Снять назначение",
+      ownedByAnotherOperator: "Тикет назначен другому оператору",
       updated: "Обновлён",
       attachmentsTitle: (count) => `Вложения (${count})`,
       viewAll: "Смотреть все",
@@ -324,6 +334,7 @@ const supportConversationCopy: Record<Locale, SupportConversationCopy> = {
     },
     controller: {
       actionsForbidden: "Support actions are available only to Admin or Moderator.",
+      ownershipRequired: "Claim the ticket before changing it.",
       notificationTitle: "Support",
       realtimeMessageFallback: "New support message",
       optimisticAttachmentPreview: (fileName) =>
@@ -393,6 +404,10 @@ const supportConversationCopy: Record<Locale, SupportConversationCopy> = {
     infoPanel: {
       panelTabsLabel: "Panel tabs",
       ticketInformation: "Ticket information",
+      assignedOperator: "Assignee",
+      claimTicket: "Claim ticket",
+      unassignTicket: "Unassign ticket",
+      ownedByAnotherOperator: "Ticket is assigned to another operator",
       updated: "Updated",
       attachmentsTitle: (count) => `Attachments (${count})`,
       viewAll: "View all",

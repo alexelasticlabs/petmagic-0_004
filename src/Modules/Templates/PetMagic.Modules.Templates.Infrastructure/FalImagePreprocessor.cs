@@ -48,7 +48,8 @@ internal sealed class FalImagePreprocessor(FalQueueClient queueClient) : IImageP
             : Result.Success(new ProviderQueueSubmission(
                 result.Value.RequestId,
                 result.Value.StatusUrl.ToString(),
-                result.Value.ResponseUrl.ToString()));
+                result.Value.ResponseUrl.ToString(),
+                result.Value.CancelUrl.ToString()));
     }
 
     public Result<ImagePreprocessResult> Complete(JsonElement response, string? requestId, double? inferenceTimeSeconds)

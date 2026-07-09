@@ -69,6 +69,7 @@ export function SupportConversationPage({
     conversationSla,
     filteredInboxItems,
     canManageSupportWorkspace,
+    canMutateConversation,
     canGoToNextQueuePage,
     canGoToPreviousQueuePage,
     hasComposerAttachment,
@@ -107,7 +108,7 @@ export function SupportConversationPage({
 
   const isConversationReadOnly = conversation?.isReadOnly ?? false;
   const isComposerBusy = isSendReplySubmitting;
-  const isComposerDisabled = isConversationReadOnly || !canManageSupportWorkspace || isComposerBusy;
+  const isComposerDisabled = isConversationReadOnly || !canMutateConversation || isComposerBusy;
   const isConversationClosed = conversation?.status === "Closed";
   const isQueueControlsLocked = !canManageSupportWorkspace || inboxQuery.isFetching;
   const setQueueSubFilter = (value: "all" | "waiting" | "unassigned" | "archive") => {
@@ -210,7 +211,9 @@ export function SupportConversationPage({
       : (secondaryStatusActions.find((action) => action.status === "InProgress") ?? null);
   const readOnlyComposerTitle = isConversationClosed
     ? copy.page.closedConversationReadonly
-    : statusHint(conversation?.status ?? "Closed", text);
+    : !canMutateConversation
+      ? copy.controller.ownershipRequired
+      : statusHint(conversation?.status ?? "Closed", text);
   const imageViewerLabels = copy.page.imageViewer;
   const queueLabels = copy.page.queue;
   const messageLabels = copy.page.message;

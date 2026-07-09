@@ -30,6 +30,15 @@ public sealed partial class SupportChatService
             return Result.Failure<SupportMessageResponse>(Forbidden);
         }
 
+        if (command.IsAdmin)
+        {
+            var ownershipError = ValidateAdminOwnership(conversation, command.SenderUserId);
+            if (ownershipError is not null)
+            {
+                return Result.Failure<SupportMessageResponse>(ownershipError);
+            }
+        }
+
         if (message.IsFromAdmin != command.IsAdmin)
         {
             return Result.Failure<SupportMessageResponse>(Forbidden);
@@ -124,15 +133,20 @@ public sealed partial class SupportChatService
 
         message.AttachmentUploadStatus = (int)command.AttachmentUploadStatus;
         conversation.UpdatedAtUtc = DateTime.UtcNow;
+        if (command.IsAdmin && command.AttachmentUploadStatus == SupportAttachmentUploadStatus.Uploaded)
+        {
+            await EnqueueUserMessageNotificationAsync(
+                conversation,
+                message.Id,
+                hasAttachments: true,
+                unreadCountDelta: 0,
+                cancellationToken);
+        }
+
         await supportChatDbContext.SaveChangesAsync(cancellationToken);
         await supportChatDbContext.Entry(message).Collection(x => x.Attachments).LoadAsync(cancellationToken);
         await NotifyConversationUpdatedAsync(conversation, cancellationToken);
         var response = await BuildMessageResponseAsync(message, cancellationToken);
-        if (command.IsAdmin && command.AttachmentUploadStatus == SupportAttachmentUploadStatus.Uploaded)
-        {
-            await NotifyUserMessageAsync(conversation, response, cancellationToken);
-        }
-
         return Result.Success(response);
     }
 

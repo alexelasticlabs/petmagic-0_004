@@ -58,6 +58,13 @@ public sealed partial class StoreSubscriptionVerifier
             var subscriptionState = stateElement.GetString() ?? string.Empty;
             var isActive = string.Equals(subscriptionState, "SUBSCRIPTION_STATE_ACTIVE", StringComparison.Ordinal)
                 || string.Equals(subscriptionState, "SUBSCRIPTION_STATE_IN_GRACE_PERIOD", StringComparison.Ordinal);
+            var providerAccountId = root.TryGetProperty("externalAccountIdentifiers", out var accountIdentifiersElement)
+                && accountIdentifiersElement.ValueKind == JsonValueKind.Object
+                && accountIdentifiersElement.TryGetProperty("obfuscatedExternalAccountId", out var accountIdElement)
+                && accountIdElement.ValueKind == JsonValueKind.String
+                    ? accountIdElement.GetString()
+                    : null;
+            var accountBindingState = ResolveAccountBindingState(providerAccountId, request.UserId);
 
             DateTime? expiresAtUtc = null;
             string? externalSubscriptionId = null;
@@ -99,7 +106,12 @@ public sealed partial class StoreSubscriptionVerifier
 
             if (!isActive)
             {
-                return Result.Success(new StoreSubscriptionVerificationResponse(false, expiresAtUtc, subscriptionState, externalSubscriptionId));
+                return Result.Success(new StoreSubscriptionVerificationResponse(
+                    false,
+                    expiresAtUtc,
+                    subscriptionState,
+                    externalSubscriptionId,
+                    accountBindingState));
             }
 
             if (!expiresAtUtc.HasValue)
@@ -107,7 +119,12 @@ public sealed partial class StoreSubscriptionVerifier
                 return Result.Failure<StoreSubscriptionVerificationResponse>(EconomyErrors.StorePurchaseInvalid);
             }
 
-            return Result.Success(new StoreSubscriptionVerificationResponse(true, expiresAtUtc, subscriptionState, externalSubscriptionId));
+            return Result.Success(new StoreSubscriptionVerificationResponse(
+                true,
+                expiresAtUtc,
+                subscriptionState,
+                externalSubscriptionId,
+                accountBindingState));
         }
         catch (Exception ex)
         {
@@ -169,10 +186,6 @@ public sealed partial class StoreSubscriptionVerifier
                 && purchaseStateElement.ValueKind == JsonValueKind.Number
                 ? purchaseStateElement.GetInt32()
                 : -1;
-            var acknowledgementState = root.TryGetProperty("acknowledgementState", out var acknowledgementStateElement)
-                && acknowledgementStateElement.ValueKind == JsonValueKind.Number
-                ? acknowledgementStateElement.GetInt32()
-                : 1;
             var purchaseType = root.TryGetProperty("purchaseType", out var purchaseTypeElement)
                 && purchaseTypeElement.ValueKind == JsonValueKind.Number
                 ? purchaseTypeElement.GetInt32()
@@ -181,18 +194,22 @@ public sealed partial class StoreSubscriptionVerifier
                 || root.TryGetProperty("cancelReason", out _);
 
             var isPurchased = purchaseState == 0
-                && acknowledgementState == 1
                 && !hasRefundOrCancelSignal
                 && purchaseType >= 0;
             var orderId = root.TryGetProperty("orderId", out var orderIdElement)
                 && orderIdElement.ValueKind == JsonValueKind.String
                 ? orderIdElement.GetString()
                 : request.PurchaseId;
+            var providerAccountId = root.TryGetProperty("obfuscatedExternalAccountId", out var accountIdElement)
+                && accountIdElement.ValueKind == JsonValueKind.String
+                    ? accountIdElement.GetString()
+                    : null;
 
             return Result.Success(new StoreProductVerificationResponse(
                 isPurchased,
                 isPurchased ? "purchased" : "not_purchased",
-                orderId));
+                orderId,
+                ResolveAccountBindingState(providerAccountId, request.UserId)));
         }
         catch (Exception ex)
         {

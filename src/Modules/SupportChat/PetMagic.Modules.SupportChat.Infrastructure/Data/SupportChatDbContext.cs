@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
+using PetMagic.BuildingBlocks.Notifications;
 using PetMagic.Modules.SupportChat.Infrastructure.Entities;
 
 namespace PetMagic.Modules.SupportChat.Infrastructure.Data;
@@ -16,8 +17,12 @@ public sealed class SupportChatDbContext(DbContextOptions<SupportChatDbContext> 
 
     public DbSet<SupportPushDeviceToken> SupportPushDeviceTokens => Set<SupportPushDeviceToken>();
 
+    public DbSet<PushOutboxMessage> PushOutboxMessages => Set<PushOutboxMessage>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
+        ConfigurePushOutbox(builder, "support_push_outbox");
+
         builder.Entity<SupportConversation>(entity =>
         {
             entity.ToTable("support_conversations");
@@ -109,6 +114,24 @@ public sealed class SupportChatDbContext(DbContextOptions<SupportChatDbContext> 
             entity.Property(x => x.Locale).HasMaxLength(16);
             entity.HasIndex(x => x.Token).IsUnique();
             entity.HasIndex(x => new { x.UserId, x.DisabledAtUtc });
+        });
+    }
+
+    private static void ConfigurePushOutbox(ModelBuilder builder, string tableName)
+    {
+        builder.Entity<PushOutboxMessage>(entity =>
+        {
+            entity.ToTable(tableName);
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.DeduplicationKey).HasMaxLength(256).IsRequired();
+            entity.Property(x => x.Kind).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.PayloadJson).HasMaxLength(16000).IsRequired();
+            entity.Property(x => x.Status).HasConversion<int>().IsRequired();
+            entity.Property(x => x.LastErrorCode).HasMaxLength(128);
+            entity.HasIndex(x => x.DeduplicationKey).IsUnique();
+            entity.HasIndex(x => new { x.Status, x.NextAttemptAtUtc, x.CreatedAtUtc });
+            entity.HasIndex(x => new { x.Status, x.LockExpiresAtUtc });
+            entity.HasIndex(x => x.UserId);
         });
     }
 }

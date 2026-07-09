@@ -92,18 +92,7 @@ public static partial class AuthEndpoints
 
     private static bool IsSecureConnection(HttpContext context)
     {
-        if (context.Request.IsHttps)
-        {
-            return true;
-        }
-
-        if (context.Request.Headers.TryGetValue("X-Forwarded-Proto", out var proto)
-            && string.Equals(proto.ToString(), "https", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        return false;
+        return context.Request.IsHttps;
     }
 
     internal static bool TryGetUserId(HttpContext context, out Guid userId, out ProblemHttpResult? problem)

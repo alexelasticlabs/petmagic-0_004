@@ -52,6 +52,8 @@ public sealed class EconomyOptions
 
     public int MaxStoreReceiptAgeHours { get; init; } = 24;
 
+    public string StoreAccountBindingMode { get; init; } = "compatibility";
+
     public bool EconomyReconciliationEnabled { get; init; } = true;
 
     public int EconomyReconciliationIntervalMinutes { get; init; } = 15;
@@ -69,6 +71,8 @@ public sealed class EconomyOptions
     public string FirebaseServiceAccountJson { get; init; } = string.Empty;
 
     public string FirebaseServiceAccountJsonPath { get; init; } = string.Empty;
+
+    public bool PushOutboxDispatcherEnabled { get; init; } = true;
 
     public bool IsFirebasePushConfigured =>
         FirebasePushEnabled

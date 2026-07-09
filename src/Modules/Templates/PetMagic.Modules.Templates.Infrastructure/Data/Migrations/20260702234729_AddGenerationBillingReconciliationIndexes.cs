@@ -12,28 +12,28 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
         {
             migrationBuilder.Sql(
                 """
-                CREATE INDEX CONCURRENTLY IF NOT EXISTS "IX_tgj_ChargedAtUtc"
+                CREATE INDEX CONCURRENTLY "IX_tgj_ChargedAtUtc"
                 ON templates_generation_jobs ("ChargedAtUtc");
                 """,
                 suppressTransaction: true);
 
             migrationBuilder.Sql(
                 """
-                CREATE INDEX CONCURRENTLY IF NOT EXISTS "IX_tgj_CreatedAtUtc_Id"
+                CREATE INDEX CONCURRENTLY "IX_tgj_CreatedAtUtc_Id"
                 ON templates_generation_jobs ("CreatedAtUtc", "Id");
                 """,
                 suppressTransaction: true);
 
             migrationBuilder.Sql(
                 """
-                CREATE INDEX CONCURRENTLY IF NOT EXISTS "IX_tgj_RefundedAtUtc"
+                CREATE INDEX CONCURRENTLY "IX_tgj_RefundedAtUtc"
                 ON templates_generation_jobs ("RefundedAtUtc");
                 """,
                 suppressTransaction: true);
 
             migrationBuilder.Sql(
                 """
-                CREATE INDEX CONCURRENTLY IF NOT EXISTS "IX_tgj_UpdatedAtUtc_Id"
+                CREATE INDEX CONCURRENTLY "IX_tgj_UpdatedAtUtc_Id"
                 ON templates_generation_jobs ("UpdatedAtUtc", "Id");
                 """,
                 suppressTransaction: true);

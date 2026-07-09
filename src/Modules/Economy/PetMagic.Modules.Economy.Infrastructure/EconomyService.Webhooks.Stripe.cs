@@ -375,6 +375,17 @@ public sealed partial class EconomyService
                 }
             }
 
+            if (pendingPremiumSync is not null)
+            {
+                await _pushNotificationSender.NotifyPremiumUpdateAsync(
+                    pendingPremiumSync.UserId,
+                    new PremiumPushNotification(
+                        Status: pendingPremiumSync.DesiredPremium ? "active" : "inactive",
+                        Provider: pendingPremiumSync.Provider,
+                        PlanCode: pendingPremiumSync.PlanCode),
+                    cancellationToken);
+            }
+
             await dbContext.SaveChangesAsync(cancellationToken);
             if (transaction is not null)
             {
@@ -391,16 +402,7 @@ public sealed partial class EconomyService
                     pendingPremiumSync.SubscriptionId,
                     pendingPremiumSync.ExternalSubscriptionId,
                     cancellationToken);
-                if (premiumSyncResult.IsSuccess)
-                {
-                    await _pushNotificationSender.NotifyPremiumUpdateAsync(
-                        pendingPremiumSync.UserId,
-                        new PremiumPushNotification(
-                            Status: pendingPremiumSync.DesiredPremium ? "active" : "inactive",
-                            Provider: pendingPremiumSync.Provider,
-                            PlanCode: pendingPremiumSync.PlanCode),
-                        cancellationToken);
-                }
+                _ = premiumSyncResult;
             }
 
             LogPaymentWebhookProcessed(

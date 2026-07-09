@@ -65,41 +65,23 @@ public sealed partial class SupportChatService
         }
     }
 
-    private async Task NotifyUserMessageAsync(
+    private async Task EnqueueUserMessageNotificationAsync(
         SupportConversation conversation,
-        SupportMessageResponse message,
+        Guid messageId,
+        bool hasAttachments,
+        int unreadCountDelta,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            await pushNotificationSender.NotifyUserAsync(
-                new SupportChatPushNotification(
-                    conversation.Id,
-                    conversation.InitiatorUserId,
-                    message.MessageId,
-                    message.Attachments.Count > 0 || message.PendingAttachment is not null,
-                    await supportChatDbContext.ConversationMessages.CountAsync(
-                        x => x.ConversationId == conversation.Id && x.IsFromAdmin && x.ReadAtUtc == null,
-                        cancellationToken)),
-                cancellationToken);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception exception)
-        {
-            logger?.LogWarning(
-                "Support chat notification fan-out failed. Operation={Operation} Channel={Channel} ConversationIdHash={ConversationIdHash} InitiatorUserIdHash={InitiatorUserIdHash} MessageIdHash={MessageIdHash} SenderType={SenderType} HasAttachments={HasAttachments} ExceptionType={ExceptionType}",
-                "message_delivery",
-                "push",
-                SafeLogValues.StableHash(conversation.Id.ToString("D")),
-                SafeLogValues.StableHash(conversation.InitiatorUserId.ToString("D")),
-                SafeLogValues.StableHash(message.MessageId.ToString("D")),
-                message.SenderType,
-                message.Attachments.Count > 0 || message.PendingAttachment is not null,
-                SafeLogValues.ExceptionType(exception));
-            // Push delivery is best-effort and must not block support replies.
-        }
+        var persistedUnreadCount = await supportChatDbContext.ConversationMessages.CountAsync(
+            x => x.ConversationId == conversation.Id && x.IsFromAdmin && x.ReadAtUtc == null,
+            cancellationToken);
+        await pushNotificationSender.NotifyUserAsync(
+            new SupportChatPushNotification(
+                conversation.Id,
+                conversation.InitiatorUserId,
+                messageId,
+                hasAttachments,
+                persistedUnreadCount + unreadCountDelta),
+            cancellationToken);
     }
 }

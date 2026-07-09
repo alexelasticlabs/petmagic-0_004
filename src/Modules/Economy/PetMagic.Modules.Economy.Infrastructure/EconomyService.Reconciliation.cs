@@ -2,6 +2,8 @@ using System.Text.Json;
 
 using Microsoft.EntityFrameworkCore;
 
+using Npgsql;
+
 using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
@@ -14,6 +16,7 @@ namespace PetMagic.Modules.Economy.Infrastructure;
 
 public sealed partial class EconomyService
 {
+    private const long EconomyReconciliationAdvisoryLockKey = 0x5065744D67_02;
     private static class EconomyIncidentType
     {
         public const string WebhookProcessingFailed = "WebhookProcessingFailed";
@@ -39,6 +42,13 @@ public sealed partial class EconomyService
     public async Task<Result<EconomyReconciliationRunResponse>> RunEconomyReconciliationAsync(
         CancellationToken cancellationToken)
     {
+        var reconciliationLock = await TryAcquireEconomyReconciliationLockAsync(cancellationToken);
+        if (!reconciliationLock.Acquired)
+        {
+            return Result.Failure<EconomyReconciliationRunResponse>(EconomyErrors.ReconciliationAlreadyRunning);
+        }
+
+        await using var lease = reconciliationLock.Lease;
         var startedAtUtc = DateTime.UtcNow;
         var stats = new ReconciliationStats(startedAtUtc);
         var stalePendingBeforeUtc = startedAtUtc.AddMinutes(-Math.Max(5, options.Value.EconomyReconciliationPendingOrderMinutes));
@@ -59,6 +69,65 @@ public sealed partial class EconomyService
             stats.IncidentsResolved,
             stats.AutoFixesApplied,
             stats.ManualReviewRequired));
+    }
+
+    private async Task<(bool Acquired, IAsyncDisposable? Lease)> TryAcquireEconomyReconciliationLockAsync(
+        CancellationToken cancellationToken)
+    {
+        if (!dbContext.Database.IsRelational()
+            || !string.Equals(
+                dbContext.Database.ProviderName,
+                "Npgsql.EntityFrameworkCore.PostgreSQL",
+                StringComparison.Ordinal))
+        {
+            return (true, null);
+        }
+
+        var connectionString = dbContext.Database.GetConnectionString();
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            return (true, null);
+        }
+
+        var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+        try
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT pg_try_advisory_lock(@key)";
+            command.Parameters.AddWithValue("key", EconomyReconciliationAdvisoryLockKey);
+            var acquired = (bool?)await command.ExecuteScalarAsync(cancellationToken) == true;
+            if (!acquired)
+            {
+                await connection.DisposeAsync();
+                return (false, null);
+            }
+
+            return (true, new EconomyReconciliationLockLease(connection));
+        }
+        catch
+        {
+            await connection.DisposeAsync();
+            throw;
+        }
+    }
+
+    private sealed class EconomyReconciliationLockLease(NpgsqlConnection connection) : IAsyncDisposable
+    {
+        public async ValueTask DisposeAsync()
+        {
+            try
+            {
+                await using var command = connection.CreateCommand();
+                command.CommandText = "SELECT pg_advisory_unlock(@key)";
+                command.Parameters.AddWithValue("key", EconomyReconciliationAdvisoryLockKey);
+                await command.ExecuteNonQueryAsync();
+            }
+            finally
+            {
+                await connection.DisposeAsync();
+            }
+        }
     }
 
     public async Task<Result<OffsetPagedResponse<AdminEconomyIncidentResponse>>> GetAdminEconomyIncidentsAsync(

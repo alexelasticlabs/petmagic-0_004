@@ -502,6 +502,14 @@ public sealed partial class EconomyService
 
             wallet.UpdatedAtUtc = now;
 
+            await _pushNotificationSender.NotifyWalletUpdateAsync(
+                order.UserId,
+                new WalletPushNotification(
+                    Status: "succeeded",
+                    OrderId: order.Id,
+                    SparkDelta: order.SparkToGrant),
+                cancellationToken);
+
             await dbContext.SaveChangesAsync(cancellationToken);
             if (transaction is not null)
             {
@@ -532,16 +540,16 @@ public sealed partial class EconomyService
             order.ConfirmedAtUtc = now;
             wallet.UpdatedAtUtc = now;
 
+            await _pushNotificationSender.NotifyWalletUpdateAsync(
+                order.UserId,
+                new WalletPushNotification(
+                    Status: "succeeded",
+                    OrderId: order.Id,
+                    SparkDelta: order.SparkToGrant),
+                cancellationToken);
+
             await dbContext.SaveChangesAsync(cancellationToken);
         }
-
-        await _pushNotificationSender.NotifyWalletUpdateAsync(
-            order.UserId,
-            new WalletPushNotification(
-                Status: "succeeded",
-                OrderId: order.Id,
-                SparkDelta: order.SparkToGrant),
-            cancellationToken);
         LogPaymentSucceeded(order, "purchase.confirm");
         return Result.Success(order);
     }

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
+using PetMagic.BuildingBlocks.Notifications;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
 
 namespace PetMagic.Modules.Economy.Infrastructure.Data;
@@ -40,12 +41,16 @@ public sealed class EconomyDbContext(DbContextOptions<EconomyDbContext> options)
 
     public DbSet<EconomyPushDeviceToken> EconomyPushDeviceTokens => Set<EconomyPushDeviceToken>();
 
+    public DbSet<PushOutboxMessage> PushOutboxMessages => Set<PushOutboxMessage>();
+
     public DbSet<EconomyIncident> EconomyIncidents => Set<EconomyIncident>();
 
     public DbSet<EconomyIncidentAuditEntry> EconomyIncidentAuditEntries => Set<EconomyIncidentAuditEntry>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
+        ConfigurePushOutbox(builder, "economy_push_outbox");
+
         builder.Entity<Wallet>(entity =>
         {
             entity.ToTable(
@@ -382,6 +387,24 @@ public sealed class EconomyDbContext(DbContextOptions<EconomyDbContext> options)
             entity.Property(x => x.DetailsJson).HasMaxLength(4000);
             entity.Property(x => x.CreatedAtUtc).IsRequired();
             entity.HasIndex(x => new { x.IncidentId, x.CreatedAtUtc });
+        });
+    }
+
+    private static void ConfigurePushOutbox(ModelBuilder builder, string tableName)
+    {
+        builder.Entity<PushOutboxMessage>(entity =>
+        {
+            entity.ToTable(tableName);
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.DeduplicationKey).HasMaxLength(256).IsRequired();
+            entity.Property(x => x.Kind).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.PayloadJson).HasMaxLength(16000).IsRequired();
+            entity.Property(x => x.Status).HasConversion<int>().IsRequired();
+            entity.Property(x => x.LastErrorCode).HasMaxLength(128);
+            entity.HasIndex(x => x.DeduplicationKey).IsUnique();
+            entity.HasIndex(x => new { x.Status, x.NextAttemptAtUtc, x.CreatedAtUtc });
+            entity.HasIndex(x => new { x.Status, x.LockExpiresAtUtc });
+            entity.HasIndex(x => x.UserId);
         });
     }
 }

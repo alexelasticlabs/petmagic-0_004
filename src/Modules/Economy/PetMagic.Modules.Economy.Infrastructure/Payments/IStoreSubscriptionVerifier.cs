@@ -2,6 +2,13 @@ using PetMagic.BuildingBlocks.Results;
 
 namespace PetMagic.Modules.Economy.Infrastructure.Payments;
 
+public enum StoreAccountBindingState
+{
+    Missing = 0,
+    Matched = 1,
+    Mismatched = 2
+}
+
 public sealed record StoreSubscriptionVerificationRequest(
     Guid UserId,
     string PaymentProvider,
@@ -16,7 +23,8 @@ public sealed record StoreSubscriptionVerificationResponse(
     bool IsActive,
     DateTime? ExpiresAtUtc,
     string Status,
-    string? ExternalSubscriptionId);
+    string? ExternalSubscriptionId,
+    StoreAccountBindingState AccountBindingState = StoreAccountBindingState.Missing);
 
 public sealed record StoreProductVerificationRequest(
     Guid UserId,
@@ -30,7 +38,8 @@ public sealed record StoreProductVerificationRequest(
 public sealed record StoreProductVerificationResponse(
     bool IsPurchased,
     string Status,
-    string? ExternalTransactionId);
+    string? ExternalTransactionId,
+    StoreAccountBindingState AccountBindingState = StoreAccountBindingState.Missing);
 
 public interface IStoreSubscriptionVerifier
 {

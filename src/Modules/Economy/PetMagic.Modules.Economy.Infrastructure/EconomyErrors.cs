@@ -50,6 +50,10 @@ public static class EconomyErrors
 
     public static readonly Error StorePurchaseInvalid = new("economy.store_purchase_invalid", "Store subscription purchase is invalid.");
 
+    public static readonly Error StoreAccountBindingMissing = new("economy.store_account_binding_missing", "Store purchase account binding is missing.");
+
+    public static readonly Error StoreAccountBindingMismatch = new("economy.store_account_binding_mismatch", "Store purchase belongs to a different account.");
+
     public static readonly Error StorePurchaseInactive = new("economy.store_purchase_inactive", "Store subscription is not active.");
 
     public static readonly Error PaymentMethodNotFound = new("economy.payment_method_not_found", "Payment method was not found.");
@@ -90,6 +94,8 @@ public static class EconomyErrors
     public static readonly Error EconomyIncidentActionInvalid = new("economy.incident_action_invalid", "Economy incident action is not supported.");
 
     public static readonly Error EconomyIncidentActionReasonRequired = new("economy.incident_action_reason_required", "Economy incident action reason is required.");
+
+    public static readonly Error ReconciliationAlreadyRunning = new("economy.reconciliation_already_running", "Economy reconciliation is already running.");
 
     public static readonly Error GenerationBillingReconciliationUnavailable = new("economy.generation_billing_reconciliation_unavailable", "Generation billing reconciliation is not available.");
 

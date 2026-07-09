@@ -143,6 +143,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.Property(x => x.Status).HasConversion<int>().IsRequired();
             entity.Property(x => x.FailureCode).HasMaxLength(120);
             entity.Property(x => x.FailureMessage).HasMaxLength(2000);
+            entity.HasIndex(x => new { x.Status, x.LockExpiresAtUtc, x.QueuedAtUtc });
             entity.HasIndex(x => new { x.Status, x.QueuedAtUtc });
             entity.HasIndex(x => new { x.Status, x.NextAttemptAtUtc, x.QueuedAtUtc });
             entity.HasIndex(x => new { x.Status, x.UpdatedAtUtc });

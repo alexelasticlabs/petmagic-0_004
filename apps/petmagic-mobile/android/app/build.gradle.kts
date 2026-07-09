@@ -1,4 +1,5 @@
 import java.io.FileInputStream
+import java.util.Base64
 import java.util.Properties
 
 val keystoreProperties = Properties()
@@ -24,6 +25,37 @@ val isReleaseTaskRequested = gradle.startParameter.taskNames.any { taskName ->
 
 val allowInsecureReleaseSigning =
     providers.gradleProperty("allowInsecureReleaseSigning").orNull == "true"
+val allowPlaceholderFirebase =
+    providers.gradleProperty("allowPlaceholderFirebase").orNull == "true"
+
+val requestedReleaseEnvironment = gradle.startParameter.taskNames
+    .joinToString(" ")
+    .lowercase()
+    .let { taskNames ->
+        when {
+            !isReleaseTaskRequested -> null
+            taskNames.contains("staging") -> "staging"
+            taskNames.contains("production") -> "production"
+            else -> throw GradleException(
+                "Release task must target an explicit staging or production flavor.",
+            )
+        }
+    }
+
+fun decodedDartDefines(): Map<String, String> {
+    val encoded = providers.gradleProperty("dart-defines").orNull.orEmpty()
+    if (encoded.isBlank()) {
+        return emptyMap()
+    }
+    return encoded.split(',').mapNotNull { value ->
+        runCatching {
+            String(Base64.getDecoder().decode(value))
+        }.getOrNull()?.substringBefore('=')?.let { key ->
+            val decoded = String(Base64.getDecoder().decode(value))
+            key to decoded.substringAfter('=', "")
+        }
+    }.toMap()
+}
 
 plugins {
     id("com.android.application")
@@ -53,6 +85,20 @@ android {
         versionName = flutter.versionName
     }
 
+    flavorDimensions += "environment"
+    productFlavors {
+        create("staging") {
+            dimension = "environment"
+            applicationId = "com.petmagic.app.staging"
+            resValue("string", "app_name", "PetMagic Staging")
+        }
+        create("production") {
+            dimension = "environment"
+            applicationId = "com.petmagic.app"
+            resValue("string", "app_name", "PetMagic")
+        }
+    }
+
     signingConfigs {
         if (hasReleaseSigningConfig) {
             create("release") {
@@ -77,6 +123,54 @@ android {
                     "Release signing is not configured. Add android/key.properties with release keystore " +
                         "or set -PallowInsecureReleaseSigning=true only for local temporary builds.",
                 )
+            }
+
+            if (isReleaseTaskRequested) {
+                val environment = requestedReleaseEnvironment!!
+                val expectedPackageName = if (environment == "staging") {
+                    "com.petmagic.app.staging"
+                } else {
+                    "com.petmagic.app"
+                }
+                val expectedApiBaseUrl = if (environment == "staging") {
+                    "https://api.staging.petmagic.app"
+                } else {
+                    "https://api.petmagic.app"
+                }
+                val defines = decodedDartDefines()
+                if (defines["APP_ENVIRONMENT"] != environment ||
+                    defines["APP_PACKAGE_NAME"] != expectedPackageName ||
+                    defines["API_BASE_URL"] != expectedApiBaseUrl
+                ) {
+                    throw GradleException(
+                        "Release dart-defines must match the $environment flavor: " +
+                            "APP_ENVIRONMENT, APP_PACKAGE_NAME and API_BASE_URL are required.",
+                    )
+                }
+
+                val firebaseConfig = file("google-services.json")
+                if (!firebaseConfig.exists()) {
+                    throw GradleException(
+                        "Missing android/app/google-services.json. Inject it from the protected environment.",
+                    )
+                }
+                val firebaseContents = firebaseConfig.readText()
+                if (!firebaseContents.contains("\"package_name\": \"$expectedPackageName\"")) {
+                    throw GradleException(
+                        "google-services.json does not match $expectedPackageName.",
+                    )
+                }
+                val hasPlaceholderFirebase = listOf(
+                    "petmagic-placeholder",
+                    "replace-with-",
+                    "000000000000",
+                ).any(firebaseContents::contains)
+                if (hasPlaceholderFirebase && !allowPlaceholderFirebase) {
+                    throw GradleException(
+                        "Placeholder Firebase config is forbidden for release builds. " +
+                            "Use -PallowPlaceholderFirebase=true only for explicit CI packaging smoke.",
+                    )
+                }
             }
 
             signingConfig = if (hasReleaseSigningConfig) {

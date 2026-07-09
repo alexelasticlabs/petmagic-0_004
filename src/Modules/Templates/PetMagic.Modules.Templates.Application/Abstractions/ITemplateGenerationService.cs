@@ -49,6 +49,8 @@ public interface ITemplateGenerationService
 
     Task<Result<TemplateGenerationResponse>> CancelAdminQueuedAsync(Guid adminUserId, Guid generationId, CancellationToken cancellationToken);
 
+    Task<Result<AdminGenerationCancellationResult>> CancelAdminAsync(Guid adminUserId, Guid generationId, CancellationToken cancellationToken);
+
     Task<Result<TemplateGenerationResponse>> RetryAdminGenerationAsync(Guid adminUserId, Guid generationId, CancellationToken cancellationToken);
 
     Task<Result<TemplateGenerationResponse>> RetryAdminGenerationRefundAsync(Guid adminUserId, Guid generationId, CancellationToken cancellationToken);

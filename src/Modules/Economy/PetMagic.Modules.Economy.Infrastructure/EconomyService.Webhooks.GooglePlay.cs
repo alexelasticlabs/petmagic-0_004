@@ -215,6 +215,14 @@ public sealed partial class EconomyService
                     cancellationToken);
             }
 
+            await _pushNotificationSender.NotifyPremiumUpdateAsync(
+                existingSubscription.UserId,
+                new PremiumPushNotification(
+                    Status: isPremium ? "active" : "inactive",
+                    Provider: "google_play",
+                    PlanCode: plan.PlanCode),
+                cancellationToken);
+
             await dbContext.SaveChangesAsync(cancellationToken);
             if (transaction is not null)
             {
@@ -229,16 +237,7 @@ public sealed partial class EconomyService
                 subscription.Id,
                 subscription.ExternalSubscriptionId,
                 cancellationToken);
-            if (premiumSyncResult.IsSuccess)
-            {
-                await _pushNotificationSender.NotifyPremiumUpdateAsync(
-                    existingSubscription.UserId,
-                    new PremiumPushNotification(
-                        Status: isPremium ? "active" : "inactive",
-                        Provider: "google_play",
-                        PlanCode: plan.PlanCode),
-                    cancellationToken);
-            }
+            _ = premiumSyncResult;
 
             LogStoreWebhookProcessed("google_play", parsed.EventId, googlePlayEventType, existingSubscription.UserId, "processed");
             return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, true, "processed"));

@@ -58,6 +58,13 @@ public sealed partial class SupportChatService
             return Result.Failure<SupportConversationDetailResponse>(ConversationNotFound);
         }
 
+
+        var ownershipError = ValidateAdminOwnership(conversation, command.AdminUserId);
+        if (ownershipError is not null)
+        {
+            return Result.Failure<SupportConversationDetailResponse>(ownershipError);
+        }
+
         var normalizedTags = NormalizeTags(command.Tags);
         if (normalizedTags is null)
         {

@@ -67,14 +67,14 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
             // PostgreSQL CREATE INDEX CONCURRENTLY must run outside the normal EF migration transaction.
             migrationBuilder.Sql(
                 """
-                CREATE INDEX CONCURRENTLY IF NOT EXISTS "IX_tgj_Status_QueueMediaType_QueueTier_QueuedAtUtc"
+                CREATE INDEX CONCURRENTLY "IX_tgj_Status_QueueMediaType_QueueTier_QueuedAtUtc"
                 ON templates_generation_jobs ("Status", "QueueMediaType", "QueueTier", "QueuedAtUtc");
                 """,
                 suppressTransaction: true);
 
             migrationBuilder.Sql(
                 """
-                CREATE INDEX CONCURRENTLY IF NOT EXISTS "IX_tgj_Status_QueueMediaType_StartedAtUtc"
+                CREATE INDEX CONCURRENTLY "IX_tgj_Status_QueueMediaType_StartedAtUtc"
                 ON templates_generation_jobs ("Status", "QueueMediaType", "StartedAtUtc");
                 """,
                 suppressTransaction: true);

@@ -331,6 +331,7 @@ public static class IdentityInfrastructureServiceCollectionExtensions
             DispatchPollIntervalMilliseconds = ParseInt(section["DispatchPollIntervalMilliseconds"], 1_000),
             MaxDispatchAttempts = ParsePositiveInt(section["MaxDispatchAttempts"], 3),
             RetryDelaySeconds = ParseNonNegativeInt(section["RetryDelaySeconds"], 30),
+            ProcessingLeaseSeconds = ParsePositiveInt(section["ProcessingLeaseSeconds"], 120),
             CompletedDispatchRetentionDays = ParseInt(section["CompletedDispatchRetentionDays"], 7)
         };
     }

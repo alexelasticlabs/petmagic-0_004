@@ -17,7 +17,8 @@ internal static partial class EconomyWebhookParser
         DateTime? PurchaseDateUtc,
         DateTime? ExpiresAtUtc,
         DateTime? RevokedAtUtc,
-        string? Environment);
+        string? Environment,
+        string? AppAccountToken);
 
     public static bool IsStoreSubscriptionPremium(string status, DateTime? currentPeriodEndUtc)
     {
@@ -224,6 +225,10 @@ internal static partial class EconomyWebhookParser
                 && environmentElement.ValueKind == JsonValueKind.String
                     ? environmentElement.GetString()
                     : null;
+            var appAccountToken = root.TryGetProperty("appAccountToken", out var appAccountTokenElement)
+                && appAccountTokenElement.ValueKind == JsonValueKind.String
+                    ? appAccountTokenElement.GetString()
+                    : null;
 
             return new AppStoreTransactionInfo(
                 bundleId,
@@ -233,7 +238,8 @@ internal static partial class EconomyWebhookParser
                 purchaseDateUtc,
                 expiresAtUtc,
                 revokedAtUtc,
-                environment);
+                environment,
+                appAccountToken);
         }
         catch
         {

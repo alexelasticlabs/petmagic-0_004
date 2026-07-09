@@ -226,6 +226,11 @@ class PremiumRepository {
     PremiumPlanModel plan,
     PremiumPaymentProvider provider,
   ) async {
+    final session = await _authSessionCoordinator.requireValidSession(
+      mapError: _mapDioException,
+      unauthorizedMessage: 'auth.sign_in_required',
+      sessionExpiredMessage: 'auth.session_expired',
+    );
     final productId = plan.productIdFor(provider);
     if (productId == null || productId.isEmpty) {
       throw const AppException('premium.store_product_unavailable');
@@ -246,7 +251,10 @@ class PremiumRepository {
     }
 
     final launched = await _inAppPurchase.buyNonConsumable(
-      purchaseParam: PurchaseParam(productDetails: productDetails),
+      purchaseParam: PurchaseParam(
+        productDetails: productDetails,
+        applicationUserName: session.user.userId,
+      ),
     );
 
     if (!launched) {
@@ -342,8 +350,15 @@ class PremiumRepository {
     return 'web';
   }
 
-  Future<void> restoreStorePurchases() {
-    return _inAppPurchase.restorePurchases();
+  Future<void> restoreStorePurchases() async {
+    final session = await _authSessionCoordinator.requireValidSession(
+      mapError: _mapDioException,
+      unauthorizedMessage: 'auth.sign_in_required',
+      sessionExpiredMessage: 'auth.session_expired',
+    );
+    await _inAppPurchase.restorePurchases(
+      applicationUserName: session.user.userId,
+    );
   }
 
   Future<void> completePurchase(PurchaseDetails purchase) {

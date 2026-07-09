@@ -12,6 +12,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using PetMagic.BuildingBlocks.Observability;
+using PetMagic.BuildingBlocks.Notifications;
 using PetMagic.Modules.Economy.Infrastructure.Data;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
 using PetMagic.Modules.Economy.Infrastructure.Options;
@@ -22,7 +23,7 @@ internal sealed class FcmEconomyPushNotificationSender(
     EconomyDbContext dbContext,
     IOptions<EconomyOptions> options,
     IHttpClientFactory httpClientFactory,
-    ILogger<FcmEconomyPushNotificationSender> logger) : IEconomyPushNotificationSender
+    ILogger<FcmEconomyPushNotificationSender> logger) : IEconomyPushDeliverySender
 {
     public const string HttpClientName = "EconomyFcm";
 
@@ -30,20 +31,21 @@ internal sealed class FcmEconomyPushNotificationSender(
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private GoogleCredential? credential;
 
-    public async Task NotifyWalletUpdateAsync(Guid userId, WalletPushNotification notification, CancellationToken cancellationToken)
+    public async Task<PushDeliveryResult> DeliverWalletUpdateAsync(Guid userId, WalletPushNotification notification, CancellationToken cancellationToken)
     {
         if (!options.Value.IsFirebasePushConfigured)
         {
-            return;
+            return PushDeliveryResult.Delivered;
         }
 
         var tokens = await ResolveActiveTokensAsync(userId, cancellationToken);
         if (tokens.Count == 0)
         {
-            return;
+            return PushDeliveryResult.Delivered;
         }
         var accessToken = await GetAccessTokenAsync(cancellationToken);
         var userIdHash = SafeLogValues.StableHash(userId.ToString("D"));
+        var results = new List<PushDeliveryResult>(tokens.Count);
         foreach (var token in tokens)
         {
             var locale = token.Locale;
@@ -66,24 +68,27 @@ internal sealed class FcmEconomyPushNotificationSender(
                 data["orderId"] = notification.OrderId.Value.ToString("D");
             }
 
-            await SendAsync(token, title, body, data, accessToken, cancellationToken);
+            results.Add(await SendAsync(token, title, body, data, accessToken, cancellationToken));
         }
+
+        return Aggregate(results);
     }
 
-    public async Task NotifyPremiumUpdateAsync(Guid userId, PremiumPushNotification notification, CancellationToken cancellationToken)
+    public async Task<PushDeliveryResult> DeliverPremiumUpdateAsync(Guid userId, PremiumPushNotification notification, CancellationToken cancellationToken)
     {
         if (!options.Value.IsFirebasePushConfigured)
         {
-            return;
+            return PushDeliveryResult.Delivered;
         }
 
         var tokens = await ResolveActiveTokensAsync(userId, cancellationToken);
         if (tokens.Count == 0)
         {
-            return;
+            return PushDeliveryResult.Delivered;
         }
         var accessToken = await GetAccessTokenAsync(cancellationToken);
         var userIdHash = SafeLogValues.StableHash(userId.ToString("D"));
+        var results = new List<PushDeliveryResult>(tokens.Count);
         foreach (var token in tokens)
         {
             var locale = token.Locale;
@@ -108,8 +113,10 @@ internal sealed class FcmEconomyPushNotificationSender(
                 data["planCode"] = notification.PlanCode!;
             }
 
-            await SendAsync(token, title, body, data, accessToken, cancellationToken);
+            results.Add(await SendAsync(token, title, body, data, accessToken, cancellationToken));
         }
+
+        return Aggregate(results);
     }
 
     private async Task<List<EconomyPushDeviceToken>> ResolveActiveTokensAsync(Guid userId, CancellationToken cancellationToken)
@@ -121,7 +128,7 @@ internal sealed class FcmEconomyPushNotificationSender(
             .ToListAsync(cancellationToken);
     }
 
-    private async Task SendAsync(
+    private async Task<PushDeliveryResult> SendAsync(
         EconomyPushDeviceToken token,
         string title,
         string body,
@@ -151,7 +158,7 @@ internal sealed class FcmEconomyPushNotificationSender(
             cancellationToken);
         if (response.IsSuccessStatusCode)
         {
-            return;
+            return PushDeliveryResult.Delivered;
         }
 
         var responseBody = await SafeHttpContentReader.ReadStringPrefixAsync(response.Content, cancellationToken);
@@ -167,7 +174,30 @@ internal sealed class FcmEconomyPushNotificationSender(
             token.DisabledAtUtc = DateTime.UtcNow;
             token.UpdatedAtUtc = token.DisabledAtUtc.Value;
             await dbContext.SaveChangesAsync(cancellationToken);
+            return PushDeliveryResult.Delivered;
         }
+
+        return response.StatusCode == HttpStatusCode.TooManyRequests
+            || (int)response.StatusCode >= 500
+                ? PushDeliveryResult.Retry("fcm.transient_error")
+                : PushDeliveryResult.PermanentFailure("fcm.request_rejected");
+    }
+
+    private static PushDeliveryResult Aggregate(IReadOnlyList<PushDeliveryResult> results)
+    {
+        var retry = results.FirstOrDefault(x => x.Disposition == PushDeliveryDisposition.Retry);
+        if (retry is not null)
+        {
+            return retry;
+        }
+
+        if (results.Any(x => x.Disposition == PushDeliveryDisposition.Delivered))
+        {
+            return PushDeliveryResult.Delivered;
+        }
+
+        return results.FirstOrDefault()
+            ?? PushDeliveryResult.Delivered;
     }
 
     private async Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)

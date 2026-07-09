@@ -47,7 +47,11 @@ internal static class TemplatesErrors
     public static readonly Error GenerationWaitTooLong = new("GENERATION_WAIT_TOO_LONG", "Estimated generation wait is too long. Please retry later.");
     public static readonly Error ProviderCapacityUnavailable = new("PROVIDER_CAPACITY_UNAVAILABLE", "Generation provider is temporarily unavailable. Please retry later.");
     public static readonly Error GenerationCancelDisabled = new("templates.generation_cancel_disabled", "Queued generation cancellation is disabled.");
-    public static readonly Error GenerationCancelNotAllowed = new("templates.generation_cancel_not_allowed", "Only queued generations can be cancelled.");
+    public static readonly Error GenerationCancelNotAllowed = new("templates.generation_cancel_not_allowed", "Generation cannot be cancelled in its current state.");
+    public static readonly Error GenerationCancelAlreadyCompleted = new("templates.generation_cancel_already_completed", "Provider generation already completed before cancellation.");
+    public static readonly Error GenerationCancelProviderNotFound = new("templates.generation_cancel_provider_not_found", "Provider generation request was not found.");
+    public static readonly Error GenerationCancelProviderUnsupported = new("templates.generation_cancel_provider_unsupported", "Generation provider does not expose a trusted cancellation endpoint.");
+    public static readonly Error GenerationCancelRetryExhausted = new("templates.generation_cancel_retry_exhausted", "Generation cancellation could not be confirmed after the retry budget was exhausted.");
     public static readonly Error GenerationRetryNotAllowed = new("templates.generation_retry_not_allowed", "Only terminal charged generations that have not been refunded can be retried.");
     public static readonly Error GenerationRefundNotPending = new("templates.generation_refund_not_pending", "Generation has no pending refund to retry.");
     public static readonly Error InvalidFeedback = new("templates.invalid_feedback", "Generation feedback is invalid.");

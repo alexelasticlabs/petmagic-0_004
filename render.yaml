@@ -32,6 +32,8 @@ envVarGroups:
         value: "false"
       - key: PETMAGIC_QA_FIXTURES_ENABLED
         value: "false"
+      - key: STORE_ACCOUNT_BINDING_MODE
+        value: compatibility
       - key: GENERATION_GLOBAL_MAX_CONCURRENT
         value: "8"
       - key: GENERATION_IMAGE_RESERVED_CONCURRENT
@@ -152,6 +154,12 @@ services:
         value: "5000"
       - key: ASPNETCORE_HTTP_PORTS
         value: "5000"
+      - key: ForwardedHeaders__Enabled
+        value: "true"
+      - key: ForwardedHeaders__TrustAll
+        value: "true"
+      - key: ForwardedHeaders__ForwardLimit
+        value: "1"
       - key: APP_VOLUME_DIRS
         value: /var/petmagic
       - key: DataProtection__KeysPath
@@ -288,6 +296,10 @@ services:
         value: /var/petmagic
       - key: Templates__GenerationWorkerEnabled
         value: "true"
+      - key: ECONOMY_RECONCILIATION_ENABLED
+        value: "false"
+      - key: ECONOMY_PUSH_OUTBOX_DISPATCHER_ENABLED
+        value: "false"
       - key: Templates__MediaCleanupWorkerEnabled
         value: "false"
       - key: Templates__TemplateOfTheDayAutoPickWorkerEnabled

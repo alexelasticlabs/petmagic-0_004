@@ -54,7 +54,8 @@ internal sealed class FalVideoMotionGenerator(FalQueueClient queueClient) : IVid
             : Result.Success(new ProviderQueueSubmission(
                 result.Value.RequestId,
                 result.Value.StatusUrl.ToString(),
-                result.Value.ResponseUrl.ToString()));
+                result.Value.ResponseUrl.ToString(),
+                result.Value.CancelUrl.ToString()));
     }
 
     public Result<VideoMotionGenerationResult> Complete(JsonElement response, string? requestId, double? inferenceTimeSeconds)

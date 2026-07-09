@@ -113,7 +113,8 @@ public sealed class DatabaseIndexModelTests
             "Migrations",
             "20260630234809_AddGenerationSchedulerQueueFields.cs"));
 
-        Assert.Contains("CREATE INDEX CONCURRENTLY IF NOT EXISTS", migration);
+        Assert.Contains("CREATE INDEX CONCURRENTLY", migration);
+        Assert.DoesNotContain("CREATE INDEX CONCURRENTLY IF NOT EXISTS", migration);
         Assert.Contains("DROP INDEX CONCURRENTLY IF EXISTS", migration);
         Assert.Contains("suppressTransaction: true", migration);
         Assert.DoesNotContain("migrationBuilder.CreateIndex(", migration);
@@ -132,7 +133,8 @@ public sealed class DatabaseIndexModelTests
             "Migrations",
             "20260702234729_AddGenerationBillingReconciliationIndexes.cs"));
 
-        Assert.Contains("CREATE INDEX CONCURRENTLY IF NOT EXISTS", migration);
+        Assert.Contains("CREATE INDEX CONCURRENTLY", migration);
+        Assert.DoesNotContain("CREATE INDEX CONCURRENTLY IF NOT EXISTS", migration);
         Assert.Contains("DROP INDEX CONCURRENTLY IF EXISTS", migration);
         Assert.Contains("suppressTransaction: true", migration);
         Assert.DoesNotContain("migrationBuilder.CreateIndex(", migration);

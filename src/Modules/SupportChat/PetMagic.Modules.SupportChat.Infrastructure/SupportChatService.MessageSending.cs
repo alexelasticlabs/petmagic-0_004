@@ -58,6 +58,15 @@ public sealed partial class SupportChatService
             return Result.Failure<SupportMessageResponse>(Forbidden);
         }
 
+        if (isAdmin)
+        {
+            var ownershipError = ValidateAdminOwnership(conversation, senderUserId);
+            if (ownershipError is not null)
+            {
+                return Result.Failure<SupportMessageResponse>(ownershipError);
+            }
+        }
+
         var canAppendError = ValidateConversationCanAcceptMessage(conversation, isAdmin, DateTime.UtcNow);
         if (canAppendError is not null)
         {
@@ -148,13 +157,19 @@ public sealed partial class SupportChatService
             await AppendStatusChangedEventAsync(conversation, currentStatus, nextStatus);
         }
 
+        if (isAdmin)
+        {
+            await EnqueueUserMessageNotificationAsync(
+                conversation,
+                message.Id,
+                normalizedAttachments.Count > 0,
+                unreadCountDelta: 1,
+                cancellationToken);
+        }
+
         await supportChatDbContext.SaveChangesAsync(cancellationToken);
         await NotifyConversationUpdatedAsync(conversation, cancellationToken);
         var response = await BuildMessageResponseAsync(message, cancellationToken);
-        if (isAdmin)
-        {
-            await NotifyUserMessageAsync(conversation, response, cancellationToken);
-        }
 
         return Result.Success(response);
     }
@@ -173,6 +188,15 @@ public sealed partial class SupportChatService
         if (!command.IsAdmin && conversation.InitiatorUserId != command.SenderUserId)
         {
             return Result.Failure<SupportMessageResponse>(Forbidden);
+        }
+
+        if (command.IsAdmin)
+        {
+            var ownershipError = ValidateAdminOwnership(conversation, command.SenderUserId);
+            if (ownershipError is not null)
+            {
+                return Result.Failure<SupportMessageResponse>(ownershipError);
+            }
         }
 
         var canAppendError = ValidateConversationCanAcceptMessage(conversation, command.IsAdmin, DateTime.UtcNow);

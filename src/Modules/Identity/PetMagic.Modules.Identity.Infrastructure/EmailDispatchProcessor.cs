@@ -34,6 +34,8 @@ internal sealed class EmailDispatchProcessor(
             job.NextAttemptAtUtc = null;
             job.FailureCode = null;
             job.FailureMessage = null;
+            job.LockId = null;
+            job.LockExpiresAtUtc = null;
             await dbContext.SaveChangesAsync(cancellationToken);
             return true;
         }
@@ -77,6 +79,8 @@ internal sealed class EmailDispatchProcessor(
     private async Task<EmailDispatchJob?> ClaimNextPostgresAsync(CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
+        var lockId = Guid.NewGuid();
+        var lockExpiresAtUtc = now.AddSeconds(Math.Max(30, options.ProcessingLeaseSeconds));
         var claimedIds = await dbContext.Database.SqlQueryRaw<Guid>(
             """
             UPDATE email_dispatch_jobs
@@ -85,12 +89,16 @@ internal sealed class EmailDispatchProcessor(
                 "LastAttemptAtUtc" = {2},
                 "UpdatedAtUtc" = {2},
                 "FailureCode" = NULL,
-                "FailureMessage" = NULL
+                "FailureMessage" = NULL,
+                "LockId" = {4},
+                "LockExpiresAtUtc" = {5}
             WHERE "Id" = (
                 SELECT "Id"
                 FROM email_dispatch_jobs
-                WHERE "Status" = {0}
-                  AND ("NextAttemptAtUtc" IS NULL OR "NextAttemptAtUtc" <= {2})
+                WHERE (("Status" = {0}
+                          AND ("NextAttemptAtUtc" IS NULL OR "NextAttemptAtUtc" <= {2}))
+                       OR ("Status" = {1}
+                          AND ("LockExpiresAtUtc" IS NULL OR "LockExpiresAtUtc" <= {2})))
                   AND "AttemptCount" < {3}
                 ORDER BY "QueuedAtUtc"
                 FOR UPDATE SKIP LOCKED
@@ -101,7 +109,9 @@ internal sealed class EmailDispatchProcessor(
             (int)EmailDispatchStatus.Queued,
             (int)EmailDispatchStatus.Processing,
             now,
-            options.MaxDispatchAttempts)
+            options.MaxDispatchAttempts,
+            lockId,
+            lockExpiresAtUtc)
             .ToListAsync(cancellationToken);
 
         var claimedId = claimedIds.FirstOrDefault();
@@ -118,8 +128,10 @@ internal sealed class EmailDispatchProcessor(
     {
         var now = DateTime.UtcNow;
         var job = await dbContext.EmailDispatchJobs
-            .Where(x => x.Status == EmailDispatchStatus.Queued
-                && (x.NextAttemptAtUtc == null || x.NextAttemptAtUtc <= now)
+            .Where(x => ((x.Status == EmailDispatchStatus.Queued
+                        && (x.NextAttemptAtUtc == null || x.NextAttemptAtUtc <= now))
+                    || (x.Status == EmailDispatchStatus.Processing
+                        && (x.LockExpiresAtUtc == null || x.LockExpiresAtUtc <= now)))
                 && x.AttemptCount < options.MaxDispatchAttempts)
             .OrderBy(x => x.QueuedAtUtc)
             .FirstOrDefaultAsync(cancellationToken);
@@ -135,6 +147,8 @@ internal sealed class EmailDispatchProcessor(
         job.UpdatedAtUtc = now;
         job.FailureCode = null;
         job.FailureMessage = null;
+        job.LockId = Guid.NewGuid();
+        job.LockExpiresAtUtc = now.AddSeconds(Math.Max(30, options.ProcessingLeaseSeconds));
         await dbContext.SaveChangesAsync(cancellationToken);
         return job;
     }
@@ -146,6 +160,8 @@ internal sealed class EmailDispatchProcessor(
         job.FailureCode = safeErrorCode;
         job.FailureMessage = SafeLogValues.SanitizeText(errorMessage, 2000);
         job.UpdatedAtUtc = now;
+        job.LockId = null;
+        job.LockExpiresAtUtc = null;
 
         if (job.AttemptCount >= options.MaxDispatchAttempts)
         {

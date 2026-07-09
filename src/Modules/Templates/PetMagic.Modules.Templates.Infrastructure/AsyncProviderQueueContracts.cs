@@ -8,7 +8,8 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 internal sealed record ProviderQueueSubmission(
     string RequestId,
     string StatusUrl,
-    string ResponseUrl);
+    string ResponseUrl,
+    string? CancelUrl = null);
 
 internal interface IAsyncImageGenerationQueue
 {

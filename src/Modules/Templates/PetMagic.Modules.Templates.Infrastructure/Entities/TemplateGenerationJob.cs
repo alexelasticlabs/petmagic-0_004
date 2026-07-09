@@ -96,9 +96,13 @@ public sealed class TemplateGenerationJob
 
     public string? PreprocessingProviderResponseUrl { get; set; }
 
+    public string? PreprocessingProviderCancelUrl { get; set; }
+
     public string? MotionProviderStatusUrl { get; set; }
 
     public string? MotionProviderResponseUrl { get; set; }
+
+    public string? MotionProviderCancelUrl { get; set; }
 
     public string? ProviderResultUrl { get; set; }
 
@@ -161,6 +165,22 @@ public sealed class TemplateGenerationJob
     public DateTime? CompletedAtUtc { get; set; }
 
     public DateTime? CancelledAtUtc { get; set; }
+
+    public Guid? CancellationRequestedByAdminUserId { get; set; }
+
+    public DateTime? CancellationRequestedAtUtc { get; set; }
+
+    public DateTime? CancellationLastAttemptedAtUtc { get; set; }
+
+    public TemplateGenerationStatus? CancellationPreviousStatus { get; set; }
+
+    public int CancellationAttemptCount { get; set; }
+
+    public DateTime? CancellationNextAttemptAtUtc { get; set; }
+
+    public DateTime? CancellationAcceptedAtUtc { get; set; }
+
+    public string? CancellationLastErrorCode { get; set; }
 
     public DateTime? ResultViewedAtUtc { get; set; }
 

@@ -85,6 +85,19 @@ public sealed partial class StoreSubscriptionVerifier : IStoreSubscriptionVerifi
         cachedGoogleAccessTokenExpiresAtUtc = now.AddSeconds(Math.Max(1, safeLifetimeSeconds));
     }
 
+    private static StoreAccountBindingState ResolveAccountBindingState(string? providerAccountId, Guid userId)
+    {
+        if (string.IsNullOrWhiteSpace(providerAccountId))
+        {
+            return StoreAccountBindingState.Missing;
+        }
+
+        return Guid.TryParse(providerAccountId.Trim(), out var boundUserId)
+            && boundUserId == userId
+                ? StoreAccountBindingState.Matched
+                : StoreAccountBindingState.Mismatched;
+    }
+
     private static string DescribeGooglePlayVerificationData(string? verificationData)
     {
         return string.IsNullOrWhiteSpace(verificationData) ? "missing" : "token";

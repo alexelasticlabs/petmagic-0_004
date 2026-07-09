@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
+using PetMagic.BuildingBlocks.Notifications;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
 
 namespace PetMagic.Modules.Templates.Infrastructure.Data;
@@ -34,6 +35,8 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
 
     public DbSet<TemplatePushDeviceToken> TemplatePushDeviceTokens => Set<TemplatePushDeviceToken>();
 
+    public DbSet<PushOutboxMessage> PushOutboxMessages => Set<PushOutboxMessage>();
+
     public DbSet<TemplateMediaRecord> TemplateMediaRecords => Set<TemplateMediaRecord>();
 
     public DbSet<TemplateCatalogChange> TemplateCatalogChanges => Set<TemplateCatalogChange>();
@@ -50,6 +53,8 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
+        ConfigurePushOutbox(builder, "templates_push_outbox");
+
         builder.Entity<TemplateCategory>(entity =>
         {
             entity.ToTable("templates_categories");
@@ -192,8 +197,10 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.Property(x => x.ProviderStatus).HasMaxLength(64);
             entity.Property(x => x.PreprocessingProviderStatusUrl).HasMaxLength(2048);
             entity.Property(x => x.PreprocessingProviderResponseUrl).HasMaxLength(2048);
+            entity.Property(x => x.PreprocessingProviderCancelUrl).HasMaxLength(2048);
             entity.Property(x => x.MotionProviderStatusUrl).HasMaxLength(2048);
             entity.Property(x => x.MotionProviderResponseUrl).HasMaxLength(2048);
+            entity.Property(x => x.MotionProviderCancelUrl).HasMaxLength(2048);
             entity.Property(x => x.ProviderResultUrl).HasMaxLength(2048);
             entity.Property(x => x.MotionProviderCostUsd).HasPrecision(12, 4);
             entity.Property(x => x.EstimatedWaitSecondsAtQueue);
@@ -201,6 +208,8 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.Property(x => x.LastErrorCode).HasMaxLength(128);
             entity.Property(x => x.LastErrorMessage).HasMaxLength(1000);
             entity.Property(x => x.RefundLastErrorCode).HasMaxLength(128);
+            entity.Property(x => x.CancellationPreviousStatus).HasConversion<int?>();
+            entity.Property(x => x.CancellationLastErrorCode).HasMaxLength(128);
             entity.Property(x => x.UserMediaCleanupFailureCode).HasMaxLength(128);
             entity.HasIndex(x => x.HiddenByUserAtUtc);
             entity.HasIndex(x => x.UserMediaDeletedAtUtc);
@@ -215,6 +224,9 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
                 .HasDatabaseName("IX_tgj_Status_QueueMediaType_StartedAtUtc");
             entity.HasIndex(x => new { x.Status, x.ProviderStatusCheckedAtUtc })
                 .HasDatabaseName("IX_tgj_Status_ProviderStatusCheckedAtUtc");
+            entity.HasIndex(x => new { x.Status, x.CancellationNextAttemptAtUtc })
+                .HasDatabaseName("IX_tgj_PendingCancellation")
+                .HasFilter("\"Status\" = 11");
             entity.HasIndex(x => new { x.Status, x.LockedAtUtc })
                 .HasDatabaseName("IX_templates_generation_jobs_Status_LockedAtUtc");
             entity.HasIndex(x => new { x.Status, x.CompletedAtUtc });
@@ -255,11 +267,11 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.HasIndex(x => new { x.UserId, x.IdempotencyKey })
                 .IsUnique()
                 .HasDatabaseName("UX_templates_generation_jobs_UserId_IdempotencyKey_active")
-                .HasFilter(""" "Status" IN (1, 2, 6, 7, 8, 9, 10) AND "IdempotencyKey" IS NOT NULL """);
+                .HasFilter(""" "Status" IN (1, 2, 6, 7, 8, 9, 10, 11) AND "IdempotencyKey" IS NOT NULL """);
             entity.HasIndex(x => new { x.UserId, x.RequestHash })
                 .IsUnique()
                 .HasDatabaseName("UX_templates_generation_jobs_UserId_RequestHash_active")
-                .HasFilter(""" "Status" IN (1, 2, 6, 7, 8, 9, 10) AND "RequestHash" IS NOT NULL """);
+                .HasFilter(""" "Status" IN (1, 2, 6, 7, 8, 9, 10, 11) AND "RequestHash" IS NOT NULL """);
             entity.HasOne(x => x.Template)
                 .WithMany()
                 .HasForeignKey(x => x.TemplateId)
@@ -529,6 +541,24 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
                 .WithMany(x => x.MediaRecords)
                 .HasForeignKey(x => x.GenerationJobId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+    }
+
+    private static void ConfigurePushOutbox(ModelBuilder builder, string tableName)
+    {
+        builder.Entity<PushOutboxMessage>(entity =>
+        {
+            entity.ToTable(tableName);
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.DeduplicationKey).HasMaxLength(256).IsRequired();
+            entity.Property(x => x.Kind).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.PayloadJson).HasMaxLength(16000).IsRequired();
+            entity.Property(x => x.Status).HasConversion<int>().IsRequired();
+            entity.Property(x => x.LastErrorCode).HasMaxLength(128);
+            entity.HasIndex(x => x.DeduplicationKey).IsUnique();
+            entity.HasIndex(x => new { x.Status, x.NextAttemptAtUtc, x.CreatedAtUtc });
+            entity.HasIndex(x => new { x.Status, x.LockExpiresAtUtc });
+            entity.HasIndex(x => x.UserId);
         });
     }
 }

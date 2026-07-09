@@ -24,6 +24,11 @@ internal sealed partial class TemplateGenerationService
             return "cancelled";
         }
 
+        if (job.Status == TemplateGenerationStatus.CancellationRequested)
+        {
+            return "cancelling";
+        }
+
         if (job.Status == TemplateGenerationStatus.Retrying)
         {
             return "retrying";
@@ -100,6 +105,7 @@ internal sealed partial class TemplateGenerationService
         {
             "completed" => 100,
             "failed" => 100,
+            "cancelling" => 95,
             "finalizing" => 90,
             "generating" => 65,
             "preprocessing" => 30,

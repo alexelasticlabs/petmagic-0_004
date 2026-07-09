@@ -91,6 +91,8 @@ public static partial class EconomyEndpoints
             "economy.premium_plan_not_found" => StatusCodes.Status404NotFound,
             "economy.store_verification_unavailable" => StatusCodes.Status503ServiceUnavailable,
             "economy.store_purchase_invalid" => StatusCodes.Status400BadRequest,
+            "economy.store_account_binding_missing" => StatusCodes.Status409Conflict,
+            "economy.store_account_binding_mismatch" => StatusCodes.Status409Conflict,
             "economy.store_purchase_inactive" => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest,
         };

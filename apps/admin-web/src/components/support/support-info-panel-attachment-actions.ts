@@ -14,10 +14,6 @@ import type {
   SupportInfoAttachment,
   SupportInfoAttachmentEntry,
 } from "@/components/support/support-info-panel-attachments";
-import {
-  getBlockedUnsafeSupportMediaUrlDetails,
-  isUnsafeSupportMediaUrl,
-} from "@/components/support/support-secure-media";
 import type { AdminSupportMessage } from "@/lib/api-client";
 import { clientLogger } from "@/lib/client-logger";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";

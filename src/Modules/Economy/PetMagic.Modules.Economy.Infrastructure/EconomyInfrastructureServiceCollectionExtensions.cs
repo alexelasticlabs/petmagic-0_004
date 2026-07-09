@@ -82,6 +82,10 @@ public static class EconomyInfrastructureServiceCollectionExtensions
             AppStoreSharedSecret = ReadValue(section, "AppStoreSharedSecret", "APP_STORE_SHARED_SECRET") ?? string.Empty,
             AppStoreEnvironment = ReadValue(section, "AppStoreEnvironment", "APP_STORE_ENVIRONMENT") ?? "production",
             MaxStoreReceiptAgeHours = ParseInt(section["MaxStoreReceiptAgeHours"], 24),
+            StoreAccountBindingMode = ReadValue(
+                section,
+                "StoreAccountBindingMode",
+                "STORE_ACCOUNT_BINDING_MODE") ?? "compatibility",
             EconomyReconciliationEnabled = ParseBool(
                 ReadValue(section, "EconomyReconciliationEnabled", "ECONOMY_RECONCILIATION_ENABLED"),
                 true),
@@ -120,10 +124,14 @@ public static class EconomyInfrastructureServiceCollectionExtensions
                 section,
                 "FirebaseServiceAccountJsonPath",
                 "ECONOMY_FIREBASE_SERVICE_ACCOUNT_JSON_PATH",
-                "FIREBASE_SERVICE_ACCOUNT_JSON_PATH") ?? string.Empty
+                "FIREBASE_SERVICE_ACCOUNT_JSON_PATH") ?? string.Empty,
+            PushOutboxDispatcherEnabled = ParseBool(
+                ReadValue(section, "PushOutboxDispatcherEnabled", "ECONOMY_PUSH_OUTBOX_DISPATCHER_ENABLED"),
+                true)
         };
 
         ValidateProductionConfiguration(economyOptions, isProduction);
+        ValidateStoreAccountBindingMode(economyOptions.StoreAccountBindingMode);
 
         services.AddSingleton<IOptions<EconomyOptions>>(Microsoft.Extensions.Options.Options.Create(economyOptions));
 
@@ -152,12 +160,15 @@ public static class EconomyInfrastructureServiceCollectionExtensions
                 economyOptions,
                 serviceProvider.GetRequiredService<IHttpClientFactory>()));
         services.AddScoped<IEconomyPushTokenService, EconomyPushTokenService>();
-        services.AddScoped<NoopEconomyPushNotificationSender>();
         services.AddScoped<FcmEconomyPushNotificationSender>();
-        services.AddScoped<IEconomyPushNotificationSender>(serviceProvider =>
-            economyOptions.IsFirebasePushConfigured
-                ? serviceProvider.GetRequiredService<FcmEconomyPushNotificationSender>()
-                : serviceProvider.GetRequiredService<NoopEconomyPushNotificationSender>());
+        services.AddScoped<IEconomyPushDeliverySender>(serviceProvider =>
+            serviceProvider.GetRequiredService<FcmEconomyPushNotificationSender>());
+        services.AddScoped<IEconomyPushNotificationSender, EconomyPushNotificationOutbox>();
+        services.AddScoped<EconomyPushOutboxProcessor>();
+        if (economyOptions.PushOutboxDispatcherEnabled && economyOptions.IsFirebasePushConfigured)
+        {
+            services.AddHostedService<EconomyPushOutboxWorker>();
+        }
         services.AddHostedService<EconomyReconciliationWorker>();
         services.AddSingleton<IStoreSubscriptionVerifier>(serviceProvider =>
             new StoreSubscriptionVerifier(
@@ -170,6 +181,18 @@ public static class EconomyInfrastructureServiceCollectionExtensions
 
     private static void ConfigureExternalHttpClient(HttpClient client) =>
         client.Timeout = ExternalHttpClientTimeout;
+
+    private static void ValidateStoreAccountBindingMode(string? value)
+    {
+        if (string.Equals(value, "compatibility", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(value, "enforce", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            "Economy:StoreAccountBindingMode must be either 'compatibility' or 'enforce'.");
+    }
 
     private static int ParseInt(string? raw, int fallback)
     {

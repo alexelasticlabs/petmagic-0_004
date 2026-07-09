@@ -4,9 +4,9 @@ import 'dart:io';
 
 import 'package:app_links/app_links.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:petmagic_mobile/core/auth/google_sign_in_adapter.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
@@ -120,10 +120,12 @@ void main() {
         dio: dio,
         sessionStorage: _InMemoryAuthSessionStorage(),
         appLinks: AppLinks(),
-        googleSignInDelegate: (googleSignIn) async {
+        googleSignInAdapter: _FakeGoogleSignInAdapter((_) async {
           googleSignInCalls++;
-          return null;
-        },
+          throw const GoogleSignInException(
+            code: GoogleSignInExceptionCode.canceled,
+          );
+        }),
       );
 
       await expectLater(
@@ -173,9 +175,11 @@ void main() {
           launchCalls++;
           return false;
         },
-        googleSignInDelegate: (_) async {
-          throw PlatformException(code: GoogleSignIn.kSignInCanceledError);
-        },
+        googleSignInAdapter: _FakeGoogleSignInAdapter(
+          (_) async => throw const GoogleSignInException(
+            code: GoogleSignInExceptionCode.canceled,
+          ),
+        ),
       );
 
       await expectLater(
@@ -221,12 +225,12 @@ void main() {
         dio: dio,
         sessionStorage: _InMemoryAuthSessionStorage(),
         appLinks: AppLinks(),
-        googleSignInDelegate: (_) async {
-          throw PlatformException(
-            code: GoogleSignIn.kSignInFailedError,
-            message: 'sign-in failed',
-          );
-        },
+        googleSignInAdapter: _FakeGoogleSignInAdapter(
+          (_) async => throw const GoogleSignInException(
+            code: GoogleSignInExceptionCode.providerConfigurationError,
+            description: 'sign-in failed',
+          ),
+        ),
       );
 
       await expectLater(
@@ -245,9 +249,9 @@ void main() {
   );
 
   test(
-    'google auth recreates native sdk when server client id changes',
+    'google auth treats server client id changes as configuration errors',
     () async {
-      final factoryCalls = <String?>[];
+      final adapter = _ConfigurationLockedGoogleSignInAdapter();
 
       Dio createDio(String serverClientId) {
         return Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
@@ -270,11 +274,7 @@ void main() {
         dio: createDio('server-client-a'),
         sessionStorage: _InMemoryAuthSessionStorage(),
         appLinks: AppLinks(),
-        googleSignInFactory: (serverClientId) {
-          factoryCalls.add(serverClientId);
-          return GoogleSignIn(serverClientId: serverClientId);
-        },
-        googleSignInDelegate: (googleSignIn) async => null,
+        googleSignInAdapter: adapter,
       );
       await firstRepository.clearSession(ExternalAuthProvider.google);
 
@@ -293,11 +293,7 @@ void main() {
         dio: createDio('server-client-b'),
         sessionStorage: _InMemoryAuthSessionStorage(),
         appLinks: AppLinks(),
-        googleSignInFactory: (serverClientId) {
-          factoryCalls.add(serverClientId);
-          return GoogleSignIn(serverClientId: serverClientId);
-        },
-        googleSignInDelegate: (googleSignIn) async => null,
+        googleSignInAdapter: adapter,
       );
 
       await expectLater(
@@ -306,12 +302,12 @@ void main() {
           isA<AppException>().having(
             (error) => error.message,
             'message',
-            'auth.external_cancelled',
+            'auth.external_invalid',
           ),
         ),
       );
 
-      expect(factoryCalls, ['server-client-a', 'server-client-b']);
+      expect(adapter.initializeCalls, ['server-client-a']);
     },
   );
 
@@ -327,8 +323,8 @@ void main() {
         source,
         contains("operation: 'authenticate_native_google_sign_in'"),
       );
-      expect(source, contains('has_message'));
-      expect(source, contains('provider_status_code'));
+      expect(source, contains('has_description'));
+      expect(source, contains('error.code.name'));
       expect(source, isNot(contains('} catch (_) {')));
     },
   );
@@ -557,4 +553,50 @@ class _FakeHttpClientAdapter implements HttpClientAdapter {
 
   @override
   void close({bool force = false}) {}
+}
+
+class _FakeGoogleSignInAdapter implements GoogleSignInAdapter {
+  _FakeGoogleSignInAdapter(this._authenticate);
+
+  final Future<GoogleSignInCredential> Function(String? serverClientId)
+  _authenticate;
+
+  @override
+  Future<GoogleSignInCredential> authenticate({String? serverClientId}) {
+    return _authenticate(serverClientId);
+  }
+
+  @override
+  Future<void> disconnect() async {}
+
+  @override
+  Future<void> signOut() async {}
+}
+
+class _ConfigurationLockedGoogleSignInAdapter
+    implements GoogleSignInAdapter {
+  final List<String?> initializeCalls = [];
+  String? _serverClientId;
+  bool _initialized = false;
+
+  @override
+  Future<GoogleSignInCredential> authenticate({String? serverClientId}) async {
+    if (_initialized && _serverClientId != serverClientId) {
+      throw const GoogleSignInConfigurationException();
+    }
+    if (!_initialized) {
+      _initialized = true;
+      _serverClientId = serverClientId;
+      initializeCalls.add(serverClientId);
+    }
+    throw const GoogleSignInException(
+      code: GoogleSignInExceptionCode.canceled,
+    );
+  }
+
+  @override
+  Future<void> disconnect() async {}
+
+  @override
+  Future<void> signOut() async {}
 }

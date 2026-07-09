@@ -101,7 +101,7 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 
             migrationBuilder.Sql(
                 """
-                CREATE INDEX CONCURRENTLY IF NOT EXISTS "IX_tgj_Status_ProviderStatusCheckedAtUtc"
+                CREATE INDEX CONCURRENTLY "IX_tgj_Status_ProviderStatusCheckedAtUtc"
                 ON templates_generation_jobs ("Status", "ProviderStatusCheckedAtUtc");
                 """,
                 suppressTransaction: true);

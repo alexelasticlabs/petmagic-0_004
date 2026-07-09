@@ -435,6 +435,12 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
                     b.Property<DateTime?>("LastAttemptAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("LockExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("LockId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime?>("NextAttemptAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -477,6 +483,8 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
                     b.HasIndex("Status", "QueuedAtUtc");
 
                     b.HasIndex("Status", "UpdatedAtUtc");
+
+                    b.HasIndex("Status", "LockExpiresAtUtc", "QueuedAtUtc");
 
                     b.HasIndex("Status", "NextAttemptAtUtc", "QueuedAtUtc");
 

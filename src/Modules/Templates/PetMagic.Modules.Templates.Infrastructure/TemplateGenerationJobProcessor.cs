@@ -520,10 +520,6 @@ internal sealed partial class TemplateGenerationJobProcessor(
     {
         var response = TemplateGenerationService.MapResponse(job);
         await realtimeService.PublishGenerationStatusChangedAsync(response, cancellationToken);
-        if (job.Status is TemplateGenerationStatus.Completed or TemplateGenerationStatus.Failed)
-        {
-            await pushNotificationSender.NotifyGenerationTerminalAsync(response, cancellationToken);
-        }
     }
 
     private Task<bool> SaveClaimedChangesAsync(
@@ -560,6 +556,13 @@ internal sealed partial class TemplateGenerationJobProcessor(
 
         try
         {
+            if (job.Status is TemplateGenerationStatus.Completed or TemplateGenerationStatus.Failed)
+            {
+                await pushNotificationSender.NotifyGenerationTerminalAsync(
+                    TemplateGenerationService.MapResponse(job),
+                    cancellationToken);
+            }
+
             await dbContext.SaveChangesAsync(cancellationToken);
             return true;
         }

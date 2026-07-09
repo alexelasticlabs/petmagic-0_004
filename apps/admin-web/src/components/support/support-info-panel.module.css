@@ -599,6 +599,11 @@
   gap: 10px;
 }
 
+.infoPanelAssignmentActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .actionsPanelBtn {
   width: 100%;
   min-height: 2.95rem;
