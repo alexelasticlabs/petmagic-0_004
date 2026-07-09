@@ -27,6 +27,8 @@ const staticTargets = [
   'apps/petmagic-mobile/android/.gradle',
   'apps/petmagic-mobile/android/build',
   'apps/petmagic-mobile/android/app/src/main/java',
+  'apps/petmagic-mobile/android/app/src/debug/google-services.json',
+  'apps/petmagic-mobile/android/app/src/profile/google-services.json',
   'apps/petmagic-mobile/android/local.properties',
   'apps/petmagic-mobile/android/petmagic_mobile_android.iml',
   'apps/petmagic-mobile/build',
