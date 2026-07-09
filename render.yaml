@@ -127,12 +127,11 @@ services:
     runtime: docker
     region: frankfurt
     plan: standard
-    branch: main
+    branch: master
     autoDeployTrigger: checksPass
     dockerfilePath: ./Dockerfile.api
     dockerContext: .
     healthCheckPath: /health
-    maxShutdownDelaySeconds: 120
     domains:
       - api.staging.petmagic.app
     disk:
@@ -269,7 +268,7 @@ services:
     runtime: docker
     region: frankfurt
     plan: standard
-    branch: main
+    branch: master
     autoDeployTrigger: checksPass
     dockerfilePath: ./Dockerfile.generation-worker
     dockerContext: .
@@ -357,7 +356,7 @@ services:
     runtime: docker
     region: frankfurt
     plan: starter
-    branch: main
+    branch: master
     autoDeployTrigger: checksPass
     dockerfilePath: ./apps/admin-web/Dockerfile
     dockerContext: ./apps/admin-web
