@@ -314,6 +314,7 @@ describe("api-client.templates query normalization", () => {
         failedJobs: 3,
         cancelledJobs: 1,
         retryingJobs: 1,
+        cancellingJobs: 0,
         generatedAtUtc: "2026-06-07T00:00:00Z",
       })
     );
@@ -324,6 +325,7 @@ describe("api-client.templates query normalization", () => {
 
     expect(response.totalJobs).toBe(12);
     expect(response.failedJobs).toBe(3);
+    expect(response.cancellingJobs).toBe(0);
     const [url, init] = fetchMock.mock.calls[0] ?? [];
     expect(String(url)).toBe("https://api.example.com/api/admin/templates/generations/metrics");
     expect(init?.method).toBe("GET");

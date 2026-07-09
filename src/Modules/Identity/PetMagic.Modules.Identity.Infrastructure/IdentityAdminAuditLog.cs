@@ -21,7 +21,7 @@ internal sealed class IdentityAdminAuditLog(
         {
             Id = Guid.NewGuid(),
             SubjectUserId = entry.SubjectUserId,
-            ActorUserId = ResolveActorUserId(httpContext),
+            ActorUserId = entry.ActorUserId ?? ResolveActorUserId(httpContext),
             ActorRole = ResolveActorRole(httpContext),
             Action = Truncate(entry.Action, 120) ?? string.Empty,
             TargetType = Truncate(entry.TargetType, 80),

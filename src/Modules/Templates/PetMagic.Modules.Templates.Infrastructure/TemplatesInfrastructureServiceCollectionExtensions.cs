@@ -267,7 +267,11 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         services.AddScoped<IPetsService, PetsService>();
         services.AddScoped<IFeedbackService, FeedbackService>();
         services.AddScoped<IAdminUserTemplateAnalyticsReader, AdminUserTemplateAnalyticsReader>();
-        services.AddScoped<ITemplateGenerationService, TemplateGenerationService>();
+        services.AddScoped<TemplateGenerationService>();
+        services.AddScoped<ITemplateGenerationService>(serviceProvider =>
+            serviceProvider.GetRequiredService<TemplateGenerationService>());
+        services.AddScoped<ITemplateGenerationCancellationProcessor>(serviceProvider =>
+            serviceProvider.GetRequiredService<TemplateGenerationService>());
         services.AddScoped<ITemplateGenerationQaFixtureService, TemplateGenerationQaFixtureService>();
         services.AddScoped<IImagePreviewGenerator, ImagePreviewGenerator>();
         services.AddScoped<IVideoThumbnailGenerator, VideoThumbnailGenerator>();

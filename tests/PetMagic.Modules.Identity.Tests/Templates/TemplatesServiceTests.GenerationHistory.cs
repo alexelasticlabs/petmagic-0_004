@@ -469,7 +469,7 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
-    public async Task ListAdminGenerationsAsync_ShouldSupportCancelledAndRetryingStatusFilters()
+    public async Task ListAdminGenerationsAsync_ShouldSupportTerminalRetryingAndRunningStatusFilters()
     {
         await using var dbContext = CreateDbContext();
         var service = CreateService(dbContext);
@@ -477,6 +477,7 @@ public sealed partial class TemplatesServiceTests
         var now = DateTime.UtcNow;
         var cancelledJobId = Guid.NewGuid();
         var retryingJobId = Guid.NewGuid();
+        var providerQueuedJobId = Guid.NewGuid();
 
         dbContext.TemplateGenerationJobs.AddRange(
             new TemplateGenerationJob
@@ -508,6 +509,21 @@ public sealed partial class TemplatesServiceTests
                 CreatedAtUtc = now.AddMinutes(-2),
                 QueuedAtUtc = now.AddMinutes(-2),
                 UpdatedAtUtc = now.AddMinutes(-1)
+            },
+            new TemplateGenerationJob
+            {
+                Id = providerQueuedJobId,
+                UserId = Guid.NewGuid(),
+                TemplateId = templateId,
+                Status = TemplateGenerationStatus.ProviderQueued,
+                TokenCost = 20,
+                SourceImageUrl = "https://cdn.example.com/provider-queued-source.jpg",
+                SourceImageFileName = "provider-queued-source.jpg",
+                SourceImageContentType = "image/jpeg",
+                AttemptCount = 1,
+                CreatedAtUtc = now,
+                QueuedAtUtc = now,
+                UpdatedAtUtc = now
             });
         await dbContext.SaveChangesAsync();
 
@@ -517,13 +533,62 @@ public sealed partial class TemplatesServiceTests
         var retrying = await service.ListAdminGenerationsAsync(
             new AdminTemplateGenerationsQuery("retrying", null, null, null, 0, 10),
             CancellationToken.None);
+        var running = await service.ListAdminGenerationsAsync(
+            new AdminTemplateGenerationsQuery("running", null, null, null, 0, 10),
+            CancellationToken.None);
 
         Assert.True(cancelled.IsSuccess);
         Assert.True(retrying.IsSuccess);
+        Assert.True(running.IsSuccess);
         Assert.Equal(cancelledJobId, Assert.Single(cancelled.Value.Items).GenerationId);
         Assert.Equal("Cancelled", cancelled.Value.Items[0].Status);
         Assert.Equal(retryingJobId, Assert.Single(retrying.Value.Items).GenerationId);
         Assert.Equal("Retrying", retrying.Value.Items[0].Status);
+        Assert.Equal(providerQueuedJobId, Assert.Single(running.Value.Items).GenerationId);
+        Assert.Equal("Running", running.Value.Items[0].Status);
+    }
+
+    [Fact]
+    public async Task ListAdminGenerationsAsync_ShouldExposeTrustedProviderCancellationAndPendingState()
+    {
+        await using var dbContext = CreateDbContext();
+        var options = CreateProviderCancellationOptions();
+        var service = CreateService(
+            dbContext,
+            templatesOptions: options,
+            falQueueClient: CreateFalQueueClient(
+                dbContext,
+                options,
+                new ProviderCancellationHttpHandler()));
+        var job = await CreateProviderCancellationJobAsync(
+            dbContext,
+            service,
+            "Admin Provider Cancellation");
+
+        var providerPage = await service.ListAdminGenerationsAsync(
+            new AdminTemplateGenerationsQuery(null, null, null, job.Id.ToString("D"), 0, 10),
+            CancellationToken.None);
+
+        Assert.True(providerPage.IsSuccess);
+        var providerItem = Assert.Single(providerPage.Value.Items);
+        Assert.Equal("Running", providerItem.Status);
+        Assert.True(providerItem.CanCancel);
+
+        job.Status = TemplateGenerationStatus.CancellationRequested;
+        job.CancellationPreviousStatus = TemplateGenerationStatus.ProviderProcessing;
+        job.CancellationRequestedAtUtc = DateTime.UtcNow;
+        job.CancellationNextAttemptAtUtc = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync();
+
+        var cancellingPage = await service.ListAdminGenerationsAsync(
+            new AdminTemplateGenerationsQuery("cancelling", null, null, null, 0, 10),
+            CancellationToken.None);
+
+        Assert.True(cancellingPage.IsSuccess);
+        var cancellingItem = Assert.Single(cancellingPage.Value.Items);
+        Assert.Equal(job.Id, cancellingItem.GenerationId);
+        Assert.Equal("Cancelling", cancellingItem.Status);
+        Assert.False(cancellingItem.CanCancel);
     }
 
     [Fact]
@@ -540,25 +605,29 @@ public sealed partial class TemplatesServiceTests
             CreateAdminMetricsJob(templateId, TemplateGenerationStatus.Retrying, todayStart.AddHours(3)),
             CreateAdminMetricsJob(templateId, TemplateGenerationStatus.Failed, todayStart.AddHours(4)),
             CreateAdminMetricsJob(templateId, TemplateGenerationStatus.Cancelled, todayStart.AddHours(5)),
+            CreateAdminMetricsJob(templateId, TemplateGenerationStatus.ProviderQueued, todayStart.AddHours(6)),
+            CreateAdminMetricsJob(templateId, TemplateGenerationStatus.ImportingMedia, todayStart.AddHours(7)),
+            CreateAdminMetricsJob(templateId, TemplateGenerationStatus.CancellationRequested, todayStart.AddHours(8)),
             CreateAdminMetricsJob(templateId, TemplateGenerationStatus.Completed, todayStart.AddDays(-40).AddHours(1)));
         await dbContext.SaveChangesAsync();
 
         var metrics = await service.GetAdminGenerationDashboardMetricsAsync(CancellationToken.None);
 
         Assert.True(metrics.IsSuccess);
-        Assert.Equal(6, metrics.Value.TotalJobs);
-        Assert.Equal(5, metrics.Value.GenerationsToday);
-        Assert.Equal(5, metrics.Value.GenerationsThisWeek);
-        Assert.Equal(5, metrics.Value.GenerationsThisMonth);
+        Assert.Equal(9, metrics.Value.TotalJobs);
+        Assert.Equal(8, metrics.Value.GenerationsToday);
+        Assert.Equal(8, metrics.Value.GenerationsThisWeek);
+        Assert.Equal(8, metrics.Value.GenerationsThisMonth);
         Assert.Equal(1, metrics.Value.FailedGenerationsToday);
         Assert.Equal(1, metrics.Value.FailedGenerationsThisWeek);
         Assert.Equal(1, metrics.Value.FailedGenerationsThisMonth);
         Assert.Equal(1, metrics.Value.PendingJobs);
-        Assert.Equal(1, metrics.Value.RunningJobs);
+        Assert.Equal(3, metrics.Value.RunningJobs);
         Assert.Equal(1, metrics.Value.CompletedJobs);
         Assert.Equal(1, metrics.Value.FailedJobs);
         Assert.Equal(1, metrics.Value.CancelledJobs);
         Assert.Equal(1, metrics.Value.RetryingJobs);
+        Assert.Equal(1, metrics.Value.CancellingJobs);
     }
 
     [Fact]

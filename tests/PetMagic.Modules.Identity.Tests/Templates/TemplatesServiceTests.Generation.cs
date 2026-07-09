@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +11,7 @@ using PetMagic.Modules.Templates.Domain.Enums;
 using PetMagic.Modules.Templates.Infrastructure;
 using PetMagic.Modules.Templates.Infrastructure.Data;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
+using PetMagic.Modules.Templates.Infrastructure.Options;
 
 namespace PetMagic.Modules.Identity.Tests.Templates;
 
@@ -742,6 +744,218 @@ public sealed partial class TemplatesServiceTests
 
         Assert.True(cancelled.IsFailure);
         Assert.Equal(TemplatesErrors.GenerationCancelNotAllowed.Code, cancelled.Error.Code);
+    }
+
+    [Fact]
+    public async Task CancelAdminAsync_ShouldPersistRequestBeforeWorkerCancelsAndRefundsOnce()
+    {
+        await using var dbContext = CreateDbContext();
+        var catalogService = CreateService(dbContext);
+        var billing = new RecordingGenerationBilling();
+        var realtime = new RecordingTemplateFeedRealtimeService();
+        var audit = new RecordingAdminAuditLog();
+        var options = CreateProviderCancellationOptions();
+        var handler = new ProviderCancellationHttpHandler(
+            (HttpStatusCode.Accepted, "CANCELLATION_REQUESTED"));
+        var generationService = CreateGenerationService(
+            dbContext,
+            options,
+            billing,
+            realtime,
+            adminAuditLog: audit,
+            falQueueClient: CreateFalQueueClient(dbContext, options, handler));
+        var job = await CreateProviderCancellationJobAsync(
+            dbContext,
+            catalogService,
+            "Provider Cancel Accepted");
+        var adminUserId = Guid.NewGuid();
+
+        var requested = await generationService.CancelAdminAsync(
+            adminUserId,
+            job.Id,
+            CancellationToken.None);
+
+        Assert.True(requested.IsSuccess);
+        Assert.True(requested.Value.IsPending);
+        Assert.Equal("CancellationRequested", requested.Value.Generation.Status);
+        Assert.Equal(0, handler.RequestCount);
+        dbContext.ChangeTracker.Clear();
+        var pending = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == job.Id);
+        Assert.Equal(TemplateGenerationStatus.CancellationRequested, pending.Status);
+        Assert.Equal(adminUserId, pending.CancellationRequestedByAdminUserId);
+        Assert.Equal(0, pending.CancellationAttemptCount);
+        var requestAudit = Assert.Single(
+            audit.Entries,
+            entry => entry.Action == "admin.template_generation.cancellation_requested");
+        Assert.Equal(adminUserId, requestAudit.ActorUserId);
+        Assert.Equal(job.UserId, requestAudit.SubjectUserId);
+
+        var processed = await generationService.ProcessNextPendingCancellationAsync(CancellationToken.None);
+
+        dbContext.ChangeTracker.Clear();
+        var cancelled = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == job.Id);
+        Assert.True(processed);
+        Assert.Equal(1, handler.RequestCount);
+        Assert.Equal(TemplateGenerationStatus.Cancelled, cancelled.Status);
+        Assert.Equal(1, cancelled.CancellationAttemptCount);
+        Assert.NotNull(cancelled.CancellationAcceptedAtUtc);
+        Assert.NotNull(cancelled.RefundedAtUtc);
+        Assert.Equal(job.Id, Assert.Single(billing.RefundedGenerationIds));
+        Assert.Contains(
+            audit.Entries,
+            entry => entry.Action == "admin.template_generation.cancelled"
+                && entry.ActorUserId == adminUserId);
+
+        var repeated = await generationService.CancelAdminAsync(
+            Guid.NewGuid(),
+            job.Id,
+            CancellationToken.None);
+        var duplicateWork = await generationService.ProcessNextPendingCancellationAsync(CancellationToken.None);
+        Assert.True(repeated.IsSuccess);
+        Assert.False(repeated.Value.IsPending);
+        Assert.False(duplicateWork);
+        Assert.Equal(1, handler.RequestCount);
+        Assert.Single(billing.RefundedGenerationIds);
+    }
+
+    [Fact]
+    public async Task ProcessNextPendingCancellationAsync_ShouldRetryTransientFailureWithoutOverlappingLease()
+    {
+        await using var dbContext = CreateDbContext();
+        var catalogService = CreateService(dbContext);
+        var billing = new RecordingGenerationBilling();
+        var options = CreateProviderCancellationOptions();
+        var handler = new ProviderCancellationHttpHandler(
+            (HttpStatusCode.ServiceUnavailable, "UNAVAILABLE"),
+            (HttpStatusCode.Accepted, "CANCELLATION_REQUESTED"));
+        var generationService = CreateGenerationService(
+            dbContext,
+            options,
+            billing,
+            falQueueClient: CreateFalQueueClient(dbContext, options, handler));
+        var job = await CreateProviderCancellationJobAsync(
+            dbContext,
+            catalogService,
+            "Provider Cancel Retry");
+        var requested = await generationService.CancelAdminAsync(
+            Guid.NewGuid(),
+            job.Id,
+            CancellationToken.None);
+        Assert.True(requested.IsSuccess);
+
+        var firstAttempt = await generationService.ProcessNextPendingCancellationAsync(CancellationToken.None);
+        var overlappingAttempt = await generationService.ProcessNextPendingCancellationAsync(CancellationToken.None);
+
+        dbContext.ChangeTracker.Clear();
+        var pending = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == job.Id);
+        Assert.True(firstAttempt);
+        Assert.False(overlappingAttempt);
+        Assert.Equal(1, handler.RequestCount);
+        Assert.Equal(TemplateGenerationStatus.CancellationRequested, pending.Status);
+        Assert.Equal(1, pending.CancellationAttemptCount);
+        Assert.NotNull(pending.CancellationNextAttemptAtUtc);
+        Assert.Empty(billing.RefundedGenerationIds);
+
+        pending.CancellationNextAttemptAtUtc = DateTime.UtcNow.AddSeconds(-1);
+        await dbContext.SaveChangesAsync();
+        var secondAttempt = await generationService.ProcessNextPendingCancellationAsync(CancellationToken.None);
+
+        dbContext.ChangeTracker.Clear();
+        var cancelled = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == job.Id);
+        Assert.True(secondAttempt);
+        Assert.Equal(2, handler.RequestCount);
+        Assert.Equal(2, cancelled.CancellationAttemptCount);
+        Assert.Equal(TemplateGenerationStatus.Cancelled, cancelled.Status);
+        Assert.Single(billing.RefundedGenerationIds);
+    }
+
+    [Fact]
+    public async Task ProcessNextPendingCancellationAsync_ShouldResumeProviderJobWhenAlreadyCompleted()
+    {
+        await using var dbContext = CreateDbContext();
+        var catalogService = CreateService(dbContext);
+        var billing = new RecordingGenerationBilling();
+        var options = CreateProviderCancellationOptions();
+        var handler = new ProviderCancellationHttpHandler(
+            (HttpStatusCode.BadRequest, "ALREADY_COMPLETED"));
+        var generationService = CreateGenerationService(
+            dbContext,
+            options,
+            billing,
+            falQueueClient: CreateFalQueueClient(dbContext, options, handler));
+        var job = await CreateProviderCancellationJobAsync(
+            dbContext,
+            catalogService,
+            "Provider Cancel Already Completed");
+        var requested = await generationService.CancelAdminAsync(
+            Guid.NewGuid(),
+            job.Id,
+            CancellationToken.None);
+        Assert.True(requested.IsSuccess);
+
+        var processed = await generationService.ProcessNextPendingCancellationAsync(CancellationToken.None);
+
+        dbContext.ChangeTracker.Clear();
+        var restored = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == job.Id);
+        Assert.True(processed);
+        Assert.Equal(1, handler.RequestCount);
+        Assert.Equal(TemplateGenerationStatus.ProviderProcessing, restored.Status);
+        Assert.Equal(TemplatesErrors.GenerationCancelAlreadyCompleted.Code, restored.CancellationLastErrorCode);
+        Assert.Null(restored.LastErrorCode);
+        Assert.Null(restored.RefundedAtUtc);
+        Assert.Empty(billing.RefundedGenerationIds);
+    }
+
+    private static TemplatesOptions CreateProviderCancellationOptions()
+    {
+        return CreateTemplatesOptions(fal: new FalAiOptions
+        {
+            ApiKey = "test-fal-key",
+            QueueBaseUrl = "https://queue.fal.test",
+            StartTimeoutSeconds = 120
+        });
+    }
+
+    private static async Task<TemplateGenerationJob> CreateProviderCancellationJobAsync(
+        TemplatesDbContext dbContext,
+        TemplatesService catalogService,
+        string title)
+    {
+        var templateId = await CreateActiveImageTemplateAsync(
+            catalogService,
+            title,
+            "Portrait",
+            ["provider-cancel"]);
+        var template = await dbContext.TemplateItems.SingleAsync(x => x.Id == templateId);
+        var now = DateTime.UtcNow;
+        var job = new TemplateGenerationJob
+        {
+            Id = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            TemplateId = templateId,
+            Template = template,
+            Status = TemplateGenerationStatus.ProviderProcessing,
+            TokenCost = template.TokenCost,
+            QueueMediaType = TemplateGenerationQueue.MediaTypeImage,
+            QueueTier = TemplateGenerationQueue.TierFree,
+            SourceImageUrl = "https://cdn.example.com/source.jpg",
+            SourceImageFileName = "source.jpg",
+            SourceImageContentType = "image/jpeg",
+            CreatedAtUtc = now.AddMinutes(-5),
+            QueuedAtUtc = now.AddMinutes(-5),
+            StartedAtUtc = now.AddMinutes(-4),
+            UpdatedAtUtc = now.AddMinutes(-1),
+            ChargedAtUtc = now.AddMinutes(-5),
+            CurrentProviderStage = "image_generation",
+            UsedPreprocessingModel = "fal-ai/test-model",
+            PreprocessingProviderRequestId = "fal-request-1",
+            PreprocessingProviderStatusUrl = "https://queue.fal.test/fal-ai/test-model/requests/fal-request-1/status",
+            PreprocessingProviderResponseUrl = "https://queue.fal.test/fal-ai/test-model/requests/fal-request-1/response",
+            PreprocessingProviderCancelUrl = "https://queue.fal.test/fal-ai/test-model/requests/fal-request-1/cancel"
+        };
+        dbContext.TemplateGenerationJobs.Add(job);
+        await dbContext.SaveChangesAsync();
+        return job;
     }
 
     [Fact]

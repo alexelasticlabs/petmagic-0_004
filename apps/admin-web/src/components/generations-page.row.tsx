@@ -33,6 +33,7 @@ export const statusOptions: StatusFilter[] = [
   "Completed",
   "Failed",
   "Cancelled",
+  "Cancelling",
   "Retrying",
 ];
 
@@ -47,6 +48,10 @@ export function getStatusTone(status: AdminGenerationStatus) {
 
   if (status === "Cancelled") {
     return "var(--neutral)";
+  }
+
+  if (status === "Cancelling") {
+    return "var(--warning)";
   }
 
   if (status === "Retrying") {

@@ -43,6 +43,28 @@ public sealed class IdentityAdminAuditLogTests
         Assert.DoesNotContain("ua-secret", auditEvent.UserAgent);
     }
 
+    [Fact]
+    public async Task WriteAsync_ShouldUseExplicitActorForBackgroundAuditDelivery()
+    {
+        await using var dbContext = CreateDbContext();
+        var auditLog = new IdentityAdminAuditLog(dbContext, new HttpContextAccessor());
+        var actorUserId = Guid.NewGuid();
+        var subjectUserId = Guid.NewGuid();
+
+        await auditLog.WriteAsync(
+            new AdminAuditEntry(
+                "admin.template_generation.cancelled",
+                "TemplateGenerationJob",
+                Guid.NewGuid().ToString("D"),
+                SubjectUserId: subjectUserId,
+                ActorUserId: actorUserId),
+            CancellationToken.None);
+
+        var auditEvent = await dbContext.AuditEvents.SingleAsync();
+        Assert.Equal(actorUserId, auditEvent.ActorUserId);
+        Assert.Equal(subjectUserId, auditEvent.SubjectUserId);
+    }
+
     private static IdentityDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<IdentityDbContext>()

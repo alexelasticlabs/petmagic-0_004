@@ -3,10 +3,20 @@ export type TemplateType = "Image" | "Video";
 export type TemplateStatus = "Draft" | "Active" | "Archived";
 
 export type TemplateGenerationJobStatus =
-  "Queued" | "Processing" | "Completed" | "Failed" | "Cancelled" | "Retrying";
+  | "Queued"
+  | "Processing"
+  | "Completed"
+  | "Failed"
+  | "Cancelled"
+  | "Retrying"
+  | "SubmittingToProvider"
+  | "ProviderQueued"
+  | "ProviderProcessing"
+  | "ImportingMedia"
+  | "CancellationRequested";
 
 export type AdminGenerationStatus =
-  "Pending" | "Running" | "Completed" | "Failed" | "Cancelled" | "Retrying";
+  "Pending" | "Running" | "Completed" | "Failed" | "Cancelled" | "Retrying" | "Cancelling";
 
 export type TemplateGenerationResponse = {
   generationId: string;
@@ -742,6 +752,8 @@ export type AdminTemplateGenerationDashboardMetrics = {
   cancelledJobs: number;
 
   retryingJobs: number;
+
+  cancellingJobs: number;
 
   generatedAtUtc: string;
 };

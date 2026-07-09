@@ -445,7 +445,8 @@ public sealed record AdminTemplateGenerationDashboardMetricsResponse(
     int FailedJobs,
     int CancelledJobs,
     int RetryingJobs,
-    DateTime GeneratedAtUtc);
+    DateTime GeneratedAtUtc,
+    int CancellingJobs = 0);
 
 public sealed record AdminTemplateGenerationsQuery(
     string? Status,

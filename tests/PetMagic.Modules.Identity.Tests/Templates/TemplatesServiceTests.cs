@@ -1,3 +1,5 @@
+using System.Net;
+using System.Text;
 using System.Threading.Channels;
 using Microsoft.Data.Sqlite;
 
@@ -5,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Templates.Application.Abstractions;
@@ -26,7 +29,8 @@ public sealed partial class TemplatesServiceTests
         ITemplateFeedRealtimeService? realtimeService = null,
         IAdminAuditLog? adminAuditLog = null,
         TemplatesOptions? templatesOptions = null,
-        ILogger<TemplatesService>? logger = null)
+        ILogger<TemplatesService>? logger = null,
+        FalQueueClient? falQueueClient = null)
     {
         var options = templatesOptions ?? CreateTemplatesServiceOptions();
 
@@ -41,7 +45,8 @@ public sealed partial class TemplatesServiceTests
             lifecycleService,
             realtimeService ?? new RecordingTemplateFeedRealtimeService(),
             adminAuditLog,
-            logger: logger);
+            logger: logger,
+            falQueueClient: falQueueClient);
     }
 
     private static TemplatesOptions CreateTemplatesServiceOptions(
@@ -178,7 +183,8 @@ public sealed partial class TemplatesServiceTests
         ITemplateGenerationBilling? billing = null,
         ITemplateFeedRealtimeService? realtimeService = null,
         ITemplateAiProviderHealthService? aiProviderHealthService = null,
-        IAdminAuditLog? adminAuditLog = null)
+        IAdminAuditLog? adminAuditLog = null,
+        FalQueueClient? falQueueClient = null)
     {
         return new TemplateGenerationService(
             dbContext,
@@ -187,7 +193,8 @@ public sealed partial class TemplatesServiceTests
             options ?? CreateTemplatesOptions(),
             realtimeService: realtimeService,
             aiProviderHealthService: aiProviderHealthService,
-            adminAuditLog: adminAuditLog);
+            adminAuditLog: adminAuditLog,
+            falQueueClient: falQueueClient);
     }
 
     private static TemplatesOptions CreateTemplatesOptions(
@@ -207,7 +214,8 @@ public sealed partial class TemplatesServiceTests
         int premiumImageMaxEstimatedWaitSeconds = 600,
         int freeVideoMaxEstimatedWaitSeconds = 3_600,
         int premiumVideoMaxEstimatedWaitSeconds = 1_800,
-        int generationShareTokenTtlDays = 30)
+        int generationShareTokenTtlDays = 30,
+        FalAiOptions? fal = null)
     {
         return new TemplatesOptions
         {
@@ -246,8 +254,21 @@ public sealed partial class TemplatesServiceTests
             FreeVideoMaxEstimatedWaitSeconds = freeVideoMaxEstimatedWaitSeconds,
             PremiumVideoMaxEstimatedWaitSeconds = premiumVideoMaxEstimatedWaitSeconds,
             GenerationShareTokenTtlDays = generationShareTokenTtlDays,
+            Fal = fal ?? new FalAiOptions(),
             SeedSampleTemplates = false
         };
+    }
+
+    private static FalQueueClient CreateFalQueueClient(
+        TemplatesDbContext dbContext,
+        TemplatesOptions options,
+        HttpMessageHandler handler)
+    {
+        return new FalQueueClient(
+            new FixedHttpClientFactory(new HttpClient(handler)),
+            options,
+            new TemplateAiProviderRateLimiter(dbContext, options),
+            NullLogger<FalQueueClient>.Instance);
     }
 
     private static TemplatesDbContext CreateDbContext(params IInterceptor[] interceptors)
@@ -310,6 +331,38 @@ public sealed partial class TemplatesServiceTests
         {
             GenerationStatusEvents.Add(generation);
             return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class FixedHttpClientFactory(HttpClient client) : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name) => client;
+    }
+
+    private sealed class ProviderCancellationHttpHandler(
+        params (HttpStatusCode StatusCode, string ProviderStatus)[] responses) : HttpMessageHandler
+    {
+        private readonly Queue<(HttpStatusCode StatusCode, string ProviderStatus)> responses = new(responses);
+
+        public int RequestCount { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            RequestCount++;
+            Assert.Equal(HttpMethod.Put, request.Method);
+            Assert.Equal("Key", request.Headers.Authorization?.Scheme);
+            var response = responses.Count > 0
+                ? responses.Dequeue()
+                : throw new InvalidOperationException("No provider cancellation response was configured.");
+            return Task.FromResult(new HttpResponseMessage(response.StatusCode)
+            {
+                Content = new StringContent(
+                    $$"""{"status":"{{response.ProviderStatus}}"}""",
+                    Encoding.UTF8,
+                    "application/json")
+            });
         }
     }
 

@@ -19,7 +19,8 @@ internal sealed partial class TemplatesService(
     IAdminAuditLog? adminAuditLog = null,
     TemplateWatermarkSettingsStore? watermarkSettings = null,
     ITemplateVisibilityPolicy? visibilityPolicy = null,
-    ILogger<TemplatesService>? logger = null) : ITemplatesService
+    ILogger<TemplatesService>? logger = null,
+    FalQueueClient? falQueueClient = null) : ITemplatesService
 {
     private readonly ITemplateVisibilityPolicy _visibilityPolicy =
         visibilityPolicy ?? new TemplateVisibilityPolicy();

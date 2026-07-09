@@ -21,6 +21,7 @@ export type GenerationsPageText = {
   completed: string;
   failed: string;
   cancelled: string;
+  cancelling: string;
   retrying: string;
   allJobsScope: string;
   filtersTitle: string;
@@ -129,6 +130,7 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
     completed: "Завершена",
     failed: "Ошибка",
     cancelled: "Отменена",
+    cancelling: "Отменяется",
     retrying: "Повторяется",
     allJobsScope: "Все задания",
     filtersTitle: "Фильтры",
@@ -182,7 +184,7 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
     cancelGenerationError: "Не удалось отменить генерацию.",
     cancelGenerationConfirmTitle: "Отменить генерацию?",
     cancelGenerationConfirmDescription: (generationId: string) =>
-      `Будет отменено только задание ${generationId}, которое ещё находится в очереди. Задания в работе через это действие не отменяются.`,
+      `Задание ${generationId} будет отменено. Для уже отправленного провайдеру задания запрос обрабатывается асинхронно, а возврат выполняется только после принятия отмены.`,
     cancelGenerationConfirmCancel: "Назад",
     cancelGenerationConfirmSubmit: "Отменить",
     retryGeneration: "Запустить снова",
@@ -221,6 +223,7 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
       Completed: "Завершена",
       Failed: "Ошибка",
       Cancelled: "Отменена",
+      Cancelling: "Отменяется",
       Retrying: "Повторяется",
     },
     templateTypeLabels: {
@@ -270,6 +273,7 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
     completed: "Completed",
     failed: "Failed",
     cancelled: "Cancelled",
+    cancelling: "Cancelling",
     retrying: "Retrying",
     allJobsScope: "All jobs",
     filtersTitle: "Filters",
@@ -323,7 +327,7 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
     cancelGenerationError: "Failed to cancel generation.",
     cancelGenerationConfirmTitle: "Cancel generation?",
     cancelGenerationConfirmDescription: (generationId: string) =>
-      `Only queued generation ${generationId} will be cancelled. Running provider jobs are not cancelled by this action.`,
+      `Generation ${generationId} will be cancelled. Provider-submitted jobs are handled asynchronously, and credits are refunded only after cancellation is accepted.`,
     cancelGenerationConfirmCancel: "Back",
     cancelGenerationConfirmSubmit: "Cancel generation",
     retryGeneration: "Retry job",
@@ -362,6 +366,7 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
       Completed: "Completed",
       Failed: "Failed",
       Cancelled: "Cancelled",
+      Cancelling: "Cancelling",
       Retrying: "Retrying",
     },
     templateTypeLabels: {

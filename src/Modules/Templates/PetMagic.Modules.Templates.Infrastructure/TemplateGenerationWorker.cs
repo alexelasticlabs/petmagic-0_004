@@ -39,7 +39,12 @@ internal sealed class TemplateGenerationWorker(
             {
                 using var scope = scopeFactory.CreateScope();
                 var processor = scope.ServiceProvider.GetRequiredService<TemplateGenerationJobProcessor>();
-                var processed = await processor.ProcessNextAsync(stoppingToken);
+                var cancellationProcessor = scope.ServiceProvider.GetRequiredService<ITemplateGenerationCancellationProcessor>();
+                var processed = await cancellationProcessor.ProcessNextPendingCancellationAsync(stoppingToken);
+                if (!processed)
+                {
+                    processed = await processor.ProcessNextAsync(stoppingToken);
+                }
                 if (!processed)
                 {
                     processed = await processor.RetryNextRefundAsync(stoppingToken);

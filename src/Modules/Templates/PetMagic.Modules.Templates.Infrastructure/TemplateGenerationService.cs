@@ -30,7 +30,7 @@ internal sealed partial class TemplateGenerationService(
     ITemplateVisibilityPolicy? visibilityPolicy = null,
     IDataProtectionProvider? dataProtectionProvider = null,
     IAdminAuditLog? adminAuditLog = null,
-    FalQueueClient? falQueueClient = null) : ITemplateGenerationService
+    FalQueueClient? falQueueClient = null) : ITemplateGenerationService, ITemplateGenerationCancellationProcessor
 {
     private readonly ITemplateVisibilityPolicy _visibilityPolicy =
         visibilityPolicy ?? new TemplateVisibilityPolicy();

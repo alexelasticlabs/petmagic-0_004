@@ -78,6 +78,7 @@ describe("generations page hardening", () => {
     expect(contentSource).toContain('Running: "В работе"');
     expect(contentSource).toContain('Failed: "Ошибка"');
     expect(contentSource).toContain('Cancelled: "Отменена"');
+    expect(contentSource).toContain('Cancelling: "Отменяется"');
     expect(contentSource).toContain('before: "До"');
     expect(contentSource).toContain('after: "После"');
     expect(contentSource).toContain('compareState: "Сравнение"');
@@ -202,6 +203,8 @@ describe("generations page hardening", () => {
     expect(source).toContain("generationMetrics?.failedJobs");
     expect(source).toContain("generationMetrics?.retryingJobs");
     expect(source).toContain("generationMetrics?.cancelledJobs");
+    expect(source).toContain("generationMetrics?.cancellingJobs");
+    expect(source).toContain('item.status === "Cancelling"');
     expect(source).toContain("hint={text.allJobsScope}");
     expect(source).toContain('aria-busy={generationsQuery.isFetching ? "true" : undefined}');
     expect(source).not.toContain('currentPageScope: isRu ? "Текущая страница" : "Current page"');

@@ -72,8 +72,9 @@ public sealed class FalQueueClientRateLimiterTests
             """
             {
               "request_id": "fal-request-1",
-              "status_url": "https://evil.example.com/status/fal-request-1",
-              "response_url": "https://queue.fal.test/response/fal-request-1"
+              "status_url": "https://evil.example.com/fal-ai/test-model/requests/fal-request-1/status",
+              "response_url": "https://queue.fal.test/fal-ai/test-model/requests/fal-request-1/response",
+              "cancel_url": "https://queue.fal.test/fal-ai/test-model/requests/fal-request-1/cancel"
             }
             """);
         var client = CreateClient(dbContext, handler, maxRequestsPerMinute: 1);
@@ -100,8 +101,9 @@ public sealed class FalQueueClientRateLimiterTests
             """
             {
               "request_id": "fal-request-1",
-              "status_url": "https://queue.fal.test/status/fal-request-1",
-              "response_url": "https://queue.fal.test/other/response/fal-request-1"
+              "status_url": "https://queue.fal.test/fal-ai/test-model/requests/fal-request-1/status",
+              "response_url": "https://queue.fal.test/other/fal-ai/test-model/requests/fal-request-1/response",
+              "cancel_url": "https://queue.fal.test/fal-ai/test-model/requests/fal-request-1/cancel"
             }
             """);
         var client = CreateClient(dbContext, handler, maxRequestsPerMinute: 1);
@@ -159,6 +161,78 @@ public sealed class FalQueueClientRateLimiterTests
         Assert.Equal(1, handler.SubmitCount);
         Assert.Equal(1, handler.StatusCount);
         Assert.Equal(1, handler.ResponseCount);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Accepted, "CANCELLATION_REQUESTED", 0)]
+    [InlineData(HttpStatusCode.BadRequest, "ALREADY_COMPLETED", 1)]
+    [InlineData(HttpStatusCode.NotFound, "NOT_FOUND", 2)]
+    [InlineData(HttpStatusCode.TooManyRequests, "RATE_LIMITED", 3)]
+    [InlineData(HttpStatusCode.ServiceUnavailable, "UNAVAILABLE", 3)]
+    public async Task CancelAsync_ShouldMapFalQueueOutcome(
+        HttpStatusCode statusCode,
+        string providerStatus,
+        int expectedOutcome)
+    {
+        ResetLocalRateLimiterState();
+        await using var dbContext = CreateDbContext();
+        var handler = new CancellationFalHandler(statusCode, providerStatus);
+        var client = CreateClient(dbContext, handler, maxRequestsPerMinute: 1);
+
+        var result = await client.CancelAsync(
+            "fal-ai/test-model",
+            "fal-request-1",
+            new Uri("https://queue.fal.test/fal-ai/test-model/requests/fal-request-1/cancel"),
+            CancellationToken.None);
+
+        Assert.Equal((FalQueueCancellationOutcome)expectedOutcome, result.Outcome);
+        Assert.Equal(HttpMethod.Put, handler.Method);
+        Assert.Equal("Key", handler.AuthorizationScheme);
+        Assert.Equal("test-fal-key", handler.AuthorizationParameter);
+    }
+
+    [Fact]
+    public async Task CancelAsync_ShouldRejectUntrustedUrlWithoutNetworkCall()
+    {
+        ResetLocalRateLimiterState();
+        await using var dbContext = CreateDbContext();
+        var handler = new CancellationFalHandler(HttpStatusCode.Accepted, "CANCELLATION_REQUESTED");
+        var client = CreateClient(dbContext, handler, maxRequestsPerMinute: 1);
+
+        var result = await client.CancelAsync(
+            "fal-ai/test-model",
+            "fal-request-1",
+            new Uri("https://evil.example.com/fal-ai/test-model/requests/fal-request-1/cancel"),
+            CancellationToken.None);
+
+        Assert.Equal(FalQueueCancellationOutcome.PermanentFailure, result.Outcome);
+        Assert.Null(handler.Method);
+    }
+
+    [Fact]
+    public void ResolveCancellationUri_ShouldDeriveTrustedLegacyUrlFromStatusUrl()
+    {
+        ResetLocalRateLimiterState();
+        using var dbContext = CreateDbContext();
+        var client = CreateClient(
+            dbContext,
+            new CancellationFalHandler(HttpStatusCode.Accepted, "CANCELLATION_REQUESTED"),
+            maxRequestsPerMinute: 1);
+
+        var result = client.ResolveCancellationUri(
+            "fal-ai/test-model",
+            "fal-request-1",
+            cancelUrl: null,
+            statusUrl: "https://queue.fal.test/fal-ai/test-model/requests/fal-request-1/status");
+
+        Assert.Equal(
+            "https://queue.fal.test/fal-ai/test-model/requests/fal-request-1/cancel",
+            result?.ToString());
+        Assert.Null(client.ResolveCancellationUri(
+            "fal-ai/test-model",
+            "fal-request-1",
+            cancelUrl: null,
+            statusUrl: "https://queue.fal.test/fal-ai/other-model/requests/fal-request-1/status"));
     }
 
     private static TemplatesDbContext CreateDbContext()
@@ -254,13 +328,14 @@ public sealed class FalQueueClientRateLimiterTests
                     """
                     {
                       "request_id": "fal-request-1",
-                      "status_url": "https://queue.fal.test/status/fal-request-1",
-                      "response_url": "https://queue.fal.test/response/fal-request-1"
+                      "status_url": "https://queue.fal.test/fal-ai/test-model/requests/fal-request-1/status",
+                      "response_url": "https://queue.fal.test/fal-ai/test-model/requests/fal-request-1/response",
+                      "cancel_url": "https://queue.fal.test/fal-ai/test-model/requests/fal-request-1/cancel"
                     }
                     """);
             }
 
-            if (path.StartsWith("/status/", StringComparison.Ordinal))
+            if (path.EndsWith("/status", StringComparison.Ordinal))
             {
                 StatusCount++;
                 return JsonAsync(
@@ -275,7 +350,7 @@ public sealed class FalQueueClientRateLimiterTests
                     """);
             }
 
-            if (path.StartsWith("/response/", StringComparison.Ordinal))
+            if (path.EndsWith("/response", StringComparison.Ordinal))
             {
                 ResponseCount++;
                 return JsonAsync(
@@ -319,13 +394,13 @@ public sealed class FalQueueClientRateLimiterTests
                 return JsonAsync(submitJson);
             }
 
-            if (path.StartsWith("/status/", StringComparison.Ordinal))
+            if (path.EndsWith("/status", StringComparison.Ordinal))
             {
                 StatusCount++;
                 return JsonAsync("""{"status":"COMPLETED"}""");
             }
 
-            if (path.StartsWith("/response/", StringComparison.Ordinal))
+            if (path.EndsWith("/response", StringComparison.Ordinal))
             {
                 ResponseCount++;
                 return JsonAsync("""{"images":[]}""");
@@ -361,19 +436,20 @@ public sealed class FalQueueClientRateLimiterTests
                     """
                     {
                       "request_id": "fal-request-1",
-                      "status_url": "https://queue.fal.test/status/fal-request-1",
-                      "response_url": "https://queue.fal.test/response/fal-request-1"
+                      "status_url": "https://queue.fal.test/fal-ai/test-model/requests/fal-request-1/status",
+                      "response_url": "https://queue.fal.test/fal-ai/test-model/requests/fal-request-1/response",
+                      "cancel_url": "https://queue.fal.test/fal-ai/test-model/requests/fal-request-1/cancel"
                     }
                     """);
             }
 
-            if (path.StartsWith("/status/", StringComparison.Ordinal))
+            if (path.EndsWith("/status", StringComparison.Ordinal))
             {
                 StatusCount++;
                 return JsonAsync(statusJson);
             }
 
-            if (path.StartsWith("/response/", StringComparison.Ordinal))
+            if (path.EndsWith("/response", StringComparison.Ordinal))
             {
                 ResponseCount++;
                 return JsonAsync(responseJson);
@@ -387,6 +463,33 @@ public sealed class FalQueueClientRateLimiterTests
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(json, Encoding.UTF8, "application/json")
+            });
+        }
+    }
+
+    private sealed class CancellationFalHandler(
+        HttpStatusCode statusCode,
+        string providerStatus) : HttpMessageHandler
+    {
+        public HttpMethod? Method { get; private set; }
+
+        public string? AuthorizationScheme { get; private set; }
+
+        public string? AuthorizationParameter { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            Method = request.Method;
+            AuthorizationScheme = request.Headers.Authorization?.Scheme;
+            AuthorizationParameter = request.Headers.Authorization?.Parameter;
+            return Task.FromResult(new HttpResponseMessage(statusCode)
+            {
+                Content = new StringContent(
+                    $$"""{"status":"{{providerStatus}}"}""",
+                    Encoding.UTF8,
+                    "application/json")
             });
         }
     }

@@ -110,6 +110,8 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
     queryFn: ({ signal }) => fetchAdminTemplateGenerations(query, signal),
     enabled: canViewGenerations,
     placeholderData: keepPreviousData,
+    refetchInterval: (activeQuery) =>
+      activeQuery.state.data?.items.some((item) => item.status === "Cancelling") ? 2_000 : false,
   });
   const generationMetricsQuery = useQuery({
     queryKey: adminQueryKeys.templateGenerationMetrics,
@@ -117,6 +119,8 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
     enabled: canViewGenerations,
     placeholderData: keepPreviousData,
     staleTime: 30_000,
+    refetchInterval: (activeQuery) =>
+      (activeQuery.state.data?.cancellingJobs ?? 0) > 0 ? 2_000 : false,
   });
 
   const visiblePage = generationsQuery.isPlaceholderData ? undefined : generationsQuery.data;
@@ -331,6 +335,12 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
             value={formatMetricCount(generationMetrics?.cancelledJobs)}
             hint={text.allJobsScope}
             tone="neutral"
+          />
+          <AdminKpiCard
+            label={text.cancelling}
+            value={formatMetricCount(generationMetrics?.cancellingJobs)}
+            hint={text.allJobsScope}
+            tone="warning"
           />
         </div>
 

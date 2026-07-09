@@ -328,7 +328,7 @@ public static partial class AdminTemplateEndpoints
         return TypedResults.Ok(result.Value);
     }
 
-    private static async Task<Results<Ok<TemplateGenerationResponse>, ProblemHttpResult>> CancelGenerationAsync(
+    private static async Task<Results<Ok<TemplateGenerationResponse>, Accepted<TemplateGenerationResponse>, ProblemHttpResult>> CancelGenerationAsync(
         HttpContext context,
         Guid generationId,
         [FromServices] ITemplateGenerationService generationService,
@@ -340,7 +340,7 @@ public static partial class AdminTemplateEndpoints
             return ToAdminTemplateProblem(subjectError);
         }
 
-        var result = await generationService.CancelAdminQueuedAsync(
+        var result = await generationService.CancelAdminAsync(
             adminUserId,
             generationId,
             cancellationToken);
@@ -349,7 +349,11 @@ public static partial class AdminTemplateEndpoints
             return ToAdminTemplateProblem(result.Error);
         }
 
-        return TypedResults.Ok(result.Value);
+        return result.Value.IsPending
+            ? TypedResults.Accepted(
+                $"/api/admin/templates/generations/{result.Value.Generation.GenerationId}",
+                result.Value.Generation)
+            : TypedResults.Ok(result.Value.Generation);
     }
 
 
