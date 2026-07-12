@@ -303,9 +303,21 @@ void main() {
   });
 
   test('template media caches use bounded object counts and app TTL', () async {
-    final source = await File(
+    final cacheSource = await File(
       'lib/core/performance/template_media_cache.dart',
     ).readAsString();
+    final supportSource = await Directory('lib/core/performance')
+        .list()
+        .where(
+          (entity) =>
+              entity is File &&
+              entity.path.endsWith('.dart') &&
+              !entity.path.endsWith('template_media_cache.dart'),
+        )
+        .cast<File>()
+        .asyncMap((file) => file.readAsString())
+        .join('\n');
+    final source = '$cacheSource\n$supportSource';
     final presentationSource =
         await Directory('lib/features/templates/presentation')
             .list(recursive: true)
@@ -375,14 +387,14 @@ void main() {
     expect(source, contains('_previewInvalidationByUrl.clear();'));
     expect(source, contains('_latestThumbnailFetchGenerationByUrl.clear();'));
     expect(source, contains('_latestPreviewFetchGenerationByUrl.clear();'));
-    expect(source, contains('_rememberLatestFetchGeneration('));
+    expect(source, contains('MediaCacheTracking.rememberLatestGeneration('));
     expect(source, contains('_canInvalidateCompletedFetch('));
-    expect(source, contains('_trimInvalidationMap('));
-    expect(source, contains('_trimBlockedCacheUrls('));
+    expect(source, contains('MediaCacheTracking.trimInvalidations('));
+    expect(source, contains('MediaCacheTracking.trimBlockedUrls('));
     expect(source, contains('_blockedThumbnailCacheUrls.remove(url);'));
     expect(source, contains('_blockedPreviewCacheUrls.remove(url);'));
     expect(source, contains('AppConfig.mediaCacheMaxBytesSafe'));
-    expect(source, contains('_scheduleThumbnailBudgetCleanup(file.parent)'));
+    expect(source, contains('TemplateMediaCacheBudget.scheduleThumbnail('));
     expect(source, contains('thumbnail_budget_cleanup'));
     expect(
       presentationSource,

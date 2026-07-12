@@ -117,15 +117,15 @@ void main() {
 
   test('notification routes are constrained to safe internal destinations', () {
     final source = File(
-      'lib/app/notifications/notification_coordinator.dart',
+      'lib/core/notifications/notification_route_resolver.dart',
     ).readAsStringSync();
-    final routeBody = _methodBody(source, '_routeFromMap');
-    final safeRouteBody = _methodBody(source, '_safeInternalRoute');
-    final generationRouteBody = _methodBody(source, '_generationRoute');
+    final routeBody = _methodBody(source, 'routeFromMap');
+    final safeRouteBody = _methodBody(source, 'safeInternalRoute');
+    final generationRouteBody = _methodBody(source, 'generationRouteFor');
 
     expect(routeBody, isNot(contains('return route;')));
-    expect(routeBody, contains('_safeInternalRoute(route)'));
-    expect(routeBody, contains('_generationRoute(generationId)'));
+    expect(routeBody, contains('safeInternalRoute(route)'));
+    expect(routeBody, contains("generationRouteFor(payload['generationId'])"));
     expect(routeBody, contains("if (type == 'wallet')"));
     expect(routeBody, contains("return '/profile/wallet';"));
     expect(routeBody, contains("if (type == 'premium')"));

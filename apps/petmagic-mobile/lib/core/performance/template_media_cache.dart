@@ -5,6 +5,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/core/performance/bounded_http_file_service.dart';
+import 'package:petmagic_mobile/core/performance/media_cache_tracking.dart';
+import 'package:petmagic_mobile/core/performance/template_media_cache_budget.dart';
 import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 
 typedef _RememberedFilesByUrl = LinkedHashMap<String, _RememberedCacheFile>;
@@ -26,8 +29,6 @@ class TemplateMediaCache {
   static const int _maxPreviewInFlightFetches = 32;
   static const int _maxThumbnailDownloadBytes = 8 * 1024 * 1024;
   static const int _maxPreviewDownloadBytes = 24 * 1024 * 1024;
-  static bool _isThumbnailBudgetCleanupRunning = false;
-  static bool _isPreviewBudgetCleanupRunning = false;
   static int _cacheGeneration = 0;
   static final _RememberedFilesByUrl _thumbnailFilesByUrl =
       _RememberedFilesByUrl();
@@ -55,7 +56,7 @@ class TemplateMediaCache {
       stalePeriod: AppConfig.mediaCacheStalePeriod,
       maxNrOfCacheObjects: _maxThumbnailFileReferences,
       repo: JsonCacheInfoRepository(databaseName: 'templateThumbnailCache'),
-      fileService: _BoundedHttpFileService(
+      fileService: BoundedHttpFileService(
         maxBytes: _maxThumbnailDownloadBytes,
         mediaKind: 'thumbnail',
       ),
@@ -68,7 +69,7 @@ class TemplateMediaCache {
       stalePeriod: AppConfig.mediaCacheStalePeriod,
       maxNrOfCacheObjects: _maxPreviewFileReferences,
       repo: JsonCacheInfoRepository(databaseName: 'templatePreviewVideoCache'),
-      fileService: _BoundedHttpFileService(
+      fileService: BoundedHttpFileService(
         maxBytes: _maxPreviewDownloadBytes,
         mediaKind: 'preview',
       ),
@@ -175,7 +176,7 @@ class TemplateMediaCache {
     late final Future<File> fetch;
     final generation = _cacheGeneration;
     final urlInvalidation = _thumbnailInvalidationByUrl[cacheKey] ?? 0;
-    _rememberLatestFetchGeneration(
+    MediaCacheTracking.rememberLatestGeneration(
       _latestThumbnailFetchGenerationByUrl,
       cacheKey,
       generation,
@@ -193,7 +194,7 @@ class TemplateMediaCache {
             _thumbnailFetchesByUrl.remove(cacheKey);
           }
         });
-    _rememberInFlightFetch(
+    MediaCacheTracking.rememberInFlightFetch(
       _thumbnailFetchesByUrl,
       cacheKey,
       fetch,
@@ -251,15 +252,19 @@ class TemplateMediaCache {
       _thumbnailFilesByUrl,
       cacheKey,
       file,
-      validTill: await _cacheValidTill(
+      validTill: await MediaCacheTracking.cacheValidTill(
         thumbnailCache,
         cacheKey,
         fallbackValidTill: DateTime.now().add(AppConfig.mediaCacheStalePeriod),
+        onFailure: _logCacheFailure,
       ),
       maxEntries: _maxThumbnailFileReferences,
     );
     _blockedThumbnailCacheUrls.remove(cacheKey);
-    _scheduleThumbnailBudgetCleanup(file.parent);
+    TemplateMediaCacheBudget.scheduleThumbnail(
+      file.parent,
+      onFailure: _logCacheFailure,
+    );
     return file;
   }
 
@@ -273,7 +278,7 @@ class TemplateMediaCache {
     late final Future<File> fetch;
     final generation = _cacheGeneration;
     final urlInvalidation = _previewInvalidationByUrl[cacheKey] ?? 0;
-    _rememberLatestFetchGeneration(
+    MediaCacheTracking.rememberLatestGeneration(
       _latestPreviewFetchGenerationByUrl,
       cacheKey,
       generation,
@@ -288,7 +293,10 @@ class TemplateMediaCache {
               urlInvalidation: urlInvalidation,
             )
             .then((file) {
-              _schedulePreviewBudgetCleanup(file.parent);
+              TemplateMediaCacheBudget.schedulePreview(
+                file.parent,
+                onFailure: _logCacheFailure,
+              );
               return file;
             })
             .whenComplete(() {
@@ -296,7 +304,7 @@ class TemplateMediaCache {
                 _previewFetchesByUrl.remove(cacheKey);
               }
             });
-    _rememberInFlightFetch(
+    MediaCacheTracking.rememberInFlightFetch(
       _previewFetchesByUrl,
       cacheKey,
       fetch,
@@ -354,10 +362,11 @@ class TemplateMediaCache {
       _previewFilesByUrl,
       cacheKey,
       file,
-      validTill: await _cacheValidTill(
+      validTill: await MediaCacheTracking.cacheValidTill(
         previewVideoCache,
         cacheKey,
         fallbackValidTill: DateTime.now().add(AppConfig.mediaCacheStalePeriod),
+        onFailure: _logCacheFailure,
       ),
       maxEntries: _maxPreviewFileReferences,
     );
@@ -387,11 +396,12 @@ class TemplateMediaCache {
     Directory thumbnailCacheDirectory, {
     required int maxBytes,
   }) {
-    return _trimCacheDirectory(
+    return TemplateMediaCacheBudget.trimDirectory(
       thumbnailCacheDirectory,
       maxBytes: maxBytes,
       statStage: 'thumbnail_budget_stat_file',
       deleteStage: 'thumbnail_budget_delete_file',
+      onFailure: _logCacheFailure,
     );
   }
 
@@ -400,11 +410,12 @@ class TemplateMediaCache {
     Directory previewCacheDirectory, {
     required int maxBytes,
   }) {
-    return _trimCacheDirectory(
+    return TemplateMediaCacheBudget.trimDirectory(
       previewCacheDirectory,
       maxBytes: maxBytes,
       statStage: 'preview_budget_stat_file',
       deleteStage: 'preview_budget_delete_file',
+      onFailure: _logCacheFailure,
     );
   }
 
@@ -486,7 +497,7 @@ class TemplateMediaCache {
     final currentInvalidation = _thumbnailInvalidationByUrl.remove(url) ?? 0;
     _thumbnailInvalidationByUrl[url] = currentInvalidation + 1;
     _blockThumbnailCacheUrl(url);
-    _trimInvalidationMap(
+    MediaCacheTracking.trimInvalidations(
       _thumbnailInvalidationByUrl,
       _blockedThumbnailCacheUrls,
       maxEntries: _maxBlockedThumbnailCacheUrls,
@@ -497,7 +508,7 @@ class TemplateMediaCache {
     final currentInvalidation = _previewInvalidationByUrl.remove(url) ?? 0;
     _previewInvalidationByUrl[url] = currentInvalidation + 1;
     _blockPreviewCacheUrl(url);
-    _trimInvalidationMap(
+    MediaCacheTracking.trimInvalidations(
       _previewInvalidationByUrl,
       _blockedPreviewCacheUrls,
       maxEntries: _maxBlockedPreviewCacheUrls,
@@ -508,7 +519,7 @@ class TemplateMediaCache {
     _thumbnailFilesByUrl.remove(url);
     _blockedThumbnailCacheUrls.remove(url);
     _blockedThumbnailCacheUrls.add(url);
-    _trimBlockedCacheUrls(
+    MediaCacheTracking.trimBlockedUrls(
       _blockedThumbnailCacheUrls,
       maxEntries: _maxBlockedThumbnailCacheUrls,
     );
@@ -518,7 +529,7 @@ class TemplateMediaCache {
     _previewFilesByUrl.remove(url);
     _blockedPreviewCacheUrls.remove(url);
     _blockedPreviewCacheUrls.add(url);
-    _trimBlockedCacheUrls(
+    MediaCacheTracking.trimBlockedUrls(
       _blockedPreviewCacheUrls,
       maxEntries: _maxBlockedPreviewCacheUrls,
     );
@@ -555,179 +566,6 @@ class TemplateMediaCache {
     }
   }
 
-  static void _trimInvalidationMap(
-    _InvalidationCountsByUrl invalidationsByUrl,
-    _BlockedCacheUrls blockedCacheUrls, {
-    required int maxEntries,
-  }) {
-    while (invalidationsByUrl.length > maxEntries) {
-      final oldestUrl = invalidationsByUrl.keys.first;
-      invalidationsByUrl.remove(oldestUrl);
-      blockedCacheUrls.remove(oldestUrl);
-    }
-  }
-
-  static void _trimBlockedCacheUrls(
-    _BlockedCacheUrls blockedCacheUrls, {
-    required int maxEntries,
-  }) {
-    while (blockedCacheUrls.length > maxEntries) {
-      blockedCacheUrls.remove(blockedCacheUrls.first);
-    }
-  }
-
-  static void _rememberLatestFetchGeneration(
-    _FetchGenerationsByUrl latestFetchGenerationsByUrl,
-    String url,
-    int generation, {
-    required int maxEntries,
-  }) {
-    latestFetchGenerationsByUrl.remove(url);
-    latestFetchGenerationsByUrl[url] = generation;
-    while (latestFetchGenerationsByUrl.length > maxEntries) {
-      latestFetchGenerationsByUrl.remove(
-        latestFetchGenerationsByUrl.keys.first,
-      );
-    }
-  }
-
-  static void _rememberInFlightFetch(
-    Map<String, Future<File>> fetchesByUrl,
-    String url,
-    Future<File> fetch, {
-    required int maxEntries,
-  }) {
-    fetchesByUrl.remove(url);
-    fetchesByUrl[url] = fetch;
-    while (fetchesByUrl.length > maxEntries) {
-      fetchesByUrl.remove(fetchesByUrl.keys.first);
-    }
-  }
-
-  static Future<DateTime> _cacheValidTill(
-    CacheManager cacheManager,
-    String url, {
-    required DateTime fallbackValidTill,
-  }) async {
-    try {
-      return (await cacheManager.getFileFromCache(url))?.validTill ??
-          fallbackValidTill;
-    } catch (error, stackTrace) {
-      _logCacheFailure('cache_valid_till_lookup', error, stackTrace);
-      return fallbackValidTill;
-    }
-  }
-
-  static void _schedulePreviewBudgetCleanup(Directory previewCacheDirectory) {
-    if (_isPreviewBudgetCleanupRunning) {
-      return;
-    }
-
-    _isPreviewBudgetCleanupRunning = true;
-    Future<void>(() async {
-      try {
-        await _trimCacheDirectory(
-          previewCacheDirectory,
-          maxBytes: AppConfig.previewVideoCacheMaxBytesSafe,
-          statStage: 'preview_budget_stat_file',
-          deleteStage: 'preview_budget_delete_file',
-        );
-      } catch (error, stackTrace) {
-        _logCacheFailure('preview_budget_cleanup', error, stackTrace);
-      } finally {
-        _isPreviewBudgetCleanupRunning = false;
-      }
-    });
-  }
-
-  static void _scheduleThumbnailBudgetCleanup(
-    Directory thumbnailCacheDirectory,
-  ) {
-    if (_isThumbnailBudgetCleanupRunning) {
-      return;
-    }
-
-    _isThumbnailBudgetCleanupRunning = true;
-    Future<void>(() async {
-      try {
-        await _trimCacheDirectory(
-          thumbnailCacheDirectory,
-          maxBytes: AppConfig.mediaCacheMaxBytesSafe,
-          statStage: 'thumbnail_budget_stat_file',
-          deleteStage: 'thumbnail_budget_delete_file',
-        );
-      } catch (error, stackTrace) {
-        _logCacheFailure('thumbnail_budget_cleanup', error, stackTrace);
-      } finally {
-        _isThumbnailBudgetCleanupRunning = false;
-      }
-    });
-  }
-
-  static Future<int> _trimCacheDirectory(
-    Directory cacheDirectory, {
-    required int maxBytes,
-    required String statStage,
-    required String deleteStage,
-  }) async {
-    if (!await cacheDirectory.exists()) {
-      return 0;
-    }
-
-    final safeMaxBytes = maxBytes < 0 ? 0 : maxBytes;
-    final entities = await cacheDirectory.list().toList();
-    final files = <File>[];
-    for (final entity in entities) {
-      if (entity is File) {
-        files.add(entity);
-      }
-    }
-
-    if (files.isEmpty) {
-      return 0;
-    }
-
-    final stats = <_CacheFileStat>[];
-    var totalBytes = 0;
-
-    for (final file in files) {
-      try {
-        final stat = await file.stat();
-        if (stat.type != FileSystemEntityType.file) {
-          continue;
-        }
-
-        final fileSize = stat.size;
-        totalBytes += fileSize;
-        stats.add(_CacheFileStat(file, fileSize, stat.modified));
-      } catch (error, stackTrace) {
-        _logCacheFailure(statStage, error, stackTrace);
-        // Skip files that cannot be stat'ed.
-      }
-    }
-
-    if (totalBytes <= safeMaxBytes) {
-      return totalBytes;
-    }
-
-    stats.sort((a, b) => a.modifiedAt.compareTo(b.modifiedAt));
-    for (final item in stats) {
-      if (totalBytes <= safeMaxBytes) {
-        break;
-      }
-
-      try {
-        await item.file.delete();
-        totalBytes -= item.sizeBytes;
-      } catch (error, stackTrace) {
-        _logCacheFailure(deleteStage, error, stackTrace);
-        // Keep best-effort semantics.
-      }
-    }
-
-    return totalBytes;
-  }
-
   static void _logCacheFailure(
     String stage,
     Object error,
@@ -744,85 +582,9 @@ class TemplateMediaCache {
   }
 }
 
-class _CacheFileStat {
-  const _CacheFileStat(this.file, this.sizeBytes, this.modifiedAt);
-
-  final File file;
-  final int sizeBytes;
-  final DateTime modifiedAt;
-}
-
 class _RememberedCacheFile {
   const _RememberedCacheFile(this.file, this.validTill);
 
   final File file;
   final DateTime validTill;
-}
-
-class _BoundedHttpFileService extends FileService {
-  _BoundedHttpFileService({required this.maxBytes, required this.mediaKind}) {
-    concurrentFetches = _delegate.concurrentFetches;
-  }
-
-  final int maxBytes;
-  final String mediaKind;
-  final HttpFileService _delegate = HttpFileService();
-
-  @override
-  Future<FileServiceResponse> get(
-    String url, {
-    Map<String, String>? headers,
-  }) async {
-    final response = await _delegate.get(url, headers: headers);
-    final contentLength = response.contentLength;
-    if (contentLength != null && contentLength > maxBytes) {
-      throw StateError('template_${mediaKind}_download_too_large');
-    }
-
-    return _BoundedFileServiceResponse(
-      response,
-      maxBytes: maxBytes,
-      mediaKind: mediaKind,
-    );
-  }
-}
-
-class _BoundedFileServiceResponse implements FileServiceResponse {
-  const _BoundedFileServiceResponse(
-    this._inner, {
-    required this.maxBytes,
-    required this.mediaKind,
-  });
-
-  final FileServiceResponse _inner;
-  final int maxBytes;
-  final String mediaKind;
-
-  @override
-  Stream<List<int>> get content async* {
-    var receivedBytes = 0;
-    await for (final chunk in _inner.content) {
-      receivedBytes += chunk.length;
-      if (receivedBytes > maxBytes) {
-        throw StateError('template_${mediaKind}_download_too_large');
-      }
-
-      yield chunk;
-    }
-  }
-
-  @override
-  int? get contentLength => _inner.contentLength;
-
-  @override
-  String? get eTag => _inner.eTag;
-
-  @override
-  String get fileExtension => _inner.fileExtension;
-
-  @override
-  int get statusCode => _inner.statusCode;
-
-  @override
-  DateTime get validTill => _inner.validTill;
 }

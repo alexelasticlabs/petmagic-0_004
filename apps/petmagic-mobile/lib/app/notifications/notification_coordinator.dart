@@ -9,6 +9,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_storage.dart';
 import 'package:petmagic_mobile/core/notifications/notification_foreground_copy.dart';
+import 'package:petmagic_mobile/core/notifications/notification_route_resolver.dart';
 import 'package:petmagic_mobile/app/notifications/push_token_registrar.dart';
 import 'package:petmagic_mobile/features/support/application/support_contract.dart';
 import 'package:petmagic_mobile/features/templates/application/template_generation_contract.dart';
@@ -32,19 +33,9 @@ class NotificationCoordinator {
 
   final PushTokenRegistrar _pushTokenRegistrar;
   final void Function(String route) _onRouteRequested;
-  static const _allowedNotificationRoutes = <String>{
-    '/templates',
-    '/creations',
-    '/rewards',
-    '/profile',
-    '/profile/support',
-    '/profile/support/chat',
-    '/profile/wallet',
-    '/profile/premium',
-    '/profile/subscription/manage',
-  };
+  final NotificationRouteResolver _routeResolver =
+      const NotificationRouteResolver();
   static final RegExp _routeControlCharacters = RegExp(r'[\x00-\x1F\x7F]');
-  static final RegExp _safeGenerationId = RegExp(r'^[A-Za-z0-9_-]{1,128}$');
   static const Duration _handledInteractionWindow = Duration(minutes: 5);
   static const int _maxHandledInteractions = 128;
   static const int _maxExternalDedupeKeyLength = 160;
@@ -462,87 +453,7 @@ class NotificationCoordinator {
   }
 
   String? _routeFromMap(Map<String, dynamic> payload) {
-    final route = payload['route'];
-    if (route is String) {
-      final safeRoute = _safeInternalRoute(route);
-      if (safeRoute != null) {
-        return safeRoute;
-      }
-    }
-
-    final generationId = payload['generationId'];
-    final generationRoute = _generationRoute(generationId);
-    if (generationRoute != null) {
-      return generationRoute;
-    }
-
-    final type = payload['type'];
-    if (type == 'support_chat') {
-      return '/profile/support';
-    }
-
-    if (type == 'wallet') {
-      return '/profile/wallet';
-    }
-
-    if (type == 'premium') {
-      return '/profile';
-    }
-
-    final conversationId = payload['conversationId'];
-    if (conversationId is String && conversationId.isNotEmpty) {
-      return '/profile/support';
-    }
-
-    return null;
-  }
-
-  String? _safeInternalRoute(String raw) {
-    final value = raw.trim();
-    if (value.isEmpty ||
-        value.length > 160 ||
-        _routeControlCharacters.hasMatch(value) ||
-        !value.startsWith('/') ||
-        value.startsWith('//') ||
-        value.contains(r'\')) {
-      return null;
-    }
-
-    final uri = Uri.tryParse(value);
-    if (uri == null ||
-        uri.hasScheme ||
-        uri.hasAuthority ||
-        uri.fragment.isNotEmpty ||
-        uri.query.isNotEmpty) {
-      return null;
-    }
-
-    final path = uri.path;
-    if (_allowedNotificationRoutes.contains(path)) {
-      return path;
-    }
-
-    if (path.startsWith('/generations/')) {
-      final generationId = path.substring('/generations/'.length);
-      if (_safeGenerationId.hasMatch(generationId)) {
-        return path;
-      }
-    }
-
-    return null;
-  }
-
-  String? _generationRoute(Object? rawGenerationId) {
-    if (rawGenerationId is! String) {
-      return null;
-    }
-
-    final generationId = rawGenerationId.trim();
-    if (!_safeGenerationId.hasMatch(generationId)) {
-      return null;
-    }
-
-    return '/generations/$generationId';
+    return _routeResolver.routeFromMap(payload);
   }
 
   bool _shouldDisplayForeground(RemoteMessage message) {

@@ -774,15 +774,19 @@ void main() {
   );
 
   test('template media cache bounds in-flight fetch tracking', () async {
-    final source = await File(
+    final cacheSource = await File(
       'lib/core/performance/template_media_cache.dart',
     ).readAsString();
+    final trackingSource = await File(
+      'lib/core/performance/media_cache_tracking.dart',
+    ).readAsString();
+    final source = '$cacheSource\n$trackingSource';
 
     expect(source, contains('_maxThumbnailInFlightFetches'));
     expect(source, contains('_maxPreviewInFlightFetches'));
-    expect(source, contains('_rememberInFlightFetch('));
+    expect(source, contains('MediaCacheTracking.rememberInFlightFetch('));
     expect(source, contains('maxEntries: _maxThumbnailInFlightFetches'));
     expect(source, contains('maxEntries: _maxPreviewInFlightFetches'));
-    expect(source, contains('fetchesByUrl.remove(fetchesByUrl.keys.first)'));
+    expect(source, contains('fetches.remove(fetches.keys.first)'));
   });
 }

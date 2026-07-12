@@ -100,9 +100,11 @@ to the router boundary.
 `test/mobile_architecture_test.dart` enforces every layer direction, keeps
 domain code framework-independent, rejects `GoRouter` in feature/shared UI,
 checks the app composition bindings, and prevents new production files over
-600 lines. Existing oversized files are an explicit frozen debt list: entries
-may be removed as files are split, but new entries are not accepted. The same
-test also guards concrete `AuthSessionStorage` usage and app-owned push/session
+600 lines. Target ownership limits are 400 lines for app/core/application/data/
+domain code and 500 lines for presentation/shared UI. Existing files above
+either target are explicit, exact frozen debt sets: entries may be removed as
+responsibilities are extracted, but new entries are not accepted. The same test
+also guards concrete `AuthSessionStorage` usage and app-owned push/session
 orchestration. UI quality gates include a `320×568` viewport, 200% system text
 scaling, button semantics, a deterministic compact welcome golden, and a
 1000+ item feed stress test that runs on an Android emulator in CI.

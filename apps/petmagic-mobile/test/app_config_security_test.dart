@@ -151,12 +151,12 @@ void main() {
   );
 
   test('release API resolver normalizes persisted URLs through allowlist', () {
-    final resolverSource = File(
-      'lib/core/network/api_base_url_resolver.dart',
+    final policySource = File(
+      'lib/core/network/api_base_url_policy.dart',
     ).readAsStringSync();
 
     expect(
-      resolverSource,
+      policySource,
       contains('return AppConfig.normalizeProductionBaseUrl(trimmed);'),
     );
   });

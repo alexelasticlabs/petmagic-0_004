@@ -1,22 +1,24 @@
 import 'dart:async';
-import 'dart:collection';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
-import 'package:petmagic_mobile/core/network/network_utils.dart';
+import 'package:petmagic_mobile/core/network/api_base_url_health_checker.dart';
+import 'package:petmagic_mobile/core/network/api_base_url_policy.dart';
+import 'package:petmagic_mobile/core/network/local_subnet_api_candidate_discovery.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+export 'package:petmagic_mobile/core/network/api_base_url_health_checker.dart'
+    show BaseUrlHealthProbe;
+export 'package:petmagic_mobile/core/network/local_subnet_api_candidate_discovery.dart'
+    show LocalSubnetCandidatesProvider;
 
 final apiBaseUrlResolverProvider = Provider<ApiBaseUrlResolver>((ref) {
   final resolver = ApiBaseUrlResolver();
   ref.onDispose(resolver.dispose);
   return resolver;
 });
-
-typedef BaseUrlHealthProbe = Future<bool> Function(String baseUrl);
-typedef LocalSubnetCandidatesProvider = Future<List<String>> Function();
 
 class ApiBaseUrlResolver {
   ApiBaseUrlResolver({
@@ -28,31 +30,37 @@ class ApiBaseUrlResolver {
     Duration? backgroundRefreshInterval,
     DateTime Function()? now,
   }) : _preferences = preferences ?? SharedPreferencesAsync(),
-       _healthProbe = healthProbe,
-       _localSubnetCandidatesProvider = localSubnetCandidatesProvider,
        _baseUrls = baseUrls ?? AppConfig.apiBaseUrls,
        _preferConfiguredBaseUrls =
            preferConfiguredBaseUrls ??
            AppConfig.configuredApiBaseUrl.trim().isNotEmpty,
        _backgroundRefreshInterval =
            backgroundRefreshInterval ?? const Duration(minutes: 5),
-       _now = now ?? DateTime.now;
+       _now = now ?? DateTime.now,
+       _policy = ApiBaseUrlPolicy(baseUrls ?? AppConfig.apiBaseUrls) {
+    _healthChecker = ApiBaseUrlHealthChecker(
+      healthProbe: healthProbe,
+      onProbeFailure: _handleProbeFailure,
+    );
+    _localSubnetDiscovery = LocalSubnetApiCandidateDiscovery(
+      overrideProvider: localSubnetCandidatesProvider,
+      onFailure: (error, stackTrace) => _logResolverFailure(
+        'read_local_subnet_candidates',
+        error,
+        stackTrace,
+      ),
+    );
+  }
 
   static const _persistedBaseUrlKey = 'petmagic_mobile_last_api_base_url';
-  static const _healthPath = '/health';
-  static const _defaultApiPort = 5000;
-  static const _probeConnectTimeout = Duration(milliseconds: 350);
-  static const _probeReadTimeout = Duration(milliseconds: 650);
-  static const _probeWorkers = 24;
-  static const _probeBudget = Duration(seconds: 8);
-
   final SharedPreferencesAsync _preferences;
-  final BaseUrlHealthProbe? _healthProbe;
-  final LocalSubnetCandidatesProvider? _localSubnetCandidatesProvider;
   final List<String> _baseUrls;
   final bool _preferConfiguredBaseUrls;
   final Duration _backgroundRefreshInterval;
   final DateTime Function() _now;
+  final ApiBaseUrlPolicy _policy;
+  late final ApiBaseUrlHealthChecker _healthChecker;
+  late final LocalSubnetApiCandidateDiscovery _localSubnetDiscovery;
 
   String? _activeBaseUrl;
   Completer<String>? _resolveInFlight;
@@ -74,7 +82,7 @@ class ApiBaseUrlResolver {
     final activeBaseUrl = _activeBaseUrl;
     if (activeBaseUrl != null &&
         (!_preferConfiguredBaseUrls ||
-            _isConfiguredBaseUrlCandidate(activeBaseUrl))) {
+            _policy.isConfiguredCandidate(activeBaseUrl))) {
       _refreshInBackgroundIfStale();
       return activeBaseUrl;
     }
@@ -84,7 +92,7 @@ class ApiBaseUrlResolver {
         return _resolveWithProbe();
       }
 
-      _activeBaseUrl = _configuredBaseUrlFallback();
+      _activeBaseUrl = _policy.configuredFallback();
       _refreshInBackgroundIfStale();
       return _activeBaseUrl!;
     }
@@ -124,7 +132,7 @@ class ApiBaseUrlResolver {
   Future<void> _completeResolveWithProbe(Completer<String> completer) async {
     try {
       final candidates = await prioritizedCandidates();
-      final reachableBaseUrl = await _findReachableBaseUrl(candidates);
+      final reachableBaseUrl = await _healthChecker.findReachable(candidates);
       if (_disposed) {
         final fallback = _activeBaseUrl ?? AppConfig.apiBaseUrl;
         _completeResolve(completer, fallback);
@@ -193,7 +201,7 @@ class ApiBaseUrlResolver {
     final candidates = <String>{};
 
     void addCandidate(String? raw) {
-      final normalized = _normalizeBaseUrl(raw);
+      final normalized = _policy.normalize(raw);
       if (normalized != null) {
         candidates.add(normalized);
       }
@@ -219,7 +227,7 @@ class ApiBaseUrlResolver {
     }
 
     if (kDebugMode && !kIsWeb) {
-      final subnetCandidates = await _readLocalSubnetCandidates();
+      final subnetCandidates = await _localSubnetDiscovery.discover();
       for (final baseUrl in subnetCandidates) {
         addCandidate(baseUrl);
       }
@@ -233,7 +241,7 @@ class ApiBaseUrlResolver {
       return;
     }
 
-    final normalized = _normalizeBaseUrl(baseUrl);
+    final normalized = _policy.normalize(baseUrl);
     if (normalized == null) {
       return;
     }
@@ -252,7 +260,7 @@ class ApiBaseUrlResolver {
       return;
     }
 
-    final normalized = _normalizeBaseUrl(baseUrl);
+    final normalized = _policy.normalize(baseUrl);
     if (normalized == null) {
       return;
     }
@@ -295,178 +303,21 @@ class ApiBaseUrlResolver {
     }
   }
 
-  Future<String?> _findReachableBaseUrl(List<String> candidates) async {
-    if (candidates.isEmpty) {
-      return null;
+  void _handleProbeFailure(
+    String baseUrl,
+    Object error,
+    StackTrace stackTrace,
+  ) {
+    final normalized = _policy.normalize(baseUrl);
+    if (normalized == null || normalized != _activeBaseUrl) {
+      return;
     }
-
-    final queue = Queue<String>.from(candidates);
-    final completer = Completer<String?>();
-    var runningWorkers = 0;
-
-    Future<void> runWorker() async {
-      try {
-        while (!completer.isCompleted) {
-          if (queue.isEmpty) {
-            return;
-          }
-
-          final candidate = queue.removeFirst();
-          final isHealthy = await _probe(candidate);
-          if (isHealthy && !completer.isCompleted) {
-            completer.complete(candidate);
-            return;
-          }
-        }
-      } finally {
-        runningWorkers--;
-        if (runningWorkers == 0 && !completer.isCompleted) {
-          completer.complete(null);
-        }
-      }
-    }
-
-    final workers = candidates.length < _probeWorkers
-        ? candidates.length
-        : _probeWorkers;
-    runningWorkers = workers;
-    for (var index = 0; index < workers; index++) {
-      unawaited(runWorker());
-    }
-
-    return completer.future.timeout(_probeBudget, onTimeout: () => null);
-  }
-
-  Future<bool> _probe(String baseUrl) {
-    final healthProbe = _healthProbe;
-    if (healthProbe != null) {
-      return healthProbe(baseUrl);
-    }
-
-    return _probeViaHttp(baseUrl);
-  }
-
-  Future<bool> _probeViaHttp(String baseUrl) async {
-    final httpClient = HttpClient()..connectionTimeout = _probeConnectTimeout;
-
-    try {
-      final request = await httpClient.getUrl(
-        Uri.parse('$baseUrl$_healthPath'),
-      );
-      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      request.headers.set('X-PetMagic-Client', 'mobile-flutter');
-      if (kDebugMode) {
-        request.headers.set('ngrok-skip-browser-warning', 'true');
-        request.headers.set('Bypass-Tunnel-Reminder', 'true');
-      }
-
-      final response = await request.close().timeout(_probeReadTimeout);
-      await response.drain<void>();
-
-      return response.statusCode >= 200 && response.statusCode < 300;
-    } catch (error, stackTrace) {
-      final normalized = _normalizeBaseUrl(baseUrl);
-      if (normalized != null && normalized == _activeBaseUrl) {
-        _logResolverFailure(
-          'probe_active_base_url',
-          error,
-          stackTrace,
-          context: {'base_url_origin': _logSafeBaseUrlOrigin(normalized)},
-        );
-      }
-      return false;
-    } finally {
-      httpClient.close(force: true);
-    }
-  }
-
-  Future<List<String>> _readLocalSubnetCandidates() async {
-    if (!kDebugMode) {
-      return const [];
-    }
-
-    try {
-      final overrideProvider = _localSubnetCandidatesProvider;
-      if (overrideProvider != null) {
-        return await overrideProvider();
-      }
-
-      if (!Platform.isAndroid && !Platform.isIOS) {
-        return const [];
-      }
-
-      final interfaces = await NetworkInterface.list(
-        type: InternetAddressType.IPv4,
-        includeLoopback: false,
-      );
-
-      final prefixes = <String>{};
-      final ownAddresses = <String>{};
-      final ownHostOctets = <int>{};
-
-      for (final networkInterface in interfaces) {
-        for (final address in networkInterface.addresses) {
-          if (!_isPrivateIpv4(address)) {
-            continue;
-          }
-
-          ownAddresses.add(address.address);
-
-          final octets = address.address.split('.');
-          prefixes.add('${octets[0]}.${octets[1]}.${octets[2]}');
-          ownHostOctets.add(int.parse(octets[3]));
-        }
-      }
-
-      if (prefixes.isEmpty) {
-        return const [];
-      }
-
-      final hostOrder = _buildHostProbeOrder(ownHostOctets);
-      final candidates = <String>[];
-
-      for (final prefix in prefixes) {
-        for (final host in hostOrder) {
-          final hostAddress = '$prefix.$host';
-          if (ownAddresses.contains(hostAddress)) {
-            continue;
-          }
-
-          candidates.add('http://$hostAddress:$_defaultApiPort');
-        }
-      }
-
-      return candidates;
-    } catch (error, stackTrace) {
-      _logResolverFailure('read_local_subnet_candidates', error, stackTrace);
-      return const [];
-    }
-  }
-
-  bool _isConfiguredBaseUrlCandidate(String baseUrl) {
-    final normalized = _normalizeBaseUrl(baseUrl);
-    if (normalized == null) {
-      return false;
-    }
-
-    for (final configured in _baseUrls) {
-      if (_normalizeBaseUrl(configured) == normalized) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  String _configuredBaseUrlFallback() {
-    for (final configured in _baseUrls) {
-      final normalized = _normalizeBaseUrl(configured);
-      if (normalized != null) {
-        return normalized;
-      }
-    }
-
-    return AppConfig.apiBaseUrl;
+    _logResolverFailure(
+      'probe_active_base_url',
+      error,
+      stackTrace,
+      context: {'base_url_origin': _policy.logSafeOrigin(normalized)},
+    );
   }
 
   void _logResolverFailure(
@@ -493,85 +344,9 @@ class ApiBaseUrlResolver {
     );
   }
 
-  String _logSafeBaseUrlOrigin(String baseUrl) {
-    final uri = Uri.tryParse(baseUrl);
-    if (uri == null || uri.scheme.isEmpty || uri.host.isEmpty) {
-      return 'invalid';
-    }
-
-    return uri.hasPort ? '${uri.scheme}://${uri.host}:${uri.port}' : uri.origin;
-  }
-
-  List<int> _buildHostProbeOrder(Set<int> ownHostOctets) {
-    final orderedHosts = <int>[];
-    final used = <int>{};
-
-    void addHost(int host) {
-      if (host < 1 || host > 254) {
-        return;
-      }
-
-      if (used.add(host)) {
-        orderedHosts.add(host);
-      }
-    }
-
-    const preferredHosts = [
-      1,
-      2,
-      10,
-      20,
-      30,
-      40,
-      50,
-      60,
-      70,
-      80,
-      90,
-      100,
-      101,
-      110,
-      120,
-      130,
-      140,
-      150,
-      160,
-      170,
-      180,
-      190,
-      200,
-      210,
-      220,
-      230,
-      240,
-      250,
-    ];
-
-    for (final host in preferredHosts) {
-      addHost(host);
-    }
-
-    for (final ownHost in ownHostOctets) {
-      for (var offset = 1; offset <= 50; offset++) {
-        addHost(ownHost - offset);
-        addHost(ownHost + offset);
-      }
-    }
-
-    for (var host = 1; host <= 254; host++) {
-      addHost(host);
-    }
-
-    return orderedHosts;
-  }
-
-  bool _isPrivateIpv4(InternetAddress address) {
-    return isPrivateIpv4(address.address);
-  }
-
   Future<String?> _readPersistedBaseUrl() async {
     final persisted = await _preferences.getString(_persistedBaseUrlKey);
-    final normalized = _normalizeBaseUrl(persisted);
+    final normalized = _policy.normalize(persisted);
     if (persisted != null && persisted.trim().isNotEmpty) {
       if (normalized == null) {
         await _preferences.remove(_persistedBaseUrlKey);
@@ -580,35 +355,6 @@ class ApiBaseUrlResolver {
       }
     }
 
-    return normalized;
-  }
-
-  String? _normalizeBaseUrl(String? raw) {
-    final trimmed = raw?.trim();
-    if (trimmed == null || trimmed.isEmpty) {
-      return null;
-    }
-
-    final uri = Uri.tryParse(trimmed);
-    if (uri == null || uri.host.isEmpty) {
-      return null;
-    }
-
-    final scheme = uri.scheme.toLowerCase();
-    if (scheme != 'http' && scheme != 'https') {
-      return null;
-    }
-
-    if (!kDebugMode && scheme != 'https') {
-      return null;
-    }
-
-    if (!kDebugMode) {
-      return AppConfig.normalizeProductionBaseUrl(trimmed);
-    }
-
-    final authority = uri.hasPort ? '${uri.host}:${uri.port}' : uri.host;
-    final normalized = '$scheme://$authority';
     return normalized;
   }
 }

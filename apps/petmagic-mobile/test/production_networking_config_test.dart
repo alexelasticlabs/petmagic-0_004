@@ -29,16 +29,22 @@ void main() {
     final resolver = File(
       'lib/core/network/api_base_url_resolver.dart',
     ).readAsStringSync();
+    final policy = File(
+      'lib/core/network/api_base_url_policy.dart',
+    ).readAsStringSync();
+    final discovery = File(
+      'lib/core/network/local_subnet_api_candidate_discovery.dart',
+    ).readAsStringSync();
 
     expect(
       resolver,
       contains(
         'if (kDebugMode && !kIsWeb) {\n'
-        '      final subnetCandidates = await _readLocalSubnetCandidates();',
+        '      final subnetCandidates = await _localSubnetDiscovery.discover();',
       ),
     );
     expect(
-      resolver,
+      policy,
       contains(
         'if (!kDebugMode) {\n'
         '      return AppConfig.normalizeProductionBaseUrl(trimmed);',
@@ -48,7 +54,7 @@ void main() {
       resolver,
       contains('await _preferences.remove(_persistedBaseUrlKey);'),
     );
-    expect(resolver, contains("if (!kDebugMode) {\n      return const [];"));
+    expect(discovery, contains("if (!kDebugMode) {\n      return const [];"));
   });
 
   test('release API config rejects dev origins before Dio can use them', () {
@@ -75,8 +81,8 @@ void main() {
     final dioProvider = File(
       'lib/core/network/dio_provider.dart',
     ).readAsStringSync();
-    final resolver = File(
-      'lib/core/network/api_base_url_resolver.dart',
+    final healthChecker = File(
+      'lib/core/network/api_base_url_health_checker.dart',
     ).readAsStringSync();
 
     expect(
@@ -88,7 +94,7 @@ void main() {
       ),
     );
     expect(
-      resolver,
+      healthChecker,
       contains(
         'if (kDebugMode) {\n'
         "        request.headers.set('ngrok-skip-browser-warning', 'true');\n"
@@ -112,9 +118,12 @@ void main() {
     final resolver = File(
       'lib/core/network/api_base_url_resolver.dart',
     ).readAsStringSync();
+    final policy = File(
+      'lib/core/network/api_base_url_policy.dart',
+    ).readAsStringSync();
 
-    expect(resolver, contains("'base_url_origin': _logSafeBaseUrlOrigin("));
-    expect(resolver, contains('String _logSafeBaseUrlOrigin(String baseUrl)'));
+    expect(resolver, contains("'base_url_origin': _policy.logSafeOrigin("));
+    expect(policy, contains('String logSafeOrigin(String baseUrl)'));
     expect(resolver, isNot(contains("context: {'base_url':")));
   });
 
