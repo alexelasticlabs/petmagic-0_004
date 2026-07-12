@@ -438,10 +438,6 @@ const _legacyApplicationPlatformDependencyFiles = <String>{
 
 const _legacyDomainSerializationFiles = <String>{
   'lib/features/premium/domain/premium_models.dart',
-  'lib/features/profile/domain/notification_preferences.dart',
-  'lib/features/profile/domain/profile_models.dart',
   'lib/features/support/domain/support_chat_models.dart',
-  'lib/features/templates/domain/template_generation_results.dart',
-  'lib/features/wallet/domain/pending_store_wallet_purchase.dart',
   'lib/features/wallet/domain/wallet_models.dart',
 };

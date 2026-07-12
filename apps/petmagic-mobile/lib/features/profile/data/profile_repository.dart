@@ -19,6 +19,7 @@ import 'package:petmagic_mobile/core/network/authenticated_request_options.dart'
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/domain/profile_models.dart';
+import 'package:petmagic_mobile/features/profile/data/profile_dto_mapper.dart';
 import 'package:petmagic_mobile/features/profile/application/profile_repository.dart';
 import 'package:petmagic_mobile/shared/files/image_upload_optimizer.dart';
 import 'package:petmagic_mobile/shared/files/media_signature.dart';
@@ -356,7 +357,7 @@ class ProfileRepository implements ProfileRepositoryPort {
 
     return (response.data ?? const <dynamic>[])
         .whereType<Map<String, dynamic>>()
-        .map(MobileLinkedAccount.fromJson)
+        .map(mapMobileLinkedAccountDto)
         .toList(growable: false);
   }
 
@@ -372,7 +373,7 @@ class ProfileRepository implements ProfileRepositoryPort {
         cancelToken: cancelToken,
       );
 
-      return MobileLegalDocuments.fromJson(response.data ?? const {});
+      return mapMobileLegalDocumentsDto(response.data ?? const {});
     } on DioException catch (error) {
       throw _mapDioException(
         error,
@@ -482,7 +483,7 @@ class ProfileRepository implements ProfileRepositoryPort {
 
     return (response.data ?? const <dynamic>[])
         .whereType<Map<String, dynamic>>()
-        .map(MobileLinkedAccount.fromJson)
+        .map(mapMobileLinkedAccountDto)
         .toList(growable: false);
   }
 

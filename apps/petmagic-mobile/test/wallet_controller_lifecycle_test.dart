@@ -15,6 +15,7 @@ import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart'
 import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_store_purchase_recovery_store.dart';
+import 'package:petmagic_mobile/features/wallet/data/pending_store_purchase_dto_mapper.dart';
 import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
@@ -985,13 +986,15 @@ void main() {
       await preferences.setString(
         WalletStorePurchaseRecoveryStore.legacyPendingPurchaseKey,
         jsonEncode(
-          PendingStoreWalletPurchase(
-            orderId: 'legacy-order-store-1',
-            provider: 'google_play',
-            productId: 'com.petmagic.app.tokens.google.pack100',
-            packId: 'pack-100',
-            packCode: 'pack100',
-            createdAtUtc: DateTime.utc(2026, 7, 2, 10),
+          mapPendingStorePurchaseToJson(
+            PendingStoreWalletPurchase(
+              orderId: 'legacy-order-store-1',
+              provider: 'google_play',
+              productId: 'com.petmagic.app.tokens.google.pack100',
+              packId: 'pack-100',
+              packCode: 'pack100',
+              createdAtUtc: DateTime.utc(2026, 7, 2, 10),
+            ),
           ),
         ),
       );

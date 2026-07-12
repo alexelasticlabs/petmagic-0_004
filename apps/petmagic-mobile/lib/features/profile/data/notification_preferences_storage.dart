@@ -56,7 +56,7 @@ class NotificationPreferencesStorage
         );
       }
 
-      final preferences = NotificationPreferences.fromJson(
+      final preferences = _mapNotificationPreferences(
         decoded,
         fallbackMarketingEmails: fallbackMarketingEmails,
       );
@@ -93,7 +93,7 @@ class NotificationPreferencesStorage
   }) async {
     await _preferences.setString(
       _keyForScope(scope),
-      jsonEncode(preferences.toJson()),
+      jsonEncode(_mapNotificationPreferencesToJson(preferences)),
     );
     await _preferences.remove(_legacyKeyForScope(scope));
   }
@@ -118,3 +118,36 @@ class NotificationPreferencesStorage
     return '$_keyPrefix$scope';
   }
 }
+
+NotificationPreferences _mapNotificationPreferences(
+  Map<String, dynamic> json, {
+  required bool fallbackMarketingEmails,
+}) {
+  return NotificationPreferences(
+    pushPhotoReady: json['pushPhotoReady'] as bool? ?? true,
+    pushVideoReady: json['pushVideoReady'] as bool? ?? true,
+    pushGenerationErrors: json['pushGenerationErrors'] as bool? ?? true,
+    pushReminders: json['pushReminders'] as bool? ?? true,
+    pushNewTemplates: json['pushNewTemplates'] as bool? ?? true,
+    pushPurchasesAndSubscriptions:
+        json['pushPurchasesAndSubscriptions'] as bool? ?? true,
+    emailOffersAndDiscounts:
+        json['emailOffersAndDiscounts'] as bool? ?? fallbackMarketingEmails,
+    emailNews: json['emailNews'] as bool? ?? false,
+    emailAccountAlerts: json['emailAccountAlerts'] as bool? ?? true,
+  );
+}
+
+Map<String, dynamic> _mapNotificationPreferencesToJson(
+  NotificationPreferences preferences,
+) => {
+  'pushPhotoReady': preferences.pushPhotoReady,
+  'pushVideoReady': preferences.pushVideoReady,
+  'pushGenerationErrors': preferences.pushGenerationErrors,
+  'pushReminders': preferences.pushReminders,
+  'pushNewTemplates': preferences.pushNewTemplates,
+  'pushPurchasesAndSubscriptions': preferences.pushPurchasesAndSubscriptions,
+  'emailOffersAndDiscounts': preferences.emailOffersAndDiscounts,
+  'emailNews': preferences.emailNews,
+  'emailAccountAlerts': preferences.emailAccountAlerts,
+};

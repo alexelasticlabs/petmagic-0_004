@@ -48,5 +48,5 @@ Future<GenerationMediaAccessResult> _fetchMediaAccess(
     retryTransientFailures: false,
   );
 
-  return GenerationMediaAccessResult.fromJson(response.data ?? const {});
+  return mapGenerationMediaAccessResultDto(response.data ?? const {});
 }

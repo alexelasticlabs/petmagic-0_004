@@ -59,35 +59,4 @@ class NotificationPreferences {
       emailAccountAlerts: emailAccountAlerts ?? this.emailAccountAlerts,
     );
   }
-
-  Map<String, dynamic> toJson() => {
-    'pushPhotoReady': pushPhotoReady,
-    'pushVideoReady': pushVideoReady,
-    'pushGenerationErrors': pushGenerationErrors,
-    'pushReminders': pushReminders,
-    'pushNewTemplates': pushNewTemplates,
-    'pushPurchasesAndSubscriptions': pushPurchasesAndSubscriptions,
-    'emailOffersAndDiscounts': emailOffersAndDiscounts,
-    'emailNews': emailNews,
-    'emailAccountAlerts': emailAccountAlerts,
-  };
-
-  static NotificationPreferences fromJson(
-    Map<String, dynamic> json, {
-    required bool fallbackMarketingEmails,
-  }) {
-    return NotificationPreferences(
-      pushPhotoReady: json['pushPhotoReady'] as bool? ?? true,
-      pushVideoReady: json['pushVideoReady'] as bool? ?? true,
-      pushGenerationErrors: json['pushGenerationErrors'] as bool? ?? true,
-      pushReminders: json['pushReminders'] as bool? ?? true,
-      pushNewTemplates: json['pushNewTemplates'] as bool? ?? true,
-      pushPurchasesAndSubscriptions:
-          json['pushPurchasesAndSubscriptions'] as bool? ?? true,
-      emailOffersAndDiscounts:
-          json['emailOffersAndDiscounts'] as bool? ?? fallbackMarketingEmails,
-      emailNews: json['emailNews'] as bool? ?? false,
-      emailAccountAlerts: json['emailAccountAlerts'] as bool? ?? true,
-    );
-  }
 }

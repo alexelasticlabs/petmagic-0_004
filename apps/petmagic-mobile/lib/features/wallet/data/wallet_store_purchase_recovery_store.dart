@@ -6,6 +6,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/features/wallet/domain/pending_store_wallet_purchase.dart';
+import 'package:petmagic_mobile/features/wallet/data/pending_store_purchase_dto_mapper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 final walletStorePurchaseRecoveryPreferencesProvider =
@@ -68,7 +69,7 @@ class WalletStorePurchaseRecoveryStore {
 
     await _secureStorage.write(
       key: pendingPurchaseSecureStorageKey,
-      value: jsonEncode(pending),
+      value: jsonEncode(mapPendingStorePurchaseToJson(pending)),
     );
     await _preferences.remove(legacyPendingPurchaseKey);
     return pending;
@@ -90,7 +91,7 @@ class WalletStorePurchaseRecoveryStore {
         return null;
       }
 
-      final pending = PendingStoreWalletPurchase.fromJson(decoded);
+      final pending = mapPendingStorePurchaseDto(decoded);
       if (pending.orderId.trim().isEmpty ||
           pending.provider.trim().isEmpty ||
           pending.productId.trim().isEmpty ||
@@ -117,7 +118,7 @@ class WalletStorePurchaseRecoveryStore {
   Future<void> savePendingPurchase(PendingStoreWalletPurchase purchase) async {
     await _secureStorage.write(
       key: pendingPurchaseSecureStorageKey,
-      value: jsonEncode(purchase),
+      value: jsonEncode(mapPendingStorePurchaseToJson(purchase)),
     );
     await _preferences.remove(legacyPendingPurchaseKey);
   }

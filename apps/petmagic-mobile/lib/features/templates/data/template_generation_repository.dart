@@ -22,6 +22,7 @@ import 'package:petmagic_mobile/core/network/request_identity.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_storage.dart';
 import 'package:petmagic_mobile/core/auth/auth_session.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_dtos.dart';
+import 'package:petmagic_mobile/features/templates/data/template_generation_result_dto_mapper.dart';
 import 'package:petmagic_mobile/features/templates/data/pet_dto_mapper.dart';
 import 'package:petmagic_mobile/features/pets/domain/pet_models.dart';
 import 'package:petmagic_mobile/features/templates/application/generation_repository.dart';
@@ -549,7 +550,7 @@ class TemplateGenerationRepository implements GenerationRepository {
       retryTransientFailures: false,
     );
 
-    return RemoveGenerationWatermarkResult.fromJson(response.data ?? const {});
+    return mapRemoveGenerationWatermarkResultDto(response.data ?? const {});
   }
 
   @override

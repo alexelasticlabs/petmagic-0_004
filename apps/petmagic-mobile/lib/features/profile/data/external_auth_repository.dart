@@ -20,6 +20,7 @@ import 'package:petmagic_mobile/core/network/authenticated_request_options.dart'
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/domain/profile_models.dart';
+import 'package:petmagic_mobile/features/profile/data/profile_dto_mapper.dart';
 import 'package:petmagic_mobile/features/profile/application/external_auth_gateway.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -456,7 +457,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
 
       return (response.data ?? const <dynamic>[])
           .whereType<Map<String, dynamic>>()
-          .map(MobileLinkedAccount.fromJson)
+          .map(mapMobileLinkedAccountDto)
           .toList(growable: false);
     } on AppException {
       await _resetGoogleSession();
@@ -667,7 +668,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
 
     return (response.data ?? const <dynamic>[])
         .whereType<Map<String, dynamic>>()
-        .map(MobileLinkedAccount.fromJson)
+        .map(mapMobileLinkedAccountDto)
         .toList(growable: false);
   }
 
