@@ -405,7 +405,6 @@ int _ownershipLimitFor(String path) {
 // Existing ownership debt is explicit and frozen: no new oversized file can
 // enter the codebase, while each split removes one entry from this list.
 const _legacyOversizedProductionFiles = <String>{
-  'lib/core/logging/app_logger.dart',
   'lib/features/pets/presentation/my_pets_display_widgets.part.dart',
   'lib/features/pets/presentation/my_pets_form_sheet.part.dart',
   'lib/features/premium/application/premium_controller_checkout.part.dart',
