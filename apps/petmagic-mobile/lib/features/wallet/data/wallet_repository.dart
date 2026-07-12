@@ -6,12 +6,10 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:petmagic_mobile/core/network/dio_request_cancellation.dart';
 import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
+import 'package:petmagic_mobile/core/payments/store_purchase.dart';
 import 'package:petmagic_mobile/core/platform/app_runtime_info.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
-import 'package:petmagic_mobile/core/payments/store_purchase.dart';
-import 'package:in_app_purchase_android/billing_client_wrappers.dart';
-import 'package:in_app_purchase_android/in_app_purchase_android.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
@@ -24,8 +22,7 @@ import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_dto_mapper.dart';
 import 'package:petmagic_mobile/features/wallet/application/wallet_repository.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_store_purchase_recovery_store.dart';
-import 'package:petmagic_mobile/shared/payments/store_product_availability_cache.dart';
-import 'package:petmagic_mobile/shared/payments/store_purchase_adapter.dart';
+import 'package:petmagic_mobile/features/wallet/data/wallet_store_purchase_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 final dioWalletRepositoryProvider = Provider<WalletRepositoryPort>((ref) {
@@ -40,8 +37,6 @@ final dioWalletRepositoryProvider = Provider<WalletRepositoryPort>((ref) {
 });
 
 class WalletRepository implements WalletRepositoryPort {
-  static const _storeAvailabilityTimeout = Duration(seconds: 8);
-
   WalletRepository({
     required Dio dio,
     required AuthSessionStore sessionStorage,
@@ -52,7 +47,9 @@ class WalletRepository implements WalletRepositoryPort {
        _authSessionCoordinator =
            authSessionCoordinator ??
            AuthSessionCoordinator(dio: dio, sessionStorage: sessionStorage),
-       _inAppPurchaseOverride = inAppPurchase,
+       _storePurchaseService = WalletStorePurchaseService(
+         inAppPurchase: inAppPurchase,
+       ),
        _storePurchaseRecoveryStore =
            storePurchaseRecoveryStore ??
            WalletStorePurchaseRecoveryStore(
@@ -61,18 +58,12 @@ class WalletRepository implements WalletRepositoryPort {
 
   final Dio _dio;
   final AuthSessionCoordinator _authSessionCoordinator;
-  final InAppPurchase? _inAppPurchaseOverride;
+  final WalletStorePurchaseService _storePurchaseService;
   final WalletStorePurchaseRecoveryStore _storePurchaseRecoveryStore;
-
-  InAppPurchase get _inAppPurchase =>
-      _inAppPurchaseOverride ?? InAppPurchase.instance;
 
   @override
   Stream<List<StorePurchaseDetails>> get purchaseUpdates =>
-      _inAppPurchase.purchaseStream.map(
-        (purchases) =>
-            purchases.map(mapPlatformStorePurchase).toList(growable: false),
-      );
+      _storePurchaseService.purchaseUpdates;
 
   @override
   Future<WalletStateModel> fetchWallet({
@@ -250,39 +241,7 @@ class WalletRepository implements WalletRepositoryPort {
     List<CurrencyPackModel> packs,
     WalletPaymentMethodModel paymentMethod,
   ) async {
-    if (!paymentMethod.isStoreNative) {
-      return (
-        isAvailable: false,
-        productIds: const <String>{},
-        productPrices: const <String, String>{},
-      );
-    }
-
-    final requestedIds = packs
-        .map((pack) => pack.productIdForProvider(paymentMethod.provider))
-        .whereType<String>()
-        .where((value) => value.isNotEmpty)
-        .toSet();
-
-    if (requestedIds.isEmpty) {
-      return (
-        isAvailable: false,
-        productIds: const <String>{},
-        productPrices: const <String, String>{},
-      );
-    }
-
-    final availability = await sharedStoreProductAvailabilityCache.read(
-      requestedIds,
-      loader: _loadStoreAvailabilitySnapshot,
-      scopeKey: paymentMethod.provider,
-    );
-
-    return (
-      isAvailable: availability.isAvailable,
-      productIds: availability.productIds,
-      productPrices: availability.productPrices,
-    );
+    return _storePurchaseService.fetchAvailability(packs, paymentMethod);
   }
 
   @override
@@ -295,60 +254,10 @@ class WalletRepository implements WalletRepositoryPort {
       unauthorizedMessage: 'auth.sign_in_required',
       sessionExpiredMessage: 'auth.session_expired',
     );
-    final productId = pack.productIdForProvider(paymentMethod.provider);
-    if (productId == null || productId.isEmpty) {
-      throw const AppException('wallet.payment_unavailable');
-    }
-
-    final availability = await sharedStoreProductAvailabilityCache.read(
-      {productId},
-      loader: _loadStoreAvailabilitySnapshot,
-      scopeKey: paymentMethod.provider,
-    );
-    final productDetails = availability.productDetailsById[productId];
-    if (!availability.isAvailable || productDetails == null) {
-      throw const AppException('wallet.payment_unavailable');
-    }
-
-    final launched = await _inAppPurchase.buyConsumable(
-      purchaseParam: PurchaseParam(
-        productDetails: productDetails,
-        applicationUserName: session.user.userId,
-      ),
-      autoConsume: false,
-    );
-    if (!launched) {
-      throw const AppException('wallet.payment_unavailable');
-    }
-  }
-
-  Future<StoreProductAvailabilitySnapshot> _loadStoreAvailabilitySnapshot(
-    Set<String> requestedProductIds,
-  ) async {
-    final isAvailable = await _inAppPurchase.isAvailable().timeout(
-      _storeAvailabilityTimeout,
-    );
-    if (!isAvailable) {
-      return const StoreProductAvailabilitySnapshot(isAvailable: false);
-    }
-
-    final response = await _inAppPurchase
-        .queryProductDetails(requestedProductIds)
-        .timeout(_storeAvailabilityTimeout);
-    if (response.error != null) {
-      throw const AppException('wallet.payment_unavailable');
-    }
-
-    return StoreProductAvailabilitySnapshot(
-      isAvailable: true,
-      productIds: response.productDetails.map((product) => product.id).toSet(),
-      productPrices: {
-        for (final product in response.productDetails)
-          product.id: product.price,
-      },
-      productDetailsById: {
-        for (final product in response.productDetails) product.id: product,
-      },
+    await _storePurchaseService.startCheckout(
+      pack,
+      paymentMethod,
+      applicationUserName: session.user.userId,
     );
   }
 
@@ -443,32 +352,19 @@ class WalletRepository implements WalletRepositoryPort {
       unauthorizedMessage: 'auth.sign_in_required',
       sessionExpiredMessage: 'auth.session_expired',
     );
-    await _inAppPurchase.restorePurchases(
+    await _storePurchaseService.restorePurchases(
       applicationUserName: session.user.userId,
     );
   }
 
   @override
   Future<void> completePurchase(StorePurchaseDetails purchase) {
-    return _inAppPurchase.completePurchase(
-      requirePlatformStorePurchase(purchase),
-    );
+    return _storePurchaseService.completePurchase(purchase);
   }
 
   @override
-  Future<void> consumeVerifiedPurchase(StorePurchaseDetails purchase) async {
-    final platformPurchase = requirePlatformStorePurchase(purchase);
-    if (!Platform.isAndroid) {
-      await _inAppPurchase.completePurchase(platformPurchase);
-      return;
-    }
-
-    final addition = _inAppPurchase
-        .getPlatformAddition<InAppPurchaseAndroidPlatformAddition>();
-    final result = await addition.consumePurchase(platformPurchase);
-    if (result.responseCode != BillingResponse.ok) {
-      throw const AppException('wallet.payment_unavailable');
-    }
+  Future<void> consumeVerifiedPurchase(StorePurchaseDetails purchase) {
+    return _storePurchaseService.consumeVerifiedPurchase(purchase);
   }
 
   @override

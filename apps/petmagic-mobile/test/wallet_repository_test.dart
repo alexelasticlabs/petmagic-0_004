@@ -113,6 +113,40 @@ void main() {
     expect(requests[0].queryParameters, {'skip': 0, 'take': 100});
     expect(requests[1].queryParameters, {'skip': 0, 'take': 1});
   });
+
+  test(
+    'wallet repository isolates store plugin operations without changing semantics',
+    () {
+      final repositorySource = File(
+        'lib/features/wallet/data/wallet_repository.dart',
+      ).readAsStringSync();
+      final storeServiceSource = File(
+        'lib/features/wallet/data/wallet_store_purchase_service.dart',
+      ).readAsStringSync();
+
+      expect(repositorySource, contains('WalletStorePurchaseService('));
+      expect(
+        repositorySource,
+        contains('_storePurchaseService.purchaseUpdates'),
+      );
+      expect(
+        repositorySource,
+        contains('_storePurchaseService.startCheckout('),
+      );
+      expect(
+        repositorySource,
+        contains('applicationUserName: session.user.userId'),
+      );
+      expect(storeServiceSource, contains('autoConsume: false'));
+      expect(
+        storeServiceSource,
+        contains('applicationUserName: applicationUserName'),
+      );
+      expect(storeServiceSource, contains('.restorePurchases('));
+      expect(storeServiceSource, contains('consumePurchase(platformPurchase)'));
+      expect(storeServiceSource, contains('BillingResponse.ok'));
+    },
+  );
 }
 
 Map<String, Object?> _purchaseJson(String orderId) {
