@@ -22,6 +22,7 @@ import 'package:petmagic_mobile/core/network/request_identity.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_storage.dart';
 import 'package:petmagic_mobile/core/auth/auth_session.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_dtos.dart';
+import 'package:petmagic_mobile/features/templates/data/pet_dto_mapper.dart';
 import 'package:petmagic_mobile/features/pets/domain/pet_models.dart';
 import 'package:petmagic_mobile/features/templates/application/generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
@@ -46,18 +47,17 @@ final templateGenerationSecureStorageProvider = Provider<FlutterSecureStorage>(
   (ref) => const FlutterSecureStorage(),
 );
 
-final dioTemplateGenerationRepositoryProvider = Provider<GenerationRepository>((
-  ref,
-) {
-  return TemplateGenerationRepository(
-    dio: ref.watch(dioProvider),
-    sessionStorage: ref.watch(authSessionStorageProvider),
-    preferences: ref.watch(templateGenerationSharedPreferencesProvider),
-    secureStorage: ref.watch(templateGenerationSecureStorageProvider),
-    authSessionCoordinator: ref.watch(authSessionCoordinatorProvider),
-    imageUploadOptimizer: const ImageUploadOptimizer(),
-  );
-});
+final dioTemplateGenerationRepositoryProvider =
+    Provider<TemplateGenerationRepository>((ref) {
+      return TemplateGenerationRepository(
+        dio: ref.watch(dioProvider),
+        sessionStorage: ref.watch(authSessionStorageProvider),
+        preferences: ref.watch(templateGenerationSharedPreferencesProvider),
+        secureStorage: ref.watch(templateGenerationSecureStorageProvider),
+        authSessionCoordinator: ref.watch(authSessionCoordinatorProvider),
+        imageUploadOptimizer: const ImageUploadOptimizer(),
+      );
+    });
 
 class TemplateGenerationRepository implements GenerationRepository {
   TemplateGenerationRepository({
@@ -382,7 +382,6 @@ class TemplateGenerationRepository implements GenerationRepository {
     return TemplateGenerationDto.fromJson(response.data ?? const {}).toDomain();
   }
 
-  @override
   Future<List<PetProfile>> fetchPets({CancelToken? cancelToken}) async {
     final response = await _authorizedRequest<List<dynamic>>(
       (session) => _dio.get<List<dynamic>>(
@@ -394,11 +393,10 @@ class TemplateGenerationRepository implements GenerationRepository {
 
     return (response.data ?? const [])
         .whereType<Map>()
-        .map((item) => PetProfile.fromJson(Map<String, dynamic>.from(item)))
+        .map((item) => mapPetProfileDto(Map<String, dynamic>.from(item)))
         .toList(growable: false);
   }
 
-  @override
   Future<PetProfile> createPet({
     required String name,
     required String type,
@@ -415,10 +413,9 @@ class TemplateGenerationRepository implements GenerationRepository {
       retryTransientFailures: false,
     );
 
-    return PetProfile.fromJson(response.data ?? const {});
+    return mapPetProfileDto(response.data ?? const {});
   }
 
-  @override
   Future<PetProfile> updatePet({
     required String petId,
     required String name,
@@ -437,10 +434,9 @@ class TemplateGenerationRepository implements GenerationRepository {
       retryTransientFailures: false,
     );
 
-    return PetProfile.fromJson(response.data ?? const {});
+    return mapPetProfileDto(response.data ?? const {});
   }
 
-  @override
   Future<void> deletePet(String petId, {CancelToken? cancelToken}) async {
     final encodedPetId = _apiPathSegment(petId);
     await _authorizedRequest<void>(
@@ -453,7 +449,6 @@ class TemplateGenerationRepository implements GenerationRepository {
     );
   }
 
-  @override
   Future<PetPhoto> uploadPetPhoto({
     required String petId,
     required XFile photo,
@@ -465,13 +460,11 @@ class TemplateGenerationRepository implements GenerationRepository {
     cancelToken: cancelToken,
   );
 
-  @override
   Future<List<PetPhoto>> fetchPetPhotos(
     String petId, {
     CancelToken? cancelToken,
   }) => _fetchPetPhotos(this, petId: petId, cancelToken: cancelToken);
 
-  @override
   Future<PetPhoto> setPetPhotoAsAvatar({
     required String petId,
     required String photoId,
@@ -483,7 +476,6 @@ class TemplateGenerationRepository implements GenerationRepository {
     cancelToken: cancelToken,
   );
 
-  @override
   Future<PetPhoto> setPetPhotoFavorite({
     required String petId,
     required String photoId,
@@ -497,7 +489,6 @@ class TemplateGenerationRepository implements GenerationRepository {
     cancelToken: cancelToken,
   );
 
-  @override
   Future<void> deletePetPhoto({
     required String petId,
     required String photoId,
@@ -509,7 +500,6 @@ class TemplateGenerationRepository implements GenerationRepository {
     cancelToken: cancelToken,
   );
 
-  @override
   Future<List<TemplateGenerationResult>> fetchPetGenerations(
     String petId, {
     CancelToken? cancelToken,
@@ -868,6 +858,10 @@ class TemplateGenerationRepository implements GenerationRepository {
     DioException error, {
     required String fallbackMessage,
   }) {
+    if (CancelToken.isCancel(error)) {
+      return const RequestCancelledException();
+    }
+
     final generationQueueRejection = _mapGenerationQueueRejection(error);
     if (generationQueueRejection != null) {
       return generationQueueRejection;

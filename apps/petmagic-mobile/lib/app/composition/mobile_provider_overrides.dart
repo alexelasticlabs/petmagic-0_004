@@ -1,5 +1,6 @@
 import 'package:petmagic_mobile/app/notifications/firebase_push_token_lifecycle_adapter.dart';
 import 'package:petmagic_mobile/features/gamification/data/gamification_repository.dart';
+import 'package:petmagic_mobile/features/pets/application/pet_repository.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_repository.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
@@ -9,12 +10,18 @@ import 'package:petmagic_mobile/features/support/data/support_chat_repository.da
 import 'package:petmagic_mobile/features/support/data/support_chat_realtime_client.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
+import 'package:petmagic_mobile/features/templates/data/template_generation_pet_repository_adapter.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_gallery_store.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
 
 final mobileProviderOverrides = [
   gamificationRepositoryProvider.overrideWith(
     (ref) => ref.watch(dioGamificationRepositoryProvider),
+  ),
+  petRepositoryProvider.overrideWith(
+    (ref) => TemplateGenerationPetRepositoryAdapter(
+      ref.watch(dioTemplateGenerationRepositoryProvider),
+    ),
   ),
   premiumRepositoryProvider.overrideWith(
     (ref) => ref.watch(dioPremiumRepositoryProvider),

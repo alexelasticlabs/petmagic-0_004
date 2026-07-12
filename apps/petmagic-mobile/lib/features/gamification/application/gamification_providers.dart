@@ -2,10 +2,10 @@ import 'dart:async';
 
 // Public gamification application providers.
 
-import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/gamification/domain/gamification_models.dart';
 import 'package:petmagic_mobile/features/gamification/application/gamification_repository.dart';
@@ -32,16 +32,16 @@ final gamificationSummaryProvider =
         disposeTimer?.cancel();
         disposeTimer = null;
       });
-      final cancelToken = CancelToken();
+      final cancellation = RequestCancellation();
       ref.onDispose(() {
         disposeTimer?.cancel();
-        if (!cancelToken.isCancelled) {
-          cancelToken.cancel('gamification_summary_provider_disposed');
+        if (!cancellation.isCancelled) {
+          cancellation.cancel('gamification_summary_provider_disposed');
         }
       });
       return ref
           .watch(gamificationRepositoryProvider)
-          .fetchSummary(cancelToken: cancelToken);
+          .fetchSummary(cancellation: cancellation);
     });
 
 final achievementsProvider = FutureProvider.autoDispose<List<AchievementModel>>(
@@ -64,16 +64,16 @@ final achievementsProvider = FutureProvider.autoDispose<List<AchievementModel>>(
       disposeTimer?.cancel();
       disposeTimer = null;
     });
-    final cancelToken = CancelToken();
+    final cancellation = RequestCancellation();
     ref.onDispose(() {
       disposeTimer?.cancel();
-      if (!cancelToken.isCancelled) {
-        cancelToken.cancel('achievements_provider_disposed');
+      if (!cancellation.isCancelled) {
+        cancellation.cancel('achievements_provider_disposed');
       }
     });
     return ref
         .watch(gamificationRepositoryProvider)
-        .fetchAchievements(cancelToken: cancelToken);
+        .fetchAchievements(cancellation: cancellation);
   },
 );
 

@@ -44,7 +44,7 @@ class _PetFormSheetState extends ConsumerState<_PetFormSheet> {
 
     setState(() => _isSaving = true);
     try {
-      final repository = ref.read(templateGenerationRepositoryProvider);
+      final repository = ref.read(petRepositoryProvider);
       final breed = _breedController.text.trim();
       final pet = widget.pet;
       final saved = pet == null
@@ -67,7 +67,11 @@ class _PetFormSheetState extends ConsumerState<_PetFormSheet> {
       if (selectedPhoto != null) {
         final uploadedPhoto = await repository.uploadPetPhoto(
           petId: saved.id,
-          photo: selectedPhoto,
+          photo: LocalMediaFile(
+            path: selectedPhoto.path,
+            name: selectedPhoto.name,
+            mimeType: selectedPhoto.mimeType,
+          ),
         );
         if (!uploadedPhoto.isAvatar && uploadedPhoto.id.isNotEmpty) {
           await repository.setPetPhotoAsAvatar(

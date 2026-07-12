@@ -231,8 +231,15 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
       showChangeAction: showChangeAction,
       pickPhoto: _pickPetGalleryPhoto,
       uploadPhoto: (photo) => ref
-          .read(templateGenerationRepositoryProvider)
-          .uploadPetPhoto(petId: petId, photo: photo),
+          .read(petRepositoryProvider)
+          .uploadPetPhoto(
+            petId: petId,
+            photo: LocalMediaFile(
+              path: photo.path,
+              name: photo.name,
+              mimeType: photo.mimeType,
+            ),
+          ),
       startGeneration: (selectedPhoto) async {
         return ref
             .read(templateGenerationRepositoryProvider)

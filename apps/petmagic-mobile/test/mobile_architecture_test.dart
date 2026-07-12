@@ -215,6 +215,52 @@ void main() {
       expect(violations, isEmpty);
     });
 
+    test('application platform dependency debt is explicit and frozen', () {
+      const forbiddenImports = <String>[
+        'package:dio/',
+        'package:flutter/',
+        'package:in_app_purchase/',
+        'package:image_picker/',
+      ];
+      final violations = <String>[];
+      final observedDebt = <String>{};
+      for (final file in _featureLayerFiles('application')) {
+        final path = _relative(file);
+        final source = file.readAsStringSync();
+        final dependencies = forbiddenImports
+            .where(source.contains)
+            .toList(growable: false);
+        if (dependencies.isEmpty) continue;
+        observedDebt.add(path);
+        if (!_legacyApplicationPlatformDependencyFiles.contains(path)) {
+          violations.add('$path -> ${dependencies.join(', ')}');
+        }
+      }
+      expect(violations, isEmpty);
+      expect(
+        observedDebt,
+        _legacyApplicationPlatformDependencyFiles,
+        reason: 'Remove stale debt entries as application ports become pure.',
+      );
+    });
+
+    test('domain serialization debt is explicit and frozen', () {
+      final observedDebt = <String>{};
+      for (final file in _featureLayerFiles('domain')) {
+        final source = file.readAsStringSync();
+        if (source.contains('fromJson') ||
+            source.contains('toJson') ||
+            source.contains('Map<String, dynamic>')) {
+          observedDebt.add(_relative(file));
+        }
+      }
+      expect(
+        observedDebt,
+        _legacyDomainSerializationFiles,
+        reason: 'Wire serialization belongs to data DTO mappers.',
+      );
+    });
+
     test('feature and shared UI do not import GoRouter', () {
       final violations = <String>[];
       for (final root in [Directory('lib/features'), Directory('lib/shared')]) {
@@ -274,6 +320,7 @@ void main() {
     ).readAsStringSync();
     for (final provider in const [
       'templatesRepositoryProvider',
+      'petRepositoryProvider',
       'gamificationRepositoryProvider',
       'supportChatRepositoryProvider',
       'supportChatRealtimeClientProvider',
@@ -373,4 +420,28 @@ const _legacyOversizedProductionFiles = <String>{
   'lib/features/wallet/presentation/all_transactions_page.dart',
   'lib/features/wallet/presentation/wallet_page.dart',
   'lib/features/wallet/presentation/widgets/wallet_page_overview_chrome.part.dart',
+};
+
+const _legacyApplicationPlatformDependencyFiles = <String>{
+  'lib/features/premium/application/premium_controller.dart',
+  'lib/features/premium/application/premium_repository.dart',
+  'lib/features/profile/application/external_auth_gateway.dart',
+  'lib/features/profile/application/profile_controller.dart',
+  'lib/features/profile/application/profile_repository.dart',
+  'lib/features/support/application/support_repository.dart',
+  'lib/features/templates/application/generation_history_controller.dart',
+  'lib/features/templates/application/generation_repository.dart',
+  'lib/features/templates/application/templates_controller.dart',
+  'lib/features/wallet/application/wallet_controller.dart',
+  'lib/features/wallet/application/wallet_repository.dart',
+};
+
+const _legacyDomainSerializationFiles = <String>{
+  'lib/features/premium/domain/premium_models.dart',
+  'lib/features/profile/domain/notification_preferences.dart',
+  'lib/features/profile/domain/profile_models.dart',
+  'lib/features/support/domain/support_chat_models.dart',
+  'lib/features/templates/domain/template_generation_results.dart',
+  'lib/features/wallet/domain/pending_store_wallet_purchase.dart',
+  'lib/features/wallet/domain/wallet_models.dart',
 };

@@ -17,7 +17,7 @@ Future<void> _pickAndUploadPhoto(
   WidgetRef ref,
   String petId, {
   String? currentAvatarUrl,
-  required CancelToken cancelToken,
+  required RequestCancellation cancelToken,
 }) async {
   final permissionFeedbackCoordinator = ref.read(
     mediaPermissionFeedbackCoordinatorProvider,
@@ -43,11 +43,15 @@ Future<void> _pickAndUploadPhoto(
     return;
   }
 
-  final repository = ref.read(templateGenerationRepositoryProvider);
+  final repository = ref.read(petRepositoryProvider);
   var uploadedPhoto = await repository.uploadPetPhoto(
     petId: petId,
-    photo: picked,
-    cancelToken: cancelToken,
+    photo: LocalMediaFile(
+      path: picked.path,
+      name: picked.name,
+      mimeType: picked.mimeType,
+    ),
+    cancellation: cancelToken,
   );
   if (cancelToken.isCancelled) {
     return;
@@ -58,7 +62,7 @@ Future<void> _pickAndUploadPhoto(
     uploadedPhoto = await repository.setPetPhotoAsAvatar(
       petId: petId,
       photoId: uploadedPhoto.id,
-      cancelToken: cancelToken,
+      cancellation: cancelToken,
     );
     if (cancelToken.isCancelled) {
       return;
@@ -77,14 +81,14 @@ Future<void> _setAvatar(
   String petId,
   PetPhoto photo, {
   String? currentAvatarUrl,
-  required CancelToken cancelToken,
+  required RequestCancellation cancelToken,
 }) async {
   final updatedPhoto = await ref
-      .read(templateGenerationRepositoryProvider)
+      .read(petRepositoryProvider)
       .setPetPhotoAsAvatar(
         petId: petId,
         photoId: photo.id,
-        cancelToken: cancelToken,
+        cancellation: cancelToken,
       );
   if (cancelToken.isCancelled) {
     return;
@@ -102,15 +106,15 @@ Future<void> _setFavorite(
   WidgetRef ref,
   String petId,
   PetPhoto photo, {
-  required CancelToken cancelToken,
+  required RequestCancellation cancelToken,
 }) async {
   await ref
-      .read(templateGenerationRepositoryProvider)
+      .read(petRepositoryProvider)
       .setPetPhotoFavorite(
         petId: petId,
         photoId: photo.id,
         isFavorite: !photo.isFavorite,
-        cancelToken: cancelToken,
+        cancellation: cancelToken,
       );
   if (cancelToken.isCancelled) {
     return;
@@ -124,14 +128,14 @@ Future<void> _deletePhoto(
   String petId,
   PetPhoto photo, {
   String? currentAvatarUrl,
-  required CancelToken cancelToken,
+  required RequestCancellation cancelToken,
 }) async {
   await ref
-      .read(templateGenerationRepositoryProvider)
+      .read(petRepositoryProvider)
       .deletePetPhoto(
         petId: petId,
         photoId: photo.id,
-        cancelToken: cancelToken,
+        cancellation: cancelToken,
       );
   if (cancelToken.isCancelled) {
     return;
@@ -144,9 +148,12 @@ Future<void> _deletePhoto(
   await _refreshPetProfileMedia(ref, petId);
 }
 
-bool _isPetPhotoRequestCancelled(Object error, CancelToken cancelToken) {
-  return cancelToken.isCancelled ||
-      (error is DioException && CancelToken.isCancel(error));
+bool _isPetPhotoRequestCancelled(
+  Object error,
+  RequestCancellation cancellation,
+) {
+  return cancellation.isCancelled ||
+      (error is AppException && error.isRequestCancelled);
 }
 
 bool _isUnauthorizedError(Object? error) {
@@ -205,7 +212,7 @@ Future<void> _deletePet(
     return;
   }
 
-  await ref.read(templateGenerationRepositoryProvider).deletePet(petId);
+  await ref.read(petRepositoryProvider).deletePet(petId);
   await _refreshPets(ref);
   if (context.mounted) {
     context.appNavigator.pop();

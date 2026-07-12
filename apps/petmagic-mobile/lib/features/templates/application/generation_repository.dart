@@ -1,7 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:petmagic_mobile/features/pets/domain/pet_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_results.dart';
 
@@ -56,50 +55,6 @@ abstract interface class GenerationRepository {
     required String templateId,
     int? expectedTemplateVersion,
     String? correlationId,
-    CancelToken? cancelToken,
-  });
-  Future<List<PetProfile>> fetchPets({CancelToken? cancelToken});
-  Future<PetProfile> createPet({
-    required String name,
-    required String type,
-    String? breed,
-    CancelToken? cancelToken,
-  });
-  Future<PetProfile> updatePet({
-    required String petId,
-    required String name,
-    required String type,
-    String? breed,
-    CancelToken? cancelToken,
-  });
-  Future<void> deletePet(String petId, {CancelToken? cancelToken});
-  Future<PetPhoto> uploadPetPhoto({
-    required String petId,
-    required XFile photo,
-    CancelToken? cancelToken,
-  });
-  Future<List<PetPhoto>> fetchPetPhotos(
-    String petId, {
-    CancelToken? cancelToken,
-  });
-  Future<PetPhoto> setPetPhotoAsAvatar({
-    required String petId,
-    required String photoId,
-    CancelToken? cancelToken,
-  });
-  Future<PetPhoto> setPetPhotoFavorite({
-    required String petId,
-    required String photoId,
-    required bool isFavorite,
-    CancelToken? cancelToken,
-  });
-  Future<void> deletePetPhoto({
-    required String petId,
-    required String photoId,
-    CancelToken? cancelToken,
-  });
-  Future<List<TemplateGenerationResult>> fetchPetGenerations(
-    String petId, {
     CancelToken? cancelToken,
   });
   Future<void> recordTemplateAnalyticsEvent({

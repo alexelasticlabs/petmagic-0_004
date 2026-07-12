@@ -22,6 +22,8 @@ import 'package:petmagic_mobile/features/pets/presentation/my_pets_page.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
+import 'package:petmagic_mobile/features/templates/data/template_generation_pet_repository_adapter.dart';
+import 'package:petmagic_mobile/features/pets/application/pet_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -95,6 +97,9 @@ Future<void> pumpMyPets(
               : UnauthenticatedAppLaunchController.new,
         ),
         templateGenerationRepositoryProvider.overrideWithValue(repository),
+        petRepositoryProvider.overrideWithValue(
+          TemplateGenerationPetRepositoryAdapter(repository),
+        ),
         appPermissionCoordinatorProvider.overrideWithValue(
           permissionCoordinator ?? FakeAppPermissionCoordinator(),
         ),
@@ -176,6 +181,9 @@ Future<void> pumpPetDetailsWithRouter(
               : UnauthenticatedAppLaunchController.new,
         ),
         templateGenerationRepositoryProvider.overrideWithValue(repository),
+        petRepositoryProvider.overrideWithValue(
+          TemplateGenerationPetRepositoryAdapter(repository),
+        ),
         appPermissionCoordinatorProvider.overrideWithValue(
           permissionCoordinator ?? FakeAppPermissionCoordinator(),
         ),

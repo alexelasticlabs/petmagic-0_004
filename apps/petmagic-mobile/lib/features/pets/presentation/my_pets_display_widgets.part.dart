@@ -281,8 +281,8 @@ class _PhotoGrid extends ConsumerStatefulWidget {
 
 class _PhotoGridState extends ConsumerState<_PhotoGrid> {
   final Set<String> _busyPhotoIds = <String>{};
-  final Map<String, CancelToken> _photoActionCancelTokens =
-      <String, CancelToken>{};
+  final Map<String, RequestCancellation> _photoActionCancelTokens =
+      <String, RequestCancellation>{};
 
   @override
   void didUpdateWidget(covariant _PhotoGrid oldWidget) {
@@ -302,13 +302,13 @@ class _PhotoGridState extends ConsumerState<_PhotoGrid> {
 
   Future<void> _runPhotoAction(
     PetPhoto photo,
-    Future<void> Function(CancelToken cancelToken) action,
+    Future<void> Function(RequestCancellation cancellation) action,
   ) async {
     if (_busyPhotoIds.contains(photo.id)) {
       return;
     }
 
-    final cancelToken = CancelToken();
+    final cancelToken = RequestCancellation();
     setState(() {
       _busyPhotoIds.add(photo.id);
       _photoActionCancelTokens[photo.id] = cancelToken;
@@ -383,7 +383,7 @@ class _PhotoGridState extends ConsumerState<_PhotoGrid> {
                 widget.petId,
                 photo,
                 currentAvatarUrl: widget.currentAvatarUrl,
-                cancelToken: cancelToken,
+              cancelToken: cancelToken,
               ),
             ),
             onSetFavorite: () => _runPhotoAction(
@@ -392,7 +392,7 @@ class _PhotoGridState extends ConsumerState<_PhotoGrid> {
                 ref,
                 widget.petId,
                 photo,
-                cancelToken: cancelToken,
+            cancelToken: cancelToken,
               ),
             ),
             onUseForGeneration: isBusy
@@ -410,7 +410,7 @@ class _PhotoGridState extends ConsumerState<_PhotoGrid> {
                 widget.petId,
                 photo,
                 currentAvatarUrl: widget.currentAvatarUrl,
-                cancelToken: cancelToken,
+              cancelToken: cancelToken,
               ),
             ),
           );
@@ -694,7 +694,7 @@ class _PetPhotoImageFallback extends StatelessWidget {
 class _GenerationList extends StatelessWidget {
   const _GenerationList({required this.generations, required this.text});
 
-  final List<TemplateGenerationResult> generations;
+  final List<PetGenerationSummary> generations;
   final AppLocalizations text;
 
   @override
@@ -718,7 +718,7 @@ class _PetGenerationHistoryTile extends StatelessWidget {
     required this.text,
   });
 
-  final TemplateGenerationResult generation;
+  final PetGenerationSummary generation;
   final AppLocalizations text;
 
   @override
@@ -774,7 +774,7 @@ class _PetGenerationHistoryTile extends StatelessWidget {
 
 String _petGenerationStatusTitle(
   AppLocalizations text,
-  TemplateGenerationResult generation,
+  PetGenerationSummary generation,
 ) {
   if (generation.isCompleted) return text.generationStatusStatusCompleted;
   if (generation.isFailed) return text.generationStatusStatusFailed;

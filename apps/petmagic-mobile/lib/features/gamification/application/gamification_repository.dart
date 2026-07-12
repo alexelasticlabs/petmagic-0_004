@@ -1,5 +1,5 @@
-import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:petmagic_mobile/features/gamification/domain/gamification_models.dart';
 
 final gamificationRepositoryProvider = Provider<GamificationRepository>((ref) {
@@ -9,6 +9,10 @@ final gamificationRepositoryProvider = Provider<GamificationRepository>((ref) {
 });
 
 abstract interface class GamificationRepository {
-  Future<GamificationSummaryModel> fetchSummary({CancelToken? cancelToken});
-  Future<List<AchievementModel>> fetchAchievements({CancelToken? cancelToken});
+  Future<GamificationSummaryModel> fetchSummary({
+    RequestCancellation? cancellation,
+  });
+  Future<List<AchievementModel>> fetchAchievements({
+    RequestCancellation? cancellation,
+  });
 }

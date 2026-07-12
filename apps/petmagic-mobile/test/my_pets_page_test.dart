@@ -13,7 +13,9 @@ import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/pets/presentation/my_pets_page.dart';
+import 'package:petmagic_mobile/features/pets/application/pet_repository.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
+import 'package:petmagic_mobile/features/templates/data/template_generation_pet_repository_adapter.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'my_pets_page_test_support.dart';
@@ -164,7 +166,7 @@ void main() {
       expect(
         pageSource,
         contains(
-          "import 'package:petmagic_mobile/features/templates/application/template_generation_contract.dart';",
+          "import 'package:petmagic_mobile/features/pets/domain/pet_generation_summary.dart';",
         ),
       );
       expect(
@@ -413,6 +415,9 @@ void main() {
           AuthenticatedAppLaunchController.new,
         ),
         templateGenerationRepositoryProvider.overrideWithValue(repository),
+        petRepositoryProvider.overrideWithValue(
+          TemplateGenerationPetRepositoryAdapter(repository),
+        ),
         networkStatusControllerProvider.overrideWith(
           () => TestMyPetsNetworkStatusController(initialHasInternet: true),
         ),
@@ -496,6 +501,9 @@ void main() {
             AuthenticatedAppLaunchController.new,
           ),
           templateGenerationRepositoryProvider.overrideWithValue(repository),
+          petRepositoryProvider.overrideWithValue(
+            TemplateGenerationPetRepositoryAdapter(repository),
+          ),
           networkStatusControllerProvider.overrideWith(() => networkController),
         ],
       );

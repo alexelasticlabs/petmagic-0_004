@@ -1,9 +1,9 @@
 import 'dart:io';
 
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
@@ -433,7 +433,7 @@ void main() {
       );
       expect(
         providersSource,
-        contains("cancelToken.cancel('achievements_provider_disposed');"),
+        contains("cancellation.cancel('achievements_provider_disposed');"),
       );
       expect(
         providersSource,
@@ -584,7 +584,7 @@ class _ControlledAchievementsRepository implements GamificationRepository {
 
   @override
   Future<List<AchievementModel>> fetchAchievements({
-    CancelToken? cancelToken,
+    RequestCancellation? cancellation,
   }) async {
     fetchCalls += 1;
     if (fetchCalls <= failUntilCall) {
@@ -623,7 +623,7 @@ class _ControlledAchievementsRepository implements GamificationRepository {
 
   @override
   Future<GamificationSummaryModel> fetchSummary({
-    CancelToken? cancelToken,
+    RequestCancellation? cancellation,
   }) async {
     summaryFetchCalls += 1;
     return const GamificationSummaryModel();

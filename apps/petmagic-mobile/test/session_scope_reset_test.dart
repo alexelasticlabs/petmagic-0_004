@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/notifications/push_token_registration_cache.dart';
@@ -14,6 +15,7 @@ import 'package:petmagic_mobile/features/gamification/domain/gamification_models
 import 'package:petmagic_mobile/features/gamification/data/gamification_repository.dart';
 import 'package:petmagic_mobile/features/gamification/application/gamification_providers.dart';
 import 'package:petmagic_mobile/features/pets/application/pet_profile_providers.dart';
+import 'package:petmagic_mobile/features/pets/domain/pet_generation_summary.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_realtime_client.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_gallery_store.dart';
@@ -172,7 +174,7 @@ void main() {
         fireImmediately: true,
       );
       final generationsSubscription = container
-          .listen<AsyncValue<List<TemplateGenerationResult>>>(
+          .listen<AsyncValue<List<PetGenerationSummary>>>(
             petGenerationsProvider('pet-1'),
             (_, _) {},
             fireImmediately: true,
@@ -556,7 +558,7 @@ class FakeGamificationRepository implements GamificationRepository {
 
   @override
   Future<GamificationSummaryModel> fetchSummary({
-    CancelToken? cancelToken,
+    RequestCancellation? cancellation,
   }) async {
     summaryFetchCount++;
     return GamificationSummaryModel(
@@ -612,7 +614,7 @@ class FakeGamificationRepository implements GamificationRepository {
 
   @override
   Future<List<AchievementModel>> fetchAchievements({
-    CancelToken? cancelToken,
+    RequestCancellation? cancellation,
   }) async {
     achievementsFetchCount++;
     return const [

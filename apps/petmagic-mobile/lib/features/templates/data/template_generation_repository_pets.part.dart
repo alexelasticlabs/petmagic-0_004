@@ -62,7 +62,7 @@ Future<PetPhoto> _uploadPetPhoto(
       retryTransientFailures: false,
     );
 
-    return PetPhoto.fromJson(response.data ?? const {});
+    return mapPetPhotoDto(response.data ?? const {});
   } finally {
     await optimizedPhoto?.dispose();
   }
@@ -115,7 +115,7 @@ Future<List<PetPhoto>> _fetchPetPhotos(
 
   return (response.data ?? const [])
       .whereType<Map>()
-      .map((item) => PetPhoto.fromJson(Map<String, dynamic>.from(item)))
+      .map((item) => mapPetPhotoDto(Map<String, dynamic>.from(item)))
       .toList(growable: false);
 }
 
@@ -136,7 +136,7 @@ Future<PetPhoto> _setPetPhotoAsAvatar(
     retryTransientFailures: false,
   );
 
-  return PetPhoto.fromJson(response.data ?? const {});
+  return mapPetPhotoDto(response.data ?? const {});
 }
 
 Future<PetPhoto> _setPetPhotoFavorite(
@@ -158,7 +158,7 @@ Future<PetPhoto> _setPetPhotoFavorite(
     retryTransientFailures: false,
   );
 
-  return PetPhoto.fromJson(response.data ?? const {});
+  return mapPetPhotoDto(response.data ?? const {});
 }
 
 Future<void> _deletePetPhoto(
