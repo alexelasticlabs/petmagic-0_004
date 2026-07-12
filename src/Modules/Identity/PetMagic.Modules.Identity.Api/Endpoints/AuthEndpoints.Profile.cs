@@ -10,7 +10,6 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.WebUtilities;
 
 using PetMagic.BuildingBlocks.Images;
-using PetMagic.Modules.Identity.Api.Authentication;
 using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Identity.Application.Contracts;
 
@@ -138,7 +137,7 @@ public static partial class AuthEndpoints
     private static async Task<Results<Ok<ExternalLinkPreparationResponse>, ProblemHttpResult>> PrepareLinkedAccountAsync(
         string provider,
         HttpContext context,
-        ExternalAccountLinkStore linkStore,
+        [FromServices] IExternalAccountLinkStore linkStore,
         IAuthenticationSchemeProvider authenticationSchemes,
         CancellationToken cancellationToken)
     {

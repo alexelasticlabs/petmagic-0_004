@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 
 using Microsoft.AspNetCore.DataProtection;
 
-namespace PetMagic.Modules.Identity.Api.Authentication;
+namespace PetMagic.Modules.Identity.Infrastructure.ExternalAuthentication;
 
 internal static class ExternalAuthTicketPayloadProtection
 {

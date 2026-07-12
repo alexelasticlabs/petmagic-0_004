@@ -4,15 +4,16 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
+using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Identity.Application.Contracts;
 using PetMagic.Modules.Identity.Infrastructure.Data;
 using PetMagic.Modules.Identity.Infrastructure.Entities;
 
-namespace PetMagic.Modules.Identity.Api.Authentication;
+namespace PetMagic.Modules.Identity.Infrastructure.ExternalAuthentication;
 
-public sealed class ExternalLoginCompletionStore(
+internal sealed class ExternalLoginCompletionStore(
     IServiceScopeFactory serviceScopeFactory,
-    IDataProtectionProvider dataProtectionProvider)
+    IDataProtectionProvider dataProtectionProvider) : IExternalLoginCompletionStore
 {
     private const string Purpose = "external_login_completion";
     private static readonly TimeSpan TicketLifetime = TimeSpan.FromMinutes(2);

@@ -1,14 +1,14 @@
 using System.Text.Json;
 
-using Microsoft.Data.Sqlite;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
-using PetMagic.Modules.Identity.Api.Authentication;
 using PetMagic.Modules.Identity.Application.Contracts;
 using PetMagic.Modules.Identity.Infrastructure.Data;
 using PetMagic.Modules.Identity.Infrastructure.Entities;
+using PetMagic.Modules.Identity.Infrastructure.ExternalAuthentication;
 
 namespace PetMagic.Modules.Identity.Tests.Identity;
 

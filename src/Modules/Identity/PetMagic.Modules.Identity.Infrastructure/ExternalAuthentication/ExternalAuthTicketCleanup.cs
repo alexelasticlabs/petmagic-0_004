@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 
 using PetMagic.Modules.Identity.Infrastructure.Data;
 
-namespace PetMagic.Modules.Identity.Api.Authentication;
+namespace PetMagic.Modules.Identity.Infrastructure.ExternalAuthentication;
 
 internal static class ExternalAuthTicketCleanup
 {

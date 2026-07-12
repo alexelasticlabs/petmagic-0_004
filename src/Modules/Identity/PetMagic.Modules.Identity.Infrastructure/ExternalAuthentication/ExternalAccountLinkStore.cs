@@ -4,14 +4,15 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
+using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Identity.Infrastructure.Data;
 using PetMagic.Modules.Identity.Infrastructure.Entities;
 
-namespace PetMagic.Modules.Identity.Api.Authentication;
+namespace PetMagic.Modules.Identity.Infrastructure.ExternalAuthentication;
 
-public sealed class ExternalAccountLinkStore(
+internal sealed class ExternalAccountLinkStore(
     IServiceScopeFactory serviceScopeFactory,
-    IDataProtectionProvider dataProtectionProvider)
+    IDataProtectionProvider dataProtectionProvider) : IExternalAccountLinkStore
 {
     private const string Purpose = "external_account_link";
     private static readonly TimeSpan TicketLifetime = TimeSpan.FromMinutes(5);
