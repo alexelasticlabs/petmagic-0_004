@@ -21,6 +21,7 @@ export type GenerationsPageText = {
   completed: string;
   failed: string;
   cancelled: string;
+  cancelling: string;
   retrying: string;
   allJobsScope: string;
   filtersTitle: string;
@@ -85,6 +86,17 @@ export type GenerationsPageText = {
   grantClean: string;
   grantingClean: string;
   grantCleanError: string;
+  gamificationLegacyReview: string;
+  gamificationLegacyReviewDescription: (generationId: string) => string;
+  gamificationLegacyReviewActionLabel: string;
+  gamificationLegacyReviewMarkDelivered: string;
+  gamificationLegacyReviewReplay: string;
+  gamificationLegacyReviewReasonLabel: string;
+  gamificationLegacyReviewReasonPlaceholder: string;
+  gamificationLegacyReviewReasonRequired: string;
+  gamificationLegacyReviewError: string;
+  gamificationLegacyReviewCancel: string;
+  gamificationLegacyReviewSubmit: string;
   created: string;
   completedAt: string;
   noFailure: string;
@@ -129,6 +141,7 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
     completed: "Завершена",
     failed: "Ошибка",
     cancelled: "Отменена",
+    cancelling: "Отменяется",
     retrying: "Повторяется",
     allJobsScope: "Все задания",
     filtersTitle: "Фильтры",
@@ -182,7 +195,7 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
     cancelGenerationError: "Не удалось отменить генерацию.",
     cancelGenerationConfirmTitle: "Отменить генерацию?",
     cancelGenerationConfirmDescription: (generationId: string) =>
-      `Будет отменено только задание ${generationId}, которое ещё находится в очереди. Задания в работе через это действие не отменяются.`,
+      `Будет отправлен запрос на отмену задания ${generationId}. Для уже запущенного FAL job отмена завершится только после подтверждения провайдера.`,
     cancelGenerationConfirmCancel: "Назад",
     cancelGenerationConfirmSubmit: "Отменить",
     retryGeneration: "Запустить снова",
@@ -196,6 +209,20 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
     grantClean: "Выдать чистый файл",
     grantingClean: "Выдаём...",
     grantCleanError: "Не удалось выдать файл без водяного знака.",
+    gamificationLegacyReview: "Проверить Gamification",
+    gamificationLegacyReviewDescription: (generationId: string) =>
+      `По задаче ${generationId} нет достоверного статуса исторической доставки Gamification. Сверьте журнал событий и выберите действие; автоматический повтор не выполняется.`,
+    gamificationLegacyReviewActionLabel: "Подтверждённое действие",
+    gamificationLegacyReviewMarkDelivered: "Доставка уже выполнена — не повторять",
+    gamificationLegacyReviewReplay:
+      "Доставка отсутствует — поставить идемпотентный повтор в очередь",
+    gamificationLegacyReviewReasonLabel: "Причина и источник проверки",
+    gamificationLegacyReviewReasonPlaceholder:
+      "Например: запись подтверждена в audit log / delivery отсутствует в ledger",
+    gamificationLegacyReviewReasonRequired: "Укажите причину и источник проверки.",
+    gamificationLegacyReviewError: "Не удалось разрешить историческую доставку Gamification.",
+    gamificationLegacyReviewCancel: "Назад",
+    gamificationLegacyReviewSubmit: "Подтвердить решение",
     created: "Создана",
     completedAt: "Завершена",
     noFailure: "Нет",
@@ -221,6 +248,7 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
       Completed: "Завершена",
       Failed: "Ошибка",
       Cancelled: "Отменена",
+      Cancelling: "Отменяется",
       Retrying: "Повторяется",
     },
     templateTypeLabels: {
@@ -270,6 +298,7 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
     completed: "Completed",
     failed: "Failed",
     cancelled: "Cancelled",
+    cancelling: "Cancelling",
     retrying: "Retrying",
     allJobsScope: "All jobs",
     filtersTitle: "Filters",
@@ -323,7 +352,7 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
     cancelGenerationError: "Failed to cancel generation.",
     cancelGenerationConfirmTitle: "Cancel generation?",
     cancelGenerationConfirmDescription: (generationId: string) =>
-      `Only queued generation ${generationId} will be cancelled. Running provider jobs are not cancelled by this action.`,
+      `A cancellation request will be sent for generation ${generationId}. A running FAL job is cancelled only after the provider accepts it.`,
     cancelGenerationConfirmCancel: "Back",
     cancelGenerationConfirmSubmit: "Cancel generation",
     retryGeneration: "Retry job",
@@ -337,6 +366,19 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
     grantClean: "Grant clean",
     grantingClean: "Granting...",
     grantCleanError: "Failed to grant clean download.",
+    gamificationLegacyReview: "Review Gamification",
+    gamificationLegacyReviewDescription: (generationId: string) =>
+      `Generation ${generationId} has no reliable historical Gamification delivery status. Check the event ledger and choose an action; no automatic replay is performed.`,
+    gamificationLegacyReviewActionLabel: "Verified action",
+    gamificationLegacyReviewMarkDelivered: "Delivery already completed — do not replay",
+    gamificationLegacyReviewReplay: "Delivery missing — queue idempotent replay",
+    gamificationLegacyReviewReasonLabel: "Review reason and evidence source",
+    gamificationLegacyReviewReasonPlaceholder:
+      "For example: audit log confirms delivery / ledger contains no delivery",
+    gamificationLegacyReviewReasonRequired: "Provide the review reason and evidence source.",
+    gamificationLegacyReviewError: "Failed to resolve historical Gamification delivery.",
+    gamificationLegacyReviewCancel: "Back",
+    gamificationLegacyReviewSubmit: "Confirm decision",
     created: "Created",
     completedAt: "Completed",
     noFailure: "None",
@@ -362,6 +404,7 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
       Completed: "Completed",
       Failed: "Failed",
       Cancelled: "Cancelled",
+      Cancelling: "Cancelling",
       Retrying: "Retrying",
     },
     templateTypeLabels: {

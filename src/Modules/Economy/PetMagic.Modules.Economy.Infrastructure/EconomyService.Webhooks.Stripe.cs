@@ -147,14 +147,32 @@ public sealed partial class EconomyService
                         || string.Equals(refundOrder.Status, PurchaseOrderStatus.RefundRequiresManualReview, StringComparison.Ordinal)
                         || string.Equals(refundOrder.Status, PurchaseOrderStatus.Refunded, StringComparison.Ordinal)))
                 {
-                    var refundResult = await ApplyPurchaseRefundInternalAsync(
-                        refundOrder,
-                        parsedEvent.ObjectId ?? string.Empty,
-                        cancellationToken);
-                    if (refundResult.IsFailure
-                        && !string.Equals(refundResult.Error.Code, EconomyErrors.PurchaseNotRefundable.Code, StringComparison.Ordinal))
+                    if (!IsFullStripePurchaseRefund(refundOrder, parsedEvent.RefundAmountMinor, parsedEvent.RefundCurrency))
                     {
-                        return StripeWebhookFailure(refundResult.Error, "purchase.refund", eventType);
+                        await MarkPurchaseRefundForManualReviewAsync(
+                            refundOrder,
+                            parsedEvent.ObjectId ?? eventId,
+                            "stripe_partial_or_unverifiable_refund",
+                            new
+                            {
+                                parsedEvent.RefundAmountMinor,
+                                parsedEvent.RefundCurrency,
+                                ExpectedAmountMinor = decimal.ToInt64(decimal.Round(refundOrder.PriceAmount * 100m, 0, MidpointRounding.AwayFromZero)),
+                                refundOrder.CurrencyCode
+                            },
+                            cancellationToken);
+                    }
+                    else
+                    {
+                        var refundResult = await ApplyPurchaseRefundInternalAsync(
+                            refundOrder,
+                            parsedEvent.ObjectId ?? string.Empty,
+                            cancellationToken);
+                        if (refundResult.IsFailure
+                            && !string.Equals(refundResult.Error.Code, EconomyErrors.PurchaseNotRefundable.Code, StringComparison.Ordinal))
+                        {
+                            return StripeWebhookFailure(refundResult.Error, "purchase.refund", eventType);
+                        }
                     }
                 }
             }
@@ -295,7 +313,8 @@ public sealed partial class EconomyService
                             eventType,
                             subscription.Id,
                             subscription.ExternalSubscriptionId,
-                            parsedEvent.PlanCode);
+                            parsedEvent.PlanCode,
+                            SafeLogValues.StableHash(eventId));
                     }
 
                     if (shouldActivatePremium || isInvoiceFailed || isSubscriptionDeleted || shouldDeactivatePremium)
@@ -375,6 +394,18 @@ public sealed partial class EconomyService
                 }
             }
 
+            if (pendingPremiumSync is not null)
+            {
+                await _pushNotificationSender.NotifyPremiumUpdateAsync(
+                    pendingPremiumSync.UserId,
+                    new PremiumPushNotification(
+                        Status: pendingPremiumSync.DesiredPremium ? "active" : "inactive",
+                        Provider: pendingPremiumSync.Provider,
+                        PlanCode: pendingPremiumSync.PlanCode,
+                        EventKey: pendingPremiumSync.EventKey),
+                    cancellationToken);
+            }
+
             await dbContext.SaveChangesAsync(cancellationToken);
             if (transaction is not null)
             {
@@ -391,16 +422,7 @@ public sealed partial class EconomyService
                     pendingPremiumSync.SubscriptionId,
                     pendingPremiumSync.ExternalSubscriptionId,
                     cancellationToken);
-                if (premiumSyncResult.IsSuccess)
-                {
-                    await _pushNotificationSender.NotifyPremiumUpdateAsync(
-                        pendingPremiumSync.UserId,
-                        new PremiumPushNotification(
-                            Status: pendingPremiumSync.DesiredPremium ? "active" : "inactive",
-                            Provider: pendingPremiumSync.Provider,
-                            PlanCode: pendingPremiumSync.PlanCode),
-                        cancellationToken);
-                }
+                _ = premiumSyncResult;
             }
 
             LogPaymentWebhookProcessed(
@@ -450,6 +472,24 @@ public sealed partial class EconomyService
         return false;
     }
 
+    private static bool IsFullStripePurchaseRefund(
+        PurchaseOrder order,
+        long? refundAmountMinor,
+        string? refundCurrency)
+    {
+        if (!refundAmountMinor.HasValue
+            || refundAmountMinor.Value <= 0
+            || string.IsNullOrWhiteSpace(refundCurrency)
+            || !string.Equals(refundCurrency.Trim(), order.CurrencyCode, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var expectedAmountMinor = decimal.ToInt64(
+            decimal.Round(order.PriceAmount * 100m, 0, MidpointRounding.AwayFromZero));
+        return refundAmountMinor.Value == expectedAmountMinor;
+    }
+
     private sealed record PendingPremiumEntitlementSync(
         Guid UserId,
         bool DesiredPremium,
@@ -457,5 +497,6 @@ public sealed partial class EconomyService
         string Reason,
         Guid? SubscriptionId,
         string? ExternalSubscriptionId,
-        string? PlanCode);
+        string? PlanCode,
+        string EventKey);
 }

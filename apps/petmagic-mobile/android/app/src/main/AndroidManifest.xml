@@ -16,7 +16,7 @@
         android:required="false"/>
 
     <application
-        android:label="PetMagic"
+        android:label="${appName}"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:enableOnBackInvokedCallback="true"
@@ -28,7 +28,6 @@
             android:taskAffinity=""
             android:theme="@style/LaunchTheme"
             android:enableOnBackInvokedCallback="true"
-            android:screenOrientation="portrait"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
@@ -49,7 +48,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
-                    android:scheme="petmagic"
+                    android:scheme="${appDeepLinkScheme}"
                     android:host="auth"
                     android:pathPrefix="/external" />
             </intent-filter>
@@ -58,7 +57,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
-                    android:scheme="petmagic"
+                    android:scheme="${appDeepLinkScheme}"
                     android:host="generations" />
             </intent-filter>
             <intent-filter>
@@ -66,7 +65,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
-                    android:scheme="petmagic"
+                    android:scheme="${appDeepLinkScheme}"
                     android:host="support" />
             </intent-filter>
             <intent-filter>
@@ -74,7 +73,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
-                    android:scheme="petmagic"
+                    android:scheme="${appDeepLinkScheme}"
                     android:host="checkout" />
             </intent-filter>
             <intent-filter>
@@ -82,7 +81,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
-                    android:scheme="petmagicstripe"
+                    android:scheme="${stripeRedirectScheme}"
                     android:host="redirect" />
             </intent-filter>
         </activity>

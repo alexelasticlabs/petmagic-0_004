@@ -75,7 +75,8 @@ public sealed partial class EconomyServiceTests
         IIdentityService? identityService = null,
         IStoreWebhookSecurityValidator? storeWebhookSecurityValidator = null,
         IAdminAuditLog? adminAuditLog = null,
-        IGenerationBillingReconciliationService? generationBillingReconciliation = null)
+        IGenerationBillingReconciliationService? generationBillingReconciliation = null,
+        string storeAccountBindingMode = "compatibility")
     {
         var options = Options.Create(new EconomyOptions
         {
@@ -87,7 +88,8 @@ public sealed partial class EconomyServiceTests
             StripeTestSecretKey = "test_stripe_secret_key",
             StripeTestWebhookSecret = "test_webhook_secret",
             StripeCheckoutSuccessUrl = "http://localhost:3000/payments/success?session_id={CHECKOUT_SESSION_ID}",
-            StripeCheckoutCancelUrl = "http://localhost:3000/payments/cancel"
+            StripeCheckoutCancelUrl = "http://localhost:3000/payments/cancel",
+            StoreAccountBindingMode = storeAccountBindingMode
         });
 
         return new EconomyService(
@@ -400,18 +402,34 @@ public sealed partial class EconomyServiceTests
 
         public string Status { get; init; } = "active";
 
+        public StoreAccountBindingState AccountBindingState { get; init; } = StoreAccountBindingState.Missing;
+
+        public Guid? BoundUserId { get; init; }
+
+        public bool IsProductPurchased { get; init; } = true;
+
         public Task<Result<StoreSubscriptionVerificationResponse>> VerifyAsync(
             StoreSubscriptionVerificationRequest request,
             CancellationToken cancellationToken)
         {
-            return Task.FromResult(Result.Success(new StoreSubscriptionVerificationResponse(IsActive, ExpiresAtUtc, Status, request.PurchaseId)));
+            return Task.FromResult(Result.Success(new StoreSubscriptionVerificationResponse(
+                IsActive,
+                ExpiresAtUtc,
+                Status,
+                request.PurchaseId,
+                AccountBindingState)));
         }
 
         public Task<Result<StoreProductVerificationResponse>> VerifyProductPurchaseAsync(
             StoreProductVerificationRequest request,
             CancellationToken cancellationToken)
         {
-            return Task.FromResult(Result.Success(new StoreProductVerificationResponse(true, "purchased", request.PurchaseId)));
+            return Task.FromResult(Result.Success(new StoreProductVerificationResponse(
+                IsProductPurchased,
+                IsProductPurchased ? "purchased" : "not_purchased",
+                request.PurchaseId,
+                AccountBindingState,
+                BoundUserId)));
         }
     }
 

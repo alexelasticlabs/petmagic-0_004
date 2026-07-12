@@ -29,7 +29,10 @@ internal sealed partial class TemplateGenerationJobProcessor
             return Result.Success(new FalProviderWebhookResponse(command.RequestId, null, "ignored_not_found"));
         }
 
-        if (job.Status is TemplateGenerationStatus.Completed or TemplateGenerationStatus.Failed or TemplateGenerationStatus.Cancelled)
+        if (job.Status is TemplateGenerationStatus.Completed
+            or TemplateGenerationStatus.Failed
+            or TemplateGenerationStatus.Cancelled
+            or TemplateGenerationStatus.CancellationRequested)
         {
             job.WebhookReceivedAtUtc ??= command.ReceivedAtUtc;
             await dbContext.SaveChangesAsync(cancellationToken);
@@ -223,6 +226,7 @@ internal sealed partial class TemplateGenerationJobProcessor
         job.MotionProviderRequestId = submission.Value.RequestId;
         job.MotionProviderStatusUrl = submission.Value.StatusUrl;
         job.MotionProviderResponseUrl = submission.Value.ResponseUrl;
+        job.MotionProviderCancelUrl = submission.Value.CancelUrl;
         job.Status = TemplateGenerationStatus.ProviderQueued;
         job.ProviderStatus = "IN_QUEUE";
         job.ProviderSubmittedAtUtc = submittedAt;
@@ -249,6 +253,7 @@ internal sealed partial class TemplateGenerationJobProcessor
         job.PreprocessingProviderRequestId = submission.RequestId;
         job.PreprocessingProviderStatusUrl = submission.StatusUrl;
         job.PreprocessingProviderResponseUrl = submission.ResponseUrl;
+        job.PreprocessingProviderCancelUrl = submission.CancelUrl;
         job.Status = TemplateGenerationStatus.ProviderQueued;
         job.CurrentProviderStage = providerStage;
         job.ProviderStatus = "IN_QUEUE";
@@ -942,7 +947,7 @@ internal sealed partial class TemplateGenerationJobProcessor
 
         await dbContext.SaveChangesAsync(cancellationToken);
         TemplateGenerationMetrics.RecordJobCompleted(job);
-        await NotifyGamificationAsync(job, cancellationToken);
+        await SyncGamificationAsync(job, cancellationToken);
         await PublishStatusChangedAsync(job, cancellationToken);
     }
 

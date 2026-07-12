@@ -8,6 +8,7 @@ class _ProfileSettingsStaticDetailContent extends StatelessWidget {
     required this.status,
     required this.nextStep,
     required this.bottomInset,
+    required this.onOpenSupport,
     required this.onDeleteAccount,
   });
 
@@ -17,6 +18,7 @@ class _ProfileSettingsStaticDetailContent extends StatelessWidget {
   final String status;
   final String nextStep;
   final double bottomInset;
+  final VoidCallback? onOpenSupport;
   final Future<void> Function()? onDeleteAccount;
 
   @override
@@ -56,6 +58,17 @@ class _ProfileSettingsStaticDetailContent extends StatelessWidget {
                 ),
               ),
             ),
+            if (onOpenSupport != null) ...[
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: onOpenSupport,
+                  icon: const Icon(Icons.support_agent_rounded),
+                  label: Text(text.supportHomeOpenChatAction),
+                ),
+              ),
+            ],
             if (kind == ProfileSettingsDetailKind.deleteAccount &&
                 onDeleteAccount != null) ...[
               const SizedBox(height: 18),

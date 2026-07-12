@@ -1,0 +1,43 @@
+name: public-web-ci
+
+on:
+  pull_request:
+    paths:
+      - apps/public-web/**
+      - shared/legal/**
+      - .github/workflows/public-web-ci.yml
+  push:
+    branches:
+      - master
+    paths:
+      - apps/public-web/**
+      - shared/legal/**
+      - .github/workflows/public-web-ci.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-web-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/public-web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/public-web/package-lock.json
+      - run: npm ci
+      - name: Audit dependencies
+        run: npm audit --audit-level=moderate
+      - name: Verify approved legal catalog
+        run: npm run validate:legal
+      - name: Build and test rendered routes
+        run: npm test

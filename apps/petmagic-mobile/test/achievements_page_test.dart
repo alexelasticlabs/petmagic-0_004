@@ -376,11 +376,33 @@ void main() {
       contains('Localizations.localeOf(context).toLanguageTag()'),
     );
     expect(calendarSource, contains('final streakColor = colors.gold;'));
+    expect(
+      calendarSource,
+      contains('text.gamificationDayStreak(currentStreak)'),
+    );
     expect(calendarSource, isNot(contains('String _dayLabel(int weekday)')));
     expect(calendarSource, isNot(contains('const Color(0xFFFF6D00)')));
     expect(overviewSource, contains('final streakColor = colors.gold;'));
     expect(overviewSource, isNot(contains('const Color(0xFFFF8A50)')));
   });
+
+  test(
+    'gamification streak summary passes the count to localized plural rules',
+    () async {
+      final summarySource = await File(
+        'lib/features/gamification/presentation/widgets/gamification_summary_card.dart',
+      ).readAsString();
+      final russianLocalizations = await File(
+        'lib/l10n/app_ru.arb',
+      ).readAsString();
+
+      expect(summarySource, contains('text.gamificationDayStreak('));
+      expect(summarySource, contains('streak?.currentStreak ?? 0'));
+      expect(russianLocalizations, contains('one{{count} день подряд}'));
+      expect(russianLocalizations, contains('few{{count} дня подряд}'));
+      expect(russianLocalizations, contains('many{{count} дней подряд}'));
+    },
+  );
 
   test(
     'achievements provider keeps warm cache instead of dropping immediately',

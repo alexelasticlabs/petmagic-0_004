@@ -264,6 +264,14 @@ public sealed class GoogleNativeLoginCommandValidator : AbstractValidator<Google
     }
 }
 
+public sealed class GoogleNativeLinkCommandValidator : AbstractValidator<GoogleNativeLinkCommand>
+{
+    public GoogleNativeLinkCommandValidator()
+    {
+        RuleFor(x => x.IdToken).NotEmpty();
+    }
+}
+
 public sealed class GoogleSocialLoginCommandValidator : AbstractValidator<GoogleSocialLoginCommand>
 {
     public GoogleSocialLoginCommandValidator()

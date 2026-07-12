@@ -51,11 +51,22 @@ public sealed partial class SupportChatService
         UpdateSupportConversationMetadataCommand command,
         CancellationToken cancellationToken)
     {
+        await using var transaction = await BeginSupportAdminActionTransactionAsync(cancellationToken);
+        if (transaction is not null)
+        {
+            await LockConversationRowForAdminActionAsync(command.ConversationId, cancellationToken);
+        }
+
         var conversation = await supportChatDbContext.SupportConversations
             .FirstOrDefaultAsync(x => x.Id == command.ConversationId, cancellationToken);
         if (conversation is null)
         {
             return Result.Failure<SupportConversationDetailResponse>(ConversationNotFound);
+        }
+        var ownershipError = ValidateAdminOwnership(conversation, command.AdminUserId);
+        if (ownershipError is not null)
+        {
+            return Result.Failure<SupportConversationDetailResponse>(ownershipError);
         }
 
         var normalizedTags = NormalizeTags(command.Tags);
@@ -69,6 +80,11 @@ public sealed partial class SupportChatService
         conversation.UpdatedAtUtc = DateTime.UtcNow;
 
         await supportChatDbContext.SaveChangesAsync(cancellationToken);
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
+
         await NotifyConversationUpdatedAsync(conversation, cancellationToken);
         return Result.Success(await BuildConversationDetailAsync(conversation.Id, cancellationToken));
     }

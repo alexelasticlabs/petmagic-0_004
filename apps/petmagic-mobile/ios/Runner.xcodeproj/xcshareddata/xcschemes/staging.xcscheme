@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Scheme LastUpgradeVersion="1510" version="1.3">
+  <BuildAction parallelizeBuildables="YES" buildImplicitDependencies="YES">
+    <PreActions>
+      <ExecutionAction ActionType="Xcode.IDEStandardExecutionActionsCore.ExecutionActionType.ShellScriptAction">
+        <ActionContent title="Validate staging Firebase configuration" scriptText="set -e&#10;CONFIG=&quot;$SRCROOT/Runner/GoogleService-Info.plist&quot;&#10;if [ ! -f &quot;$CONFIG&quot; ]; then echo &quot;Missing GoogleService-Info.plist&quot; &gt;&amp;2; exit 1; fi&#10;BUNDLE_ID=$(/usr/libexec/PlistBuddy -c &quot;Print :BUNDLE_ID&quot; &quot;$CONFIG&quot;)&#10;if [ &quot;$BUNDLE_ID&quot; != &quot;com.petmagic.app.staging&quot; ]; then echo &quot;Firebase plist does not match staging bundle id&quot; &gt;&amp;2; exit 1; fi&#10;if grep -Eq &quot;petmagic-placeholder|replace-with-|000000000000&quot; &quot;$CONFIG&quot; &amp;&amp; [ &quot;${PETMAGIC_ALLOW_PLACEHOLDER_FIREBASE:-false}&quot; != &quot;true&quot; ]; then echo &quot;Placeholder Firebase plist is forbidden&quot; &gt;&amp;2; exit 1; fi&#10;if [ &quot;${PETMAGIC_ALLOW_PLACEHOLDER_FIREBASE:-false}&quot; != &quot;true&quot; ] &amp;&amp; { [ -z &quot;${PETMAGIC_GOOGLE_CLIENT_ID:-}&quot; ] || [ -z &quot;${PETMAGIC_GOOGLE_REVERSED_CLIENT_ID:-}&quot; ]; }; then echo &quot;Protected Google iOS client build settings are required&quot; &gt;&amp;2; exit 1; fi&#10;">
+          <EnvironmentBuildable><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="97C146ED1CF9000F007C117D" BuildableName="Runner.app" BlueprintName="Runner" ReferencedContainer="container:Runner.xcodeproj"/></EnvironmentBuildable>
+        </ActionContent>
+      </ExecutionAction>
+      <ExecutionAction ActionType="Xcode.IDEStandardExecutionActionsCore.ExecutionActionType.ShellScriptAction">
+        <ActionContent title="Run Prepare Flutter Framework Script" scriptText="/bin/sh &quot;$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh&quot; prepare&#10;">
+          <EnvironmentBuildable><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="97C146ED1CF9000F007C117D" BuildableName="Runner.app" BlueprintName="Runner" ReferencedContainer="container:Runner.xcodeproj"/></EnvironmentBuildable>
+        </ActionContent>
+      </ExecutionAction>
+    </PreActions>
+    <BuildActionEntries><BuildActionEntry buildForTesting="YES" buildForRunning="YES" buildForProfiling="YES" buildForArchiving="YES" buildForAnalyzing="YES"><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="97C146ED1CF9000F007C117D" BuildableName="Runner.app" BlueprintName="Runner" ReferencedContainer="container:Runner.xcodeproj"/></BuildActionEntry></BuildActionEntries>
+  </BuildAction>
+  <TestAction buildConfiguration="Debug-staging" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.DebuggerFoundation.Launcher.LLDB" customLLDBInitFile="$(SRCROOT)/Flutter/ephemeral/flutter_lldbinit" shouldUseLaunchSchemeArgsEnv="YES"><MacroExpansion><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="97C146ED1CF9000F007C117D" BuildableName="Runner.app" BlueprintName="Runner" ReferencedContainer="container:Runner.xcodeproj"/></MacroExpansion></TestAction>
+  <LaunchAction buildConfiguration="Debug-staging" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.DebuggerFoundation.Launcher.LLDB" customLLDBInitFile="$(SRCROOT)/Flutter/ephemeral/flutter_lldbinit" launchStyle="0" useCustomWorkingDirectory="NO" ignoresPersistentStateOnLaunch="NO" debugDocumentVersioning="YES" debugServiceExtension="internal" allowLocationSimulation="YES"><BuildableProductRunnable runnableDebuggingMode="0"><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="97C146ED1CF9000F007C117D" BuildableName="Runner.app" BlueprintName="Runner" ReferencedContainer="container:Runner.xcodeproj"/></BuildableProductRunnable></LaunchAction>
+  <ProfileAction buildConfiguration="Profile-staging" shouldUseLaunchSchemeArgsEnv="YES" savedToolIdentifier="" useCustomWorkingDirectory="NO" debugDocumentVersioning="YES"><BuildableProductRunnable runnableDebuggingMode="0"><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="97C146ED1CF9000F007C117D" BuildableName="Runner.app" BlueprintName="Runner" ReferencedContainer="container:Runner.xcodeproj"/></BuildableProductRunnable></ProfileAction>
+  <AnalyzeAction buildConfiguration="Debug-staging"/>
+  <ArchiveAction buildConfiguration="Release-staging" revealArchiveInOrganizer="YES"/>
+</Scheme>

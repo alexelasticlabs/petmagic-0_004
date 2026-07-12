@@ -274,13 +274,18 @@ public sealed partial class SupportChatEndpointsIntegrationTests
             "/api/support/conversation/open",
             new OpenConversationRequest("Need screenshot review", SupportConversationPriority.Normal));
 
+        var adminClient = application.CreateClient(AdminId, "Admin");
+        _ = await PostEmptyAsync<SupportConversationDetailResponse>(
+            adminClient,
+            $"/api/admin/support/tickets/{created.ConversationId}/assign-to-me");
+
         using var form = new MultipartFormDataContent();
         var fileContent = new ByteArrayContent([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
         fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
         form.Add(fileContent, "file", "admin-screenshot.png");
         form.Add(new StringContent("Screenshot attached"), "body");
 
-        using var response = await application.CreateClient(AdminId, "Admin").PostAsync(
+        using var response = await adminClient.PostAsync(
             $"/api/admin/support/tickets/{created.ConversationId}/attachments",
             form);
 
@@ -432,13 +437,18 @@ public sealed partial class SupportChatEndpointsIntegrationTests
             "/api/support/conversation/open",
             new OpenConversationRequest("Need admin retry finalize fallback", SupportConversationPriority.Normal));
 
+        var adminClient = application.CreateClient(AdminId, "Admin");
+        _ = await PostEmptyAsync<SupportConversationDetailResponse>(
+            adminClient,
+            $"/api/admin/support/tickets/{created.ConversationId}/assign-to-me");
+
         using var failedForm = new MultipartFormDataContent();
         var failedContent = new ByteArrayContent([0x25, 0x50, 0x44, 0x46]);
         failedContent.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
         failedForm.Add(failedContent, "file", "invoice.pdf");
         failedForm.Add(new StringContent("First admin upload should fail"), "body");
 
-        using var failedResponse = await application.CreateClient(AdminId, "Admin").PostAsync(
+        using var failedResponse = await adminClient.PostAsync(
             $"/api/admin/support/tickets/{created.ConversationId}/attachments",
             failedForm);
 
@@ -450,7 +460,7 @@ public sealed partial class SupportChatEndpointsIntegrationTests
         retryContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
         retryForm.Add(retryContent, "file", "fixed.png");
 
-        using var retryResponse = await application.CreateClient(AdminId, "Admin").PostAsync(
+        using var retryResponse = await adminClient.PostAsync(
             $"/api/admin/support/tickets/{created.ConversationId}/messages/{failedMessage.MessageId}/attachment/retry",
             retryForm);
 

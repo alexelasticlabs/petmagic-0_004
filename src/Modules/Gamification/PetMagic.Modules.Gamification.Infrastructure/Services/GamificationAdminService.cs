@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Gamification.Application.Abstractions;
 using PetMagic.Modules.Gamification.Application.Contracts;
@@ -10,7 +11,8 @@ namespace PetMagic.Modules.Gamification.Infrastructure.Services;
 
 public sealed class GamificationAdminService(
     GamificationDbContext dbContext,
-    IGamificationService gamificationService) : IGamificationAdminService
+    IGamificationService gamificationService,
+    IAdminAuditLog adminAuditLog) : IGamificationAdminService
 {
     public async Task<Result<AdminGamificationDashboardMetricsResponse>> GetAdminDashboardMetricsAsync(CancellationToken cancellationToken)
     {
@@ -154,18 +156,40 @@ public sealed class GamificationAdminService(
         return Result.Success(response);
     }
 
-    public async Task<Result> ResetAdminUserStreakAsync(Guid userId, CancellationToken cancellationToken)
+    public async Task<Result> ResetAdminUserStreakAsync(
+        AdminResetUserStreakCommand command,
+        CancellationToken cancellationToken)
     {
+        var reason = command.Reason?.Trim();
+        if (string.IsNullOrWhiteSpace(reason) || reason.Length > 500)
+        {
+            return Result.Failure(GamificationErrors.AdminStreakResetReasonRequired);
+        }
+
         var streak = await dbContext.DailyStreaks
-            .FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
+            .FirstOrDefaultAsync(x => x.UserId == command.UserId, cancellationToken);
 
         if (streak is null)
         {
             return Result.Failure(GamificationErrors.StreakNotFound);
         }
 
+        var oldValue = $"current={streak.CurrentStreak};longest={streak.LongestStreak};last_active={streak.LastActiveDate:yyyy-MM-dd}";
         dbContext.DailyStreaks.Remove(streak);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await adminAuditLog.WriteAsync(
+            new AdminAuditEntry(
+                "admin.gamification.streak.reset",
+                "DailyStreak",
+                streak.Id.ToString("D"),
+                oldValue,
+                "deleted",
+                reason,
+                command.UserId,
+                ActorUserId: command.AdminUserId),
+            cancellationToken);
+
         return Result.Success();
     }
 

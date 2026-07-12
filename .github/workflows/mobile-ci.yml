@@ -7,7 +7,7 @@ on:
       - .github/workflows/mobile-ci.yml
   push:
     branches:
-      - main
+      - master
     paths:
       - apps/petmagic-mobile/**
       - .github/workflows/mobile-ci.yml
@@ -15,59 +15,103 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: mobile-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  mobile:
+  quality-and-android:
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: apps/petmagic-mobile
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
-          channel: stable
-
+          flutter-version: '3.44.5'
+          cache: true
       - name: Resolve dependencies
         run: flutter pub get
-
       - name: Generate localization
         run: flutter gen-l10n
-
-      - name: Verify generation localization completeness
-        run: dart run tool/check_generation_status_l10n.dart
-
-      - name: Verify localization completeness
-        run: dart run tool/check_l10n_completeness.dart
-
+      - name: Format
+        run: dart format --output=none --set-exit-if-changed lib test tool
+      - name: Verify localization catalogs
+        run: |
+          dart tool/check_generation_status_l10n.dart
+          dart tool/check_l10n_completeness.dart
       - name: Analyze
         run: flutter analyze --fatal-infos
-
+      - name: Test
+        run: flutter test --concurrency=1
       - name: Verify release signing guard
         shell: bash
         run: |
+          dart run tool/configure_firebase_smoke.dart --environment=staging
           set +e
-          output=$(cd android && ./gradlew :app:assembleRelease 2>&1)
+          output=$(cd android && ./gradlew :app:assembleStagingRelease 2>&1)
           status=$?
           set -e
-
           echo "$output"
+          test "$status" -ne 0
+          echo "$output" | grep -q "Release signing is not configured"
+      - name: Build Android staging release smoke
+        env:
+          ORG_GRADLE_PROJECT_allowInsecureReleaseSigning: "true"
+          ORG_GRADLE_PROJECT_allowPlaceholderFirebase: "true"
+        run: |
+          dart run tool/configure_firebase_smoke.dart --environment=staging
+          flutter build appbundle --release --flavor staging \
+            --android-project-arg=allowInsecureReleaseSigning=true \
+            --android-project-arg=allowPlaceholderFirebase=true \
+            --dart-define=APP_ENVIRONMENT=staging \
+            --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging \
+            --dart-define=API_BASE_URL=https://api.staging.petmagic.app \
+            --obfuscate --split-debug-info=build/symbols/staging
+      - name: Build Android production release smoke
+        env:
+          ORG_GRADLE_PROJECT_allowInsecureReleaseSigning: "true"
+          ORG_GRADLE_PROJECT_allowPlaceholderFirebase: "true"
+        run: |
+          dart run tool/configure_firebase_smoke.dart --environment=production
+          flutter build appbundle --release --flavor production \
+            --android-project-arg=allowInsecureReleaseSigning=true \
+            --android-project-arg=allowPlaceholderFirebase=true \
+            --dart-define=APP_ENVIRONMENT=production \
+            --dart-define=APP_PACKAGE_NAME=com.petmagic.app \
+            --dart-define=API_BASE_URL=https://api.petmagic.app \
+            --obfuscate --split-debug-info=build/symbols/production
 
-          if [ "$status" -eq 0 ]; then
-            echo "Expected release signing guard to fail without key.properties"
-            exit 1
-          fi
-
-          if ! echo "$output" | grep -q "Release signing is not configured"; then
-            echo "Release task failed for an unexpected reason"
-            exit 1
-          fi
-
-      - name: Release packaging smoke
-        run: cd android && ./gradlew :app:bundleRelease -PallowInsecureReleaseSigning=true --warning-mode all
-
-      - name: Test
-        run: flutter test
+  ios-build:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: apps/petmagic-mobile
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: '3.44.5'
+          cache: true
+      - run: flutter pub get
+      - name: Build iOS staging release smoke
+        env:
+          PETMAGIC_ALLOW_PLACEHOLDER_FIREBASE: "true"
+        run: |
+          dart run tool/configure_firebase_smoke.dart --environment=staging
+          flutter build ios --no-codesign --release --flavor staging \
+            --dart-define=APP_ENVIRONMENT=staging \
+            --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging \
+            --dart-define=API_BASE_URL=https://api.staging.petmagic.app \
+            --obfuscate --split-debug-info=build/symbols/ios-staging
+      - name: Build iOS production release smoke
+        env:
+          PETMAGIC_ALLOW_PLACEHOLDER_FIREBASE: "true"
+        run: |
+          dart run tool/configure_firebase_smoke.dart --environment=production
+          flutter build ios --no-codesign --release --flavor production \
+            --dart-define=APP_ENVIRONMENT=production \
+            --dart-define=APP_PACKAGE_NAME=com.petmagic.app \
+            --dart-define=API_BASE_URL=https://api.petmagic.app \
+            --obfuscate --split-debug-info=build/symbols/ios-production

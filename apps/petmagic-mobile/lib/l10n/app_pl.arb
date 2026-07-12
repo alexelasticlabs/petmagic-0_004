@@ -62,6 +62,10 @@
   "profileSignInHint": "Użyj swojego konta PetMagic, aby załadować swój profil i zarządzać awatarem widocznym w panelu administracyjnym.",
   "profileEmailLabel": "E-mail",
   "profilePasswordLabel": "Hasło",
+  "authShowPassword": "Pokaż hasło",
+  "authHidePassword": "Ukryj hasło",
+  "authShowPasswordConfirmation": "Pokaż potwierdzenie hasła",
+  "authHidePasswordConfirmation": "Ukryj potwierdzenie hasła",
   "profileSignInAction": "Zaloguj się",
   "profileSignOutAction": "Wyloguj się",
   "profileLoadingAction": "Trwa ładowanie...",
@@ -392,6 +396,9 @@
   "profileAccountDisplayNameMissing": "Jeszcze nie ustawione",
   "profileAccountRolesLabel": "Role",
   "profileAccountRolesMissing": "Brak przypisanych ról",
+  "profileAccountRoleUser": "Użytkownik",
+  "profileAccountRoleModerator": "Moderator",
+  "profileAccountRoleAdmin": "Administrator",
   "profileAccountMembershipLabel": "Członkostwo",
   "profileAccountConsentLabel": "Akceptacja warunków",
   "profileAccountMarketingLabel": "Oferty i aktualizacje",
@@ -1197,6 +1204,8 @@
   "premiumBestValueBadge": "NAJLEPSZA WARTOŚĆ",
   "premiumStorePaymentDisclaimerTitle": "Bezpieczna płatność za pośrednictwem App Store / Google Play",
   "premiumStorePaymentDisclaimerBody": "Płatność zostanie pobrana z Twojego konta App Store/Google Play. Subskrypcja odnawia się automatycznie, chyba że zostanie anulowana przed datą odnowienia.",
+  "premiumCardPaymentDisclaimerTitle": "Bezpieczna płatność kartą",
+  "premiumCardPaymentDisclaimerBody": "Płatność zostanie pobrana z Twojej karty bankowej. Subskrypcja odnawia się automatycznie, chyba że zostanie anulowana przed datą odnowienia.",
   "premiumBenefitAiGenerationsTitle": "30 pokoleń sztucznej inteligencji",
   "premiumBenefitAiGenerationsSubtitle": "co miesiąc",
   "premiumBenefitPremiumTemplatesTitle": "Szablony premium",
@@ -1303,7 +1312,14 @@
   "gamificationKeepGenerating": "Generuj dalej, aby odblokować więcej!",
   "gamificationUnlocked": "{unlocked} / {total} odblokowanych",
   "gamificationLoadFailed": "Nie udało się załadować osiągnięć",
-  "gamificationDayStreak": "dni z rzędu",
+  "gamificationDayStreak": "{count, plural, one{{count} dzień z rzędu} few{{count} dni z rzędu} many{{count} dni z rzędu} other{{count} dnia z rzędu}}",
+  "@gamificationDayStreak": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "gamificationHubSubtitle": "Śledź serię, wyzwania i kamienie milowe w jednym miejscu.",
   "gamificationHubEntrySubtitle": "Seria, cele tygodnia i kamienie milowe osiągnięć.",
   "gamificationWeekFocusTitle": "W tym tygodniu",
@@ -1521,5 +1537,9 @@
       }
     }
   },
-  "templateFlowGenerationWaitTooLongPremiumHint": "Zgłoszenia Premium mają priorytet, gdy usługa jest obciążona, i mogą czekać krócej."
+  "templateFlowGenerationWaitTooLongPremiumHint": "Zgłoszenia Premium mają priorytet, gdy usługa jest obciążona, i mogą czekać krócej.",
+  "mediaPlayAction": "Odtwórz",
+  "mediaPauseAction": "Pauza",
+  "mediaMuteAction": "Wycisz",
+  "mediaUnmuteAction": "Włącz dźwięk"
 }

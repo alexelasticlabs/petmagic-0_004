@@ -39,7 +39,12 @@ internal sealed class TemplateGenerationWorker(
             {
                 using var scope = scopeFactory.CreateScope();
                 var processor = scope.ServiceProvider.GetRequiredService<TemplateGenerationJobProcessor>();
-                var processed = await processor.ProcessNextAsync(stoppingToken);
+                var generationService = scope.ServiceProvider.GetRequiredService<TemplateGenerationService>();
+                var processed = await generationService.ProcessNextPendingCancellationAsync(stoppingToken);
+                if (!processed)
+                {
+                    processed = await processor.ProcessNextAsync(stoppingToken);
+                }
                 if (!processed)
                 {
                     processed = await processor.RetryNextRefundAsync(stoppingToken);
@@ -48,6 +53,16 @@ internal sealed class TemplateGenerationWorker(
                 if (!processed)
                 {
                     processed = await processor.CleanupNextExpiredGenerationAsync(stoppingToken);
+                }
+
+                if (await processor.ProcessNextPendingGamificationAsync(stoppingToken))
+                {
+                    processed = true;
+                }
+
+                if (await generationService.ProcessNextPendingGamificationShareAsync(stoppingToken))
+                {
+                    processed = true;
                 }
 
                 if (!processed)

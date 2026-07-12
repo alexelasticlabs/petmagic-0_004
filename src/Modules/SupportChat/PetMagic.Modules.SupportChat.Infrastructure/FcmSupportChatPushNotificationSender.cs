@@ -10,6 +10,7 @@ using Google.Apis.Auth.OAuth2;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Notifications;
 using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.SupportChat.Application.Abstractions;
 using PetMagic.Modules.SupportChat.Infrastructure.Data;
@@ -21,17 +22,19 @@ internal sealed class FcmSupportChatPushNotificationSender(
     SupportChatDbContext dbContext,
     SupportChatPushOptions options,
     HttpClient httpClient,
-    ILogger<FcmSupportChatPushNotificationSender> logger) : ISupportChatPushNotificationSender
+    ILogger<FcmSupportChatPushNotificationSender> logger) : ISupportChatPushDeliverySender
 {
     private const string FirebaseMessagingScope = "https://www.googleapis.com/auth/firebase.messaging";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private GoogleCredential? credential;
 
-    public async Task NotifyUserAsync(SupportChatPushNotification notification, CancellationToken cancellationToken)
+    public async Task<PushDeliveryResult> DeliverUserAsync(
+        SupportChatPushNotification notification,
+        CancellationToken cancellationToken)
     {
         if (!options.IsConfigured)
         {
-            return;
+            return PushDeliveryResult.Delivered;
         }
 
         var tokens = await dbContext.SupportPushDeviceTokens
@@ -42,17 +45,17 @@ internal sealed class FcmSupportChatPushNotificationSender(
 
         if (tokens.Count == 0)
         {
-            return;
+            return PushDeliveryResult.Delivered;
         }
 
         var accessToken = await GetAccessTokenAsync(cancellationToken);
-        foreach (var token in tokens)
-        {
-            await SendAsync(notification, token, accessToken, cancellationToken);
-        }
+        var deliveries = await Task.WhenAll(tokens.Select(token =>
+            SendAsync(notification, token, accessToken, cancellationToken)));
+        DisableInvalidTokens(deliveries);
+        return Aggregate(deliveries.Select(x => x.Result).ToArray());
     }
 
-    private async Task SendAsync(
+    private async Task<TokenDeliveryResult> SendAsync(
         SupportChatPushNotification notification,
         SupportPushDeviceToken token,
         string accessToken,
@@ -101,7 +104,7 @@ internal sealed class FcmSupportChatPushNotificationSender(
                 eventIdHash,
                 tokenIdHash,
                 SafeLogValues.StableHash(CorrelationContext.ResolveOrCreate()));
-            return;
+            return new TokenDeliveryResult(PushDeliveryResult.Delivered, token, false);
         }
 
         var responseBody = await SafeHttpContentReader.ReadStringPrefixAsync(response.Content, cancellationToken);
@@ -115,10 +118,40 @@ internal sealed class FcmSupportChatPushNotificationSender(
 
         if (FirebaseMessagingErrorClassifier.ShouldDisableToken(response.StatusCode, responseBody))
         {
-            token.DisabledAtUtc = DateTime.UtcNow;
-            token.UpdatedAtUtc = token.DisabledAtUtc.Value;
-            await dbContext.SaveChangesAsync(cancellationToken);
+            return new TokenDeliveryResult(PushDeliveryResult.Delivered, token, true);
         }
+
+        var result = response.StatusCode == HttpStatusCode.TooManyRequests
+            || (int)response.StatusCode >= 500
+                ? PushDeliveryResult.Retry("fcm.transient_error")
+                : PushDeliveryResult.PermanentFailure("fcm.request_rejected");
+        return new TokenDeliveryResult(result, token, false);
+    }
+
+    private static void DisableInvalidTokens(IEnumerable<TokenDeliveryResult> deliveries)
+    {
+        var now = DateTime.UtcNow;
+        foreach (var delivery in deliveries.Where(x => x.DisableToken))
+        {
+            delivery.Token.DisabledAtUtc = now;
+            delivery.Token.UpdatedAtUtc = now;
+        }
+    }
+
+    private static PushDeliveryResult Aggregate(IReadOnlyList<PushDeliveryResult> results)
+    {
+        var retry = results.FirstOrDefault(x => x.Disposition == PushDeliveryDisposition.Retry);
+        if (retry is not null)
+        {
+            return retry;
+        }
+
+        if (results.Any(x => x.Disposition == PushDeliveryDisposition.Delivered))
+        {
+            return PushDeliveryResult.Delivered;
+        }
+
+        return results.FirstOrDefault() ?? PushDeliveryResult.Delivered;
     }
 
     private async Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
@@ -180,4 +213,9 @@ internal sealed class FcmSupportChatPushNotificationSender(
     private sealed record FcmApnsPayload(FcmAps Aps);
 
     private sealed record FcmAps(string Sound, int Badge);
+
+    private sealed record TokenDeliveryResult(
+        PushDeliveryResult Result,
+        SupportPushDeviceToken Token,
+        bool DisableToken);
 }

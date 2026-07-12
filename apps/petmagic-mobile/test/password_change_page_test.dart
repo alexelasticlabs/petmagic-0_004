@@ -86,6 +86,61 @@ void main() {
       expect(find.byType(ProtectedAuthGate), findsNothing);
     },
   );
+
+  testWidgets(
+    'password change keeps the active code form when route arguments are lost',
+    (tester) async {
+      _ActivePasswordChangeController.resetCalls = 0;
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedAppLaunchController.new,
+            ),
+            passwordChangeControllerProvider.overrideWith(
+              _ActivePasswordChangeController.new,
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const Scaffold(
+              body: PasswordChangePage(email: 'user@example.com'),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedAppLaunchController.new,
+            ),
+            passwordChangeControllerProvider.overrideWith(
+              _ActivePasswordChangeController.new,
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const Scaffold(body: PasswordChangePage(email: '')),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      expect(_ActivePasswordChangeController.resetCalls, 0);
+      expect(find.byType(TextField), findsNWidgets(3));
+    },
+  );
 }
 
 class _TrackedPasswordChangeController extends PasswordChangeController {
@@ -113,6 +168,38 @@ class _GuestAppLaunchController extends AppLaunchController {
       hasSeenOnboarding: true,
       guestSessionReady: true,
     );
+  }
+}
+
+class _AuthenticatedAppLaunchController extends AppLaunchController {
+  @override
+  AppLaunchState build() {
+    return const AppLaunchState(
+      isLoading: false,
+      isAuthenticated: true,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: true,
+    );
+  }
+}
+
+class _ActivePasswordChangeController extends PasswordChangeController {
+  static int resetCalls = 0;
+
+  @override
+  PasswordChangeState build() {
+    return const PasswordChangeState(
+      email: 'user@example.com',
+      code: '123456',
+      codeRequested: true,
+    );
+  }
+
+  @override
+  void reset({required String email}) {
+    resetCalls += 1;
+    super.reset(email: email);
   }
 }
 

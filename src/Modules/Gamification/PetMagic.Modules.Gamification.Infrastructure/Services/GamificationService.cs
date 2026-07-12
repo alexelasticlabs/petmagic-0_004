@@ -1,4 +1,7 @@
+using System.Data;
+
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
@@ -16,16 +19,72 @@ public sealed class GamificationService(
     GamificationDbContext dbContext,
     IEconomyService? economyService = null) : IGamificationService
 {
-    public async Task<GenerationProcessResult> ProcessGenerationCompletedAsync(
+    public Task<GenerationProcessResult> ProcessGenerationCompletedAsync(
+        Guid generationId,
         Guid userId,
         Guid petId,
         Guid templateId,
         bool isTemplateOfTheDay,
         bool isPremium,
+        CancellationToken cancellationToken) => ProcessGenerationCompletedAsync(
+            generationId,
+            userId,
+            petId,
+            templateId,
+            DateTime.UtcNow,
+            isTemplateOfTheDay,
+            isPremium,
+            cancellationToken);
+
+    public async Task<GenerationProcessResult> ProcessGenerationCompletedAsync(
+        Guid generationId,
+        Guid userId,
+        Guid petId,
+        Guid templateId,
+        DateTime completedAtUtc,
+        bool isTemplateOfTheDay,
+        bool isPremium,
         CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
-        var today = DateOnly.FromDateTime(now);
+        var occurredAtUtc = NormalizeUtcTimestamp(completedAtUtc);
+        var today = DateOnly.FromDateTime(occurredAtUtc);
+        var weekStart = GamificationWeeklyChallengeCatalog.GetCurrentWeekStart(today);
+        var dayStartUtc = DateTime.SpecifyKind(today.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+        var nextDayStartUtc = dayStartUtc.AddDays(1);
+        await using var transaction = await BeginUserMutationTransactionAsync(userId, cancellationToken);
+        if (await dbContext.GenerationEvents
+            .AsNoTracking()
+            .AnyAsync(x => x.GenerationId == generationId, cancellationToken))
+        {
+            return new GenerationProcessResult(0, null, null, false, [], 0);
+        }
+
+        var isFirstUseOfTemplateThisWeek = !await dbContext.GenerationEvents
+            .AsNoTracking()
+            .AnyAsync(
+                x => x.UserId == userId
+                    && x.WeekStartDate == weekStart
+                    && x.TemplateId == templateId,
+                cancellationToken);
+        var isFirstOfDay = !await dbContext.GenerationEvents
+            .AsNoTracking()
+            .AnyAsync(
+                x => x.UserId == userId
+                    && x.PetId == petId
+                    && x.OccurredAtUtc >= dayStartUtc
+                    && x.OccurredAtUtc < nextDayStartUtc,
+                cancellationToken);
+        dbContext.GenerationEvents.Add(new GamificationGenerationEvent
+        {
+            GenerationId = generationId,
+            UserId = userId,
+            PetId = petId,
+            TemplateId = templateId,
+            WeekStartDate = weekStart,
+            OccurredAtUtc = occurredAtUtc,
+            ProcessedAtUtc = now
+        });
 
         var progress = await dbContext.PetProgresses
             .FirstOrDefaultAsync(x => x.UserId == userId && x.PetId == petId, cancellationToken);
@@ -37,14 +96,11 @@ public sealed class GamificationService(
                 Id = Guid.NewGuid(),
                 UserId = userId,
                 PetId = petId,
-                CreatedAtUtc = now,
+                CreatedAtUtc = occurredAtUtc,
                 UpdatedAtUtc = now
             };
             dbContext.PetProgresses.Add(progress);
         }
-
-        var isFirstOfDay = progress.LastGenerationAtUtc is null
-            || DateOnly.FromDateTime(progress.LastGenerationAtUtc.Value) < today;
 
         var xpAwarded = XpThresholds.BaseXpPerGeneration;
         if (isTemplateOfTheDay)
@@ -60,9 +116,16 @@ public sealed class GamificationService(
         var previousLevel = progress.Level;
         progress.Xp += xpAwarded;
         progress.TotalGenerations += 1;
-        progress.FavoriteTemplateId = templateId;
-        progress.FirstGenerationAtUtc ??= now;
-        progress.LastGenerationAtUtc = now;
+        if (progress.FirstGenerationAtUtc is null || occurredAtUtc < progress.FirstGenerationAtUtc.Value)
+        {
+            progress.FirstGenerationAtUtc = occurredAtUtc;
+        }
+
+        if (progress.LastGenerationAtUtc is null || occurredAtUtc >= progress.LastGenerationAtUtc.Value)
+        {
+            progress.FavoriteTemplateId = templateId;
+            progress.LastGenerationAtUtc = occurredAtUtc;
+        }
         progress.Level = XpThresholds.GetLevel(progress.Xp);
         progress.EvolutionStage = EvolutionStage.FromLevel(progress.Level);
         progress.UpdatedAtUtc = now;
@@ -73,23 +136,34 @@ public sealed class GamificationService(
             : null;
 
         await UpdateDailyStreakAsync(userId, today, isPremium, cancellationToken);
-        await UpdateChallengeProgressAsync(userId, "generate_images", 1, cancellationToken);
-        await UpdateChallengeProgressAsync(userId, "try_templates", 1, cancellationToken);
+        await UpdateChallengeProgressAsync(userId, "generate_images", 1, weekStart, occurredAtUtc, cancellationToken);
+        if (isFirstUseOfTemplateThisWeek)
+        {
+            await UpdateChallengeProgressAsync(userId, "try_templates", 1, weekStart, occurredAtUtc, cancellationToken);
+        }
 
         var unlockedAchievements = await EvaluateAchievementsAsync(userId, cancellationToken);
 
         var totalSparkReward = 0;
         var unlockedAchievementResponses = new List<AchievementResponse>();
-        if (unlockedAchievements.Count > 0)
+        var persistedPendingRewards = await dbContext.UserAchievements
+            .Where(x => x.UserId == userId && !x.RewardCredited)
+            .ToListAsync(cancellationToken);
+        var pendingRewardAchievements = persistedPendingRewards
+            .Concat(unlockedAchievements)
+            .DistinctBy(x => x.Id)
+            .ToList();
+
+        if (pendingRewardAchievements.Count > 0 || unlockedAchievements.Count > 0)
         {
-            var unlockedKeys = unlockedAchievements
+            var rewardKeys = pendingRewardAchievements
                 .Select(a => NormalizeAchievementKey(a.AchievementKey))
                 .Where(key => key.Length > 0)
                 .ToHashSet(StringComparer.Ordinal);
-            var definitions = unlockedKeys.Count == 0
+            var definitions = rewardKeys.Count == 0
                 ? new Dictionary<string, AchievementDefinition>(StringComparer.Ordinal)
                 : (await dbContext.AchievementDefinitions
-                        .Where(d => d.Key != null && d.Key != string.Empty && unlockedKeys.Contains(d.Key))
+                        .Where(d => d.Key != null && d.Key != string.Empty && rewardKeys.Contains(d.Key))
                         .ToListAsync(cancellationToken))
                     .Select(def => new
                     {
@@ -100,38 +174,72 @@ public sealed class GamificationService(
                     .GroupBy(x => x.Key, StringComparer.Ordinal)
                     .ToDictionary(x => x.Key, x => x.First().Definition, StringComparer.Ordinal);
 
-            foreach (var achievement in unlockedAchievements.Where(a => !a.RewardCredited))
+            foreach (var achievement in pendingRewardAchievements.Where(a => !a.RewardCredited))
             {
                 var normalizedAchievementKey = NormalizeAchievementKey(achievement.AchievementKey);
                 if (normalizedAchievementKey.Length > 0 && definitions.TryGetValue(normalizedAchievementKey, out var def))
                 {
+                    if (def.RewardSpark <= 0)
+                    {
+                        achievement.RewardCredited = true;
+                        continue;
+                    }
+
+                    if (economyService is null)
+                    {
+                        continue;
+                    }
+
+                    var creditResult = await economyService.CreditAsync(
+                        new CreditBalanceCommand(
+                            userId,
+                            def.RewardSpark,
+                            "achievement_reward",
+                            "Achievement unlock reward",
+                            IdempotencyKey: $"achievement:{normalizedAchievementKey}"),
+                        cancellationToken);
+                    if (creditResult.IsFailure)
+                    {
+                        throw new InvalidOperationException("Achievement reward credit could not be confirmed.");
+                    }
+
                     totalSparkReward += def.RewardSpark;
-                    unlockedAchievementResponses.Add(new AchievementResponse(
-                        normalizedAchievementKey,
-                        def.Category ?? "special",
-                        def.Rarity ?? "common",
-                        def.TitleKey ?? string.Empty,
-                        def.DescriptionKey ?? string.Empty,
-                        def.IconEmoji,
-                        def.RequirementValue,
-                        def.RequirementValue,
-                        def.RewardSpark,
-                        def.IsSecret,
-                        true,
-                        achievement.UnlockedAtUtc));
+                    achievement.RewardCredited = true;
                 }
-                achievement.RewardCredited = true;
             }
 
-            if (totalSparkReward > 0 && economyService is not null)
+            foreach (var achievement in unlockedAchievements)
             {
-                await economyService.CreditAsync(
-                    new CreditBalanceCommand(userId, totalSparkReward, "achievement_reward", "Achievement unlock reward"),
-                    cancellationToken);
+                var normalizedAchievementKey = NormalizeAchievementKey(achievement.AchievementKey);
+                if (normalizedAchievementKey.Length == 0
+                    || !definitions.TryGetValue(normalizedAchievementKey, out var def))
+                {
+                    continue;
+                }
+
+                unlockedAchievementResponses.Add(new AchievementResponse(
+                    normalizedAchievementKey,
+                    def.Category ?? "special",
+                    def.Rarity ?? "common",
+                    def.TitleKey ?? string.Empty,
+                    def.DescriptionKey ?? string.Empty,
+                    def.IconEmoji,
+                    def.RequirementValue,
+                    def.RequirementValue,
+                    def.RewardSpark,
+                    def.IsSecret,
+                    true,
+                    achievement.UnlockedAtUtc));
             }
         }
 
+        totalSparkReward += await CreditPendingChallengeRewardsAsync(userId, cancellationToken);
+
         await dbContext.SaveChangesAsync(cancellationToken);
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
 
         return new GenerationProcessResult(
             xpAwarded,
@@ -277,11 +385,6 @@ public sealed class GamificationService(
             startOfWeek = today.AddDays(-6);
         }
 
-        var activeDays = await dbContext.DailyStreaks
-            .Where(x => x.UserId == userId)
-            .Select(x => x.LastActiveDate)
-            .ToListAsync(cancellationToken);
-
         var activeDaysThisWeek = new List<DateOnly>();
         if (streak.CurrentStreak > 0)
         {
@@ -295,33 +398,123 @@ public sealed class GamificationService(
             }
         }
 
+        var freezesPerWeek = await ResolveWeeklyFreezeAllowanceAsync(
+            userId,
+            streak.WeeklyFreezeAllowance,
+            cancellationToken);
+
         return new StreakResponse(
             streak.CurrentStreak,
             streak.LongestStreak,
             streak.StreakFreezesAvailable,
-            streak.FreezesResetAt.HasValue ? 2 : 1,
+            freezesPerWeek,
             streak.LastActiveDate,
             activeDaysThisWeek);
     }
 
     public async Task<UseFreezeResult> UseStreakFreezeAsync(Guid userId, CancellationToken cancellationToken)
     {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var now = DateTime.UtcNow;
+        var expectedLastActiveDate = today.AddDays(-2);
+        var virtualActiveDate = today.AddDays(-1);
+        var currentWeekStart = GamificationWeeklyChallengeCatalog.GetCurrentWeekStart(today);
+        var existingAllowance = await dbContext.DailyStreaks
+            .AsNoTracking()
+            .Where(x => x.UserId == userId)
+            .Select(x => (int?)x.WeeklyFreezeAllowance)
+            .SingleOrDefaultAsync(cancellationToken) ?? 1;
+        var weeklyAllowance = await ResolveWeeklyFreezeAllowanceAsync(
+            userId,
+            existingAllowance,
+            cancellationToken);
+        if (dbContext.Database.IsRelational())
+        {
+            var updated = await dbContext.DailyStreaks
+                .Where(x => x.UserId == userId
+                    && x.LastActiveDate == expectedLastActiveDate
+                    && ((x.FreezesResetAt == null || x.FreezesResetAt < currentWeekStart)
+                        || x.StreakFreezesAvailable > 0))
+                .ExecuteUpdateAsync(
+                    setters => setters
+                        .SetProperty(
+                            x => x.StreakFreezesAvailable,
+                            x => x.FreezesResetAt == null || x.FreezesResetAt < currentWeekStart
+                                ? weeklyAllowance - 1
+                                : x.StreakFreezesAvailable - 1)
+                        .SetProperty(
+                            x => x.WeeklyFreezeAllowance,
+                            x => x.FreezesResetAt == null || x.FreezesResetAt < currentWeekStart
+                                ? weeklyAllowance
+                                : x.WeeklyFreezeAllowance)
+                        .SetProperty(
+                            x => x.FreezesResetAt,
+                            x => x.FreezesResetAt == null || x.FreezesResetAt < currentWeekStart
+                                ? currentWeekStart
+                                : x.FreezesResetAt)
+                        .SetProperty(x => x.CurrentStreak, x => x.CurrentStreak + 1)
+                        .SetProperty(
+                            x => x.LongestStreak,
+                            x => x.CurrentStreak + 1 > x.LongestStreak
+                                ? x.CurrentStreak + 1
+                                : x.LongestStreak)
+                        .SetProperty(x => x.LastActiveDate, virtualActiveDate)
+                        .SetProperty(x => x.StreakFreezeUsedAt, today)
+                        .SetProperty(x => x.UpdatedAtUtc, now),
+                    cancellationToken);
+            var freezesRemaining = await dbContext.DailyStreaks
+                .AsNoTracking()
+                .Where(x => x.UserId == userId)
+                .Select(x => (int?)x.StreakFreezesAvailable)
+                .SingleOrDefaultAsync(cancellationToken) ?? 0;
+
+            return new UseFreezeResult(updated == 1, freezesRemaining);
+        }
+
         var streak = await dbContext.DailyStreaks
             .FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
 
-        if (streak is null || streak.StreakFreezesAvailable <= 0)
+        if (streak is not null)
+        {
+            ResetWeeklyFreezesIfNeeded(streak, today, weeklyAllowance > 1);
+        }
+
+        if (streak is null
+            || streak.StreakFreezesAvailable <= 0
+            || streak.LastActiveDate != expectedLastActiveDate)
         {
             return new UseFreezeResult(false, streak?.StreakFreezesAvailable ?? 0);
         }
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
         streak.StreakFreezesAvailable -= 1;
+        streak.CurrentStreak += 1;
+        streak.LongestStreak = Math.Max(streak.LongestStreak, streak.CurrentStreak);
+        streak.LastActiveDate = virtualActiveDate;
         streak.StreakFreezeUsedAt = today;
-        streak.UpdatedAtUtc = DateTime.UtcNow;
+        streak.UpdatedAtUtc = now;
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return new UseFreezeResult(true, streak.StreakFreezesAvailable);
+    }
+
+    private async Task<int> ResolveWeeklyFreezeAllowanceAsync(
+        Guid userId,
+        int fallbackAllowance,
+        CancellationToken cancellationToken)
+    {
+        if (economyService is not null)
+        {
+            var summary = await economyService.GetSubscriptionSummaryAsync(
+                userId,
+                cancellationToken);
+            if (summary.IsSuccess)
+            {
+                return summary.Value.IsPremium ? 2 : 1;
+            }
+        }
+
+        return Math.Clamp(fallbackAllowance, 1, 2);
     }
 
     public async Task<IReadOnlyList<ChallengeResponse>> GetCurrentChallengesAsync(Guid userId, CancellationToken cancellationToken)
@@ -329,19 +522,15 @@ public sealed class GamificationService(
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var startOfWeek = GamificationWeeklyChallengeCatalog.GetCurrentWeekStart(today);
 
+        await GamificationWeeklyChallengeCatalog.EnsureWeeklyChallengesAsync(
+            dbContext,
+            startOfWeek,
+            cancellationToken);
+
         var challenges = await dbContext.WeeklyChallenges
             .Where(x => x.WeekStartDate == startOfWeek)
             .OrderBy(x => x.SortOrder)
             .ToListAsync(cancellationToken);
-
-        if (challenges.Count == 0)
-        {
-            await GamificationWeeklyChallengeCatalog.EnsureWeeklyChallengesAsync(dbContext, startOfWeek, cancellationToken);
-            challenges = await dbContext.WeeklyChallenges
-                .Where(x => x.WeekStartDate == startOfWeek)
-                .OrderBy(x => x.SortOrder)
-                .ToListAsync(cancellationToken);
-        }
 
         var challengeIds = challenges.Select(x => x.Id).ToHashSet();
         var progressMap = await dbContext.UserChallengeProgresses
@@ -390,10 +579,79 @@ public sealed class GamificationService(
                 p.FavoriteTemplateId, p.LastGenerationAtUtc)).ToList());
     }
 
-    public async Task RecordCreationSharedAsync(Guid userId, CancellationToken cancellationToken)
+    public Task RecordCreationSharedAsync(
+        Guid generationId,
+        Guid userId,
+        CancellationToken cancellationToken) => RecordCreationSharedAsync(
+            generationId,
+            userId,
+            DateTime.UtcNow,
+            cancellationToken);
+
+    public async Task RecordCreationSharedAsync(
+        Guid generationId,
+        Guid userId,
+        DateTime sharedAtUtc,
+        CancellationToken cancellationToken)
     {
-        await UpdateChallengeProgressAsync(userId, "share_creations", 1, cancellationToken);
+        var occurredAtUtc = NormalizeUtcTimestamp(sharedAtUtc);
+        var today = DateOnly.FromDateTime(occurredAtUtc);
+        var weekStart = GamificationWeeklyChallengeCatalog.GetCurrentWeekStart(today);
+        await using var transaction = await BeginUserMutationTransactionAsync(userId, cancellationToken);
+        if (await dbContext.ShareEvents
+            .AsNoTracking()
+            .AnyAsync(x => x.GenerationId == generationId, cancellationToken))
+        {
+            return;
+        }
+
+        dbContext.ShareEvents.Add(new GamificationShareEvent
+        {
+            GenerationId = generationId,
+            UserId = userId,
+            WeekStartDate = weekStart,
+            SharedAtUtc = occurredAtUtc
+        });
+        await UpdateChallengeProgressAsync(
+            userId,
+            "share_creations",
+            1,
+            weekStart,
+            occurredAtUtc,
+            cancellationToken);
+        await CreditPendingChallengeRewardsAsync(userId, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
+    }
+
+    private async Task<IDbContextTransaction?> BeginUserMutationTransactionAsync(
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        if (!dbContext.Database.IsRelational())
+        {
+            return null;
+        }
+
+        var isPostgres = string.Equals(
+            dbContext.Database.ProviderName,
+            "Npgsql.EntityFrameworkCore.PostgreSQL",
+            StringComparison.Ordinal);
+        var transaction = await dbContext.Database.BeginTransactionAsync(
+            isPostgres ? IsolationLevel.ReadCommitted : IsolationLevel.Serializable,
+            cancellationToken);
+        if (isPostgres)
+        {
+            var lockKey = BitConverter.ToInt64(userId.ToByteArray(), 0);
+            await dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock({lockKey})",
+                cancellationToken);
+        }
+
+        return transaction;
     }
 
     private async Task UpdateDailyStreakAsync(Guid userId, DateOnly today, bool isPremium, CancellationToken cancellationToken)
@@ -411,12 +669,21 @@ public sealed class GamificationService(
                 LongestStreak = 1,
                 LastActiveDate = today,
                 StreakFreezesAvailable = isPremium ? 2 : 1,
+                WeeklyFreezeAllowance = isPremium ? 2 : 1,
+                FreezesResetAt = GamificationWeeklyChallengeCatalog.GetCurrentWeekStart(today),
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow
             };
             dbContext.DailyStreaks.Add(streak);
             return;
         }
+
+        if (today < streak.LastActiveDate)
+        {
+            return;
+        }
+
+        ResetWeeklyFreezesIfNeeded(streak, today, isPremium);
 
         if (streak.LastActiveDate == today)
         {
@@ -428,10 +695,11 @@ public sealed class GamificationService(
         {
             streak.CurrentStreak += 1;
         }
-        else if (streak.StreakFreezesAvailable > 0)
+        else if (streak.LastActiveDate == today.AddDays(-2)
+            && streak.StreakFreezesAvailable > 0)
         {
             streak.StreakFreezesAvailable -= 1;
-            streak.CurrentStreak += 1;
+            streak.CurrentStreak += 2;
             streak.StreakFreezeUsedAt = today;
         }
         else
@@ -447,40 +715,43 @@ public sealed class GamificationService(
         streak.LastActiveDate = today;
         streak.UpdatedAtUtc = DateTime.UtcNow;
 
-        ResetWeeklyFreezesIfNeeded(streak, today, isPremium);
     }
 
     private static void ResetWeeklyFreezesIfNeeded(DailyStreak streak, DateOnly today, bool isPremium)
     {
-        if (streak.FreezesResetAt.HasValue)
+        var currentWeekStart = GamificationWeeklyChallengeCatalog.GetCurrentWeekStart(today);
+        if (!streak.FreezesResetAt.HasValue || streak.FreezesResetAt.Value < currentWeekStart)
         {
-            var daysSinceReset = today.DayNumber - streak.FreezesResetAt.Value.DayNumber;
-            if (daysSinceReset < 7)
-            {
-                return;
-            }
-        }
-
-        if (today.DayOfWeek == DayOfWeek.Monday)
-        {
-            streak.StreakFreezesAvailable = isPremium ? 2 : 1;
-            streak.FreezesResetAt = today;
+            streak.WeeklyFreezeAllowance = isPremium ? 2 : 1;
+            streak.StreakFreezesAvailable = streak.WeeklyFreezeAllowance;
+            streak.FreezesResetAt = currentWeekStart;
         }
     }
 
-    private async Task UpdateChallengeProgressAsync(Guid userId, string challengeType, int increment, CancellationToken cancellationToken)
+    private async Task UpdateChallengeProgressAsync(
+        Guid userId,
+        string challengeType,
+        int increment,
+        DateOnly startOfWeek,
+        DateTime occurredAtUtc,
+        CancellationToken cancellationToken)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var startOfWeek = GamificationWeeklyChallengeCatalog.GetCurrentWeekStart(today);
-
         var challenge = await dbContext.WeeklyChallenges
             .FirstOrDefaultAsync(x => x.WeekStartDate == startOfWeek && x.ChallengeType == challengeType, cancellationToken);
 
         if (challenge is null)
         {
-            await GamificationWeeklyChallengeCatalog.EnsureWeeklyChallengesAsync(dbContext, startOfWeek, cancellationToken);
-            challenge = await dbContext.WeeklyChallenges
-                .FirstOrDefaultAsync(x => x.WeekStartDate == startOfWeek && x.ChallengeType == challengeType, cancellationToken);
+            await GamificationWeeklyChallengeCatalog.EnsureWeeklyChallengesAsync(
+                dbContext,
+                startOfWeek,
+                cancellationToken,
+                persistImmediately: false);
+            challenge = dbContext.WeeklyChallenges.Local
+                .FirstOrDefault(x => x.WeekStartDate == startOfWeek && x.ChallengeType == challengeType)
+                ?? await dbContext.WeeklyChallenges
+                    .FirstOrDefaultAsync(
+                        x => x.WeekStartDate == startOfWeek && x.ChallengeType == challengeType,
+                        cancellationToken);
 
             if (challenge is null)
             {
@@ -511,8 +782,71 @@ public sealed class GamificationService(
         if (progress.CurrentValue >= challenge.TargetValue)
         {
             progress.Completed = true;
-            progress.CompletedAtUtc = DateTime.UtcNow;
+            progress.CompletedAtUtc = occurredAtUtc;
         }
+    }
+
+    private async Task<int> CreditPendingChallengeRewardsAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var persistedPending = await dbContext.UserChallengeProgresses
+            .Where(x => x.UserId == userId && x.Completed && !x.RewardCredited)
+            .ToListAsync(cancellationToken);
+        var pending = persistedPending
+            .Concat(dbContext.UserChallengeProgresses.Local
+                .Where(x => x.UserId == userId && x.Completed && !x.RewardCredited))
+            .DistinctBy(x => x.Id)
+            .ToList();
+        if (pending.Count == 0)
+        {
+            return 0;
+        }
+
+        var challengeIds = pending.Select(x => x.ChallengeId).ToHashSet();
+        var persistedChallenges = await dbContext.WeeklyChallenges
+            .Where(x => challengeIds.Contains(x.Id))
+            .ToListAsync(cancellationToken);
+        var challenges = persistedChallenges
+            .Concat(dbContext.WeeklyChallenges.Local.Where(x => challengeIds.Contains(x.Id)))
+            .GroupBy(x => x.Id)
+            .ToDictionary(x => x.Key, x => x.First());
+        var creditedSpark = 0;
+
+        foreach (var progress in pending)
+        {
+            if (!challenges.TryGetValue(progress.ChallengeId, out var challenge))
+            {
+                continue;
+            }
+
+            if (challenge.RewardSpark <= 0)
+            {
+                progress.RewardCredited = true;
+                continue;
+            }
+
+            if (economyService is null)
+            {
+                continue;
+            }
+
+            var creditResult = await economyService.CreditAsync(
+                new CreditBalanceCommand(
+                    userId,
+                    challenge.RewardSpark,
+                    "challenge_reward",
+                    "Weekly challenge reward",
+                    IdempotencyKey: $"challenge:{challenge.Id:N}"),
+                cancellationToken);
+            if (creditResult.IsFailure)
+            {
+                throw new InvalidOperationException("Weekly challenge reward credit could not be confirmed.");
+            }
+
+            progress.RewardCredited = true;
+            creditedSpark += challenge.RewardSpark;
+        }
+
+        return creditedSpark;
     }
 
     private async Task<List<UserAchievement>> EvaluateAchievementsAsync(Guid userId, CancellationToken cancellationToken)
@@ -558,27 +892,24 @@ public sealed class GamificationService(
 
     private async Task<UserProgressCounters> GetUserProgressCountersAsync(Guid userId, CancellationToken cancellationToken)
     {
-        var totalGenerations = await dbContext.PetProgresses
+        var persistedProgress = await dbContext.PetProgresses
             .Where(x => x.UserId == userId)
-            .SumAsync(x => x.TotalGenerations, cancellationToken);
-
-        var petCount = await dbContext.PetProgresses
-            .CountAsync(x => x.UserId == userId, cancellationToken);
+            .ToListAsync(cancellationToken);
+        var progress = persistedProgress
+            .Concat(dbContext.PetProgresses.Local.Where(x => x.UserId == userId))
+            .DistinctBy(x => x.Id)
+            .ToList();
 
         var streak = await dbContext.DailyStreaks
-            .FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
-
-        var maxEvolutionStage = await dbContext.PetProgresses
-            .Where(x => x.UserId == userId)
-            .Select(x => (int?)x.Level)
-            .MaxAsync(cancellationToken) ?? 0;
+            .FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken)
+            ?? dbContext.DailyStreaks.Local.FirstOrDefault(x => x.UserId == userId);
 
         return new UserProgressCounters
         {
-            TotalGenerations = totalGenerations,
-            PetCount = petCount,
+            TotalGenerations = progress.Sum(x => x.TotalGenerations),
+            PetCount = progress.Count,
             StreakDays = streak?.CurrentStreak ?? 0,
-            MaxPetLevel = maxEvolutionStage
+            MaxPetLevel = progress.Count == 0 ? 0 : progress.Max(x => x.Level)
         };
     }
 
@@ -592,6 +923,13 @@ public sealed class GamificationService(
     };
 
     private static string NormalizeAchievementKey(string? value) => value?.Trim() ?? string.Empty;
+
+    private static DateTime NormalizeUtcTimestamp(DateTime value) => value.Kind switch
+    {
+        DateTimeKind.Utc => value,
+        DateTimeKind.Local => value.ToUniversalTime(),
+        _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+    };
 
     private sealed class UserProgressCounters
     {

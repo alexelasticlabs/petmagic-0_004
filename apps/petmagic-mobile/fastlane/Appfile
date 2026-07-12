@@ -1,0 +1,5 @@
+package_name(ENV.fetch("GOOGLE_PLAY_PACKAGE_NAME", "com.petmagic.app"))
+apple_id(ENV["APPLE_ID"]) if ENV["APPLE_ID"]
+app_identifier(ENV.fetch("APP_STORE_BUNDLE_ID", "com.petmagic.app"))
+team_id(ENV["APPLE_TEAM_ID"]) if ENV["APPLE_TEAM_ID"]
+itc_team_id(ENV["APP_STORE_CONNECT_TEAM_ID"]) if ENV["APP_STORE_CONNECT_TEAM_ID"]

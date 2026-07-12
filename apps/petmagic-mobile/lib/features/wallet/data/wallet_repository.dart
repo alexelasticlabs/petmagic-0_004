@@ -4,6 +4,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:in_app_purchase_android/billing_client_wrappers.dart';
+import 'package:in_app_purchase_android/in_app_purchase_android.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
@@ -29,6 +31,8 @@ final walletRepositoryProvider = Provider<WalletRepository>((ref) {
 });
 
 class WalletRepository {
+  static const _storeAvailabilityTimeout = Duration(seconds: 8);
+
   WalletRepository({
     required Dio dio,
     required AuthSessionStorage sessionStorage,
@@ -259,6 +263,11 @@ class WalletRepository {
     CurrencyPackModel pack,
     WalletPaymentMethodModel paymentMethod,
   ) async {
+    final session = await _authSessionCoordinator.requireValidSession(
+      mapError: _mapDioException,
+      unauthorizedMessage: 'auth.sign_in_required',
+      sessionExpiredMessage: 'auth.session_expired',
+    );
     final productId = pack.productIdForProvider(paymentMethod.provider);
     if (productId == null || productId.isEmpty) {
       throw const AppException('wallet.payment_unavailable');
@@ -275,7 +284,11 @@ class WalletRepository {
     }
 
     final launched = await _inAppPurchase.buyConsumable(
-      purchaseParam: PurchaseParam(productDetails: productDetails),
+      purchaseParam: PurchaseParam(
+        productDetails: productDetails,
+        applicationUserName: session.user.userId,
+      ),
+      autoConsume: false,
     );
     if (!launched) {
       throw const AppException('wallet.payment_unavailable');
@@ -285,14 +298,16 @@ class WalletRepository {
   Future<StoreProductAvailabilitySnapshot> _loadStoreAvailabilitySnapshot(
     Set<String> requestedProductIds,
   ) async {
-    final isAvailable = await _inAppPurchase.isAvailable();
+    final isAvailable = await _inAppPurchase.isAvailable().timeout(
+      _storeAvailabilityTimeout,
+    );
     if (!isAvailable) {
       return const StoreProductAvailabilitySnapshot(isAvailable: false);
     }
 
-    final response = await _inAppPurchase.queryProductDetails(
-      requestedProductIds,
-    );
+    final response = await _inAppPurchase
+        .queryProductDetails(requestedProductIds)
+        .timeout(_storeAvailabilityTimeout);
     if (response.error != null) {
       throw const AppException('wallet.payment_unavailable');
     }
@@ -389,12 +404,33 @@ class WalletRepository {
     return _storePurchaseRecoveryStore.clearPendingPurchase(orderId: orderId);
   }
 
-  Future<void> restoreStorePurchases() {
-    return _inAppPurchase.restorePurchases();
+  Future<void> restoreStorePurchases() async {
+    final session = await _authSessionCoordinator.requireValidSession(
+      mapError: _mapDioException,
+      unauthorizedMessage: 'auth.sign_in_required',
+      sessionExpiredMessage: 'auth.session_expired',
+    );
+    await _inAppPurchase.restorePurchases(
+      applicationUserName: session.user.userId,
+    );
   }
 
   Future<void> completePurchase(PurchaseDetails purchase) {
     return _inAppPurchase.completePurchase(purchase);
+  }
+
+  Future<void> consumeVerifiedPurchase(PurchaseDetails purchase) async {
+    if (!Platform.isAndroid) {
+      await _inAppPurchase.completePurchase(purchase);
+      return;
+    }
+
+    final addition = _inAppPurchase
+        .getPlatformAddition<InAppPurchaseAndroidPlatformAddition>();
+    final result = await addition.consumePurchase(purchase);
+    if (result.responseCode != BillingResponse.ok) {
+      throw const AppException('wallet.payment_unavailable');
+    }
   }
 
   Future<WalletStateModel> claimAdReward() async {

@@ -139,11 +139,18 @@ public static partial class AuthEndpoints
         string provider,
         HttpContext context,
         ExternalAccountLinkStore linkStore,
+        IAuthenticationSchemeProvider authenticationSchemes,
         CancellationToken cancellationToken)
     {
-        if (NormalizeExternalProvider(provider) is null)
+        var normalizedProvider = NormalizeExternalProvider(provider);
+        if (normalizedProvider is null)
         {
             return IdentityClientProblems.ExternalProviderInvalid();
+        }
+
+        if (await authenticationSchemes.GetSchemeAsync(normalizedProvider) is null)
+        {
+            return ToExternalAuthProblem("auth.external_not_configured", StatusCodes.Status404NotFound);
         }
 
         if (!TryGetUserId(context, out var userId, out var invalidSubjectProblem))
@@ -154,6 +161,45 @@ public static partial class AuthEndpoints
         ApplySensitiveNoStoreHeaders(context);
         return TypedResults.Ok(new ExternalLinkPreparationResponse(
             await linkStore.CreateAsync(userId, cancellationToken)));
+    }
+
+    private static async Task<Results<Ok<IReadOnlyList<LinkedAccountResponse>>, ValidationProblem, ProblemHttpResult>> GoogleNativeLinkAsync(
+        HttpContext context,
+        GoogleNativeLinkCommand command,
+        IValidator<GoogleNativeLinkCommand> validator,
+        IGoogleIdentityTokenVerifier verifier,
+        IIdentityService service,
+        CancellationToken cancellationToken)
+    {
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
+        }
+
+        if (!TryGetUserId(context, out var userId, out var invalidSubjectProblem))
+        {
+            return invalidSubjectProblem!;
+        }
+
+        var verification = await verifier.VerifyIdTokenAsync(command.IdToken, cancellationToken);
+        if (verification.IsFailure)
+        {
+            var statusCode = string.Equals(verification.Error.Code, "auth.external_not_configured", StringComparison.Ordinal)
+                ? StatusCodes.Status404NotFound
+                : StatusCodes.Status401Unauthorized;
+
+            return ToExternalAuthProblem(verification.Error.Code, statusCode);
+        }
+
+        var result = await service.LinkExternalLoginAsync(userId, verification.Value, cancellationToken);
+        if (result.IsFailure)
+        {
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
+        }
+
+        ApplySensitiveNoStoreHeaders(context);
+        return TypedResults.Ok(result.Value);
     }
 
     private static async Task<Results<Ok<IReadOnlyList<LinkedAccountResponse>>, ProblemHttpResult>> UnlinkLinkedAccountAsync(

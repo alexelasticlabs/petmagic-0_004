@@ -32,6 +32,8 @@ import type {
   AdminModerationQueuePage,
   AdminModerationQueueQuery,
   AdminTemplateGenerationDashboardMetrics,
+  AdminGamificationLegacyDeliveryResolutionAction,
+  AdminGamificationLegacyDeliveryResolutionResponse,
   AdminTemplateGenerationsPage,
   AdminTemplateGenerationsQuery,
   AdminWatermarkSettings,
@@ -57,6 +59,7 @@ import type {
 
 export const MODERATION_SEARCH_MAX_LENGTH = 120;
 export const MODERATION_DECISION_REASON_MAX_LENGTH = 500;
+export const GAMIFICATION_LEGACY_DELIVERY_REASON_MAX_LENGTH = 1000;
 export const GENERATION_PROVIDER_FILTER_MAX_LENGTH = 40;
 export const GENERATION_USER_FILTER_MAX_LENGTH = 80;
 export const GENERATION_SEARCH_FILTER_MAX_LENGTH = 80;
@@ -859,5 +862,20 @@ export async function retryAdminTemplateGeneration(
   return apiRequest<TemplateGenerationResponse>(
     `/api/admin/templates/generations/${encodedGenerationId}/retry`,
     { method: "POST" }
+  );
+}
+
+export async function resolveAdminLegacyGamificationDelivery(
+  generationId: string,
+  payload: { action: AdminGamificationLegacyDeliveryResolutionAction; reason: string }
+): Promise<AdminGamificationLegacyDeliveryResolutionResponse> {
+  const encodedGenerationId = encodePathSegment(generationId);
+  const reason = payload.reason.trim().slice(0, GAMIFICATION_LEGACY_DELIVERY_REASON_MAX_LENGTH);
+  return apiRequest<AdminGamificationLegacyDeliveryResolutionResponse>(
+    `/api/admin/templates/generations/${encodedGenerationId}/resolve-legacy-gamification`,
+    {
+      method: "POST",
+      body: JSON.stringify({ ...payload, reason }),
+    }
   );
 }

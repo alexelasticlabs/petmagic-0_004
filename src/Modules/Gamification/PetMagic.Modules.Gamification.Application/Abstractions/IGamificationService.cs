@@ -5,12 +5,30 @@ namespace PetMagic.Modules.Gamification.Application.Abstractions;
 public interface IGamificationService
 {
     Task<GenerationProcessResult> ProcessGenerationCompletedAsync(
+        Guid generationId,
         Guid userId,
         Guid petId,
         Guid templateId,
         bool isTemplateOfTheDay,
         bool isPremium,
         CancellationToken cancellationToken);
+
+    Task<GenerationProcessResult> ProcessGenerationCompletedAsync(
+        Guid generationId,
+        Guid userId,
+        Guid petId,
+        Guid templateId,
+        DateTime completedAtUtc,
+        bool isTemplateOfTheDay,
+        bool isPremium,
+        CancellationToken cancellationToken) => ProcessGenerationCompletedAsync(
+            generationId,
+            userId,
+            petId,
+            templateId,
+            isTemplateOfTheDay,
+            isPremium,
+            cancellationToken);
 
     Task<PetProgressResponse?> GetPetProgressAsync(Guid userId, Guid petId, CancellationToken cancellationToken);
 
@@ -26,7 +44,16 @@ public interface IGamificationService
 
     Task<GamificationSummaryResponse> GetSummaryAsync(Guid userId, CancellationToken cancellationToken);
 
-    Task RecordCreationSharedAsync(Guid userId, CancellationToken cancellationToken);
+    Task RecordCreationSharedAsync(Guid generationId, Guid userId, CancellationToken cancellationToken);
+
+    Task RecordCreationSharedAsync(
+        Guid generationId,
+        Guid userId,
+        DateTime sharedAtUtc,
+        CancellationToken cancellationToken) => RecordCreationSharedAsync(
+            generationId,
+            userId,
+            cancellationToken);
 }
 
 public sealed record GenerationProcessResult(

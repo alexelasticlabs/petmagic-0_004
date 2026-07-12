@@ -230,6 +230,10 @@ public sealed record CancelQueuedGenerationResponse(
     bool Refunded,
     DateTime CancelledAtUtc);
 
+public sealed record AdminGenerationCancellationResult(
+    TemplateGenerationResponse Generation,
+    bool IsPending);
+
 public sealed record CreateQaGenerationFixturesCommand(
     Guid? ImageTemplateId,
     Guid? VideoTemplateId,

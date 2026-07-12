@@ -62,6 +62,10 @@
   "profileSignInHint": "Usa tu cuenta de PetMagic para cargar tu perfil y gestionar el avatar visible en el panel de administración.",
   "profileEmailLabel": "Correo electrónico",
   "profilePasswordLabel": "Contraseña",
+  "authShowPassword": "Mostrar contraseña",
+  "authHidePassword": "Ocultar contraseña",
+  "authShowPasswordConfirmation": "Mostrar confirmación de contraseña",
+  "authHidePasswordConfirmation": "Ocultar confirmación de contraseña",
   "profileSignInAction": "Iniciar sesión",
   "profileSignOutAction": "Cerrar sesión",
   "profileLoadingAction": "Procesando...",
@@ -392,6 +396,9 @@
   "profileAccountDisplayNameMissing": "Aún no configurado",
   "profileAccountRolesLabel": "Roles",
   "profileAccountRolesMissing": "No hay roles asignados",
+  "profileAccountRoleUser": "Usuario",
+  "profileAccountRoleModerator": "Moderador",
+  "profileAccountRoleAdmin": "Administrador",
   "profileAccountMembershipLabel": "Afiliación",
   "profileAccountConsentLabel": "Aceptación de términos",
   "profileAccountMarketingLabel": "Ofertas y actualizaciones",
@@ -1209,6 +1216,8 @@
   "premiumBestValueBadge": "MEJOR VALOR",
   "premiumStorePaymentDisclaimerTitle": "Pago seguro a través de App Store / Google Play",
   "premiumStorePaymentDisclaimerBody": "El pago se cargará a su cuenta de App Store/Google Play. La suscripción se renueva automáticamente a menos que se cancele antes de la fecha de renovación.",
+  "premiumCardPaymentDisclaimerTitle": "Pago seguro con tarjeta",
+  "premiumCardPaymentDisclaimerBody": "El pago se cargará a su tarjeta bancaria. La suscripción se renueva automáticamente a menos que se cancele antes de la fecha de renovación.",
   "premiumBenefitAiGenerationsTitle": "30 generaciones de IA",
   "premiumBenefitAiGenerationsSubtitle": "cada mes",
   "premiumBenefitPremiumTemplatesTitle": "Plantillas premium",
@@ -1303,7 +1312,14 @@
   "gamificationKeepGenerating": "¡Sigue generando para desbloquear más!",
   "gamificationUnlocked": "{unlocked} / {total} desbloqueados",
   "gamificationLoadFailed": "No se pudieron cargar los logros",
-  "gamificationDayStreak": "días de racha",
+  "gamificationDayStreak": "{count, plural, one{{count} día de racha} other{{count} días de racha}}",
+  "@gamificationDayStreak": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "gamificationHubSubtitle": "Sigue tu racha, retos e hitos en un solo lugar.",
   "gamificationHubEntrySubtitle": "Racha, objetivos semanales e hitos de logros.",
   "gamificationWeekFocusTitle": "Esta semana",
@@ -1521,5 +1537,9 @@
       }
     }
   },
-  "templateFlowGenerationWaitTooLongPremiumHint": "Las solicitudes Premium tienen prioridad cuando el servicio está ocupado y pueden esperar menos."
+  "templateFlowGenerationWaitTooLongPremiumHint": "Las solicitudes Premium tienen prioridad cuando el servicio está ocupado y pueden esperar menos.",
+  "mediaPlayAction": "Reproducir",
+  "mediaPauseAction": "Pausar",
+  "mediaMuteAction": "Silenciar",
+  "mediaUnmuteAction": "Activar sonido"
 }

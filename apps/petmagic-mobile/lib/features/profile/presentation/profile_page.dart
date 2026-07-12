@@ -517,7 +517,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
   Future<void> _handlePremiumTap(
     PremiumSubscriptionSummaryView? summary,
   ) async {
-    if (summary?.canManageSubscription == true) {
+    if (summary?.isPremium == true && summary?.canManageSubscription == true) {
       await _handleSubscriptionAction(summary);
       return;
     }
@@ -534,7 +534,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
       return;
     }
 
-    if (summary == null || !summary.canManageSubscription) {
+    if (summary == null ||
+        !summary.isPremium ||
+        !summary.canManageSubscription) {
       if (mounted) {
         context.push(PremiumPage.routePath);
       }

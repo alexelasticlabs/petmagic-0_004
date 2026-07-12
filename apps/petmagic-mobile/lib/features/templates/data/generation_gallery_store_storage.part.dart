@@ -492,9 +492,12 @@ Future<_GalleryMaterializeFileResult> _galleryMaterializeRemoteFile(
       options: Options(responseType: ResponseType.bytes),
       onReceiveProgress: backgroundDownloadByteLimit == null
           ? null
-          : (received, _) {
+          : (received, total) {
               receivedBytes = math.max(receivedBytes, received);
-              if (received <= backgroundDownloadByteLimit ||
+              final exceedsDeclaredLimit =
+                  total > 0 && total > backgroundDownloadByteLimit;
+              if ((!exceedsDeclaredLimit &&
+                      received <= backgroundDownloadByteLimit) ||
                   cancelToken.isCancelled) {
                 return;
               }
@@ -506,12 +509,20 @@ Future<_GalleryMaterializeFileResult> _galleryMaterializeRemoteFile(
               cancelToken.cancel(backgroundLimitFailureCode);
             },
     );
-  } on DioException catch (error) {
-    if (!CancelToken.isCancel(error) || backgroundLimitFailureCode == null) {
+  } on Object {
+    // Depending on the transport timing, cancelling the token after the byte
+    // limit is crossed can surface as a transport or file-system exception
+    // while the client removes the partial file. The local limit is still the
+    // authoritative cause once the progress callback has recorded it.
+    if (backgroundLimitFailureCode == null) {
       rethrow;
     }
-    if (await tempFile.exists()) {
-      await tempFile.delete();
+    try {
+      if (await tempFile.exists()) {
+        await tempFile.delete();
+      }
+    } on Object {
+      // Dio may already have removed the partial file after cancellation.
     }
     return _GalleryMaterializeFileResult(
       downloadedBytes: receivedBytes,

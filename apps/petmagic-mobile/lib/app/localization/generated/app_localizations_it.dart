@@ -216,6 +216,18 @@ class AppLocalizationsIt extends AppLocalizations {
   String get profilePasswordLabel => 'Password';
 
   @override
+  String get authShowPassword => 'Mostra password';
+
+  @override
+  String get authHidePassword => 'Nascondi password';
+
+  @override
+  String get authShowPasswordConfirmation => 'Mostra conferma password';
+
+  @override
+  String get authHidePasswordConfirmation => 'Nascondi conferma password';
+
+  @override
   String get profileSignInAction => 'Registrazione';
 
   @override
@@ -1841,6 +1853,15 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get profileAccountRolesMissing => 'Nessun ruolo assegnato';
+
+  @override
+  String get profileAccountRoleUser => 'Utente';
+
+  @override
+  String get profileAccountRoleModerator => 'Moderatore';
+
+  @override
+  String get profileAccountRoleAdmin => 'Amministratore';
 
   @override
   String get profileAccountMembershipLabel => 'Appartenenza';
@@ -3956,6 +3977,13 @@ class AppLocalizationsIt extends AppLocalizations {
       'Il pagamento verrà addebitato sul tuo account App Store/Google Play. L\'abbonamento si rinnova automaticamente a meno che non venga annullato prima della data di rinnovo.';
 
   @override
+  String get premiumCardPaymentDisclaimerTitle => 'Pagamento sicuro con carta';
+
+  @override
+  String get premiumCardPaymentDisclaimerBody =>
+      'Il pagamento verrà addebitato sulla tua carta bancaria. L\'abbonamento si rinnova automaticamente a meno che non venga annullato prima della data di rinnovo.';
+
+  @override
   String get premiumCheckoutPageTitle => 'Passa a Premium';
 
   @override
@@ -4383,7 +4411,15 @@ class AppLocalizationsIt extends AppLocalizations {
   String get gamificationLoadFailed => 'Impossibile caricare le imprese';
 
   @override
-  String get gamificationDayStreak => 'giorni di serie';
+  String gamificationDayStreak(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count giorni di serie',
+      one: '$count giorno di serie',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get gamificationHubSubtitle =>
@@ -4770,4 +4806,16 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get templateFlowGenerationWaitTooLongPremiumHint =>
       'Le richieste Premium hanno priorità quando il servizio è molto richiesto e possono attendere meno.';
+
+  @override
+  String get mediaPlayAction => 'Riproduci';
+
+  @override
+  String get mediaPauseAction => 'Pausa';
+
+  @override
+  String get mediaMuteAction => 'Disattiva audio';
+
+  @override
+  String get mediaUnmuteAction => 'Attiva audio';
 }

@@ -444,6 +444,7 @@ public sealed record AdminTemplateGenerationDashboardMetricsResponse(
     int CompletedJobs,
     int FailedJobs,
     int CancelledJobs,
+    int CancellingJobs,
     int RetryingJobs,
     DateTime GeneratedAtUtc);
 
@@ -501,7 +502,8 @@ public sealed record AdminTemplateGenerationListItemResponse(
     Guid? PetId = null,
     Guid? PetPhotoId = null,
     bool CanCancel = false,
-    bool CanRetry = false);
+    bool CanRetry = false,
+    bool GamificationLegacyReviewRequired = false);
 
 public sealed record AdminTemplateGenerationListPageResponse(
     IReadOnlyList<AdminTemplateGenerationListItemResponse> Items,
@@ -510,3 +512,14 @@ public sealed record AdminTemplateGenerationListPageResponse(
     int Take,
     bool HasMore,
     DateTime GeneratedAtUtc);
+
+public sealed record AdminGamificationLegacyDeliveryResolutionCommand(
+    Guid GenerationId,
+    string Action,
+    string Reason);
+
+public sealed record AdminGamificationLegacyDeliveryResolutionResponse(
+    Guid GenerationId,
+    string Action,
+    bool ReplayQueued,
+    DateTime ResolvedAtUtc);

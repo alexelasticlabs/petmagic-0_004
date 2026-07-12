@@ -171,6 +171,23 @@ void main() {
     },
   );
 
+  test('generation feedback prevents accidental duplicate submissions', () {
+    final source = generationStatusLibrarySource;
+    final ratingBody = methodBody(source, 'Future<void> _handleRatingSelected');
+    final submitBody = methodBody(source, 'Future<void> _submitFeedback');
+    final structuredSubmitBody = methodBody(
+      source,
+      'Future<void> _submitStructuredFeedback',
+    );
+
+    expect(ratingBody, contains('_hasSubmittedFeedback'));
+    expect(submitBody, contains('_hasSubmittedFeedback = true'));
+    expect(source, contains('bool markFeedbackSubmitted = true'));
+    expect(structuredSubmitBody, contains('_hasSubmittedFeedback = true'));
+    expect(source, contains('if (_hasSubmittedFeedback)'));
+    expect(source, contains('_FeedbackSubmittedCard'));
+  });
+
   test(
     'generation status back button preserves existing navigation stack first',
     () {
@@ -604,6 +621,71 @@ void main() {
 
       expect(find.text(text.generationStatusStatusCompleted), findsWidgets);
       expect(repository.cancelGenerationCalls, 0);
+    },
+  );
+
+  testWidgets(
+    'generation status refetches compact realtime terminal events before rendering',
+    (tester) async {
+      final repository = FakeGenerationStatusTemplateGenerationRepository(
+        generationStatusFixture(
+          status: TemplateGenerationStatus.queued,
+          queuePosition: 2,
+          estimatedWaitSeconds: 480,
+          canCancel: true,
+        ),
+      );
+      final realtimeClient = FakeGenerationStatusRealtimeClient();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedGenerationStatusAppLaunchController.new,
+            ),
+            templateGenerationRepositoryProvider.overrideWithValue(repository),
+            realtimeClientProvider.overrideWithValue(realtimeClient),
+            generationHistoryControllerProvider.overrideWith(
+              IdleGenerationStatusHistoryController.new,
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            locale: const Locale('en'),
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const GenerationStatusPage(generationId: 'generation-1'),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+      final text = AppLocalizations.of(
+        tester.element(find.byType(GenerationStatusPage)),
+      );
+      expect(repository.fetchGenerationCalls, 1);
+
+      repository.generation = generationStatusFixture(
+        status: TemplateGenerationStatus.completed,
+      );
+      realtimeClient.emitGenerationStatus({
+        'eventType': 'generation.status_changed',
+        'generationId': 'generation-1',
+        'status': 'Completed',
+        'updatedAtUtc': '2026-06-14T12:04:00Z',
+        'requiresRefetch': true,
+      });
+      await tester.pump();
+      await tester.pump();
+
+      expect(repository.fetchGenerationCalls, 2);
+      expect(find.text(text.generationStatusStatusCompleted), findsWidgets);
+      expect(find.text(text.templateFlowResultUnavailable), findsNothing);
     },
   );
 

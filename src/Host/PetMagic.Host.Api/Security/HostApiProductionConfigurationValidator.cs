@@ -81,6 +81,32 @@ public static class HostApiProductionConfigurationValidator
         }
     }
 
+    public static void ValidateExternalAuthMobileRedirectScheme(
+        IConfiguration configuration,
+        IHostEnvironment environment)
+    {
+        if (environment.IsDevelopment())
+        {
+            return;
+        }
+
+        var scheme = configuration["ExternalAuth:MobileRedirectScheme"]?.Trim();
+        if (string.IsNullOrWhiteSpace(scheme))
+        {
+            throw new InvalidOperationException(
+                "ExternalAuth:MobileRedirectScheme must be configured for non-development environments.");
+        }
+
+        if (scheme.Length > 64
+            || !Uri.CheckSchemeName(scheme)
+            || string.Equals(scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "ExternalAuth:MobileRedirectScheme must be a valid non-HTTP URI scheme outside development.");
+        }
+    }
+
     public static void ValidateCorsAllowedOrigins(IReadOnlyCollection<string> allowedOrigins, IHostEnvironment environment)
     {
         if (environment.IsDevelopment())

@@ -84,6 +84,7 @@ class _SupportReplyComposerPreview extends StatelessWidget {
           ),
           IconButton(
             visualDensity: VisualDensity.compact,
+            tooltip: text.supportChatCloseAction,
             splashRadius: 14,
             constraints: const BoxConstraints.tightFor(width: 34, height: 34),
             onPressed: onClear,

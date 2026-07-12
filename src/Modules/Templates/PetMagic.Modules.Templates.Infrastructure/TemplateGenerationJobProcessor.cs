@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
+using PetMagic.Modules.Economy.Application.Contracts;
 using PetMagic.Modules.Gamification.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
@@ -44,6 +45,7 @@ internal sealed partial class TemplateGenerationJobProcessor(
     private const int ImageGenerationAdvisoryLockKey = 0x506D4749;
     private const int VideoGenerationAdvisoryLockKey = 0x506D4756;
     private const int BorrowedVideoGenerationAdvisoryLockKey = 0x506D4742;
+    private const string GamificationSyncFailedCode = "templates.gamification_sync_failed";
     private static readonly string WorkerInstanceId = $"{Environment.MachineName}:{Guid.NewGuid():N}";
     private static readonly object LocalConcurrencyLock = new();
     private static readonly HashSet<int> LocalConcurrencySlots = [];
@@ -157,6 +159,32 @@ internal sealed partial class TemplateGenerationJobProcessor(
         }
 
         await ProcessAsync(job, cancellationToken);
+        return true;
+    }
+
+    public async Task<bool> ProcessNextPendingGamificationAsync(CancellationToken cancellationToken)
+    {
+        if (gamificationService is null)
+        {
+            return false;
+        }
+
+        var now = DateTime.UtcNow;
+        var job = await dbContext.TemplateGenerationJobs
+            .Include(x => x.Template)
+            .Where(x => x.Status == TemplateGenerationStatus.Completed
+                && x.GamificationProcessedAtUtc == null
+                && (x.GamificationNextAttemptAtUtc == null || x.GamificationNextAttemptAtUtc <= now))
+            .OrderBy(x => x.GamificationNextAttemptAtUtc)
+            .ThenBy(x => x.CompletedAtUtc)
+            .ThenBy(x => x.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (job is null)
+        {
+            return false;
+        }
+
+        await SyncGamificationAsync(job, cancellationToken);
         return true;
     }
 
@@ -520,10 +548,6 @@ internal sealed partial class TemplateGenerationJobProcessor(
     {
         var response = TemplateGenerationService.MapResponse(job);
         await realtimeService.PublishGenerationStatusChangedAsync(response, cancellationToken);
-        if (job.Status is TemplateGenerationStatus.Completed or TemplateGenerationStatus.Failed)
-        {
-            await pushNotificationSender.NotifyGenerationTerminalAsync(response, cancellationToken);
-        }
     }
 
     private Task<bool> SaveClaimedChangesAsync(
@@ -560,6 +584,13 @@ internal sealed partial class TemplateGenerationJobProcessor(
 
         try
         {
+            if (job.Status is TemplateGenerationStatus.Completed or TemplateGenerationStatus.Failed)
+            {
+                await pushNotificationSender.NotifyGenerationTerminalAsync(
+                    TemplateGenerationService.MapResponse(job),
+                    cancellationToken);
+            }
+
             await dbContext.SaveChangesAsync(cancellationToken);
             return true;
         }
@@ -663,31 +694,79 @@ internal sealed partial class TemplateGenerationJobProcessor(
         return (int)Math.Min(int.MaxValue, (completedAtUtc.Value - startedAtUtc.Value).TotalMilliseconds);
     }
 
-    private async Task NotifyGamificationAsync(TemplateGenerationJob job, CancellationToken cancellationToken)
+    private async Task SyncGamificationAsync(TemplateGenerationJob job, CancellationToken cancellationToken)
     {
-        if (gamificationService is null || job.UserId == TemplateGenerationService.AdminTestUserId)
+        if (job.GamificationProcessedAtUtc is not null)
         {
             return;
+        }
+
+        var succeeded = await NotifyGamificationAsync(job, cancellationToken);
+        var now = DateTime.UtcNow;
+        if (succeeded)
+        {
+            job.GamificationProcessedAtUtc = now;
+            job.GamificationNextAttemptAtUtc = null;
+            job.GamificationLastErrorCode = null;
+        }
+        else
+        {
+            job.GamificationAttemptCount += 1;
+            job.GamificationNextAttemptAtUtc = now.Add(GetGamificationRetryDelay(job.GamificationAttemptCount));
+            job.GamificationLastErrorCode = GamificationSyncFailedCode;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<bool> NotifyGamificationAsync(TemplateGenerationJob job, CancellationToken cancellationToken)
+    {
+        if (job.UserId == TemplateGenerationService.AdminTestUserId)
+        {
+            return true;
+        }
+
+        if (gamificationService is null)
+        {
+            logger.LogError(
+                "Template generation gamification sync is unavailable. Operation={Operation} JobIdHash={JobIdHash}",
+                "notify_gamification",
+                SafeLogValues.StableHash(job.Id.ToString("D")));
+            return false;
         }
 
         try
         {
             var petId = job.PetId ?? job.UserId;
             var isTemplateOfTheDay = await IsTemplateOfTheDayGenerationAsync(job, cancellationToken);
-            var isPremium = false;
-            if (economyService is not null)
+            var completedAtUtc = job.CompletedAtUtc ?? job.UpdatedAtUtc;
+            var isPremium = job.GamificationPremiumAtCompletion;
+            if (!isPremium.HasValue && economyService is not null)
             {
                 var premiumSummary = await economyService.GetSubscriptionSummaryAsync(job.UserId, cancellationToken);
-                isPremium = premiumSummary.IsSuccess && premiumSummary.Value.IsPremium;
+                if (premiumSummary.IsFailure)
+                {
+                    throw new InvalidOperationException("Premium status could not be resolved for gamification sync.");
+                }
+
+                isPremium = WasPremiumAt(premiumSummary.Value, completedAtUtc);
+                job.GamificationPremiumAtCompletion = isPremium;
             }
 
             await gamificationService.ProcessGenerationCompletedAsync(
+                job.Id,
                 job.UserId,
                 petId,
                 job.TemplateId,
+                completedAtUtc,
                 isTemplateOfTheDay,
-                isPremium,
+                isPremium ?? false,
                 cancellationToken);
+            return true;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -700,7 +779,34 @@ internal sealed partial class TemplateGenerationJobProcessor(
                 economyService is not null,
                 true,
                 SafeLogValues.ExceptionType(ex));
+            return false;
         }
+    }
+
+    private static TimeSpan GetGamificationRetryDelay(int attemptCount)
+    {
+        var exponent = Math.Min(Math.Max(0, attemptCount - 1), 6);
+        return TimeSpan.FromSeconds(Math.Min(300, 5 * (1 << exponent)));
+    }
+
+    private static bool WasPremiumAt(SubscriptionSummaryResponse summary, DateTime occurredAtUtc)
+    {
+        if (summary.IsPremium)
+        {
+            return true;
+        }
+
+        if (summary.CurrentPeriodStartUtc is null
+            || summary.CurrentPeriodEndUtc is null
+            || occurredAtUtc < summary.CurrentPeriodStartUtc.Value
+            || occurredAtUtc >= summary.CurrentPeriodEndUtc.Value)
+        {
+            return false;
+        }
+
+        return !string.Equals(summary.Status, "revoked", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(summary.Status, "refunded", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(summary.Status, "chargeback", StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task<bool> IsTemplateOfTheDayGenerationAsync(TemplateGenerationJob job, CancellationToken cancellationToken)

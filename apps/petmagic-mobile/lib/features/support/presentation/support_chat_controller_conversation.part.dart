@@ -314,11 +314,12 @@ mixin _SupportChatControllerConversationMixin
     );
   }
 
-  Future<void> submitFeedback(int rating) async {
+  Future<void> submitFeedback(int rating, {String? comment}) async {
     await _runConversationLifecycleAction(
       (conversation) => _repository.submitFeedback(
         conversationId: conversation.conversationId,
         rating: rating,
+        comment: comment,
       ),
     );
   }

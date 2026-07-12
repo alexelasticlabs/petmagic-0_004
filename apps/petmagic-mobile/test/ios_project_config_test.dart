@@ -93,18 +93,89 @@ void main() {
     );
   });
 
-  test('iOS Firebase placeholder does not abort native plugin startup', () {
-    final googleServiceInfo = File(
-      'ios/Runner/GoogleService-Info.plist',
-    ).readAsStringSync();
-    final apiKey = RegExp(
-      r'<key>API_KEY</key>\s*<string>([^<]+)</string>',
-    ).firstMatch(googleServiceInfo)?.group(1);
+  test('iOS release path injects Firebase config instead of tracking it', () {
+    expect(File('ios/Runner/GoogleService-Info.plist').existsSync(), isFalse);
+    expect(
+      File('ios/Runner/GoogleService-Info.plist.example').existsSync(),
+      isTrue,
+    );
+    expect(File('tool/configure_firebase_smoke.dart').existsSync(), isTrue);
 
-    expect(apiKey, isNotNull);
-    expect(apiKey, isNot(contains('replace-with')));
-    expect(apiKey, hasLength(39));
-    expect(apiKey, startsWith('A'));
-    expect(RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(apiKey!), isTrue);
+    for (final flavor in const ['staging', 'production']) {
+      final scheme = File(
+        'ios/Runner.xcodeproj/xcshareddata/xcschemes/$flavor.xcscheme',
+      ).readAsStringSync();
+      expect(scheme, contains('Placeholder Firebase plist is forbidden'));
+      expect(scheme, contains('PETMAGIC_ALLOW_PLACEHOLDER_FIREBASE'));
+      expect(scheme, contains('/usr/libexec/PlistBuddy'));
+      final expectedBundleId = flavor == 'staging'
+          ? 'com.petmagic.app.staging'
+          : 'com.petmagic.app';
+      expect(
+        scheme,
+        contains(
+          'if [ &quot;\$BUNDLE_ID&quot; != &quot;$expectedBundleId&quot; ]',
+        ),
+      );
+    }
   });
+
+  test('mobile release configuration allows portrait and landscape', () {
+    final mainSource = File('lib/main.dart').readAsStringSync();
+    final androidManifest = File(
+      'android/app/src/main/AndroidManifest.xml',
+    ).readAsStringSync();
+    final infoPlist = File('ios/Runner/Info.plist').readAsStringSync();
+
+    expect(mainSource, isNot(contains('setPreferredOrientations')));
+    expect(androidManifest, isNot(contains('screenOrientation')));
+    expect(infoPlist, contains('UIInterfaceOrientationLandscapeLeft'));
+    expect(infoPlist, contains('UIInterfaceOrientationLandscapeRight'));
+  });
+
+  test(
+    'native deep-link schemes are isolated by staging and production flavor',
+    () {
+      final androidGradle = File(
+        'android/app/build.gradle.kts',
+      ).readAsStringSync();
+      final androidManifest = File(
+        'android/app/src/main/AndroidManifest.xml',
+      ).readAsStringSync();
+      final infoPlist = File('ios/Runner/Info.plist').readAsStringSync();
+      final project = File(
+        'ios/Runner.xcodeproj/project.pbxproj',
+      ).readAsStringSync();
+
+      expect(
+        androidManifest,
+        contains(r'android:scheme="${appDeepLinkScheme}"'),
+      );
+      expect(
+        androidManifest,
+        contains(r'android:scheme="${stripeRedirectScheme}"'),
+      );
+      expect(
+        androidGradle,
+        contains('"appDeepLinkScheme"] = "petmagic-staging"'),
+      );
+      expect(androidGradle, contains('"appDeepLinkScheme"] = "petmagic"'));
+      expect(
+        androidGradle,
+        contains('"stripeRedirectScheme"] = "petmagicstripe-staging"'),
+      );
+      expect(infoPlist, contains(r'<string>$(APP_DEEP_LINK_SCHEME)</string>'));
+      expect(
+        infoPlist,
+        contains(r'<string>$(STRIPE_REDIRECT_SCHEME)</string>'),
+      );
+      expect(project, contains('APP_DEEP_LINK_SCHEME = "petmagic-staging";'));
+      expect(project, contains('APP_DEEP_LINK_SCHEME = petmagic;'));
+      expect(
+        project,
+        contains('STRIPE_REDIRECT_SCHEME = "petmagicstripe-staging";'),
+      );
+      expect(project, contains('STRIPE_REDIRECT_SCHEME = petmagicstripe;'));
+    },
+  );
 }

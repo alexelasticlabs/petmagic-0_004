@@ -102,6 +102,7 @@ describe("generations page hardening", () => {
     );
     expect(contentSource).toContain('seedLabel: "Сид"');
     expect(contentSource).toContain('cancelGeneration: "Отменить"');
+    expect(contentSource).toContain('gamificationLegacyReview: "Проверить Gamification"');
     expect(contentSource).toContain('retryGeneration: "Запустить снова"');
     expect(contentSource).toContain('feedbackTab: "Отзывы"');
   });
@@ -368,10 +369,12 @@ describe("generations page hardening", () => {
     );
     expect(source).toContain("cancelAdminTemplateGeneration,");
     expect(source).toContain("retryAdminTemplateGeneration,");
+    expect(source).toContain("resolveAdminLegacyGamificationDelivery,");
     expect(source).toContain("const [cancelGenerationError, setCancelGenerationError]");
     expect(source).toContain("const [pendingCancelGenerationId, setPendingCancelGenerationId]");
     expect(source).toContain("const [retryGenerationError, setRetryGenerationError]");
     expect(source).toContain("const [pendingRetryGenerationId, setPendingRetryGenerationId]");
+    expect(source).toContain("const [legacyGamificationReason, setLegacyGamificationReason]");
     expect(source).toContain("mutationFn: cancelAdminTemplateGeneration");
     expect(source).toContain("mutationFn: retryAdminTemplateGeneration");
     expect(source).toContain("adminQueryKeys.templateGenerationMetrics");
@@ -392,22 +395,28 @@ describe("generations page hardening", () => {
     expect(source).toContain("retryGenerationMutation.mutate(pendingRetryGenerationId);");
     expect(source).toContain("onCancelGeneration={requestCancelGeneration}");
     expect(source).toContain("onRetryGeneration={requestRetryGeneration}");
+    expect(source).toContain("onResolveLegacyGamification={requestLegacyGamificationResolution}");
     expect(source).toContain("cancellingGenerationId={cancellingGenerationId}");
     expect(source).toContain("cancelGenerationPending={isCancelGenerationLocked}");
     expect(source).toContain("retryingGenerationId={retryingGenerationId}");
     expect(source).toContain("retryGenerationPending={isRetryGenerationLocked}");
+    expect(source).toContain("maxLength={GAMIFICATION_LEGACY_DELIVERY_REASON_MAX_LENGTH}");
+    expect(source).toContain("confirmDisabled={!legacyGamificationReason.trim()}");
     expect(source).toContain("onCancelGeneration: (generationId: string) => void;");
     expect(source).toContain("onRetryGeneration: (generationId: string) => void;");
+    expect(source).toContain("onResolveLegacyGamification: (generationId: string) => void;");
     expect(source).toContain("cancellingGenerationId: string | null;");
     expect(source).toContain("cancelGenerationPending: boolean;");
     expect(source).toContain("retryingGenerationId: string | null;");
     expect(source).toContain("retryGenerationPending: boolean;");
+    expect(source).toContain("legacyGamificationResolutionPending: boolean;");
     expect(source).toContain(
       "const cancelGenerationLabel = `${text.cancelGeneration}: ${generationIdText}`;"
     );
     expect(source).toContain("item.canCancel ? (");
     expect(source).toContain("disabled={cancelGenerationPending}");
     expect(source).toContain("item.canRetry ? (");
+    expect(source).toContain("item.gamificationLegacyReviewRequired ? (");
     expect(source).toContain("disabled={retryGenerationPending}");
     expect(source).toContain("aria-label={retryGenerationLabel}");
     expect(source).toContain("aria-label={cancelGenerationLabel}");
@@ -417,6 +426,7 @@ describe("generations page hardening", () => {
     expect(source).toContain("description={pendingCancelGenerationDescription}");
     expect(source).toContain("title={text.retryGenerationConfirmTitle}");
     expect(source).toContain("description={pendingRetryGenerationDescription}");
+    expect(source).toContain("description={pendingLegacyGamificationDescription}");
     expect(source).not.toContain("window.confirm");
   });
 

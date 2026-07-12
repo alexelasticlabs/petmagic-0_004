@@ -57,6 +57,7 @@ internal sealed partial class TemplatesService
             CompletedJobs: statusCountByStatus.GetValueOrDefault(TemplateGenerationStatus.Completed),
             FailedJobs: statusCountByStatus.GetValueOrDefault(TemplateGenerationStatus.Failed),
             CancelledJobs: statusCountByStatus.GetValueOrDefault(TemplateGenerationStatus.Cancelled),
+            CancellingJobs: statusCountByStatus.GetValueOrDefault(TemplateGenerationStatus.CancellationRequested),
             RetryingJobs: statusCountByStatus.GetValueOrDefault(TemplateGenerationStatus.Retrying),
             GeneratedAtUtc: now));
     }
@@ -118,7 +119,11 @@ internal sealed partial class TemplatesService
                 job.Template.Title ?? string.Empty,
                 job.Template.TemplateType.ToString(),
                 job.Status,
-                job.UsedKlingModel ?? job.UsedPreprocessingModel,
+                job.CurrentProviderStage == "video_generation"
+                    ? job.UsedKlingModel
+                    : (job.CurrentProviderStage == "image_generation" || job.CurrentProviderStage == "video_preprocessing")
+                        ? job.UsedPreprocessingModel
+                        : job.UsedKlingModel ?? job.UsedPreprocessingModel,
                 job.TokenCost,
                 job.AttemptCount,
                 job.MotionProviderCostUsd,
@@ -145,7 +150,15 @@ internal sealed partial class TemplatesService
                 job.PromptBeforeVariation,
                 job.PromptAfterVariation,
                 job.PetId,
-                job.PetPhotoId))
+                job.PetPhotoId,
+                job.CurrentProviderStage,
+                job.PreprocessingProviderRequestId,
+                job.PreprocessingProviderStatusUrl,
+                job.PreprocessingProviderCancelUrl,
+                job.MotionProviderRequestId,
+                job.MotionProviderStatusUrl,
+                job.MotionProviderCancelUrl,
+                job.GamificationAttemptCount < 0))
             .ToListAsync(cancellationToken);
 
         var rowIds = rows.Select(row => row.GenerationId).ToArray();
@@ -210,8 +223,9 @@ internal sealed partial class TemplatesService
                     row.PromptAfterVariation,
                     row.PetId,
                     row.PetPhotoId,
-                    CanAdminCancelGeneration(row.Status),
-                    CanAdminRetryGeneration(row.Status, row.UserId, row.ChargedAtUtc, row.RefundedAtUtc)));
+                    CanAdminCancelGeneration(row),
+                    CanAdminRetryGeneration(row.Status, row.UserId, row.ChargedAtUtc, row.RefundedAtUtc),
+                    row.GamificationLegacyReviewRequired));
         }
 
         return Result.Success(new AdminTemplateGenerationListPageResponse(
@@ -466,6 +480,7 @@ internal sealed partial class TemplatesService
             "failed" => TemplateGenerationStatus.Failed,
             "cancelled" => TemplateGenerationStatus.Cancelled,
             "retrying" => TemplateGenerationStatus.Retrying,
+            "cancelling" => TemplateGenerationStatus.CancellationRequested,
             _ => null
         };
     }
@@ -480,13 +495,31 @@ internal sealed partial class TemplatesService
             TemplateGenerationStatus.Failed => "Failed",
             TemplateGenerationStatus.Cancelled => "Cancelled",
             TemplateGenerationStatus.Retrying => "Retrying",
+            TemplateGenerationStatus.CancellationRequested => "Cancelling",
             _ => status.ToString()
         };
     }
 
-    private static bool CanAdminCancelGeneration(TemplateGenerationStatus status)
+    private bool CanAdminCancelGeneration(AdminGenerationPageRow row)
     {
-        return status == TemplateGenerationStatus.Queued;
+        if (row.Status == TemplateGenerationStatus.Queued)
+        {
+            return true;
+        }
+
+        if (row.Status is not (TemplateGenerationStatus.ProviderQueued or TemplateGenerationStatus.ProviderProcessing)
+            || falQueueClient is null)
+        {
+            return false;
+        }
+
+        var isMotion = string.Equals(row.CurrentProviderStage, "video_generation", StringComparison.Ordinal);
+        var requestId = isMotion ? row.MotionProviderRequestId : row.PreprocessingProviderRequestId;
+        var statusUrl = isMotion ? row.MotionProviderStatusUrl : row.PreprocessingProviderStatusUrl;
+        var cancelUrl = isMotion ? row.MotionProviderCancelUrl : row.PreprocessingProviderCancelUrl;
+        return !string.IsNullOrWhiteSpace(row.Model)
+            && !string.IsNullOrWhiteSpace(requestId)
+            && falQueueClient.ResolveCancellationUri(row.Model, requestId, cancelUrl, statusUrl) is not null;
     }
 
     private static bool CanAdminRetryGeneration(
@@ -557,7 +590,15 @@ internal sealed partial class TemplatesService
         string? PromptBeforeVariation,
         string? PromptAfterVariation,
         Guid? PetId,
-        Guid? PetPhotoId);
+        Guid? PetPhotoId,
+        string? CurrentProviderStage,
+        string? PreprocessingProviderRequestId,
+        string? PreprocessingProviderStatusUrl,
+        string? PreprocessingProviderCancelUrl,
+        string? MotionProviderRequestId,
+        string? MotionProviderStatusUrl,
+        string? MotionProviderCancelUrl,
+        bool GamificationLegacyReviewRequired);
 
     private sealed record AdminGenerationWatermarkUnlockRow(
         Guid GenerationId,

@@ -31,7 +31,7 @@ dependencies:
   http_parser: ^4.1.2
   app_links:
     path: third_party/flutter_plugins/app_links
-  google_sign_in: ^6.3.0
+  google_sign_in: 7.2.0
   sign_in_with_apple:
     path: third_party/flutter_plugins/sign_in_with_apple
   url_launcher: ^6.3.2
@@ -39,7 +39,9 @@ dependencies:
   photo_manager:
     path: third_party/flutter_plugins/photo_manager
   in_app_purchase: ^3.3.0
+  in_app_purchase_android: ^0.5.1
   firebase_core: ^4.10.0
+  firebase_crashlytics: ^5.1.0
   firebase_messaging: ^16.3.0
   flutter_localizations:
     sdk: flutter

@@ -7,7 +7,10 @@ public sealed record AdminAuditEntry(
     string? OldValue = null,
     string? NewValue = null,
     string? Details = null,
-    Guid? SubjectUserId = null);
+    Guid? SubjectUserId = null,
+    Guid? EventId = null,
+    Guid? ActorUserId = null,
+    string? CorrelationId = null);
 
 public interface IAdminAuditLog
 {

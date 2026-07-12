@@ -34,6 +34,7 @@ export const statusOptions: StatusFilter[] = [
   "Failed",
   "Cancelled",
   "Retrying",
+  "Cancelling",
 ];
 
 export function getStatusTone(status: AdminGenerationStatus) {
@@ -51,6 +52,10 @@ export function getStatusTone(status: AdminGenerationStatus) {
 
   if (status === "Retrying") {
     return "var(--magenta)";
+  }
+
+  if (status === "Cancelling") {
+    return "var(--warning)";
   }
 
   if (status === "Running") {
@@ -142,12 +147,14 @@ export function GenerationRow({
   onGrantClean,
   onCancelGeneration,
   onRetryGeneration,
+  onResolveLegacyGamification,
   grantingGenerationId,
   grantCleanPending,
   cancellingGenerationId,
   cancelGenerationPending,
   retryingGenerationId,
   retryGenerationPending,
+  legacyGamificationResolutionPending,
   isExpanded,
   onToggleDetails,
 }: {
@@ -157,12 +164,14 @@ export function GenerationRow({
   onGrantClean: (generationId: string) => void;
   onCancelGeneration: (generationId: string) => void;
   onRetryGeneration: (generationId: string) => void;
+  onResolveLegacyGamification: (generationId: string) => void;
   grantingGenerationId: string | null;
   grantCleanPending: boolean;
   cancellingGenerationId: string | null;
   cancelGenerationPending: boolean;
   retryingGenerationId: string | null;
   retryGenerationPending: boolean;
+  legacyGamificationResolutionPending: boolean;
   isExpanded: boolean;
   onToggleDetails: (generationId: string) => void;
 }) {
@@ -178,6 +187,7 @@ export function GenerationRow({
   const grantCleanLabel = `${text.grantClean}: ${generationIdText}`;
   const cancelGenerationLabel = `${text.cancelGeneration}: ${generationIdText}`;
   const retryGenerationLabel = `${text.retryGeneration}: ${generationIdText}`;
+  const gamificationLegacyReviewLabel = `${text.gamificationLegacyReview}: ${generationIdText}`;
   const parentTitle = item.parentTemplateTitle
     ? sanitizeSensitiveText(item.parentTemplateTitle, 48)
     : item.similarToGenerationId
@@ -276,6 +286,18 @@ export function GenerationRow({
                 {retryingGenerationId === item.generationId
                   ? text.retryingGeneration
                   : text.retryGeneration}
+              </button>
+            ) : null}
+            {item.gamificationLegacyReviewRequired ? (
+              <button
+                type="button"
+                className={styles.inlineAction}
+                disabled={legacyGamificationResolutionPending}
+                onClick={() => onResolveLegacyGamification(item.generationId)}
+                aria-label={gamificationLegacyReviewLabel}
+                title={gamificationLegacyReviewLabel}
+              >
+                {text.gamificationLegacyReview}
               </button>
             ) : null}
           </div>

@@ -747,6 +747,8 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
                     onSendMessage: () => _sendCurrentMessage(localeTag),
                     onCloseConversation: _controller.closeConversation,
                     onReopenConversation: _controller.reopenConversation,
+                    onSubmitFeedback: (rating, comment) =>
+                        _controller.submitFeedback(rating, comment: comment),
                     replyToMessage: _replyToMessage,
                     onClearReplyToMessage: _clearReplyToMessage,
                   ),

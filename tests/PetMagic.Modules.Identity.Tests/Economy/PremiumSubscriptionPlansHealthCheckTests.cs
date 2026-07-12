@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 using PetMagic.Modules.Economy.Infrastructure;
 using PetMagic.Modules.Economy.Infrastructure.Data;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
+using PetMagic.Modules.Economy.Infrastructure.Options;
 
 namespace PetMagic.Modules.Identity.Tests.Economy;
 
@@ -19,7 +21,7 @@ public sealed class PremiumSubscriptionPlansHealthCheckTests
             CreatePlan("yearly", isActive: true));
         await dbContext.SaveChangesAsync();
 
-        var healthCheck = new PremiumSubscriptionPlansHealthCheck(dbContext);
+        var healthCheck = CreateHealthCheck(dbContext);
 
         var result = await healthCheck.CheckHealthAsync(new HealthCheckContext());
 
@@ -34,7 +36,7 @@ public sealed class PremiumSubscriptionPlansHealthCheckTests
         await dbContext.SaveChangesAsync();
 
         var logger = new CapturingLogger<PremiumSubscriptionPlansHealthCheck>();
-        var healthCheck = new PremiumSubscriptionPlansHealthCheck(dbContext, logger);
+        var healthCheck = CreateHealthCheck(dbContext, logger);
 
         var result = await healthCheck.CheckHealthAsync(new HealthCheckContext());
 
@@ -46,12 +48,32 @@ public sealed class PremiumSubscriptionPlansHealthCheckTests
     }
 
     [Fact]
+    public async Task CheckHealthAsync_ShouldBeUnhealthy_WhenProviderProductIdsDrift()
+    {
+        await using var dbContext = CreateDbContext();
+        var monthly = CreatePlan("monthly", isActive: true);
+        monthly.GoogleProductId = "unexpected.product.id";
+        dbContext.SubscriptionPlans.AddRange(
+            monthly,
+            CreatePlan("yearly", isActive: true));
+        await dbContext.SaveChangesAsync();
+
+        var result = await CreateHealthCheck(dbContext)
+            .CheckHealthAsync(new HealthCheckContext());
+
+        Assert.Equal(HealthStatus.Unhealthy, result.Status);
+        Assert.Equal(
+            ["monthly"],
+            Assert.IsType<string[]>(result.Data["productIdMismatches"]));
+    }
+
+    [Fact]
     public async Task CheckHealthAsync_ShouldLogError_WhenVerificationThrows()
     {
         var logger = new CapturingLogger<PremiumSubscriptionPlansHealthCheck>();
         var dbContext = CreateDbContext();
         await dbContext.DisposeAsync();
-        var healthCheck = new PremiumSubscriptionPlansHealthCheck(dbContext, logger);
+        var healthCheck = CreateHealthCheck(dbContext, logger);
 
         var result = await healthCheck.CheckHealthAsync(new HealthCheckContext());
 
@@ -67,6 +89,16 @@ public sealed class PremiumSubscriptionPlansHealthCheckTests
             .Options;
 
         return new EconomyDbContext(options);
+    }
+
+    private static PremiumSubscriptionPlansHealthCheck CreateHealthCheck(
+        EconomyDbContext dbContext,
+        ILogger<PremiumSubscriptionPlansHealthCheck>? logger = null)
+    {
+        return new PremiumSubscriptionPlansHealthCheck(
+            dbContext,
+            Options.Create(new EconomyOptions()),
+            logger);
     }
 
     private static SubscriptionPlan CreatePlan(string id, bool isActive)

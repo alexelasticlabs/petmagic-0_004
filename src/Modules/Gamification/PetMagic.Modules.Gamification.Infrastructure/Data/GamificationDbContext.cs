@@ -12,6 +12,8 @@ public sealed class GamificationDbContext(DbContextOptions<GamificationDbContext
     public DbSet<DailyStreak> DailyStreaks => Set<DailyStreak>();
     public DbSet<WeeklyChallenge> WeeklyChallenges => Set<WeeklyChallenge>();
     public DbSet<UserChallengeProgress> UserChallengeProgresses => Set<UserChallengeProgress>();
+    public DbSet<GamificationGenerationEvent> GenerationEvents => Set<GamificationGenerationEvent>();
+    public DbSet<GamificationShareEvent> ShareEvents => Set<GamificationShareEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -58,7 +60,7 @@ public sealed class GamificationDbContext(DbContextOptions<GamificationDbContext
         {
             entity.ToTable("gamification_weekly_challenges");
             entity.HasKey(x => x.Id);
-            entity.HasIndex(x => x.WeekStartDate);
+            entity.HasIndex(x => new { x.WeekStartDate, x.ChallengeType }).IsUnique();
             entity.Property(x => x.ChallengeType).HasMaxLength(50).IsRequired();
             entity.Property(x => x.TitleKey).HasMaxLength(200).IsRequired();
             entity.Property(x => x.DescriptionKey).HasMaxLength(200).IsRequired();
@@ -71,6 +73,21 @@ public sealed class GamificationDbContext(DbContextOptions<GamificationDbContext
             entity.HasKey(x => x.Id);
             entity.HasIndex(x => new { x.UserId, x.ChallengeId }).IsUnique();
             entity.HasIndex(x => x.UserId);
+        });
+
+        modelBuilder.Entity<GamificationGenerationEvent>(entity =>
+        {
+            entity.ToTable("gamification_generation_events");
+            entity.HasKey(x => x.GenerationId);
+            entity.HasIndex(x => new { x.UserId, x.WeekStartDate, x.TemplateId });
+            entity.HasIndex(x => new { x.UserId, x.PetId, x.OccurredAtUtc });
+        });
+
+        modelBuilder.Entity<GamificationShareEvent>(entity =>
+        {
+            entity.ToTable("gamification_share_events");
+            entity.HasKey(x => x.GenerationId);
+            entity.HasIndex(x => new { x.UserId, x.WeekStartDate });
         });
     }
 }

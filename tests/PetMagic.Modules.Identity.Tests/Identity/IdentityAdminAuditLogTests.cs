@@ -43,6 +43,34 @@ public sealed class IdentityAdminAuditLogTests
         Assert.DoesNotContain("ua-secret", auditEvent.UserAgent);
     }
 
+    [Fact]
+    public async Task WriteAsync_WithEventId_ShouldBeIdempotentAcrossImmediateAndRetriedDelivery()
+    {
+        await using var dbContext = CreateDbContext();
+        var auditLog = new IdentityAdminAuditLog(
+            dbContext,
+            new HttpContextAccessor { HttpContext = new DefaultHttpContext() });
+        var eventId = Guid.NewGuid();
+        var actorUserId = Guid.NewGuid();
+        var entry = new AdminAuditEntry(
+            "admin.support.ticket.assigned",
+            "SupportConversation",
+            Guid.NewGuid().ToString("D"),
+            NewValue: actorUserId.ToString("D"),
+            SubjectUserId: Guid.NewGuid(),
+            EventId: eventId,
+            ActorUserId: actorUserId,
+            CorrelationId: "support-assignment-test");
+
+        await auditLog.WriteAsync(entry, CancellationToken.None);
+        await auditLog.WriteAsync(entry, CancellationToken.None);
+
+        var persisted = await dbContext.AuditEvents.SingleAsync();
+        Assert.Equal(eventId, persisted.Id);
+        Assert.Equal(actorUserId, persisted.ActorUserId);
+        Assert.Equal("support-assignment-test", persisted.CorrelationId);
+    }
+
     private static IdentityDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<IdentityDbContext>()

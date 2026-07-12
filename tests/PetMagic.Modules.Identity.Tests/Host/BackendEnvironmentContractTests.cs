@@ -154,6 +154,7 @@ public sealed class BackendEnvironmentContractTests
             "R2_SECRET_KEY",
             "R2_BUCKET_NAME",
             "R2_PUBLIC_URL",
+            "Jwt__SigningKey",
             "Templates__PublicBaseUrl",
             "Templates__StorageProvider",
             "Templates__AiProvider"

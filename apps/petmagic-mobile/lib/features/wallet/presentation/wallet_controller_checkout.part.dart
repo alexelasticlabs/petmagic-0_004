@@ -640,7 +640,10 @@ mixin _WalletControllerCheckout
       return;
     }
 
-    await _recoverPendingStorePurchase(requestStoreRestore: true);
+    // A manual restore must not depend on a locally persisted checkout order:
+    // after reinstall or storage loss, StoreKit/Google Play is the source of
+    // the purchase update that lets the backend recover the order.
+    await _repository.restoreStorePurchases();
   }
 
   @override
@@ -742,7 +745,7 @@ mixin _WalletControllerCheckout
     if (verificationKey != null) {
       if (_storePurchaseVerifiedKeys.contains(verificationKey)) {
         if (purchase.pendingCompletePurchase) {
-          await _repository.completePurchase(purchase);
+          await _repository.consumeVerifiedPurchase(purchase);
         }
         return;
       }
@@ -776,7 +779,7 @@ mixin _WalletControllerCheckout
             _rememberStorePurchaseVerifiedKey(verificationKey);
           }
           if (purchase.pendingCompletePurchase) {
-            await _repository.completePurchase(purchase);
+            await _repository.consumeVerifiedPurchase(purchase);
             if (!ref.mounted) {
               return;
             }
@@ -824,7 +827,7 @@ mixin _WalletControllerCheckout
           _rememberStorePurchaseVerifiedKey(verificationKey);
         }
         if (purchase.pendingCompletePurchase) {
-          await _repository.completePurchase(purchase);
+          await _repository.consumeVerifiedPurchase(purchase);
           if (!ref.mounted) {
             return;
           }

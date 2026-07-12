@@ -271,12 +271,23 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
     }
 
     try {
+      final generationId = event.payload['generationId'] as String?;
+      if (generationId != widget.generationId) {
+        return;
+      }
+
+      // The server deliberately publishes compact status events to avoid
+      // leaking media URLs through the broadcast channel. A terminal event
+      // therefore must be refreshed from the authenticated endpoint before
+      // it is rendered; otherwise polling stops with an incomplete result.
+      if (event.payload['requiresRefetch'] == true) {
+        unawaited(_load(silent: true));
+        return;
+      }
+
       final generation = TemplateGenerationDto.fromJson(
         Map<String, dynamic>.from(event.payload),
       ).toDomain();
-      if (generation.generationId != widget.generationId) {
-        return;
-      }
 
       _applyGenerationSnapshot(_reuseCurrentLocalMedia(generation));
     } catch (error, stackTrace) {
@@ -691,6 +702,7 @@ Duration _generationPollInterval(TemplateGenerationResult? generation) {
     TemplateGenerationStatus.generating ||
     TemplateGenerationStatus.providerProcessing ||
     TemplateGenerationStatus.importingMedia ||
+    TemplateGenerationStatus.cancellationRequested ||
     TemplateGenerationStatus.finalizing => const Duration(seconds: 3),
     _ => const Duration(seconds: 5),
   };

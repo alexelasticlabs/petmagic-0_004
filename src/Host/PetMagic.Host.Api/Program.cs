@@ -114,8 +114,11 @@ try
 
     var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
     var allowAnyCorsInDevelopment = builder.Environment.IsDevelopment();
+    var forwardedHeadersTrustSettings = ForwardedHeadersTrustSettings.Read(builder.Configuration);
+    ForwardedHeadersTrust.Validate(forwardedHeadersTrustSettings, builder.Environment);
     HostApiProductionConfigurationValidator.ValidateDefaultConnectionString(builder.Configuration, builder.Environment);
     HostApiProductionConfigurationValidator.ValidateJwtSigningKey(builder.Configuration, builder.Environment);
+    HostApiProductionConfigurationValidator.ValidateExternalAuthMobileRedirectScheme(builder.Configuration, builder.Environment);
     HostApiProductionConfigurationValidator.ValidateAllowedHosts(builder.Configuration, builder.Environment);
     HostApiProductionConfigurationValidator.ValidateCorsAllowedOrigins(allowedOrigins, builder.Environment);
     HostApiProductionConfigurationValidator.ValidatePublicMediaBaseUrls(builder.Configuration, builder.Environment);
@@ -326,8 +329,11 @@ try
     builder.Services.AddHealthChecks()
         .AddCheck("self", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy())
         .AddCheck<PremiumSubscriptionPlansHealthCheck>("economy_subscription_plans")
+        .AddCheck<StoreAccountBindingModeHealthCheck>("store_account_binding")
         .AddCheck<TemplateContentHealthCheck>("templates_content")
-        .AddCheck<TemplateSchedulerConfigHealthCheck>("templates_scheduler_config");
+        .AddCheck<TemplateSchedulerConfigHealthCheck>("templates_scheduler_config")
+        .AddCheck<GamificationLegacyDeliveryHealthCheck>("gamification_legacy_delivery")
+        .AddCheck<PushOutboxHealthCheck>("push_outbox");
 
     builder.Services
         .AddOpenTelemetry()
@@ -351,7 +357,8 @@ try
                 .AddRuntimeInstrumentation()
                 .AddMeter("PetMagic.Host.Api")
                 .AddMeter("PetMagic.Modules.Economy")
-                .AddMeter("PetMagic.Modules.Templates");
+                .AddMeter("PetMagic.Modules.Templates")
+                .AddMeter("PetMagic.Notifications");
 
             if (IsOtlpExporterConfigured(builder.Configuration))
             {
@@ -375,10 +382,10 @@ try
         Directory.CreateDirectory(Path.Combine(extraStaticWebRootPath, "templates-media"));
     }
 
-    app.UseForwardedHeaders(new ForwardedHeadersOptions
+    if (forwardedHeadersTrustSettings.Enabled)
     {
-        ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
-    });
+        app.UseForwardedHeaders(ForwardedHeadersTrust.BuildOptions(forwardedHeadersTrustSettings));
+    }
 
     app.UseMiddleware<CorrelationIdMiddleware>();
     app.UseMiddleware<GlobalExceptionMiddleware>();
@@ -468,8 +475,12 @@ try
         if (IsManagedSignedMediaPath(
             context.Request.Path,
             "/templates-media",
-            templatesOptions.PublicBaseUrl))
+            templatesOptions.PublicBaseUrl) &&
+            !app.Environment.IsDevelopment())
         {
+            // Local template storage is development-only and public catalog
+            // responses carry its canonical static URL. Production rejects the
+            // local provider and continues to require signed managed media URLs.
             var signer = context.RequestServices.GetRequiredService<ITemplateMediaReadUrlSigner>();
             var query = context.Request.Query.ToDictionary(
                 pair => pair.Key,
@@ -524,11 +535,15 @@ try
         app.Configuration.GetConnectionString("DefaultConnection"),
         async () =>
         {
+            await PostgreSqlIndexIntegrityValidator.RepairPendingMigrationIndexesAsync(
+                app.Configuration.GetConnectionString("DefaultConnection"));
             await app.Services.EnsureEconomySeedDataAsync();
             await app.Services.EnsureIdentitySeedDataAsync();
             await app.Services.EnsureSupportChatSeedDataAsync();
             await app.Services.EnsureTemplatesSeedDataAsync();
             await app.Services.EnsureGamificationSeedDataAsync();
+            await PostgreSqlIndexIntegrityValidator.ValidateAsync(
+                app.Configuration.GetConnectionString("DefaultConnection"));
         },
         acquireTimeout: TimeSpan.FromMinutes(5));
 

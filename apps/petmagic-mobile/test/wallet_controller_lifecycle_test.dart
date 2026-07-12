@@ -1044,6 +1044,21 @@ void main() {
   );
 
   test(
+    'manual store restore runs without a locally persisted checkout order',
+    () async {
+      final repository = _StoreRecoveryWalletRepository();
+      final container = _walletTestContainer(repository);
+      addTearDown(container.dispose);
+
+      await container
+          .read(walletControllerProvider.notifier)
+          .restoreStorePurchases();
+
+      expect(repository.restoreStorePurchasesCalls, 1);
+    },
+  );
+
+  test(
     'lost wallet store order falls back to billing validation before completing purchase',
     () async {
       final repository = _StoreRecoveryWalletRepository(
@@ -1064,7 +1079,15 @@ void main() {
       repository.emitPurchase(_storePurchase());
 
       await repository.validationStarted.future;
-      await Future<void>.delayed(Duration.zero);
+      for (var attempt = 0; attempt < 10; attempt++) {
+        if (container
+                .read(walletControllerProvider)
+                .checkoutVerificationState ==
+            WalletCheckoutVerificationState.succeeded) {
+          break;
+        }
+        await Future<void>.delayed(Duration.zero);
+      }
 
       final state = container.read(walletControllerProvider);
       expect(repository.validateStorePurchaseCalls, 1);
@@ -2138,6 +2161,11 @@ class _StoreRecoveryWalletRepository extends WalletRepository {
   Future<void> completePurchase(PurchaseDetails purchase) async {
     completePurchaseCalls++;
     purchase.pendingCompletePurchase = false;
+  }
+
+  @override
+  Future<void> consumeVerifiedPurchase(PurchaseDetails purchase) {
+    return completePurchase(purchase);
   }
 }
 

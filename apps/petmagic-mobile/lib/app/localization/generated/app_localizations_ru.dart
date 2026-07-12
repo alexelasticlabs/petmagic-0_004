@@ -213,6 +213,18 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profilePasswordLabel => 'Пароль';
 
   @override
+  String get authShowPassword => 'Показать пароль';
+
+  @override
+  String get authHidePassword => 'Скрыть пароль';
+
+  @override
+  String get authShowPasswordConfirmation => 'Показать подтверждение пароля';
+
+  @override
+  String get authHidePasswordConfirmation => 'Скрыть подтверждение пароля';
+
+  @override
   String get profileSignInAction => 'Войти';
 
   @override
@@ -1820,6 +1832,15 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get profileAccountRolesMissing => 'Роли не назначены';
+
+  @override
+  String get profileAccountRoleUser => 'Пользователь';
+
+  @override
+  String get profileAccountRoleModerator => 'Модератор';
+
+  @override
+  String get profileAccountRoleAdmin => 'Администратор';
 
   @override
   String get profileAccountMembershipLabel => 'Тариф';
@@ -3907,6 +3928,14 @@ class AppLocalizationsRu extends AppLocalizations {
       'Оплата будет списана с вашего аккаунта App Store / Google Play. Подписка продлевается автоматически, если ее не отменить до даты продления.';
 
   @override
+  String get premiumCardPaymentDisclaimerTitle =>
+      'Безопасная оплата банковской картой';
+
+  @override
+  String get premiumCardPaymentDisclaimerBody =>
+      'Оплата будет списана с вашей банковской карты. Подписка продлевается автоматически, если ее не отменить до даты продления.';
+
+  @override
   String get premiumCheckoutPageTitle => 'Оформить Premium';
 
   @override
@@ -4333,7 +4362,18 @@ class AppLocalizationsRu extends AppLocalizations {
   String get gamificationLoadFailed => 'Не удалось загрузить достижения';
 
   @override
-  String get gamificationDayStreak => 'дней подряд';
+  String gamificationDayStreak(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count дня подряд',
+      many: '$count дней подряд',
+      few: '$count дня подряд',
+      one: '$count день подряд',
+      zero: '0 дней подряд',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get gamificationHubSubtitle =>
@@ -4721,4 +4761,16 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get templateFlowGenerationWaitTooLongPremiumHint =>
       'Premium-запросы получают приоритет при высокой нагрузке и могут ждать меньше.';
+
+  @override
+  String get mediaPlayAction => 'Воспроизвести';
+
+  @override
+  String get mediaPauseAction => 'Пауза';
+
+  @override
+  String get mediaMuteAction => 'Выключить звук';
+
+  @override
+  String get mediaUnmuteAction => 'Включить звук';
 }

@@ -27,6 +27,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Modules\Economy\PetMagic.Modules.Economy.Infrastructure\PetMagic.Modules.Economy.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Gamification\PetMagic.Modules.Gamification.Infrastructure\PetMagic.Modules.Gamification.Infrastructure.csproj" />
     <ProjectReference Include="..\..\Modules\Templates\PetMagic.Modules.Templates.Infrastructure\PetMagic.Modules.Templates.Infrastructure.csproj" />
   </ItemGroup>
 

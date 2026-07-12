@@ -215,6 +215,18 @@ class AppLocalizationsDe extends AppLocalizations {
   String get profilePasswordLabel => 'Passwort';
 
   @override
+  String get authShowPassword => 'Passwort anzeigen';
+
+  @override
+  String get authHidePassword => 'Passwort verbergen';
+
+  @override
+  String get authShowPasswordConfirmation => 'Passwortbestätigung anzeigen';
+
+  @override
+  String get authHidePasswordConfirmation => 'Passwortbestätigung verbergen';
+
+  @override
   String get profileSignInAction => 'anmelden';
 
   @override
@@ -1837,6 +1849,15 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get profileAccountRolesMissing => 'Keine Rollen zugewiesen';
+
+  @override
+  String get profileAccountRoleUser => 'Benutzer';
+
+  @override
+  String get profileAccountRoleModerator => 'Moderator';
+
+  @override
+  String get profileAccountRoleAdmin => 'Administrator';
 
   @override
   String get profileAccountMembershipLabel => 'Mitgliedschaft';
@@ -3960,6 +3981,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'Die Zahlung wird Ihrem App Store-/Google Play-Konto belastet. Das Abonnement verlängert sich automatisch, sofern es nicht vor dem Verlängerungsdatum gekündigt wird.';
 
   @override
+  String get premiumCardPaymentDisclaimerTitle => 'Sichere Kartenzahlung';
+
+  @override
+  String get premiumCardPaymentDisclaimerBody =>
+      'Die Zahlung wird Ihrer Bankkarte belastet. Das Abonnement verlängert sich automatisch, sofern es nicht vor dem Verlängerungsdatum gekündigt wird.';
+
+  @override
   String get premiumCheckoutPageTitle => 'Auf Premium upgraden';
 
   @override
@@ -4389,7 +4417,15 @@ class AppLocalizationsDe extends AppLocalizations {
   String get gamificationLoadFailed => 'Erfolge konnten nicht geladen werden';
 
   @override
-  String get gamificationDayStreak => 'Tage Serie';
+  String gamificationDayStreak(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count-Tage-Serie',
+      one: '$count-Tag-Serie',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get gamificationHubSubtitle =>
@@ -4778,4 +4814,16 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get templateFlowGenerationWaitTooLongPremiumHint =>
       'Premium-Anfragen erhalten Priorität, wenn der Dienst stark ausgelastet ist, und können kürzer warten.';
+
+  @override
+  String get mediaPlayAction => 'Wiedergeben';
+
+  @override
+  String get mediaPauseAction => 'Pause';
+
+  @override
+  String get mediaMuteAction => 'Stummschalten';
+
+  @override
+  String get mediaUnmuteAction => 'Ton einschalten';
 }

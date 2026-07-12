@@ -155,6 +155,18 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text(text.profileSettingsFeedbackOptionBug), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.widgetWithText(
+              FilledButton,
+              text.profileSettingsFeedbackSubmitAction,
+            ),
+          )
+          .onPressed,
+      isNull,
+    );
+    expect(repository.submittedType, isNull);
 
     await tester.tap(find.text(text.profileSettingsFeedbackOptionBug));
     await tester.enterText(find.byType(TextFormField), 'Краш при отправке');
@@ -235,6 +247,14 @@ void main() {
     expect(feedbackSource, contains('AppLogger.warn('));
     expect(feedbackSource, contains("feature: 'Profile.SettingsFeedback'"));
     expect(feedbackSource, isNot(contains('} catch (_) {')));
+    expect(
+      contentSource,
+      contains('text.profileSettingsVersionLabel(AppConfig.appVersion)'),
+    );
+    expect(
+      contentSource,
+      isNot(contains("profileSettingsVersionLabel('1.2.0')")),
+    );
     expect(contentSource, contains('Color.alphaBlend('));
     expect(
       contentSource,

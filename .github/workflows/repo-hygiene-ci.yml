@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - render.yaml
+      - render.production.yaml
       - .env.staging.local.example
       - Dockerfile.api
       - Dockerfile.generation-worker
@@ -19,6 +20,7 @@ on:
       - develop
     paths:
       - render.yaml
+      - render.production.yaml
       - .env.staging.local.example
       - Dockerfile.api
       - Dockerfile.generation-worker
@@ -92,6 +94,9 @@ jobs:
 
       - name: Validate script safety inventory
         run: node scripts/qa/test-script-safety-inventory.mjs
+
+      - name: Validate repository structure
+        run: node scripts/qa/check-repository-structure.mjs
 
       - name: Install admin-web dependencies for YAML validation
         run: npm ci --prefix apps/admin-web --ignore-scripts

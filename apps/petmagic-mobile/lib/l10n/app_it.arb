@@ -62,6 +62,10 @@
   "profileSignInHint": "Usa il tuo account PetMagic per caricare il tuo profilo e gestire l'avatar visibile nell'amministratore.",
   "profileEmailLabel": "E-mail",
   "profilePasswordLabel": "Password",
+  "authShowPassword": "Mostra password",
+  "authHidePassword": "Nascondi password",
+  "authShowPasswordConfirmation": "Mostra conferma password",
+  "authHidePasswordConfirmation": "Nascondi conferma password",
   "profileSignInAction": "Registrazione",
   "profileSignOutAction": "disconnessione",
   "profileLoadingAction": "Caricamento...",
@@ -392,6 +396,9 @@
   "profileAccountDisplayNameMissing": "Non ancora impostato",
   "profileAccountRolesLabel": "Ruoli",
   "profileAccountRolesMissing": "Nessun ruolo assegnato",
+  "profileAccountRoleUser": "Utente",
+  "profileAccountRoleModerator": "Moderatore",
+  "profileAccountRoleAdmin": "Amministratore",
   "profileAccountMembershipLabel": "Appartenenza",
   "profileAccountConsentLabel": "Accettazione dei termini",
   "profileAccountMarketingLabel": "Offerte e aggiornamenti",
@@ -1209,6 +1216,8 @@
   "premiumBestValueBadge": "MIGLIOR VALORE",
   "premiumStorePaymentDisclaimerTitle": "Pagamento sicuro tramite App Store/Google Play",
   "premiumStorePaymentDisclaimerBody": "Il pagamento verrà addebitato sul tuo account App Store/Google Play. L'abbonamento si rinnova automaticamente a meno che non venga annullato prima della data di rinnovo.",
+  "premiumCardPaymentDisclaimerTitle": "Pagamento sicuro con carta",
+  "premiumCardPaymentDisclaimerBody": "Il pagamento verrà addebitato sulla tua carta bancaria. L'abbonamento si rinnova automaticamente a meno che non venga annullato prima della data di rinnovo.",
   "premiumBenefitAiGenerationsTitle": "30 generazioni di IA",
   "premiumBenefitAiGenerationsSubtitle": "ogni mese",
   "premiumBenefitPremiumTemplatesTitle": "Modelli premium",
@@ -1303,7 +1312,14 @@
   "gamificationKeepGenerating": "Continua a generare per sbloccare di più!",
   "gamificationUnlocked": "{unlocked} / {total} sbloccati",
   "gamificationLoadFailed": "Impossibile caricare le imprese",
-  "gamificationDayStreak": "giorni di serie",
+  "gamificationDayStreak": "{count, plural, one{{count} giorno di serie} other{{count} giorni di serie}}",
+  "@gamificationDayStreak": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "gamificationHubSubtitle": "Tieni sotto controllo serie, sfide e traguardi in un unico posto.",
   "gamificationHubEntrySubtitle": "Serie, obiettivi settimanali e traguardi degli obiettivi.",
   "gamificationWeekFocusTitle": "Questa settimana",
@@ -1521,5 +1537,9 @@
       }
     }
   },
-  "templateFlowGenerationWaitTooLongPremiumHint": "Le richieste Premium hanno priorità quando il servizio è molto richiesto e possono attendere meno."
+  "templateFlowGenerationWaitTooLongPremiumHint": "Le richieste Premium hanno priorità quando il servizio è molto richiesto e possono attendere meno.",
+  "mediaPlayAction": "Riproduci",
+  "mediaPauseAction": "Pausa",
+  "mediaMuteAction": "Disattiva audio",
+  "mediaUnmuteAction": "Attiva audio"
 }

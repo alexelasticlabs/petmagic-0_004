@@ -126,7 +126,7 @@ class _AccountProfileHeroCard extends StatelessWidget {
               ),
               if (profile.roles.isNotEmpty)
                 ProfileStatusPill(
-                  label: profile.roles.first,
+                  label: _localizedProfileRole(text, profile.roles.first),
                   leading: Icons.shield_outlined,
                 ),
             ],
@@ -136,6 +136,15 @@ class _AccountProfileHeroCard extends StatelessWidget {
       ),
     );
   }
+}
+
+String _localizedProfileRole(AppLocalizations text, String role) {
+  return switch (role.trim().toLowerCase()) {
+    'user' => text.profileAccountRoleUser,
+    'moderator' => text.profileAccountRoleModerator,
+    'admin' => text.profileAccountRoleAdmin,
+    _ => role,
+  };
 }
 
 class _ProfileEditableNameCard extends StatelessWidget {

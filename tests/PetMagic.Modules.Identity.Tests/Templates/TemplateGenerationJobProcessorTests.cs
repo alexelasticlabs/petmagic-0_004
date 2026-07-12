@@ -700,6 +700,39 @@ public sealed class TemplateGenerationJobProcessorTests
     }
 
     [Fact]
+    public async Task ProcessFalWebhookAsync_ShouldIgnoreLateResultWhileCancellationIsPending()
+    {
+        await using var dbContext = CreateDbContext();
+        var template = CreateReadyImageTemplate();
+        var now = DateTime.UtcNow;
+        var job = CreateGenerationJob(template, TemplateGenerationStatus.CancellationRequested, now);
+        job.CompletedAtUtc = null;
+        job.PreprocessingProviderRequestId = "image-provider-request-cancelling";
+        job.CurrentProviderStage = "image_generation";
+        job.ProviderStatus = "IN_PROGRESS";
+        job.CancellationPreviousStatus = TemplateGenerationStatus.ProviderProcessing;
+        job.CancellationRequestedAtUtc = now;
+        job.CancellationNextAttemptAtUtc = now.AddSeconds(5);
+
+        dbContext.TemplateItems.Add(template);
+        dbContext.TemplateGenerationJobs.Add(job);
+        await dbContext.SaveChangesAsync();
+
+        var processor = CreateProcessor(dbContext);
+        var webhook = await processor.ProcessFalWebhookAsync(
+            CreateFalWebhookCommand("image-provider-request-cancelling", "OK"),
+            CancellationToken.None);
+
+        var persisted = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == job.Id);
+        Assert.True(webhook.IsSuccess);
+        Assert.Equal("ignored_terminal", webhook.Value.Result);
+        Assert.Equal(TemplateGenerationStatus.CancellationRequested, persisted.Status);
+        Assert.NotNull(persisted.WebhookReceivedAtUtc);
+        Assert.Null(persisted.ResultUrl);
+        Assert.Null(persisted.CompletedAtUtc);
+    }
+
+    [Fact]
     public async Task ProcessNextAsync_ShouldSanitizeDurableWatermarkFailureCode()
     {
         await using var dbContext = CreateDbContext();
@@ -1460,6 +1493,7 @@ public sealed class TemplateGenerationJobProcessorTests
         await task;
 
         var notification = Assert.Single(gamification.CompletedGenerations);
+        Assert.Equal(job.Id, notification.GenerationId);
         Assert.Equal(userId, notification.UserId);
         Assert.Equal(petId, notification.PetId);
         Assert.Equal(template.Id, notification.TemplateId);
@@ -1518,6 +1552,59 @@ public sealed class TemplateGenerationJobProcessorTests
         Assert.Equal(true, entry.Properties["GenerationStillCompleted"]);
         Assert.Equal("InvalidOperationException", entry.Properties["ExceptionType"]);
         Assert.Null(entry.Exception);
+    }
+
+    [Fact]
+    public async Task ProcessNextPendingGamificationAsync_ShouldPersistRetryAndCompleteOnReplay()
+    {
+        await using var dbContext = CreateDbContext();
+        var template = CreateReadyImageTemplate();
+        var now = DateTime.UtcNow;
+        var job = new TemplateGenerationJob
+        {
+            Id = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            TemplateId = template.Id,
+            Status = TemplateGenerationStatus.Completed,
+            TokenCost = template.TokenCost,
+            SourceImageUrl = "http://localhost:5000/templates-media/source.jpg",
+            SourceImageFileName = "source.jpg",
+            SourceImageContentType = "image/jpeg",
+            SourceImageFileSizeBytes = 1024,
+            CreatedAtUtc = now.AddMinutes(-2),
+            QueuedAtUtc = now.AddMinutes(-2),
+            ChargedAtUtc = now.AddMinutes(-2),
+            CompletedAtUtc = now.AddMinutes(-1),
+            UpdatedAtUtc = now.AddMinutes(-1)
+        };
+        dbContext.TemplateItems.Add(template);
+        dbContext.TemplateGenerationJobs.Add(job);
+        await dbContext.SaveChangesAsync();
+
+        var failingProcessor = CreateProcessor(
+            dbContext,
+            gamificationService: new ThrowingGamificationService(),
+            economyService: PremiumEconomyServiceProxy.Create(isPremium: false));
+
+        Assert.True(await failingProcessor.ProcessNextPendingGamificationAsync(CancellationToken.None));
+        Assert.Null(job.GamificationProcessedAtUtc);
+        Assert.Equal(1, job.GamificationAttemptCount);
+        Assert.Equal("templates.gamification_sync_failed", job.GamificationLastErrorCode);
+        Assert.True(job.GamificationNextAttemptAtUtc > now);
+
+        job.GamificationNextAttemptAtUtc = DateTime.UtcNow.AddSeconds(-1);
+        await dbContext.SaveChangesAsync();
+        var recordingGamification = new RecordingGamificationService();
+        var succeedingProcessor = CreateProcessor(
+            dbContext,
+            gamificationService: recordingGamification,
+            economyService: PremiumEconomyServiceProxy.Create(isPremium: false));
+
+        Assert.True(await succeedingProcessor.ProcessNextPendingGamificationAsync(CancellationToken.None));
+        Assert.Equal(job.Id, Assert.Single(recordingGamification.CompletedGenerations).GenerationId);
+        Assert.NotNull(job.GamificationProcessedAtUtc);
+        Assert.Null(job.GamificationNextAttemptAtUtc);
+        Assert.Null(job.GamificationLastErrorCode);
     }
 
     [Fact]
@@ -1879,6 +1966,7 @@ public sealed class TemplateGenerationJobProcessorTests
         public List<GamificationCompletionCall> CompletedGenerations { get; } = [];
 
         public Task<GenerationProcessResult> ProcessGenerationCompletedAsync(
+            Guid generationId,
             Guid userId,
             Guid petId,
             Guid templateId,
@@ -1886,7 +1974,13 @@ public sealed class TemplateGenerationJobProcessorTests
             bool isPremium,
             CancellationToken cancellationToken)
         {
-            CompletedGenerations.Add(new GamificationCompletionCall(userId, petId, templateId, isTemplateOfTheDay, isPremium));
+            CompletedGenerations.Add(new GamificationCompletionCall(
+                generationId,
+                userId,
+                petId,
+                templateId,
+                isTemplateOfTheDay,
+                isPremium));
             return Task.FromResult(new GenerationProcessResult(0, null, null, false, [], 0));
         }
 
@@ -1925,7 +2019,7 @@ public sealed class TemplateGenerationJobProcessorTests
             return Task.FromResult(new GamificationSummaryResponse(null, [], [], []));
         }
 
-        public Task RecordCreationSharedAsync(Guid userId, CancellationToken cancellationToken)
+        public Task RecordCreationSharedAsync(Guid generationId, Guid userId, CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }
@@ -1934,6 +2028,7 @@ public sealed class TemplateGenerationJobProcessorTests
     private sealed class ThrowingGamificationService : IGamificationService
     {
         public Task<GenerationProcessResult> ProcessGenerationCompletedAsync(
+            Guid generationId,
             Guid userId,
             Guid petId,
             Guid templateId,
@@ -1979,7 +2074,7 @@ public sealed class TemplateGenerationJobProcessorTests
             return Task.FromResult(new GamificationSummaryResponse(null, [], [], []));
         }
 
-        public Task RecordCreationSharedAsync(Guid userId, CancellationToken cancellationToken)
+        public Task RecordCreationSharedAsync(Guid generationId, Guid userId, CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }
@@ -2026,6 +2121,7 @@ public sealed class TemplateGenerationJobProcessorTests
     }
 
     private sealed record GamificationCompletionCall(
+        Guid GenerationId,
         Guid UserId,
         Guid PetId,
         Guid TemplateId,

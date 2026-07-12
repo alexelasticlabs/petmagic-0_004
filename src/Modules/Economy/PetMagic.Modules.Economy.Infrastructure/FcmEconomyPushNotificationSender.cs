@@ -12,6 +12,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using PetMagic.BuildingBlocks.Observability;
+using PetMagic.BuildingBlocks.Notifications;
 using PetMagic.Modules.Economy.Infrastructure.Data;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
 using PetMagic.Modules.Economy.Infrastructure.Options;
@@ -22,7 +23,7 @@ internal sealed class FcmEconomyPushNotificationSender(
     EconomyDbContext dbContext,
     IOptions<EconomyOptions> options,
     IHttpClientFactory httpClientFactory,
-    ILogger<FcmEconomyPushNotificationSender> logger) : IEconomyPushNotificationSender
+    ILogger<FcmEconomyPushNotificationSender> logger) : IEconomyPushDeliverySender
 {
     public const string HttpClientName = "EconomyFcm";
 
@@ -30,28 +31,25 @@ internal sealed class FcmEconomyPushNotificationSender(
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private GoogleCredential? credential;
 
-    public async Task NotifyWalletUpdateAsync(Guid userId, WalletPushNotification notification, CancellationToken cancellationToken)
+    public async Task<PushDeliveryResult> DeliverWalletUpdateAsync(Guid userId, WalletPushNotification notification, CancellationToken cancellationToken)
     {
         if (!options.Value.IsFirebasePushConfigured)
         {
-            return;
+            return PushDeliveryResult.Delivered;
         }
 
         var tokens = await ResolveActiveTokensAsync(userId, cancellationToken);
         if (tokens.Count == 0)
         {
-            return;
+            return PushDeliveryResult.Delivered;
         }
         var accessToken = await GetAccessTokenAsync(cancellationToken);
         var userIdHash = SafeLogValues.StableHash(userId.ToString("D"));
-        foreach (var token in tokens)
+        var deliveries = await Task.WhenAll(tokens.Select(token =>
         {
             var locale = token.Locale;
             var title = EconomyPushNotificationLocalizer.BuildWalletTitle(locale);
-            var body = EconomyPushNotificationLocalizer.BuildWalletBody(
-                locale,
-                notification.SparkDelta);
-
+            var body = EconomyPushNotificationLocalizer.BuildWalletBody(locale, notification.SparkDelta);
             var data = new Dictionary<string, string>
             {
                 ["type"] = "wallet",
@@ -66,38 +64,38 @@ internal sealed class FcmEconomyPushNotificationSender(
                 data["orderId"] = notification.OrderId.Value.ToString("D");
             }
 
-            await SendAsync(token, title, body, data, accessToken, cancellationToken);
-        }
+            return SendAsync(token, title, body, data, accessToken, cancellationToken);
+        }));
+
+        DisableInvalidTokens(deliveries);
+        return Aggregate(deliveries.Select(x => x.Result).ToArray());
     }
 
-    public async Task NotifyPremiumUpdateAsync(Guid userId, PremiumPushNotification notification, CancellationToken cancellationToken)
+    public async Task<PushDeliveryResult> DeliverPremiumUpdateAsync(Guid userId, PremiumPushNotification notification, CancellationToken cancellationToken)
     {
         if (!options.Value.IsFirebasePushConfigured)
         {
-            return;
+            return PushDeliveryResult.Delivered;
         }
 
         var tokens = await ResolveActiveTokensAsync(userId, cancellationToken);
         if (tokens.Count == 0)
         {
-            return;
+            return PushDeliveryResult.Delivered;
         }
         var accessToken = await GetAccessTokenAsync(cancellationToken);
         var userIdHash = SafeLogValues.StableHash(userId.ToString("D"));
-        foreach (var token in tokens)
+        var deliveries = await Task.WhenAll(tokens.Select(token =>
         {
             var locale = token.Locale;
             var title = EconomyPushNotificationLocalizer.BuildPremiumTitle(locale);
-            var body = EconomyPushNotificationLocalizer.BuildPremiumBody(
-                locale,
-                notification.Status);
-
+            var body = EconomyPushNotificationLocalizer.BuildPremiumBody(locale, notification.Status);
             var data = new Dictionary<string, string>
             {
                 ["type"] = "premium",
                 ["status"] = notification.Status,
                 ["route"] = "/profile",
-                ["dedupe_key"] = $"premium:{notification.Status}:{notification.Provider ?? "unknown"}:{notification.PlanCode ?? "unknown"}:{userIdHash}"
+                ["dedupe_key"] = $"premium:{notification.Status}:{notification.Provider ?? "unknown"}:{notification.PlanCode ?? "unknown"}:{userIdHash}:{notification.EventKey ?? "state"}"
             };
             if (!string.IsNullOrWhiteSpace(notification.Provider))
             {
@@ -108,8 +106,11 @@ internal sealed class FcmEconomyPushNotificationSender(
                 data["planCode"] = notification.PlanCode!;
             }
 
-            await SendAsync(token, title, body, data, accessToken, cancellationToken);
-        }
+            return SendAsync(token, title, body, data, accessToken, cancellationToken);
+        }));
+
+        DisableInvalidTokens(deliveries);
+        return Aggregate(deliveries.Select(x => x.Result).ToArray());
     }
 
     private async Task<List<EconomyPushDeviceToken>> ResolveActiveTokensAsync(Guid userId, CancellationToken cancellationToken)
@@ -121,7 +122,7 @@ internal sealed class FcmEconomyPushNotificationSender(
             .ToListAsync(cancellationToken);
     }
 
-    private async Task SendAsync(
+    private async Task<TokenDeliveryResult> SendAsync(
         EconomyPushDeviceToken token,
         string title,
         string body,
@@ -151,7 +152,7 @@ internal sealed class FcmEconomyPushNotificationSender(
             cancellationToken);
         if (response.IsSuccessStatusCode)
         {
-            return;
+            return new TokenDeliveryResult(PushDeliveryResult.Delivered, token, false);
         }
 
         var responseBody = await SafeHttpContentReader.ReadStringPrefixAsync(response.Content, cancellationToken);
@@ -164,10 +165,41 @@ internal sealed class FcmEconomyPushNotificationSender(
 
         if (FirebaseMessagingErrorClassifier.ShouldDisableToken(response.StatusCode, responseBody))
         {
-            token.DisabledAtUtc = DateTime.UtcNow;
-            token.UpdatedAtUtc = token.DisabledAtUtc.Value;
-            await dbContext.SaveChangesAsync(cancellationToken);
+            return new TokenDeliveryResult(PushDeliveryResult.Delivered, token, true);
         }
+
+        var result = response.StatusCode == HttpStatusCode.TooManyRequests
+            || (int)response.StatusCode >= 500
+                ? PushDeliveryResult.Retry("fcm.transient_error")
+                : PushDeliveryResult.PermanentFailure("fcm.request_rejected");
+        return new TokenDeliveryResult(result, token, false);
+    }
+
+    private static void DisableInvalidTokens(IEnumerable<TokenDeliveryResult> deliveries)
+    {
+        var now = DateTime.UtcNow;
+        foreach (var delivery in deliveries.Where(x => x.DisableToken))
+        {
+            delivery.Token.DisabledAtUtc = now;
+            delivery.Token.UpdatedAtUtc = now;
+        }
+    }
+
+    private static PushDeliveryResult Aggregate(IReadOnlyList<PushDeliveryResult> results)
+    {
+        var retry = results.FirstOrDefault(x => x.Disposition == PushDeliveryDisposition.Retry);
+        if (retry is not null)
+        {
+            return retry;
+        }
+
+        if (results.Any(x => x.Disposition == PushDeliveryDisposition.Delivered))
+        {
+            return PushDeliveryResult.Delivered;
+        }
+
+        return results.FirstOrDefault()
+            ?? PushDeliveryResult.Delivered;
     }
 
     private async Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
@@ -223,4 +255,9 @@ internal sealed class FcmEconomyPushNotificationSender(
     private sealed record FcmApnsPayload(FcmAps Aps);
 
     private sealed record FcmAps(string Sound);
+
+    private sealed record TokenDeliveryResult(
+        PushDeliveryResult Result,
+        EconomyPushDeviceToken Token,
+        bool DisableToken);
 }

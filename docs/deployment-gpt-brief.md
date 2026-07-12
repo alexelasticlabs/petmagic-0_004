@@ -282,7 +282,7 @@ Build staging and production admin images/config separately.
 - `apps/admin-web/Dockerfile`
 - `docs/API_CONTRACTS.md`
 - `docs/OBSERVABILITY.md`
-- `docs/production-readiness-audit-2026-07-03.md`
+- `docs/RELEASE_READINESS.md`
 - `docs/economy-generation-billing.md`
 - `docs/payments-sandbox-checklist.md`
 - `docs/notifications-contract.md`

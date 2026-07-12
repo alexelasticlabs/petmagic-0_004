@@ -53,10 +53,16 @@ flutter run --dart-define=API_BASE_URL=https://api.petmagic.app
 
 ## Release Hardening Checklist
 
-- Always pass HTTPS API endpoint in release builds:
+- Every release build must target an explicit flavor and provide the matching
+  environment contract. A production build also requires real Firebase config
+  injected outside Git and protected release signing material:
 
 ```bash
-flutter build appbundle --release --dart-define=API_BASE_URL=https://api.petmagic.app
+flutter build appbundle --release --flavor production \
+  --dart-define=APP_ENVIRONMENT=production \
+  --dart-define=APP_PACKAGE_NAME=com.petmagic.app \
+  --dart-define=API_BASE_URL=https://api.petmagic.app \
+  --obfuscate --split-debug-info=build/symbols/production
 ```
 
 - Configure release signing by copying
@@ -74,20 +80,30 @@ keyPassword=CHANGE_ME
 - Release tasks fail fast if signing is missing. This is expected on machines
   without production signing material and must remain a blocker for store
   artifacts.
-- For local packaging/R8/resource experiments only, bypass signing with direct
-  Gradle from `apps/petmagic-mobile/android`:
+- For local packaging/R8/resource experiments only, use the same explicit
+  staging contract as CI. Generate placeholder Firebase configuration first;
+  it is ignored by Git and must never be used for provider E2E or store rollout:
 
 ```bash
-./gradlew :app:bundleRelease -PallowInsecureReleaseSigning=true
+dart run tool/configure_firebase_smoke.dart --environment=staging
+flutter build appbundle --release --flavor staging \
+  --android-project-arg=allowInsecureReleaseSigning=true \
+  --android-project-arg=allowPlaceholderFirebase=true \
+  --dart-define=APP_ENVIRONMENT=staging \
+  --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging \
+  --dart-define=API_BASE_URL=https://api.staging.petmagic.app \
+  --obfuscate --split-debug-info=build/symbols/staging
 ```
 
-Do not use the insecure override for production artifacts. It signs with the
-debug key only to prove the release packaging pipeline.
+Do not use either insecure override for production artifacts. They sign with
+the debug key and permit placeholder Firebase configuration only to prove the
+release packaging pipeline.
 
 ## External auth and password reset
 
 Google and Apple sign-in use native provider SDKs and send provider tokens to the backend for validation.
-Tracked Firebase files in this repository are placeholders only. For local or CI mobile builds, inject environment-specific Firebase config outside git:
+Firebase templates are tracked, but active Firebase configuration is injected
+outside Git for local, CI, and release builds:
 
 - `android/app/google-services.json`
 - `ios/Runner/GoogleService-Info.plist`

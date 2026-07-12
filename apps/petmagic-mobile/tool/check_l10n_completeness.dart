@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'l10n_same_value_allowlist.dart';
+
 void main(List<String> args) {
   final root = Directory.current;
   final l10nDir = Directory('${root.path}/lib/l10n');
@@ -25,73 +27,6 @@ void main(List<String> args) {
     'app_pl.arb',
   ];
 
-  const sameValueAllowlist = <String>{
-    'achievementTrendsetter',
-    'authAppleShortLabel',
-    'authGoogleShortLabel',
-    'emailVerificationCodeLabel',
-    'gamificationEvolutionBaby',
-    'gamificationLevel',
-    'generationStatusCopyLinkAction',
-    'imageLabel',
-    'imagesFilter',
-    'premiumCheckoutSummaryPlanLabel',
-    'premiumCheckoutTotalLabel',
-    'premiumLabel',
-    'premiumPaymentApple',
-    'premiumPaymentGooglePlay',
-    'premiumPageTitle',
-    'premiumPremiumColumn',
-    'profileAccountAvatarLabel',
-    'profileAccountRolesLabel',
-    'profileEmailLabel',
-    'profileNotificationsDeviceNotifications',
-    'profileNotificationsDevicePhotos',
-    'profilePasswordLabel',
-    'profilePremiumOpenAction',
-    'profileSettingsAccountSection',
-    'profileLegalDocumentSection',
-    'profileSettingsNotificationsSection',
-    'profileSettingsThemeSystem',
-    'profileStatBalanceLabel',
-    'profileStatLegalLabel',
-    'profileStatPlanLabel',
-    'profileSubscriptionStatusLabel',
-    'profileNotificationsEmailSection',
-    'rewardsSourceBonus',
-    'profileWalletPreviewEyebrow',
-    'randomTemplateAccessPremium',
-    'rewardsReferralInputHint',
-    'subscriptionPaymentProviderGooglePlay',
-    'supportChatArchiveAction',
-    'supportChatAssistantBadge',
-    'supportChatFileFallbackLabel',
-    'supportChatFaqTitle',
-    'supportChatTeamTitle',
-    'startupMiniFeaturePetFirst',
-    'templateDetailCategoryPortrait',
-    'templateDetailCategoryVideo',
-    'templateDetailFormatLabel',
-    'templateDetailImageEta',
-    'templateDetailVideoEta',
-    'videoLabel',
-    'videosFilter',
-    'walletBalanceUnit',
-    'walletApproxPhotos',
-    'walletApproxPhotosOnly',
-    'walletBalanceAfter',
-    'walletPackBaseSpark',
-    'walletPackBonus',
-    'walletPackBonusPill',
-    'walletPackBreakdown',
-    'walletPackTotalSpark',
-    'walletPurchaseSummary',
-    'walletPopularBadge',
-    'walletStripeCardBrandsLabel',
-    'walletStripeWalletsLabel',
-    'walletCheckoutTotalLabel',
-  };
-
   var hasFailures = false;
 
   for (final localeFileName in localeFiles) {
@@ -103,6 +38,7 @@ void main(List<String> args) {
     }
 
     final localeMap = _readArb(file);
+    final localeCode = _localeCodeFromFile(localeFileName);
     final missingKeys = baseKeys
         .where((key) => !localeMap.containsKey(key))
         .toList(growable: false);
@@ -116,7 +52,7 @@ void main(List<String> args) {
     final sameValueKeys = baseKeys
         .where((key) => localeMap.containsKey(key) && enMap.containsKey(key))
         .where((key) {
-          if (sameValueAllowlist.contains(key)) {
+          if (isSameValueAllowed(localeCode, key)) {
             return false;
           }
 
@@ -155,6 +91,10 @@ void main(List<String> args) {
   stdout.writeln(
     'Localization completeness check passed (${baseKeys.length} keys).',
   );
+}
+
+String _localeCodeFromFile(String fileName) {
+  return fileName.replaceAll('.arb', '').split('_').last.toLowerCase();
 }
 
 Map<String, dynamic> _readArb(File file) {

@@ -50,9 +50,14 @@ Evidence to capture:
 
 - Android wallet UI shows Google Play/native purchase path when configured.
 - Purchase completes with a license tester.
+- Play purchase carries the authenticated PetMagic user through `obfuscatedAccountId`.
 - Backend `verify-store` confirms the purchase.
+- An unacknowledged purchase is accepted and credited exactly once.
+- The token pack remains unconsumed until backend verification succeeds, then Android consume succeeds before local pending state is cleared.
 - Wallet balance increases once.
 - Receipt replay does not duplicate credit.
+- A mismatched binding returns `economy.store_account_binding_mismatch`.
+- A new unbound transaction returns `economy.store_account_binding_missing` in `enforce` mode; a legacy transaction already owned by the same user can still be restored.
 - Pending purchase survives app restart.
 - Restore/recovery works after reinstall or local order loss.
 - Admin purchase appears with provider `google_play`.
@@ -65,9 +70,11 @@ Evidence to capture:
 
 - iOS wallet UI shows App Store/native purchase path when configured.
 - Sandbox purchase completes.
+- StoreKit purchase carries the authenticated PetMagic user through `appAccountToken`.
 - Backend `verify-store` confirms the purchase.
 - Wallet balance increases once.
 - Receipt/server event replay does not duplicate credit.
+- Mismatched, new-unbound and same-user legacy restore cases follow the same binding policy as Google Play.
 - Restore/recovery works after reinstall or local order loss.
 - Admin purchase appears with provider `app_store`.
 
@@ -104,3 +111,7 @@ Manual checks:
 ## Release gate
 
 Production release requires attaching evidence for every checked item. If an external dependency is unavailable, record `needs verification`, the missing credential/device/account, and the exact scenario that remains unverified.
+
+Keep `STORE_ACCOUNT_BINDING_MODE=compatibility` while the backend fix and bound mobile client roll out. Change production to `enforce` only after Google Play and App Store purchase, restore, replay, mismatch and new-unbound sandbox evidence is attached. A production deployment must not perform this switch implicitly.
+
+While production remains in `compatibility`, `/health` reports `store_account_binding` as `Degraded` with the required remediation. Treat that status as a release follow-up, not as permission to keep compatibility enabled indefinitely.

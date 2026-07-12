@@ -82,20 +82,26 @@ class _AuthFlowContentSection extends StatelessWidget {
                 onChanged: controller.updatePassword,
                 enabled: !state.isSaving,
                 compact: compactLayout,
-                trailing: IconButton(
-                  onPressed: state.isSaving
-                      ? null
-                      : page._togglePasswordVisibility,
-                  icon: AnimatedSwitcher(
-                    duration: PetMotion.effectiveDuration(
-                      context,
-                      PetMotion.fast,
-                    ),
-                    child: Icon(
-                      page._obscurePassword
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
-                      key: ValueKey(page._obscurePassword),
+                trailing: Semantics(
+                  toggled: !page._obscurePassword,
+                  child: IconButton(
+                    tooltip: page._obscurePassword
+                        ? text.authShowPassword
+                        : text.authHidePassword,
+                    onPressed: state.isSaving
+                        ? null
+                        : page._togglePasswordVisibility,
+                    icon: AnimatedSwitcher(
+                      duration: PetMotion.effectiveDuration(
+                        context,
+                        PetMotion.fast,
+                      ),
+                      child: Icon(
+                        page._obscurePassword
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                        key: ValueKey(page._obscurePassword),
+                      ),
                     ),
                   ),
                 ),
@@ -129,20 +135,26 @@ class _AuthFlowContentSection extends StatelessWidget {
                   errorText: confirmPasswordMismatch
                       ? text.authPasswordMismatch
                       : null,
-                  trailing: IconButton(
-                    onPressed: state.isSaving
-                        ? null
-                        : page._toggleConfirmPasswordVisibility,
-                    icon: AnimatedSwitcher(
-                      duration: PetMotion.effectiveDuration(
-                        context,
-                        PetMotion.fast,
-                      ),
-                      child: Icon(
-                        page._obscureConfirmPassword
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
-                        key: ValueKey(page._obscureConfirmPassword),
+                  trailing: Semantics(
+                    toggled: !page._obscureConfirmPassword,
+                    child: IconButton(
+                      tooltip: page._obscureConfirmPassword
+                          ? text.authShowPasswordConfirmation
+                          : text.authHidePasswordConfirmation,
+                      onPressed: state.isSaving
+                          ? null
+                          : page._toggleConfirmPasswordVisibility,
+                      icon: AnimatedSwitcher(
+                        duration: PetMotion.effectiveDuration(
+                          context,
+                          PetMotion.fast,
+                        ),
+                        child: Icon(
+                          page._obscureConfirmPassword
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                          key: ValueKey(page._obscureConfirmPassword),
+                        ),
                       ),
                     ),
                   ),

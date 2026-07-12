@@ -49,6 +49,14 @@ public sealed partial class StoreSubscriptionVerifier
             using var document = await ReadProviderJsonAsync(response.Content, cancellationToken);
             var root = document.RootElement;
 
+            if (IsGooglePlayProduction
+                && root.TryGetProperty("testPurchase", out var testPurchaseElement)
+                && testPurchaseElement.ValueKind == JsonValueKind.Object)
+            {
+                LogGooglePlayTestPurchaseRejected("subscription_verify", request.UserId, request.ProductId);
+                return Result.Failure<StoreSubscriptionVerificationResponse>(EconomyErrors.StorePurchaseInvalid);
+            }
+
             if (!root.TryGetProperty("subscriptionState", out var stateElement)
                 || stateElement.ValueKind != JsonValueKind.String)
             {
@@ -58,6 +66,13 @@ public sealed partial class StoreSubscriptionVerifier
             var subscriptionState = stateElement.GetString() ?? string.Empty;
             var isActive = string.Equals(subscriptionState, "SUBSCRIPTION_STATE_ACTIVE", StringComparison.Ordinal)
                 || string.Equals(subscriptionState, "SUBSCRIPTION_STATE_IN_GRACE_PERIOD", StringComparison.Ordinal);
+            var providerAccountId = root.TryGetProperty("externalAccountIdentifiers", out var accountIdentifiersElement)
+                && accountIdentifiersElement.ValueKind == JsonValueKind.Object
+                && accountIdentifiersElement.TryGetProperty("obfuscatedExternalAccountId", out var accountIdElement)
+                && accountIdElement.ValueKind == JsonValueKind.String
+                    ? accountIdElement.GetString()
+                    : null;
+            var accountBindingState = ResolveAccountBindingState(providerAccountId, request.UserId);
 
             DateTime? expiresAtUtc = null;
             string? externalSubscriptionId = null;
@@ -99,7 +114,13 @@ public sealed partial class StoreSubscriptionVerifier
 
             if (!isActive)
             {
-                return Result.Success(new StoreSubscriptionVerificationResponse(false, expiresAtUtc, subscriptionState, externalSubscriptionId));
+                return Result.Success(new StoreSubscriptionVerificationResponse(
+                    false,
+                    expiresAtUtc,
+                    subscriptionState,
+                    externalSubscriptionId,
+                    accountBindingState,
+                    ResolveBoundUserId(providerAccountId)));
             }
 
             if (!expiresAtUtc.HasValue)
@@ -107,7 +128,13 @@ public sealed partial class StoreSubscriptionVerifier
                 return Result.Failure<StoreSubscriptionVerificationResponse>(EconomyErrors.StorePurchaseInvalid);
             }
 
-            return Result.Success(new StoreSubscriptionVerificationResponse(true, expiresAtUtc, subscriptionState, externalSubscriptionId));
+            return Result.Success(new StoreSubscriptionVerificationResponse(
+                true,
+                expiresAtUtc,
+                subscriptionState,
+                externalSubscriptionId,
+                accountBindingState,
+                ResolveBoundUserId(providerAccountId)));
         }
         catch (Exception ex)
         {
@@ -169,30 +196,50 @@ public sealed partial class StoreSubscriptionVerifier
                 && purchaseStateElement.ValueKind == JsonValueKind.Number
                 ? purchaseStateElement.GetInt32()
                 : -1;
-            var acknowledgementState = root.TryGetProperty("acknowledgementState", out var acknowledgementStateElement)
-                && acknowledgementStateElement.ValueKind == JsonValueKind.Number
-                ? acknowledgementStateElement.GetInt32()
-                : 1;
-            var purchaseType = root.TryGetProperty("purchaseType", out var purchaseTypeElement)
+            int? purchaseType = root.TryGetProperty("purchaseType", out var purchaseTypeElement)
                 && purchaseTypeElement.ValueKind == JsonValueKind.Number
                 ? purchaseTypeElement.GetInt32()
-                : 0;
+                : null;
+            var quantity = root.TryGetProperty("quantity", out var quantityElement)
+                && quantityElement.ValueKind == JsonValueKind.Number
+                && quantityElement.TryGetInt32(out var parsedQuantity)
+                    ? parsedQuantity
+                    : 1;
+            int? refundableQuantity = root.TryGetProperty("refundableQuantity", out var refundableQuantityElement)
+                && refundableQuantityElement.ValueKind == JsonValueKind.Number
+                && refundableQuantityElement.TryGetInt32(out var parsedRefundableQuantity)
+                    ? parsedRefundableQuantity
+                    : null;
             var hasRefundOrCancelSignal = root.TryGetProperty("voidedPurchaseType", out _)
                 || root.TryGetProperty("cancelReason", out _);
 
+            var isDisallowedProductionPurchaseType = IsGooglePlayProduction
+                && purchaseType is 0 or 2;
+            if (isDisallowedProductionPurchaseType)
+            {
+                LogGooglePlayTestPurchaseRejected("product_verify", request.UserId, request.ProductId);
+            }
+
             var isPurchased = purchaseState == 0
-                && acknowledgementState == 1
                 && !hasRefundOrCancelSignal
-                && purchaseType >= 0;
+                && !isDisallowedProductionPurchaseType
+                && quantity == 1
+                && (!refundableQuantity.HasValue || refundableQuantity.Value == quantity);
             var orderId = root.TryGetProperty("orderId", out var orderIdElement)
                 && orderIdElement.ValueKind == JsonValueKind.String
                 ? orderIdElement.GetString()
                 : request.PurchaseId;
+            var providerAccountId = root.TryGetProperty("obfuscatedExternalAccountId", out var accountIdElement)
+                && accountIdElement.ValueKind == JsonValueKind.String
+                    ? accountIdElement.GetString()
+                    : null;
 
             return Result.Success(new StoreProductVerificationResponse(
                 isPurchased,
                 isPurchased ? "purchased" : "not_purchased",
-                orderId));
+                orderId,
+                ResolveAccountBindingState(providerAccountId, request.UserId),
+                ResolveBoundUserId(providerAccountId)));
         }
         catch (Exception ex)
         {
@@ -211,6 +258,20 @@ public sealed partial class StoreSubscriptionVerifier
 
             return Result.Failure<StoreProductVerificationResponse>(EconomyErrors.StoreVerificationUnavailable);
         }
+    }
+
+    private bool IsGooglePlayProduction =>
+        string.Equals(options.Value.GooglePlayEnvironment?.Trim(), "production", StringComparison.OrdinalIgnoreCase);
+
+    private void LogGooglePlayTestPurchaseRejected(string operation, Guid userId, string productId)
+    {
+        EconomyMetrics.RecordSandboxReceiptInProduction("google_play", operation);
+        logger?.LogError(
+            "SECURITY: Google Play test or rewarded purchase rejected in production. Operation={Operation} UserIdHash={UserIdHash} ProductId={ProductId} CorrelationIdHash={CorrelationIdHash}",
+            operation,
+            EconomyLogSanitizer.SafeUserId(userId),
+            productId,
+            SafeLogValues.StableHash(CorrelationContext.ResolveOrCreate()));
     }
 
     private async Task<string?> RequestGoogleAccessTokenAsync(CancellationToken cancellationToken)

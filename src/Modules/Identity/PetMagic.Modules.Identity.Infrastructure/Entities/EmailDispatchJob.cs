@@ -30,6 +30,10 @@ public sealed class EmailDispatchJob
 
     public DateTime? NextAttemptAtUtc { get; set; }
 
+    public Guid? LockId { get; set; }
+
+    public DateTime? LockExpiresAtUtc { get; set; }
+
     public DateTime? SentAtUtc { get; set; }
 
     public string? FailureCode { get; set; }

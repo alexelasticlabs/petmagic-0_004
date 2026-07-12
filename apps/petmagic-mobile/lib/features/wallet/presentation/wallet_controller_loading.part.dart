@@ -121,6 +121,24 @@ mixin _WalletControllerLoading
         return;
       }
 
+      // Native store probing can be slow or unavailable on a physical device.
+      // Keep the wallet, rewards, and history usable while payment-method
+      // availability is resolved in the background portion of this load.
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          wallet: wallet,
+          rewards: rewards,
+          ledger: ledger,
+          ledgerHasMore: ledgerHasMore,
+          packs: packs,
+          paymentMethods: paymentMethods,
+          purchases: purchases,
+          isLoading: false,
+          isRefreshing: false,
+          errorMessage: softError,
+        ),
+      );
+
       if (packs.isNotEmpty && paymentMethods.isNotEmpty) {
         final availability = await _resolvePaymentMethodsAvailability(
           packs: packs,

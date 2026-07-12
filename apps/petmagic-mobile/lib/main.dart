@@ -5,12 +5,13 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:petmagic_mobile/app/app.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
+import 'package:petmagic_mobile/core/config/app_config.dart';
+import 'package:petmagic_mobile/core/logging/app_crash_reporter.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/performance/decoded_image_cache_budget.dart';
 import 'package:petmagic_mobile/shared/files/temp_media_cleanup.dart';
@@ -24,7 +25,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  AppConfig.validateReleaseConfiguration();
   GoogleFonts.config.allowRuntimeFetching = false;
   _installGlobalErrorHandlers();
   configureDecodedImageCacheBudget();
@@ -51,12 +52,18 @@ Future<void> main() async {
       runApp(const ProviderScope(child: PetMagicApp()));
     },
     (error, stackTrace) {
+      AppCrashReporter.recordFatal(
+        error: error,
+        stackTrace: stackTrace,
+        reason: 'zoned_guarded_error',
+      );
       AppLogger.error(
         feature: 'App',
         operation: 'zoned_guarded_error',
         message: 'Unhandled zoned error',
         error: error,
         stackTrace: stackTrace,
+        reportToCrashlytics: false,
       );
     },
   );
@@ -64,22 +71,34 @@ Future<void> main() async {
 
 void _installGlobalErrorHandlers() {
   FlutterError.onError = (details) {
+    AppCrashReporter.recordFatal(
+      error: details.exception,
+      stackTrace: details.stack ?? StackTrace.current,
+      reason: 'flutter_framework_error',
+    );
     AppLogger.error(
       feature: 'App',
       operation: 'flutter_error',
       message: 'Unhandled Flutter framework error',
       error: details.exception,
       stackTrace: details.stack,
+      reportToCrashlytics: false,
     );
   };
   ErrorWidget.builder = _buildSafeErrorWidget;
   PlatformDispatcher.instance.onError = (error, stackTrace) {
+    AppCrashReporter.recordFatal(
+      error: error,
+      stackTrace: stackTrace,
+      reason: 'platform_dispatcher_error',
+    );
     AppLogger.error(
       feature: 'App',
       operation: 'platform_dispatcher_error',
       message: 'Unhandled platform error',
       error: error,
       stackTrace: stackTrace,
+      reportToCrashlytics: false,
     );
     return true;
   };
@@ -102,6 +121,7 @@ Widget _buildSafeErrorWidget(FlutterErrorDetails details) {
     message: 'Widget build failed',
     error: details.exception,
     stackTrace: details.stack,
+    reportToCrashlytics: false,
   );
 
   if (kDebugMode) {
@@ -127,12 +147,12 @@ Future<bool> _initializeFirebase() async {
     return false;
   }
 
-  if (Firebase.apps.isNotEmpty) {
-    return true;
-  }
-
   try {
-    await Firebase.initializeApp();
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp();
+    }
+    await AppCrashReporter.initialize();
+    AppCrashReporter.runStagingProbeIfRequested();
     return true;
   } catch (error, stackTrace) {
     AppLogger.error(

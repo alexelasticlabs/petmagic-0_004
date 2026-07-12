@@ -51,13 +51,13 @@ Template generation:
 - `generation_queue_wait_seconds` queue wait duration histogram.
 - `generation_eta_accuracy_error_seconds` queued ETA accuracy histogram.
 - `generation_jobs_rejected_total` pre-charge admission rejection counter.
-- `generation_jobs_cancelled_total` queued cancellation counter.
+- `generation_jobs_cancelled_total` confirmed local or provider cancellation counter.
 - `generation_jobs_queued_without_charge_total` billing invariant counter for queued jobs found
   without charge.
 - `generation_jobs_refunded_total` generation refund counter.
 - `generation_duplicate_refund_attempts_total` duplicate generation refund attempt counter.
 - `generation_refund_failures_total` generation refund failure counter.
-- `generation_cancel_refunds_total` generation refunds caused by queued cancellation.
+- `generation_cancel_refunds_total` generation refunds caused by confirmed cancellation.
 - `generation_fal_timeouts_total` FAL timeout counter by media type, stage, and model.
 - `generation_sse_delivery_failures_total` realtime delivery, persistence, or polling failure counter.
 - `generation_webhook_delivery_failures_total` provider webhook delivery or payload failures.

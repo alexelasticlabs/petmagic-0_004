@@ -11,6 +11,27 @@ public sealed partial class SupportChatService
 {
     public async Task<Result<SupportConversationDetailResponse>> OpenConversationAsync(OpenSupportConversationCommand command, CancellationToken cancellationToken)
     {
+        if (command.Priority != SupportConversationPriority.Normal)
+        {
+            return Result.Failure<SupportConversationDetailResponse>(InvalidPriority);
+        }
+
+        if (command.Source is not (SupportConversationSource.MobileChat or SupportConversationSource.MobileAssistant))
+        {
+            return Result.Failure<SupportConversationDetailResponse>(InvalidSource);
+        }
+
+        var relatedResourceError = await ValidateRelatedResourcesAsync(
+            command.UserId,
+            command.RelatedGenerationId,
+            command.RelatedPaymentId,
+            command.RelatedSubscriptionId,
+            cancellationToken);
+        if (relatedResourceError is not null)
+        {
+            return Result.Failure<SupportConversationDetailResponse>(relatedResourceError);
+        }
+
         var createdConversation = false;
         var appendedInitialMessage = false;
         var conversation = await supportChatDbContext.SupportConversations
@@ -103,6 +124,53 @@ public sealed partial class SupportChatService
         }
 
         return Result.Success(await BuildConversationDetailAsync(conversation.Id, cancellationToken));
+    }
+
+    private async Task<Error?> ValidateRelatedResourcesAsync(
+        Guid userId,
+        Guid? relatedGenerationId,
+        Guid? relatedPaymentId,
+        Guid? relatedSubscriptionId,
+        CancellationToken cancellationToken)
+    {
+        if (relatedGenerationId.HasValue)
+        {
+            if (templateGenerationService is null)
+            {
+                return SupportChatErrors.RelatedResourceNotFound;
+            }
+
+            var generation = await templateGenerationService.GetAsync(
+                userId,
+                relatedGenerationId.Value,
+                cancellationToken);
+            if (generation.IsFailure)
+            {
+                return SupportChatErrors.RelatedResourceNotFound;
+            }
+        }
+
+        if (relatedPaymentId.HasValue
+            && (economyResourceOwnershipReader is null
+                || !await economyResourceOwnershipReader.OwnsPurchaseOrderAsync(
+                    userId,
+                    relatedPaymentId.Value,
+                    cancellationToken)))
+        {
+            return SupportChatErrors.RelatedResourceNotFound;
+        }
+
+        if (relatedSubscriptionId.HasValue
+            && (economyResourceOwnershipReader is null
+                || !await economyResourceOwnershipReader.OwnsSubscriptionAsync(
+                    userId,
+                    relatedSubscriptionId.Value,
+                    cancellationToken)))
+        {
+            return SupportChatErrors.RelatedResourceNotFound;
+        }
+
+        return null;
     }
 
     public async Task<Result<SupportConversationDetailResponse>> GetUserConversationAsync(

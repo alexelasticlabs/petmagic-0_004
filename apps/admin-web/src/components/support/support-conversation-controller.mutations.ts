@@ -14,9 +14,10 @@ import {
 } from "@/components/support/support-conversation-controller.helpers";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
-  assignSupportConversation,
+  assignSupportConversationToMe,
   sendSupportAttachment,
   sendSupportMessage,
+  unassignSupportConversation,
   updateSupportConversationMetadata,
   updateSupportConversationStatus,
   type AdminSupportConversation,
@@ -33,8 +34,9 @@ type SupportControllerSessionIdentity = {
 
 type UseSupportConversationMutationsParams = {
   conversationId: string;
-  canManageSupportWorkspace: boolean;
+  canMutateConversation: boolean;
   supportActionsForbidden: string;
+  supportOwnershipRequired: string;
   assertCanManageSupportWorkspace: () => boolean;
   reply: string;
   selectedAttachment: File | null;
@@ -59,8 +61,9 @@ type UseSupportConversationMutationsParams = {
 
 export function useSupportConversationMutations({
   conversationId,
-  canManageSupportWorkspace,
+  canMutateConversation,
   supportActionsForbidden,
+  supportOwnershipRequired,
   assertCanManageSupportWorkspace,
   reply,
   selectedAttachment,
@@ -102,13 +105,16 @@ export function useSupportConversationMutations({
       if (!assertCanManageSupportWorkspace()) {
         throw new Error(supportActionsForbidden);
       }
+      if (!canMutateConversation) {
+        throw new Error(supportOwnershipRequired);
+      }
 
       return selectedAttachment
         ? sendSupportAttachment(conversationId, selectedAttachment, reply.trim(), replyToMessageId)
         : sendSupportMessage(conversationId, reply.trim(), replyToMessageId);
     },
     onMutate: async (): Promise<SendOptimisticContext> => {
-      if (!canManageSupportWorkspace) {
+      if (!canMutateConversation) {
         return {};
       }
 
@@ -269,7 +275,7 @@ export function useSupportConversationMutations({
 
   const requestSendReply = useCallback(() => {
     if (
-      !canManageSupportWorkspace ||
+      !canMutateConversation ||
       sendReplyInFlightRef.current ||
       sendMutation.isPending ||
       (!reply.trim() && !selectedAttachment)
@@ -281,12 +287,15 @@ export function useSupportConversationMutations({
     setIsSendReplyInFlight(true);
     sendMutation.mutate();
     return true;
-  }, [canManageSupportWorkspace, reply, selectedAttachment, sendMutation]);
+  }, [canMutateConversation, reply, selectedAttachment, sendMutation]);
 
   const statusMutation = useMutation({
     mutationFn: async (status: SupportConversationStatus) => {
       if (!assertCanManageSupportWorkspace()) {
         throw new Error(supportActionsForbidden);
+      }
+      if (!canMutateConversation) {
+        throw new Error(supportOwnershipRequired);
       }
 
       return updateSupportConversationStatus(conversationId, status);
@@ -302,12 +311,14 @@ export function useSupportConversationMutations({
   });
 
   const assignmentMutation = useMutation({
-    mutationFn: async (assignedAdminId?: string | null) => {
+    mutationFn: async (action: "claim" | "unassign") => {
       if (!assertCanManageSupportWorkspace()) {
         throw new Error(supportActionsForbidden);
       }
 
-      return assignSupportConversation(conversationId, assignedAdminId);
+      return action === "claim"
+        ? assignSupportConversationToMe(conversationId)
+        : unassignSupportConversation(conversationId);
     },
     onSuccess: async () => {
       setToast({ type: "success", message: supportAssignmentSaved });
@@ -323,6 +334,9 @@ export function useSupportConversationMutations({
     mutationFn: async (payload: { priority: SupportConversationPriority; tags: string[] }) => {
       if (!assertCanManageSupportWorkspace()) {
         throw new Error(supportActionsForbidden);
+      }
+      if (!canMutateConversation) {
+        throw new Error(supportOwnershipRequired);
       }
 
       return updateSupportConversationMetadata(conversationId, payload);

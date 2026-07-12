@@ -1,0 +1,68 @@
+name: mobile-promote
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        required: true
+        type: choice
+        options: [android, ios]
+      build_number:
+        description: Existing uploaded versionCode/build number
+        required: true
+        type: string
+      target_track:
+        description: Android target track (alpha, beta, production)
+        required: false
+        default: production
+        type: string
+      rollout:
+        description: Android rollout fraction (0.1, 0.5, 1.0)
+        required: false
+        default: "0.1"
+        type: string
+      submit_for_review:
+        description: Submit existing iOS build for review
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  promote:
+    runs-on: macos-latest
+    environment: production
+    defaults:
+      run:
+        working-directory: apps/petmagic-mobile
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: ruby/setup-ruby@d45b1a4e94b71acab930e56e79c6aa188764e7f9 # v1
+        with: { ruby-version: '3.3', bundler-cache: true, working-directory: apps/petmagic-mobile }
+      - name: Prepare Play key
+        if: inputs.platform == 'android'
+        env:
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: printf '%s' "$GOOGLE_PLAY_SERVICE_ACCOUNT_JSON" > build-google-play-key.json
+      - name: Promote existing Play artifact
+        if: inputs.platform == 'android'
+        env:
+          GOOGLE_PLAY_PACKAGE_NAME: com.petmagic.app
+          GOOGLE_PLAY_JSON_KEY_PATH: ${{ github.workspace }}/apps/petmagic-mobile/build-google-play-key.json
+          SOURCE_TRACK: internal
+          TARGET_TRACK: ${{ inputs.target_track }}
+          VERSION_CODE: ${{ inputs.build_number }}
+          ROLLOUT: ${{ inputs.rollout }}
+        run: bundle exec fastlane android promote
+      - name: Promote existing TestFlight build
+        if: inputs.platform == 'ios'
+        env:
+          APP_STORE_BUNDLE_ID: com.petmagic.app
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
+          BUILD_NUMBER: ${{ inputs.build_number }}
+          SUBMIT_FOR_REVIEW: ${{ inputs.submit_for_review }}
+        run: bundle exec fastlane ios promote

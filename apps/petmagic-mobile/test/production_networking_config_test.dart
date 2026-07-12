@@ -58,9 +58,11 @@ void main() {
       config,
       contains(
         'if (!kDebugMode) {\n'
-        '        final productionBaseUrl = normalizeProductionBaseUrl(',
+        '        final releaseBaseUrl = normalizeReleaseBaseUrl(',
       ),
     );
+    expect(config, contains('validateReleaseConfiguration'));
+    expect(config, contains("'staging' => 'api.staging.petmagic.app'"));
     expect(config, contains("return const [productionApiBaseUrl];"));
     expect(config, contains("static const productionApiBaseUrl = 'https://"));
     expect(

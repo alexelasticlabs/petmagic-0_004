@@ -38,7 +38,17 @@ internal sealed class FalQueueClient(
         try
         {
             var queueBaseUri = BuildQueueBaseUri();
-            using var submitRequest = new HttpRequestMessage(HttpMethod.Post, BuildSubmitUri(model));
+            var submitUri = BuildSubmitUri(model);
+            if (submitUri is null)
+            {
+                logger.LogWarning(
+                    "Rejected invalid fal model route. Stage={Stage} ModelHash={ModelHash}",
+                    stageKind.Stage,
+                    SafeLogValues.StableHash(model));
+                return ProviderFailure<FalQueueSubmitResult>("model.invalid", model, TemplatesErrors.AiProviderFailed);
+            }
+
+            using var submitRequest = new HttpRequestMessage(HttpMethod.Post, submitUri);
             ApplyAuth(submitRequest);
             if (options.Fal.StartTimeoutSeconds > 0)
             {
@@ -82,12 +92,25 @@ internal sealed class FalQueueClient(
             var statusUrl = ResolveQueueCallbackUri(
                 ReadRequiredString(submitDocument.RootElement, "status_url"),
                 queueBaseUri,
-                "/status/");
+                model,
+                requestId,
+                "status");
             var responseUrl = ResolveQueueCallbackUri(
                 ReadRequiredString(submitDocument.RootElement, "response_url"),
                 queueBaseUri,
-                "/response/");
-            if (string.IsNullOrWhiteSpace(requestId) || statusUrl is null || responseUrl is null)
+                model,
+                requestId,
+                "response");
+            var cancelUrl = ResolveQueueCallbackUri(
+                ReadRequiredString(submitDocument.RootElement, "cancel_url"),
+                queueBaseUri,
+                model,
+                requestId,
+                "cancel");
+            if (string.IsNullOrWhiteSpace(requestId)
+                || statusUrl is null
+                || responseUrl is null
+                || cancelUrl is null)
             {
                 logger.LogWarning(
                     "fal queue returned an invalid submit payload. MediaType={MediaType} Stage={Stage} Model={Model} ProviderRequestIdHash={ProviderRequestIdHash} QueueBaseUrl={QueueBaseUrl}",
@@ -99,7 +122,7 @@ internal sealed class FalQueueClient(
                 return ProviderFailure<FalQueueSubmitResult>("submit.parse", model, TemplatesErrors.AiProviderFailed);
             }
 
-            return Result.Success(new FalQueueSubmitResult(requestId, statusUrl, responseUrl));
+            return Result.Success(new FalQueueSubmitResult(requestId, statusUrl, responseUrl, cancelUrl));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -166,6 +189,142 @@ internal sealed class FalQueueClient(
         CancellationToken cancellationToken)
     {
         return FetchResponseAsync(responseUrl, model, cancellationToken);
+    }
+
+    public async Task<FalQueueCancellationResult> CancelAsync(
+        string model,
+        string requestId,
+        Uri cancelUrl,
+        CancellationToken cancellationToken)
+    {
+        if (!options.Fal.IsConfigured)
+        {
+            return new FalQueueCancellationResult(
+                FalQueueCancellationOutcome.TransientFailure,
+                "templates.fal_cancel_configuration");
+        }
+
+        var validatedUrl = ResolveQueueCallbackUri(
+            cancelUrl.ToString(),
+            BuildQueueBaseUri(),
+            model,
+            requestId,
+            "cancel");
+        if (validatedUrl is null)
+        {
+            return new FalQueueCancellationResult(
+                FalQueueCancellationOutcome.PermanentFailure,
+                "templates.fal_cancel_url_invalid");
+        }
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Put, validatedUrl);
+            ApplyAuth(request);
+            using var response = await CreateClient().SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken);
+            var body = await SafeHttpContentReader.ReadRawStringPrefixAsync(
+                response.Content,
+                cancellationToken,
+                QueueMetadataMaxChars);
+            var providerStatus = TryReadCancellationStatus(body);
+
+            return response.StatusCode switch
+            {
+                System.Net.HttpStatusCode.Accepted when string.Equals(
+                    providerStatus,
+                    "CANCELLATION_REQUESTED",
+                    StringComparison.Ordinal) => new FalQueueCancellationResult(
+                        FalQueueCancellationOutcome.Accepted,
+                        null),
+                System.Net.HttpStatusCode.BadRequest when string.Equals(
+                    providerStatus,
+                    "ALREADY_COMPLETED",
+                    StringComparison.Ordinal) => new FalQueueCancellationResult(
+                        FalQueueCancellationOutcome.AlreadyCompleted,
+                        "templates.fal_cancel_already_completed"),
+                System.Net.HttpStatusCode.NotFound when string.Equals(
+                    providerStatus,
+                    "NOT_FOUND",
+                    StringComparison.Ordinal) => new FalQueueCancellationResult(
+                        FalQueueCancellationOutcome.NotFound,
+                        "templates.fal_cancel_not_found"),
+                _ when IsTransientStatusCode(response.StatusCode) => new FalQueueCancellationResult(
+                    FalQueueCancellationOutcome.TransientFailure,
+                    $"templates.fal_cancel_http_{(int)response.StatusCode}"),
+                _ => new FalQueueCancellationResult(
+                    FalQueueCancellationOutcome.PermanentFailure,
+                    $"templates.fal_cancel_http_{(int)response.StatusCode}"),
+            };
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (OperationCanceledException)
+        {
+            return new FalQueueCancellationResult(
+                FalQueueCancellationOutcome.TransientFailure,
+                "templates.fal_cancel_timeout");
+        }
+        catch (HttpRequestException)
+        {
+            return new FalQueueCancellationResult(
+                FalQueueCancellationOutcome.TransientFailure,
+                "templates.fal_cancel_network");
+        }
+        catch
+        {
+            return new FalQueueCancellationResult(
+                FalQueueCancellationOutcome.PermanentFailure,
+                "templates.fal_cancel_failed");
+        }
+    }
+
+    public Uri? ResolveCancellationUri(
+        string model,
+        string requestId,
+        string? cancelUrl,
+        string? statusUrl)
+    {
+        var queueBaseUri = BuildQueueBaseUri();
+        var explicitCancelUri = ResolveQueueCallbackUri(
+            cancelUrl,
+            queueBaseUri,
+            model,
+            requestId,
+            "cancel");
+        if (explicitCancelUri is not null)
+        {
+            return explicitCancelUri;
+        }
+
+        var validatedStatusUri = ResolveQueueCallbackUri(
+            statusUrl,
+            queueBaseUri,
+            model,
+            requestId,
+            "status");
+        if (validatedStatusUri is null)
+        {
+            return null;
+        }
+
+        var cancelPath = validatedStatusUri.AbsolutePath[..^"status".Length] + "cancel";
+        var derived = new UriBuilder(validatedStatusUri)
+        {
+            Path = cancelPath,
+            Query = string.Empty,
+            Fragment = string.Empty,
+        }.Uri;
+        return ResolveQueueCallbackUri(
+            derived.ToString(),
+            queueBaseUri,
+            model,
+            requestId,
+            "cancel");
     }
 
     public async Task<Result<FalQueueRunResult>> RunAsync(
@@ -354,14 +513,56 @@ internal sealed class FalQueueClient(
         return new Uri(options.Fal.QueueBaseUrl.TrimEnd('/') + "/");
     }
 
-    private Uri BuildModelUri(string model)
+    private Uri? BuildModelUri(string model)
     {
-        return new Uri(BuildQueueBaseUri(), model.TrimStart('/'));
+        if (string.IsNullOrWhiteSpace(model))
+        {
+            return null;
+        }
+
+        var queueBaseUri = BuildQueueBaseUri();
+        var normalizedModel = model.Trim();
+        if (Uri.TryCreate(normalizedModel, UriKind.Absolute, out _)
+            || normalizedModel.StartsWith("/", StringComparison.Ordinal)
+            || normalizedModel.Contains('\\')
+            || normalizedModel.Contains('?')
+            || normalizedModel.Contains('#'))
+        {
+            return null;
+        }
+
+        var modelSegments = normalizedModel
+            .Trim('/')
+            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (modelSegments.Length == 0
+            || modelSegments.Any(segment =>
+                string.Equals(Uri.UnescapeDataString(segment), ".", StringComparison.Ordinal)
+                || string.Equals(Uri.UnescapeDataString(segment), "..", StringComparison.Ordinal)))
+        {
+            return null;
+        }
+
+        var modelUri = new Uri(queueBaseUri, string.Join('/', modelSegments));
+        var expectedPathPrefix = queueBaseUri.AbsolutePath.TrimEnd('/') + "/";
+        return string.Equals(modelUri.Scheme, queueBaseUri.Scheme, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(modelUri.Host, queueBaseUri.Host, StringComparison.OrdinalIgnoreCase)
+            && modelUri.Port == queueBaseUri.Port
+            && string.IsNullOrEmpty(modelUri.UserInfo)
+            && string.IsNullOrEmpty(modelUri.Query)
+            && string.IsNullOrEmpty(modelUri.Fragment)
+            && modelUri.AbsolutePath.StartsWith(expectedPathPrefix, StringComparison.Ordinal)
+                ? modelUri
+                : null;
     }
 
-    private Uri BuildSubmitUri(string model)
+    private Uri? BuildSubmitUri(string model)
     {
         var modelUri = BuildModelUri(model);
+        if (modelUri is null)
+        {
+            return null;
+        }
+
         if (!Uri.TryCreate(options.Fal.WebhookUrl, UriKind.Absolute, out var webhookUri))
         {
             return modelUri;
@@ -371,38 +572,48 @@ internal sealed class FalQueueClient(
         return new Uri(submitUrl);
     }
 
-    private static Uri? ResolveQueueCallbackUri(string? callbackUrl, Uri queueBaseUri, string requiredPathPrefix)
+    private static Uri? ResolveQueueCallbackUri(
+        string? callbackUrl,
+        Uri queueBaseUri,
+        string model,
+        string? requestId,
+        string terminalSuffix)
     {
-        if (!Uri.TryCreate(callbackUrl, UriKind.Absolute, out var callbackUri))
+        if (string.IsNullOrWhiteSpace(requestId)
+            || requestId.Length > 128
+            || requestId.Any(character => !char.IsAsciiLetterOrDigit(character) && character is not '-' and not '_')
+            || !Uri.TryCreate(callbackUrl, UriKind.Absolute, out var callbackUri))
         {
             return null;
         }
 
         if (!string.Equals(callbackUri.Scheme, queueBaseUri.Scheme, StringComparison.OrdinalIgnoreCase)
             || !string.Equals(callbackUri.Host, queueBaseUri.Host, StringComparison.OrdinalIgnoreCase)
-            || callbackUri.Port != queueBaseUri.Port)
+            || callbackUri.Port != queueBaseUri.Port
+            || !string.IsNullOrEmpty(callbackUri.UserInfo)
+            || !string.IsNullOrEmpty(callbackUri.Query)
+            || !string.IsNullOrEmpty(callbackUri.Fragment))
         {
             return null;
         }
 
-        var allowedBasePath = queueBaseUri.AbsolutePath;
-        if (!allowedBasePath.EndsWith("/", StringComparison.Ordinal))
-        {
-            allowedBasePath += "/";
-        }
+        var expectedPath = $"{queueBaseUri.AbsolutePath.TrimEnd('/')}/{model.Trim('/')}/requests/{requestId}/{terminalSuffix}";
+        return string.Equals(callbackUri.AbsolutePath, expectedPath, StringComparison.Ordinal)
+            ? callbackUri
+            : null;
+    }
 
-        if (!callbackUri.AbsolutePath.StartsWith(allowedBasePath, StringComparison.Ordinal))
+    private static string? TryReadCancellationStatus(string body)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            return ReadRequiredString(document.RootElement, "status");
+        }
+        catch (JsonException)
         {
             return null;
         }
-
-        var callbackRelativePath = callbackUri.AbsolutePath[allowedBasePath.Length..];
-        if (!callbackRelativePath.StartsWith(requiredPathPrefix.TrimStart('/'), StringComparison.Ordinal))
-        {
-            return null;
-        }
-
-        return callbackUri;
     }
 
     private void ApplyAuth(HttpRequestMessage request)
@@ -458,7 +669,21 @@ internal sealed record FalQueueRunResult(
 internal sealed record FalQueueSubmitResult(
     string RequestId,
     Uri StatusUrl,
-    Uri ResponseUrl);
+    Uri ResponseUrl,
+    Uri CancelUrl);
+
+internal sealed record FalQueueCancellationResult(
+    FalQueueCancellationOutcome Outcome,
+    string? ErrorCode);
+
+internal enum FalQueueCancellationOutcome
+{
+    Accepted,
+    AlreadyCompleted,
+    NotFound,
+    TransientFailure,
+    PermanentFailure,
+}
 
 internal sealed record FalQueueStatusResult(
     string Status,

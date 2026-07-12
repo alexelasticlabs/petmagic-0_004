@@ -132,6 +132,14 @@ void main() {
     expect(footerSource, contains("part of 'premium_page.dart';"));
     expect(footerSource, contains('class _Footer'));
     expect(footerSource, contains('class _Link'));
+    expect(
+      footerSource,
+      contains('state.selectedProvider == PremiumPaymentProvider.stripe'),
+    );
+    expect(footerSource, contains('text.premiumCardPaymentDisclaimerTitle'));
+    expect(footerSource, contains('text.premiumCardPaymentDisclaimerBody'));
+    expect(footerSource, contains('text.premiumStorePaymentDisclaimerTitle'));
+    expect(footerSource, contains('text.premiumStorePaymentDisclaimerBody'));
   });
 
   test(
@@ -163,6 +171,16 @@ void main() {
       ),
     );
     expect(ctaSource, isNot(contains('letterSpacing: -0.2')));
+  });
+
+  test('premium page reports a completed purchase restore to the user', () {
+    final pageSource = File(
+      'lib/features/premium/presentation/premium_page.dart',
+    ).readAsStringSync();
+
+    expect(pageSource, contains("'premium.restore_started'"));
+    expect(pageSource, contains('fallbackText.premiumRestoreStarted'));
+    expect(pageSource, contains('PetMagicToastTone.success'));
   });
 
   testWidgets('premium page renders monthly/yearly plans and manage action', (

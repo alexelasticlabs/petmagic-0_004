@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 
+using PetMagic.BuildingBlocks.Notifications;
 using PetMagic.Modules.Economy.Infrastructure.Data;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
 using PetMagic.Modules.Identity.Infrastructure.Data;
@@ -139,6 +140,58 @@ public sealed class DatabaseIndexModelTests
     }
 
     [Fact]
+    public void HistoricalConcurrentIndexMigrations_ShouldRepairOnlyInvalidIndexesFromPendingOwnerMigration()
+    {
+        var migrationsRoot = Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Infrastructure",
+            "Data",
+            "Migrations");
+        foreach (var fileName in new[]
+        {
+            "20260630234809_AddGenerationSchedulerQueueFields.cs",
+            "20260701093000_AddAsyncGenerationProviderPipeline.cs",
+            "20260702234729_AddGenerationBillingReconciliationIndexes.cs",
+            "20260710093545_AddGamificationSyncDeliveryState.cs",
+            "20260710094027_AddGamificationShareDeliveryState.cs"
+        })
+        {
+            var migration = File.ReadAllText(Path.Combine(migrationsRoot, fileName));
+            Assert.Contains("CREATE INDEX CONCURRENTLY IF NOT EXISTS", migration, StringComparison.Ordinal);
+            Assert.Contains("suppressTransaction: true", migration, StringComparison.Ordinal);
+        }
+
+        var validator = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Host",
+            "PetMagic.Host.Api",
+            "Startup",
+            "PostgreSqlIndexIntegrityValidator.cs"));
+        var program = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Host",
+            "PetMagic.Host.Api",
+            "Program.cs"));
+
+        Assert.Contains("RepairPendingMigrationIndexesAsync", program, StringComparison.Ordinal);
+        Assert.True(
+            program.IndexOf("RepairPendingMigrationIndexesAsync", StringComparison.Ordinal)
+                < program.IndexOf("EnsureTemplatesSeedDataAsync", StringComparison.Ordinal));
+        Assert.Contains("appliedMigrations.Contains(ownerMigration)", validator, StringComparison.Ordinal);
+        Assert.Contains("DROP INDEX CONCURRENTLY IF EXISTS", validator, StringComparison.Ordinal);
+        Assert.Contains("20260630234809_AddGenerationSchedulerQueueFields", validator, StringComparison.Ordinal);
+        Assert.Contains("20260701093000_AddAsyncGenerationProviderPipeline", validator, StringComparison.Ordinal);
+        Assert.Contains("20260702234729_AddGenerationBillingReconciliationIndexes", validator, StringComparison.Ordinal);
+        Assert.Contains("20260710093545_AddGamificationSyncDeliveryState", validator, StringComparison.Ordinal);
+        Assert.Contains("20260710094027_AddGamificationShareDeliveryState", validator, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ConcurrentIndexMigrations_ShouldSuppressEfTransactions()
     {
         var migrationsRoot = Path.Combine(FindRepositoryRoot(), "src", "Modules");
@@ -217,6 +270,30 @@ public sealed class DatabaseIndexModelTests
             economyDbContext,
             supportChatDbContext,
             templatesDbContext);
+    }
+
+    [Fact]
+    public void PushOutboxContexts_ShouldUseLockIdAsConcurrencyToken()
+    {
+        using var economyDbContext = new EconomyDbContext(
+            new DbContextOptionsBuilder<EconomyDbContext>()
+                .UseInMemoryDatabase($"economy-outbox-lock-{Guid.NewGuid():N}")
+                .Options);
+        using var supportChatDbContext = new SupportChatDbContext(
+            new DbContextOptionsBuilder<SupportChatDbContext>()
+                .UseInMemoryDatabase($"support-outbox-lock-{Guid.NewGuid():N}")
+                .Options);
+        using var templatesDbContext = new TemplatesDbContext(
+            new DbContextOptionsBuilder<TemplatesDbContext>()
+                .UseInMemoryDatabase($"templates-outbox-lock-{Guid.NewGuid():N}")
+                .Options);
+
+        foreach (var dbContext in new DbContext[] { economyDbContext, supportChatDbContext, templatesDbContext })
+        {
+            var lockId = dbContext.Model.FindEntityType(typeof(PushOutboxMessage))?.FindProperty(nameof(PushOutboxMessage.LockId));
+            Assert.NotNull(lockId);
+            Assert.True(lockId!.IsConcurrencyToken);
+        }
     }
 
     private static void AssertHasIndex<TEntity>(DbContext dbContext, IReadOnlyList<string> propertyNames)

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Identity.Application.Abstractions;
@@ -21,7 +22,9 @@ public sealed partial class SupportChatService(
     IEconomyService? economyService = null,
     IAdminUserEconomyAnalyticsReader? adminUserEconomyAnalyticsReader = null,
     ITemplateGenerationService? templateGenerationService = null,
-    IAdminUserTemplateAnalyticsReader? adminUserTemplateAnalyticsReader = null) : ISupportChatService
+    IAdminUserTemplateAnalyticsReader? adminUserTemplateAnalyticsReader = null,
+    IAdminAuditLog? adminAuditLog = null,
+    IUserEconomyResourceOwnershipReader? economyResourceOwnershipReader = null) : ISupportChatService
 {
     private const int DefaultConversationMessagesTake = 60;
     private const int MaxConversationMessagesTake = 120;
@@ -36,4 +39,12 @@ public sealed partial class SupportChatService(
     private static readonly Error InvalidQueue = new("support.queue_invalid", "Support inbox queue is not supported.");
     private static readonly Error InvalidStatusTransition = new("support.status_transition_invalid", "Support conversation status transition is not allowed.");
     private static readonly Error InvalidTags = new("support.tags_invalid", "Support conversation tags are invalid.");
+    private const string NpgsqlProviderName = "Npgsql.EntityFrameworkCore.PostgreSQL";
+
+    private static Error? ValidateAdminOwnership(Entities.SupportConversation conversation, Guid adminUserId)
+    {
+        return conversation.AssignedAdminId == adminUserId
+            ? null
+            : SupportChatErrors.ConversationNotOwned;
+    }
 }

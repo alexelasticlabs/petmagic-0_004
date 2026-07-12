@@ -950,6 +950,115 @@ public sealed partial class EconomyServiceTests
     }
 
     [Fact]
+    public async Task VerifyPremiumStorePurchaseAsync_ShouldRejectMismatchedAccountBinding()
+    {
+        await using var dbContext = CreateDbContext();
+        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = "monthly",
+            Name = "PetMagic Premium Monthly Plus",
+            BillingPeriod = "monthly",
+            PriceAmount = 19.99m,
+            CurrencyCode = "USD",
+            MonthlyTokenLimit = 777,
+            IsActive = true,
+            AppleProductId = "com.petmagic.custom.monthly.apple",
+            GoogleProductId = "com.petmagic.custom.monthly.google",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+        });
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(
+            dbContext,
+            storeVerifier: new FakeStoreSubscriptionVerifier
+            {
+                AccountBindingState = StoreAccountBindingState.Mismatched
+            });
+        var result = await service.VerifyPremiumStorePurchaseAsync(
+            new VerifyPremiumStorePurchaseCommand(
+                Guid.NewGuid(),
+                "monthly",
+                "google_play",
+                "com.petmagic.custom.monthly.google",
+                "mismatched-token",
+                null,
+                "mismatched-order",
+                null),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(EconomyErrors.StoreAccountBindingMismatch.Code, result.Error.Code);
+        Assert.Empty(await dbContext.UserSubscriptions.ToListAsync());
+    }
+
+    [Fact]
+    public async Task VerifyPremiumStorePurchaseAsync_EnforceMode_ShouldAllowMissingBindingOnlyForSameUserRestore()
+    {
+        await using var dbContext = CreateDbContext();
+        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = "monthly",
+            Name = "PetMagic Premium Monthly Plus",
+            BillingPeriod = "monthly",
+            PriceAmount = 19.99m,
+            CurrencyCode = "USD",
+            MonthlyTokenLimit = 777,
+            IsActive = true,
+            AppleProductId = "com.petmagic.custom.monthly.apple",
+            GoogleProductId = "com.petmagic.custom.monthly.google",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+        });
+        await dbContext.SaveChangesAsync();
+
+        var userId = Guid.NewGuid();
+        var verifier = new FakeStoreSubscriptionVerifier
+        {
+            AccountBindingState = StoreAccountBindingState.Missing
+        };
+        var identityService = new FakeIdentityService();
+        var command = new VerifyPremiumStorePurchaseCommand(
+            userId,
+            "monthly",
+            "google_play",
+            "com.petmagic.custom.monthly.google",
+            "legacy-unbound-token",
+            null,
+            "legacy-unbound-order",
+            null);
+
+        var firstClaim = await CreateService(
+            dbContext,
+            storeVerifier: verifier,
+            identityService: identityService,
+            storeAccountBindingMode: "enforce").VerifyPremiumStorePurchaseAsync(
+                command,
+                CancellationToken.None);
+        Assert.True(firstClaim.IsFailure);
+        Assert.Equal(EconomyErrors.StoreAccountBindingMissing.Code, firstClaim.Error.Code);
+
+        var compatibilityClaim = await CreateService(
+            dbContext,
+            storeVerifier: verifier,
+            identityService: identityService,
+            storeAccountBindingMode: "compatibility").VerifyPremiumStorePurchaseAsync(
+                command,
+                CancellationToken.None);
+        Assert.True(compatibilityClaim.IsSuccess, compatibilityClaim.Error.Code);
+
+        var sameUserRestore = await CreateService(
+            dbContext,
+            storeVerifier: verifier,
+            identityService: identityService,
+            storeAccountBindingMode: "enforce").VerifyPremiumStorePurchaseAsync(
+                command,
+                CancellationToken.None);
+        Assert.True(sameUserRestore.IsSuccess, sameUserRestore.Error.Code);
+        Assert.Single(await dbContext.UserSubscriptions.ToListAsync());
+    }
+
+    [Fact]
     public async Task VerifyPremiumStorePurchaseAsync_ShouldRejectActiveStoreVerificationWithoutExpiry()
     {
         await using var dbContext = CreateDbContext();

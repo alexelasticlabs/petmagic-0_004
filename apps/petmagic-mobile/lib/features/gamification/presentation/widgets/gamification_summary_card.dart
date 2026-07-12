@@ -118,9 +118,7 @@ class GamificationHighlightsCard extends StatelessWidget {
                 child: _MiniStat(
                   emoji: '🔥',
                   label: text.gamificationStreakTitle,
-                  value: streak != null
-                      ? '${streak.currentStreak} ${text.gamificationDayStreak}'
-                      : '0 ${text.gamificationDayStreak}',
+                  value: text.gamificationDayStreak(streak?.currentStreak ?? 0),
                   color: const Color(0xFFFF6D00),
                 ),
               ),

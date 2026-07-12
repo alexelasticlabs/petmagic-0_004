@@ -114,7 +114,7 @@ public sealed partial class EconomyService
             return Result.Success<IReadOnlyList<PremiumPlanResponse>>(plans);
         }
 
-        var catalogPlans = PremiumPlanCatalog.All
+        var catalogPlans = PremiumPlanCatalog.Create(options.Value)
             .OrderBy(x => x.SortOrder)
             .Select(x => new PremiumPlanResponse(
                 x.PlanCode,

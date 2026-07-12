@@ -11,6 +11,7 @@ enum TemplateGenerationStatus {
   providerQueued,
   providerProcessing,
   importingMedia,
+  cancellationRequested,
   completed,
   failed,
   cancelled,
@@ -107,6 +108,7 @@ TemplateGenerationStatus templateGenerationStatusFromApi(String value) {
     '8' => TemplateGenerationStatus.providerQueued,
     '9' => TemplateGenerationStatus.providerProcessing,
     '10' => TemplateGenerationStatus.importingMedia,
+    '11' => TemplateGenerationStatus.cancellationRequested,
     'uploading' => TemplateGenerationStatus.uploading,
     'processing' => TemplateGenerationStatus.processing,
     'preprocessing' => TemplateGenerationStatus.preprocessing,
@@ -124,6 +126,9 @@ TemplateGenerationStatus templateGenerationStatusFromApi(String value) {
     'importingmedia' ||
     'importing_media' ||
     'importing-media' => TemplateGenerationStatus.importingMedia,
+    'cancellationrequested' ||
+    'cancellation_requested' ||
+    'cancellation-requested' => TemplateGenerationStatus.cancellationRequested,
     'completed' => TemplateGenerationStatus.completed,
     'succeeded' => TemplateGenerationStatus.completed,
     'failed' => TemplateGenerationStatus.failed,
@@ -412,7 +417,8 @@ class TemplateGenerationResult {
       status == TemplateGenerationStatus.processing ||
       status == TemplateGenerationStatus.preprocessing ||
       status == TemplateGenerationStatus.generating ||
-      status == TemplateGenerationStatus.providerProcessing;
+      status == TemplateGenerationStatus.providerProcessing ||
+      status == TemplateGenerationStatus.cancellationRequested;
 
   bool get canCancelQueued =>
       status == TemplateGenerationStatus.queued && (canCancel ?? true);
@@ -427,6 +433,7 @@ class TemplateGenerationResult {
       TemplateGenerationStatus.completed => 100,
       TemplateGenerationStatus.failed => 100,
       TemplateGenerationStatus.cancelled => 100,
+      TemplateGenerationStatus.cancellationRequested => 95,
       TemplateGenerationStatus.finalizing => 90,
       TemplateGenerationStatus.importingMedia => 90,
       TemplateGenerationStatus.generating => 65,

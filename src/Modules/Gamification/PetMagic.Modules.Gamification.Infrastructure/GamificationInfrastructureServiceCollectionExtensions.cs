@@ -13,7 +13,8 @@ public static class GamificationInfrastructureServiceCollectionExtensions
 {
     public static IServiceCollection AddGamificationInfrastructure(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        bool includeAdminServices = true)
     {
         services.AddDbContextPool<GamificationDbContext>(options =>
         {
@@ -21,7 +22,10 @@ public static class GamificationInfrastructureServiceCollectionExtensions
         });
 
         services.AddScoped<IGamificationService, GamificationService>();
-        services.AddScoped<IGamificationAdminService, GamificationAdminService>();
+        if (includeAdminServices)
+        {
+            services.AddScoped<IGamificationAdminService, GamificationAdminService>();
+        }
 
         return services;
     }

@@ -36,7 +36,8 @@ public sealed partial class StoreSubscriptionVerifier
                 isActive,
                 transactionInfo.ExpiresAtUtc,
                 isActive ? "active" : "expired",
-                transactionInfo.OriginalTransactionId ?? transactionInfo.TransactionId));
+                transactionInfo.OriginalTransactionId ?? transactionInfo.TransactionId,
+                ResolveAccountBindingState(transactionInfo.AppAccountToken, request.UserId)));
         }
 
         if (string.IsNullOrWhiteSpace(options.Value.AppStoreSharedSecret)
@@ -96,7 +97,8 @@ public sealed partial class StoreSubscriptionVerifier
             return Result.Success(new StoreProductVerificationResponse(
                 true,
                 "purchased",
-                transactionInfo!.TransactionId ?? request.PurchaseId));
+                transactionInfo!.TransactionId ?? request.PurchaseId,
+                ResolveAccountBindingState(transactionInfo.AppAccountToken, request.UserId)));
         }
 
         if (string.IsNullOrWhiteSpace(options.Value.AppStoreSharedSecret)
@@ -187,6 +189,7 @@ public sealed partial class StoreSubscriptionVerifier
 
             DateTime? expiresAtUtc = null;
             string? externalSubscriptionId = null;
+            string? providerAccountId = null;
             var matchedProduct = false;
 
             if (root.TryGetProperty("latest_receipt_info", out var receiptsElement)
@@ -201,7 +204,13 @@ public sealed partial class StoreSubscriptionVerifier
                         continue;
                     }
 
+                    if (HasAppStoreCancellationSignal(item))
+                    {
+                        continue;
+                    }
+
                     matchedProduct = true;
+                    providerAccountId ??= TryReadAppStoreAccountBinding(item);
 
                     if (item.TryGetProperty("original_transaction_id", out var transactionElement)
                         && transactionElement.ValueKind == JsonValueKind.String)
@@ -232,7 +241,9 @@ public sealed partial class StoreSubscriptionVerifier
                 isActive,
                 expiresAtUtc,
                 isActive ? "active" : "expired",
-                externalSubscriptionId);
+                externalSubscriptionId,
+                ResolveAccountBindingState(providerAccountId, request.UserId),
+                ResolveBoundUserId(providerAccountId));
 
             return (Result.Success(result), false);
         }
@@ -309,6 +320,7 @@ public sealed partial class StoreSubscriptionVerifier
 
             var matched = false;
             string? transactionId = null;
+            string? providerAccountId = null;
             string? expectedPurchaseId = string.IsNullOrWhiteSpace(request.PurchaseId)
                 ? null
                 : request.PurchaseId.Trim();
@@ -322,7 +334,8 @@ public sealed partial class StoreSubscriptionVerifier
                     inAppElement,
                     request.ProductId,
                     expectedPurchaseId,
-                    out transactionId);
+                    out transactionId,
+                    out providerAccountId);
             }
 
             if (!matched
@@ -333,13 +346,16 @@ public sealed partial class StoreSubscriptionVerifier
                     latestReceiptsElement,
                     request.ProductId,
                     expectedPurchaseId,
-                    out transactionId);
+                    out transactionId,
+                    out providerAccountId);
             }
 
             return (Result.Success(new StoreProductVerificationResponse(
                 matched,
                 matched ? "purchased" : "not_purchased",
-                transactionId)), false);
+                transactionId,
+                ResolveAccountBindingState(providerAccountId, request.UserId),
+                ResolveBoundUserId(providerAccountId))), false);
         }
         catch (Exception ex)
         {
@@ -431,14 +447,21 @@ public sealed partial class StoreSubscriptionVerifier
         JsonElement receiptsArray,
         string expectedProductId,
         string? expectedPurchaseId,
-        out string? transactionId)
+        out string? transactionId,
+        out string? providerAccountId)
     {
         transactionId = null;
+        providerAccountId = null;
         foreach (var item in receiptsArray.EnumerateArray())
         {
             if (!item.TryGetProperty("product_id", out var productIdElement)
                 || productIdElement.ValueKind != JsonValueKind.String
                 || !string.Equals(productIdElement.GetString(), expectedProductId, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (HasAppStoreCancellationSignal(item))
             {
                 continue;
             }
@@ -456,10 +479,47 @@ public sealed partial class StoreSubscriptionVerifier
             }
 
             transactionId = candidateTransactionId;
+            providerAccountId = TryReadAppStoreAccountBinding(item);
             return true;
         }
 
         return false;
+    }
+
+    private static bool HasAppStoreCancellationSignal(JsonElement item)
+    {
+        return HasNonEmptyAppStoreReceiptValue(item, "cancellation_date")
+            || HasNonEmptyAppStoreReceiptValue(item, "cancellation_date_ms");
+    }
+
+    private static bool HasNonEmptyAppStoreReceiptValue(JsonElement item, string propertyName)
+    {
+        if (!item.TryGetProperty(propertyName, out var value))
+        {
+            return false;
+        }
+
+        return value.ValueKind switch
+        {
+            JsonValueKind.String => !string.IsNullOrWhiteSpace(value.GetString()),
+            JsonValueKind.Number => true,
+            _ => false
+        };
+    }
+
+    private static string? TryReadAppStoreAccountBinding(JsonElement receipt)
+    {
+        foreach (var propertyName in new[] { "app_account_token", "appAccountToken", "application_username" })
+        {
+            if (receipt.TryGetProperty(propertyName, out var valueElement)
+                && valueElement.ValueKind == JsonValueKind.String
+                && !string.IsNullOrWhiteSpace(valueElement.GetString()))
+            {
+                return valueElement.GetString();
+            }
+        }
+
+        return null;
     }
 
     private static bool HasExpectedAppStoreBundleId(JsonElement root, string expectedBundleId)

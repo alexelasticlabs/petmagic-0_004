@@ -37,32 +37,17 @@ public sealed partial class IdentityService
                 return Result.Failure<UserProfileResponse>(IdentityErrors.UserAlreadyExists);
             }
 
-            existing.DisplayName = command.DisplayName;
-            existing.TermsOfUseAccepted = command.TermsOfUseAccepted;
-            existing.TermsOfUseAcceptedAtUtc = command.TermsOfUseAccepted ? now : null;
-            existing.TermsOfUseAcceptedVersion = command.TermsOfUseAccepted ? termsOfUseVersion : null;
-            existing.PrivacyPolicyAccepted = command.PrivacyPolicyAccepted;
-            existing.PrivacyPolicyAcceptedAtUtc = command.PrivacyPolicyAccepted ? now : null;
-            existing.PrivacyPolicyAcceptedVersion = command.PrivacyPolicyAccepted ? privacyPolicyVersion : null;
-            existing.MarketingEmailsEnabled = command.MarketingEmailsEnabled;
-            existing.MarketingEmailsUpdatedAtUtc = now;
-            existing.IsActive = true;
-            existing.EmailConfirmed = false;
-            existing.AccountStatus = AccountStatus.PendingEmailVerification;
-            existing.AccountStatusUpdatedAtUtc = now;
-            existing.PasswordHash = userManager.PasswordHasher.HashPassword(existing, command.Password);
-            existing.SecurityStamp = Guid.NewGuid().ToString("N");
-
-            var updateExistingResult = await userManager.UpdateAsync(existing);
-            if (!updateExistingResult.Succeeded)
+            user = existing;
+            var resendResult = await RequestEmailConfirmationAsync(
+                new RequestEmailConfirmationCommand(email),
+                cancellationToken);
+            if (resendResult.IsFailure)
             {
-                return Result.Failure<UserProfileResponse>(IdentityErrors.OperationFailed);
+                return Result.Failure<UserProfileResponse>(resendResult.Error);
             }
 
-            user = existing;
-            await QueueEmailCodeAsync(user, EmailCodePurpose.EmailConfirmation, cancellationToken);
-            await WriteAuditAsync(user.Id, "user.registered.pending.reissue", "Pending registration reissued verification code.", cancellationToken);
-            LogAuthInformation("registration", user.Id, "pending_reissued");
+            await WriteAuditAsync(user.Id, "user.registered.pending.reissue", "Pending registration verification code requested again.", cancellationToken);
+            LogAuthInformation("registration", user.Id, "pending_resend_requested");
             var existingRoles = await userManager.GetRolesAsync(user);
             return Result.Success(ToUserProfileResponse(user, existingRoles.Count == 0 ? [SystemRoles.User] : existingRoles));
         }

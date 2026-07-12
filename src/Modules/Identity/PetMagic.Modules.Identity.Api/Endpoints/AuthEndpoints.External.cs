@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.Configuration;
 
 using PetMagic.Modules.Identity.Api.Authentication;
 using PetMagic.Modules.Identity.Application.Abstractions;
@@ -20,7 +21,13 @@ namespace PetMagic.Modules.Identity.Api.Endpoints;
 public static partial class AuthEndpoints
 {
 
-    private static IResult ExternalChallengeAsync(string provider, string? redirectUri, string? mode, string? linkTicket)
+    private static async Task<IResult> ExternalChallengeAsync(
+        string provider,
+        string? redirectUri,
+        string? mode,
+        string? linkTicket,
+        IConfiguration configuration,
+        IAuthenticationSchemeProvider authenticationSchemes)
     {
         var normalizedProvider = NormalizeExternalProvider(provider);
         string? normalizedRedirectUri = null;
@@ -29,9 +36,18 @@ public static partial class AuthEndpoints
             return ToExternalAuthProblem("auth.external_invalid", StatusCodes.Status400BadRequest);
         }
 
-        if (redirectUri is not null && !TryNormalizeMobileRedirectUri(redirectUri, out normalizedRedirectUri))
+        if (redirectUri is not null
+            && !TryNormalizeMobileRedirectUri(redirectUri, configuration, out normalizedRedirectUri))
         {
             return ToExternalAuthProblem("auth.external_invalid", StatusCodes.Status400BadRequest);
+        }
+
+        if (await authenticationSchemes.GetSchemeAsync(normalizedProvider) is null)
+        {
+            return BuildExternalCallbackErrorResult(
+                normalizedRedirectUri,
+                "auth.external_not_configured",
+                StatusCodes.Status404NotFound);
         }
 
         var callbackRedirectUri = $"/api/auth/external/callback?provider={normalizedProvider}";
@@ -60,6 +76,7 @@ public static partial class AuthEndpoints
         IIdentityService service,
         ExternalLoginCompletionStore completionStore,
         ExternalAccountLinkStore linkStore,
+        IConfiguration configuration,
         CancellationToken cancellationToken)
     {
         var normalizedProvider = NormalizeExternalProvider(provider);
@@ -69,7 +86,7 @@ public static partial class AuthEndpoints
         }
 
         var externalAuthResult = await httpContext.AuthenticateAsync(IdentityConstants.ExternalScheme);
-        var clientRedirectUri = ReadMobileRedirectUri(externalAuthResult.Properties);
+        var clientRedirectUri = ReadMobileRedirectUri(externalAuthResult.Properties, configuration);
         var flowMode = ReadAuthProperty(externalAuthResult.Properties, ExternalFlowModeProperty);
         var linkTicket = ReadAuthProperty(externalAuthResult.Properties, ExternalLinkTicketProperty);
         if (!externalAuthResult.Succeeded || externalAuthResult.Principal is null)
@@ -339,11 +356,13 @@ public static partial class AuthEndpoints
         return null;
     }
 
-    private static string? ReadMobileRedirectUri(AuthenticationProperties? properties)
+    private static string? ReadMobileRedirectUri(
+        AuthenticationProperties? properties,
+        IConfiguration configuration)
     {
         if (properties?.Items.TryGetValue(ExternalRedirectUriProperty, out var redirectUri) == true &&
             redirectUri is not null &&
-            TryNormalizeMobileRedirectUri(redirectUri, out var normalizedRedirectUri))
+            TryNormalizeMobileRedirectUri(redirectUri, configuration, out var normalizedRedirectUri))
         {
             return normalizedRedirectUri;
         }
@@ -351,7 +370,10 @@ public static partial class AuthEndpoints
         return null;
     }
 
-    private static bool TryNormalizeMobileRedirectUri(string redirectUri, out string? normalizedRedirectUri)
+    internal static bool TryNormalizeMobileRedirectUri(
+        string redirectUri,
+        IConfiguration configuration,
+        out string? normalizedRedirectUri)
     {
         normalizedRedirectUri = null;
 
@@ -360,9 +382,20 @@ public static partial class AuthEndpoints
             return false;
         }
 
-        if (!string.Equals(parsedUri.Scheme, MobileRedirectScheme, StringComparison.OrdinalIgnoreCase) ||
+        var allowedScheme = configuration[MobileRedirectSchemeConfigurationKey]?.Trim();
+        if (string.IsNullOrWhiteSpace(allowedScheme))
+        {
+            allowedScheme = DefaultMobileRedirectScheme;
+        }
+
+        if (!Uri.CheckSchemeName(allowedScheme)
+            || !string.Equals(parsedUri.Scheme, allowedScheme, StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(parsedUri.Host, MobileRedirectHost, StringComparison.OrdinalIgnoreCase) ||
-            !string.Equals(parsedUri.AbsolutePath, MobileRedirectPath, StringComparison.Ordinal))
+            !string.Equals(parsedUri.AbsolutePath, MobileRedirectPath, StringComparison.Ordinal) ||
+            !parsedUri.IsDefaultPort ||
+            !string.IsNullOrEmpty(parsedUri.UserInfo) ||
+            !string.IsNullOrEmpty(parsedUri.Query) ||
+            !string.IsNullOrEmpty(parsedUri.Fragment))
         {
             return false;
         }

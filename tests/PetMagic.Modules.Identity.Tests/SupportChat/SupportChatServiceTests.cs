@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Logging;
 
 using PetMagic.BuildingBlocks.Observability;
+using PetMagic.BuildingBlocks.Notifications;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Identity.Domain.Enums;
 using PetMagic.Modules.Identity.Infrastructure;
@@ -21,7 +22,7 @@ namespace PetMagic.Modules.Identity.Tests.SupportChat;
 public sealed class SupportChatServiceTests
 {
     [Fact]
-    public async Task OpenConversationAsync_ShouldCreateConversationAndInitialUnreadState()
+    public async Task OpenConversationAsync_ShouldCreateNormalPriorityConversationAndInitialUnreadState()
     {
         var store = CreateStore();
 
@@ -32,12 +33,12 @@ public sealed class SupportChatServiceTests
         var service = scope.CreateService();
 
         var result = await service.OpenConversationAsync(
-            new OpenSupportConversationCommand(userId, "  Help, please  ", SupportConversationPriority.High),
+            new OpenSupportConversationCommand(userId, "  Help, please  ", SupportConversationPriority.Normal),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal("New", result.Value.Status);
-        Assert.Equal("High", result.Value.Priority);
+        Assert.Equal("Normal", result.Value.Priority);
         var userMessage = Assert.Single(result.Value.Messages, message => message.SenderType == "User");
         Assert.Equal("Help, please", userMessage.Body);
         Assert.False(userMessage.IsFromAdmin);
@@ -48,7 +49,7 @@ public sealed class SupportChatServiceTests
         var conversation = await scope.SupportDbContext.SupportConversations.Include(x => x.Messages).SingleAsync();
         Assert.Equal(userId, conversation.InitiatorUserId);
         Assert.Equal(SupportConversationStatus.New, conversation.Status);
-        Assert.Equal(SupportConversationPriority.High, conversation.Priority);
+        Assert.Equal(SupportConversationPriority.Normal, conversation.Priority);
         Assert.Equal(3, conversation.Messages.Count);
     }
 
@@ -89,12 +90,10 @@ public sealed class SupportChatServiceTests
     }
 
     [Fact]
-    public async Task SendMessageAsync_ByAdmin_ShouldSucceedWhenPushNotifierFails_AndLogWarning()
+    public async Task SendMessageAsync_ByAdmin_ShouldNotPersistReplyWhenDurablePushEnqueueFails()
     {
-        var logger = new CapturingLogger<SupportChatService>();
         var store = CreateStore(
-            pushNotificationSender: new ThrowingSupportChatPushNotificationSender(),
-            logger: logger);
+            pushNotificationSender: new ThrowingSupportChatPushNotificationSender());
 
         var userId = Guid.NewGuid();
         var adminId = Guid.NewGuid();
@@ -110,28 +109,20 @@ public sealed class SupportChatServiceTests
             conversationId = openResult.Value.ConversationId;
         }
 
-        await using var sendScope = await store.CreateScopeAsync();
-        var sendResult = await sendScope.CreateService().SendMessageAsync(
-            new SendSupportMessageCommand(conversationId, adminId, "We are on it", true),
-            CancellationToken.None);
+        await AssignConversationForTestAsync(store, conversationId, adminId);
 
-        Assert.True(sendResult.IsSuccess);
-        var entry = Assert.Single(
-            logger.Entries,
-            x => x.LogLevel == LogLevel.Warning && Equals(x.Properties.GetValueOrDefault("Channel"), "push"));
-        Assert.Contains("Support chat notification fan-out failed.", entry.Message, StringComparison.Ordinal);
-        Assert.Equal("message_delivery", entry.Properties["Operation"]);
-        Assert.Equal("push", entry.Properties["Channel"]);
-        Assert.Equal(SafeLogValues.StableHash(conversationId.ToString("D")), entry.Properties["ConversationIdHash"]);
-        Assert.Equal(SafeLogValues.StableHash(userId.ToString("D")), entry.Properties["InitiatorUserIdHash"]);
-        Assert.Equal(SafeLogValues.StableHash(sendResult.Value.MessageId.ToString("D")), entry.Properties["MessageIdHash"]);
-        Assert.False(entry.Properties.ContainsKey("ConversationId"));
-        Assert.False(entry.Properties.ContainsKey("InitiatorUserId"));
-        Assert.False(entry.Properties.ContainsKey("MessageId"));
-        Assert.Equal("SupportAgent", entry.Properties["SenderType"]);
-        Assert.Equal(false, entry.Properties["HasAttachments"]);
-        Assert.Equal("InvalidOperationException", entry.Properties["ExceptionType"]);
-        Assert.Null(entry.Exception);
+        await using var sendScope = await store.CreateScopeAsync();
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sendScope.CreateService().SendMessageAsync(
+                new SendSupportMessageCommand(conversationId, adminId, "We are on it", true),
+                CancellationToken.None));
+        Assert.Equal("push provider is unavailable", exception.Message);
+
+        await using var verificationScope = await store.CreateScopeAsync();
+        var persistedConversation = await verificationScope.SupportDbContext.SupportConversations
+            .Include(x => x.Messages)
+            .SingleAsync(x => x.Id == conversationId);
+        Assert.DoesNotContain(persistedConversation.Messages, message => message.Body == "We are on it");
     }
 
     [Fact]
@@ -153,6 +144,8 @@ public sealed class SupportChatServiceTests
 
             conversationId = openResult.Value.ConversationId;
         }
+
+        await AssignConversationForTestAsync(store, conversationId, adminId);
 
         await using (var sendScope = await store.CreateScopeAsync())
         {
@@ -243,6 +236,44 @@ public sealed class SupportChatServiceTests
 
         Assert.True(assignResult.IsFailure);
         Assert.Equal("support.assigned_admin_invalid", assignResult.Error.Code);
+    }
+
+    [Fact]
+    public async Task UnassignedConversation_ShouldRejectAdminReplyStatusAndMetadataMutations()
+    {
+        var store = CreateStore();
+        var userId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
+        await SeedUserAsync(store, adminId, "admin@petmagic.test", "Support Admin", SystemRoles.Admin);
+
+        Guid conversationId;
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            conversationId = (await openScope.CreateService().OpenConversationAsync(
+                new OpenSupportConversationCommand(userId, "Ownership required", SupportConversationPriority.Normal),
+                CancellationToken.None)).Value.ConversationId;
+        }
+
+        await using var mutationScope = await store.CreateScopeAsync();
+        var service = mutationScope.CreateService();
+        var reply = await service.SendMessageAsync(
+            new SendSupportMessageCommand(conversationId, adminId, "Reply", true),
+            CancellationToken.None);
+        var status = await service.UpdateConversationStatusAsync(
+            new UpdateSupportConversationStatusCommand(conversationId, adminId, SupportConversationStatus.Closed),
+            CancellationToken.None);
+        var metadata = await service.UpdateConversationMetadataAsync(
+            new UpdateSupportConversationMetadataCommand(
+                conversationId,
+                adminId,
+                SupportConversationPriority.High,
+                ["ownership"]),
+            CancellationToken.None);
+
+        Assert.Equal("support.conversation_not_owned", reply.Error.Code);
+        Assert.Equal("support.conversation_not_owned", status.Error.Code);
+        Assert.Equal("support.conversation_not_owned", metadata.Error.Code);
     }
 
     [Fact]
@@ -850,6 +881,8 @@ public sealed class SupportChatServiceTests
                 .MessageId;
         }
 
+        await AssignConversationForTestAsync(store, conversationId, adminId);
+
         await using var sendScope = await store.CreateScopeAsync();
         var sendResult = await sendScope.CreateService().SendMessageAsync(
             new SendSupportMessageCommand(
@@ -903,7 +936,7 @@ public sealed class SupportChatServiceTests
     }
 
     [Fact]
-    public async Task AssignConversationAsync_ShouldUpdateAssignedAdmin()
+    public async Task AssignConversationAsync_ShouldRejectStealingAnotherOperatorsTicket()
     {
         var store = CreateStore();
 
@@ -923,23 +956,69 @@ public sealed class SupportChatServiceTests
             conversationId = openResult.Value.ConversationId;
         }
 
-        await using (var sendScope = await store.CreateScopeAsync())
+        await using (var claimScope = await store.CreateScopeAsync())
         {
-            var sendResult = await sendScope.CreateService().SendMessageAsync(
-                new SendSupportMessageCommand(conversationId, adminAId, "Taking this case", true),
+            var claimResult = await claimScope.CreateService().AssignConversationAsync(
+                new AssignSupportConversationCommand(conversationId, adminAId, adminAId),
                 CancellationToken.None);
 
-            Assert.True(sendResult.IsSuccess);
+            Assert.True(claimResult.IsSuccess);
         }
 
         await using var assignScope = await store.CreateScopeAsync();
         var assignResult = await assignScope.CreateService().AssignConversationAsync(
-            new AssignSupportConversationCommand(conversationId, adminAId, adminBId),
+            new AssignSupportConversationCommand(conversationId, adminBId, adminBId),
             CancellationToken.None);
 
-        Assert.True(assignResult.IsSuccess);
-        Assert.Equal(adminBId, assignResult.Value.AssignedAdminId);
-        Assert.Equal("Support Admin B", assignResult.Value.AssignedAdminDisplayName);
+        Assert.True(assignResult.IsFailure);
+        Assert.Equal("support.conversation_already_assigned", assignResult.Error.Code);
+    }
+
+    [Fact]
+    public async Task AssignConversationAsync_ShouldCommitAndQueueAuditWhenImmediateAuditSinkFails()
+    {
+        var store = CreateStore(adminAuditLog: new ThrowingAdminAuditLog());
+        var userId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        await SeedUserAsync(store, userId, "audit-user@petmagic.test", "Audit User");
+        await SeedUserAsync(store, adminId, "audit-admin@petmagic.test", "Audit Admin", SystemRoles.Admin);
+
+        Guid conversationId;
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            conversationId = (await openScope.CreateService().OpenConversationAsync(
+                new OpenSupportConversationCommand(userId, "Audit durability", SupportConversationPriority.Normal),
+                CancellationToken.None)).Value.ConversationId;
+        }
+
+        await using (var assignmentScope = await store.CreateScopeAsync())
+        {
+            var result = await assignmentScope.CreateService().AssignConversationAsync(
+                new AssignSupportConversationCommand(conversationId, adminId, adminId),
+                CancellationToken.None);
+
+            Assert.True(result.IsSuccess);
+            Assert.Equal(adminId, result.Value.AssignedAdminId);
+        }
+
+        var retryAuditLog = new CapturingAdminAuditLog();
+        await using var retryScope = await store.CreateScopeAsync();
+        var queued = await retryScope.SupportDbContext.PushOutboxMessages.SingleAsync();
+        Assert.Equal(SupportChatPushNotificationOutbox.AdminAuditKind, queued.Kind);
+        Assert.Equal(PushOutboxStatus.Queued, queued.Status);
+        var processor = new SupportChatPushOutboxProcessor(
+            retryScope.SupportDbContext,
+            new NoopPushDeliverySender(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<SupportChatPushOutboxProcessor>.Instance,
+            retryAuditLog);
+
+        Assert.True(await processor.ProcessNextAsync(CancellationToken.None));
+
+        Assert.Equal(PushOutboxStatus.Sent, queued.Status);
+        var retriedAudit = Assert.Single(retryAuditLog.Entries);
+        Assert.Equal("admin.support.ticket.assigned", retriedAudit.Action);
+        Assert.Equal(adminId, retriedAudit.ActorUserId);
+        Assert.Equal(userId, retriedAudit.SubjectUserId);
     }
 
     [Fact]
@@ -968,6 +1047,8 @@ public sealed class SupportChatServiceTests
                 new OpenSupportConversationCommand(userB, "Unassigned issue", SupportConversationPriority.Normal),
                 CancellationToken.None)).Value.ConversationId;
         }
+
+        await AssignConversationForTestAsync(store, assignedConversationId, adminId);
 
         await using (var replyScope = await store.CreateScopeAsync())
         {
@@ -1026,12 +1107,22 @@ public sealed class SupportChatServiceTests
                 new OpenSupportConversationCommand(normalUserId, "Normal case", SupportConversationPriority.Normal),
                 CancellationToken.None)).Value.ConversationId;
             highConversationId = (await service.OpenConversationAsync(
-                new OpenSupportConversationCommand(highUserId, "High case", SupportConversationPriority.High),
+                new OpenSupportConversationCommand(highUserId, "High case", SupportConversationPriority.Normal),
                 CancellationToken.None)).Value.ConversationId;
             waitingConversationId = (await service.OpenConversationAsync(
                 new OpenSupportConversationCommand(waitingUserId, "Waiting case", SupportConversationPriority.Normal),
                 CancellationToken.None)).Value.ConversationId;
         }
+
+        await using (var priorityScope = await store.CreateScopeAsync())
+        {
+            var highConversation = await priorityScope.SupportDbContext.SupportConversations
+                .SingleAsync(x => x.Id == highConversationId);
+            highConversation.Priority = SupportConversationPriority.High;
+            await priorityScope.SupportDbContext.SaveChangesAsync();
+        }
+
+        await AssignConversationForTestAsync(store, waitingConversationId, adminId);
 
         await using (var replyScope = await store.CreateScopeAsync())
         {
@@ -1111,6 +1202,7 @@ public sealed class SupportChatServiceTests
             var assignResult = await service.AssignConversationAsync(
                 new AssignSupportConversationCommand(assignedConversationId, adminId, adminId),
                 CancellationToken.None);
+            await AssignConversationForTestAsync(store, waitingConversationId, adminId);
             var replyResult = await service.SendMessageAsync(
                 new SendSupportMessageCommand(waitingConversationId, adminId, "Please send details", true),
                 CancellationToken.None);
@@ -1151,6 +1243,8 @@ public sealed class SupportChatServiceTests
                 new OpenSupportConversationCommand(userId, "Legacy alias case", SupportConversationPriority.Normal),
                 CancellationToken.None)).Value.ConversationId;
         }
+
+        await AssignConversationForTestAsync(store, conversationId, adminId);
 
         await using (var closeScope = await store.CreateScopeAsync())
         {
@@ -1329,6 +1423,8 @@ public sealed class SupportChatServiceTests
                 CancellationToken.None)).Value.ConversationId;
         }
 
+        await AssignConversationForTestAsync(store, assignedConversationId, adminId);
+
         await using (var mutateScope = await store.CreateScopeAsync())
         {
             var service = mutateScope.CreateService();
@@ -1377,6 +1473,8 @@ public sealed class SupportChatServiceTests
             conversationId = openResult.Value.ConversationId;
         }
 
+        await AssignConversationForTestAsync(store, conversationId, adminId);
+
         await using (var sendScope = await store.CreateScopeAsync())
         {
             await sendScope.CreateService().SendMessageAsync(
@@ -1422,6 +1520,8 @@ public sealed class SupportChatServiceTests
                 CancellationToken.None);
             conversationId = openResult.Value.ConversationId;
         }
+
+        await AssignConversationForTestAsync(store, conversationId, adminId);
 
         await using (var updateScope = await store.CreateScopeAsync())
         {
@@ -1474,6 +1574,8 @@ public sealed class SupportChatServiceTests
             conversationId = openResult.Value.ConversationId;
         }
 
+        await AssignConversationForTestAsync(store, conversationId, adminId);
+
         await using (var closeScope = await store.CreateScopeAsync())
         {
             var closeResult = await closeScope.CreateService().UpdateConversationStatusAsync(
@@ -1519,6 +1621,8 @@ public sealed class SupportChatServiceTests
                 CancellationToken.None);
             conversationId = openResult.Value.ConversationId;
         }
+
+        await AssignConversationForTestAsync(store, conversationId, adminId);
 
         await using (var resolveScope = await store.CreateScopeAsync())
         {
@@ -1598,6 +1702,11 @@ public sealed class SupportChatServiceTests
                 new OpenSupportConversationCommand(userId, "Need help", SupportConversationPriority.Normal),
                 CancellationToken.None)).Value.ConversationId;
 
+            var assignedConversation = await openScope.SupportDbContext.SupportConversations
+                .SingleAsync(x => x.Id == conversationId);
+            assignedConversation.AssignedAdminId = adminId;
+            await openScope.SupportDbContext.SaveChangesAsync();
+
             var closeResult = await service.UpdateConversationStatusAsync(
                 new UpdateSupportConversationStatusCommand(conversationId, adminId, SupportConversationStatus.Closed),
                 CancellationToken.None);
@@ -1666,14 +1775,16 @@ public sealed class SupportChatServiceTests
     private static TestStore CreateStore(
         ISupportChatRealtimeNotifier? realtimeNotifier = null,
         ISupportChatPushNotificationSender? pushNotificationSender = null,
-        ILogger<SupportChatService>? logger = null)
+        ILogger<SupportChatService>? logger = null,
+        IAdminAuditLog? adminAuditLog = null)
     {
         return new TestStore(
             $"support-chat-tests-{Guid.NewGuid():N}",
             $"support-chat-identity-tests-{Guid.NewGuid():N}",
             realtimeNotifier,
             pushNotificationSender,
-            logger);
+            logger,
+            adminAuditLog);
     }
 
     private static async Task SeedUserAsync(
@@ -1739,16 +1850,31 @@ public sealed class SupportChatServiceTests
         }
     }
 
+    private static async Task AssignConversationForTestAsync(
+        TestStore store,
+        Guid conversationId,
+        Guid adminId)
+    {
+        await using var scope = await store.CreateScopeAsync();
+        var conversation = await scope.SupportDbContext.SupportConversations
+            .SingleAsync(x => x.Id == conversationId);
+        conversation.AssignedAdminId = adminId;
+        conversation.UpdatedAtUtc = DateTime.UtcNow;
+        await scope.SupportDbContext.SaveChangesAsync();
+    }
+
     private sealed class TestStore(
         string supportDatabaseName,
         string identityDatabaseName,
         ISupportChatRealtimeNotifier? realtimeNotifier = null,
         ISupportChatPushNotificationSender? pushNotificationSender = null,
-        ILogger<SupportChatService>? logger = null)
+        ILogger<SupportChatService>? logger = null,
+        IAdminAuditLog? adminAuditLog = null)
     {
         private readonly ISupportChatRealtimeNotifier notifier = realtimeNotifier ?? new FakeSupportChatRealtimeNotifier();
         private readonly ISupportChatPushNotificationSender pushNotifier = pushNotificationSender ?? new NoopSupportChatPushNotificationSender();
         private readonly ILogger<SupportChatService>? supportLogger = logger;
+        private readonly IAdminAuditLog? auditLog = adminAuditLog;
 
         public IReadOnlyList<SupportConversationRealtimeEvent> Notifications => notifier is FakeSupportChatRealtimeNotifier fakeNotifier
             ? fakeNotifier.Events
@@ -1768,7 +1894,7 @@ public sealed class SupportChatServiceTests
             await identityDbContext.Database.EnsureCreatedAsync();
             await supportDbContext.Database.EnsureCreatedAsync();
 
-            return new TestScope(supportDbContext, identityDbContext, notifier, pushNotifier, supportLogger);
+            return new TestScope(supportDbContext, identityDbContext, notifier, pushNotifier, supportLogger, auditLog);
         }
     }
 
@@ -1777,7 +1903,8 @@ public sealed class SupportChatServiceTests
         IdentityDbContext identityDbContext,
         ISupportChatRealtimeNotifier realtimeNotifier,
         ISupportChatPushNotificationSender pushNotificationSender,
-        ILogger<SupportChatService>? logger) : IAsyncDisposable
+        ILogger<SupportChatService>? logger,
+        IAdminAuditLog? adminAuditLog) : IAsyncDisposable
     {
         public SupportChatDbContext SupportDbContext { get; } = supportDbContext;
 
@@ -1805,7 +1932,8 @@ public sealed class SupportChatServiceTests
                 {
                     PublicBaseUrl = "http://localhost:5000"
                 },
-                logger);
+                logger,
+                adminAuditLog: adminAuditLog);
         }
 
         public async ValueTask DisposeAsync()
@@ -1859,6 +1987,30 @@ public sealed class SupportChatServiceTests
         public Task NotifyUserAsync(SupportChatPushNotification notification, CancellationToken cancellationToken)
         {
             throw new InvalidOperationException("push provider is unavailable");
+        }
+    }
+
+    private sealed class NoopPushDeliverySender : ISupportChatPushDeliverySender
+    {
+        public Task<PushDeliveryResult> DeliverUserAsync(
+            SupportChatPushNotification notification,
+            CancellationToken cancellationToken) => Task.FromResult(PushDeliveryResult.Delivered);
+    }
+
+    private sealed class ThrowingAdminAuditLog : IAdminAuditLog
+    {
+        public Task WriteAsync(AdminAuditEntry entry, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("audit sink unavailable");
+    }
+
+    private sealed class CapturingAdminAuditLog : IAdminAuditLog
+    {
+        public List<AdminAuditEntry> Entries { get; } = [];
+
+        public Task WriteAsync(AdminAuditEntry entry, CancellationToken cancellationToken)
+        {
+            Entries.Add(entry);
+            return Task.CompletedTask;
         }
     }
 

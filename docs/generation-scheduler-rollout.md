@@ -112,6 +112,9 @@ Required checks:
   not change for the rejected request.
 - Cancelling a queued charged generation refunds once. Repeating the cancel request must not create a
   second `economy_wallet_ledger` row with `Source='generation_refund'` for the same generation.
+- Admin cancellation of a validated FAL `ProviderQueued` or `ProviderProcessing` generation refunds
+  only after FAL confirms `202 CANCELLATION_REQUESTED`; `ALREADY_COMPLETED` and `NOT_FOUND` restore
+  the active state without a refund.
 - Completed and failed generations publish realtime status changes and terminal analytics.
 - Failed charged generations are refunded by the worker retry/refund path.
 - `templates_realtime_events` remains bounded by retention during active event flow.
@@ -236,9 +239,10 @@ Invoke-RestMethod `
 Supported scenarios:
 
 - `queued`: charged image job that remains `Queued`; cancel is available and should refund once.
-- `providerQueued`: video job in `ProviderQueued`; cancel is unavailable.
+- `providerQueued`: video job in `ProviderQueued`; the admin cancel route is available only when its
+  FAL model, request id and trusted cancellation URL validate.
 - `providerProcessing`: video job in `ProviderProcessing`; polling and realtime status evidence are
-  available.
+  available, and the same validated admin cancellation rule applies.
 - `importingMedia`: video job in `ImportingMedia`; cancel is unavailable.
 - `failed`: charged image job in `Failed` with a user-facing provider error and an immediate refund.
 - `waitTooLongImage` / `waitTooLongVideo`: system-owned backlog jobs that make the next normal
@@ -366,11 +370,11 @@ Default checks:
 - when `STAGING_FAILING_TEMPLATE_ID` is set, one extra generation is submitted and must reach
   terminal `failed` status;
 - when QA fixtures are enabled, deterministic `ProviderQueued`, `ProviderProcessing`,
-  `ImportingMedia`, `Failed`, queued cancel, and `GENERATION_WAIT_TOO_LONG` fixture probes are
-  created and cleaned up through the API;
+  `ImportingMedia`, `Failed`, queued cancel, validated provider-cancel outcomes, and
+  `GENERATION_WAIT_TOO_LONG` fixture probes are created and cleaned up through the API;
 - `GENERATION_WAIT_TOO_LONG`, when observed, does not change the submitting user's wallet balance;
 - `GENERATION_WAIT_TOO_LONG` includes structured queue metadata and does not create an active job;
-- queued cancel refund ledger rows are not duplicated and charged cancels refund exactly once;
+- confirmed cancellation refund ledger rows are not duplicated and charged cancels refund exactly once;
 - the failing template reaches terminal `failed`, is refund-safe, and has no duplicate refund ledger
   rows;
 - Premium queue evidence is not worse than comparable Free work for image and video lanes;

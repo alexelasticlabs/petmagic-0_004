@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 using PetMagic.BuildingBlocks.Observability;
+using PetMagic.BuildingBlocks.Notifications;
 using PetMagic.Modules.Identity.Domain.Enums;
 using PetMagic.Modules.Identity.Infrastructure.Data;
 using PetMagic.Modules.Identity.Infrastructure.Entities;
@@ -25,6 +26,18 @@ internal sealed class EmailDispatchProcessor(
             return false;
         }
 
+        PushOutboxMetrics.RecordAttempt("identity_email");
+
+        if (job.AttemptCount > options.MaxDispatchAttempts)
+        {
+            await MarkFailedAsync(
+                job,
+                "email.dispatch_attempts_exhausted",
+                "Email dispatch lease expired after the maximum number of attempts.",
+                cancellationToken);
+            return true;
+        }
+
         var sent = await emailSender.SendAsync(job, cancellationToken);
         if (sent.IsSuccess)
         {
@@ -34,7 +47,13 @@ internal sealed class EmailDispatchProcessor(
             job.NextAttemptAtUtc = null;
             job.FailureCode = null;
             job.FailureMessage = null;
-            await dbContext.SaveChangesAsync(cancellationToken);
+            job.LockId = null;
+            job.LockExpiresAtUtc = null;
+            if (await TrySaveLeaseResultAsync(job, cancellationToken))
+            {
+                PushOutboxMetrics.RecordSent("identity_email");
+            }
+
             return true;
         }
 
@@ -77,6 +96,8 @@ internal sealed class EmailDispatchProcessor(
     private async Task<EmailDispatchJob?> ClaimNextPostgresAsync(CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
+        var lockId = Guid.NewGuid();
+        var lockExpiresAtUtc = now.AddSeconds(Math.Max(30, options.ProcessingLeaseSeconds));
         var claimedIds = await dbContext.Database.SqlQueryRaw<Guid>(
             """
             UPDATE email_dispatch_jobs
@@ -85,13 +106,17 @@ internal sealed class EmailDispatchProcessor(
                 "LastAttemptAtUtc" = {2},
                 "UpdatedAtUtc" = {2},
                 "FailureCode" = NULL,
-                "FailureMessage" = NULL
+                "FailureMessage" = NULL,
+                "LockId" = {4},
+                "LockExpiresAtUtc" = {5}
             WHERE "Id" = (
                 SELECT "Id"
                 FROM email_dispatch_jobs
-                WHERE "Status" = {0}
-                  AND ("NextAttemptAtUtc" IS NULL OR "NextAttemptAtUtc" <= {2})
-                  AND "AttemptCount" < {3}
+                WHERE (("Status" = {0}
+                          AND ("NextAttemptAtUtc" IS NULL OR "NextAttemptAtUtc" <= {2})
+                          AND "AttemptCount" < {3})
+                       OR ("Status" = {1}
+                          AND ("LockExpiresAtUtc" IS NULL OR "LockExpiresAtUtc" <= {2})))
                 ORDER BY "QueuedAtUtc"
                 FOR UPDATE SKIP LOCKED
                 LIMIT 1
@@ -101,7 +126,9 @@ internal sealed class EmailDispatchProcessor(
             (int)EmailDispatchStatus.Queued,
             (int)EmailDispatchStatus.Processing,
             now,
-            options.MaxDispatchAttempts)
+            options.MaxDispatchAttempts,
+            lockId,
+            lockExpiresAtUtc)
             .ToListAsync(cancellationToken);
 
         var claimedId = claimedIds.FirstOrDefault();
@@ -118,9 +145,11 @@ internal sealed class EmailDispatchProcessor(
     {
         var now = DateTime.UtcNow;
         var job = await dbContext.EmailDispatchJobs
-            .Where(x => x.Status == EmailDispatchStatus.Queued
-                && (x.NextAttemptAtUtc == null || x.NextAttemptAtUtc <= now)
-                && x.AttemptCount < options.MaxDispatchAttempts)
+            .Where(x => ((x.Status == EmailDispatchStatus.Queued
+                        && (x.NextAttemptAtUtc == null || x.NextAttemptAtUtc <= now)
+                        && x.AttemptCount < options.MaxDispatchAttempts)
+                    || (x.Status == EmailDispatchStatus.Processing
+                        && (x.LockExpiresAtUtc == null || x.LockExpiresAtUtc <= now))))
             .OrderBy(x => x.QueuedAtUtc)
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -135,6 +164,8 @@ internal sealed class EmailDispatchProcessor(
         job.UpdatedAtUtc = now;
         job.FailureCode = null;
         job.FailureMessage = null;
+        job.LockId = Guid.NewGuid();
+        job.LockExpiresAtUtc = now.AddSeconds(Math.Max(30, options.ProcessingLeaseSeconds));
         await dbContext.SaveChangesAsync(cancellationToken);
         return job;
     }
@@ -146,11 +177,29 @@ internal sealed class EmailDispatchProcessor(
         job.FailureCode = safeErrorCode;
         job.FailureMessage = SafeLogValues.SanitizeText(errorMessage, 2000);
         job.UpdatedAtUtc = now;
+        job.LockId = null;
+        job.LockExpiresAtUtc = null;
 
-        if (job.AttemptCount >= options.MaxDispatchAttempts)
+        var exhausted = job.AttemptCount >= options.MaxDispatchAttempts;
+        if (exhausted)
         {
             job.Status = EmailDispatchStatus.Failed;
             job.NextAttemptAtUtc = null;
+        }
+        else
+        {
+            job.Status = EmailDispatchStatus.Queued;
+            job.NextAttemptAtUtc = now.AddSeconds(options.RetryDelaySeconds);
+        }
+
+        if (!await TrySaveLeaseResultAsync(job, cancellationToken))
+        {
+            return;
+        }
+
+        if (exhausted)
+        {
+            PushOutboxMetrics.RecordDeadLetter("identity_email");
             logger.LogWarning(
                 "Email dispatch exhausted attempts. EmailJobIdHash={EmailJobIdHash} ErrorCode={ErrorCode}",
                 SafeLogValues.StableHash(job.Id.ToString("D")),
@@ -158,14 +207,30 @@ internal sealed class EmailDispatchProcessor(
         }
         else
         {
-            job.Status = EmailDispatchStatus.Queued;
-            job.NextAttemptAtUtc = now.AddSeconds(options.RetryDelaySeconds);
+            PushOutboxMetrics.RecordRetry("identity_email");
             logger.LogWarning(
                 "Email dispatch failed. EmailJobIdHash={EmailJobIdHash} ErrorCode={ErrorCode}",
                 SafeLogValues.StableHash(job.Id.ToString("D")),
                 safeErrorCode);
         }
+    }
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+    private async Task<bool> TrySaveLeaseResultAsync(
+        EmailDispatchJob job,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            dbContext.ChangeTracker.Clear();
+            logger.LogInformation(
+                "Email dispatch completion ignored because the processing lease was reclaimed. EmailJobIdHash={EmailJobIdHash}",
+                SafeLogValues.StableHash(job.Id.ToString("D")));
+            return false;
+        }
     }
 }

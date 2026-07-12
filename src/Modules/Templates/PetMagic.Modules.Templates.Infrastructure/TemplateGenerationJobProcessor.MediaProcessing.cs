@@ -94,15 +94,19 @@ internal sealed partial class TemplateGenerationJobProcessor
         job.UpdatedAtUtc = job.PreprocessingCompletedAtUtc.Value;
         if (UsesFakeAiProvider())
         {
+            var fakeStoredOutput = await generatedMediaImporter.ImportImageAsync(
+                generated.Value.ImageUrl,
+                job.Id,
+                cancellationToken);
+            if (fakeStoredOutput.IsFailure)
+            {
+                await MarkFailedAsync(job, fakeStoredOutput.Error, cancellationToken);
+                return;
+            }
+
             await CompleteFakeGeneratedMediaAsync(
                 job,
-                new StoredMediaResponse(
-                    generated.Value.ImageUrl,
-                    generated.Value.ImageUrl,
-                    $"generation-{job.Id:N}.png",
-                    "image/png",
-                    null,
-                    null),
+                fakeStoredOutput.Value,
                 TemplateType.Image,
                 cancellationToken);
             return;
@@ -164,7 +168,7 @@ internal sealed partial class TemplateGenerationJobProcessor
             "Template generation result uploaded. ElapsedMs={ElapsedMs}",
             ElapsedMsBetween(job.StartedAtUtc, job.MediaImportCompletedAtUtc));
         TemplateGenerationMetrics.RecordJobCompleted(job);
-        await NotifyGamificationAsync(job, cancellationToken);
+        await SyncGamificationAsync(job, cancellationToken);
         await PublishStatusChangedAsync(job, cancellationToken);
         logger.LogInformation(
             "Template generation job completed. ElapsedMs={ElapsedMs}",
@@ -273,15 +277,19 @@ internal sealed partial class TemplateGenerationJobProcessor
         job.UpdatedAtUtc = job.MotionGenerationCompletedAtUtc.Value;
         if (UsesFakeAiProvider())
         {
+            var fakeStoredOutput = await generatedMediaImporter.ImportVideoAsync(
+                generated.Value.VideoUrl,
+                job.Id,
+                cancellationToken);
+            if (fakeStoredOutput.IsFailure)
+            {
+                await MarkFailedAsync(job, fakeStoredOutput.Error, cancellationToken);
+                return;
+            }
+
             await CompleteFakeGeneratedMediaAsync(
                 job,
-                new StoredMediaResponse(
-                    generated.Value.VideoUrl,
-                    generated.Value.VideoUrl,
-                    $"generation-{job.Id:N}.mp4",
-                    "video/mp4",
-                    null,
-                    null),
+                fakeStoredOutput.Value,
                 TemplateType.Video,
                 cancellationToken);
             return;
@@ -353,7 +361,7 @@ internal sealed partial class TemplateGenerationJobProcessor
             "Template generation result uploaded. ElapsedMs={ElapsedMs}",
             ElapsedMsBetween(job.StartedAtUtc, job.MediaImportCompletedAtUtc));
         TemplateGenerationMetrics.RecordJobCompleted(job);
-        await NotifyGamificationAsync(job, cancellationToken);
+        await SyncGamificationAsync(job, cancellationToken);
         await PublishStatusChangedAsync(job, cancellationToken);
         logger.LogInformation(
             "Template generation job completed. ElapsedMs={ElapsedMs}",
@@ -387,7 +395,7 @@ internal sealed partial class TemplateGenerationJobProcessor
             "Template generation fake result recorded. ElapsedMs={ElapsedMs}",
             ElapsedMsBetween(job.StartedAtUtc, job.MediaImportCompletedAtUtc));
         TemplateGenerationMetrics.RecordJobCompleted(job);
-        await NotifyGamificationAsync(job, cancellationToken);
+        await SyncGamificationAsync(job, cancellationToken);
         await PublishStatusChangedAsync(job, cancellationToken);
         logger.LogInformation(
             "Template generation job completed. ElapsedMs={ElapsedMs}",

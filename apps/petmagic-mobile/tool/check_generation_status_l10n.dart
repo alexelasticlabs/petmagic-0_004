@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'l10n_same_value_allowlist.dart';
+
 void main() {
   final root = Directory.current;
   final l10nDir = Directory('${root.path}/lib/l10n');
@@ -112,6 +114,9 @@ void main() {
             final localValue = localeMap[key];
             final enValue = enMap[key];
             if (localValue is! String || enValue is! String) {
+              return false;
+            }
+            if (isSameValueAllowed(localeCode, key)) {
               return false;
             }
             return localValue.trim() == enValue.trim();

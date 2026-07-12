@@ -149,7 +149,7 @@ class _SettingsFeedbackSheet extends StatefulWidget {
 }
 
 class _SettingsFeedbackSheetState extends State<_SettingsFeedbackSheet> {
-  late (String, String, String) _selected = widget.copy.options.first;
+  (String, String, String)? _selected;
   final _messageController = TextEditingController();
 
   @override
@@ -207,6 +207,7 @@ class _SettingsFeedbackSheetState extends State<_SettingsFeedbackSheet> {
                   controller: _messageController,
                   minLines: 3,
                   maxLines: 5,
+                  maxLength: 2000,
                   decoration: InputDecoration(
                     labelText: copy.messageLabel,
                     hintText: copy.messageHint,
@@ -214,16 +215,24 @@ class _SettingsFeedbackSheetState extends State<_SettingsFeedbackSheet> {
                 ),
                 const SizedBox(height: 14),
                 FilledButton(
-                  onPressed: () {
-                    final trimmedMessage = _messageController.text.trim();
-                    Navigator.of(context).pop(
-                      _SettingsFeedbackDraft(
-                        type: _selected.$1,
-                        category: _selected.$2,
-                        message: trimmedMessage.isEmpty ? null : trimmedMessage,
-                      ),
-                    );
-                  },
+                  onPressed: _selected == null
+                      ? null
+                      : () {
+                          final trimmedMessage = _messageController.text.trim();
+                          final selected = _selected;
+                          if (selected == null) {
+                            return;
+                          }
+                          Navigator.of(context).pop(
+                            _SettingsFeedbackDraft(
+                              type: selected.$1,
+                              category: selected.$2,
+                              message: trimmedMessage.isEmpty
+                                  ? null
+                                  : trimmedMessage,
+                            ),
+                          );
+                        },
                   child: Text(copy.submit),
                 ),
               ],

@@ -74,21 +74,22 @@ public sealed class ExternalAccountLinkStore(
         }
         catch (JsonException)
         {
-            await ConsumeAndClearAsync(dbContext, persisted, now, cancellationToken);
+            await TryConsumeAndClearAsync(dbContext, persisted, now, cancellationToken);
             return null;
         }
 
         if (userId == Guid.Empty)
         {
-            await ConsumeAndClearAsync(dbContext, persisted, now, cancellationToken);
+            await TryConsumeAndClearAsync(dbContext, persisted, now, cancellationToken);
             return null;
         }
 
-        await ConsumeAndClearAsync(dbContext, persisted, now, cancellationToken);
-        return userId;
+        return await TryConsumeAndClearAsync(dbContext, persisted, now, cancellationToken)
+            ? userId
+            : null;
     }
 
-    private static Task ConsumeAndClearAsync(
+    private static async Task<bool> TryConsumeAndClearAsync(
         IdentityDbContext dbContext,
         ExternalAuthTicket ticket,
         DateTime consumedAtUtc,
@@ -96,6 +97,14 @@ public sealed class ExternalAccountLinkStore(
     {
         ticket.ConsumedAtUtc = consumedAtUtc;
         ticket.PayloadJson = "\"\"";
-        return dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return false;
+        }
     }
 }

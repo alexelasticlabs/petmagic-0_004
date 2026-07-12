@@ -300,6 +300,10 @@ void main() {
     );
     expect(routeBody, contains('_pendingRoute = route'));
     expect(deepLinkBody, contains('if (!mounted)'));
+    expect(
+      deepLinkBody,
+      contains('AppConfig.isExpectedDeepLinkScheme(uri.scheme)'),
+    );
     expect(initialLinkBody, contains('if (!mounted)'));
     expect(deepLinkBody, contains('_openRoute('));
     expect(
@@ -307,6 +311,11 @@ void main() {
       contains('_queueCheckoutVerification(sessionId: sessionId);'),
     );
     expect(deepLinkBody, contains('_queueCheckoutVerification();'));
+    expect(
+      deepLinkBody,
+      contains('_openRoute(SubscriptionManagementPage.routePath);'),
+    );
+    expect(source, contains('_isSubscriptionManagementRoute(route)'));
     expect(initialLinkBody, isNot(contains('Firebase.apps')));
     expect(
       flushPendingBody,

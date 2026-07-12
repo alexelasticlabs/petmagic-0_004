@@ -62,24 +62,10 @@ internal sealed partial class TemplateGenerationService
         Guid generationId,
         CancellationToken cancellationToken)
     {
-        if (!options.CancelQueuedGenerationEnabled)
-        {
-            return Result.Failure<TemplateGenerationResponse>(TemplatesErrors.GenerationCancelDisabled);
-        }
-
-        var job = await dbContext.TemplateGenerationJobs
-            .Include(x => x.Template)
-            .Include(x => x.WatermarkUnlocks)
-            .FirstOrDefaultAsync(x => x.Id == generationId && x.HiddenByUserAtUtc == null, cancellationToken);
-        if (job is null)
-        {
-            return Result.Failure<TemplateGenerationResponse>(TemplatesErrors.GenerationJobNotFound);
-        }
-
-        var cancelled = await CancelQueuedJobAsync(job, adminUserId, cancellationToken);
+        var cancelled = await CancelAdminAsync(adminUserId, generationId, cancellationToken);
         return cancelled.IsFailure
             ? Result.Failure<TemplateGenerationResponse>(cancelled.Error)
-            : Result.Success(cancelled.Value.Response);
+            : Result.Success(cancelled.Value.Generation);
     }
 
     public async Task<Result<TemplateGenerationResponse>> RetryAdminGenerationAsync(
@@ -250,14 +236,24 @@ internal sealed partial class TemplateGenerationService
         job.PreprocessingProviderRequestId = null;
         job.PreprocessingProviderStatusUrl = null;
         job.PreprocessingProviderResponseUrl = null;
+        job.PreprocessingProviderCancelUrl = null;
         job.PreprocessingInferenceTimeSeconds = null;
         job.PreprocessingCompletedAtUtc = null;
         job.MotionProviderRequestId = null;
         job.MotionProviderStatusUrl = null;
         job.MotionProviderResponseUrl = null;
+        job.MotionProviderCancelUrl = null;
         job.MotionInferenceTimeSeconds = null;
         job.MotionGenerationCompletedAtUtc = null;
         job.CurrentProviderStage = null;
+        job.CancellationRequestedByAdminUserId = null;
+        job.CancellationRequestedAtUtc = null;
+        job.CancellationLastAttemptedAtUtc = null;
+        job.CancellationPreviousStatus = null;
+        job.CancellationAttemptCount = 0;
+        job.CancellationNextAttemptAtUtc = null;
+        job.CancellationAcceptedAtUtc = null;
+        job.CancellationLastErrorCode = null;
         job.ProviderStatus = null;
         job.ProviderResultUrl = null;
         job.ProviderSubmittedAtUtc = null;

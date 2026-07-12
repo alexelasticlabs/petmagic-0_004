@@ -4,10 +4,12 @@ import 'package:app_links/app_links.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/notifications/notification_coordinator.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
+import 'package:petmagic_mobile/features/premium/presentation/subscription_management_page.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
@@ -256,7 +258,7 @@ class _PushNotificationsBootstrapState
       return;
     }
 
-    if (uri.scheme != 'petmagic') {
+    if (!AppConfig.isExpectedDeepLinkScheme(uri.scheme)) {
       return;
     }
 
@@ -267,6 +269,10 @@ class _PushNotificationsBootstrapState
 
     if (uri.host == 'checkout') {
       final path = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : '';
+      if (path == 'manage') {
+        _openRoute(SubscriptionManagementPage.routePath);
+        return;
+      }
       _openRoute(WalletPage.routePath);
       if (path == 'success') {
         final sessionId = uri.queryParameters['session_id'];
@@ -345,12 +351,14 @@ class _PushNotificationsBootstrapState
     return _isGenerationRoute(route) ||
         _isSupportRoute(route) ||
         _isWalletRoute(route) ||
+        _isSubscriptionManagementRoute(route) ||
         _isProfileRoute(route);
   }
 
   bool _isAuthOnlyRoute(String route) {
     return _isSupportRoute(route) ||
         _isWalletRoute(route) ||
+        _isSubscriptionManagementRoute(route) ||
         _isProfileRoute(route);
   }
 
@@ -369,6 +377,10 @@ class _PushNotificationsBootstrapState
 
   bool _isWalletRoute(String route) {
     return route == WalletPage.routePath;
+  }
+
+  bool _isSubscriptionManagementRoute(String route) {
+    return route == SubscriptionManagementPage.routePath;
   }
 
   bool _isProfileRoute(String route) {

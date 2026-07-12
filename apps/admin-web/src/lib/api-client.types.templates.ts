@@ -3,10 +3,16 @@ export type TemplateType = "Image" | "Video";
 export type TemplateStatus = "Draft" | "Active" | "Archived";
 
 export type TemplateGenerationJobStatus =
-  "Queued" | "Processing" | "Completed" | "Failed" | "Cancelled" | "Retrying";
+  | "Queued"
+  | "Processing"
+  | "Completed"
+  | "Failed"
+  | "Cancelled"
+  | "Retrying"
+  | "CancellationRequested";
 
 export type AdminGenerationStatus =
-  "Pending" | "Running" | "Completed" | "Failed" | "Cancelled" | "Retrying";
+  "Pending" | "Running" | "Completed" | "Failed" | "Cancelled" | "Retrying" | "Cancelling";
 
 export type TemplateGenerationResponse = {
   generationId: string;
@@ -741,6 +747,8 @@ export type AdminTemplateGenerationDashboardMetrics = {
 
   cancelledJobs: number;
 
+  cancellingJobs: number;
+
   retryingJobs: number;
 
   generatedAtUtc: string;
@@ -838,6 +846,20 @@ export type AdminTemplateGenerationListItem = {
   canCancel: boolean;
 
   canRetry: boolean;
+
+  gamificationLegacyReviewRequired?: boolean;
+};
+
+export type AdminGamificationLegacyDeliveryResolutionAction = "mark_delivered" | "replay";
+
+export type AdminGamificationLegacyDeliveryResolutionResponse = {
+  generationId: string;
+
+  action: AdminGamificationLegacyDeliveryResolutionAction;
+
+  replayQueued: boolean;
+
+  resolvedAtUtc: string;
 };
 
 export type AdminTemplateGenerationsQuery = {

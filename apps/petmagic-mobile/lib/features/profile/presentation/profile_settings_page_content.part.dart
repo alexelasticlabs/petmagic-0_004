@@ -128,9 +128,6 @@ class _ProfileSettingsPageContent extends StatelessWidget {
                     title: text.profileSettingsNotificationsTitle,
                     subtitle: text.profileSettingsNotificationsSubtitle,
                     onTap: onOpenNotifications,
-                    trailingText: state.profile?.marketingEmailsEnabled == true
-                        ? text.profilePreferenceEnabled
-                        : text.profilePreferenceOff,
                     showDivider: false,
                   ),
                 ],
@@ -213,7 +210,7 @@ class _ProfileSettingsPageContent extends StatelessWidget {
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        text.profileSettingsVersionLabel('1.2.0'),
+                        text.profileSettingsVersionLabel(AppConfig.appVersion),
                         style: TextStyle(
                           color: colors.textMuted,
                           fontSize: 13,

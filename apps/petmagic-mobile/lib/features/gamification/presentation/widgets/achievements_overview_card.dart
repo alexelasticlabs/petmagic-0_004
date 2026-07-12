@@ -67,7 +67,7 @@ class AchievementsOverviewCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  text.gamificationUnlocked(unlocked, total),
+                  text.gamificationUnlocked(total, unlocked),
                   style: TextStyle(
                     color: colors.textStrong,
                     fontSize: 16,

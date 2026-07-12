@@ -59,6 +59,34 @@ class _FeedbackCard extends StatelessWidget {
   }
 }
 
+class _FeedbackSubmittedCard extends StatelessWidget {
+  const _FeedbackSubmittedCard({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    return _Panel(
+      child: Row(
+        children: [
+          Icon(Icons.check_circle_rounded, color: colors.accent),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: colors.textStrong,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _RatingButton extends StatelessWidget {
   const _RatingButton({
     required this.label,
@@ -215,6 +243,7 @@ class _ProblemFeedbackSheetState extends State<_ProblemFeedbackSheet> {
                   controller: _commentController,
                   minLines: 2,
                   maxLines: 4,
+                  maxLength: 2000,
                   decoration: InputDecoration(
                     labelText: text.commentLabel,
                     hintText: text.commentHint,
@@ -371,6 +400,7 @@ class _NegativeFeedbackSheetState extends State<_NegativeFeedbackSheet> {
                   controller: _commentController,
                   minLines: 2,
                   maxLines: 4,
+                  maxLength: 2000,
                   decoration: InputDecoration(
                     labelText: text.generationStatusFeedbackCommentLabel,
                     hintText: text.generationStatusFeedbackCommentHint,

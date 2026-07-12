@@ -20,6 +20,12 @@ const skipDotnetBuild = args.has('--skip-dotnet-build');
 const runId = getOptionValue('--run-id') ?? `render-predeploy-gate-${formatTimestamp(new Date())}`;
 const artifactDir = getOptionValue('--artifact-dir') ?? join('artifacts', 'render-predeploy-gate', runId);
 const dockerPlatform = getOptionValue('--docker-platform') ?? 'linux/amd64';
+const environment = (getOptionValue('--environment') ?? 'staging').toLowerCase();
+if (!['staging', 'production'].includes(environment)) {
+  throw new Error('--environment must be staging or production.');
+}
+const blueprint = getOptionValue('--blueprint')
+  ?? (environment === 'production' ? 'render.production.yaml' : 'render.yaml');
 
 mkdirSync(artifactDir, { recursive: true });
 
@@ -29,6 +35,8 @@ const evidence = {
   withDockerBuild,
   skipDotnetBuild,
   dockerPlatform,
+  environment,
+  blueprint,
   steps: []
 };
 
@@ -39,13 +47,20 @@ const steps = [
     required: true
   },
   {
-    name: 'render_blueprint',
-    command: ['node', ['scripts/qa/check-render-blueprint.mjs']],
+    name: 'legal_catalog_completeness',
+    command: ['node', ['apps/public-web/scripts/validate-legal-catalog.mjs']],
     required: true
   },
   {
-    name: 'staging_env_example',
-    command: ['node', ['scripts/qa/check-staging-env-readiness.mjs', '--file', '.env.staging.local.example', '--example']],
+    name: 'render_blueprint',
+    command: ['node', ['scripts/qa/check-render-blueprint.mjs', '--environment', environment, '--file', blueprint]],
+    required: true
+  },
+  {
+    name: 'environment_release_configuration',
+    command: environment === 'production'
+      ? ['node', ['scripts/qa/check-production-release-config.mjs', '--blueprint', blueprint]]
+      : ['node', ['scripts/qa/check-staging-env-readiness.mjs', '--file', '.env.staging.local.example', '--example']],
     required: true
   },
   {
@@ -61,7 +76,8 @@ const steps = [
   {
     name: 'compose_staging_example_config',
     command: ['docker', ['compose', '--env-file', '.env.staging.local.example', 'config', '--quiet']],
-    required: true
+    required: environment === 'staging',
+    skippedReason: 'Production uses managed Render/R2 secrets and does not reuse the staging compose env file.'
   },
   {
     name: 'backend_api_build',
@@ -210,6 +226,8 @@ Options:
   --with-docker-build      Also build API, worker, and admin Docker images with Render Dockerfile/context settings.
   --docker-platform <val>  Platform passed to the Docker build smoke. Defaults to linux/amd64.
   --skip-dotnet-build      Skip the backend API dotnet build.
+  --environment <value>    staging or production. Defaults to staging.
+  --blueprint <path>       Blueprint path. Defaults by environment.
   --run-id <id>            Artifact run id.
   --artifact-dir <dir>     Evidence output directory.
   --help, -h               Print this help.

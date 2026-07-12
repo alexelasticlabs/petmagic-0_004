@@ -10,8 +10,8 @@ using Google.Apis.Auth.OAuth2;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Notifications;
 using PetMagic.BuildingBlocks.Observability;
-using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Infrastructure.Data;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
@@ -23,17 +23,19 @@ internal sealed class FcmTemplateGenerationPushNotificationSender(
     TemplatesDbContext dbContext,
     TemplatesOptions options,
     HttpClient httpClient,
-    ILogger<FcmTemplateGenerationPushNotificationSender> logger) : ITemplateGenerationPushNotificationSender
+    ILogger<FcmTemplateGenerationPushNotificationSender> logger) : ITemplateGenerationPushDeliverySender
 {
     private const string FirebaseMessagingScope = "https://www.googleapis.com/auth/firebase.messaging";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private GoogleCredential? credential;
 
-    public async Task NotifyGenerationTerminalAsync(TemplateGenerationResponse generation, CancellationToken cancellationToken)
+    public async Task<PushDeliveryResult> DeliverGenerationTerminalAsync(
+        TemplateGenerationResponse generation,
+        CancellationToken cancellationToken)
     {
         if (!options.FirebasePush.IsConfigured || generation.UserId == TemplateGenerationService.AdminTestUserId)
         {
-            return;
+            return PushDeliveryResult.Delivered;
         }
 
         var tokens = await dbContext.TemplatePushDeviceTokens
@@ -44,17 +46,17 @@ internal sealed class FcmTemplateGenerationPushNotificationSender(
 
         if (tokens.Count == 0)
         {
-            return;
+            return PushDeliveryResult.Delivered;
         }
 
         var accessToken = await GetAccessTokenAsync(cancellationToken);
-        foreach (var token in tokens)
-        {
-            await SendAsync(generation, token, accessToken, cancellationToken);
-        }
+        var deliveries = await Task.WhenAll(tokens.Select(token =>
+            SendAsync(generation, token, accessToken, cancellationToken)));
+        DisableInvalidTokens(deliveries);
+        return Aggregate(deliveries.Select(x => x.Result).ToArray());
     }
 
-    private async Task SendAsync(
+    private async Task<TokenDeliveryResult> SendAsync(
         TemplateGenerationResponse generation,
         TemplatePushDeviceToken token,
         string accessToken,
@@ -103,7 +105,7 @@ internal sealed class FcmTemplateGenerationPushNotificationSender(
                 eventIdHash,
                 tokenIdHash,
                 SafeLogValues.StableHash(CorrelationContext.ResolveOrCreate()));
-            return;
+            return new TokenDeliveryResult(PushDeliveryResult.Delivered, token, false);
         }
 
         var body = await SafeHttpContentReader.ReadStringPrefixAsync(response.Content, cancellationToken);
@@ -117,10 +119,40 @@ internal sealed class FcmTemplateGenerationPushNotificationSender(
 
         if (FirebaseMessagingErrorClassifier.ShouldDisableToken(response.StatusCode, body))
         {
-            token.DisabledAtUtc = DateTime.UtcNow;
-            token.UpdatedAtUtc = token.DisabledAtUtc.Value;
-            await dbContext.SaveChangesAsync(cancellationToken);
+            return new TokenDeliveryResult(PushDeliveryResult.Delivered, token, true);
         }
+
+        var result = response.StatusCode == HttpStatusCode.TooManyRequests
+            || (int)response.StatusCode >= 500
+                ? PushDeliveryResult.Retry("fcm.transient_error")
+                : PushDeliveryResult.PermanentFailure("fcm.request_rejected");
+        return new TokenDeliveryResult(result, token, false);
+    }
+
+    private static void DisableInvalidTokens(IEnumerable<TokenDeliveryResult> deliveries)
+    {
+        var now = DateTime.UtcNow;
+        foreach (var delivery in deliveries.Where(x => x.DisableToken))
+        {
+            delivery.Token.DisabledAtUtc = now;
+            delivery.Token.UpdatedAtUtc = now;
+        }
+    }
+
+    private static PushDeliveryResult Aggregate(IReadOnlyList<PushDeliveryResult> results)
+    {
+        var retry = results.FirstOrDefault(x => x.Disposition == PushDeliveryDisposition.Retry);
+        if (retry is not null)
+        {
+            return retry;
+        }
+
+        if (results.Any(x => x.Disposition == PushDeliveryDisposition.Delivered))
+        {
+            return PushDeliveryResult.Delivered;
+        }
+
+        return results.FirstOrDefault() ?? PushDeliveryResult.Delivered;
     }
 
     private async Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
@@ -176,4 +208,9 @@ internal sealed class FcmTemplateGenerationPushNotificationSender(
     private sealed record FcmApnsPayload(FcmAps Aps);
 
     private sealed record FcmAps(string Sound);
+
+    private sealed record TokenDeliveryResult(
+        PushDeliveryResult Result,
+        TemplatePushDeviceToken Token,
+        bool DisableToken);
 }

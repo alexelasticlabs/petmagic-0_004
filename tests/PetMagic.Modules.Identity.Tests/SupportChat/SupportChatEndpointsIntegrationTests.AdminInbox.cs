@@ -20,6 +20,10 @@ public sealed partial class SupportChatEndpointsIntegrationTests
             "/api/support/conversation/open",
             new OpenConversationRequest("Assigned case", SupportConversationPriority.Normal));
 
+        _ = await PostEmptyAsync<SupportConversationDetailResponse>(
+            adminClient,
+            $"/api/admin/support/tickets/{mine.ConversationId}/assign-to-me");
+
         var adminReply = await PostAsJsonAsync<SupportMessageResponse>(
             adminClient,
             $"/api/admin/support/tickets/{mine.ConversationId}/messages",
@@ -96,12 +100,20 @@ public sealed partial class SupportChatEndpointsIntegrationTests
         var newTicket = await PostAsJsonAsync<SupportConversationDetailResponse>(
             userClient,
             "/api/support/conversation/open",
-            new OpenConversationRequest("New high priority case", SupportConversationPriority.High));
+            new OpenConversationRequest("New high priority case", SupportConversationPriority.Normal));
+
+        await application.SetConversationPriorityAsync(
+            newTicket.ConversationId,
+            SupportConversationPriority.High);
 
         var waitingTicket = await PostAsJsonAsync<SupportConversationDetailResponse>(
             otherUserClient,
             "/api/support/conversation/open",
             new OpenConversationRequest("Waiting case", SupportConversationPriority.Normal));
+
+        _ = await PostEmptyAsync<SupportConversationDetailResponse>(
+            adminClient,
+            $"/api/admin/support/tickets/{waitingTicket.ConversationId}/assign-to-me");
 
         await PostAsJsonAsync<SupportMessageResponse>(
             adminClient,
@@ -137,6 +149,10 @@ public sealed partial class SupportChatEndpointsIntegrationTests
             otherUserClient,
             "/api/support/conversation/open",
             new OpenConversationRequest("Waiting for user", SupportConversationPriority.Normal));
+
+        _ = await PostEmptyAsync<SupportConversationDetailResponse>(
+            adminClient,
+            $"/api/admin/support/tickets/{waitingForUserTicket.ConversationId}/assign-to-me");
 
         await PostAsJsonAsync<SupportMessageResponse>(
             adminClient,

@@ -58,7 +58,8 @@ internal sealed class FalImageGenerator(FalQueueClient queueClient) : IImageGene
             : Result.Success(new ProviderQueueSubmission(
                 result.Value.RequestId,
                 result.Value.StatusUrl.ToString(),
-                result.Value.ResponseUrl.ToString()));
+                result.Value.ResponseUrl.ToString(),
+                result.Value.CancelUrl.ToString()));
     }
 
     public Result<ImageGenerationResult> Complete(JsonElement response, string? requestId, double? inferenceTimeSeconds)

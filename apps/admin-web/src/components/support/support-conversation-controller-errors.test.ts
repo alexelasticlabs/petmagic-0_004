@@ -102,8 +102,9 @@ describe("support conversation controller errors", () => {
       "if (!canManageSupportWorkspace) {\n      return;\n    }\n\n    const currentConversation"
     );
     expect(controllerSource).toContain("if (!assertCanManageSupportWorkspace())");
-    expect(controllerSource).toContain("if (!canManageSupportWorkspace) {\n        return {};");
+    expect(controllerSource).toContain("if (!canMutateConversation) {\n        return {};");
     expect(controllerSource).toContain("canManageSupportWorkspace,");
+    expect(controllerSource).toContain("canMutateConversation,");
     expect(controllerSource).toContain("sessionUserRoles,");
     expect(controllerSource).toContain("const [isSendReplyInFlight, setIsSendReplyInFlight]");
     expect(controllerSource).toContain("const sendReplyInFlightRef = useRef(false);");
@@ -120,15 +121,15 @@ describe("support conversation controller errors", () => {
     expect(controllerSource).toContain("isSendReplySubmitting,");
     expect(pageSource).toContain("const isComposerBusy = isSendReplySubmitting;");
     expect(pageSource).toContain(
-      "const isComposerDisabled = isConversationReadOnly || !canManageSupportWorkspace || isComposerBusy;"
+      "const isComposerDisabled = isConversationReadOnly || !canMutateConversation || isComposerBusy;"
     );
     expect(pageSource).toContain("if (isComposerDisabled) return;");
-    expect(infoPanelSource).toContain("disabled={!canManageSupportWorkspace}");
+    expect(infoPanelSource).toContain("disabled={!canMutateConversation}");
     expect(infoPanelSource).toContain(
-      "disabled={!canManageSupportWorkspace || statusMutation.isPending}"
+      "disabled={!canMutateConversation || statusMutation.isPending}"
     );
     expect(infoPanelSource).toContain(
-      "if (!canManageSupportWorkspace || statusMutation.isPending || conversation.status === status)"
+      "if (!canMutateConversation || statusMutation.isPending || conversation.status === status)"
     );
     expect(infoPanelSource).toContain(
       "if (!canManageSupportWorkspace || pendingAttachmentOpenKey !== null)"
@@ -512,14 +513,14 @@ describe("support conversation controller errors", () => {
     expect(infoPanelSource).toContain("await statusMutation.mutateAsync(pendingStatusConfirm)");
     expect(infoPanelSource).toContain("setPendingStatusConfirm(null);");
     expect(infoPanelSource).toContain(
-      "if (!canManageSupportWorkspace || !pendingStatusConfirm || statusMutation.isPending)"
+      "if (!canMutateConversation || !pendingStatusConfirm || statusMutation.isPending)"
     );
     expect(infoPanelSource).toContain("disabled={statusMutation.isPending}");
     expect(infoPanelSource).toContain(
       "const requestStatusChange = (status: SupportConversationStatus) =>"
     );
     expect(infoPanelSource).toContain(
-      "if (!canManageSupportWorkspace || statusMutation.isPending || conversation.status === status)"
+      "if (!canMutateConversation || statusMutation.isPending || conversation.status === status)"
     );
     expect(infoPanelSource).toContain(
       "onClick={() => requestStatusChange(primaryStatusAction.status)}"
@@ -575,7 +576,7 @@ describe("support conversation controller errors", () => {
     expect(pageSource).toContain("const submitReply = () => {");
     expect(pageSource).toContain("const isComposerBusy = isSendReplySubmitting;");
     expect(pageSource).toContain(
-      "const isComposerDisabled = isConversationReadOnly || !canManageSupportWorkspace || isComposerBusy;"
+      "const isComposerDisabled = isConversationReadOnly || !canMutateConversation || isComposerBusy;"
     );
     expect(pageSource).toContain("if (isComposerDisabled ||");
     expect(pageSource).toContain("(!reply.trim() && !hasComposerAttachment)");

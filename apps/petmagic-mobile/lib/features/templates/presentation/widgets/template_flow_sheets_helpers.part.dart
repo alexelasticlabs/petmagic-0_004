@@ -23,6 +23,7 @@ double? _progressValue(TemplateGenerationResult? generation, bool isFailed) {
     TemplateGenerationStatus.generating => 0.74,
     TemplateGenerationStatus.finalizing => 0.9,
     TemplateGenerationStatus.importingMedia => 0.92,
+    TemplateGenerationStatus.cancellationRequested => 0.95,
     TemplateGenerationStatus.completed => 1,
     TemplateGenerationStatus.cancelled => 1,
     TemplateGenerationStatus.failed => 1,

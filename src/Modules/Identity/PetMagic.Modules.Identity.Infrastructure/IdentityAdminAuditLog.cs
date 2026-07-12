@@ -1,6 +1,7 @@
 using System.Security.Claims;
 
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 
 using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Identity.Infrastructure.Data;
@@ -14,14 +15,22 @@ internal sealed class IdentityAdminAuditLog(
 {
     public async Task WriteAsync(AdminAuditEntry entry, CancellationToken cancellationToken)
     {
+        if (entry.EventId.HasValue
+            && await dbContext.AuditEvents.AsNoTracking().AnyAsync(
+                auditEvent => auditEvent.Id == entry.EventId.Value,
+                cancellationToken))
+        {
+            return;
+        }
+
         var now = DateTime.UtcNow;
         var httpContext = httpContextAccessor.HttpContext;
 
         dbContext.AuditEvents.Add(new AuditEvent
         {
-            Id = Guid.NewGuid(),
+            Id = entry.EventId ?? Guid.NewGuid(),
             SubjectUserId = entry.SubjectUserId,
-            ActorUserId = ResolveActorUserId(httpContext),
+            ActorUserId = entry.ActorUserId ?? ResolveActorUserId(httpContext),
             ActorRole = ResolveActorRole(httpContext),
             Action = Truncate(entry.Action, 120) ?? string.Empty,
             TargetType = Truncate(entry.TargetType, 80),
@@ -30,13 +39,28 @@ internal sealed class IdentityAdminAuditLog(
             NewValue = SanitizeAndTruncate(entry.NewValue, 2000),
             IpAddress = Truncate(ResolveClientIpAddress(httpContext), 64),
             UserAgent = SanitizeAndTruncate(httpContext?.Request.Headers.UserAgent.ToString(), 512),
-            CorrelationId = Truncate(CorrelationContext.ResolveOrCreate(), 128),
+            CorrelationId = Truncate(entry.CorrelationId ?? CorrelationContext.ResolveOrCreate(), 128),
             Details = SanitizeAndTruncate(entry.Details ?? entry.Action, 2000) ?? string.Empty,
             CreatedAtUtc = now,
             OccurredAtUtc = now
         });
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException) when (entry.EventId.HasValue)
+        {
+            dbContext.ChangeTracker.Clear();
+            if (await dbContext.AuditEvents.AsNoTracking().AnyAsync(
+                    auditEvent => auditEvent.Id == entry.EventId.Value,
+                    cancellationToken))
+            {
+                return;
+            }
+
+            throw;
+        }
     }
 
     private static Guid? ResolveActorUserId(HttpContext? httpContext)
@@ -64,16 +88,6 @@ internal sealed class IdentityAdminAuditLog(
         if (httpContext is null)
         {
             return null;
-        }
-
-        var forwardedFor = httpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(forwardedFor))
-        {
-            var firstAddress = forwardedFor.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
-            if (!string.IsNullOrWhiteSpace(firstAddress))
-            {
-                return firstAddress;
-            }
         }
 
         return httpContext.Connection.RemoteIpAddress?.ToString();

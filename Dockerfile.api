@@ -4,6 +4,7 @@ ARG TARGETARCH
 WORKDIR /src
 COPY ["Directory.Build.props", "./"]
 COPY ["Directory.Packages.props", "./"]
+COPY ["shared/", "shared/"]
 COPY ["src/", "src/"]
 RUN --mount=type=cache,id=nuget-api,sharing=locked,target=/root/.nuget/packages \
     case "$TARGETARCH" in \

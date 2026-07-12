@@ -424,16 +424,6 @@ public sealed partial class IdentityService(
             return null;
         }
 
-        var forwardedFor = httpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(forwardedFor))
-        {
-            var firstAddress = forwardedFor.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
-            if (!string.IsNullOrWhiteSpace(firstAddress))
-            {
-                return firstAddress;
-            }
-        }
-
         return httpContext.Connection.RemoteIpAddress?.ToString();
     }
 

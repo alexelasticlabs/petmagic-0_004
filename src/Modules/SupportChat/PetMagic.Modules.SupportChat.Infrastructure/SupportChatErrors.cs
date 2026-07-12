@@ -17,4 +17,7 @@ internal static class SupportChatErrors
     public static readonly Error InvalidFeedbackRating = new("support.feedback_rating_invalid", "Support feedback rating must be between 1 and 5.");
     public static readonly Error InvalidPushToken = new("support.push_token_invalid", "Support push token is invalid.");
     public static readonly Error InvalidAssignedAdmin = new("support.assigned_admin_invalid", "Assigned support operator is invalid.");
+    public static readonly Error RelatedResourceNotFound = new("support.related_resource_not_found", "Related support resource was not found.");
+    public static readonly Error ConversationAlreadyAssigned = new("support.conversation_already_assigned", "Support conversation is already assigned to another operator.");
+    public static readonly Error ConversationNotOwned = new("support.conversation_not_owned", "Support conversation must be assigned to the current operator.");
 }

@@ -17,19 +17,53 @@ internal static class GamificationWeeklyChallengeCatalog
     public static async Task EnsureWeeklyChallengesAsync(
         GamificationDbContext dbContext,
         DateOnly weekStart,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool persistImmediately = true)
     {
-        var existing = await dbContext.WeeklyChallenges
-            .AnyAsync(x => x.WeekStartDate == weekStart, cancellationToken);
-
-        if (existing)
+        var now = DateTime.UtcNow;
+        if (dbContext.Database.IsRelational())
         {
+            await using var transaction = dbContext.Database.CurrentTransaction is null
+                ? await dbContext.Database.BeginTransactionAsync(cancellationToken)
+                : null;
+            foreach (var template in DefaultChallenges.Templates.Select((challenge, index) => (challenge, index)))
+            {
+                await dbContext.Database.ExecuteSqlInterpolatedAsync($$"""
+                    INSERT INTO "gamification_weekly_challenges"
+                        ("Id", "WeekStartDate", "ChallengeType", "TargetValue", "TitleKey", "DescriptionKey",
+                         "RewardSpark", "SortOrder", "CreatedAtUtc")
+                    VALUES
+                        ({{Guid.NewGuid()}}, {{weekStart}}, {{template.challenge.ChallengeType}}, {{template.challenge.TargetValue}},
+                         {{template.challenge.TitleKey}}, {{template.challenge.DescriptionKey}},
+                         {{template.challenge.RewardSpark}}, {{template.index}}, {{now}})
+                    ON CONFLICT ("WeekStartDate", "ChallengeType") DO NOTHING
+                    """, cancellationToken);
+            }
+
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+
             return;
         }
 
-        var now = DateTime.UtcNow;
+        var existingTypes = (await dbContext.WeeklyChallenges
+                .Where(x => x.WeekStartDate == weekStart)
+                .Select(x => x.ChallengeType)
+                .ToListAsync(cancellationToken))
+            .Concat(dbContext.WeeklyChallenges.Local
+                .Where(x => x.WeekStartDate == weekStart)
+                .Select(x => x.ChallengeType))
+            .ToHashSet(StringComparer.Ordinal);
+
         foreach (var template in DefaultChallenges.Templates.Select((challenge, index) => (challenge, index)))
         {
+            if (!existingTypes.Add(template.challenge.ChallengeType))
+            {
+                continue;
+            }
+
             dbContext.WeeklyChallenges.Add(new WeeklyChallenge
             {
                 Id = Guid.NewGuid(),
@@ -44,6 +78,9 @@ internal static class GamificationWeeklyChallengeCatalog
             });
         }
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        if (persistImmediately)
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
     }
 }

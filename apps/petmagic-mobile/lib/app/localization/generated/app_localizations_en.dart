@@ -213,6 +213,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profilePasswordLabel => 'Password';
 
   @override
+  String get authShowPassword => 'Show password';
+
+  @override
+  String get authHidePassword => 'Hide password';
+
+  @override
+  String get authShowPasswordConfirmation => 'Show password confirmation';
+
+  @override
+  String get authHidePasswordConfirmation => 'Hide password confirmation';
+
+  @override
   String get profileSignInAction => 'Sign in';
 
   @override
@@ -1824,6 +1836,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileAccountRolesMissing => 'No roles assigned';
+
+  @override
+  String get profileAccountRoleUser => 'User';
+
+  @override
+  String get profileAccountRoleModerator => 'Moderator';
+
+  @override
+  String get profileAccountRoleAdmin => 'Administrator';
 
   @override
   String get profileAccountMembershipLabel => 'Membership';
@@ -3893,6 +3914,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Payment will be charged to your App Store / Google Play account. Subscription renews automatically unless cancelled before the renewal date.';
 
   @override
+  String get premiumCardPaymentDisclaimerTitle => 'Secure card payment';
+
+  @override
+  String get premiumCardPaymentDisclaimerBody =>
+      'Payment will be charged to your bank card. Subscription renews automatically unless cancelled before the renewal date.';
+
+  @override
   String get premiumCheckoutPageTitle => 'Upgrade to Premium';
 
   @override
@@ -4314,7 +4342,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get gamificationLoadFailed => 'Failed to load achievements';
 
   @override
-  String get gamificationDayStreak => 'day streak';
+  String gamificationDayStreak(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count-day streak',
+      one: '$count-day streak',
+      zero: '0-day streak',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get gamificationHubSubtitle =>
@@ -4698,4 +4735,16 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get templateFlowGenerationWaitTooLongPremiumHint =>
       'Premium requests get priority when the service is busy and may wait less.';
+
+  @override
+  String get mediaPlayAction => 'Play';
+
+  @override
+  String get mediaPauseAction => 'Pause';
+
+  @override
+  String get mediaMuteAction => 'Mute';
+
+  @override
+  String get mediaUnmuteAction => 'Unmute';
 }

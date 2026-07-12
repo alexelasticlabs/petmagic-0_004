@@ -24,10 +24,12 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using PetMagic.BuildingBlocks.Results;
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Identity.Domain.Enums;
 using PetMagic.Modules.Identity.Infrastructure.Data;
 using PetMagic.Modules.Identity.Infrastructure.Entities;
+using PetMagic.Modules.Identity.Infrastructure;
 using PetMagic.Modules.SupportChat.Api;
 using PetMagic.Modules.SupportChat.Application.Abstractions;
 using PetMagic.Modules.SupportChat.Application.Contracts;
@@ -56,10 +58,10 @@ public sealed partial class SupportChatEndpointsIntegrationTests
         var openResponse = await PostAsJsonAsync<SupportConversationDetailResponse>(
             application.CreateClient(UserId, "User"),
             "/api/support/conversation/open",
-            new OpenConversationRequest("Need help with premium", SupportConversationPriority.High));
+            new OpenConversationRequest("Need help with premium", SupportConversationPriority.Normal));
 
         Assert.Equal("New", openResponse.Status);
-        Assert.Equal("High", openResponse.Priority);
+        Assert.Equal("Normal", openResponse.Priority);
         Assert.Contains(
             openResponse.Messages,
             message => message.SenderType == "User" && message.Body == "Need help with premium");
@@ -82,7 +84,7 @@ public sealed partial class SupportChatEndpointsIntegrationTests
     }
 
     [Fact]
-    public async Task OpenConversationEndpoint_ShouldPreserveClientProvidedRelatedContextLinks()
+    public async Task OpenConversationEndpoint_ShouldRejectUnownedRelatedContextLinks()
     {
         await using var application = await SupportChatTestApplication.CreateAsync();
 
@@ -90,8 +92,7 @@ public sealed partial class SupportChatEndpointsIntegrationTests
         var paymentId = Guid.NewGuid();
         var subscriptionId = Guid.NewGuid();
 
-        var opened = await PostAsJsonAsync<SupportConversationDetailResponse>(
-            application.CreateClient(UserId, "User"),
+        using var response = await application.CreateClient(UserId, "User").PostAsJsonAsync(
             "/api/support/conversation/open",
             new OpenConversationWithPaymentLinksRequest(
                 "Billing issue",
@@ -100,17 +101,39 @@ public sealed partial class SupportChatEndpointsIntegrationTests
                 RelatedPaymentId: paymentId,
                 RelatedSubscriptionId: subscriptionId));
 
-        Assert.Equal(generationId, opened.RelatedGenerationId);
-        Assert.Equal(paymentId, opened.RelatedPaymentId);
-        Assert.Equal(subscriptionId, opened.RelatedSubscriptionId);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("support.related_resource_not_found", body, StringComparison.Ordinal);
+    }
 
-        var adminContext = await GetFromJsonAsync<SupportTicketContextResponse>(
-            application.CreateClient(AdminId, "Admin"),
-            $"/api/admin/support/tickets/{opened.ConversationId}/context");
+    [Fact]
+    public async Task OpenConversationEndpoint_ShouldRejectUserForgedPriorityAndInternalSource()
+    {
+        await using var application = await SupportChatTestApplication.CreateAsync();
+        var client = application.CreateClient(UserId, "User");
 
-        Assert.Equal(generationId, adminContext.LinkedGeneration);
-        Assert.Equal(paymentId, adminContext.RelatedPaymentId);
-        Assert.Equal(subscriptionId, adminContext.RelatedSubscriptionId);
+        using var priorityResponse = await client.PostAsJsonAsync(
+            "/api/support/conversation/open",
+            new OpenConversationRequest("Urgent", SupportConversationPriority.High));
+        using var sourceResponse = await client.PostAsJsonAsync(
+            "/api/support/conversation/open",
+            new
+            {
+                initialMessage = "Internal source",
+                priority = SupportConversationPriority.Normal,
+                source = SupportConversationSource.AdminCreated
+            });
+
+        Assert.Equal(HttpStatusCode.BadRequest, priorityResponse.StatusCode);
+        Assert.Contains(
+            "support.conversation_priority_invalid",
+            await priorityResponse.Content.ReadAsStringAsync(),
+            StringComparison.Ordinal);
+        Assert.Equal(HttpStatusCode.BadRequest, sourceResponse.StatusCode);
+        Assert.Contains(
+            "support.conversation_source_invalid",
+            await sourceResponse.Content.ReadAsStringAsync(),
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -150,7 +173,7 @@ public sealed partial class SupportChatEndpointsIntegrationTests
         var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
             userClient,
             "/api/support/conversation/open",
-            new OpenConversationRequest("Queue action case", SupportConversationPriority.High));
+            new OpenConversationRequest("Queue action case", SupportConversationPriority.Normal));
 
         var tickets = await GetFromJsonAsync<SupportConversationInboxPageResponse>(
             adminClient,
@@ -217,6 +240,52 @@ public sealed partial class SupportChatEndpointsIntegrationTests
     }
 
     [Fact]
+    public async Task SupportAssignment_ShouldBeIdempotentAndRejectStealOrForeignUnassign()
+    {
+        await using var application = await SupportChatTestApplication.CreateAsync();
+        var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
+            application.CreateClient(UserId, "User"),
+            "/api/support/conversation/open",
+            new OpenConversationRequest("Ownership case", SupportConversationPriority.Normal));
+        var adminClient = application.CreateClient(AdminId, "Admin");
+        var moderatorClient = application.CreateClient(ModeratorId, "Moderator");
+        var claimPath = $"/api/admin/support/tickets/{created.ConversationId}/assign-to-me";
+        var unassignPath = $"/api/admin/support/tickets/{created.ConversationId}/unassign";
+
+        _ = await PostEmptyAsync<SupportConversationDetailResponse>(adminClient, claimPath);
+        var repeatedClaim = await PostEmptyAsync<SupportConversationDetailResponse>(adminClient, claimPath);
+        Assert.Equal(AdminId, repeatedClaim.AssignedAdminId);
+        Assert.Single(
+            repeatedClaim.Messages,
+            message => message.SenderType == "System" && message.Body == "Ticket assigned to operator");
+
+        using var stealResponse = await moderatorClient.PostAsync(claimPath, content: null);
+        Assert.Equal(HttpStatusCode.Conflict, stealResponse.StatusCode);
+        Assert.Contains(
+            "support.conversation_already_assigned",
+            await stealResponse.Content.ReadAsStringAsync(),
+            StringComparison.Ordinal);
+
+        using var foreignUnassignResponse = await moderatorClient.PostAsync(unassignPath, content: null);
+        Assert.Equal(HttpStatusCode.Conflict, foreignUnassignResponse.StatusCode);
+        Assert.Contains(
+            "support.conversation_not_owned",
+            await foreignUnassignResponse.Content.ReadAsStringAsync(),
+            StringComparison.Ordinal);
+
+        _ = await PostEmptyAsync<SupportConversationDetailResponse>(adminClient, unassignPath);
+        var repeatedUnassign = await PostEmptyAsync<SupportConversationDetailResponse>(adminClient, unassignPath);
+        Assert.Null(repeatedUnassign.AssignedAdminId);
+        Assert.Single(
+            repeatedUnassign.Messages,
+            message => message.SenderType == "System" && message.Body == "Ticket unassigned");
+
+        var auditEvents = await application.GetAuditEventsAsync(created.ConversationId);
+        Assert.Contains(auditEvents, audit => audit.Action == "admin.support.ticket.assigned" && audit.ActorUserId == AdminId);
+        Assert.Contains(auditEvents, audit => audit.Action == "admin.support.ticket.unassigned" && audit.ActorUserId == AdminId);
+    }
+
+    [Fact]
     public async Task AdminReplyStatusAndReadEndpoints_ShouldRoundTripConversationState()
     {
         await using var application = await SupportChatTestApplication.CreateAsync();
@@ -227,7 +296,11 @@ public sealed partial class SupportChatEndpointsIntegrationTests
         var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
             userClient,
             "/api/support/conversation/open",
-            new OpenConversationRequest("App crashes on startup", SupportConversationPriority.High));
+            new OpenConversationRequest("App crashes on startup", SupportConversationPriority.Normal));
+
+        _ = await PostEmptyAsync<SupportConversationDetailResponse>(
+            adminClient,
+            $"/api/admin/support/tickets/{created.ConversationId}/assign-to-me");
 
         var replied = await PostAsJsonAsync<SupportMessageResponse>(
             adminClient,
@@ -364,6 +437,10 @@ public sealed partial class SupportChatEndpointsIntegrationTests
             "/api/support/conversation/open",
             new OpenConversationRequest("Need help", SupportConversationPriority.Normal));
 
+        _ = await PostEmptyAsync<SupportConversationDetailResponse>(
+            adminClient,
+            $"/api/admin/support/tickets/{created.ConversationId}/assign-to-me");
+
         var closed = await PutAsJsonAsync<SupportConversationDetailResponse>(
             adminClient,
             $"/api/admin/support/tickets/{created.ConversationId}/status",
@@ -393,6 +470,10 @@ public sealed partial class SupportChatEndpointsIntegrationTests
             userClient,
             "/api/support/conversation/open",
             new OpenConversationRequest("Need help", SupportConversationPriority.Normal));
+
+        _ = await PostEmptyAsync<SupportConversationDetailResponse>(
+            adminClient,
+            $"/api/admin/support/tickets/{created.ConversationId}/assign-to-me");
 
         var closed = await PutAsJsonAsync<SupportConversationDetailResponse>(
             adminClient,
@@ -642,6 +723,7 @@ public sealed partial class SupportChatEndpointsIntegrationTests
             });
 
             builder.Services.AddProblemDetails();
+            builder.Services.AddHttpContextAccessor();
             builder.Services.AddMemoryCache();
             builder.Services.AddRateLimiter(options =>
             {
@@ -666,6 +748,7 @@ public sealed partial class SupportChatEndpointsIntegrationTests
                 options.UseInMemoryDatabase(identityDatabaseName, identityDatabaseRoot));
 
             builder.Services.AddScoped<IIdentityUserLookupService, TestIdentityUserLookupService>();
+            builder.Services.AddScoped<IAdminAuditLog, IdentityAdminAuditLog>();
             builder.Services.AddSingleton<ISupportAttachmentStorage, FakeSupportAttachmentStorage>();
             builder.Services.AddSingleton(new SupportAttachmentReadUrlSigningOptions
             {
@@ -732,6 +815,30 @@ public sealed partial class SupportChatEndpointsIntegrationTests
                     }
                 })
                 .Build();
+        }
+
+        public async Task<IReadOnlyList<AuditEvent>> GetAuditEventsAsync(Guid conversationId)
+        {
+            using var scope = app.Services.CreateScope();
+            return await scope.ServiceProvider.GetRequiredService<IdentityDbContext>()
+                .AuditEvents
+                .AsNoTracking()
+                .Where(audit => audit.TargetId == conversationId.ToString("D"))
+                .OrderBy(audit => audit.CreatedAtUtc)
+                .ToListAsync();
+        }
+
+        public async Task SetConversationPriorityAsync(
+            Guid conversationId,
+            SupportConversationPriority priority)
+        {
+            using var scope = app.Services.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<SupportChatDbContext>();
+            var conversation = await dbContext.SupportConversations
+                .SingleAsync(x => x.Id == conversationId);
+            conversation.Priority = priority;
+            conversation.UpdatedAtUtc = DateTime.UtcNow;
+            await dbContext.SaveChangesAsync();
         }
 
         public async ValueTask DisposeAsync()

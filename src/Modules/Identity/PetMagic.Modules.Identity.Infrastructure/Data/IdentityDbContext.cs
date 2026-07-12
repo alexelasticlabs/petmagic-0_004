@@ -63,6 +63,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.ToTable("refresh_token_sessions");
             entity.HasKey(x => x.Id);
             entity.Property(x => x.TokenHash).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.RevokedAtUtc).IsConcurrencyToken();
             entity.HasIndex(x => x.TokenHash).IsUnique();
             entity.HasIndex(x => x.UserId);
         });
@@ -143,6 +144,8 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.Property(x => x.Status).HasConversion<int>().IsRequired();
             entity.Property(x => x.FailureCode).HasMaxLength(120);
             entity.Property(x => x.FailureMessage).HasMaxLength(2000);
+            entity.Property(x => x.LockId).IsConcurrencyToken();
+            entity.HasIndex(x => new { x.Status, x.LockExpiresAtUtc, x.QueuedAtUtc });
             entity.HasIndex(x => new { x.Status, x.QueuedAtUtc });
             entity.HasIndex(x => new { x.Status, x.NextAttemptAtUtc, x.QueuedAtUtc });
             entity.HasIndex(x => new { x.Status, x.UpdatedAtUtc });
@@ -159,6 +162,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.Property(x => x.PayloadJson).HasMaxLength(8000).IsRequired();
             entity.Property(x => x.CreatedAtUtc).IsRequired();
             entity.Property(x => x.ExpiresAtUtc).IsRequired();
+            entity.Property(x => x.ConsumedAtUtc).IsConcurrencyToken();
             entity.HasIndex(x => new { x.Purpose, x.ExpiresAtUtc });
             entity.HasIndex(x => x.ConsumedAtUtc);
         });

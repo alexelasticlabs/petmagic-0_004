@@ -118,12 +118,70 @@ namespace PetMagic.Modules.Gamification.Infrastructure.Data.Migrations
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
+                    b.Property<int>("WeeklyFreezeAllowance")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("UserId")
                         .IsUnique();
 
                     b.ToTable("gamification_daily_streaks", (string)null);
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.Gamification.Infrastructure.Entities.GamificationGenerationEvent", b =>
+                {
+                    b.Property<Guid>("GenerationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ProcessedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("TemplateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("WeekStartDate")
+                        .HasColumnType("date");
+
+                    b.HasKey("GenerationId");
+
+                    b.HasIndex("UserId", "PetId", "OccurredAtUtc");
+
+                    b.HasIndex("UserId", "WeekStartDate", "TemplateId");
+
+                    b.ToTable("gamification_generation_events", (string)null);
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.Gamification.Infrastructure.Entities.GamificationShareEvent", b =>
+                {
+                    b.Property<Guid>("GenerationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("SharedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("WeekStartDate")
+                        .HasColumnType("date");
+
+                    b.HasKey("GenerationId");
+
+                    b.HasIndex("UserId", "WeekStartDate");
+
+                    b.ToTable("gamification_share_events", (string)null);
                 });
 
             modelBuilder.Entity("PetMagic.Modules.Gamification.Infrastructure.Entities.PetProgress", b =>
@@ -283,7 +341,8 @@ namespace PetMagic.Modules.Gamification.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("WeekStartDate");
+                    b.HasIndex("WeekStartDate", "ChallengeType")
+                        .IsUnique();
 
                     b.ToTable("gamification_weekly_challenges", (string)null);
                 });

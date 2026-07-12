@@ -185,6 +185,71 @@ public sealed class AuthEndpointsNativeGoogleTests
     }
 
     [Fact]
+    public async Task GoogleNativeLink_ShouldLinkVerifiedIdentityToCurrentUser()
+    {
+        var verifier = new FakeGoogleIdentityTokenVerifier(
+            isConfigured: true,
+            clientId: "google-web-client-id",
+            verifiedCommand: new ExternalLoginCallbackCommand(
+                "Google",
+                "google-subject-link",
+                "pet@example.com",
+                "Pet Parent"));
+        var service = new FakeIdentityService();
+
+        await using var app = await TestApplication.CreateAsync(verifier, service);
+
+        var response = await app.Client.PostAsJsonAsync(
+            "/api/auth/me/linked-accounts/google/native",
+            new GoogleNativeLinkCommand("native-google-id-token"));
+        var payload = await response.Content.ReadFromJsonAsync<List<LinkedAccountResponse>>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(payload);
+        Assert.Single(payload);
+        Assert.NotEqual(Guid.Empty, service.LastLinkedUserId);
+        Assert.NotNull(service.LastLinkExternalCommand);
+        Assert.Equal("Google", service.LastLinkExternalCommand!.Provider);
+        Assert.Equal("google-subject-link", service.LastLinkExternalCommand.ProviderSubject);
+        AssertNoStoreCacheHeaders(response);
+    }
+
+    [Fact]
+    public async Task ExternalChallenge_ShouldRedirectMobileToSafeFailure_WhenProviderIsNotConfigured()
+    {
+        var verifier = new FakeGoogleIdentityTokenVerifier(isConfigured: true, clientId: "google-web-client-id");
+        var service = new FakeIdentityService();
+
+        await using var app = await TestApplication.CreateAsync(verifier, service);
+        var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            "/api/auth/external/Apple?redirectUri=petmagic%3A%2F%2Fauth%2Fexternal&mode=link");
+        var response = await app.Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal(
+            "petmagic://auth/external?error=auth.external_not_configured",
+            response.Headers.Location?.ToString());
+    }
+
+    [Fact]
+    public async Task PrepareLinkedAccount_ShouldRejectProviderWithoutAuthenticationScheme()
+    {
+        var verifier = new FakeGoogleIdentityTokenVerifier(isConfigured: true, clientId: "google-web-client-id");
+        var service = new FakeIdentityService();
+
+        await using var app = await TestApplication.CreateAsync(verifier, service);
+
+        var response = await app.Client.PostAsync("/api/auth/me/linked-accounts/Apple/prepare", null);
+        var payload = JsonNode.Parse(await response.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("auth.external_not_configured", payload?["title"]?.GetValue<string>());
+        Assert.Equal("auth.external_not_configured", payload?["code"]?.GetValue<string>());
+        Assert.Null(payload?["detail"]);
+    }
+
+    [Fact]
     public async Task GoogleSocialLogin_ShouldReturnSession_WhenTokenVerificationSucceeds()
     {
         var verifier = new FakeGoogleIdentityTokenVerifier(
@@ -375,6 +440,26 @@ public sealed class AuthEndpointsNativeGoogleTests
             setCookieValues,
             value => value.Contains("petmagic_refresh_token=rotated-refresh-token", StringComparison.Ordinal));
         AssertRefreshCookieSecurity(refreshCookie, expectSecure: true);
+    }
+
+    [Fact]
+    public async Task Refresh_ShouldIgnoreUnprocessedForwardedProto_WhenRequestIsHttp()
+    {
+        var verifier = new FakeGoogleIdentityTokenVerifier(isConfigured: true, clientId: "google-web-client-id");
+        var service = new FakeIdentityService();
+
+        await using var app = await TestApplication.CreateAsync(verifier, service);
+        app.Client.DefaultRequestHeaders.Add("Cookie", "petmagic_refresh_token=cookie-refresh-token");
+        app.Client.DefaultRequestHeaders.Add("X-Forwarded-Proto", "https");
+
+        var response = await app.Client.PostAsJsonAsync("/api/auth/refresh", new { refreshToken = string.Empty });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(response.Headers.TryGetValues("Set-Cookie", out var setCookieValues));
+        var refreshCookie = Assert.Single(
+            setCookieValues,
+            value => value.Contains("petmagic_refresh_token=rotated-refresh-token", StringComparison.Ordinal));
+        AssertRefreshCookieSecurity(refreshCookie, expectSecure: false);
     }
 
     [Fact]
@@ -579,6 +664,10 @@ public sealed class AuthEndpointsNativeGoogleTests
 
         public ExternalLoginCallbackCommand? LastExternalLoginCommand { get; private set; }
 
+        public ExternalLoginCallbackCommand? LastLinkExternalCommand { get; private set; }
+
+        public Guid LastLinkedUserId { get; private set; }
+
         public RegisterUserCommand? LastRegisterCommand { get; private set; }
 
         public RefreshTokenCommand? LastRefreshCommand { get; private set; }
@@ -669,7 +758,13 @@ public sealed class AuthEndpointsNativeGoogleTests
             => NotSupported<IReadOnlyList<LinkedAccountResponse>>();
 
         public Task<Result<IReadOnlyList<LinkedAccountResponse>>> LinkExternalLoginAsync(Guid userId, ExternalLoginCallbackCommand command, CancellationToken cancellationToken)
-            => NotSupported<IReadOnlyList<LinkedAccountResponse>>();
+        {
+            LastLinkedUserId = userId;
+            LastLinkExternalCommand = command;
+            return Task.FromResult(Result.Success<IReadOnlyList<LinkedAccountResponse>>([
+                new LinkedAccountResponse(command.Provider, command.DisplayName ?? command.Email ?? "Google", true)
+            ]));
+        }
 
         public Task<Result<IReadOnlyList<LinkedAccountResponse>>> UnlinkExternalLoginAsync(Guid userId, string provider, CancellationToken cancellationToken)
             => NotSupported<IReadOnlyList<LinkedAccountResponse>>();

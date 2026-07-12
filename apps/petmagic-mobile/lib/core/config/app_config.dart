@@ -16,11 +16,24 @@ class AndroidLoopbackBackendHintConfig {
 class AppConfig {
   const AppConfig._();
 
+  static const stagingApiBaseUrl = 'https://api.staging.petmagic.app';
   static const productionApiBaseUrl = 'https://api.petmagic.app';
-  static const _productionApiHosts = {'api.petmagic.app'};
+  static const stagingDeepLinkScheme = 'petmagic-staging';
+  static const productionDeepLinkScheme = 'petmagic';
+  static const appEnvironment = String.fromEnvironment('APP_ENVIRONMENT');
+  static const appPackageName = String.fromEnvironment(
+    'APP_PACKAGE_NAME',
+    defaultValue: String.fromEnvironment(
+      'PETMAGIC_ANDROID_PACKAGE_NAME',
+      defaultValue: 'com.petmagic.app',
+    ),
+  );
   static const androidPackageName = String.fromEnvironment(
-    'PETMAGIC_ANDROID_PACKAGE_NAME',
-    defaultValue: 'com.petmagic.app',
+    'APP_PACKAGE_NAME',
+    defaultValue: String.fromEnvironment(
+      'PETMAGIC_ANDROID_PACKAGE_NAME',
+      defaultValue: 'com.petmagic.app',
+    ),
   );
 
   static const configuredApiBaseUrl = String.fromEnvironment('API_BASE_URL');
@@ -147,12 +160,13 @@ class AppConfig {
   static List<String> get apiBaseUrls {
     if (configuredApiBaseUrl.isNotEmpty) {
       if (!kDebugMode) {
-        final productionBaseUrl = normalizeProductionBaseUrl(
+        final releaseBaseUrl = normalizeReleaseBaseUrl(
           configuredApiBaseUrl,
+          environment: appEnvironment,
         );
-        return productionBaseUrl == null
+        return releaseBaseUrl == null
             ? const [productionApiBaseUrl]
-            : [productionBaseUrl];
+            : [releaseBaseUrl];
       }
 
       if (kDebugMode &&
@@ -208,6 +222,28 @@ class AppConfig {
     return apiBaseUrls.first;
   }
 
+  static String get deepLinkScheme {
+    return deepLinkSchemeForEnvironment(appEnvironment) ??
+        productionDeepLinkScheme;
+  }
+
+  static String? deepLinkSchemeForEnvironment(String environment) {
+    return switch (environment.trim().toLowerCase()) {
+      'staging' => stagingDeepLinkScheme,
+      '' || 'development' || 'production' => productionDeepLinkScheme,
+      _ => null,
+    };
+  }
+
+  static bool isExpectedDeepLinkScheme(
+    String scheme, {
+    String environment = appEnvironment,
+  }) {
+    final expectedScheme = deepLinkSchemeForEnvironment(environment);
+    return expectedScheme != null &&
+        scheme.trim().toLowerCase() == expectedScheme;
+  }
+
   static bool get _isConfiguredLoopbackBaseUrl {
     final uri = Uri.tryParse(configuredApiBaseUrl.trim());
     if (uri == null) {
@@ -220,6 +256,47 @@ class AppConfig {
 
   static bool isProductionSafeBaseUrl(String rawUrl) {
     return normalizeProductionBaseUrl(rawUrl) != null;
+  }
+
+  static void validateReleaseConfiguration({
+    bool isReleaseBuild = kReleaseMode,
+    String environment = appEnvironment,
+    String apiBaseUrl = configuredApiBaseUrl,
+    String packageName = appPackageName,
+  }) {
+    if (!isReleaseBuild) {
+      return;
+    }
+
+    final normalizedEnvironment = environment.trim().toLowerCase();
+    final expected = switch (normalizedEnvironment) {
+      'staging' => (
+        apiBaseUrl: stagingApiBaseUrl,
+        packageName: 'com.petmagic.app.staging',
+      ),
+      'production' => (
+        apiBaseUrl: productionApiBaseUrl,
+        packageName: 'com.petmagic.app',
+      ),
+      _ => throw StateError(
+        'APP_ENVIRONMENT must be staging or production for release builds.',
+      ),
+    };
+
+    final normalizedApiBaseUrl = normalizeReleaseBaseUrl(
+      apiBaseUrl,
+      environment: normalizedEnvironment,
+    );
+    if (normalizedApiBaseUrl != expected.apiBaseUrl) {
+      throw StateError(
+        'API_BASE_URL does not match APP_ENVIRONMENT=$normalizedEnvironment.',
+      );
+    }
+    if (packageName.trim() != expected.packageName) {
+      throw StateError(
+        'APP_PACKAGE_NAME does not match APP_ENVIRONMENT=$normalizedEnvironment.',
+      );
+    }
   }
 
   static AndroidLoopbackBackendHintConfig? androidLoopbackBackendHintConfig({
@@ -257,6 +334,13 @@ class AppConfig {
   }
 
   static String? normalizeProductionBaseUrl(String rawUrl) {
+    return normalizeReleaseBaseUrl(rawUrl, environment: 'production');
+  }
+
+  static String? normalizeReleaseBaseUrl(
+    String rawUrl, {
+    required String environment,
+  }) {
     final uri = Uri.tryParse(rawUrl.trim());
     if (uri == null || !uri.hasAuthority) {
       return null;
@@ -277,8 +361,13 @@ class AppConfig {
       return null;
     }
 
+    final expectedHost = switch (environment.trim().toLowerCase()) {
+      'staging' => 'api.staging.petmagic.app',
+      'production' => 'api.petmagic.app',
+      _ => null,
+    };
     final host = uri.host.toLowerCase();
-    if (!_productionApiHosts.contains(host)) {
+    if (expectedHost == null || host != expectedHost) {
       return null;
     }
 

@@ -259,13 +259,14 @@ public sealed class AdminTemplateEndpointHardeningTests
             "TemplatesContracts.Admin.cs"));
 
         Assert.Contains("group.MapPost(\"/generations/{generationId:guid}/cancel\", CancelGenerationAsync)", endpointSource, StringComparison.Ordinal);
-        Assert.Contains("CancelAdminQueuedAsync(", endpointSource, StringComparison.Ordinal);
+        Assert.Contains("CancelAdminAsync(", endpointSource, StringComparison.Ordinal);
         Assert.Contains("\"templates.generation_cancel_not_allowed\"", endpointSource, StringComparison.Ordinal);
-        Assert.Contains("Task<Result<TemplateGenerationResponse>> CancelAdminQueuedAsync", generationServiceSource, StringComparison.Ordinal);
-        Assert.Contains("CancelQueuedJobAsync(job, adminUserId, cancellationToken)", generationServiceSource, StringComparison.Ordinal);
+        Assert.Contains("Task<Result<AdminGenerationCancellationResult>> CancelAdminAsync", generationServiceSource, StringComparison.Ordinal);
+        Assert.Contains("CancelQueuedJobAsync(queued, adminUserId, cancellationToken)", generationServiceSource, StringComparison.Ordinal);
+        Assert.Contains("TemplateGenerationStatus.CancellationRequested", generationServiceSource, StringComparison.Ordinal);
         Assert.Contains("admin.template_generation.cancelled", generationServiceSource, StringComparison.Ordinal);
-        Assert.Contains("CanAdminCancelGeneration(row.Status)", adminDashboardSource, StringComparison.Ordinal);
-        Assert.Contains("return status == TemplateGenerationStatus.Queued;", adminDashboardSource, StringComparison.Ordinal);
+        Assert.Contains("CanAdminCancelGeneration(row)", adminDashboardSource, StringComparison.Ordinal);
+        Assert.Contains("ResolveCancellationUri", adminDashboardSource, StringComparison.Ordinal);
         Assert.Contains("bool CanCancel = false", contractsSource, StringComparison.Ordinal);
     }
 

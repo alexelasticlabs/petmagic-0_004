@@ -60,6 +60,9 @@ public static partial class AdminTemplateEndpoints
         group.MapPost("/generations/{generationId:guid}/retry-refund", RetryGenerationRefundAsync)
             .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateSmallJsonRequestBodyBytes))
             .RequireAuthorization("AdminOnly");
+        group.MapPost("/generations/{generationId:guid}/resolve-legacy-gamification", ResolveLegacyGamificationDeliveryAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateSmallJsonRequestBodyBytes))
+            .RequireAuthorization("AdminOnly");
         group.MapGet("/{templateId:guid}", GetAsync);
         group.MapGet("/{templateId:guid}/statistics", GetStatisticsAsync);
         group.MapGet("/{templateId:guid}/statistics/trends", GetTrendAsync);

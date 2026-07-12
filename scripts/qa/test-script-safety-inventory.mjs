@@ -23,7 +23,9 @@ const expectedScriptFiles = [
   'scripts/load/run-template-generation-baseline.sh',
   'scripts/qa/audit-android-kotlin-legacy.ps1',
   'scripts/qa/check-markdown-local-links.mjs',
+  'scripts/qa/check-production-release-config.mjs',
   'scripts/qa/check-repository-sensitive-files.mjs',
+  'scripts/qa/check-repository-structure.mjs',
   'scripts/qa/check-render-blueprint.mjs',
   'scripts/qa/check-staging-env-readiness.mjs',
   'scripts/qa/clean-local-generated-artifacts.mjs',
@@ -68,6 +70,9 @@ const expectedWorkflowFiles = [
   '.github/workflows/backend-ci.yml',
   '.github/workflows/backend-security.yml',
   '.github/workflows/mobile-ci.yml',
+  '.github/workflows/mobile-promote.yml',
+  '.github/workflows/mobile-release.yml',
+  '.github/workflows/public-web-ci.yml',
   '.github/workflows/repo-hygiene-ci.yml',
 ].sort();
 const expectedWorkflowActionUses = [
@@ -75,6 +80,8 @@ const expectedWorkflowActionUses = [
   '.github/workflows/admin-web-ci.yml:actions/setup-node@v4',
   '.github/workflows/backend-ci.yml:actions/checkout@v4',
   '.github/workflows/backend-ci.yml:actions/checkout@v4',
+  '.github/workflows/backend-ci.yml:actions/checkout@v4',
+  '.github/workflows/backend-ci.yml:actions/setup-dotnet@v4',
   '.github/workflows/backend-ci.yml:actions/setup-dotnet@v4',
   '.github/workflows/backend-ci.yml:actions/upload-artifact@v4',
   '.github/workflows/backend-security.yml:actions/checkout@v4',
@@ -84,8 +91,22 @@ const expectedWorkflowActionUses = [
   '.github/workflows/backend-security.yml:actions/setup-dotnet@v4',
   '.github/workflows/backend-security.yml:actions/upload-artifact@v4',
   '.github/workflows/backend-security.yml:gitleaks/gitleaks-action@v2',
-  '.github/workflows/mobile-ci.yml:actions/checkout@v4',
-  '.github/workflows/mobile-ci.yml:subosito/flutter-action@v2',
+  '.github/workflows/mobile-ci.yml:actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5',
+  '.github/workflows/mobile-ci.yml:actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5',
+  '.github/workflows/mobile-ci.yml:subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2',
+  '.github/workflows/mobile-ci.yml:subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2',
+  '.github/workflows/mobile-promote.yml:actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5',
+  '.github/workflows/mobile-promote.yml:ruby/setup-ruby@d45b1a4e94b71acab930e56e79c6aa188764e7f9',
+  '.github/workflows/mobile-release.yml:actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5',
+  '.github/workflows/mobile-release.yml:actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5',
+  '.github/workflows/mobile-release.yml:actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02',
+  '.github/workflows/mobile-release.yml:actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02',
+  '.github/workflows/mobile-release.yml:ruby/setup-ruby@d45b1a4e94b71acab930e56e79c6aa188764e7f9',
+  '.github/workflows/mobile-release.yml:ruby/setup-ruby@d45b1a4e94b71acab930e56e79c6aa188764e7f9',
+  '.github/workflows/mobile-release.yml:subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2',
+  '.github/workflows/mobile-release.yml:subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2',
+  '.github/workflows/public-web-ci.yml:actions/checkout@v4',
+  '.github/workflows/public-web-ci.yml:actions/setup-node@v4',
   '.github/workflows/repo-hygiene-ci.yml:actions/checkout@v4',
   '.github/workflows/repo-hygiene-ci.yml:actions/setup-dotnet@v4',
   '.github/workflows/repo-hygiene-ci.yml:actions/setup-node@v4',
@@ -93,6 +114,29 @@ const expectedWorkflowActionUses = [
 ].sort();
 const expectedWorkflowSecretReferences = [
   '.github/workflows/backend-security.yml:secrets.GITHUB_TOKEN',
+  '.github/workflows/mobile-promote.yml:secrets.APP_STORE_CONNECT_ISSUER_ID',
+  '.github/workflows/mobile-promote.yml:secrets.APP_STORE_CONNECT_KEY_ID',
+  '.github/workflows/mobile-promote.yml:secrets.APP_STORE_CONNECT_KEY_P8',
+  '.github/workflows/mobile-promote.yml:secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON',
+  '.github/workflows/mobile-release.yml:secrets.ANDROID_KEYSTORE_BASE64',
+  '.github/workflows/mobile-release.yml:secrets.ANDROID_KEYSTORE_PASSWORD',
+  '.github/workflows/mobile-release.yml:secrets.ANDROID_KEY_ALIAS',
+  '.github/workflows/mobile-release.yml:secrets.ANDROID_KEY_PASSWORD',
+  '.github/workflows/mobile-release.yml:secrets.APP_STORE_CONNECT_ISSUER_ID',
+  '.github/workflows/mobile-release.yml:secrets.APP_STORE_CONNECT_ISSUER_ID',
+  '.github/workflows/mobile-release.yml:secrets.APP_STORE_CONNECT_KEY_ID',
+  '.github/workflows/mobile-release.yml:secrets.APP_STORE_CONNECT_KEY_ID',
+  '.github/workflows/mobile-release.yml:secrets.APP_STORE_CONNECT_KEY_P8',
+  '.github/workflows/mobile-release.yml:secrets.APP_STORE_CONNECT_KEY_P8',
+  '.github/workflows/mobile-release.yml:secrets.FIREBASE_ANDROID_APP_ID',
+  '.github/workflows/mobile-release.yml:secrets.FIREBASE_ANDROID_CONFIG_BASE64',
+  '.github/workflows/mobile-release.yml:secrets.FIREBASE_IOS_APP_ID',
+  '.github/workflows/mobile-release.yml:secrets.FIREBASE_IOS_CONFIG_BASE64',
+  '.github/workflows/mobile-release.yml:secrets.FIREBASE_TOKEN',
+  '.github/workflows/mobile-release.yml:secrets.FIREBASE_TOKEN',
+  '.github/workflows/mobile-release.yml:secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON',
+  '.github/workflows/mobile-release.yml:secrets.MATCH_GIT_URL',
+  '.github/workflows/mobile-release.yml:secrets.MATCH_PASSWORD',
 ].sort();
 
 const allowedRmRf = new Map([
@@ -155,7 +199,7 @@ function collectWorkflowActionUses() {
     .flatMap((absolutePath) => {
       const relativePath = relativeScriptPath(absolutePath);
       const source = readFileSync(absolutePath, 'utf8');
-      return [...source.matchAll(/^\s*uses:\s*([^#\s]+)/gm)].map(
+      return [...source.matchAll(/^\s*(?:-\s*)?uses:\s*([^#\s]+)/gm)].map(
         (match) => `${relativePath}:${match[1]}`,
       );
     })
@@ -166,8 +210,22 @@ function assertWorkflowActionsUseStableMajorTags(actionUses) {
   for (const actionUse of actionUses) {
     const actionReference = actionUse.slice(actionUse.lastIndexOf(':') + 1);
     assert(
-      /@v\d+$/.test(actionReference),
-      `${actionUse} must use a stable major-version tag such as @v4`,
+      /@v\d+$/.test(actionReference) || /@[0-9a-f]{40}$/.test(actionReference),
+      `${actionUse} must use a stable major-version tag or a full commit SHA`,
+    );
+  }
+}
+
+function assertWorkflowActionsPinnedToCommit(relativePath) {
+  const source = read(relativePath);
+  const references = [...source.matchAll(/^\s*(?:-\s*)?uses:\s*([^#\s]+)/gm)].map(
+    (match) => match[1],
+  );
+  assert(references.length > 0, `${relativePath} must declare release actions`);
+  for (const reference of references) {
+    assert(
+      /@[0-9a-f]{40}$/.test(reference),
+      `${relativePath}:${reference} handles release secrets and must be pinned to a full commit SHA`,
     );
   }
 }
@@ -255,6 +313,27 @@ assert.deepEqual(
 );
 
 assertWorkflowActionsUseStableMajorTags(collectWorkflowActionUses());
+assertWorkflowActionsPinnedToCommit('.github/workflows/mobile-release.yml');
+assertWorkflowActionsPinnedToCommit('.github/workflows/mobile-promote.yml');
+
+const dockerCompose = read('docker-compose.yml');
+const publishedPortBindings = [...dockerCompose.matchAll(/^\s+-\s+"([^"]+:\d+)"\s*$/gm)]
+  .map((match) => match[1]);
+assert(publishedPortBindings.length > 0, 'docker-compose.yml must declare published ports');
+assert(
+  publishedPortBindings.every((binding) =>
+    binding.startsWith('${DOCKER_BIND_ADDRESS:-127.0.0.1}:'),
+  ),
+  'all Docker Compose published ports must bind to localhost by default',
+);
+
+const adminDockerfile = read('apps/admin-web/Dockerfile');
+const adminRuntimeStage = adminDockerfile.slice(adminDockerfile.lastIndexOf('FROM '));
+assert(
+  adminRuntimeStage.includes('USER node')
+    && adminRuntimeStage.indexOf('USER node') < adminRuntimeStage.indexOf('CMD ['),
+  'admin web runtime image must execute as the non-root node user',
+);
 
 assert.deepEqual(
   collectWorkflowSecretReferences(),

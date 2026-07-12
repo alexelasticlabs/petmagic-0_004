@@ -6,10 +6,6 @@ import {
   formatSafeSupportDownloadName,
   getMessageAttachments,
 } from "@/components/support/support-conversation-helpers";
-import {
-  getBlockedUnsafeSupportMediaUrlDetails,
-  isUnsafeSupportMediaUrl,
-} from "@/components/support/support-secure-media";
 import type {
   SupportInfoAttachment,
   SupportInfoAttachmentEntry,

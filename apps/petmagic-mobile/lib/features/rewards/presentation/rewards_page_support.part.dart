@@ -389,20 +389,16 @@ String _ledgerEntryTitle(AppLocalizations text, WalletLedgerItem item) {
     }
 
     if (_looksTechnical(reason)) {
-      return _sourceLabel(text, source, fallbackDelta: item.delta);
+      return _sourceLabel(text, source);
     }
 
     return reason;
   }
 
-  return _sourceLabel(text, source, fallbackDelta: item.delta);
+  return _sourceLabel(text, source);
 }
 
-String _sourceLabel(
-  AppLocalizations text,
-  String source, {
-  required int fallbackDelta,
-}) {
+String _sourceLabel(AppLocalizations text, String source) {
   return switch (source) {
     'pack_purchase' || 'purchase' => text.walletSourcePackPurchase,
     'generation_spend' ||
@@ -414,10 +410,7 @@ String _sourceLabel(
     'promo_redeem' || 'redeem_code' || 'redeem' => text.walletSourcePromoCode,
     'admin_grant' => text.walletSourceAdminGrant,
     'admin_debit' => text.walletSourceAdminDebit,
-    _ =>
-      fallbackDelta >= 0
-          ? text.walletSourceWeeklyGrant
-          : text.walletSourceGenerationSpend,
+    _ => text.walletSourceOther,
   };
 }
 

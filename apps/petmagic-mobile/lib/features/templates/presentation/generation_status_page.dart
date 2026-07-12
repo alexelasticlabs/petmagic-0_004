@@ -156,6 +156,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
   TemplateGenerationResult? _generation;
   bool _isLoading = true;
   bool _isSubmittingFeedback = false;
+  bool _hasSubmittedFeedback = false;
   bool _isDeleting = false;
   bool _isMediaActionInFlight = false;
   bool _isRemovingWatermark = false;
@@ -461,14 +462,19 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
                       ],
                     ),
                     const SizedBox(height: 10),
-                    _FeedbackCard(
-                      isSubmitting: _isSubmittingFeedback,
-                      title: text.generationStatusFeedbackTitle,
-                      excellentLabel: text.generationStatusFeedbackExcellent,
-                      okayLabel: text.generationStatusFeedbackOkay,
-                      badLabel: text.generationStatusFeedbackBad,
-                      onRatingSelected: _handleRatingSelected,
-                    ),
+                    if (_hasSubmittedFeedback)
+                      _FeedbackSubmittedCard(
+                        message: text.generationStatusFeedbackThanksMessage,
+                      )
+                    else
+                      _FeedbackCard(
+                        isSubmitting: _isSubmittingFeedback,
+                        title: text.generationStatusFeedbackTitle,
+                        excellentLabel: text.generationStatusFeedbackExcellent,
+                        okayLabel: text.generationStatusFeedbackOkay,
+                        badLabel: text.generationStatusFeedbackBad,
+                        onRatingSelected: _handleRatingSelected,
+                      ),
                   ] else if (generation.isFailed) ...[
                     _FailureCard(generation: generation),
                     const SizedBox(height: 14),
@@ -480,18 +486,23 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
                       onSupport: () => context.push(SupportChatPage.routePath),
                     ),
                     const SizedBox(height: 14),
-                    _FailedFeedbackCard(
-                      isSubmitting: _isSubmittingFeedback,
-                      onSubmit: (category) => unawaited(
-                        _submitStructuredFeedback(
-                          generation: generation,
-                          type: 'GenerationFailure',
-                          category: category,
-                          rating: -1,
-                          sourceScreen: 'generation_status_failed',
+                    if (_hasSubmittedFeedback)
+                      _FeedbackSubmittedCard(
+                        message: text.generationStatusFeedbackThanksMessage,
+                      )
+                    else
+                      _FailedFeedbackCard(
+                        isSubmitting: _isSubmittingFeedback,
+                        onSubmit: (category) => unawaited(
+                          _submitStructuredFeedback(
+                            generation: generation,
+                            type: 'GenerationFailure',
+                            category: category,
+                            rating: -1,
+                            sourceScreen: 'generation_status_failed',
+                          ),
                         ),
                       ),
-                    ),
                     const SizedBox(height: 14),
                     _DetailsCard(
                       title: text.generationStatusDetailsTitle,

@@ -333,7 +333,9 @@ public sealed partial class TemplatesApiIntegrationTests
                 .ConfigurePrimaryHttpMessageHandler(() => new UnavailableTranslationHandler());
             builder.Services.AddScoped<ITemplateMediaLifecycleService, TemplateMediaLifecycleService>();
             builder.Services.AddScoped<ITemplatesService, TemplatesService>();
-            builder.Services.AddScoped<ITemplateGenerationService, TemplateGenerationService>();
+            builder.Services.AddScoped<TemplateGenerationService>();
+            builder.Services.AddScoped<ITemplateGenerationService>(serviceProvider =>
+                serviceProvider.GetRequiredService<TemplateGenerationService>());
             builder.Services.AddScoped<ITemplateGenerationQaFixtureService, TemplateGenerationQaFixtureService>();
             builder.Services.AddScoped<IPetsService, PetsService>();
             builder.Services.AddScoped<IFeedbackService, FeedbackService>();

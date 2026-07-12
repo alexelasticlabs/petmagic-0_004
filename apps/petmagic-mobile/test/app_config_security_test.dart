@@ -46,6 +46,72 @@ void main() {
     }
   });
 
+  test('release flavor configuration must match API and package identity', () {
+    expect(
+      AppConfig.normalizeReleaseBaseUrl(
+        'https://api.staging.petmagic.app',
+        environment: 'staging',
+      ),
+      AppConfig.stagingApiBaseUrl,
+    );
+    expect(
+      AppConfig.normalizeReleaseBaseUrl(
+        'https://api.staging.petmagic.app',
+        environment: 'production',
+      ),
+      isNull,
+    );
+
+    expect(
+      () => AppConfig.validateReleaseConfiguration(
+        isReleaseBuild: true,
+        environment: 'staging',
+        apiBaseUrl: AppConfig.stagingApiBaseUrl,
+        packageName: 'com.petmagic.app.staging',
+      ),
+      returnsNormally,
+    );
+    expect(
+      () => AppConfig.validateReleaseConfiguration(
+        isReleaseBuild: true,
+        environment: 'production',
+        apiBaseUrl: AppConfig.stagingApiBaseUrl,
+        packageName: 'com.petmagic.app',
+      ),
+      throwsStateError,
+    );
+  });
+
+  test('deep-link schemes are isolated by release environment', () {
+    expect(
+      AppConfig.deepLinkSchemeForEnvironment('production'),
+      AppConfig.productionDeepLinkScheme,
+    );
+    expect(
+      AppConfig.deepLinkSchemeForEnvironment('staging'),
+      AppConfig.stagingDeepLinkScheme,
+    );
+    expect(
+      AppConfig.isExpectedDeepLinkScheme(
+        'petmagic-staging',
+        environment: 'staging',
+      ),
+      isTrue,
+    );
+    expect(
+      AppConfig.isExpectedDeepLinkScheme('petmagic', environment: 'staging'),
+      isFalse,
+    );
+    expect(
+      AppConfig.isExpectedDeepLinkScheme(
+        'petmagic-staging',
+        environment: 'production',
+      ),
+      isFalse,
+    );
+    expect(AppConfig.deepLinkSchemeForEnvironment('unexpected'), isNull);
+  });
+
   test(
     'production API base URL allowlist rejects configured debug candidates',
     () {

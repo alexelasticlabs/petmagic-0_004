@@ -50,6 +50,17 @@ public sealed partial class SupportChatService
             return Result.Failure<SupportTicketContextResponse>(ConversationNotFound);
         }
 
+        var relatedResourceError = await ValidateRelatedResourcesAsync(
+            conversation.InitiatorUserId,
+            conversation.RelatedGenerationId,
+            conversation.RelatedPaymentId,
+            conversation.RelatedSubscriptionId,
+            cancellationToken);
+        if (relatedResourceError is not null)
+        {
+            return Result.Failure<SupportTicketContextResponse>(relatedResourceError);
+        }
+
         var subscriptionSummaryTask = economyService?.GetSubscriptionSummaryAsync(
             conversation.InitiatorUserId,
             cancellationToken);

@@ -1,5 +1,7 @@
 namespace PetMagic.Modules.Economy.Infrastructure;
 
+using PetMagic.Modules.Economy.Infrastructure.Options;
+
 internal sealed record PremiumPlanDefinition(
     string PlanCode,
     string ProductName,
@@ -16,7 +18,7 @@ internal sealed record PremiumPlanDefinition(
 
 internal static class PremiumPlanCatalog
 {
-    public static IReadOnlyList<PremiumPlanDefinition> All { get; } =
+    public static IReadOnlyList<PremiumPlanDefinition> Create(EconomyOptions options) =>
     [
         new(
             "monthly",
@@ -29,8 +31,8 @@ internal static class PremiumPlanCatalog
             false,
             null,
             1,
-            "com.petmagic.app.premium.monthly",
-            "com.petmagic.app.premium.monthly"),
+            options.GooglePlayPremiumMonthlyProductId,
+            options.AppStorePremiumMonthlyProductId),
         new(
             "yearly",
             "PetMagic Premium Yearly",
@@ -41,14 +43,14 @@ internal static class PremiumPlanCatalog
             1000,
             true,
             33,
-                2,
-            "com.petmagic.app.premium.yearly",
-            "com.petmagic.app.premium.yearly")
+            2,
+            options.GooglePlayPremiumYearlyProductId,
+            options.AppStorePremiumYearlyProductId)
     ];
 
-    public static PremiumPlanDefinition? Find(string planCode)
+    public static PremiumPlanDefinition? Find(EconomyOptions options, string planCode)
     {
-        return All.FirstOrDefault(x =>
+        return Create(options).FirstOrDefault(x =>
             string.Equals(x.PlanCode, planCode.Trim(), StringComparison.OrdinalIgnoreCase));
     }
 }

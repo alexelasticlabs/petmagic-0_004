@@ -72,6 +72,26 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('password visibility control exposes its semantic action', (
+    tester,
+  ) async {
+    await pumpTestApp(tester, sharedPrefs: const {onboardingSeenKey: true});
+
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+
+    final text = AppLocalizations.of(
+      tester.element(find.byType(AuthEntryPage)),
+    );
+    expect(find.byTooltip(text.authShowPassword), findsOneWidget);
+
+    await tester.tap(find.byTooltip(text.authShowPassword));
+    await tester.pump();
+
+    expect(find.byTooltip(text.authHidePassword), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   test('auth social providers are platform-specific and ordered', () {
     expect(authSocialProvidersForPlatform(isIOS: false), [
       ExternalAuthProvider.google,

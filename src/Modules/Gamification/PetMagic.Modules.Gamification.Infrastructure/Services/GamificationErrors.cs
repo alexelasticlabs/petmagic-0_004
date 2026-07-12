@@ -5,4 +5,5 @@ namespace PetMagic.Modules.Gamification.Infrastructure.Services;
 internal static class GamificationErrors
 {
     public static readonly Error StreakNotFound = new("gamification.streak_not_found", "No streak exists for the specified user.");
+    public static readonly Error AdminStreakResetReasonRequired = new("gamification.admin_streak_reset_reason_required", "Resetting a user streak requires an audit reason.");
 }

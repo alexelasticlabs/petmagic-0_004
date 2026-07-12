@@ -46,6 +46,14 @@ public sealed partial class SupportChatService
         string? locale,
         CancellationToken cancellationToken)
     {
+        await using var transaction = isAdmin
+            ? await BeginSupportAdminActionTransactionAsync(cancellationToken)
+            : null;
+        if (transaction is not null)
+        {
+            await LockConversationRowForAdminActionAsync(conversationId, cancellationToken);
+        }
+
         var conversation = await supportChatDbContext.SupportConversations
             .FirstOrDefaultAsync(x => x.Id == conversationId, cancellationToken);
         if (conversation is null)
@@ -56,6 +64,15 @@ public sealed partial class SupportChatService
         if (!isAdmin && conversation.InitiatorUserId != senderUserId)
         {
             return Result.Failure<SupportMessageResponse>(Forbidden);
+        }
+
+        if (isAdmin)
+        {
+            var ownershipError = ValidateAdminOwnership(conversation, senderUserId);
+            if (ownershipError is not null)
+            {
+                return Result.Failure<SupportMessageResponse>(ownershipError);
+            }
         }
 
         var canAppendError = ValidateConversationCanAcceptMessage(conversation, isAdmin, DateTime.UtcNow);
@@ -148,13 +165,24 @@ public sealed partial class SupportChatService
             await AppendStatusChangedEventAsync(conversation, currentStatus, nextStatus);
         }
 
-        await supportChatDbContext.SaveChangesAsync(cancellationToken);
-        await NotifyConversationUpdatedAsync(conversation, cancellationToken);
-        var response = await BuildMessageResponseAsync(message, cancellationToken);
         if (isAdmin)
         {
-            await NotifyUserMessageAsync(conversation, response, cancellationToken);
+            await EnqueueUserMessageNotificationAsync(
+                conversation,
+                message.Id,
+                normalizedAttachments.Count > 0,
+                unreadCountDelta: 1,
+                cancellationToken);
         }
+
+        await supportChatDbContext.SaveChangesAsync(cancellationToken);
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
+
+        await NotifyConversationUpdatedAsync(conversation, cancellationToken);
+        var response = await BuildMessageResponseAsync(message, cancellationToken);
 
         return Result.Success(response);
     }
@@ -163,6 +191,14 @@ public sealed partial class SupportChatService
         CreateSupportAttachmentMessageCommand command,
         CancellationToken cancellationToken)
     {
+        await using var transaction = command.IsAdmin
+            ? await BeginSupportAdminActionTransactionAsync(cancellationToken)
+            : null;
+        if (transaction is not null)
+        {
+            await LockConversationRowForAdminActionAsync(command.ConversationId, cancellationToken);
+        }
+
         var conversation = await supportChatDbContext.SupportConversations
             .FirstOrDefaultAsync(x => x.Id == command.ConversationId, cancellationToken);
         if (conversation is null)
@@ -173,6 +209,15 @@ public sealed partial class SupportChatService
         if (!command.IsAdmin && conversation.InitiatorUserId != command.SenderUserId)
         {
             return Result.Failure<SupportMessageResponse>(Forbidden);
+        }
+
+        if (command.IsAdmin)
+        {
+            var ownershipError = ValidateAdminOwnership(conversation, command.SenderUserId);
+            if (ownershipError is not null)
+            {
+                return Result.Failure<SupportMessageResponse>(ownershipError);
+            }
         }
 
         var canAppendError = ValidateConversationCanAcceptMessage(conversation, command.IsAdmin, DateTime.UtcNow);
@@ -229,6 +274,11 @@ public sealed partial class SupportChatService
         }
 
         await supportChatDbContext.SaveChangesAsync(cancellationToken);
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
+
         await NotifyConversationUpdatedAsync(conversation, cancellationToken);
         return Result.Success(await BuildMessageResponseAsync(message, cancellationToken));
     }

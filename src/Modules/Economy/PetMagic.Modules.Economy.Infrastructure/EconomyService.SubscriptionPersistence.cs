@@ -279,7 +279,7 @@ public sealed partial class EconomyService
             };
         }
 
-        var catalogPlan = PremiumPlanCatalog.Find(planId);
+        var catalogPlan = PremiumPlanCatalog.Find(options.Value, planId);
         if (catalogPlan is null)
         {
             return null;

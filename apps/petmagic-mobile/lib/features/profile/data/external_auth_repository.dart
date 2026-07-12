@@ -2,10 +2,11 @@ import 'dart:async';
 
 import 'package:app_links/app_links.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
+import 'package:petmagic_mobile/core/auth/google_sign_in_adapter.dart';
+import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
@@ -74,18 +75,13 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
   static const _invalidSessionCode = 'auth.external_ticket_invalid';
   static const _genericFailedCode = 'auth.external_invalid';
   static const _cancelledCode = 'auth.external_cancelled';
-  static GoogleSignIn? _googleSignInInstance;
-  static String? _initializedGoogleServerClientId;
-
   MobileExternalAuthRepository({
     required Dio dio,
     required AuthSessionStorage sessionStorage,
     required AppLinks appLinks,
     AuthSessionCoordinator? authSessionCoordinator,
     Future<bool> Function(Uri uri, LaunchMode mode)? launchUrlDelegate,
-    Future<GoogleSignInAccount?> Function(GoogleSignIn googleSignIn)?
-    googleSignInDelegate,
-    GoogleSignIn Function(String? serverClientId)? googleSignInFactory,
+    GoogleSignInAdapter? googleSignInAdapter,
     Future<AuthorizationCredentialAppleID> Function()? appleSignInDelegate,
     Stream<Uri>? uriLinkStream,
   }) : _dio = dio,
@@ -95,11 +91,8 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
            AuthSessionCoordinator(dio: dio, sessionStorage: sessionStorage),
        _launchUrl =
            launchUrlDelegate ?? ((uri, mode) => launchUrl(uri, mode: mode)),
-       _googleSignIn =
-           googleSignInDelegate ?? ((googleSignIn) => googleSignIn.signIn()),
-       _createGoogleSignIn =
-           googleSignInFactory ??
-           ((serverClientId) => GoogleSignIn(serverClientId: serverClientId)),
+       _googleSignInAdapter =
+           googleSignInAdapter ?? PluginGoogleSignInAdapter.shared,
        _appleSignIn =
            appleSignInDelegate ??
            (() => SignInWithApple.getAppleIDCredential(
@@ -111,7 +104,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
        _uriLinkStream = uriLinkStream ?? appLinks.uriLinkStream;
 
   static final Uri _callbackUri = Uri(
-    scheme: 'petmagic',
+    scheme: AppConfig.deepLinkScheme,
     host: 'auth',
     path: '/external',
   );
@@ -120,9 +113,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
   final AuthSessionStorage _sessionStorage;
   final AuthSessionCoordinator _authSessionCoordinator;
   final Future<bool> Function(Uri uri, LaunchMode mode) _launchUrl;
-  final Future<GoogleSignInAccount?> Function(GoogleSignIn googleSignIn)
-  _googleSignIn;
-  final GoogleSignIn Function(String? serverClientId) _createGoogleSignIn;
+  final GoogleSignInAdapter _googleSignInAdapter;
   final Future<AuthorizationCredentialAppleID> Function() _appleSignIn;
   final Stream<Uri> _uriLinkStream;
 
@@ -143,6 +134,10 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
     ExternalAuthProvider provider, {
     CancelToken? cancelToken,
   }) {
+    if (provider == ExternalAuthProvider.google) {
+      return _linkGoogleNatively(cancelToken: cancelToken);
+    }
+
     return _linkWithBrowserFlow(provider, cancelToken: cancelToken);
   }
 
@@ -173,29 +168,9 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
         },
       );
 
-      final googleSignIn = await _getGoogleSignIn(
+      final account = await _googleSignInAdapter.authenticate(
         serverClientId: serverClientId,
       );
-
-      AppLogger.info(
-        feature: 'Profile.ExternalAuth',
-        operation: 'google_native_auth_stage',
-        message: 'Starting Google native account picker',
-        context: {
-          'stage': 'native_picker_starting',
-          'has_server_client_id': serverClientId != null,
-        },
-      );
-      final account = await _googleSignIn(googleSignIn);
-      if (account == null) {
-        AppLogger.info(
-          feature: 'Profile.ExternalAuth',
-          operation: 'google_native_auth_stage',
-          message: 'Google native account picker returned no account',
-          context: {'stage': 'native_picker_returned_null'},
-        );
-        throw const AppException(_cancelledCode);
-      }
       AppLogger.info(
         feature: 'Profile.ExternalAuth',
         operation: 'google_native_auth_stage',
@@ -206,8 +181,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
         },
       );
 
-      final authentication = await account.authentication;
-      final idToken = authentication.idToken;
+      final idToken = account.idToken;
       if (idToken == null || idToken.isEmpty) {
         throw const AppException(_genericFailedCode);
       }
@@ -254,16 +228,23 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
       );
       await _resetGoogleSession();
       rethrow;
-    } on PlatformException catch (error, stackTrace) {
-      _logGooglePlatformException(error, stackTrace);
-      final mapped = _mapGooglePlatformException(error);
+    } on GoogleSignInException catch (error, stackTrace) {
+      _logGoogleSignInException(error, stackTrace);
+      final mapped = _mapGoogleSignInException(error);
       _trackSocialAuthEvent(
         'social_login_failed',
         provider: ExternalAuthProvider.google,
-        status: _classifyGooglePlatformFailure(error),
+        status: _classifyGoogleSignInFailure(error),
       );
       await _resetGoogleSession();
       throw mapped;
+    } on GoogleSignInConfigurationException catch (error, stackTrace) {
+      _logExternalAuthFailure(
+        'authenticate_native_google_configuration',
+        error,
+        stackTrace,
+      );
+      throw const AppException(_genericFailedCode);
     } on DioException catch (error) {
       await _resetGoogleSession();
       final mapped = _mapDioException(
@@ -292,25 +273,30 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
     }
   }
 
-  AppException _mapGooglePlatformException(PlatformException error) {
+  AppException _mapGoogleSignInException(GoogleSignInException error) {
     return switch (error.code) {
-      GoogleSignIn.kSignInCanceledError => const AppException(_cancelledCode),
-      GoogleSignIn.kNetworkError => const AppException('network.unavailable'),
+      GoogleSignInExceptionCode.canceled ||
+      GoogleSignInExceptionCode.interrupted => const AppException(
+        _cancelledCode,
+      ),
       _ => const AppException(_genericFailedCode),
     };
   }
 
-  String _classifyGooglePlatformFailure(PlatformException error) {
+  String _classifyGoogleSignInFailure(GoogleSignInException error) {
     return switch (error.code) {
-      GoogleSignIn.kSignInCanceledError => 'user_cancellation',
-      GoogleSignIn.kNetworkError => 'network_failure',
-      GoogleSignIn.kSignInRequiredError => 'provider_unavailable',
+      GoogleSignInExceptionCode.canceled ||
+      GoogleSignInExceptionCode.interrupted => 'user_cancellation',
+      GoogleSignInExceptionCode.clientConfigurationError ||
+      GoogleSignInExceptionCode.providerConfigurationError =>
+        'configuration_failure',
+      GoogleSignInExceptionCode.uiUnavailable => 'provider_unavailable',
       _ => 'provider_failure',
     };
   }
 
-  void _logGooglePlatformException(
-    PlatformException error,
+  void _logGoogleSignInException(
+    GoogleSignInException error,
     StackTrace stackTrace,
   ) {
     AppLogger.warn(
@@ -318,68 +304,13 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
       operation: 'authenticate_native_google_sign_in',
       message: 'Google sign-in SDK failed',
       context: {
-        'code': error.code,
-        'provider_status_code': ?_tryReadGoogleApiStatusCode(error),
-        'has_message': error.message?.isNotEmpty ?? false,
+        'code': error.code.name,
+        'has_description': error.description?.isNotEmpty ?? false,
         'has_details': error.details != null,
       },
       error: error,
       stackTrace: stackTrace,
     );
-  }
-
-  int? _tryReadGoogleApiStatusCode(PlatformException error) {
-    final message = error.message;
-    if (message == null || message.isEmpty) {
-      return null;
-    }
-
-    final match = RegExp(r'ApiException:\s*(\d+)').firstMatch(message);
-    if (match == null) {
-      return null;
-    }
-
-    return int.tryParse(match.group(1)!);
-  }
-
-  Future<GoogleSignIn> _getGoogleSignIn({
-    required String? serverClientId,
-  }) async {
-    if (_googleSignInInstance != null &&
-        _initializedGoogleServerClientId != serverClientId) {
-      await _resetGoogleSession(clearInitializationState: true);
-    }
-
-    final existing = _googleSignInInstance;
-    if (existing != null) {
-      AppLogger.info(
-        feature: 'Profile.ExternalAuth',
-        operation: 'google_native_auth_stage',
-        message: 'Reusing Google Sign-In native SDK',
-        context: {
-          'stage': 'google_sign_in_reused',
-          'requested_server_client_id_present': serverClientId != null,
-          'initialized_server_client_id_present':
-              _initializedGoogleServerClientId != null,
-        },
-      );
-      return existing;
-    }
-
-    final googleSignIn = _createGoogleSignIn(serverClientId);
-    _googleSignInInstance = googleSignIn;
-    _initializedGoogleServerClientId = serverClientId;
-    AppLogger.info(
-      feature: 'Profile.ExternalAuth',
-      operation: 'google_native_auth_stage',
-      message: 'Created Google Sign-In native SDK',
-      context: {
-        'stage': 'google_sign_in_created',
-        'has_server_client_id': serverClientId != null,
-      },
-    );
-
-    return googleSignIn;
   }
 
   Future<String?> _resolveGoogleServerClientId({
@@ -496,23 +427,13 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
     }
   }
 
-  Future<void> _resetGoogleSession({
-    bool clearInitializationState = true,
-  }) async {
-    final googleSignIn = _googleSignInInstance;
-    if (googleSignIn == null) {
-      if (clearInitializationState) {
-        _clearGoogleInitializationState();
-      }
-      return;
-    }
-
+  Future<void> _resetGoogleSession() async {
     try {
-      await googleSignIn.disconnect();
+      await _googleSignInAdapter.disconnect();
     } catch (error, stackTrace) {
       _logExternalAuthFailure('google_disconnect_cleanup', error, stackTrace);
       try {
-        await googleSignIn.signOut();
+        await _googleSignInAdapter.signOut();
       } catch (innerError, innerStackTrace) {
         _logExternalAuthFailure(
           'google_sign_out_cleanup',
@@ -522,14 +443,63 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
         // Best-effort cleanup only.
       }
     }
-    if (clearInitializationState) {
-      _clearGoogleInitializationState();
-    }
   }
 
-  void _clearGoogleInitializationState() {
-    _googleSignInInstance = null;
-    _initializedGoogleServerClientId = null;
+  Future<List<MobileLinkedAccount>> _linkGoogleNatively({
+    CancelToken? cancelToken,
+  }) async {
+    try {
+      final session = await _readAuthorizedSession();
+      final serverClientId = await _resolveGoogleServerClientId(
+        cancelToken: cancelToken,
+      );
+      final account = await _googleSignInAdapter.authenticate(
+        serverClientId: serverClientId,
+      );
+      final idToken = account.idToken;
+      if (idToken == null || idToken.isEmpty) {
+        throw const AppException(_genericFailedCode);
+      }
+
+      final response = await _dio.post<List<dynamic>>(
+        '/api/auth/me/linked-accounts/google/native',
+        data: {'idToken': idToken},
+        options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
+      );
+
+      return (response.data ?? const <dynamic>[])
+          .whereType<Map<String, dynamic>>()
+          .map(MobileLinkedAccount.fromJson)
+          .toList(growable: false);
+    } on AppException {
+      await _resetGoogleSession();
+      rethrow;
+    } on GoogleSignInException catch (error, stackTrace) {
+      _logGoogleSignInException(error, stackTrace);
+      await _resetGoogleSession();
+      throw _mapGoogleSignInException(error);
+    } on GoogleSignInConfigurationException catch (error, stackTrace) {
+      _logExternalAuthFailure(
+        'link_native_google_configuration',
+        error,
+        stackTrace,
+      );
+      await _resetGoogleSession();
+      throw const AppException(_genericFailedCode);
+    } on DioException catch (error) {
+      _logExternalAuthFailure(
+        'link_native_google_dio',
+        error,
+        error.stackTrace,
+      );
+      await _resetGoogleSession();
+      throw _mapDioException(error, fallbackMessage: _genericFailedCode);
+    } catch (error, stackTrace) {
+      _logExternalAuthFailure('link_native_google_unknown', error, stackTrace);
+      await _resetGoogleSession();
+      throw const AppException(_genericFailedCode);
+    }
   }
 
   Future<List<MobileLinkedAccount>> _linkWithBrowserFlow(

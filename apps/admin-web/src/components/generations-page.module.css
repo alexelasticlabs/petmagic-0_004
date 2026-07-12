@@ -66,6 +66,39 @@
   opacity: 0.62;
 }
 
+.resolutionField {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.resolutionTextarea {
+  width: 100%;
+  min-height: 5.5rem;
+  resize: vertical;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-strong);
+  padding: 0.5rem 0.65rem;
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+.resolutionTextarea:focus-visible {
+  outline: none;
+  border-color: var(--border-accent);
+  box-shadow: var(--focus-ring);
+}
+
+.resolutionField small {
+  color: var(--warning);
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
 .tableHeader {
   display: flex;
   align-items: center;

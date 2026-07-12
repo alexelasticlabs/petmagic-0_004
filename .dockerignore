@@ -79,6 +79,7 @@ logs/
 tmp_*
 debug_*
 backup_*
+backups/
 temp/
 tmp/
 .tmp/

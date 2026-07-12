@@ -37,9 +37,12 @@ type SupportInfoPanelUserTabProps = {
   analyticsQuery: SupportConversationController["analyticsQuery"];
   attachmentPreviewEntries: SupportInfoAttachmentEntry[];
   canManageSupportWorkspace: boolean;
+  canMutateConversation: boolean;
   canViewSubjectUserContext: boolean;
   confirmPendingStatusChange: () => Promise<void>;
   conversation: NonNullable<SupportConversationController["conversation"]>;
+  assignmentMutation: SupportConversationController["assignmentMutation"];
+  isAssignedToCurrentAdmin: boolean;
   destructiveStatusAction: SupportConversationController["destructiveStatusAction"];
   handleAddTag: () => void;
   isTagEditorOpen: boolean;
@@ -108,9 +111,12 @@ export function SupportInfoPanelUserTab({
   analyticsQuery,
   attachmentPreviewEntries,
   canManageSupportWorkspace,
+  canMutateConversation,
   canViewSubjectUserContext,
   confirmPendingStatusChange,
   conversation,
+  assignmentMutation,
+  isAssignedToCurrentAdmin,
   destructiveStatusAction,
   handleAddTag,
   isTagEditorOpen,
@@ -149,6 +155,44 @@ export function SupportInfoPanelUserTab({
         <div className={styles.infoPanelKvRow}>
           <span className={styles.infoPanelKvLabel}>
             <span className={styles.infoPanelKvIcon} aria-hidden="true">
+              ◉
+            </span>
+            <span>{panelText.assignedOperator}</span>
+          </span>
+          <strong>
+            {conversation.assignedAdminId
+              ? (conversation.assignedAdminDisplayName ?? panelText.ownedByAnotherOperator)
+              : panelText.unassignedOperator}
+          </strong>
+        </div>
+        <div className={styles.infoPanelAssignmentActions}>
+          {!conversation.assignedAdminId ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="primary"
+              onClick={() => assignmentMutation.mutate("claim")}
+              disabled={!canManageSupportWorkspace || assignmentMutation.isPending}
+            >
+              {panelText.claimTicket}
+            </Button>
+          ) : isAssignedToCurrentAdmin ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() => assignmentMutation.mutate("unassign")}
+              disabled={!canManageSupportWorkspace || assignmentMutation.isPending}
+            >
+              {panelText.unassignTicket}
+            </Button>
+          ) : (
+            <span className={styles.subtle}>{panelText.ownedByAnotherOperator}</span>
+          )}
+        </div>
+        <div className={styles.infoPanelKvRow}>
+          <span className={styles.infoPanelKvLabel}>
+            <span className={styles.infoPanelKvIcon} aria-hidden="true">
               ⚑
             </span>
             <span>{text.supportPriorityLabel}</span>
@@ -157,7 +201,7 @@ export function SupportInfoPanelUserTab({
             <Select
               value={operatorPriority}
               onChange={(value) => setOperatorPriority(value as typeof operatorPriority)}
-              disabled={!canManageSupportWorkspace}
+              disabled={!canMutateConversation}
               showSelectedDescription={false}
               options={[
                 { value: "Low", label: text.supportPriorityLow },
@@ -178,9 +222,36 @@ export function SupportInfoPanelUserTab({
         </div>
       </div>
 
+      <div className={styles.infoPanelSection}>
+        <div className={styles.infoPanelSectionHeader}>
+          <span className={styles.infoPanelSectionTitle}>{panelText.feedbackTitle}</span>
+        </div>
+        {typeof conversation.feedbackRating === "number" ? (
+          <>
+            <div className={styles.infoPanelKvRow}>
+              <span>{panelText.feedbackRating(conversation.feedbackRating)}</span>
+              <strong aria-label={panelText.feedbackRating(conversation.feedbackRating)}>
+                {"★".repeat(conversation.feedbackRating)}
+                {"☆".repeat(5 - conversation.feedbackRating)}
+              </strong>
+            </div>
+            {conversation.feedbackComment?.trim() ? (
+              <div className={styles.infoPanelKvRow}>
+                <span>{panelText.feedbackComment}</span>
+                <strong>
+                  {formatSafeSupportDisplay(conversation.feedbackComment, panelText.noData, 1000)}
+                </strong>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <span className={styles.subtle}>{panelText.feedbackNotSubmitted}</span>
+        )}
+      </div>
+
       <SupportInfoPanelAttachmentPreviewSection
         attachmentPreviewEntries={attachmentPreviewEntries}
-        canManageSupportWorkspace={canManageSupportWorkspace}
+        canManageSupportWorkspace={canMutateConversation}
         locale={locale}
         openAttachmentBlob={openAttachmentBlob}
         panelText={panelText}
@@ -197,13 +268,13 @@ export function SupportInfoPanelUserTab({
             type="button"
             className={styles.infoPanelTagAddChip}
             onClick={() => {
-              if (!canManageSupportWorkspace) {
+              if (!canMutateConversation) {
                 return;
               }
               setIsTagEditorOpen((current) => !current);
               window.setTimeout(() => tagInputRef.current?.focus(), 0);
             }}
-            disabled={!canManageSupportWorkspace}
+            disabled={!canMutateConversation}
             aria-label={panelText.addTag}
             title={panelText.addTag}
           >
@@ -218,7 +289,7 @@ export function SupportInfoPanelUserTab({
                 type="button"
                 className={styles.infoPanelTagChip}
                 onClick={() => removeOperatorTag(tag)}
-                disabled={!canManageSupportWorkspace}
+                disabled={!canMutateConversation}
                 title={panelText.removeTag}
               >
                 {formatSafeSupportDisplay(tag, panelText.tagFallback, 40)}{" "}
@@ -242,14 +313,14 @@ export function SupportInfoPanelUserTab({
               }}
               maxLength={40}
               placeholder={text.tagsLabel}
-              disabled={!canManageSupportWorkspace}
+              disabled={!canMutateConversation}
             />
             <Button
               type="button"
               size="sm"
               variant="secondary"
               onClick={handleAddTag}
-              disabled={!canManageSupportWorkspace || !tagInput.trim()}
+              disabled={!canMutateConversation || !tagInput.trim()}
             >
               {panelText.add}
             </Button>
@@ -316,7 +387,7 @@ export function SupportInfoPanelUserTab({
                   variant="primary"
                   size="sm"
                   onClick={() => void confirmPendingStatusChange()}
-                  disabled={!canManageSupportWorkspace || statusMutation.isPending}
+                  disabled={!canMutateConversation || statusMutation.isPending}
                 >
                   {panelText.close}
                 </Button>
@@ -336,7 +407,7 @@ export function SupportInfoPanelUserTab({
               className={`ui-button ui-button--primary ui-button--md ${styles.actionsPanelBtn}`}
               onClick={() => requestStatusChange(primaryStatusAction.status)}
               disabled={
-                !canManageSupportWorkspace ||
+                !canMutateConversation ||
                 statusMutation.isPending ||
                 conversation.status === primaryStatusAction.status
               }
@@ -352,7 +423,7 @@ export function SupportInfoPanelUserTab({
               className={`ui-button ui-button--secondary ui-button--md ${styles.actionsPanelBtn}`}
               onClick={() => requestStatusChange(action.status)}
               disabled={
-                !canManageSupportWorkspace ||
+                !canMutateConversation ||
                 statusMutation.isPending ||
                 conversation.status === action.status
               }
@@ -366,7 +437,7 @@ export function SupportInfoPanelUserTab({
               variant="danger"
               onClick={() => requestStatusChange(destructiveStatusAction.status)}
               disabled={
-                !canManageSupportWorkspace ||
+                !canMutateConversation ||
                 statusMutation.isPending ||
                 conversation.status === destructiveStatusAction.status
               }

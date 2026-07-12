@@ -217,6 +217,18 @@ class AppLocalizationsPl extends AppLocalizations {
   String get profilePasswordLabel => 'Hasło';
 
   @override
+  String get authShowPassword => 'Pokaż hasło';
+
+  @override
+  String get authHidePassword => 'Ukryj hasło';
+
+  @override
+  String get authShowPasswordConfirmation => 'Pokaż potwierdzenie hasła';
+
+  @override
+  String get authHidePasswordConfirmation => 'Ukryj potwierdzenie hasła';
+
+  @override
   String get profileSignInAction => 'Zaloguj się';
 
   @override
@@ -1834,6 +1846,15 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get profileAccountRolesMissing => 'Brak przypisanych ról';
+
+  @override
+  String get profileAccountRoleUser => 'Użytkownik';
+
+  @override
+  String get profileAccountRoleModerator => 'Moderator';
+
+  @override
+  String get profileAccountRoleAdmin => 'Administrator';
 
   @override
   String get profileAccountMembershipLabel => 'Członkostwo';
@@ -3926,6 +3947,13 @@ class AppLocalizationsPl extends AppLocalizations {
       'Płatność zostanie pobrana z Twojego konta App Store/Google Play. Subskrypcja odnawia się automatycznie, chyba że zostanie anulowana przed datą odnowienia.';
 
   @override
+  String get premiumCardPaymentDisclaimerTitle => 'Bezpieczna płatność kartą';
+
+  @override
+  String get premiumCardPaymentDisclaimerBody =>
+      'Płatność zostanie pobrana z Twojej karty bankowej. Subskrypcja odnawia się automatycznie, chyba że zostanie anulowana przed datą odnowienia.';
+
+  @override
   String get premiumCheckoutPageTitle => 'Przejdź na Premium';
 
   @override
@@ -4355,7 +4383,17 @@ class AppLocalizationsPl extends AppLocalizations {
   String get gamificationLoadFailed => 'Nie udało się załadować osiągnięć';
 
   @override
-  String get gamificationDayStreak => 'dni z rzędu';
+  String gamificationDayStreak(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count dnia z rzędu',
+      many: '$count dni z rzędu',
+      few: '$count dni z rzędu',
+      one: '$count dzień z rzędu',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get gamificationHubSubtitle =>
@@ -4743,4 +4781,16 @@ class AppLocalizationsPl extends AppLocalizations {
   @override
   String get templateFlowGenerationWaitTooLongPremiumHint =>
       'Zgłoszenia Premium mają priorytet, gdy usługa jest obciążona, i mogą czekać krócej.';
+
+  @override
+  String get mediaPlayAction => 'Odtwórz';
+
+  @override
+  String get mediaPauseAction => 'Pauza';
+
+  @override
+  String get mediaMuteAction => 'Wycisz';
+
+  @override
+  String get mediaUnmuteAction => 'Włącz dźwięk';
 }

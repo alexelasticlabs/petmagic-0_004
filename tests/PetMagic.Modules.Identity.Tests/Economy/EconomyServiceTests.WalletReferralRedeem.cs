@@ -1392,7 +1392,7 @@ public sealed partial class EconomyServiceTests
         var eventId = $"evt_{Guid.NewGuid():N}";
         var refundId = $"re_{orderId:N}";
         var created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        var payload = $"{{\"id\":\"{eventId}\",\"object\":\"event\",\"type\":\"refund.created\",\"created\":{created},\"data\":{{\"object\":{{\"id\":\"{refundId}\",\"object\":\"refund\",\"status\":\"succeeded\",\"metadata\":{{\"order_id\":\"{orderId:D}\",\"reason\":\"support refund\"}}}}}}}}";
+        var payload = $"{{\"id\":\"{eventId}\",\"object\":\"event\",\"type\":\"refund.created\",\"created\":{created},\"data\":{{\"object\":{{\"id\":\"{refundId}\",\"object\":\"refund\",\"status\":\"succeeded\",\"amount\":499,\"currency\":\"usd\",\"metadata\":{{\"order_id\":\"{orderId:D}\",\"reason\":\"support refund\"}}}}}}}}";
         var signature = BuildStripeSignature(payload, "test_webhook_secret");
 
         var result = await CreateService(dbContext).HandleStripeWebhookAsync(
@@ -1415,6 +1415,64 @@ public sealed partial class EconomyServiceTests
             .SingleAsync();
         Assert.Equal(-120, refundLedger.Delta);
         Assert.Equal(refundId, refundLedger.SourceTransactionId);
+    }
+
+    [Fact]
+    public async Task HandleStripeWebhook_ShouldRequireManualReviewForPartialRefundWithoutClawback()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var packId = AddStarterPack(dbContext);
+        var orderId = Guid.NewGuid();
+        var confirmedAtUtc = DateTime.UtcNow.AddMinutes(-5);
+        dbContext.Wallets.Add(new Wallet
+        {
+            UserId = userId,
+            Balance = 120,
+            UpdatedAtUtc = confirmedAtUtc
+        });
+        dbContext.PurchaseOrders.Add(new PurchaseOrder
+        {
+            Id = orderId,
+            UserId = userId,
+            PackId = packId,
+            PaymentProvider = "stripe",
+            Status = PurchaseOrderStatus.Succeeded,
+            PriceAmount = 4.99m,
+            CurrencyCode = "USD",
+            SparkToGrant = 120,
+            ExternalPaymentId = "pi_partial_refund",
+            CreatedAtUtc = confirmedAtUtc.AddMinutes(-1),
+            ConfirmedAtUtc = confirmedAtUtc
+        });
+        await dbContext.SaveChangesAsync();
+
+        var eventId = $"evt_{Guid.NewGuid():N}";
+        var refundId = $"re_{orderId:N}";
+        var created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var payload = $"{{\"id\":\"{eventId}\",\"object\":\"event\",\"type\":\"refund.created\",\"created\":{created},\"data\":{{\"object\":{{\"id\":\"{refundId}\",\"object\":\"refund\",\"status\":\"succeeded\",\"amount\":200,\"currency\":\"usd\",\"metadata\":{{\"order_id\":\"{orderId:D}\"}}}}}}}}";
+        var signature = BuildStripeSignature(payload, "test_webhook_secret");
+
+        var result = await CreateService(dbContext).HandleStripeWebhookAsync(
+            new StripeWebhookCommand(payload, signature),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(PurchaseOrderStatus.RefundRequiresManualReview, await dbContext.PurchaseOrders
+            .Where(x => x.Id == orderId)
+            .Select(x => x.Status)
+            .SingleAsync());
+        Assert.Equal(120, await dbContext.Wallets
+            .Where(x => x.UserId == userId)
+            .Select(x => x.Balance)
+            .SingleAsync());
+        Assert.Empty(await dbContext.WalletLedgerEntries
+            .Where(x => x.UserId == userId && x.Source == WalletLedgerSource.PurchaseRefund)
+            .ToListAsync());
+        Assert.Single(await dbContext.EconomyIncidents
+            .Where(x => x.PurchaseOrderId == orderId && x.Type == "RefundRequiresManualReview")
+            .ToListAsync());
     }
 
     [Fact]
@@ -1451,7 +1509,7 @@ public sealed partial class EconomyServiceTests
         var eventId = $"evt_{Guid.NewGuid():N}";
         var refundId = $"re_{orderId:N}";
         var created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        var payload = $"{{\"id\":\"{eventId}\",\"object\":\"event\",\"type\":\"refund.created\",\"created\":{created},\"data\":{{\"object\":{{\"id\":\"{refundId}\",\"object\":\"refund\",\"status\":\"succeeded\",\"metadata\":{{\"order_id\":\"{orderId:D}\",\"reason\":\"dashboard refund\"}}}}}}}}";
+        var payload = $"{{\"id\":\"{eventId}\",\"object\":\"event\",\"type\":\"refund.created\",\"created\":{created},\"data\":{{\"object\":{{\"id\":\"{refundId}\",\"object\":\"refund\",\"status\":\"succeeded\",\"amount\":499,\"currency\":\"usd\",\"metadata\":{{\"order_id\":\"{orderId:D}\",\"reason\":\"dashboard refund\"}}}}}}}}";
         var signature = BuildStripeSignature(payload, "test_webhook_secret");
 
         var result = await CreateService(dbContext).HandleStripeWebhookAsync(
@@ -1503,7 +1561,7 @@ public sealed partial class EconomyServiceTests
         var eventId = $"evt_{Guid.NewGuid():N}";
         var refundId = $"re_{orderId:N}";
         var created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        var payload = $"{{\"id\":\"{eventId}\",\"object\":\"event\",\"type\":\"refund.created\",\"created\":{created},\"data\":{{\"object\":{{\"id\":\"{refundId}\",\"object\":\"refund\",\"status\":\"succeeded\",\"metadata\":{{\"order_id\":\"{orderId:D}\",\"reason\":\"duplicate refund\"}}}}}}}}";
+        var payload = $"{{\"id\":\"{eventId}\",\"object\":\"event\",\"type\":\"refund.created\",\"created\":{created},\"data\":{{\"object\":{{\"id\":\"{refundId}\",\"object\":\"refund\",\"status\":\"succeeded\",\"amount\":499,\"currency\":\"usd\",\"metadata\":{{\"order_id\":\"{orderId:D}\",\"reason\":\"duplicate refund\"}}}}}}}}";
         var signature = BuildStripeSignature(payload, "test_webhook_secret");
         var service = CreateService(dbContext);
 
@@ -1569,7 +1627,7 @@ public sealed partial class EconomyServiceTests
         var eventId = $"evt_{Guid.NewGuid():N}";
         var refundId = $"re_{orderId:N}";
         var created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        var payload = $"{{\"id\":\"{eventId}\",\"object\":\"event\",\"type\":\"refund.created\",\"created\":{created},\"data\":{{\"object\":{{\"id\":\"{refundId}\",\"object\":\"refund\",\"status\":\"succeeded\",\"payment_intent\":\"pi_refundable_fallback\",\"metadata\":{{\"reason\":\"support refund\"}}}}}}}}";
+        var payload = $"{{\"id\":\"{eventId}\",\"object\":\"event\",\"type\":\"refund.created\",\"created\":{created},\"data\":{{\"object\":{{\"id\":\"{refundId}\",\"object\":\"refund\",\"status\":\"succeeded\",\"amount\":499,\"currency\":\"usd\",\"payment_intent\":\"pi_refundable_fallback\",\"metadata\":{{\"reason\":\"support refund\"}}}}}}}}";
         var signature = BuildStripeSignature(payload, "test_webhook_secret");
 
         var result = await CreateService(dbContext).HandleStripeWebhookAsync(

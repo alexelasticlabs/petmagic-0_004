@@ -130,6 +130,7 @@ String statusTitle(AppLocalizations text, TemplateGenerationResult generation) {
     'preprocessing' => text.templateFlowStepProcessPhoto,
     'generating' => text.templateFlowStepCreateMagic,
     'finalizing' => text.templateFlowStepFinalTouches,
+    'cancelling' => text.generationStatusStatusCreatingMagic,
     _ => switch (generation.status) {
       TemplateGenerationStatus.queued => text.generationStatusStageQueued,
       TemplateGenerationStatus.uploading => text.templateFlowStepProcessPhoto,
@@ -145,6 +146,8 @@ String statusTitle(AppLocalizations text, TemplateGenerationResult generation) {
       TemplateGenerationStatus.finalizing ||
       TemplateGenerationStatus.importingMedia =>
         text.templateFlowStepFinalTouches,
+      TemplateGenerationStatus.cancellationRequested =>
+        text.generationStatusStatusCreatingMagic,
       _ => text.generationStatusStatusCreatingMagic,
     },
   };

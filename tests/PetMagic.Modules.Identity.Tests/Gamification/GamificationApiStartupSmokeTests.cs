@@ -34,6 +34,7 @@ public sealed class GamificationApiStartupSmokeTests
     [InlineData("GET", "/api/gamification/achievements", "economy")]
     [InlineData("POST", "/api/gamification/streaks/freeze", "economy")]
     [InlineData("GET", "/api/admin/gamification/dashboard/metrics", "admin")]
+    [InlineData("POST", "/api/admin/gamification/users/{userId:guid}/streak/reset", "admin")]
     [InlineData("DELETE", "/api/admin/gamification/users/{userId:guid}/streak", "admin")]
     public async Task GamificationEndpoints_ShouldUseExpectedRateLimitPolicies(
         string method,
@@ -74,6 +75,7 @@ public sealed class GamificationApiStartupSmokeTests
     [InlineData("GET", "/api/admin/gamification/achievements")]
     [InlineData("GET", "/api/admin/gamification/challenges/current")]
     [InlineData("GET", "/api/admin/gamification/users/{userId:guid}")]
+    [InlineData("POST", "/api/admin/gamification/users/{userId:guid}/streak/reset")]
     [InlineData("DELETE", "/api/admin/gamification/users/{userId:guid}/streak")]
     public async Task GamificationAdminEndpoints_ShouldRequireAdminOnlyPolicy(
         string method,
@@ -88,6 +90,7 @@ public sealed class GamificationApiStartupSmokeTests
 
     [Theory]
     [InlineData("POST", "/api/gamification/streaks/freeze")]
+    [InlineData("POST", "/api/admin/gamification/users/{userId:guid}/streak/reset")]
     [InlineData("DELETE", "/api/admin/gamification/users/{userId:guid}/streak")]
     public async Task GamificationMutationEndpoints_ShouldLimitRequestBodiesBeforeHandlerExecution(
         string method,

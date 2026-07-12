@@ -236,10 +236,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
                 AllowAutoRedirect = false
             });
         services.AddHttpClient(HttpGeneratedMediaImporter.HttpClientName, ConfigureExternalHttpClient)
-            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
-            {
-                AllowAutoRedirect = false
-            });
+            .ConfigurePrimaryHttpMessageHandler(GeneratedMediaHttpMessageHandler.Create);
         services.AddHttpClient(FalProviderHealthService.HttpClientName, ConfigureExternalHttpClient)
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
             {
@@ -252,26 +249,26 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             {
                 AllowAutoRedirect = false
             });
-        services.AddScoped<NoopTemplateGenerationPushNotificationSender>();
         services.AddHttpClient<FcmTemplateGenerationPushNotificationSender>(ConfigureExternalHttpClient)
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
             {
                 AllowAutoRedirect = false
             });
-        services.AddScoped<ITemplateGenerationPushNotificationSender>(serviceProvider =>
-        {
-            var pushOptions = serviceProvider.GetRequiredService<TemplatesOptions>().FirebasePush;
-            return pushOptions.IsConfigured
-                ? serviceProvider.GetRequiredService<FcmTemplateGenerationPushNotificationSender>()
-                : serviceProvider.GetRequiredService<NoopTemplateGenerationPushNotificationSender>();
-        });
+        services.AddScoped<ITemplateGenerationPushDeliverySender>(serviceProvider =>
+            serviceProvider.GetRequiredService<FcmTemplateGenerationPushNotificationSender>());
+        services.AddScoped<ITemplateGenerationPushNotificationSender, TemplateGenerationPushNotificationOutbox>();
+        services.AddScoped<TemplatePushOutboxProcessor>();
         services.AddScoped<ITemplateMediaLifecycleService, TemplateMediaLifecycleService>();
         services.AddScoped<ITemplateVisibilityPolicy, TemplateVisibilityPolicy>();
         services.AddScoped<ITemplatesService, TemplatesService>();
         services.AddScoped<IPetsService, PetsService>();
         services.AddScoped<IFeedbackService, FeedbackService>();
         services.AddScoped<IAdminUserTemplateAnalyticsReader, AdminUserTemplateAnalyticsReader>();
-        services.AddScoped<ITemplateGenerationService, TemplateGenerationService>();
+        services.AddScoped<TemplateGenerationService>();
+        services.AddScoped<ITemplateGenerationService>(serviceProvider =>
+            serviceProvider.GetRequiredService<TemplateGenerationService>());
+        services.AddScoped<ITemplateGenerationGamificationReconciliationService>(serviceProvider =>
+            serviceProvider.GetRequiredService<TemplateGenerationService>());
         services.AddScoped<ITemplateGenerationQaFixtureService, TemplateGenerationQaFixtureService>();
         services.AddScoped<IImagePreviewGenerator, ImagePreviewGenerator>();
         services.AddScoped<IVideoThumbnailGenerator, VideoThumbnailGenerator>();
@@ -281,6 +278,15 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         if (options.GenerationWorkerEnabled)
         {
             services.AddHostedService<TemplateGenerationWorker>();
+        }
+
+        if (options.FirebasePush.IsConfigured
+            && string.Equals(
+                ResolveSchedulerComponent(schedulerComponent, options),
+                TemplateSchedulerConfigFingerprint.GenerationWorkerComponent,
+                StringComparison.Ordinal))
+        {
+            services.AddHostedService<TemplatePushOutboxWorker>();
         }
 
         if (options.MediaCleanupWorkerEnabled)

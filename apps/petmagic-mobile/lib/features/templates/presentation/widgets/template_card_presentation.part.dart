@@ -44,26 +44,15 @@ class _TemplateHeaderBadges extends StatelessWidget {
   Widget build(BuildContext context) {
     final trimmedPromo = promoBadgeValue?.trim();
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        Expanded(
-          child: Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              if (highlightBadgeLabel != null &&
-                  highlightBadgeLabel!.isNotEmpty)
-                _HighlightBadge(
-                  label: highlightBadgeLabel!,
-                  isFeatured: isFeatured,
-                ),
-              if (trimmedPromo != null && trimmedPromo.isNotEmpty)
-                _PromoBadge(value: trimmedPromo),
-            ],
-          ),
-        ),
-        const SizedBox(width: 6),
+        if (highlightBadgeLabel != null && highlightBadgeLabel!.isNotEmpty)
+          _HighlightBadge(label: highlightBadgeLabel!, isFeatured: isFeatured),
+        if (trimmedPromo != null && trimmedPromo.isNotEmpty)
+          _PromoBadge(value: trimmedPromo),
         _MediaTypeBadge(type: type),
       ],
     );

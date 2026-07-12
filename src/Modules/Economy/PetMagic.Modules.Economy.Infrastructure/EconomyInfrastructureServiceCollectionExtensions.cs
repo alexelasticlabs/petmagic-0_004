@@ -72,16 +72,36 @@ public static class EconomyInfrastructureServiceCollectionExtensions
                 section,
                 "StripeBillingPortalReturnUrl",
                 "STRIPE_BILLING_PORTAL_RETURN_URL") ?? "https://petmagic.app/profile/premium",
-            GooglePlayPackageName = section["GooglePlayPackageName"] ?? "com.petmagic.app",
+            GooglePlayPackageName = ReadValue(section, "GooglePlayPackageName", "GOOGLE_PLAY_PACKAGE_NAME") ?? "com.petmagic.app",
+            GooglePlayPremiumMonthlyProductId = ReadValue(
+                section,
+                "GooglePlayPremiumMonthlyProductId",
+                "GOOGLE_PLAY_PREMIUM_MONTHLY_PRODUCT_ID") ?? "com.petmagic.app.premium.monthly",
+            GooglePlayPremiumYearlyProductId = ReadValue(
+                section,
+                "GooglePlayPremiumYearlyProductId",
+                "GOOGLE_PLAY_PREMIUM_YEARLY_PRODUCT_ID") ?? "com.petmagic.app.premium.yearly",
             GooglePlayServiceAccountEmail = ReadValue(section, "GooglePlayServiceAccountEmail", "GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL") ?? string.Empty,
             GooglePlayPrivateKeyPem = NormalizePem(ReadValue(section, "GooglePlayPrivateKeyPem", "GOOGLE_PLAY_PRIVATE_KEY_PEM")),
             GooglePlayEnvironment = ReadValue(section, "GooglePlayEnvironment", "GOOGLE_PLAY_ENVIRONMENT") ?? "production",
             GooglePlayPubSubAudience = ReadValue(section, "GooglePlayPubSubAudience", "GOOGLE_PLAY_PUBSUB_AUDIENCE") ?? string.Empty,
             GooglePlayPubSubExpectedEmail = ReadValue(section, "GooglePlayPubSubExpectedEmail", "GOOGLE_PLAY_PUBSUB_EXPECTED_EMAIL") ?? string.Empty,
-            AppStoreBundleId = section["AppStoreBundleId"] ?? "com.petmagic.app",
+            AppStoreBundleId = ReadValue(section, "AppStoreBundleId", "APP_STORE_BUNDLE_ID") ?? "com.petmagic.app",
+            AppStorePremiumMonthlyProductId = ReadValue(
+                section,
+                "AppStorePremiumMonthlyProductId",
+                "APP_STORE_PREMIUM_MONTHLY_PRODUCT_ID") ?? "com.petmagic.app.premium.monthly",
+            AppStorePremiumYearlyProductId = ReadValue(
+                section,
+                "AppStorePremiumYearlyProductId",
+                "APP_STORE_PREMIUM_YEARLY_PRODUCT_ID") ?? "com.petmagic.app.premium.yearly",
             AppStoreSharedSecret = ReadValue(section, "AppStoreSharedSecret", "APP_STORE_SHARED_SECRET") ?? string.Empty,
             AppStoreEnvironment = ReadValue(section, "AppStoreEnvironment", "APP_STORE_ENVIRONMENT") ?? "production",
             MaxStoreReceiptAgeHours = ParseInt(section["MaxStoreReceiptAgeHours"], 24),
+            StoreAccountBindingMode = ReadValue(
+                section,
+                "StoreAccountBindingMode",
+                "STORE_ACCOUNT_BINDING_MODE") ?? "compatibility",
             EconomyReconciliationEnabled = ParseBool(
                 ReadValue(section, "EconomyReconciliationEnabled", "ECONOMY_RECONCILIATION_ENABLED"),
                 true),
@@ -120,10 +140,14 @@ public static class EconomyInfrastructureServiceCollectionExtensions
                 section,
                 "FirebaseServiceAccountJsonPath",
                 "ECONOMY_FIREBASE_SERVICE_ACCOUNT_JSON_PATH",
-                "FIREBASE_SERVICE_ACCOUNT_JSON_PATH") ?? string.Empty
+                "FIREBASE_SERVICE_ACCOUNT_JSON_PATH") ?? string.Empty,
+            PushOutboxDispatcherEnabled = ParseBool(
+                ReadValue(section, "PushOutboxDispatcherEnabled", "ECONOMY_PUSH_OUTBOX_DISPATCHER_ENABLED"),
+                true)
         };
 
         ValidateProductionConfiguration(economyOptions, isProduction);
+        ValidateStoreAccountBindingMode(economyOptions.StoreAccountBindingMode);
 
         services.AddSingleton<IOptions<EconomyOptions>>(Microsoft.Extensions.Options.Options.Create(economyOptions));
 
@@ -137,6 +161,7 @@ public static class EconomyInfrastructureServiceCollectionExtensions
         services.AddScoped<IEconomyService, EconomyService>();
         services.AddScoped<IEconomyAdminService>(sp =>
             (IEconomyAdminService)sp.GetRequiredService<IEconomyService>());
+        services.AddScoped<IUserEconomyResourceOwnershipReader, UserEconomyResourceOwnershipReader>();
         services.AddScoped<IAdminUserEconomyAnalyticsReader, AdminUserEconomyAnalyticsReader>();
         services.AddSingleton<IGoogleStoreWebhookTokenVerifier, GoogleStoreWebhookTokenVerifier>();
         services.AddSingleton<IStoreWebhookSecurityValidator, StoreWebhookSecurityValidator>();
@@ -152,12 +177,15 @@ public static class EconomyInfrastructureServiceCollectionExtensions
                 economyOptions,
                 serviceProvider.GetRequiredService<IHttpClientFactory>()));
         services.AddScoped<IEconomyPushTokenService, EconomyPushTokenService>();
-        services.AddScoped<NoopEconomyPushNotificationSender>();
         services.AddScoped<FcmEconomyPushNotificationSender>();
-        services.AddScoped<IEconomyPushNotificationSender>(serviceProvider =>
-            economyOptions.IsFirebasePushConfigured
-                ? serviceProvider.GetRequiredService<FcmEconomyPushNotificationSender>()
-                : serviceProvider.GetRequiredService<NoopEconomyPushNotificationSender>());
+        services.AddScoped<IEconomyPushDeliverySender>(serviceProvider =>
+            serviceProvider.GetRequiredService<FcmEconomyPushNotificationSender>());
+        services.AddScoped<IEconomyPushNotificationSender, EconomyPushNotificationOutbox>();
+        services.AddScoped<EconomyPushOutboxProcessor>();
+        if (economyOptions.PushOutboxDispatcherEnabled && economyOptions.IsFirebasePushConfigured)
+        {
+            services.AddHostedService<EconomyPushOutboxWorker>();
+        }
         services.AddHostedService<EconomyReconciliationWorker>();
         services.AddSingleton<IStoreSubscriptionVerifier>(serviceProvider =>
             new StoreSubscriptionVerifier(
@@ -170,6 +198,18 @@ public static class EconomyInfrastructureServiceCollectionExtensions
 
     private static void ConfigureExternalHttpClient(HttpClient client) =>
         client.Timeout = ExternalHttpClientTimeout;
+
+    private static void ValidateStoreAccountBindingMode(string? value)
+    {
+        if (string.Equals(value, "compatibility", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(value, "enforce", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            "Economy:StoreAccountBindingMode must be either 'compatibility' or 'enforce'.");
+    }
 
     private static int ParseInt(string? raw, int fallback)
     {
@@ -256,8 +296,12 @@ public static class EconomyInfrastructureServiceCollectionExtensions
 
         RequireProductionSecret(options.AppStoreSharedSecret, "App Store shared secret", "APP_STORE_SHARED_SECRET");
         RequireProductionSecret(options.AppStoreBundleId, "App Store bundle id", "Economy:AppStoreBundleId");
+        RequireProductionSecret(options.AppStorePremiumMonthlyProductId, "App Store monthly premium product id", "APP_STORE_PREMIUM_MONTHLY_PRODUCT_ID");
+        RequireProductionSecret(options.AppStorePremiumYearlyProductId, "App Store yearly premium product id", "APP_STORE_PREMIUM_YEARLY_PRODUCT_ID");
 
         RequireProductionSecret(options.GooglePlayPackageName, "Google Play package name", "Economy:GooglePlayPackageName");
+        RequireProductionSecret(options.GooglePlayPremiumMonthlyProductId, "Google Play monthly premium product id", "GOOGLE_PLAY_PREMIUM_MONTHLY_PRODUCT_ID");
+        RequireProductionSecret(options.GooglePlayPremiumYearlyProductId, "Google Play yearly premium product id", "GOOGLE_PLAY_PREMIUM_YEARLY_PRODUCT_ID");
         RequireProductionSecret(options.GooglePlayServiceAccountEmail, "Google Play service account email", "GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL");
         RequireProductionSecret(options.GooglePlayPrivateKeyPem, "Google Play private key", "GOOGLE_PLAY_PRIVATE_KEY_PEM");
         RequireProductionSecret(options.GooglePlayPubSubAudience, "Google Play Pub/Sub audience", "GOOGLE_PLAY_PUBSUB_AUDIENCE");
@@ -420,9 +464,10 @@ public static class EconomyInfrastructureServiceCollectionExtensions
     {
         using var scope = serviceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<EconomyDbContext>();
+        var economyOptions = scope.ServiceProvider.GetRequiredService<IOptions<EconomyOptions>>().Value;
         await dbContext.Database.MigrateAsync();
 
-        await SeedSubscriptionPlansAsync(dbContext);
+        await SeedSubscriptionPlansAsync(dbContext, economyOptions);
         await SeedPaymentProviderConfigurationsAsync(
             dbContext,
             IsProductionEnvironment() ? "live" : "test");
@@ -507,7 +552,9 @@ public static class EconomyInfrastructureServiceCollectionExtensions
         }
     }
 
-    private static async Task SeedSubscriptionPlansAsync(EconomyDbContext dbContext)
+    private static async Task SeedSubscriptionPlansAsync(
+        EconomyDbContext dbContext,
+        EconomyOptions options)
     {
         var now = DateTime.UtcNow;
         var plans = new[]
@@ -522,8 +569,8 @@ public static class EconomyInfrastructureServiceCollectionExtensions
                 MonthlyTokenLimit = 500,
                 IsRecommended = false,
                 IsActive = true,
-                AppleProductId = "com.petmagic.app.premium.monthly",
-                GoogleProductId = "com.petmagic.app.premium.monthly",
+                AppleProductId = options.AppStorePremiumMonthlyProductId,
+                GoogleProductId = options.GooglePlayPremiumMonthlyProductId,
                 DisplayOrder = 1,
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now
@@ -538,8 +585,8 @@ public static class EconomyInfrastructureServiceCollectionExtensions
                 MonthlyTokenLimit = 1000,
                 IsRecommended = true,
                 IsActive = true,
-                AppleProductId = "com.petmagic.app.premium.yearly",
-                GoogleProductId = "com.petmagic.app.premium.yearly",
+                AppleProductId = options.AppStorePremiumYearlyProductId,
+                GoogleProductId = options.GooglePlayPremiumYearlyProductId,
                 DisplayOrder = 2,
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now
@@ -562,8 +609,15 @@ public static class EconomyInfrastructureServiceCollectionExtensions
             existing.MonthlyTokenLimit = plan.MonthlyTokenLimit;
             existing.IsRecommended = plan.IsRecommended;
             existing.IsActive = plan.IsActive;
-            existing.AppleProductId = plan.AppleProductId;
-            existing.GoogleProductId = plan.GoogleProductId;
+            if (string.IsNullOrWhiteSpace(existing.AppleProductId))
+            {
+                existing.AppleProductId = plan.AppleProductId;
+            }
+
+            if (string.IsNullOrWhiteSpace(existing.GoogleProductId))
+            {
+                existing.GoogleProductId = plan.GoogleProductId;
+            }
             existing.DisplayOrder = plan.DisplayOrder;
             existing.UpdatedAtUtc = now;
         }

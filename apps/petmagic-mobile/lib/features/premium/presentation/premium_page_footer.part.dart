@@ -16,6 +16,14 @@ class _Footer extends StatelessWidget {
     final text = _premiumText(context);
     final sub = isDark ? _kDarkSubtitle : _kLightSubtitle;
     final accent = isDark ? const Color(0xFFAA8FFF) : _kLightAccent;
+    final isCardPayment =
+        state.selectedProvider == PremiumPaymentProvider.stripe;
+    final disclaimerTitle = isCardPayment
+        ? text.premiumCardPaymentDisclaimerTitle
+        : text.premiumStorePaymentDisclaimerTitle;
+    final disclaimerBody = isCardPayment
+        ? text.premiumCardPaymentDisclaimerBody
+        : text.premiumStorePaymentDisclaimerBody;
 
     return Column(
       children: [
@@ -25,7 +33,7 @@ class _Footer extends StatelessWidget {
             Icon(Icons.lock_outline_rounded, size: 12, color: sub),
             const SizedBox(width: 5),
             Text(
-              text.premiumStorePaymentDisclaimerTitle,
+              disclaimerTitle,
               style: TextStyle(
                 color: sub,
                 fontSize: 11,
@@ -36,7 +44,7 @@ class _Footer extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          text.premiumStorePaymentDisclaimerBody,
+          disclaimerBody,
           textAlign: TextAlign.center,
           style: TextStyle(
             color: sub.withValues(alpha: 0.84),

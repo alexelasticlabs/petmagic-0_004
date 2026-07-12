@@ -45,6 +45,21 @@ public sealed class HostApiMiddlewareOrderTests
     }
 
     [Fact]
+    public void Program_ShouldAllowUnsignedLocalTemplateMediaOnlyInDevelopment()
+    {
+        var source = ReadHostProgramSource();
+
+        Assert.Contains(
+            "templatesOptions.PublicBaseUrl) &&\n            !app.Environment.IsDevelopment()",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Local template storage is development-only",
+            source,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Program_ShouldClassifyStaticMediaOnlyByManagedPathSegments()
     {
         var source = ReadHostProgramSource();

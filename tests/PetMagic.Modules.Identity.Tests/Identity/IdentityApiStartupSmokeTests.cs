@@ -102,6 +102,7 @@ public sealed class IdentityApiStartupSmokeTests
     [InlineData("DELETE", "/api/auth/me")]
     [InlineData("POST", "/api/auth/me/legal-acceptance")]
     [InlineData("POST", "/api/auth/me/linked-accounts/{provider}/prepare")]
+    [InlineData("POST", "/api/auth/me/linked-accounts/google/native")]
     [InlineData("DELETE", "/api/auth/me/linked-accounts/{provider}")]
     [InlineData("DELETE", "/api/auth/me/avatar")]
     [InlineData("POST", "/api/auth/external/exchange")]

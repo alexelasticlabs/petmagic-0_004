@@ -58,6 +58,8 @@ public sealed record ExternalLinkPreparationResponse(string Ticket);
 
 public sealed record GoogleNativeLoginCommand(string IdToken);
 
+public sealed record GoogleNativeLinkCommand(string IdToken);
+
 public sealed record TokenPairResponse(
     string AccessToken,
     string RefreshToken,

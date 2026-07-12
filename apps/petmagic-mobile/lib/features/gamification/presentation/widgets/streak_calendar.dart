@@ -38,7 +38,7 @@ class StreakCounter extends StatelessWidget {
               ),
             ),
             Text(
-              text.gamificationDayStreak,
+              text.gamificationDayStreak(currentStreak),
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,

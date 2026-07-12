@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using System.Security.Cryptography;
+using System.Text;
 
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.BuildingBlocks.Observability;
@@ -56,7 +57,7 @@ public sealed class StoreSubscriptionVerifierCorrelationTests
     }
 
     [Fact]
-    public async Task VerifyProductPurchaseAsync_ShouldRejectUnacknowledgedGooglePlayProduct()
+    public async Task VerifyProductPurchaseAsync_ShouldAcceptUnacknowledgedGooglePlayProduct()
     {
         using var rsa = RSA.Create(2048);
         var handler = new GooglePlayProductHandler(
@@ -92,8 +93,187 @@ public sealed class StoreSubscriptionVerifierCorrelationTests
         Assert.True(
             result.IsSuccess,
             result.IsFailure ? $"{result.Error.Code}:{result.Error.Message}" : "unexpected failure state");
+        Assert.True(result.Value.IsPurchased);
+        Assert.Equal("purchased", result.Value.Status);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2)]
+    public async Task VerifyProductPurchaseAsync_ShouldRejectGoogleTestOrRewardedPurchaseInProduction(int purchaseType)
+    {
+        using var rsa = RSA.Create(2048);
+        var handler = new GooglePlayProductHandler(
+            $$"""
+            {
+                "purchaseState": 0,
+                "purchaseType": {{purchaseType}},
+                "orderId": "GPA.1234-5678-9012-99999"
+            }
+            """);
+        var verifier = new StoreSubscriptionVerifier(
+            new SingleClientFactory(new HttpClient(handler)),
+            Options.Create(new EconomyOptions
+            {
+                GooglePlayServiceAccountEmail = "billing-test@petmagic.iam.gserviceaccount.com",
+                GooglePlayPrivateKeyPem = rsa.ExportPkcs8PrivateKeyPem(),
+                GooglePlayPackageName = "com.petmagic.app",
+                GooglePlayEnvironment = "production",
+                AppStoreBundleId = "com.petmagic.app"
+            }),
+            new FakeStoreWebhookSecurityValidator(Result.Success()));
+
+        var result = await verifier.VerifyProductPurchaseAsync(
+            new StoreProductVerificationRequest(
+                Guid.NewGuid(),
+                "google_play",
+                "com.petmagic.app.tokens.google.pack100",
+                "gp-token-test-purchase",
+                null,
+                "gp-token-test-purchase",
+                null),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
         Assert.False(result.Value.IsPurchased);
         Assert.Equal("not_purchased", result.Value.Status);
+    }
+
+    [Fact]
+    public async Task VerifyAsync_ShouldRejectGoogleTestSubscriptionInProduction()
+    {
+        using var rsa = RSA.Create(2048);
+        var handler = new GooglePlayProductHandler(
+            """
+            {
+                "subscriptionState": "SUBSCRIPTION_STATE_ACTIVE",
+                "testPurchase": {},
+                "latestOrderId": "GPA.7777-8888-9999-00000",
+                "lineItems": [
+                    {
+                        "productId": "com.petmagic.app.premium.monthly",
+                        "expiryTime": "2099-01-01T00:00:00Z"
+                    }
+                ]
+            }
+            """);
+        var verifier = new StoreSubscriptionVerifier(
+            new SingleClientFactory(new HttpClient(handler)),
+            Options.Create(new EconomyOptions
+            {
+                GooglePlayServiceAccountEmail = "billing-test@petmagic.iam.gserviceaccount.com",
+                GooglePlayPrivateKeyPem = rsa.ExportPkcs8PrivateKeyPem(),
+                GooglePlayPackageName = "com.petmagic.app",
+                GooglePlayEnvironment = "production",
+                AppStoreBundleId = "com.petmagic.app"
+            }),
+            new FakeStoreWebhookSecurityValidator(Result.Success()));
+
+        var result = await verifier.VerifyAsync(
+            new StoreSubscriptionVerificationRequest(
+                Guid.NewGuid(),
+                "google_play",
+                "monthly",
+                "com.petmagic.app.premium.monthly",
+                "gp-test-subscription-token",
+                null,
+                "GPA.7777-8888-9999-00000",
+                null),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(EconomyErrors.StorePurchaseInvalid.Code, result.Error.Code);
+    }
+
+    [Fact]
+    public async Task VerifyProductPurchaseAsync_ShouldResolveGooglePlayAccountBinding()
+    {
+        using var rsa = RSA.Create(2048);
+        var userId = Guid.NewGuid();
+        var handler = new GooglePlayProductHandler(
+            $$"""
+            {
+                "purchaseState": 0,
+                "acknowledgementState": 0,
+                "orderId": "GPA.2222-3333-4444-55555",
+                "obfuscatedExternalAccountId": "{{userId:D}}"
+            }
+            """);
+        var verifier = new StoreSubscriptionVerifier(
+            new SingleClientFactory(new HttpClient(handler)),
+            Options.Create(new EconomyOptions
+            {
+                GooglePlayServiceAccountEmail = "billing-test@petmagic.iam.gserviceaccount.com",
+                GooglePlayPrivateKeyPem = rsa.ExportPkcs8PrivateKeyPem(),
+                GooglePlayPackageName = "com.petmagic.app",
+                AppStoreBundleId = "com.petmagic.app"
+            }),
+            new FakeStoreWebhookSecurityValidator(Result.Success()));
+
+        var matched = await verifier.VerifyProductPurchaseAsync(
+            new StoreProductVerificationRequest(
+                userId,
+                "google_play",
+                "com.petmagic.app.tokens.google.pack100",
+                "gp-token-bound",
+                null,
+                "gp-token-bound",
+                null),
+            CancellationToken.None);
+        var mismatched = await verifier.VerifyProductPurchaseAsync(
+            new StoreProductVerificationRequest(
+                Guid.NewGuid(),
+                "google_play",
+                "com.petmagic.app.tokens.google.pack100",
+                "gp-token-bound",
+                null,
+                "gp-token-bound",
+                null),
+            CancellationToken.None);
+
+        Assert.Equal(StoreAccountBindingState.Matched, matched.Value.AccountBindingState);
+        Assert.Equal(StoreAccountBindingState.Mismatched, mismatched.Value.AccountBindingState);
+    }
+
+    [Fact]
+    public async Task VerifyProductPurchaseAsync_ShouldTreatOpaqueLegacyGoogleAccountIdAsMissingBinding()
+    {
+        using var rsa = RSA.Create(2048);
+        var handler = new GooglePlayProductHandler(
+            """
+            {
+                "purchaseState": 0,
+                "orderId": "GPA.2222-3333-4444-66666",
+                "obfuscatedExternalAccountId": "legacy-client-hash"
+            }
+            """);
+        var verifier = new StoreSubscriptionVerifier(
+            new SingleClientFactory(new HttpClient(handler)),
+            Options.Create(new EconomyOptions
+            {
+                GooglePlayServiceAccountEmail = "billing-test@petmagic.iam.gserviceaccount.com",
+                GooglePlayPrivateKeyPem = rsa.ExportPkcs8PrivateKeyPem(),
+                GooglePlayPackageName = "com.petmagic.app",
+                GooglePlayEnvironment = "production",
+                AppStoreBundleId = "com.petmagic.app"
+            }),
+            new FakeStoreWebhookSecurityValidator(Result.Success()));
+
+        var result = await verifier.VerifyProductPurchaseAsync(
+            new StoreProductVerificationRequest(
+                Guid.NewGuid(),
+                "google_play",
+                "com.petmagic.app.tokens.google.pack100",
+                "gp-token-legacy-binding",
+                null,
+                "gp-token-legacy-binding",
+                null),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value.IsPurchased);
+        Assert.Equal(StoreAccountBindingState.Missing, result.Value.AccountBindingState);
+        Assert.Null(result.Value.BoundUserId);
     }
 
     [Fact]
@@ -160,6 +340,50 @@ public sealed class StoreSubscriptionVerifierCorrelationTests
 
         Assert.True(result.IsFailure);
         Assert.Equal(EconomyErrors.InvalidStoreWebhookSignature.Code, result.Error.Code);
+    }
+
+    [Fact]
+    public async Task VerifyProductPurchaseAsync_ShouldResolveAppStoreAccountBinding()
+    {
+        var userId = Guid.NewGuid();
+        var signedTransaction = BuildAppStoreJws(
+            "com.petmagic.spark100",
+            "txn_bound_123",
+            userId);
+        var verifier = new StoreSubscriptionVerifier(
+            new SingleClientFactory(new HttpClient(new RecordingHandler())),
+            Options.Create(new EconomyOptions
+            {
+                AppStoreBundleId = "com.petmagic.app",
+                AppStoreEnvironment = "production"
+            }),
+            new FakeStoreWebhookSecurityValidator(Result.Success()));
+
+        var matched = await verifier.VerifyProductPurchaseAsync(
+            new StoreProductVerificationRequest(
+                userId,
+                "app_store",
+                "com.petmagic.spark100",
+                signedTransaction,
+                null,
+                "txn_bound_123",
+                null),
+            CancellationToken.None);
+        var mismatched = await verifier.VerifyProductPurchaseAsync(
+            new StoreProductVerificationRequest(
+                Guid.NewGuid(),
+                "app_store",
+                "com.petmagic.spark100",
+                signedTransaction,
+                null,
+                "txn_bound_123",
+                null),
+            CancellationToken.None);
+
+        Assert.True(matched.IsSuccess);
+        Assert.True(mismatched.IsSuccess);
+        Assert.Equal(StoreAccountBindingState.Matched, matched.Value.AccountBindingState);
+        Assert.Equal(StoreAccountBindingState.Mismatched, mismatched.Value.AccountBindingState);
     }
 
     [Fact]
@@ -235,6 +459,93 @@ public sealed class StoreSubscriptionVerifierCorrelationTests
                 "receipt-data",
                 null,
                 "txn_123",
+                null),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(EconomyErrors.StorePurchaseInvalid.Code, result.Error.Code);
+    }
+
+    [Fact]
+    public async Task VerifyProductPurchaseAsync_ShouldRejectCanceledLegacyAppStoreTransaction()
+    {
+        var verifier = new StoreSubscriptionVerifier(
+            new SingleClientFactory(new HttpClient(new AppStoreReceiptHandler(
+                """
+                {
+                    "status": 0,
+                    "receipt": {
+                        "bundle_id": "com.petmagic.app",
+                        "in_app": [
+                            {
+                                "product_id": "com.petmagic.spark100",
+                                "transaction_id": "txn_refunded_123",
+                                "cancellation_date_ms": "1760000000000"
+                            }
+                        ]
+                    }
+                }
+                """))),
+            Options.Create(new EconomyOptions
+            {
+                AppStoreSharedSecret = "app-store-shared-secret",
+                AppStoreBundleId = "com.petmagic.app"
+            }),
+            new FakeStoreWebhookSecurityValidator(Result.Success()));
+
+        var result = await verifier.VerifyProductPurchaseAsync(
+            new StoreProductVerificationRequest(
+                Guid.NewGuid(),
+                "app_store",
+                "com.petmagic.spark100",
+                "receipt-data",
+                null,
+                "txn_refunded_123",
+                null),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value.IsPurchased);
+        Assert.Equal("not_purchased", result.Value.Status);
+    }
+
+    [Fact]
+    public async Task VerifyAsync_ShouldRejectCanceledLegacyAppStoreSubscriptionReceipt()
+    {
+        var verifier = new StoreSubscriptionVerifier(
+            new SingleClientFactory(new HttpClient(new AppStoreReceiptHandler(
+                """
+                {
+                    "status": 0,
+                    "receipt": {
+                        "bundle_id": "com.petmagic.app"
+                    },
+                    "latest_receipt_info": [
+                        {
+                            "product_id": "com.petmagic.app.premium.monthly",
+                            "original_transaction_id": "sub_refunded_123",
+                            "expires_date_ms": "4102444800000",
+                            "cancellation_date": "2026-07-10 12:00:00 Etc/GMT"
+                        }
+                    ]
+                }
+                """))),
+            Options.Create(new EconomyOptions
+            {
+                AppStoreSharedSecret = "app-store-shared-secret",
+                AppStoreBundleId = "com.petmagic.app"
+            }),
+            new FakeStoreWebhookSecurityValidator(Result.Success()));
+
+        var result = await verifier.VerifyAsync(
+            new StoreSubscriptionVerificationRequest(
+                Guid.NewGuid(),
+                "app_store",
+                "monthly",
+                "com.petmagic.app.premium.monthly",
+                "receipt-data",
+                null,
+                "sub_refunded_123",
                 null),
             CancellationToken.None);
 
@@ -379,6 +690,25 @@ public sealed class StoreSubscriptionVerifierCorrelationTests
             Assert.Equal(StoreSubscriptionVerifier.HttpClientName, name);
             return httpClient;
         }
+    }
+
+    private static string BuildAppStoreJws(string productId, string transactionId, Guid appAccountToken)
+    {
+        var payload = $$"""
+            {
+                "bundleId": "com.petmagic.app",
+                "productId": "{{productId}}",
+                "transactionId": "{{transactionId}}",
+                "originalTransactionId": "{{transactionId}}",
+                "environment": "production",
+                "appAccountToken": "{{appAccountToken:D}}"
+            }
+            """;
+        var encodedPayload = Convert.ToBase64String(Encoding.UTF8.GetBytes(payload))
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+        return $"e30.{encodedPayload}.test-signature";
     }
 
     private sealed class FakeStoreWebhookSecurityValidator(Result appStoreResult) : IStoreWebhookSecurityValidator

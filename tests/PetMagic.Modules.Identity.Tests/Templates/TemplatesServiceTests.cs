@@ -1,10 +1,13 @@
 using System.Threading.Channels;
+using System.Net;
+using System.Text;
 using Microsoft.Data.Sqlite;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Templates.Application.Abstractions;
@@ -178,7 +181,8 @@ public sealed partial class TemplatesServiceTests
         ITemplateGenerationBilling? billing = null,
         ITemplateFeedRealtimeService? realtimeService = null,
         ITemplateAiProviderHealthService? aiProviderHealthService = null,
-        IAdminAuditLog? adminAuditLog = null)
+        IAdminAuditLog? adminAuditLog = null,
+        FalQueueClient? falQueueClient = null)
     {
         return new TemplateGenerationService(
             dbContext,
@@ -187,7 +191,8 @@ public sealed partial class TemplatesServiceTests
             options ?? CreateTemplatesOptions(),
             realtimeService: realtimeService,
             aiProviderHealthService: aiProviderHealthService,
-            adminAuditLog: adminAuditLog);
+            adminAuditLog: adminAuditLog,
+            falQueueClient: falQueueClient);
     }
 
     private static TemplatesOptions CreateTemplatesOptions(
@@ -207,7 +212,8 @@ public sealed partial class TemplatesServiceTests
         int premiumImageMaxEstimatedWaitSeconds = 600,
         int freeVideoMaxEstimatedWaitSeconds = 3_600,
         int premiumVideoMaxEstimatedWaitSeconds = 1_800,
-        int generationShareTokenTtlDays = 30)
+        int generationShareTokenTtlDays = 30,
+        FalAiOptions? fal = null)
     {
         return new TemplatesOptions
         {
@@ -246,8 +252,21 @@ public sealed partial class TemplatesServiceTests
             FreeVideoMaxEstimatedWaitSeconds = freeVideoMaxEstimatedWaitSeconds,
             PremiumVideoMaxEstimatedWaitSeconds = premiumVideoMaxEstimatedWaitSeconds,
             GenerationShareTokenTtlDays = generationShareTokenTtlDays,
+            Fal = fal ?? new FalAiOptions(),
             SeedSampleTemplates = false
         };
+    }
+
+    private static FalQueueClient CreateFalQueueClient(
+        TemplatesDbContext dbContext,
+        TemplatesOptions options,
+        HttpMessageHandler handler)
+    {
+        return new FalQueueClient(
+            new FixedHttpClientFactory(new HttpClient(handler)),
+            options,
+            new TemplateAiProviderRateLimiter(dbContext, options),
+            NullLogger<FalQueueClient>.Instance);
     }
 
     private static TemplatesDbContext CreateDbContext(params IInterceptor[] interceptors)
@@ -310,6 +329,34 @@ public sealed partial class TemplatesServiceTests
         {
             GenerationStatusEvents.Add(generation);
             return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class FixedHttpClientFactory(HttpClient client) : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name) => client;
+    }
+
+    private sealed class ProviderCancellationHttpHandler(
+        HttpStatusCode statusCode,
+        string providerStatus) : HttpMessageHandler
+    {
+        public int RequestCount { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            RequestCount++;
+            Assert.Equal(HttpMethod.Put, request.Method);
+            Assert.Equal("Key", request.Headers.Authorization?.Scheme);
+            return Task.FromResult(new HttpResponseMessage(statusCode)
+            {
+                Content = new StringContent(
+                    $$"""{"status":"{{providerStatus}}"}""",
+                    Encoding.UTF8,
+                    "application/json")
+            });
         }
     }
 
@@ -594,6 +641,7 @@ public sealed partial class TemplatesServiceTests
     {
         public List<Guid> ChargedGenerationIds { get; } = [];
         public List<Guid> RefundedGenerationIds { get; } = [];
+        public PetMagic.BuildingBlocks.Results.Error? RefundError { get; init; }
 
         public Task<PetMagic.BuildingBlocks.Results.Result> ChargeAsync(Guid userId, Guid generationId, int tokenCost, CancellationToken cancellationToken)
         {
@@ -604,7 +652,9 @@ public sealed partial class TemplatesServiceTests
         public Task<PetMagic.BuildingBlocks.Results.Result> RefundAsync(Guid userId, Guid generationId, int tokenCost, CancellationToken cancellationToken)
         {
             RefundedGenerationIds.Add(generationId);
-            return Task.FromResult(PetMagic.BuildingBlocks.Results.Result.Success());
+            return Task.FromResult(RefundError is null
+                ? PetMagic.BuildingBlocks.Results.Result.Success()
+                : PetMagic.BuildingBlocks.Results.Result.Failure(RefundError));
         }
 
         public Task<PetMagic.BuildingBlocks.Results.Result<int>> SpendWatermarkUnlockAsync(Guid userId, Guid generationId, int creditCost, CancellationToken cancellationToken)

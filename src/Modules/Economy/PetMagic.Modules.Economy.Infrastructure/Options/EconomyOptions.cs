@@ -34,6 +34,10 @@ public sealed class EconomyOptions
 
     public string GooglePlayPackageName { get; init; } = "com.petmagic.app";
 
+    public string GooglePlayPremiumMonthlyProductId { get; init; } = "com.petmagic.app.premium.monthly";
+
+    public string GooglePlayPremiumYearlyProductId { get; init; } = "com.petmagic.app.premium.yearly";
+
     public string GooglePlayServiceAccountEmail { get; init; } = string.Empty;
 
     public string GooglePlayPrivateKeyPem { get; init; } = string.Empty;
@@ -46,11 +50,17 @@ public sealed class EconomyOptions
 
     public string AppStoreBundleId { get; init; } = "com.petmagic.app";
 
+    public string AppStorePremiumMonthlyProductId { get; init; } = "com.petmagic.app.premium.monthly";
+
+    public string AppStorePremiumYearlyProductId { get; init; } = "com.petmagic.app.premium.yearly";
+
     public string AppStoreSharedSecret { get; init; } = string.Empty;
 
     public string AppStoreEnvironment { get; init; } = "production";
 
     public int MaxStoreReceiptAgeHours { get; init; } = 24;
+
+    public string StoreAccountBindingMode { get; init; } = "compatibility";
 
     public bool EconomyReconciliationEnabled { get; init; } = true;
 
@@ -69,6 +79,8 @@ public sealed class EconomyOptions
     public string FirebaseServiceAccountJson { get; init; } = string.Empty;
 
     public string FirebaseServiceAccountJsonPath { get; init; } = string.Empty;
+
+    public bool PushOutboxDispatcherEnabled { get; init; } = true;
 
     public bool IsFirebasePushConfigured =>
         FirebasePushEnabled

@@ -254,6 +254,7 @@ public static partial class SupportChatEndpoints
             "support.conversation_not_found" => StatusCodes.Status404NotFound,
             "support.message_not_found" => StatusCodes.Status404NotFound,
             "support.template_not_found" => StatusCodes.Status404NotFound,
+            "support.related_resource_not_found" => StatusCodes.Status404NotFound,
             "support.forbidden" => StatusCodes.Status403Forbidden,
             "support.status_transition_invalid" => StatusCodes.Status400BadRequest,
             "support.source_invalid" => StatusCodes.Status400BadRequest,
@@ -275,6 +276,8 @@ public static partial class SupportChatEndpoints
             "support.feedback_rating_invalid" => StatusCodes.Status400BadRequest,
             "support.push_token_invalid" => StatusCodes.Status400BadRequest,
             "support.assigned_admin_invalid" => StatusCodes.Status400BadRequest,
+            "support.conversation_already_assigned" => StatusCodes.Status409Conflict,
+            "support.conversation_not_owned" => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest,
         };
 

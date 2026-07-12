@@ -21,7 +21,7 @@ public sealed partial class EconomyService
             return configuredPlan;
         }
 
-        var catalogPlan = PremiumPlanCatalog.Find(normalizedPlanCode);
+        var catalogPlan = PremiumPlanCatalog.Find(options.Value, normalizedPlanCode);
         return catalogPlan is null ? null : ToResolvedPremiumPlan(catalogPlan);
     }
 
@@ -56,7 +56,7 @@ public sealed partial class EconomyService
             return ToResolvedPremiumPlan(configuredPlan);
         }
 
-        var catalogPlan = PremiumPlanCatalog.All.FirstOrDefault(
+        var catalogPlan = PremiumPlanCatalog.Create(options.Value).FirstOrDefault(
             x => string.Equals(
                 provider == "app_store" ? x.AppStoreProductId : x.GooglePlayProductId,
                 normalizedProductId,
@@ -82,7 +82,7 @@ public sealed partial class EconomyService
             return ToResolvedPremiumPlan(configuredPlan);
         }
 
-        var catalogPlan = PremiumPlanCatalog.Find(normalizedPlanCode);
+        var catalogPlan = PremiumPlanCatalog.Find(options.Value, normalizedPlanCode);
         return catalogPlan is null ? null : ToResolvedPremiumPlan(catalogPlan);
     }
 

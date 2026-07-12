@@ -328,7 +328,30 @@ public static partial class AdminTemplateEndpoints
         return TypedResults.Ok(result.Value);
     }
 
-    private static async Task<Results<Ok<TemplateGenerationResponse>, ProblemHttpResult>> CancelGenerationAsync(
+    private static async Task<Results<Ok<AdminGamificationLegacyDeliveryResolutionResponse>, ProblemHttpResult>> ResolveLegacyGamificationDeliveryAsync(
+        HttpContext context,
+        Guid generationId,
+        [FromBody] AdminGamificationLegacyDeliveryResolutionRequest? request,
+        [FromServices] ITemplateGenerationGamificationReconciliationService reconciliationService,
+        CancellationToken cancellationToken)
+    {
+        var (adminUserId, subjectError) = TryGetAdminUserId(context);
+        if (subjectError is not null)
+        {
+            return ToAdminTemplateProblem(subjectError);
+        }
+
+        var result = await reconciliationService.ResolveLegacyDeliveryAsync(
+            adminUserId,
+            new AdminGamificationLegacyDeliveryResolutionCommand(
+                generationId,
+                request?.Action ?? string.Empty,
+                request?.Reason ?? string.Empty),
+            cancellationToken);
+        return result.IsFailure ? ToAdminTemplateProblem(result.Error) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<TemplateGenerationResponse>, Accepted<TemplateGenerationResponse>, ProblemHttpResult>> CancelGenerationAsync(
         HttpContext context,
         Guid generationId,
         [FromServices] ITemplateGenerationService generationService,
@@ -340,7 +363,7 @@ public static partial class AdminTemplateEndpoints
             return ToAdminTemplateProblem(subjectError);
         }
 
-        var result = await generationService.CancelAdminQueuedAsync(
+        var result = await generationService.CancelAdminAsync(
             adminUserId,
             generationId,
             cancellationToken);
@@ -349,7 +372,11 @@ public static partial class AdminTemplateEndpoints
             return ToAdminTemplateProblem(result.Error);
         }
 
-        return TypedResults.Ok(result.Value);
+        return result.Value.IsPending
+            ? TypedResults.Accepted(
+                $"/api/admin/templates/generations/{result.Value.Generation.GenerationId}",
+                result.Value.Generation)
+            : TypedResults.Ok(result.Value.Generation);
     }
 
 
@@ -704,4 +731,8 @@ public static partial class AdminTemplateEndpoints
         int CostCredits,
         bool ApplyToImages,
         bool ApplyToVideos);
+
+    public sealed record AdminGamificationLegacyDeliveryResolutionRequest(
+        string Action,
+        string Reason);
 }

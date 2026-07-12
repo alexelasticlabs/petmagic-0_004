@@ -1,4 +1,7 @@
+import { connection } from "next/server";
+
 import type { Metadata } from "next";
+
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -6,11 +9,13 @@ export const metadata: Metadata = {
   description: "PetMagic Admin",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  await connection();
+
   return (
     <html lang="en">
       <body>{children}</body>

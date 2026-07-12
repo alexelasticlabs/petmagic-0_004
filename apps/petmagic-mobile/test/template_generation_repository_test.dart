@@ -315,17 +315,19 @@ void main() {
   });
 
   test(
-    'parses async provider queue statuses as active non-cancellable states',
+    'parses async provider and cancellation statuses as active non-cancellable states',
     () {
       final cases = {
         'SubmittingToProvider': TemplateGenerationStatus.submittingToProvider,
         'ProviderQueued': TemplateGenerationStatus.providerQueued,
         'ProviderProcessing': TemplateGenerationStatus.providerProcessing,
         'ImportingMedia': TemplateGenerationStatus.importingMedia,
+        'CancellationRequested': TemplateGenerationStatus.cancellationRequested,
         '7': TemplateGenerationStatus.submittingToProvider,
         '8': TemplateGenerationStatus.providerQueued,
         '9': TemplateGenerationStatus.providerProcessing,
         '10': TemplateGenerationStatus.importingMedia,
+        '11': TemplateGenerationStatus.cancellationRequested,
       };
 
       for (final entry in cases.entries) {

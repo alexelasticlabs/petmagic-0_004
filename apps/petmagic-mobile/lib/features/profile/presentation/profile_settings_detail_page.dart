@@ -12,6 +12,7 @@ import 'package:petmagic_mobile/features/profile/presentation/profile_avatar_cro
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
+import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/profile_linked_accounts_settings_section.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/profile_notifications_settings_section.dart';
@@ -485,6 +486,9 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
       status: status,
       nextStep: nextStep,
       bottomInset: bottomInset,
+      onOpenSupport: kind == ProfileSettingsDetailKind.helpCenter
+          ? () => context.push(SupportChatPage.routePath)
+          : null,
       onDeleteAccount: kind == ProfileSettingsDetailKind.deleteAccount
           ? () async {
               await showProfileDeleteAccountConfirmationSheet(

@@ -45,6 +45,15 @@ public sealed class RateLimitPartitionKeysTests
     }
 
     [Fact]
+    public void Ip_ShouldIgnoreUnprocessedForwardedHeader()
+    {
+        var context = CreateContext(remoteIp: "203.0.113.10");
+        context.Request.Headers["X-Forwarded-For"] = "198.51.100.77";
+
+        Assert.Equal("203.0.113.10", RateLimitPartitionKeys.Ip(context));
+    }
+
+    [Fact]
     public void Ip_ShouldIgnoreUserClaims()
     {
         var context = CreateContext(

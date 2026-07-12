@@ -62,6 +62,10 @@
   "profileSignInHint": "Verwenden Sie Ihr PetMagic-Konto, um Ihr Profil zu laden und den im Adminbereich sichtbaren Avatar zu verwalten.",
   "profileEmailLabel": "E-Mail",
   "profilePasswordLabel": "Passwort",
+  "authShowPassword": "Passwort anzeigen",
+  "authHidePassword": "Passwort verbergen",
+  "authShowPasswordConfirmation": "Passwortbestätigung anzeigen",
+  "authHidePasswordConfirmation": "Passwortbestätigung verbergen",
   "profileSignInAction": "anmelden",
   "profileSignOutAction": "Abmelden",
   "profileLoadingAction": "Wird verarbeitet...",
@@ -388,6 +392,9 @@
   "profileAccountDisplayNameMissing": "Noch nicht festgelegt",
   "profileAccountRolesLabel": "Rollen",
   "profileAccountRolesMissing": "Keine Rollen zugewiesen",
+  "profileAccountRoleUser": "Benutzer",
+  "profileAccountRoleModerator": "Moderator",
+  "profileAccountRoleAdmin": "Administrator",
   "profileAccountMembershipLabel": "Mitgliedschaft",
   "profileAccountConsentLabel": "Bedingungen akzeptieren",
   "profileAccountMarketingLabel": "Angebote und Updates",
@@ -1210,6 +1217,8 @@
   "premiumBestValueBadge": "BESTER PREIS",
   "premiumStorePaymentDisclaimerTitle": "Sichere Zahlung über App Store / Google Play",
   "premiumStorePaymentDisclaimerBody": "Die Zahlung wird Ihrem App Store-/Google Play-Konto belastet. Das Abonnement verlängert sich automatisch, sofern es nicht vor dem Verlängerungsdatum gekündigt wird.",
+  "premiumCardPaymentDisclaimerTitle": "Sichere Kartenzahlung",
+  "premiumCardPaymentDisclaimerBody": "Die Zahlung wird Ihrer Bankkarte belastet. Das Abonnement verlängert sich automatisch, sofern es nicht vor dem Verlängerungsdatum gekündigt wird.",
   "premiumBenefitAiGenerationsTitle": "30 KI-Generationen",
   "premiumBenefitAiGenerationsSubtitle": "jeden Monat",
   "premiumBenefitPremiumTemplatesTitle": "Premium-Vorlagen",
@@ -1304,7 +1313,14 @@
   "gamificationKeepGenerating": "Generiere weiter, um mehr freizuschalten!",
   "gamificationUnlocked": "{unlocked} / {total} freigeschaltet",
   "gamificationLoadFailed": "Erfolge konnten nicht geladen werden",
-  "gamificationDayStreak": "Tage Serie",
+  "gamificationDayStreak": "{count, plural, one{{count}-Tag-Serie} other{{count}-Tage-Serie}}",
+  "@gamificationDayStreak": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "gamificationHubSubtitle": "Behalten Sie Ihre Serie, Herausforderungen und Meilensteine an einem Ort im Blick.",
   "gamificationHubEntrySubtitle": "Serie, Wochenziele und Erfolgsmeilensteine.",
   "gamificationWeekFocusTitle": "Diese Woche",
@@ -1521,5 +1537,9 @@
       }
     }
   },
-  "templateFlowGenerationWaitTooLongPremiumHint": "Premium-Anfragen erhalten Priorität, wenn der Dienst stark ausgelastet ist, und können kürzer warten."
+  "templateFlowGenerationWaitTooLongPremiumHint": "Premium-Anfragen erhalten Priorität, wenn der Dienst stark ausgelastet ist, und können kürzer warten.",
+  "mediaPlayAction": "Wiedergeben",
+  "mediaPauseAction": "Pause",
+  "mediaMuteAction": "Stummschalten",
+  "mediaUnmuteAction": "Ton einschalten"
 }

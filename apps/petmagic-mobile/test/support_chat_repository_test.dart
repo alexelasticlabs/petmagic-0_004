@@ -332,11 +332,15 @@ void main() {
       final encodedConversationId = Uri.encodeComponent(conversationId);
       final encodedMessageId = Uri.encodeComponent(messageId);
       final paths = <String>[];
+      Object? feedbackPayload;
       final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
         ..interceptors.add(
           InterceptorsWrapper(
             onRequest: (options, handler) {
               paths.add(options.path);
+              if (options.path.endsWith('/feedback')) {
+                feedbackPayload = options.data;
+              }
               expect(
                 options.headers[HttpHeaders.authorizationHeader],
                 'Bearer access-token',
@@ -402,6 +406,7 @@ void main() {
       await repository.submitFeedback(
         conversationId: conversationId,
         rating: 5,
+        comment: '  Thanks for helping  ',
       );
 
       expect(paths, [
@@ -415,6 +420,7 @@ void main() {
         '/api/support/conversation/$encodedConversationId/close',
         '/api/support/conversation/$encodedConversationId/feedback',
       ]);
+      expect(feedbackPayload, {'rating': 5, 'comment': 'Thanks for helping'});
     },
   );
 

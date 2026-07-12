@@ -65,6 +65,11 @@ FAL_PROVIDER_SPEND_DAILY_LIMIT_USD=0
 
 API role check:
 
+- For a sandbox or mocked FAL queue request, verify the admin cancellation route returns `200` only
+  after `202 CANCELLATION_REQUESTED`, returns `202` while a transient cancellation is pending, and
+  returns controlled `409` for `ALREADY_COMPLETED` and `NOT_FOUND`. Verify that only the confirmed
+  cancellation creates one refund ledger row.
+
 - `Templates:GenerationWorkerEnabled=false` for the API process.
 - API must have the same scheduler, provider guardrail, webhook, and balance values as workers.
 

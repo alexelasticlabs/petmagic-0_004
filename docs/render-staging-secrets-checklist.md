@@ -25,6 +25,7 @@ assistant chats.
 | `R2_SECRET_KEY` | API, worker | Cloudflare R2 secret access key paired with `R2_ACCESS_KEY`. | Upload/read smoke passes for generated media. |
 | `R2_BUCKET_NAME` | API, worker | Cloudflare R2 staging bucket name. | Generated media records point to the staging bucket. |
 | `R2_PUBLIC_URL` | API, worker | Cloudflare R2 public/custom domain URL for staging media. | Public/signed media URLs resolve over HTTPS. |
+| `ADMIN_MEDIA_ORIGINS` | admin-web | Comma-separated, exact HTTPS origins that host admin-viewable media (for example the configured R2 custom domain); do not include paths, credentials, private hosts, or placeholders. | Admin CSP permits required images/video while continuing to block unconfigured origins. |
 | `STRIPE_TEST_SECRET_KEY` | API, worker | Stripe dashboard test mode secret key. | Stripe sandbox checkout/session creation works. |
 | `STRIPE_TEST_PUBLISHABLE_KEY` | API, worker | Stripe dashboard test mode publishable key. | Client-visible payment config returns test publishable key only. |
 | `STRIPE_TEST_WEBHOOK_SECRET` | API, worker | Stripe CLI/dashboard webhook endpoint signing secret for staging API. | Stripe test webhook signature verifies and idempotent processing succeeds. |
@@ -32,7 +33,11 @@ assistant chats.
 | `GOOGLE_PLAY_PRIVATE_KEY_PEM` | API, worker | Private key PEM for the Google service account. | Key parses with escaped newlines preserved; purchase verification does not fail auth. |
 | `GOOGLE_PLAY_PUBSUB_AUDIENCE` | API, worker | Expected audience for Google Play Pub/Sub push authentication. | Pub/Sub push token audience is accepted. |
 | `GOOGLE_PLAY_PUBSUB_EXPECTED_EMAIL` | API, worker | Expected Google service account email for Pub/Sub push authentication. | Pub/Sub push token email is accepted. |
+| `GOOGLE_PLAY_PREMIUM_MONTHLY_PRODUCT_ID` | API, worker | Exact staging Google Play monthly subscription product ID. | `/health` reports provider catalog parity. |
+| `GOOGLE_PLAY_PREMIUM_YEARLY_PRODUCT_ID` | API, worker | Exact staging Google Play yearly subscription product ID. | `/health` reports provider catalog parity. |
 | `APP_STORE_SHARED_SECRET` | API, worker | App Store Connect shared secret for in-app purchase validation. | App Store sandbox purchase validation succeeds. |
+| `APP_STORE_PREMIUM_MONTHLY_PRODUCT_ID` | API, worker | Exact staging App Store monthly subscription product ID. | `/health` reports provider catalog parity. |
+| `APP_STORE_PREMIUM_YEARLY_PRODUCT_ID` | API, worker | Exact staging App Store yearly subscription product ID. | `/health` reports provider catalog parity. |
 | `FIREBASE_PROJECT_ID` | API, worker | Firebase project id for staging. | FCM push sender initializes for templates/economy/support paths. |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | API, worker | Firebase service account JSON for staging. | JSON parses in Render env and push delivery can be tested on a real device. |
 | `GOOGLE_CLIENT_ID` | API | Google OAuth Web application client id for backend flows. | Google external auth config returns the expected staging client id. |

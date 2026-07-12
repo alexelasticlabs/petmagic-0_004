@@ -9,6 +9,7 @@ on:
       - develop
     paths:
       - src/**
+      - shared/legal/**
       - tests/**
       - scripts/k6/**
       - scripts/db/**
@@ -22,6 +23,7 @@ on:
   pull_request:
     paths:
       - src/**
+      - shared/legal/**
       - tests/**
       - scripts/k6/**
       - scripts/db/**
@@ -101,3 +103,125 @@ jobs:
           path: |
             **/*.trx
             **/TestResults/**/*
+
+  database-migrations:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: petmagic
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d petmagic"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PGPASSWORD: postgres
+      PETMAGIC_IDENTITY_MIGRATIONS_CONNECTION_STRING: Host=localhost;Port=5432;Database=petmagic;Username=postgres;Password=postgres
+      PETMAGIC_ECONOMY_MIGRATIONS_CONNECTION_STRING: Host=localhost;Port=5432;Database=petmagic;Username=postgres;Password=postgres
+      PETMAGIC_TEMPLATES_MIGRATIONS_CONNECTION_STRING: Host=localhost;Port=5432;Database=petmagic;Username=postgres;Password=postgres
+      PETMAGIC_SUPPORTCHAT_MIGRATIONS_CONNECTION_STRING: Host=localhost;Port=5432;Database=petmagic;Username=postgres;Password=postgres
+      PETMAGIC_GAMIFICATION_MIGRATIONS_CONNECTION_STRING: Host=localhost;Port=5432;Database=petmagic;Username=postgres;Password=postgres
+      PETMAGIC_POSTGRES_INTEGRATION_CONNECTION_STRING: Host=localhost;Port=5432;Database=petmagic;Username=postgres;Password=postgres
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore tools and projects
+        run: |
+          dotnet tool restore
+          dotnet restore PetMagic.slnx
+
+      - name: Build migration projects
+        run: dotnet build PetMagic.slnx --configuration Release --no-restore
+
+      - name: Apply all contexts to clean PostgreSQL 16 database
+        shell: bash
+        run: |
+          set -euo pipefail
+          contexts=(
+            "IdentityDbContext|src/Modules/Identity/PetMagic.Modules.Identity.Infrastructure/PetMagic.Modules.Identity.Infrastructure.csproj"
+            "EconomyDbContext|src/Modules/Economy/PetMagic.Modules.Economy.Infrastructure/PetMagic.Modules.Economy.Infrastructure.csproj"
+            "TemplatesDbContext|src/Modules/Templates/PetMagic.Modules.Templates.Infrastructure/PetMagic.Modules.Templates.Infrastructure.csproj"
+            "SupportChatDbContext|src/Modules/SupportChat/PetMagic.Modules.SupportChat.Infrastructure/PetMagic.Modules.SupportChat.Infrastructure.csproj"
+            "GamificationDbContext|src/Modules/Gamification/PetMagic.Modules.Gamification.Infrastructure/PetMagic.Modules.Gamification.Infrastructure.csproj"
+          )
+          for entry in "${contexts[@]}"; do
+            IFS='|' read -r context project <<< "$entry"
+            dotnet ef database update --configuration Release --no-build --context "$context" --project "$project"
+            dotnet ef migrations has-pending-model-changes --configuration Release --no-build --context "$context" --project "$project"
+          done
+
+          expected=$(find src/Modules -path '*/Data/Migrations/20*.cs' ! -name '*.Designer.cs' | wc -l | tr -d ' ')
+          applied=$(psql -h localhost -U postgres -d petmagic -Atc 'SELECT count(*) FROM "__EFMigrationsHistory";')
+          test "$applied" = "$expected"
+          invalid=$(psql -h localhost -U postgres -d petmagic -Atc "SELECT count(*) FROM pg_index WHERE NOT indisvalid OR NOT indisready;")
+          test "$invalid" = "0"
+
+      - name: Validate concurrent support claim ownership
+        run: dotnet test tests/PetMagic.Modules.Identity.Tests/PetMagic.Modules.Identity.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName~SupportClaimPostgresConcurrencyTests|FullyQualifiedName~EconomyReconciliationPostgresConcurrencyTests"
+
+      - name: Validate existing database upgrade from previous migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          contexts=(
+            "identity|IdentityDbContext|src/Modules/Identity/PetMagic.Modules.Identity.Infrastructure/PetMagic.Modules.Identity.Infrastructure.csproj|src/Modules/Identity/PetMagic.Modules.Identity.Infrastructure/Data/Migrations"
+            "economy|EconomyDbContext|src/Modules/Economy/PetMagic.Modules.Economy.Infrastructure/PetMagic.Modules.Economy.Infrastructure.csproj|src/Modules/Economy/PetMagic.Modules.Economy.Infrastructure/Data/Migrations"
+            "templates|TemplatesDbContext|src/Modules/Templates/PetMagic.Modules.Templates.Infrastructure/PetMagic.Modules.Templates.Infrastructure.csproj|src/Modules/Templates/PetMagic.Modules.Templates.Infrastructure/Data/Migrations"
+            "support|SupportChatDbContext|src/Modules/SupportChat/PetMagic.Modules.SupportChat.Infrastructure/PetMagic.Modules.SupportChat.Infrastructure.csproj|src/Modules/SupportChat/PetMagic.Modules.SupportChat.Infrastructure/Data/Migrations"
+            "gamification|GamificationDbContext|src/Modules/Gamification/PetMagic.Modules.Gamification.Infrastructure/PetMagic.Modules.Gamification.Infrastructure.csproj|src/Modules/Gamification/PetMagic.Modules.Gamification.Infrastructure/Data/Migrations"
+          )
+          for entry in "${contexts[@]}"; do
+            IFS='|' read -r name context project migrations <<< "$entry"
+            mapfile -t ids < <(find "$migrations" -maxdepth 1 -name '20*.cs' ! -name '*.Designer.cs' -printf '%f\n' | sed 's/\.cs$//' | sort)
+            test "${#ids[@]}" -ge 2
+            database="petmagic_upgrade_${name}"
+            psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE ${database};"
+            connection="Host=localhost;Port=5432;Database=${database};Username=postgres;Password=postgres"
+            previous="${ids[$((${#ids[@]} - 2))]}"
+            dotnet ef database update "$previous" --connection "$connection" --configuration Release --no-build --context "$context" --project "$project"
+            dotnet ef database update --connection "$connection" --configuration Release --no-build --context "$context" --project "$project"
+            invalid=$(psql -h localhost -U postgres -d "$database" -Atc "SELECT count(*) FROM pg_index WHERE NOT indisvalid OR NOT indisready;")
+            test "$invalid" = "0"
+          done
+
+      - name: Validate PostgreSQL outbox multi-worker claim race
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql -h localhost -U postgres -d petmagic -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO economy_push_outbox
+            ("Id", "DeduplicationKey", "Kind", "UserId", "PayloadJson", "Status", "AttemptCount",
+             "NextAttemptAtUtc", "CreatedAtUtc", "UpdatedAtUtc")
+          VALUES
+            ('00000000-0000-0000-0000-000000000101', 'ci-race-1', 'wallet', '00000000-0000-0000-0000-000000000001', '{}', 1, 0, now(), now(), now()),
+            ('00000000-0000-0000-0000-000000000102', 'ci-race-2', 'wallet', '00000000-0000-0000-0000-000000000002', '{}', 1, 0, now(), now(), now());
+          SQL
+
+          claim_sql='BEGIN; WITH candidate AS (SELECT "Id" FROM economy_push_outbox WHERE "Status" = 1 ORDER BY "CreatedAtUtc", "Id" FOR UPDATE SKIP LOCKED LIMIT 1) UPDATE economy_push_outbox AS job SET "Status" = 2, "AttemptCount" = job."AttemptCount" + 1, "LockExpiresAtUtc" = now() + interval '\''2 minutes'\'' FROM candidate WHERE job."Id" = candidate."Id" RETURNING job."Id"; SELECT pg_sleep(2); COMMIT;'
+          (psql -h localhost -U postgres -d petmagic -Atc "$claim_sql" > /tmp/claim-1.txt) &
+          first_pid=$!
+          sleep 0.25
+          (psql -h localhost -U postgres -d petmagic -Atc "$claim_sql" > /tmp/claim-2.txt) &
+          second_pid=$!
+          wait "$first_pid" "$second_pid"
+
+          first_id=$(grep -Eo '[0-9a-f-]{36}' /tmp/claim-1.txt | head -1)
+          second_id=$(grep -Eo '[0-9a-f-]{36}' /tmp/claim-2.txt | head -1)
+          test -n "$first_id"
+          test -n "$second_id"
+          test "$first_id" != "$second_id"
+          claimed=$(psql -h localhost -U postgres -d petmagic -Atc "SELECT count(*) FROM economy_push_outbox WHERE \"DeduplicationKey\" LIKE 'ci-race-%' AND \"Status\" = 2 AND \"AttemptCount\" = 1;")
+          test "$claimed" = "2"

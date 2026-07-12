@@ -238,10 +238,16 @@ Compatibility rules:
 - Recent generation history defaults must stay bounded when `take` is omitted.
 - Template status, type, promo badge, asset, and analytics field names must stay aligned with `apps/admin-web/src/lib/api-client.types.ts`.
 - Image and video template update requests may send `keepPreviewAsset=true` to preserve existing preview media when no replacement asset is uploaded. Video update requests may send `keepReferenceMotionAsset=true` to preserve existing reference motion media. Omitted flags keep legacy replace/remove semantics for older clients.
-- Admin generation rows may include `canCancel=true` only for queued jobs. `POST /api/admin/templates/generations/{generationId}/cancel` is `AdminOnly`, may cancel only queued jobs, returns the updated generation response, and must return ProblemDetails with `templates.generation_cancel_not_allowed` for running, completed, failed, retrying, or already-cancelled jobs.
+- Admin generation rows may include `canCancel=true` for local `Queued` jobs and for `ProviderQueued`/`ProviderProcessing` FAL jobs whose request id, model and trusted queue cancellation URL validate against the configured FAL origin. `SubmittingToProvider`, `ImportingMedia`, non-FAL providers and jobs without a validated cancellation contract remain non-cancellable.
+- `POST /api/admin/templates/generations/{generationId}/cancel` remains `AdminOnly`. It returns HTTP 200 with the generation response after local queued cancellation or a confirmed FAL `202 CANCELLATION_REQUESTED`; it returns HTTP 202 with the generation response while durable provider cancellation is pending; completed, provider `ALREADY_COMPLETED`/`NOT_FOUND`, unsupported-provider and exhausted-retry outcomes return controlled HTTP 409 ProblemDetails.
+- `CancellationRequested` is an active internal/mobile generation status and maps to admin status `Cancelling`. While present, normal generation processing and duplicate cancel actions are blocked; the cancellation worker retries transient timeout/429/5xx outcomes at most five times with bounded exponential backoff. Only a FAL HTTP 202 result transitions to `Cancelled` and enters the existing idempotent refund/reconciliation path. Late provider webhooks/results cannot overwrite `CancellationRequested` or `Cancelled`.
+- FAL submit metadata persists validated `status_url`, `response_url` and `cancel_url`. Provider URLs must match the configured queue origin and exact `{model}/requests/{requestId}/{status|response|cancel}` path, must not contain credentials/query/fragment, and redirects are not followed. Legacy rows may derive a cancel URL only from an already validated matching FAL status URL.
+- Generation dashboard metrics include `cancellingJobs`; generation list filtering accepts `cancelling` and returns `Cancelling` rows with `canCancel=false` while the provider request is pending.
 - Admin generation rows may include `canRetry=true` only for failed/cancelled jobs whose original charge has not been refunded, plus admin test jobs. `POST /api/admin/templates/generations/{generationId}/retry` is `AdminOnly`, requeues the same generation with a fresh attempt budget, does not create a new billing command, does not charge or refund credits, and must return ProblemDetails with `templates.generation_retry_not_allowed` for active, completed, refunded, or otherwise unsafe jobs.
 - `POST /api/admin/templates/generations/{generationId}/retry-refund` is refund-only. It re-arms the idempotent refund retry path for failed/cancelled charged generations without creating or retrying generation work.
+- Historical generations that were completed before durable Gamification delivery may return `gamificationLegacyReviewRequired=true`. `POST /api/admin/templates/generations/{generationId}/resolve-legacy-gamification` is `AdminOnly`, requires an auditable reason, and accepts only `mark_delivered` (suppress replay) or `replay` (queue the idempotent delivery). It never performs an implicit replay.
 - Admin endpoints must keep `ModeratorOrAdmin` or stricter authorization policies according to route intent.
+- `POST /api/admin/gamification/users/{userId}/streak/reset` is `AdminOnly`, requires `{ "reason": "..." }` (1–500 characters), and records the actor, previous streak state, target user and reason in the admin audit log. The legacy `DELETE /api/admin/gamification/users/{userId}/streak` route remains only for compatibility and requires the same reason in `X-Admin-Audit-Reason`; requests without a reason are rejected.
 - `GET /api/admin/templates/categories/diagnostics` is `AdminOnly` and reports active templates whose string category no longer maps to a non-archived canonical category.
 
 ## Template Generation History
@@ -276,10 +282,10 @@ Consumers:
 
 Request body:
 
-- `type`: required string. Supported values are `GenerationResult`, `GenerationFailure`, `BugReport`, `FeatureRequest`, `PaymentIssue`, and `General`; unsupported values are normalized to `General`.
-- `category`: required non-empty string, backend-bounded.
-- `rating`: optional integer normalized to `-1..1`.
-- `message`: optional string, backend-bounded.
+- `type`: required string. Supported values are `GenerationResult`, `GenerationFailure`, `BugReport`, `FeatureRequest`, `PaymentIssue`, and `General`; unsupported values are rejected with HTTP 400 `ValidationProblem`.
+- `category`: required non-empty string, at most 80 characters.
+- `rating`: optional integer from `-1` through `1`; out-of-range values are rejected with HTTP 400 `ValidationProblem`.
+- `message`: optional string, at most 2000 characters.
 - `generationId`, `templateId`, `petId`: optional GUID strings. When `generationId` or `petId` is provided, backend must verify ownership for the authenticated user.
 - `sourceScreen`, `appVersion`, `platform`, `deviceModel`, `locale`: optional client diagnostics strings, backend-bounded.
 
@@ -291,8 +297,8 @@ Response shape:
 Compatibility rules:
 
 - Mobile sends JSON field names in camelCase; backend must keep accepting the current field names.
-- Validation/ownership failures must return ProblemDetails, not successful no-op responses.
-- Known failure titles include `templates.invalid_subject`, `GENERATION_JOB_NOT_FOUND`, `feedback.forbidden`, and `feedback.rate_limited`.
+- Validation/ownership failures must return ProblemDetails, not successful no-op responses. Ownership failures for a referenced generation or pet are exposed as `feedback.not_found`, not `feedback.forbidden`, so callers cannot enumerate another user's records.
+- Known failure titles include `templates.invalid_subject`, `GENERATION_JOB_NOT_FOUND`, `feedback.not_found`, and `feedback.rate_limited`.
 - Mobile feedback submission is non-idempotent and clients must not retry transient failures automatically unless a future idempotency key is introduced.
 
 ## Admin Feedback
@@ -450,6 +456,9 @@ Compatibility rules:
 - Numeric enum values such as `status=1`, `source=1`, or `priority=1` must not be accepted; clients must send named values and receive HTTP 400 ProblemDetails for numeric values.
 - Extremely large but syntactically valid `page` values must not overflow backend offset calculation; return an empty page with the normalized `page`, `pageSize`, `totalCount`, and `hasMore=false`.
 - Admin support endpoints must require `ModeratorOrAdmin`.
+- `POST /api/admin/support/tickets/{conversationId}/assign-to-me` claims only an unassigned ticket or idempotently returns a ticket already owned by the current operator. Claiming a ticket owned by another operator returns HTTP 409 `support.conversation_already_assigned`.
+- `POST /api/admin/support/tickets/{conversationId}/unassign` succeeds only for the current owner and is idempotent when already unassigned. Foreign unassign returns HTTP 409 `support.conversation_not_owned`.
+- Assignment changes are serialized with a PostgreSQL row lock and emit admin audit events. An unassigned ticket or a ticket owned by another operator remains readable but reply, status, attachment and metadata mutations return HTTP 409 `support.conversation_not_owned`.
 
 ## Support Conversation Messages
 
@@ -481,6 +490,22 @@ Compatibility rules:
 - Do not remove timestamp-only pagination support without updating mobile and admin clients.
 - `beforeMessageId` is additive and optional; adding it must not change responses for clients that omit it.
 - Message pagination must remain stable by `createdAtUtc` plus message id tie-break and must avoid unbounded message loads.
+
+## Support Conversation Feedback
+
+Endpoint: `POST /api/support/conversation/{conversationId}/feedback`
+
+Consumers:
+
+- Flutter mobile closed-conversation feedback UI.
+- Next.js admin support workspace feedback panel.
+
+Compatibility rules:
+
+- Only the conversation initiator may submit feedback, and only after the conversation is `Closed`.
+- Request `rating` is required and must be an integer from `1` through `5`; `comment` is optional and backend-bounded.
+- Successful submission returns the current `SupportConversationDetailResponse`, including `feedbackRating`, `feedbackComment`, and `feedbackSubmittedAtUtc`.
+- Admin support detail responses must preserve these feedback fields so operators can see the submitted rating and optional comment without a separate request.
 
 ## Support Attachment Messages
 

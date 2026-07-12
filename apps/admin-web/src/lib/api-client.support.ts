@@ -249,15 +249,25 @@ export async function updateSupportConversationStatus(
   return conversation;
 }
 
-export async function assignSupportConversation(
-  conversationId: string,
-  assignedAdminId?: string | null
+export async function assignSupportConversationToMe(
+  conversationId: string
 ): Promise<AdminSupportConversation> {
   const encodedConversationId = encodePathSegment(conversationId);
   const conversation = await apiRequest<AdminSupportConversation>(
-    assignedAdminId
-      ? `/api/admin/support/tickets/${encodedConversationId}/assign-to-me`
-      : `/api/admin/support/tickets/${encodedConversationId}/unassign`,
+    `/api/admin/support/tickets/${encodedConversationId}/assign-to-me`,
+    { method: "POST" }
+  );
+
+  clearSupportCaches(conversationId);
+  return conversation;
+}
+
+export async function unassignSupportConversation(
+  conversationId: string
+): Promise<AdminSupportConversation> {
+  const encodedConversationId = encodePathSegment(conversationId);
+  const conversation = await apiRequest<AdminSupportConversation>(
+    `/api/admin/support/tickets/${encodedConversationId}/unassign`,
     { method: "POST" }
   );
 

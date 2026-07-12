@@ -218,6 +218,20 @@ class AppLocalizationsEs extends AppLocalizations {
   String get profilePasswordLabel => 'Contraseña';
 
   @override
+  String get authShowPassword => 'Mostrar contraseña';
+
+  @override
+  String get authHidePassword => 'Ocultar contraseña';
+
+  @override
+  String get authShowPasswordConfirmation =>
+      'Mostrar confirmación de contraseña';
+
+  @override
+  String get authHidePasswordConfirmation =>
+      'Ocultar confirmación de contraseña';
+
+  @override
   String get profileSignInAction => 'Iniciar sesión';
 
   @override
@@ -1839,6 +1853,15 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get profileAccountRolesMissing => 'No hay roles asignados';
+
+  @override
+  String get profileAccountRoleUser => 'Usuario';
+
+  @override
+  String get profileAccountRoleModerator => 'Moderador';
+
+  @override
+  String get profileAccountRoleAdmin => 'Administrador';
 
   @override
   String get profileAccountMembershipLabel => 'Afiliación';
@@ -3949,6 +3972,13 @@ class AppLocalizationsEs extends AppLocalizations {
       'El pago se cargará a su cuenta de App Store/Google Play. La suscripción se renueva automáticamente a menos que se cancele antes de la fecha de renovación.';
 
   @override
+  String get premiumCardPaymentDisclaimerTitle => 'Pago seguro con tarjeta';
+
+  @override
+  String get premiumCardPaymentDisclaimerBody =>
+      'El pago se cargará a su tarjeta bancaria. La suscripción se renueva automáticamente a menos que se cancele antes de la fecha de renovación.';
+
+  @override
   String get premiumCheckoutPageTitle => 'Mejorar a Premium';
 
   @override
@@ -4380,7 +4410,15 @@ class AppLocalizationsEs extends AppLocalizations {
   String get gamificationLoadFailed => 'No se pudieron cargar los logros';
 
   @override
-  String get gamificationDayStreak => 'días de racha';
+  String gamificationDayStreak(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count días de racha',
+      one: '$count día de racha',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get gamificationHubSubtitle =>
@@ -4767,4 +4805,16 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get templateFlowGenerationWaitTooLongPremiumHint =>
       'Las solicitudes Premium tienen prioridad cuando el servicio está ocupado y pueden esperar menos.';
+
+  @override
+  String get mediaPlayAction => 'Reproducir';
+
+  @override
+  String get mediaPauseAction => 'Pausar';
+
+  @override
+  String get mediaMuteAction => 'Silenciar';
+
+  @override
+  String get mediaUnmuteAction => 'Activar sonido';
 }

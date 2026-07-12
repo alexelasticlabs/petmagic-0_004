@@ -10,6 +10,14 @@ const rawArgs = process.argv.slice(2);
 const args = new Set(rawArgs);
 const repoRoot = resolve(getOptionValue('--root') ?? resolve(scriptDir, '..', '..'));
 const blueprintPath = resolve(repoRoot, getOptionValue('--file') ?? 'render.yaml');
+const environment = (getOptionValue('--environment')
+  ?? (blueprintPath.endsWith('render.production.yaml') ? 'production' : 'staging')).toLowerCase();
+if (!['staging', 'production'].includes(environment)) {
+  throw new Error('--environment must be staging or production.');
+}
+const prefix = `petmagic-${environment}`;
+const apiDomain = environment === 'production' ? 'api.petmagic.app' : 'api.staging.petmagic.app';
+const adminDomain = environment === 'production' ? 'admin.petmagic.app' : 'admin.staging.petmagic.app';
 
 if (args.has('--help') || args.has('-h')) {
   printUsage();
@@ -37,10 +45,10 @@ const databases = Array.isArray(blueprint.databases) ? blueprint.databases : [];
 const envVarGroups = Array.isArray(blueprint.envVarGroups) ? blueprint.envVarGroups : [];
 
 requireServiceCount(3);
-requireDatabase('petmagic-staging-db', 'basic-1gb');
-requireEnvGroup('petmagic-staging-shared');
+requireDatabase(`${prefix}-db`, 'basic-1gb');
+requireEnvGroup(`${prefix}-shared`);
 
-const api = requireService('petmagic-staging-api', {
+const api = requireService(`${prefix}-api`, {
   type: 'web',
   runtime: 'docker',
   dockerfilePath: './Dockerfile.api',
@@ -48,14 +56,14 @@ const api = requireService('petmagic-staging-api', {
   healthCheckPath: '/health'
 });
 
-const worker = requireService('petmagic-staging-generation-worker', {
+const worker = requireService(`${prefix}-generation-worker`, {
   type: 'worker',
   runtime: 'docker',
   dockerfilePath: './Dockerfile.generation-worker',
   dockerContext: '.'
 });
 
-const admin = requireService('petmagic-staging-admin-web', {
+const admin = requireService(`${prefix}-admin-web`, {
   type: 'web',
   runtime: 'docker',
   dockerfilePath: './apps/admin-web/Dockerfile',
@@ -69,16 +77,34 @@ if (api) {
     expectedExpose: '5000',
     requiredCopy: 'scripts/docker/run-dotnet-app.sh'
   });
-  requireDomain(api, 'api.staging.petmagic.app');
+  requireDomain(api, apiDomain);
+  requirePersistentDisk(api, `${prefix}-api-data`, '/var/petmagic');
   requireEnvValue(api, 'PORT', '5000');
   requireEnvValue(api, 'ASPNETCORE_HTTP_PORTS', '5000');
+  requireEnvValue(
+    api,
+    'ExternalAuth__MobileRedirectScheme',
+    environment === 'production' ? 'petmagic' : 'petmagic-staging'
+  );
   requireEnvValue(api, 'Templates__GenerationWorkerEnabled', 'false');
   requireEnvValue(api, 'Templates__TemplateOfTheDayAutoPickWorkerEnabled', 'true');
+  requireEnvValue(api, 'APP_VOLUME_DIRS', '/var/petmagic');
   requireEnvValue(api, 'DataProtection__KeysPath', '/var/petmagic/DataProtection-Keys');
   requireEnvValue(api, 'StaticFiles__ExtraWebRootPath', '/var/petmagic/wwwroot');
-  requireEnvContains(api, 'AllowedHosts', 'api.staging.petmagic.app');
-  requireEnvContains(api, 'AllowedHosts', 'petmagic-staging-api.onrender.com');
-  requireDatabaseBinding(api, 'ConnectionStrings__DefaultConnection', 'petmagic-staging-db');
+  requireEnvValue(api, 'Identity__AvatarStorage__PublicBaseUrl', `https://${apiDomain}`);
+  requireEnvValue(api, 'Identity__AvatarStorage__LocalMediaRootPath', '/var/petmagic/wwwroot/user-avatars');
+  requireEnvValue(api, 'SupportChat__AttachmentStorage__PublicBaseUrl', `https://${apiDomain}`);
+  requireEnvValue(api, 'SupportChat__AttachmentStorage__LocalMediaRootPath', '/var/petmagic/wwwroot/support-attachments');
+  requireEnvValue(api, 'Templates__LocalMediaRootPath', '/var/petmagic/wwwroot/templates-media');
+  requireEnvValue(
+    api,
+    'STRIPE_CHECKOUT_SUCCESS_URL',
+    `https://${adminDomain}/payments/success?session_id={CHECKOUT_SESSION_ID}`
+  );
+  requireEnvValue(api, 'STRIPE_CHECKOUT_CANCEL_URL', `https://${adminDomain}/payments/cancel`);
+  requireEnvValue(api, 'STRIPE_BILLING_PORTAL_RETURN_URL', `https://${adminDomain}/payments/return`);
+  requireEnvContains(api, 'AllowedHosts', apiDomain);
+  requireDatabaseBinding(api, 'ConnectionStrings__DefaultConnection', `${prefix}-db`);
   requireSecretKeys(api, [
     'Jwt__SigningKey',
     'FAL_PROVIDER_SPEND_DAILY_LIMIT_USD',
@@ -88,9 +114,13 @@ if (api) {
     'R2_SECRET_KEY',
     'R2_BUCKET_NAME',
     'R2_PUBLIC_URL',
-    'STRIPE_TEST_SECRET_KEY',
-    'STRIPE_TEST_PUBLISHABLE_KEY',
-    'STRIPE_TEST_WEBHOOK_SECRET',
+    environment === 'production' ? 'STRIPE_LIVE_SECRET_KEY' : 'STRIPE_TEST_SECRET_KEY',
+    environment === 'production' ? 'STRIPE_LIVE_PUBLISHABLE_KEY' : 'STRIPE_TEST_PUBLISHABLE_KEY',
+    environment === 'production' ? 'STRIPE_LIVE_WEBHOOK_SECRET' : 'STRIPE_TEST_WEBHOOK_SECRET',
+    'GOOGLE_PLAY_PREMIUM_MONTHLY_PRODUCT_ID',
+    'GOOGLE_PLAY_PREMIUM_YEARLY_PRODUCT_ID',
+    'APP_STORE_PREMIUM_MONTHLY_PRODUCT_ID',
+    'APP_STORE_PREMIUM_YEARLY_PRODUCT_ID',
     'GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL',
     'GOOGLE_PLAY_PRIVATE_KEY_PEM',
     'GOOGLE_PLAY_PUBSUB_AUDIENCE',
@@ -119,14 +149,14 @@ if (worker) {
     requiredCopy: 'scripts/docker/run-dotnet-app.sh'
   });
   if (Array.isArray(worker.domains) && worker.domains.length > 0) {
-    fail('petmagic-staging-generation-worker must not define public domains.');
+    fail(`${prefix}-generation-worker must not define public domains.`);
   }
 
   requireEnvValue(worker, 'Templates__GenerationWorkerEnabled', 'true');
   requireEnvValue(worker, 'Templates__MediaCleanupWorkerEnabled', 'false');
   requireEnvValue(worker, 'Templates__TemplateOfTheDayAutoPickWorkerEnabled', 'false');
   requireEnvValue(worker, 'Templates__MaxConcurrentJobsPerWorker', '2');
-  requireDatabaseBinding(worker, 'ConnectionStrings__DefaultConnection', 'petmagic-staging-db');
+  requireDatabaseBinding(worker, 'ConnectionStrings__DefaultConnection', `${prefix}-db`);
   requireSecretKeys(worker, [
     'Jwt__SigningKey',
     'FAL_PROVIDER_SPEND_DAILY_LIMIT_USD',
@@ -136,9 +166,13 @@ if (worker) {
     'R2_SECRET_KEY',
     'R2_BUCKET_NAME',
     'R2_PUBLIC_URL',
-    'STRIPE_TEST_SECRET_KEY',
-    'STRIPE_TEST_PUBLISHABLE_KEY',
-    'STRIPE_TEST_WEBHOOK_SECRET',
+    environment === 'production' ? 'STRIPE_LIVE_SECRET_KEY' : 'STRIPE_TEST_SECRET_KEY',
+    environment === 'production' ? 'STRIPE_LIVE_PUBLISHABLE_KEY' : 'STRIPE_TEST_PUBLISHABLE_KEY',
+    environment === 'production' ? 'STRIPE_LIVE_WEBHOOK_SECRET' : 'STRIPE_TEST_WEBHOOK_SECRET',
+    'GOOGLE_PLAY_PREMIUM_MONTHLY_PRODUCT_ID',
+    'GOOGLE_PLAY_PREMIUM_YEARLY_PRODUCT_ID',
+    'APP_STORE_PREMIUM_MONTHLY_PRODUCT_ID',
+    'APP_STORE_PREMIUM_YEARLY_PRODUCT_ID',
     'GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL',
     'GOOGLE_PLAY_PRIVATE_KEY_PEM',
     'GOOGLE_PLAY_PUBSUB_AUDIENCE',
@@ -161,19 +195,27 @@ if (admin) {
       'NEXT_PUBLIC_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION'
     ]
   });
-  requireDomain(admin, 'admin.staging.petmagic.app');
+  requireDomain(admin, adminDomain);
   requireEnvValue(admin, 'PORT', '3000');
   requireEnvValue(admin, 'NODE_ENV', 'production');
-  requireEnvValue(admin, 'NEXT_PUBLIC_API_BASE_URL', 'https://api.staging.petmagic.app');
-  requireEnvValue(admin, 'INTERNAL_API_BASE_URL', 'https://api.staging.petmagic.app');
+  requireEnvValue(admin, 'NEXT_PUBLIC_API_BASE_URL', `https://${apiDomain}`);
+  requireEnvValue(admin, 'INTERNAL_API_BASE_URL', `https://${apiDomain}`);
+  requireDeferredEnvValue(admin, 'ADMIN_MEDIA_ORIGINS');
+  requireEnvValue(
+    admin,
+    'PETMAGIC_APP_DEEP_LINK_SCHEME',
+    environment === 'production' ? 'petmagic' : 'petmagic-staging'
+  );
   rejectPublicSecrets(admin);
 }
 
-requireSecretCoverageInFiles([
-  'docs/render-staging-deployment.md',
-  'docs/render-staging-secrets-checklist.md',
-  '.env.staging.local.example'
-]);
+if (environment === 'staging') {
+  requireSecretCoverageInFiles([
+    'docs/render-staging-deployment.md',
+    'docs/render-staging-secrets-checklist.md',
+    '.env.staging.local.example'
+  ]);
+}
 
 finish();
 
@@ -202,8 +244,9 @@ function requireEnvGroup(name) {
     return;
   }
 
-  requireGroupValue(group, 'ASPNETCORE_ENVIRONMENT', 'Staging');
-  requireGroupValue(group, 'DOTNET_ENVIRONMENT', 'Staging');
+  const expectedEnvironment = environment === 'production' ? 'Production' : 'Staging';
+  requireGroupValue(group, 'ASPNETCORE_ENVIRONMENT', expectedEnvironment);
+  requireGroupValue(group, 'DOTNET_ENVIRONMENT', expectedEnvironment);
   requireGroupValue(group, 'TEMPLATES_STORAGE_PROVIDER', 'R2');
   requireGroupValue(group, 'TEMPLATES_AI_PROVIDER', 'Fal');
 }
@@ -233,12 +276,13 @@ function requireService(name, expected) {
     }
   }
 
-  if (service.autoDeployTrigger !== 'checksPass') {
-    fail(`${name} must use autoDeployTrigger: checksPass.`);
+  const expectedAutoDeploy = environment === 'production' ? 'off' : 'checksPass';
+  if (service.autoDeployTrigger !== expectedAutoDeploy) {
+    fail(`${name} must use autoDeployTrigger: ${expectedAutoDeploy}.`);
   }
 
-  if (!hasEnvGroup(service, 'petmagic-staging-shared') && name !== 'petmagic-staging-admin-web') {
-    fail(`${name} must include env group petmagic-staging-shared.`);
+  if (!hasEnvGroup(service, `${prefix}-shared`) && name !== `${prefix}-admin-web`) {
+    fail(`${name} must include env group ${prefix}-shared.`);
   }
 
   return service;
@@ -365,6 +409,36 @@ function requireSecretKeys(service, keys) {
   }
 }
 
+function requireDeferredEnvValue(service, key) {
+  const entry = findEnv(service.envVars, key);
+  if (!entry) {
+    fail(`${service.name} is missing deferred env ${key}.`);
+    return;
+  }
+
+  if (entry.sync !== false || entry.value !== undefined) {
+    fail(`${service.name} ${key} must use sync: false without a committed value.`);
+  }
+}
+
+function requirePersistentDisk(service, expectedName, expectedMountPath) {
+  const disk = service.disk;
+  if (!disk || typeof disk !== 'object' || Array.isArray(disk)) {
+    fail(`${service.name} must define a persistent disk.`);
+    return;
+  }
+
+  if (disk.name !== expectedName) {
+    fail(`${service.name} disk name must be ${expectedName}.`);
+  }
+  if (disk.mountPath !== expectedMountPath) {
+    fail(`${service.name} disk mountPath must be ${expectedMountPath}.`);
+  }
+  if (!Number.isFinite(disk.sizeGB) || disk.sizeGB < 1) {
+    fail(`${service.name} disk sizeGB must be at least 1.`);
+  }
+}
+
 function rejectPublicSecrets(service) {
   const publicSecrets = service.envVars
     .filter((entry) => typeof entry.key === 'string' && entry.key.startsWith('NEXT_PUBLIC_'))
@@ -455,6 +529,7 @@ Usage:
 Options:
   --file <path>  Blueprint path. Defaults to render.yaml.
   --root <path>  Repository root. Defaults to this repository.
+  --environment <value>  staging or production.
   --help, -h     Print this help.
 
 The checker validates PetMagic's expected Render staging topology, secret

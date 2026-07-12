@@ -64,6 +64,10 @@
   "profileSignInHint": "Use your PetMagic account to load your profile and manage the avatar visible in admin.",
   "profileEmailLabel": "Email",
   "profilePasswordLabel": "Password",
+  "authShowPassword": "Show password",
+  "authHidePassword": "Hide password",
+  "authShowPasswordConfirmation": "Show password confirmation",
+  "authHidePasswordConfirmation": "Hide password confirmation",
   "profileSignInAction": "Sign in",
   "profileSignOutAction": "Sign out",
   "profileLoadingAction": "Working...",
@@ -581,6 +585,9 @@
   "profileAccountDisplayNameMissing": "Not set yet",
   "profileAccountRolesLabel": "Roles",
   "profileAccountRolesMissing": "No roles assigned",
+  "profileAccountRoleUser": "User",
+  "profileAccountRoleModerator": "Moderator",
+  "profileAccountRoleAdmin": "Administrator",
   "profileAccountMembershipLabel": "Membership",
   "profileAccountConsentLabel": "Terms acceptance",
   "profileAccountMarketingLabel": "Offers and updates",
@@ -1205,6 +1212,8 @@
   "premiumBestValueBadge": "BEST VALUE",
   "premiumStorePaymentDisclaimerTitle": "Secure payment via App Store / Google Play",
   "premiumStorePaymentDisclaimerBody": "Payment will be charged to your App Store / Google Play account. Subscription renews automatically unless cancelled before the renewal date.",
+  "premiumCardPaymentDisclaimerTitle": "Secure card payment",
+  "premiumCardPaymentDisclaimerBody": "Payment will be charged to your bank card. Subscription renews automatically unless cancelled before the renewal date.",
   "premiumCheckoutPageTitle": "Upgrade to Premium",
   "premiumCheckoutHeroBadge": "Premium subscription",
   "premiumCheckoutHeroSubtitle": "Recurring Premium access for unlimited templates and faster generation in PetMagic.",
@@ -1350,7 +1359,14 @@
   "gamificationUnlocked": "{unlocked} / {total} Unlocked",
   "@gamificationUnlocked": {},
   "gamificationLoadFailed": "Failed to load achievements",
-  "gamificationDayStreak": "day streak",
+  "gamificationDayStreak": "{count, plural, =0{0-day streak} one{{count}-day streak} other{{count}-day streak}}",
+  "@gamificationDayStreak": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "gamificationHubSubtitle": "Track your streak, challenges and milestones in one place.",
   "gamificationHubEntrySubtitle": "Streak, weekly goals and achievement milestones.",
   "gamificationWeekFocusTitle": "This week",
@@ -1534,5 +1550,9 @@
       }
     }
   },
-  "templateFlowGenerationWaitTooLongPremiumHint": "Premium requests get priority when the service is busy and may wait less."
+  "templateFlowGenerationWaitTooLongPremiumHint": "Premium requests get priority when the service is busy and may wait less.",
+  "mediaPlayAction": "Play",
+  "mediaPauseAction": "Pause",
+  "mediaMuteAction": "Mute",
+  "mediaUnmuteAction": "Unmute"
 }

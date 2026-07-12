@@ -103,13 +103,13 @@ public sealed class SupportChatRealtimePrivacyTests
         Assert.DoesNotContain("Body", notificationContract, StringComparison.Ordinal);
         Assert.DoesNotContain("SenderDisplayName", notificationContract, StringComparison.Ordinal);
 
-        var notifyUserBody = SliceBetween(
+        var enqueueUserBody = SliceBetween(
             fanOutSource,
-            "private async Task NotifyUserMessageAsync(",
+            "private async Task EnqueueUserMessageNotificationAsync(",
             "    }",
-            "NotifyUserMessageAsync");
-        Assert.DoesNotContain("message.Body", notifyUserBody, StringComparison.Ordinal);
-        Assert.DoesNotContain("message.SenderDisplayName", notifyUserBody, StringComparison.Ordinal);
+            "EnqueueUserMessageNotificationAsync");
+        Assert.DoesNotContain(".Body", enqueueUserBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("SenderDisplayName", enqueueUserBody, StringComparison.Ordinal);
 
         var buildBody = SliceBetween(
             senderSource,
@@ -123,23 +123,31 @@ public sealed class SupportChatRealtimePrivacyTests
     [Fact]
     public void NotificationFanOutLogs_ShouldHashStableIdentifiers()
     {
-        var source = File.ReadAllText(Path.Combine(
-            FindRepositoryRoot(),
+        var root = FindRepositoryRoot();
+        var fanOutSource = File.ReadAllText(Path.Combine(
+            root,
             "src",
             "Modules",
             "SupportChat",
             "PetMagic.Modules.SupportChat.Infrastructure",
             "SupportChatService.RealtimeNotifications.cs"));
+        var processorSource = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "Modules",
+            "SupportChat",
+            "PetMagic.Modules.SupportChat.Infrastructure",
+            "SupportChatPushOutboxProcessor.cs"));
 
-        Assert.Contains("ConversationIdHash={ConversationIdHash}", source, StringComparison.Ordinal);
-        Assert.Contains("InitiatorUserIdHash={InitiatorUserIdHash}", source, StringComparison.Ordinal);
-        Assert.Contains("MessageIdHash={MessageIdHash}", source, StringComparison.Ordinal);
-        Assert.Contains("SafeLogValues.StableHash(conversation.Id.ToString(\"D\"))", source, StringComparison.Ordinal);
-        Assert.Contains("SafeLogValues.StableHash(conversation.InitiatorUserId.ToString(\"D\"))", source, StringComparison.Ordinal);
-        Assert.Contains("SafeLogValues.StableHash(message.MessageId.ToString(\"D\"))", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("ConversationId={ConversationId}", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("InitiatorUserId={InitiatorUserId}", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("MessageId={MessageId}", source, StringComparison.Ordinal);
+        Assert.Contains("ConversationIdHash={ConversationIdHash}", fanOutSource, StringComparison.Ordinal);
+        Assert.Contains("InitiatorUserIdHash={InitiatorUserIdHash}", fanOutSource, StringComparison.Ordinal);
+        Assert.Contains("MessageIdHash={MessageIdHash}", processorSource, StringComparison.Ordinal);
+        Assert.Contains("SafeLogValues.StableHash(conversation.Id.ToString(\"D\"))", fanOutSource, StringComparison.Ordinal);
+        Assert.Contains("SafeLogValues.StableHash(conversation.InitiatorUserId.ToString(\"D\"))", fanOutSource, StringComparison.Ordinal);
+        Assert.Contains("SafeLogValues.StableHash(message.Id.ToString(\"D\"))", processorSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("ConversationId={ConversationId}", fanOutSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("InitiatorUserId={InitiatorUserId}", fanOutSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("MessageId={MessageId}", processorSource, StringComparison.Ordinal);
     }
 
     private static string SliceBetween(string source, string start, string end, string label)

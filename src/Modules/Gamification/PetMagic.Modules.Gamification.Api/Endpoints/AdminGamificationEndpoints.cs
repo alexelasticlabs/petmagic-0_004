@@ -1,3 +1,5 @@
+using System.Security.Claims;
+
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -26,6 +28,8 @@ public static class AdminGamificationEndpoints
         group.MapGet("/achievements", ListAchievementsAsync);
         group.MapGet("/challenges/current", ListCurrentChallengesAsync);
         group.MapGet("/users/{userId:guid}", GetUserOverviewAsync);
+        group.MapPost("/users/{userId:guid}/streak/reset", ResetUserStreakAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminGamificationMutationRequestBodyBytes));
         group.MapDelete("/users/{userId:guid}/streak", ResetUserStreakAsync)
             .WithMetadata(new RequestSizeLimitAttribute(MaxAdminGamificationMutationRequestBodyBytes));
 
@@ -98,10 +102,24 @@ public static class AdminGamificationEndpoints
 
     private static async Task<Results<NoContent, ProblemHttpResult>> ResetUserStreakAsync(
         Guid userId,
+        [FromBody] ResetUserStreakRequest? request,
+        [FromHeader(Name = "X-Admin-Audit-Reason")] string? legacyReason,
+        HttpContext httpContext,
         IGamificationAdminService service,
         CancellationToken cancellationToken)
     {
-        var result = await service.ResetAdminUserStreakAsync(userId, cancellationToken);
+        var adminUserId = TryGetAdminUserId(httpContext);
+        if (adminUserId is null)
+        {
+            return ToAdminGamificationProblem(new Error("gamification.admin_invalid_subject", "Admin token subject is invalid."));
+        }
+
+        var result = await service.ResetAdminUserStreakAsync(
+            new AdminResetUserStreakCommand(
+                adminUserId.Value,
+                userId,
+                request?.Reason ?? legacyReason ?? string.Empty),
+            cancellationToken);
         if (result.IsFailure)
         {
             return ToAdminGamificationProblem(result.Error);
@@ -114,6 +132,8 @@ public static class AdminGamificationEndpoints
     {
         var statusCode = string.Equals(error.Code, "gamification.streak_not_found", StringComparison.Ordinal)
             ? StatusCodes.Status404NotFound
+            : string.Equals(error.Code, "gamification.admin_invalid_subject", StringComparison.Ordinal)
+                ? StatusCodes.Status401Unauthorized
             : StatusCodes.Status400BadRequest;
 
         return TypedResults.Problem(
@@ -126,4 +146,14 @@ public static class AdminGamificationEndpoints
     {
         return new Dictionary<string, object?> { ["code"] = errorCode };
     }
+
+    private static Guid? TryGetAdminUserId(HttpContext context)
+    {
+        var subject = context.User.FindFirstValue("sub")
+            ?? context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        return Guid.TryParse(subject, out var userId) ? userId : null;
+    }
+
+    public sealed record ResetUserStreakRequest(string? Reason);
 }

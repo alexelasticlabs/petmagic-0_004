@@ -17,7 +17,8 @@ internal static partial class EconomyWebhookParser
         DateTime? PurchaseDateUtc,
         DateTime? ExpiresAtUtc,
         DateTime? RevokedAtUtc,
-        string? Environment);
+        string? Environment,
+        string? AppAccountToken);
 
     public static bool IsStoreSubscriptionPremium(string status, DateTime? currentPeriodEndUtc)
     {
@@ -113,7 +114,7 @@ internal static partial class EconomyWebhookParser
             || string.Equals(status, "Canceled", StringComparison.OrdinalIgnoreCase);
     }
 
-    public static (bool Success, string? EventId, string? NotificationType, string? Subtype, string? ProductId, string? ExternalSubscriptionId, string? ExternalPurchaseId, DateTime? ExpiresAtUtc, bool CancelAtPeriodEnd) ParseAppStoreServerNotification(string signedPayload)
+    public static (bool Success, string? EventId, string? NotificationType, string? Subtype, string? ProductId, string? ExternalSubscriptionId, string? ExternalPurchaseId, DateTime? ExpiresAtUtc, bool CancelAtPeriodEnd, Guid? AppAccountUserId) ParseAppStoreServerNotification(string signedPayload)
     {
         try
         {
@@ -133,6 +134,7 @@ internal static partial class EconomyWebhookParser
             string? externalSubscriptionId = null;
             string? externalPurchaseId = null;
             DateTime? expiresAtUtc = null;
+            Guid? appAccountUserId = null;
             var cancelAtPeriodEnd = string.Equals(subtype, "AUTO_RENEW_DISABLED", StringComparison.OrdinalIgnoreCase);
 
             if (root.TryGetProperty("data", out var dataElement) && dataElement.ValueKind == JsonValueKind.Object)
@@ -154,6 +156,12 @@ internal static partial class EconomyWebhookParser
                     expiresAtUtc = transaction.TryGetProperty("expiresDate", out var expiresElement)
                         ? ParseUnixMilliseconds(expiresElement)
                         : null;
+                    if (transaction.TryGetProperty("appAccountToken", out var accountTokenElement)
+                        && accountTokenElement.ValueKind == JsonValueKind.String
+                        && Guid.TryParse(accountTokenElement.GetString(), out var parsedAppAccountUserId))
+                    {
+                        appAccountUserId = parsedAppAccountUserId;
+                    }
                 }
 
                 if (dataElement.TryGetProperty("signedRenewalInfo", out var renewalInfoElement)
@@ -175,11 +183,11 @@ internal static partial class EconomyWebhookParser
                 }
             }
 
-            return (!string.IsNullOrWhiteSpace(eventId), eventId, notificationType, subtype, productId, externalSubscriptionId, externalPurchaseId, expiresAtUtc, cancelAtPeriodEnd);
+            return (!string.IsNullOrWhiteSpace(eventId), eventId, notificationType, subtype, productId, externalSubscriptionId, externalPurchaseId, expiresAtUtc, cancelAtPeriodEnd, appAccountUserId);
         }
         catch
         {
-            return (false, null, null, null, null, null, null, null, false);
+            return (false, null, null, null, null, null, null, null, false, null);
         }
     }
 
@@ -224,6 +232,10 @@ internal static partial class EconomyWebhookParser
                 && environmentElement.ValueKind == JsonValueKind.String
                     ? environmentElement.GetString()
                     : null;
+            var appAccountToken = root.TryGetProperty("appAccountToken", out var appAccountTokenElement)
+                && appAccountTokenElement.ValueKind == JsonValueKind.String
+                    ? appAccountTokenElement.GetString()
+                    : null;
 
             return new AppStoreTransactionInfo(
                 bundleId,
@@ -233,7 +245,8 @@ internal static partial class EconomyWebhookParser
                 purchaseDateUtc,
                 expiresAtUtc,
                 revokedAtUtc,
-                environment);
+                environment,
+                appAccountToken);
         }
         catch
         {
@@ -241,7 +254,7 @@ internal static partial class EconomyWebhookParser
         }
     }
 
-    public static (bool Success, string? EventId, int NotificationType, string? ProductId, string? PurchaseToken, bool IsSubscriptionNotification, bool IsOneTimeProductNotification) ParseGooglePlayDeveloperNotification(string messageData, string? messageId)
+    public static (bool Success, string? EventId, int NotificationType, string? ProductId, string? PurchaseToken, bool IsSubscriptionNotification, bool IsOneTimeProductNotification, bool IsVoidedPurchaseNotification, int? VoidedProductType, int? RefundType, string? OrderId) ParseGooglePlayDeveloperNotification(string messageData, string? messageId)
     {
         try
         {
@@ -266,7 +279,7 @@ internal static partial class EconomyWebhookParser
                     ? messageId
                     : BuildGooglePlayFallbackEventId(purchaseToken, notificationType, "sub");
 
-                return (!string.IsNullOrWhiteSpace(productId) && !string.IsNullOrWhiteSpace(purchaseToken), eventId, notificationType, productId, purchaseToken, true, false);
+                return (!string.IsNullOrWhiteSpace(productId) && !string.IsNullOrWhiteSpace(purchaseToken), eventId, notificationType, productId, purchaseToken, true, false, false, null, null, null);
             }
 
             if (root.TryGetProperty("oneTimeProductNotification", out var oneTimeElement)
@@ -288,18 +301,50 @@ internal static partial class EconomyWebhookParser
                     ? messageId
                     : BuildGooglePlayFallbackEventId(purchaseToken, notificationType, "one_time");
 
-                return (!string.IsNullOrWhiteSpace(productId) && !string.IsNullOrWhiteSpace(purchaseToken), eventId, notificationType, productId, purchaseToken, false, true);
+                return (!string.IsNullOrWhiteSpace(productId) && !string.IsNullOrWhiteSpace(purchaseToken), eventId, notificationType, productId, purchaseToken, false, true, false, null, null, null);
             }
 
-            return (false, null, 0, null, null, false, false);
+            if (root.TryGetProperty("voidedPurchaseNotification", out var voidedElement)
+                && voidedElement.ValueKind == JsonValueKind.Object)
+            {
+                var purchaseToken = voidedElement.TryGetProperty("purchaseToken", out var tokenElement)
+                    && tokenElement.ValueKind == JsonValueKind.String
+                        ? tokenElement.GetString()
+                        : null;
+                int? productType = voidedElement.TryGetProperty("productType", out var productTypeElement)
+                    && productTypeElement.ValueKind == JsonValueKind.Number
+                    && productTypeElement.TryGetInt32(out var parsedProductType)
+                        ? parsedProductType
+                        : null;
+                int? refundType = voidedElement.TryGetProperty("refundType", out var refundTypeElement)
+                    && refundTypeElement.ValueKind == JsonValueKind.Number
+                    && refundTypeElement.TryGetInt32(out var parsedRefundType)
+                        ? parsedRefundType
+                        : null;
+                var orderId = voidedElement.TryGetProperty("orderId", out var orderIdElement)
+                    && orderIdElement.ValueKind == JsonValueKind.String
+                        ? orderIdElement.GetString()
+                        : null;
+                var notificationType = refundType ?? 0;
+                var eventId = !string.IsNullOrWhiteSpace(messageId)
+                    ? messageId
+                    : BuildGooglePlayFallbackEventId(purchaseToken, notificationType, $"voided_{productType}");
+                var isValid = !string.IsNullOrWhiteSpace(purchaseToken)
+                    && productType is 1 or 2
+                    && refundType is 1 or 2;
+
+                return (isValid, eventId, notificationType, null, purchaseToken, false, false, true, productType, refundType, orderId);
+            }
+
+            return (false, null, 0, null, null, false, false, false, null, null, null);
         }
         catch
         {
-            return (false, null, 0, null, null, false, false);
+            return (false, null, 0, null, null, false, false, false, null, null, null);
         }
     }
 
-    public static (bool Success, Guid? OrderId, Guid? UserId, string? ObjectId, string? PaymentReferenceId, string? Purpose, string? SetupIntentId, string? Status, string? CheckoutPaymentStatus, string? PlanCode, string? StripePriceId, string? SubscriptionId, string? CustomerId, DateTime? CurrentPeriodStartUtc, DateTime? CurrentPeriodEndUtc, bool CancelAtPeriodEnd) ParseStripeEvent(string rawBody)
+    public static (bool Success, Guid? OrderId, Guid? UserId, string? ObjectId, string? PaymentReferenceId, string? Purpose, string? SetupIntentId, string? Status, string? CheckoutPaymentStatus, string? PlanCode, string? StripePriceId, string? SubscriptionId, string? CustomerId, DateTime? CurrentPeriodStartUtc, DateTime? CurrentPeriodEndUtc, bool CancelAtPeriodEnd, long? RefundAmountMinor, string? RefundCurrency) ParseStripeEvent(string rawBody)
     {
         try
         {
@@ -311,7 +356,7 @@ internal static partial class EconomyWebhookParser
                 || !dataElement.TryGetProperty("object", out var objectElement)
                 || objectElement.ValueKind != JsonValueKind.Object)
             {
-                return (false, null, null, null, null, null, null, null, null, null, null, null, null, null, null, false);
+                return (false, null, null, null, null, null, null, null, null, null, null, null, null, null, null, false, null, null);
             }
 
             string? objectId = null;
@@ -348,6 +393,16 @@ internal static partial class EconomyWebhookParser
             {
                 checkoutPaymentStatus = paymentStatusElement.GetString();
             }
+
+            long? refundAmountMinor = objectElement.TryGetProperty("amount", out var amountElement)
+                && amountElement.ValueKind == JsonValueKind.Number
+                && amountElement.TryGetInt64(out var parsedRefundAmountMinor)
+                    ? parsedRefundAmountMinor
+                    : null;
+            var refundCurrency = objectElement.TryGetProperty("currency", out var currencyElement)
+                && currencyElement.ValueKind == JsonValueKind.String
+                    ? currencyElement.GetString()
+                    : null;
 
             string? customerId = null;
             if (objectElement.TryGetProperty("customer", out var customerElement) && customerElement.ValueKind == JsonValueKind.String)
@@ -414,7 +469,7 @@ internal static partial class EconomyWebhookParser
                 ApplyStripeMetadata(subscriptionMetadataElement, ref orderId, ref userId, ref purpose, ref planCode);
             }
 
-            return (true, orderId, userId, objectId, paymentReferenceId, purpose, setupIntentId, status, checkoutPaymentStatus, planCode, stripePriceId, subscriptionId, customerId, currentPeriodStartUtc, currentPeriodEndUtc, cancelAtPeriodEnd);
+            return (true, orderId, userId, objectId, paymentReferenceId, purpose, setupIntentId, status, checkoutPaymentStatus, planCode, stripePriceId, subscriptionId, customerId, currentPeriodStartUtc, currentPeriodEndUtc, cancelAtPeriodEnd, refundAmountMinor, refundCurrency);
         }
         catch
         {
@@ -439,10 +494,10 @@ internal static partial class EconomyWebhookParser
 
             if (!orderId.HasValue && string.IsNullOrWhiteSpace(objectId))
             {
-                return (false, null, null, null, null, null, null, null, null, null, null, null, null, null, null, false);
+                return (false, null, null, null, null, null, null, null, null, null, null, null, null, null, null, false, null, null);
             }
 
-            return (true, orderId, null, objectId, null, null, null, null, null, null, null, null, null, null, null, false);
+            return (true, orderId, null, objectId, null, null, null, null, null, null, null, null, null, null, null, false, null, null);
         }
     }
 

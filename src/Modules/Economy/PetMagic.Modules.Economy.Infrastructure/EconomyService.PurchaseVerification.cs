@@ -353,6 +353,16 @@ public sealed partial class EconomyService
 
         var externalPaymentId = ResolveStoreExternalPaymentId(provider, command.ServerVerificationData, verification.Value.ExternalTransactionId, command.PurchaseId);
         var legacyExternalPaymentId = ResolveLegacyStoreExternalPaymentId(provider, command.ServerVerificationData, verification.Value.ExternalTransactionId, command.PurchaseId);
+        var bindingError = ResolveStoreAccountBindingError(
+            verification.Value.AccountBindingState,
+            alreadyLinkedToSameUser: string.Equals(order.ExternalPaymentId, externalPaymentId, StringComparison.Ordinal)
+                || (!string.IsNullOrWhiteSpace(legacyExternalPaymentId)
+                    && string.Equals(order.ExternalPaymentId, legacyExternalPaymentId, StringComparison.Ordinal)));
+        if (bindingError is not null)
+        {
+            return Result.Failure<PurchaseOrderResponse>(bindingError);
+        }
+
         var confirmResult = await ConfirmStorePurchaseInternalAsync(order, externalPaymentId, cancellationToken, legacyExternalPaymentId);
         if (confirmResult.IsFailure)
         {
@@ -529,6 +539,14 @@ public sealed partial class EconomyService
                     && (x.ExternalPaymentId == externalPaymentId
                         || (legacyExternalPaymentId != null && x.ExternalPaymentId == legacyExternalPaymentId)),
                 cancellationToken);
+        var bindingError = ResolveStoreAccountBindingError(
+            verification.Value.AccountBindingState,
+            alreadyLinkedToSameUser: existing?.UserId == userId);
+        if (bindingError is not null)
+        {
+            return Result.Failure<StoreBillingValidationResponse>(bindingError);
+        }
+
         if (existing is not null)
         {
             if (existing.UserId != userId)
@@ -609,7 +627,7 @@ public sealed partial class EconomyService
             return await ResolveConfiguredPremiumPlanAsync(configuredPlan.Id, cancellationToken);
         }
 
-        return PremiumPlanCatalog.All
+        return PremiumPlanCatalog.Create(options.Value)
             .FirstOrDefault(x => string.Equals(
                 provider == "google_play" ? x.GooglePlayProductId : x.AppStoreProductId,
                 productId,

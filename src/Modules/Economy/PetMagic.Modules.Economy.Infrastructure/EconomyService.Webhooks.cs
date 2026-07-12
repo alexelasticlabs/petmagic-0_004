@@ -6,6 +6,7 @@ using Npgsql;
 
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Contracts;
+using PetMagic.Modules.Economy.Domain.Enums;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
 
 namespace PetMagic.Modules.Economy.Infrastructure;
@@ -61,7 +62,7 @@ public sealed partial class EconomyService
     }
 
     private static string BuildSafeAppStoreWebhookPayloadMetadata(
-        (bool Success, string? EventId, string? NotificationType, string? Subtype, string? ProductId, string? ExternalSubscriptionId, string? ExternalPurchaseId, DateTime? ExpiresAtUtc, bool CancelAtPeriodEnd) parsed)
+        (bool Success, string? EventId, string? NotificationType, string? Subtype, string? ProductId, string? ExternalSubscriptionId, string? ExternalPurchaseId, DateTime? ExpiresAtUtc, bool CancelAtPeriodEnd, Guid? AppAccountUserId) parsed)
     {
         return JsonSerializer.Serialize(new
         {
@@ -76,19 +77,22 @@ public sealed partial class EconomyService
     }
 
     private static string BuildSafeGooglePlayWebhookPayloadMetadata(
-        (bool Success, string? EventId, int NotificationType, string? ProductId, string? PurchaseToken, bool IsSubscriptionNotification, bool IsOneTimeProductNotification) parsed)
+        (bool Success, string? EventId, int NotificationType, string? ProductId, string? PurchaseToken, bool IsSubscriptionNotification, bool IsOneTimeProductNotification, bool IsVoidedPurchaseNotification, int? VoidedProductType, int? RefundType, string? OrderId) parsed)
     {
         return JsonSerializer.Serialize(new
         {
             parsed.NotificationType,
             parsed.ProductId,
             parsed.IsSubscriptionNotification,
-            parsed.IsOneTimeProductNotification
+            parsed.IsOneTimeProductNotification,
+            parsed.IsVoidedPurchaseNotification,
+            parsed.VoidedProductType,
+            parsed.RefundType
         });
     }
 
     private static string BuildSafeStripeWebhookPayloadMetadata(
-        (bool Success, Guid? OrderId, Guid? UserId, string? ObjectId, string? PaymentReferenceId, string? Purpose, string? SetupIntentId, string? Status, string? CheckoutPaymentStatus, string? PlanCode, string? StripePriceId, string? SubscriptionId, string? CustomerId, DateTime? CurrentPeriodStartUtc, DateTime? CurrentPeriodEndUtc, bool CancelAtPeriodEnd) parsed)
+        (bool Success, Guid? OrderId, Guid? UserId, string? ObjectId, string? PaymentReferenceId, string? Purpose, string? SetupIntentId, string? Status, string? CheckoutPaymentStatus, string? PlanCode, string? StripePriceId, string? SubscriptionId, string? CustomerId, DateTime? CurrentPeriodStartUtc, DateTime? CurrentPeriodEndUtc, bool CancelAtPeriodEnd, long? RefundAmountMinor, string? RefundCurrency) parsed)
     {
         return JsonSerializer.Serialize(new
         {
@@ -108,5 +112,33 @@ public sealed partial class EconomyService
             HasSubscriptionId = !string.IsNullOrWhiteSpace(parsed.SubscriptionId),
             HasCustomerId = !string.IsNullOrWhiteSpace(parsed.CustomerId)
         });
+    }
+
+    private async Task MarkPurchaseRefundForManualReviewAsync(
+        PurchaseOrder order,
+        string externalReferenceId,
+        string reason,
+        object? details,
+        CancellationToken cancellationToken)
+    {
+        if (string.Equals(order.Status, PurchaseOrderStatus.Refunded, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        order.Status = PurchaseOrderStatus.RefundRequiresManualReview;
+        await UpsertEconomyIncidentAsync(
+            EconomyIncidentType.RefundRequiresManualReview,
+            "Critical",
+            $"purchase:refund_review:{order.Id:D}",
+            $"Purchase order {order.Id:D} received a refund that cannot be applied as a full automatic token clawback.",
+            new ReconciliationStats(DateTime.UtcNow),
+            userId: order.UserId,
+            purchaseOrderId: order.Id,
+            provider: order.PaymentProvider,
+            externalReferenceId: externalReferenceId,
+            details: new { reason, providerDetails = details },
+            lastError: reason,
+            cancellationToken: cancellationToken);
     }
 }

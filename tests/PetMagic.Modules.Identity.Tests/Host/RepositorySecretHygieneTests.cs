@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using System.Text.Json;
+using System.Diagnostics;
 
 namespace PetMagic.Modules.Identity.Tests.Host;
 
@@ -80,14 +81,19 @@ public sealed class RepositorySecretHygieneTests
 
         Assert.Contains("backups/", gitignore);
 
-        var backupsDirectory = Path.Combine(repositoryRoot, "backups");
-        if (!Directory.Exists(backupsDirectory))
+        using var process = Process.Start(new ProcessStartInfo("git", "ls-files -- backups")
         {
-            return;
-        }
+            WorkingDirectory = repositoryRoot,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        });
+        Assert.NotNull(process);
+        var trackedFiles = process.StandardOutput.ReadToEnd();
+        process.WaitForExit();
 
-        var databaseBackups = Directory.GetFiles(backupsDirectory, "*.sql", SearchOption.AllDirectories);
-        Assert.Empty(databaseBackups);
+        Assert.True(process.ExitCode == 0, process.StandardError.ReadToEnd());
+        Assert.DoesNotContain(".sql", trackedFiles, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -235,14 +241,14 @@ public sealed class RepositorySecretHygieneTests
     }
 
     [Fact]
-    public void ClientFirebaseConfigs_ShouldContainPlaceholdersOnly()
+    public void ClientFirebaseConfigExamples_ShouldContainPlaceholdersOnly()
     {
         var repositoryRoot = FindRepositoryRoot();
         var configPaths = new[]
         {
             Path.Combine(repositoryRoot, "apps", "petmagic-mobile", "ios", "Runner", "Info.plist"),
-            Path.Combine(repositoryRoot, "apps", "petmagic-mobile", "ios", "Runner", "GoogleService-Info.plist"),
-            Path.Combine(repositoryRoot, "apps", "petmagic-mobile", "android", "app", "google-services.json"),
+            Path.Combine(repositoryRoot, "apps", "petmagic-mobile", "ios", "Runner", "GoogleService-Info.plist.example"),
+            Path.Combine(repositoryRoot, "apps", "petmagic-mobile", "android", "app", "google-services.json.example"),
         };
 
         foreach (var configPath in configPaths)
@@ -257,7 +263,7 @@ public sealed class RepositorySecretHygieneTests
     }
 
     [Fact]
-    public void ClientFirebaseConfigs_ShouldStayInsideMobilePlatformProjects()
+    public void ClientFirebaseConfigs_ShouldUseIgnoredActiveFilesAndTrackedExamples()
     {
         var repositoryRoot = FindRepositoryRoot();
         var forbiddenRootConfigs = new[]
@@ -273,18 +279,39 @@ public sealed class RepositorySecretHygieneTests
                 $"{forbiddenRootConfig} must not live at the repository root.");
         }
 
-        var requiredMobileConfigs = new[]
+        var activeMobileConfigs = new[]
         {
             Path.Combine(repositoryRoot, "apps", "petmagic-mobile", "ios", "Runner", "GoogleService-Info.plist"),
             Path.Combine(repositoryRoot, "apps", "petmagic-mobile", "android", "app", "google-services.json"),
+            Path.Combine(repositoryRoot, "apps", "petmagic-mobile", "android", "app", "src", "staging", "google-services.json"),
+            Path.Combine(repositoryRoot, "apps", "petmagic-mobile", "android", "app", "src", "production", "google-services.json"),
         };
 
-        foreach (var requiredMobileConfig in requiredMobileConfigs)
+        foreach (var activeMobileConfig in activeMobileConfigs)
+        {
+            Assert.False(
+                File.Exists(activeMobileConfig),
+                $"{Path.GetRelativePath(repositoryRoot, activeMobileConfig)} must be injected from a protected environment.");
+        }
+
+        var requiredMobileExamples = new[]
+        {
+            Path.Combine(repositoryRoot, "apps", "petmagic-mobile", "ios", "Runner", "GoogleService-Info.plist.example"),
+            Path.Combine(repositoryRoot, "apps", "petmagic-mobile", "android", "app", "google-services.json.example"),
+        };
+
+        foreach (var requiredMobileExample in requiredMobileExamples)
         {
             Assert.True(
-                File.Exists(requiredMobileConfig),
-                $"{Path.GetRelativePath(repositoryRoot, requiredMobileConfig)} must remain in the mobile platform project.");
+                File.Exists(requiredMobileExample),
+                $"{Path.GetRelativePath(repositoryRoot, requiredMobileExample)} must remain in the mobile platform project.");
         }
+
+        var gitignore = File.ReadAllText(Path.Combine(repositoryRoot, ".gitignore"));
+        Assert.Contains("apps/petmagic-mobile/android/app/google-services.json", gitignore, StringComparison.Ordinal);
+        Assert.Contains("apps/petmagic-mobile/android/app/src/staging/google-services.json", gitignore, StringComparison.Ordinal);
+        Assert.Contains("apps/petmagic-mobile/android/app/src/production/google-services.json", gitignore, StringComparison.Ordinal);
+        Assert.Contains("apps/petmagic-mobile/ios/Runner/GoogleService-Info.plist", gitignore, StringComparison.Ordinal);
     }
 
     [Fact]

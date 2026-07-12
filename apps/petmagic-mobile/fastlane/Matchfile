@@ -1,0 +1,6 @@
+git_url(ENV.fetch("MATCH_GIT_URL"))
+storage_mode("git")
+type("appstore")
+readonly(true)
+app_identifier([ENV.fetch("APP_STORE_BUNDLE_ID", "com.petmagic.app")])
+username(ENV["APPLE_ID"]) if ENV["APPLE_ID"]

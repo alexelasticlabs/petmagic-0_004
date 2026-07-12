@@ -85,6 +85,33 @@ public sealed partial class StoreSubscriptionVerifier : IStoreSubscriptionVerifi
         cachedGoogleAccessTokenExpiresAtUtc = now.AddSeconds(Math.Max(1, safeLifetimeSeconds));
     }
 
+    private static StoreAccountBindingState ResolveAccountBindingState(string? providerAccountId, Guid userId)
+    {
+        if (string.IsNullOrWhiteSpace(providerAccountId))
+        {
+            return StoreAccountBindingState.Missing;
+        }
+
+        if (!Guid.TryParse(providerAccountId.Trim(), out var boundUserId))
+        {
+            // Legacy clients may have populated application_username / obfuscatedExternalAccountId
+            // with an opaque value. Treat it as unbound so compatibility mode remains non-breaking;
+            // enforce mode still rejects it until a controlled migration/backfill is complete.
+            return StoreAccountBindingState.Missing;
+        }
+
+        return boundUserId == userId
+            ? StoreAccountBindingState.Matched
+            : StoreAccountBindingState.Mismatched;
+    }
+
+    private static Guid? ResolveBoundUserId(string? providerAccountId)
+    {
+        return Guid.TryParse(providerAccountId?.Trim(), out var boundUserId)
+            ? boundUserId
+            : null;
+    }
+
     private static string DescribeGooglePlayVerificationData(string? verificationData)
     {
         return string.IsNullOrWhiteSpace(verificationData) ? "missing" : "token";

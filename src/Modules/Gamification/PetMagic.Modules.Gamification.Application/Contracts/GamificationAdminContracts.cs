@@ -44,3 +44,8 @@ public sealed record AdminUserGamificationOverviewResponse(
     IReadOnlyList<PetProgressResponse> Pets,
     IReadOnlyList<AchievementResponse> Achievements,
     IReadOnlyList<ChallengeResponse> CurrentChallenges);
+
+public sealed record AdminResetUserStreakCommand(
+    Guid AdminUserId,
+    Guid UserId,
+    string Reason);

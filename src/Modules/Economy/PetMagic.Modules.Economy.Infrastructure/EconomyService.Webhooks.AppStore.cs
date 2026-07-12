@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Contracts;
 using PetMagic.Modules.Economy.Domain.Enums;
@@ -39,27 +40,43 @@ public sealed partial class EconomyService
             }
 
             var processedTokenPurchase = false;
-            if (!string.IsNullOrWhiteSpace(parsed.ExternalPurchaseId)
+            if (string.Equals(parsed.NotificationType, "ONE_TIME_CHARGE", StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(parsed.ExternalPurchaseId)
                 && !string.IsNullOrWhiteSpace(parsed.ProductId))
             {
-                var pendingOrder = await dbContext.PurchaseOrders
+                var pendingCandidates = await dbContext.PurchaseOrders
                     .Join(
-                        dbContext.CurrencyPacks.AsNoTracking(),
+                        dbContext.CurrencyPacks,
                         order => order.PackId,
                         pack => pack.Id,
                         (order, pack) => new { order, pack })
                     .Where(x =>
                         x.order.PaymentProvider == "app_store"
                         && x.order.Status == PurchaseOrderStatus.Pending
-                        && x.order.ExternalPaymentId == parsed.ExternalPurchaseId)
+                        && (x.order.ExternalPaymentId == parsed.ExternalPurchaseId
+                            || (x.order.ExternalPaymentId == null
+                                && parsed.AppAccountUserId.HasValue
+                                && x.order.UserId == parsed.AppAccountUserId.Value)))
                     .OrderByDescending(x => x.order.CreatedAtUtc)
-                    .Select(x => new { x.order, ExpectedProductId = ResolvePackStoreProductId(x.pack, "app_store") })
-                    .FirstOrDefaultAsync(cancellationToken);
+                    .Take(10)
+                    .ToListAsync(cancellationToken);
 
-                if (pendingOrder is not null
-                    && string.Equals(pendingOrder.ExpectedProductId, parsed.ProductId, StringComparison.Ordinal))
+                var productCandidates = pendingCandidates
+                    .Where(x => string.Equals(
+                        ResolvePackStoreProductId(x.pack, "app_store"),
+                        parsed.ProductId,
+                        StringComparison.Ordinal))
+                    .ToList();
+                var pendingOrder = productCandidates.FirstOrDefault(x =>
+                        string.Equals(x.order.ExternalPaymentId, parsed.ExternalPurchaseId, StringComparison.Ordinal))
+                    ?? (productCandidates.Count == 1 ? productCandidates[0] : null);
+
+                if (pendingOrder is not null)
                 {
-                    var confirmResult = await ConfirmPurchaseInternalAsync(pendingOrder.order, cancellationToken);
+                    var confirmResult = await ConfirmStorePurchaseInternalAsync(
+                        pendingOrder.order,
+                        parsed.ExternalPurchaseId,
+                        cancellationToken);
                     if (confirmResult.IsFailure
                         && !string.Equals(confirmResult.Error.Code, EconomyErrors.PurchaseAlreadyProcessed.Code, StringComparison.Ordinal))
                     {
@@ -158,6 +175,15 @@ public sealed partial class EconomyService
                     cancellationToken);
             }
 
+            await _pushNotificationSender.NotifyPremiumUpdateAsync(
+                existingSubscription.UserId,
+                new PremiumPushNotification(
+                    Status: isPremium ? "active" : "inactive",
+                    Provider: "app_store",
+                    PlanCode: plan.PlanCode,
+                    EventKey: SafeLogValues.StableHash(parsed.EventId)),
+                cancellationToken);
+
             await dbContext.SaveChangesAsync(cancellationToken);
             if (transaction is not null)
             {
@@ -172,16 +198,7 @@ public sealed partial class EconomyService
                 subscription.Id,
                 subscription.ExternalSubscriptionId,
                 cancellationToken);
-            if (premiumSyncResult.IsSuccess)
-            {
-                await _pushNotificationSender.NotifyPremiumUpdateAsync(
-                    existingSubscription.UserId,
-                    new PremiumPushNotification(
-                        Status: isPremium ? "active" : "inactive",
-                        Provider: "app_store",
-                        PlanCode: plan.PlanCode),
-                    cancellationToken);
-            }
+            _ = premiumSyncResult;
 
             LogStoreWebhookProcessed("app_store", parsed.EventId, appStoreEventType, existingSubscription.UserId, "processed");
             return Result.Success(new StoreWebhookResultResponse("app_store", parsed.EventId, true, "processed"));

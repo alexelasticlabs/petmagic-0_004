@@ -34,7 +34,8 @@ public static partial class AuthEndpoints
     private const string ExternalFlowModeLink = "link";
     private const string ExternalTicketInvalidMessage = "External sign-in session is invalid or expired.";
     private const string ExternalCancelledMessage = "External sign-in was cancelled.";
-    private const string MobileRedirectScheme = "petmagic";
+    private const string DefaultMobileRedirectScheme = "petmagic";
+    internal const string MobileRedirectSchemeConfigurationKey = "ExternalAuth:MobileRedirectScheme";
     private const string MobileRedirectHost = "auth";
     private const string MobileRedirectPath = "/external";
     private const int MaxAuthJsonRequestBodyBytes = 32 * 1024;
@@ -138,6 +139,10 @@ public static partial class AuthEndpoints
             .RequireAuthorization();
 
         group.MapPost("/me/linked-accounts/{provider}/prepare", PrepareLinkedAccountAsync)
+            .RequireAuthorization()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAuthJsonRequestBodyBytes));
+
+        group.MapPost("/me/linked-accounts/google/native", GoogleNativeLinkAsync)
             .RequireAuthorization()
             .WithMetadata(new RequestSizeLimitAttribute(MaxAuthJsonRequestBodyBytes));
 

@@ -65,6 +65,32 @@ public sealed class ExternalLoginCompletionStoreTests
     }
 
     [Fact]
+    public async Task Concurrent_try_take_returns_login_payload_to_exactly_one_consumer()
+    {
+        var (services, databasePath) = CreateFileServices();
+        try
+        {
+            var store = new ExternalLoginCompletionStore(
+                services.GetRequiredService<IServiceScopeFactory>(),
+                services.GetRequiredService<IDataProtectionProvider>());
+            var ticket = await store.CreateAsync(CreateSession(), CancellationToken.None);
+
+            var results = await Task.WhenAll(
+                store.TryTakeAsync(ticket, CancellationToken.None),
+                store.TryTakeAsync(ticket, CancellationToken.None));
+
+            Assert.Single(results, result => result is not null);
+            Assert.Single(results, result => result is null);
+        }
+        finally
+        {
+            await services.DisposeAsync();
+            SqliteConnection.ClearAllPools();
+            File.Delete(databasePath);
+        }
+    }
+
+    [Fact]
     public async Task Try_take_returns_false_for_unknown_ticket()
     {
         await using var services = CreateServices();
@@ -107,6 +133,32 @@ public sealed class ExternalLoginCompletionStoreTests
             var consumedTicket = await dbContext.ExternalAuthTickets.SingleAsync(x => x.Ticket == ticket);
             Assert.NotNull(consumedTicket.ConsumedAtUtc);
             Assert.Equal("\"\"", consumedTicket.PayloadJson);
+        }
+    }
+
+    [Fact]
+    public async Task Concurrent_try_take_returns_account_link_to_exactly_one_consumer()
+    {
+        var (services, databasePath) = CreateFileServices();
+        try
+        {
+            var store = new ExternalAccountLinkStore(
+                services.GetRequiredService<IServiceScopeFactory>(),
+                services.GetRequiredService<IDataProtectionProvider>());
+            var ticket = await store.CreateAsync(Guid.NewGuid(), CancellationToken.None);
+
+            var results = await Task.WhenAll(
+                store.TryTakeAsync(ticket, CancellationToken.None),
+                store.TryTakeAsync(ticket, CancellationToken.None));
+
+            Assert.Single(results, result => result.HasValue);
+            Assert.Single(results, result => !result.HasValue);
+        }
+        finally
+        {
+            await services.DisposeAsync();
+            SqliteConnection.ClearAllPools();
+            File.Delete(databasePath);
         }
     }
 
@@ -241,6 +293,21 @@ public sealed class ExternalLoginCompletionStoreTests
         using var scope = serviceProvider.CreateScope();
         scope.ServiceProvider.GetRequiredService<IdentityDbContext>().Database.EnsureCreated();
         return serviceProvider;
+    }
+
+    private static (ServiceProvider Services, string DatabasePath) CreateFileServices()
+    {
+        var databasePath = Path.Combine(
+            Path.GetTempPath(),
+            $"petmagic-external-auth-ticket-tests-{Guid.NewGuid():N}.db");
+        var services = new ServiceCollection();
+        services.AddDataProtection();
+        services.AddDbContext<IdentityDbContext>(options =>
+            options.UseSqlite($"Data Source={databasePath};Default Timeout=30;Pooling=False"));
+        var serviceProvider = services.BuildServiceProvider();
+        using var scope = serviceProvider.CreateScope();
+        scope.ServiceProvider.GetRequiredService<IdentityDbContext>().Database.EnsureCreated();
+        return (serviceProvider, databasePath);
     }
 
     private static TokenPairResponse CreateSession()

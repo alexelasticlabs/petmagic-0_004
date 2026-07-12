@@ -1,5 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 
+using PetMagic.BuildingBlocks.Observability;
+using PetMagic.Modules.Gamification.Application.Contracts;
+using PetMagic.Modules.Gamification.Domain.Constants;
 using PetMagic.Modules.Gamification.Infrastructure.Data;
 using PetMagic.Modules.Gamification.Infrastructure.Entities;
 using PetMagic.Modules.Gamification.Infrastructure.Services;
@@ -93,7 +96,7 @@ public sealed class GamificationAdminServiceTests
         Assert.Equal(1, result.Value.TotalAchievementDefinitions);
         Assert.Equal(1, result.Value.TotalAchievementsUnlocked);
         Assert.Equal(1, result.Value.UsersWithActiveStreak);
-        Assert.Equal(1, result.Value.CurrentWeekChallenges);
+        Assert.Equal(DefaultChallenges.Templates.Length, result.Value.CurrentWeekChallenges);
         Assert.Equal(1, result.Value.CurrentWeekChallengeParticipants);
         Assert.Equal(1, result.Value.CurrentWeekChallengeCompletions);
     }
@@ -170,6 +173,7 @@ public sealed class GamificationAdminServiceTests
 
         var userService = new GamificationService(dbContext);
         await userService.ProcessGenerationCompletedAsync(
+            Guid.NewGuid(),
             userId,
             petId,
             templateId,
@@ -177,10 +181,14 @@ public sealed class GamificationAdminServiceTests
             isPremium: false,
             CancellationToken.None);
 
-        var service = CreateAdminService(dbContext);
+        var auditLog = new RecordingAdminAuditLog();
+        var service = CreateAdminService(dbContext, auditLog);
 
         var overview = await service.GetAdminUserOverviewAsync(userId, CancellationToken.None);
-        var resetResult = await service.ResetAdminUserStreakAsync(userId, CancellationToken.None);
+        var adminUserId = Guid.NewGuid();
+        var resetResult = await service.ResetAdminUserStreakAsync(
+            new AdminResetUserStreakCommand(adminUserId, userId, "Verified duplicate test profile."),
+            CancellationToken.None);
 
         Assert.True(overview.IsSuccess);
         Assert.Equal(userId, overview.Value.UserId);
@@ -190,12 +198,59 @@ public sealed class GamificationAdminServiceTests
         Assert.NotEmpty(overview.Value.CurrentChallenges);
         Assert.True(resetResult.IsSuccess);
         Assert.Null(await dbContext.DailyStreaks.FirstOrDefaultAsync(x => x.UserId == userId));
+        var audit = Assert.Single(auditLog.Entries);
+        Assert.Equal("admin.gamification.streak.reset", audit.Action);
+        Assert.Equal(userId, audit.SubjectUserId);
+        Assert.Equal(adminUserId, audit.ActorUserId);
+        Assert.Equal("Verified duplicate test profile.", audit.Details);
     }
 
-    private static GamificationAdminService CreateAdminService(GamificationDbContext dbContext)
+    [Fact]
+    public async Task ResetAdminUserStreakAsync_ShouldRejectMissingAuditReason()
+    {
+        await using var dbContext = CreateDbContext();
+        var userId = Guid.NewGuid();
+        dbContext.DailyStreaks.Add(new DailyStreak
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            CurrentStreak = 3,
+            LongestStreak = 3,
+            LastActiveDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        await dbContext.SaveChangesAsync();
+
+        var auditLog = new RecordingAdminAuditLog();
+        var service = CreateAdminService(dbContext, auditLog);
+        var result = await service.ResetAdminUserStreakAsync(
+            new AdminResetUserStreakCommand(Guid.NewGuid(), userId, " "),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("gamification.admin_streak_reset_reason_required", result.Error.Code);
+        Assert.NotNull(await dbContext.DailyStreaks.FirstOrDefaultAsync(x => x.UserId == userId));
+        Assert.Empty(auditLog.Entries);
+    }
+
+    private static GamificationAdminService CreateAdminService(
+        GamificationDbContext dbContext,
+        IAdminAuditLog? auditLog = null)
     {
         var userService = new GamificationService(dbContext);
-        return new GamificationAdminService(dbContext, userService);
+        return new GamificationAdminService(dbContext, userService, auditLog ?? new RecordingAdminAuditLog());
+    }
+
+    private sealed class RecordingAdminAuditLog : IAdminAuditLog
+    {
+        public List<AdminAuditEntry> Entries { get; } = [];
+
+        public Task WriteAsync(AdminAuditEntry entry, CancellationToken cancellationToken)
+        {
+            Entries.Add(entry);
+            return Task.CompletedTask;
+        }
     }
 
     private static GamificationDbContext CreateDbContext()

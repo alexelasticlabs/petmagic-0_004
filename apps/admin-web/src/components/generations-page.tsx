@@ -25,9 +25,11 @@ import {
   GENERATION_PROVIDER_FILTER_MAX_LENGTH,
   GENERATION_SEARCH_FILTER_MAX_LENGTH,
   GENERATION_USER_FILTER_MAX_LENGTH,
+  GAMIFICATION_LEGACY_DELIVERY_REASON_MAX_LENGTH,
   grantAdminGenerationCleanDownload,
   normalizeAdminTemplateGenerationsQuery,
   retryAdminTemplateGeneration,
+  resolveAdminLegacyGamificationDelivery,
   useAuthSession,
 } from "@/lib/api-client";
 import { formatDateTime } from "@/lib/format-date-time";
@@ -80,6 +82,12 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
   const [pendingCancelGenerationId, setPendingCancelGenerationId] = useState<string | null>(null);
   const [retryGenerationError, setRetryGenerationError] = useState<string | null>(null);
   const [pendingRetryGenerationId, setPendingRetryGenerationId] = useState<string | null>(null);
+  const [legacyGamificationError, setLegacyGamificationError] = useState<string | null>(null);
+  const [pendingLegacyGamificationResolution, setPendingLegacyGamificationResolution] = useState<{
+    generationId: string;
+    action: "mark_delivered" | "replay";
+  } | null>(null);
+  const [legacyGamificationReason, setLegacyGamificationReason] = useState("");
 
   const debouncedProvider = useDebouncedValue(provider, 350);
   const debouncedUser = useDebouncedValue(user, 350);
@@ -110,6 +118,8 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
     queryFn: ({ signal }) => fetchAdminTemplateGenerations(query, signal),
     enabled: canViewGenerations,
     placeholderData: keepPreviousData,
+    refetchInterval: (queryState) =>
+      queryState.state.data?.items.some((item) => item.status === "Cancelling") ? 2_000 : false,
   });
   const generationMetricsQuery = useQuery({
     queryKey: adminQueryKeys.templateGenerationMetrics,
@@ -191,6 +201,37 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
   const pendingRetryGenerationDescription = pendingRetryGenerationId
     ? text.retryGenerationConfirmDescription(formatShortId(pendingRetryGenerationId))
     : text.retryGenerationConfirmDescription("");
+  const legacyGamificationResolutionMutation = useMutation({
+    mutationFn: ({
+      generationId,
+      action,
+      reason,
+    }: {
+      generationId: string;
+      action: "mark_delivered" | "replay";
+      reason: string;
+    }) => resolveAdminLegacyGamificationDelivery(generationId, { action, reason }),
+    onMutate: () => {
+      setLegacyGamificationError(null);
+    },
+    onSuccess: async () => {
+      setPendingLegacyGamificationResolution(null);
+      setLegacyGamificationReason("");
+      await Promise.allSettled([
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.templateGenerations(query) }),
+      ]);
+    },
+    onError: (error) => {
+      setLegacyGamificationError(getAdminErrorMessage(error, text.gamificationLegacyReviewError));
+    },
+  });
+  const isLegacyGamificationResolutionLocked =
+    legacyGamificationResolutionMutation.isPending || generationsQuery.isFetching;
+  const pendingLegacyGamificationDescription = pendingLegacyGamificationResolution
+    ? text.gamificationLegacyReviewDescription(
+        formatShortId(pendingLegacyGamificationResolution.generationId)
+      )
+    : text.gamificationLegacyReviewDescription("");
 
   useEffect(() => {
     let isActive = true;
@@ -272,6 +313,33 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
     retryGenerationMutation.mutate(pendingRetryGenerationId);
   }
 
+  function requestLegacyGamificationResolution(generationId: string) {
+    if (!canViewGenerations || isLegacyGamificationResolutionLocked) {
+      return;
+    }
+
+    setLegacyGamificationError(null);
+    setLegacyGamificationReason("");
+    setPendingLegacyGamificationResolution({ generationId, action: "mark_delivered" });
+  }
+
+  function confirmLegacyGamificationResolution() {
+    const reason = legacyGamificationReason.trim();
+    if (
+      !canViewGenerations ||
+      !pendingLegacyGamificationResolution ||
+      !reason ||
+      isLegacyGamificationResolutionLocked
+    ) {
+      return;
+    }
+
+    legacyGamificationResolutionMutation.mutate({
+      ...pendingLegacyGamificationResolution,
+      reason,
+    });
+  }
+
   if (!canViewGenerations) {
     return (
       <section className={styles.page}>
@@ -331,6 +399,12 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
             value={formatMetricCount(generationMetrics?.cancelledJobs)}
             hint={text.allJobsScope}
             tone="neutral"
+          />
+          <AdminKpiCard
+            label={text.cancelling}
+            value={formatMetricCount(generationMetrics?.cancellingJobs)}
+            hint={text.allJobsScope}
+            tone="warning"
           />
         </div>
 
@@ -460,6 +534,9 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
             {retryGenerationError ? (
               <AdminStateCard tone="warning" title={retryGenerationError} />
             ) : null}
+            {legacyGamificationError ? (
+              <AdminStateCard tone="warning" title={legacyGamificationError} />
+            ) : null}
             <div
               className={adminTableStyles.tableWrap}
               aria-busy={generationsQuery.isFetching ? "true" : undefined}
@@ -494,9 +571,11 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
                       cancelGenerationPending={isCancelGenerationLocked}
                       retryingGenerationId={retryingGenerationId}
                       retryGenerationPending={isRetryGenerationLocked}
+                      legacyGamificationResolutionPending={isLegacyGamificationResolutionLocked}
                       onGrantClean={requestGrantClean}
                       onCancelGeneration={requestCancelGeneration}
                       onRetryGeneration={requestRetryGeneration}
+                      onResolveLegacyGamification={requestLegacyGamificationResolution}
                       isExpanded={expandedGenerationId === item.generationId}
                       onToggleDetails={(generationId) =>
                         setExpandedGeneration((current) =>
@@ -553,6 +632,63 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
         }}
         onConfirm={confirmCancelGeneration}
       />
+      <ConfirmationDialog
+        open={canViewGenerations && pendingLegacyGamificationResolution !== null}
+        title={text.gamificationLegacyReview}
+        description={pendingLegacyGamificationDescription}
+        confirmLabel={text.gamificationLegacyReviewSubmit}
+        cancelLabel={text.gamificationLegacyReviewCancel}
+        tone="primary"
+        isSubmitting={legacyGamificationResolutionMutation.isPending}
+        confirmDisabled={!legacyGamificationReason.trim()}
+        onCancel={() => {
+          if (!legacyGamificationResolutionMutation.isPending) {
+            setPendingLegacyGamificationResolution(null);
+            setLegacyGamificationReason("");
+          }
+        }}
+        onConfirm={confirmLegacyGamificationResolution}
+      >
+        <label className={styles.resolutionField}>
+          <span>{text.gamificationLegacyReviewActionLabel}</span>
+          <select
+            className={styles.select}
+            value={pendingLegacyGamificationResolution?.action ?? "mark_delivered"}
+            disabled={legacyGamificationResolutionMutation.isPending}
+            onChange={(event) =>
+              setPendingLegacyGamificationResolution((current) =>
+                current
+                  ? {
+                      ...current,
+                      action: event.target.value as "mark_delivered" | "replay",
+                    }
+                  : null
+              )
+            }
+          >
+            <option value="mark_delivered">{text.gamificationLegacyReviewMarkDelivered}</option>
+            <option value="replay">{text.gamificationLegacyReviewReplay}</option>
+          </select>
+        </label>
+        <label className={styles.resolutionField}>
+          <span>{text.gamificationLegacyReviewReasonLabel}</span>
+          <textarea
+            className={styles.resolutionTextarea}
+            value={legacyGamificationReason}
+            maxLength={GAMIFICATION_LEGACY_DELIVERY_REASON_MAX_LENGTH}
+            disabled={legacyGamificationResolutionMutation.isPending}
+            placeholder={text.gamificationLegacyReviewReasonPlaceholder}
+            onChange={(event) =>
+              setLegacyGamificationReason(
+                event.target.value.slice(0, GAMIFICATION_LEGACY_DELIVERY_REASON_MAX_LENGTH)
+              )
+            }
+          />
+          {!legacyGamificationReason.trim() ? (
+            <small>{text.gamificationLegacyReviewReasonRequired}</small>
+          ) : null}
+        </label>
+      </ConfirmationDialog>
       <ConfirmationDialog
         open={canViewGenerations && pendingRetryGenerationId !== null}
         title={text.retryGenerationConfirmTitle}

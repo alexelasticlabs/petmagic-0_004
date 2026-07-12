@@ -13,5 +13,5 @@ public interface IGamificationAdminService
 
     Task<Result<AdminUserGamificationOverviewResponse>> GetAdminUserOverviewAsync(Guid userId, CancellationToken cancellationToken);
 
-    Task<Result> ResetAdminUserStreakAsync(Guid userId, CancellationToken cancellationToken);
+    Task<Result> ResetAdminUserStreakAsync(AdminResetUserStreakCommand command, CancellationToken cancellationToken);
 }

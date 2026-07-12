@@ -435,6 +435,13 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
                     b.Property<DateTime?>("LastAttemptAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("LockExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("LockId")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime?>("NextAttemptAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -477,6 +484,8 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
                     b.HasIndex("Status", "QueuedAtUtc");
 
                     b.HasIndex("Status", "UpdatedAtUtc");
+
+                    b.HasIndex("Status", "LockExpiresAtUtc", "QueuedAtUtc");
 
                     b.HasIndex("Status", "NextAttemptAtUtc", "QueuedAtUtc");
 
@@ -531,6 +540,7 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
                         .HasColumnType("character varying(64)");
 
                     b.Property<DateTime?>("ConsumedAtUtc")
+                        .IsConcurrencyToken()
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime>("CreatedAtUtc")
@@ -571,6 +581,7 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime?>("RevokedAtUtc")
+                        .IsConcurrencyToken()
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("TokenHash")

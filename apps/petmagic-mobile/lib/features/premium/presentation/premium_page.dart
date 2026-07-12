@@ -534,17 +534,31 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
           normalizePremiumErrorKey(next.successMessage) ==
               'premium.purchase_activated' &&
           next.isPremium;
+      final justRestored =
+          normalizePremiumErrorKey(previous?.successMessage) !=
+              'premium.restore_started' &&
+          normalizePremiumErrorKey(next.successMessage) ==
+              'premium.restore_started';
 
       final justActivated =
           justActivatedViaCheckoutState ||
           justActivatedViaFlag ||
           justActivatedViaSuccessMessage;
 
-      if (!justActivated || !mounted) {
+      if ((!justActivated && !justRestored) || !mounted) {
         return;
       }
 
       final fallbackText = _premiumText(context);
+      if (justRestored) {
+        PetMagicToast.show(
+          context,
+          message: fallbackText.premiumRestoreStarted,
+          tone: PetMagicToastTone.success,
+        );
+        return;
+      }
+
       _closeAfterSuccessfulActivation();
 
       PetMagicToast.show(
@@ -759,11 +773,12 @@ Future<_PaywallFeedbackResult?> _showPaywallFeedbackSheet(
                                 setState(() => selected = option),
                           ),
                           const SizedBox(height: 16),
-                          TextField(
-                            controller: controller,
-                            minLines: 2,
-                            maxLines: 4,
-                            decoration: InputDecoration(
+                            TextField(
+                              controller: controller,
+                              minLines: 2,
+                              maxLines: 4,
+                              maxLength: 2000,
+                              decoration: InputDecoration(
                               labelText: copy.commentLabel,
                               hintText: copy.commentHint,
                             ),

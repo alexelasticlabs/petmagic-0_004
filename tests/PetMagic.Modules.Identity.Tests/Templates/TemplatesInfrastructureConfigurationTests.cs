@@ -365,12 +365,20 @@ public sealed class TemplatesInfrastructureConfigurationTests
             "Templates",
             "PetMagic.Modules.Templates.Infrastructure",
             "TemplatesInfrastructureServiceCollectionExtensions.cs"));
+        var generatedMediaHandlerSource = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Infrastructure",
+            "GeneratedMediaHttpMessageHandler.cs"));
 
         Assert.Contains("TemplateContentHealthCheck.HttpClientName", source, StringComparison.Ordinal);
         Assert.Contains("HttpGeneratedMediaImporter.HttpClientName", source, StringComparison.Ordinal);
         Assert.Contains(".ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler", source, StringComparison.Ordinal);
+        Assert.Contains("ConfigurePrimaryHttpMessageHandler(GeneratedMediaHttpMessageHandler.Create)", source, StringComparison.Ordinal);
         Assert.True(
-            source.Split("AllowAutoRedirect = false", StringSplitOptions.None).Length >= 7,
+            (source + generatedMediaHandlerSource).Split("AllowAutoRedirect = false", StringSplitOptions.None).Length >= 7,
             "Template media, FCM, Fal, and localization HTTP clients must disable automatic redirects.");
     }
 
@@ -616,7 +624,7 @@ public sealed class TemplatesInfrastructureConfigurationTests
     }
 
     [Fact]
-    public void AddTemplatesInfrastructure_ShouldNotRegisterHostedGenerationWorker_WhenDisabled()
+    public async Task AddTemplatesInfrastructure_ShouldNotRegisterHostedGenerationWorker_WhenDisabled()
     {
         var services = CreateServices();
         var configuration = CreateConfiguration(new Dictionary<string, string?>
@@ -626,7 +634,7 @@ public sealed class TemplatesInfrastructureConfigurationTests
 
         services.AddTemplatesInfrastructure(configuration);
 
-        using var provider = services.BuildServiceProvider();
+        await using var provider = services.BuildServiceProvider();
 
         var options = provider.GetRequiredService<TemplatesOptions>();
         var hostedServices = provider.GetServices<IHostedService>();

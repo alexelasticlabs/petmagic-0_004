@@ -34,11 +34,24 @@ class _PetLaunchSelectedPhotoPreview extends StatelessWidget {
     required this.photo,
     required this.isLoading,
     required this.onUpload,
+    required this.onImageLoadFailed,
   });
 
   final PetPhoto? photo;
   final bool isLoading;
   final VoidCallback? onUpload;
+  final ValueChanged<PetPhoto> onImageLoadFailed;
+
+  void _reportImageLoadFailure() {
+    final selectedPhoto = photo;
+    if (selectedPhoto == null) {
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => onImageLoadFailed(selectedPhoto),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -67,8 +80,10 @@ class _PetLaunchSelectedPhotoPreview extends StatelessWidget {
                   maxWidthDiskCache: _petLaunchSelectedPhotoPreviewCacheWidth,
                   filterQuality: FilterQuality.medium,
                   placeholder: (_, _) => _PetLaunchMagicFallback(iconSize: 34),
-                  errorWidget: (_, _, _) =>
-                      _PetLaunchNoPhotoPreview(onUpload: onUpload),
+                  errorWidget: (_, _, _) {
+                    _reportImageLoadFailure();
+                    return _PetLaunchNoPhotoPreview(onUpload: onUpload);
+                  },
                 )
               else if (isLoading)
                 _PetLaunchLoadingPhotoPreview()

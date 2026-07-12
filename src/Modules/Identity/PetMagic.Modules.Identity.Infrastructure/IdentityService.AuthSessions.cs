@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Identity.Application.Contracts;
@@ -43,13 +44,47 @@ public sealed partial class IdentityService
             return Result.Failure<TokenPairResponse>(accountStatusNormalization.Error);
         }
 
-        session.RevokedAtUtc = DateTime.UtcNow;
-        var roles = await userManager.GetRolesAsync(user);
-        var pair = await IssueTokenPairAsync(user, roles, cancellationToken);
-        await dbContext.SaveChangesAsync(cancellationToken);
-        await WriteAuditAsync(user.Id, "auth.refresh.succeeded", "Refresh token rotated.", cancellationToken);
+        IDbContextTransaction? transaction = dbContext.Database.IsRelational()
+            ? await dbContext.Database.BeginTransactionAsync(cancellationToken)
+            : null;
+        try
+        {
+            session.RevokedAtUtc = DateTime.UtcNow;
+            var roles = await userManager.GetRolesAsync(user);
+            TokenPairResponse pair;
+            try
+            {
+                pair = await IssueTokenPairAsync(user, roles, cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (transaction is not null)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    await transaction.DisposeAsync();
+                    transaction = null;
+                }
 
-        return Result.Success(pair);
+                dbContext.ChangeTracker.Clear();
+                await WriteAuditAsync(user.Id, "auth.refresh.reuse_detected", "Detected concurrent refresh token reuse attempt.", cancellationToken);
+                return Result.Failure<TokenPairResponse>(IdentityErrors.InvalidRefreshToken);
+            }
+
+            await WriteAuditAsync(user.Id, "auth.refresh.succeeded", "Refresh token rotated.", cancellationToken);
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+
+            return Result.Success(pair);
+        }
+        finally
+        {
+            if (transaction is not null)
+            {
+                await transaction.DisposeAsync();
+            }
+        }
     }
 
     public async Task<Result> LogoutAsync(LogoutCommand command, CancellationToken cancellationToken)

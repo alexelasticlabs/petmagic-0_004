@@ -244,6 +244,54 @@ public sealed class HostApiProductionConfigurationValidatorTests
     }
 
     [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("https")]
+    [InlineData("petmagic://")]
+    public void ValidateExternalAuthMobileRedirectScheme_ShouldRejectMissingOrUnsafeSchemeOutsideDevelopment(
+        string? scheme)
+    {
+        var environment = CreateEnvironment(Environments.Production);
+        var configuration = CreateConfiguration(
+            defaultConnectionString: "Host=db.petmagic.internal;Database=petmagic;Username=petmagic_app;Password=strong-secret",
+            additionalValues: new Dictionary<string, string?>
+            {
+                ["ExternalAuth:MobileRedirectScheme"] = scheme
+            });
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            HostApiProductionConfigurationValidator.ValidateExternalAuthMobileRedirectScheme(
+                configuration,
+                environment));
+
+        Assert.Contains("ExternalAuth:MobileRedirectScheme", exception.Message);
+    }
+
+    [Fact]
+    public void ValidateExternalAuthMobileRedirectScheme_ShouldAllowExplicitFlavorSchemeOutsideDevelopment()
+    {
+        var environment = CreateEnvironment(Environments.Production);
+        var configuration = CreateConfiguration(
+            defaultConnectionString: "Host=db.petmagic.internal;Database=petmagic;Username=petmagic_app;Password=strong-secret",
+            additionalValues: new Dictionary<string, string?>
+            {
+                ["ExternalAuth:MobileRedirectScheme"] = "petmagic-staging"
+            });
+
+        HostApiProductionConfigurationValidator.ValidateExternalAuthMobileRedirectScheme(
+            configuration,
+            environment);
+    }
+
+    [Fact]
+    public void ValidateExternalAuthMobileRedirectScheme_ShouldAllowLocalDefaultInDevelopment()
+    {
+        HostApiProductionConfigurationValidator.ValidateExternalAuthMobileRedirectScheme(
+            CreateConfiguration(defaultConnectionString: ""),
+            CreateEnvironment(Environments.Development));
+    }
+
+    [Theory]
     [InlineData("Identity:AvatarStorage:PublicBaseUrl")]
     [InlineData("SupportChat:AttachmentStorage:PublicBaseUrl")]
     [InlineData("Templates:PublicBaseUrl")]

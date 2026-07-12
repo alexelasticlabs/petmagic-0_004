@@ -175,59 +175,6 @@ export function apiImageRemotePatterns(
   return patterns;
 }
 
-function apiOriginsForCsp(
-  configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL,
-  nodeEnv = process.env.NODE_ENV,
-  allowLocalApiBaseUrlInProduction = shouldAllowLocalApiBaseUrlInProduction()
-): string[] {
-  const parsedApiBaseUrl = normalizeConfiguredApiBaseUrl(
-    configuredApiBaseUrl,
-    nodeEnv,
-    allowLocalApiBaseUrlInProduction
-  );
-  const origins = new Set<string>();
-
-  if (parsedApiBaseUrl) {
-    origins.add(parsedApiBaseUrl.origin);
-  }
-
-  if (nodeEnv !== "production") {
-    origins.add("http://localhost:5000");
-    origins.add("http://127.0.0.1:5000");
-  }
-
-  return Array.from(origins);
-}
-
-export function buildContentSecurityPolicy(
-  configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL,
-  nodeEnv = process.env.NODE_ENV,
-  allowLocalApiBaseUrlInProduction = shouldAllowLocalApiBaseUrlInProduction()
-): string {
-  const apiOrigins = apiOriginsForCsp(
-    configuredApiBaseUrl,
-    nodeEnv,
-    allowLocalApiBaseUrlInProduction
-  );
-  const connectSrc = ["'self'", ...apiOrigins].join(" ");
-  const imgSrc = ["'self'", "data:", "blob:", ...apiOrigins].join(" ");
-
-  return [
-    "default-src 'self'",
-    // Next.js hydration/runtime bootstrap relies on small inline scripts; there is no
-    // per-request nonce wiring (no middleware) yet, so 'unsafe-inline' is required here.
-    "script-src 'self' 'unsafe-inline'",
-    "style-src 'self' 'unsafe-inline'",
-    `img-src ${imgSrc}`,
-    "font-src 'self' data:",
-    `connect-src ${connectSrc}`,
-    "object-src 'none'",
-    "base-uri 'self'",
-    "form-action 'self'",
-    "frame-ancestors 'none'",
-  ].join("; ");
-}
-
 const securityHeaders = [
   {
     key: "X-Frame-Options",
@@ -245,13 +192,10 @@ const securityHeaders = [
     key: "Permissions-Policy",
     value: "camera=(), microphone=(), geolocation=()",
   },
-  {
-    key: "Content-Security-Policy",
-    value: buildContentSecurityPolicy(),
-  },
 ];
 
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
   async headers() {
     return [
       {

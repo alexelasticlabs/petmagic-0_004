@@ -58,6 +58,37 @@ public sealed class HttpGeneratedMediaImporterTests
     }
 
     [Fact]
+    public void GeneratedMediaConnectionGuard_ShouldRejectMixedPublicAndPrivateDnsAnswer()
+    {
+        var target = new DnsEndPoint("cdn.example.com", 443);
+        var addresses = new[]
+        {
+            IPAddress.Parse("93.184.216.34"),
+            IPAddress.Parse("169.254.169.254")
+        };
+
+        var exception = Assert.Throws<HttpRequestException>(() =>
+            GeneratedMediaHttpMessageHandler.BuildValidatedEndpoints(target, addresses));
+
+        Assert.Contains("non-public", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GeneratedMediaConnectionGuard_ShouldPinConnectionToValidatedPublicAddress()
+    {
+        var target = new DnsEndPoint("cdn.example.com", 443);
+        var publicAddress = IPAddress.Parse("93.184.216.34");
+
+        var endpoints = GeneratedMediaHttpMessageHandler.BuildValidatedEndpoints(
+            target,
+            new[] { publicAddress });
+
+        var endpoint = Assert.Single(endpoints);
+        Assert.Equal(publicAddress, endpoint.Address);
+        Assert.Equal(443, endpoint.Port);
+    }
+
+    [Fact]
     public async Task ImportImageAsync_ShouldNotStore_WhenProviderReturnsRedirect()
     {
         var handler = new StatusHandler(HttpStatusCode.Redirect);

@@ -3,6 +3,7 @@ import 'dart:developer' as developer;
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/logging/app_crash_reporter.dart';
 import 'package:petmagic_mobile/core/logging/log_correlation_context.dart';
 import 'package:petmagic_mobile/core/network/network_utils.dart';
 import 'package:petmagic_mobile/core/network/request_identity.dart';
@@ -87,6 +88,7 @@ class AppLogger {
     Map<String, Object?> context = const {},
     Object? error,
     StackTrace? stackTrace,
+    bool reportToCrashlytics = true,
   }) {
     _log(
       level: 1000,
@@ -99,6 +101,7 @@ class AppLogger {
       context: context,
       error: error,
       stackTrace: stackTrace,
+      reportToCrashlytics: reportToCrashlytics,
     );
   }
 
@@ -113,6 +116,7 @@ class AppLogger {
     Map<String, Object?> context = const {},
     Object? error,
     StackTrace? stackTrace,
+    bool reportToCrashlytics = true,
   }) {
     if (!kDebugMode && level < 800) {
       return;
@@ -142,6 +146,16 @@ class AppLogger {
       error: _sanitizeError(error),
       stackTrace: kDebugMode ? stackTrace : null,
     );
+
+    if (level >= 1000 && reportToCrashlytics) {
+      AppCrashReporter.recordNonFatal(
+        errorType: error?.runtimeType.toString() ?? 'LoggedError',
+        reason: '$feature.$operation',
+        message: resolvedMessage,
+        context: payload,
+        stackTrace: stackTrace,
+      );
+    }
   }
 
   static Map<String, Object> _buildPayload({

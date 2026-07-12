@@ -1,6 +1,3 @@
-import 'dart:io';
-
-import 'package:flutter/foundation.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 
@@ -44,7 +41,10 @@ Uri _rewriteLocalBackendMediaUri(Uri uri) {
     return uri;
   }
 
-  final baseUri = _petMediaBaseUri(preferReachableLocalhost: true);
+  // The first configured URL is the endpoint that the API client is using.
+  // Do not replace it with an emulator-only fallback such as 10.0.2.2: a
+  // physical Android device reaches a loopback backend through adb reverse.
+  final baseUri = _petMediaBaseUri();
   if (baseUri == null || baseUri.host.isEmpty) {
     return uri;
   }
@@ -60,7 +60,7 @@ Uri _rewriteLocalBackendMediaUri(Uri uri) {
   );
 }
 
-Uri? _petMediaBaseUri({bool preferReachableLocalhost = false}) {
+Uri? _petMediaBaseUri() {
   final parsed = AppConfig.apiBaseUrls
       .map((value) => Uri.tryParse(value.trim()))
       .whereType<Uri>()
@@ -68,14 +68,6 @@ Uri? _petMediaBaseUri({bool preferReachableLocalhost = false}) {
       .toList(growable: false);
   if (parsed.isEmpty) {
     return null;
-  }
-
-  if (preferReachableLocalhost && !kIsWeb && Platform.isAndroid) {
-    for (final uri in parsed) {
-      if (!_isAndroidLoopbackHost(uri.host)) {
-        return uri;
-      }
-    }
   }
 
   return parsed.first;
@@ -87,11 +79,4 @@ bool _isLocalBackendHost(String host) {
       normalized == '127.0.0.1' ||
       normalized == '0.0.0.0' ||
       normalized == 'host.docker.internal';
-}
-
-bool _isAndroidLoopbackHost(String host) {
-  final normalized = host.toLowerCase();
-  return normalized == 'localhost' ||
-      normalized == '127.0.0.1' ||
-      normalized == '0.0.0.0';
 }

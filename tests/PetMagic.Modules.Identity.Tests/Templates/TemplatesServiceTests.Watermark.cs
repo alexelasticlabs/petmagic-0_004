@@ -475,6 +475,42 @@ public sealed partial class TemplatesServiceTests
 
         Assert.True(share.IsSuccess);
         Assert.Equal([userId], gamification.SharedUsers);
+        Assert.NotNull(job.GamificationShareRequestedAtUtc);
+        Assert.NotNull(job.GamificationShareProcessedAtUtc);
+    }
+
+    [Fact]
+    public async Task GetShareAsync_ShouldPersistGamificationRetryUntilReplaySucceeds()
+    {
+        await using var dbContext = CreateDbContext();
+        var userId = Guid.NewGuid();
+        var gamification = new RecordingGamificationService { FailShares = true };
+        var service = new TemplateGenerationService(
+            dbContext,
+            new PassiveGenerationBilling(),
+            new RecordingMediaStorage(),
+            CreateTemplatesOptions(),
+            gamificationService: gamification);
+        var job = await SeedCompletedWatermarkedGenerationAsync(dbContext, userId);
+
+        var share = await service.GetShareAsync(userId, job.Id, isPremium: true, CancellationToken.None);
+
+        Assert.True(share.IsSuccess);
+        Assert.NotNull(job.GamificationShareRequestedAtUtc);
+        Assert.Null(job.GamificationShareProcessedAtUtc);
+        Assert.Equal(1, job.GamificationShareAttemptCount);
+        Assert.Equal("templates.gamification_share_sync_failed", job.GamificationShareLastErrorCode);
+        Assert.NotNull(job.GamificationShareNextAttemptAtUtc);
+
+        gamification.FailShares = false;
+        job.GamificationShareNextAttemptAtUtc = DateTime.UtcNow.AddSeconds(-1);
+        await dbContext.SaveChangesAsync();
+
+        Assert.True(await service.ProcessNextPendingGamificationShareAsync(CancellationToken.None));
+        Assert.Equal([userId], gamification.SharedUsers);
+        Assert.NotNull(job.GamificationShareProcessedAtUtc);
+        Assert.Null(job.GamificationShareNextAttemptAtUtc);
+        Assert.Null(job.GamificationShareLastErrorCode);
     }
 
     [Fact]
@@ -797,7 +833,9 @@ public sealed partial class TemplatesServiceTests
     {
         public List<Guid> SharedUsers { get; } = [];
 
-        public Task<GenerationProcessResult> ProcessGenerationCompletedAsync(Guid userId, Guid petId, Guid templateId, bool isTemplateOfTheDay, bool isPremium, CancellationToken cancellationToken)
+        public bool FailShares { get; set; }
+
+        public Task<GenerationProcessResult> ProcessGenerationCompletedAsync(Guid generationId, Guid userId, Guid petId, Guid templateId, bool isTemplateOfTheDay, bool isPremium, CancellationToken cancellationToken)
         {
             return Task.FromResult(new GenerationProcessResult(0, null, null, false, [], 0));
         }
@@ -837,8 +875,13 @@ public sealed partial class TemplatesServiceTests
             return Task.FromResult(new GamificationSummaryResponse(null, [], [], []));
         }
 
-        public Task RecordCreationSharedAsync(Guid userId, CancellationToken cancellationToken)
+        public Task RecordCreationSharedAsync(Guid generationId, Guid userId, CancellationToken cancellationToken)
         {
+            if (FailShares)
+            {
+                throw new InvalidOperationException("simulated share sync failure");
+            }
+
             SharedUsers.Add(userId);
             return Task.CompletedTask;
         }

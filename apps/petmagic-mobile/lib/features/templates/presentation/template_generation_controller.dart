@@ -697,6 +697,7 @@ Duration _generationPollInterval(TemplateGenerationResult? generation) {
     TemplateGenerationStatus.generating ||
     TemplateGenerationStatus.providerProcessing ||
     TemplateGenerationStatus.importingMedia ||
+    TemplateGenerationStatus.cancellationRequested ||
     TemplateGenerationStatus.finalizing => const Duration(seconds: 3),
     _ => const Duration(seconds: 5),
   };

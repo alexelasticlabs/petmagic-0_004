@@ -926,6 +926,28 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'TemplateCard constrains Russian featured badge on phone-width cards',
+    (tester) async {
+      await tester.pumpWidget(
+        buildTemplateCardHost(
+          imageTemplate(id: 'featured-russian-badge'),
+          theme: AppTheme.dark(),
+          size: const Size(164, 300),
+          locale: const Locale('ru'),
+          featuredData: const TemplateCardFeaturedData(
+            badgeLabel: 'Выбор дня',
+            actionLabel: 'Попробовать шаблон',
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Выбор дня'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 String _methodBody(String source, String signature) {

@@ -112,6 +112,8 @@ describe("next admin env config", () => {
 
     expect(dockerfile).toContain("RUN npm run build");
     expect(dockerfile).toContain('CMD ["npm", "run", "start"');
+    expect(dockerfile).toContain("USER node");
+    expect(dockerfile).toContain("COPY --chown=node:node");
     expect(dockerfile).not.toContain('npm", "run", "dev');
     expect(dockerfile).not.toContain("next dev");
   });
@@ -147,14 +149,20 @@ describe("next admin env config", () => {
     expect(devLines).toEqual([
       "NEXT_PUBLIC_API_BASE_URL=http://localhost:5001",
       "INTERNAL_API_BASE_URL=http://localhost:5001",
+      "ADMIN_MEDIA_ORIGINS=http://localhost:5001",
+      "PETMAGIC_APP_DEEP_LINK_SCHEME=petmagic",
     ]);
     expect(stagingLines).toEqual([
       "NEXT_PUBLIC_API_BASE_URL=https://api.staging.petmagic.app",
       "INTERNAL_API_BASE_URL=https://api.staging.petmagic.app",
+      "ADMIN_MEDIA_ORIGINS=https://cdn.staging.petmagic.app",
+      "PETMAGIC_APP_DEEP_LINK_SCHEME=petmagic-staging",
     ]);
     expect(productionLines).toEqual([
       "NEXT_PUBLIC_API_BASE_URL=https://api.petmagic.app",
       "INTERNAL_API_BASE_URL=https://api.petmagic.app",
+      "ADMIN_MEDIA_ORIGINS=https://cdn.petmagic.app",
+      "PETMAGIC_APP_DEEP_LINK_SCHEME=petmagic",
     ]);
     expect(stagingLines.join("\n")).not.toMatch(/localhost|127\.0\.0\.1|http:\/\//);
     expect(productionLines.join("\n")).not.toMatch(/localhost|127\.0\.0\.1|http:\/\//);
@@ -192,6 +200,13 @@ describe("next admin env config", () => {
     expect(compose).toContain("ADMIN_WEB_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION:-false");
     expect(compose).toContain("BACKEND_PUBLIC_BASE_URL is required for public backend media URLs");
     expect(compose).toContain("BACKEND_PUBLIC_BASE_URL is required for public template media URLs");
+    expect(compose).toContain("${DOCKER_BIND_ADDRESS:-127.0.0.1}:${POSTGRES_HOST_PORT:-5432}:5432");
+    expect(compose).toContain(
+      "${DOCKER_BIND_ADDRESS:-127.0.0.1}:${MAILPIT_WEB_HOST_PORT:-8025}:8025"
+    );
+    expect(compose).not.toMatch(
+      /^\s*-\s+"?\$\{(?:POSTGRES|MAILPIT|BACKEND|ADMIN_WEB|TEMPO|PROMETHEUS|ALERTMANAGER|GRAFANA)_HOST_PORT/m
+    );
   });
 
   it("points Docker local-smoke server calls at the compose backend service", () => {

@@ -21,9 +21,16 @@ let artifactDir;
 let apiBaseUrl;
 let adminBaseUrl;
 let timeoutMs;
+let environment;
 
 try {
-  envFilePath = getOptionValue('--env-file') ?? process.env.STAGING_ENV_FILE ?? '.env.staging.local';
+  environment = (getOptionValue('--environment') ?? 'staging').toLowerCase();
+  if (!['staging', 'production'].includes(environment)) {
+    throw new Error('--environment must be staging or production.');
+  }
+  envFilePath = getOptionValue('--env-file')
+    ?? process.env.PETMAGIC_ENV_FILE
+    ?? (environment === 'staging' ? '.env.staging.local' : '.env.production.local');
   loadLocalEnvFile(envFilePath);
 
   startedAt = new Date();
@@ -31,12 +38,12 @@ try {
   artifactDir = getOptionValue('--artifact-dir') ?? join('artifacts', 'render-postdeploy-smoke', runId);
   apiBaseUrl = normalizeBaseUrl(
     getOptionValue('--api-base-url')
-    ?? process.env.STAGING_API_BASE_URL
-    ?? 'https://api.staging.petmagic.app');
+    ?? process.env.PETMAGIC_API_BASE_URL
+    ?? (environment === 'staging' ? 'https://api.staging.petmagic.app' : 'https://api.petmagic.app'));
   adminBaseUrl = normalizeBaseUrl(
     getOptionValue('--admin-base-url')
-    ?? process.env.STAGING_ADMIN_BASE_URL
-    ?? 'https://admin.staging.petmagic.app');
+    ?? process.env.PETMAGIC_ADMIN_BASE_URL
+    ?? (environment === 'staging' ? 'https://admin.staging.petmagic.app' : 'https://admin.petmagic.app'));
   timeoutMs = positiveIntegerOption('--timeout-ms', 15_000);
 
   mkdirSync(artifactDir, { recursive: true });
@@ -53,6 +60,7 @@ const evidence = {
   apiBaseUrl: anonymizeUrl(apiBaseUrl),
   adminBaseUrl: anonymizeUrl(adminBaseUrl),
   timeoutMs,
+  environment,
   checks
 };
 
@@ -347,6 +355,7 @@ Options:
   --api-base-url <url>    API base URL. Defaults to STAGING_API_BASE_URL or https://api.staging.petmagic.app.
   --admin-base-url <url>  Admin base URL. Defaults to STAGING_ADMIN_BASE_URL or https://admin.staging.petmagic.app.
   --env-file <path>       Optional env file. Defaults to STAGING_ENV_FILE or .env.staging.local.
+  --environment <value>  staging or production. Defaults to staging.
   --timeout-ms <ms>       Per-request timeout. Defaults to 15000.
   --run-id <id>           Artifact run id.
   --artifact-dir <dir>    Evidence output directory.

@@ -492,6 +492,30 @@ abstract class AppLocalizations {
   /// **'Password'**
   String get profilePasswordLabel;
 
+  /// No description provided for @authShowPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Show password'**
+  String get authShowPassword;
+
+  /// No description provided for @authHidePassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide password'**
+  String get authHidePassword;
+
+  /// No description provided for @authShowPasswordConfirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Show password confirmation'**
+  String get authShowPasswordConfirmation;
+
+  /// No description provided for @authHidePasswordConfirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide password confirmation'**
+  String get authHidePasswordConfirmation;
+
   /// No description provided for @profileSignInAction.
   ///
   /// In en, this message translates to:
@@ -3347,6 +3371,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No roles assigned'**
   String get profileAccountRolesMissing;
+
+  /// No description provided for @profileAccountRoleUser.
+  ///
+  /// In en, this message translates to:
+  /// **'User'**
+  String get profileAccountRoleUser;
+
+  /// No description provided for @profileAccountRoleModerator.
+  ///
+  /// In en, this message translates to:
+  /// **'Moderator'**
+  String get profileAccountRoleModerator;
+
+  /// No description provided for @profileAccountRoleAdmin.
+  ///
+  /// In en, this message translates to:
+  /// **'Administrator'**
+  String get profileAccountRoleAdmin;
 
   /// No description provided for @profileAccountMembershipLabel.
   ///
@@ -6999,6 +7041,18 @@ abstract class AppLocalizations {
   /// **'Payment will be charged to your App Store / Google Play account. Subscription renews automatically unless cancelled before the renewal date.'**
   String get premiumStorePaymentDisclaimerBody;
 
+  /// No description provided for @premiumCardPaymentDisclaimerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Secure card payment'**
+  String get premiumCardPaymentDisclaimerTitle;
+
+  /// No description provided for @premiumCardPaymentDisclaimerBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment will be charged to your bank card. Subscription renews automatically unless cancelled before the renewal date.'**
+  String get premiumCardPaymentDisclaimerBody;
+
   /// No description provided for @premiumCheckoutPageTitle.
   ///
   /// In en, this message translates to:
@@ -7728,8 +7782,8 @@ abstract class AppLocalizations {
   /// No description provided for @gamificationDayStreak.
   ///
   /// In en, this message translates to:
-  /// **'day streak'**
-  String get gamificationDayStreak;
+  /// **'{count, plural, =0{0-day streak} one{{count}-day streak} other{{count}-day streak}}'**
+  String gamificationDayStreak(int count);
 
   /// No description provided for @gamificationHubSubtitle.
   ///
@@ -8392,6 +8446,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Premium requests get priority when the service is busy and may wait less.'**
   String get templateFlowGenerationWaitTooLongPremiumHint;
+
+  /// No description provided for @mediaPlayAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Play'**
+  String get mediaPlayAction;
+
+  /// No description provided for @mediaPauseAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get mediaPauseAction;
+
+  /// No description provided for @mediaMuteAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Mute'**
+  String get mediaMuteAction;
+
+  /// No description provided for @mediaUnmuteAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Unmute'**
+  String get mediaUnmuteAction;
 }
 
 class _AppLocalizationsDelegate

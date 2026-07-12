@@ -3,7 +3,7 @@ part of 'generation_status_page.dart';
 extension _GenerationStatusPageFeedbackActions on _GenerationStatusPageState {
   Future<void> _handleRatingSelected(int rating) async {
     final generation = _generation;
-    if (generation == null) {
+    if (generation == null || _isSubmittingFeedback || _hasSubmittedFeedback) {
       return;
     }
 
@@ -56,6 +56,8 @@ extension _GenerationStatusPageFeedbackActions on _GenerationStatusPageState {
         return;
       }
 
+      _setPageState(() => _hasSubmittedFeedback = true);
+
       PetMagicToast.show(
         context,
         message: AppLocalizations.of(
@@ -80,8 +82,11 @@ extension _GenerationStatusPageFeedbackActions on _GenerationStatusPageState {
     required String sourceScreen,
     int? rating,
     String? message,
+    bool markFeedbackSubmitted = true,
   }) async {
-    if (!mounted || _isSubmittingFeedback) {
+    if (!mounted ||
+        _isSubmittingFeedback ||
+        (markFeedbackSubmitted && _hasSubmittedFeedback)) {
       return;
     }
 
@@ -101,6 +106,10 @@ extension _GenerationStatusPageFeedbackActions on _GenerationStatusPageState {
           );
       if (!mounted) {
         return;
+      }
+
+      if (markFeedbackSubmitted) {
+        _setPageState(() => _hasSubmittedFeedback = true);
       }
 
       PetMagicToast.show(
@@ -160,6 +169,7 @@ extension _GenerationStatusPageFeedbackActions on _GenerationStatusPageState {
       rating: -1,
       message: result.comment,
       sourceScreen: 'generation_result_report',
+      markFeedbackSubmitted: false,
     );
   }
 

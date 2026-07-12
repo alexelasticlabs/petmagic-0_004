@@ -26,6 +26,30 @@ void main() {
     );
   });
 
+  test('pet generation launch sheet disables creation for an unusable photo', () {
+    final source = File(
+      'lib/features/templates/presentation/widgets/pet_generation_launch_sheet.dart',
+    ).readAsStringSync();
+
+    expect(
+      source,
+      contains('_petPhotoDisplayUrl(selectedPhotoForStart) == null'),
+    );
+    expect(source, contains(': () => _start(selectedPhotoForStart);'));
+    expect(source, contains('selectedPhotoPreviewFailed ||'));
+    expect(source, contains('onPreviewLoadFailed: _markPreviewLoadFailed'));
+  });
+
+  test('pet generation launch sheet reports selected preview failures', () {
+    final mediaSource = File(
+      'lib/features/templates/presentation/widgets/'
+      'pet_generation_launch_sheet_media.part.dart',
+    ).readAsStringSync();
+
+    expect(mediaSource, contains('onImageLoadFailed(selectedPhoto)'));
+    expect(mediaSource, contains('_reportImageLoadFailure();'));
+  });
+
   test('pet generation launch sheet strips signed pet photo cache keys', () {
     final mediaSource = File(
       'lib/features/templates/presentation/widgets/'

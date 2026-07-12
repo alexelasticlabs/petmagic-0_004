@@ -115,8 +115,11 @@ Current endpoints include:
 4. POST /api/auth/google
 5. POST /api/auth/apple
 6. POST /api/auth/external/google/native
+7. POST /api/auth/me/linked-accounts/google/native
 
 External login can create a new account when the provider returns a verified email and no local account exists yet. If the user already exists, the provider is linked to that account and the user is signed in.
+
+The authenticated Google linking endpoint accepts an ID token from the native mobile SDK, verifies it server-side, and links the verified identity to the current account. It avoids a browser callback for the Android Google linking flow.
 
 ## Client behavior
 

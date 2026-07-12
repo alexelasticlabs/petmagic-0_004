@@ -21,6 +21,7 @@ const runtimeDependencyEvidence: Record<string, readonly string[]> = {
 };
 
 const devDependencyEvidence: Record<string, readonly string[]> = {
+  "@playwright/test": ['"test:e2e": "playwright test"'],
   "@types/node": ['from "node:', "node:fs", "node:path"],
   "@types/react": ['from "react"', ".tsx"],
   "@types/react-dom": ['"react-dom"'],
@@ -85,7 +86,7 @@ describe("admin dependency inventory", () => {
         `${dependency} must have source/framework evidence before it stays in dependencies`
       ).toBe(true);
     }
-  });
+  }, 10_000);
 
   it("keeps dev dependencies tied to scripts or tool configs", () => {
     const manifest = readManifest();
@@ -100,5 +101,5 @@ describe("admin dependency inventory", () => {
         `${dependency} must be tied to an admin script, test, type, or lint config`
       ).toBe(true);
     }
-  });
+  }, 10_000);
 });

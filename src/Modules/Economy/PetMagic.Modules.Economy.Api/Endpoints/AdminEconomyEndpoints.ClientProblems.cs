@@ -29,6 +29,7 @@ public static partial class AdminEconomyEndpoints
             "economy.incident_not_found" => StatusCodes.Status404NotFound,
             "economy.purchase_not_refundable" => StatusCodes.Status409Conflict,
             "economy.incident_action_invalid" => StatusCodes.Status409Conflict,
+            "economy.reconciliation_already_running" => StatusCodes.Status409Conflict,
             "economy.payment_provider_config_exists" => StatusCodes.Status409Conflict,
             "economy.redeem_code_exists" => StatusCodes.Status409Conflict,
             "economy.payment_gateway_failed" => StatusCodes.Status502BadGateway,

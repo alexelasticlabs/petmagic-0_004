@@ -34,6 +34,8 @@ public sealed class EmailOptions
 
     public int RetryDelaySeconds { get; init; } = 30;
 
+    public int ProcessingLeaseSeconds { get; init; } = 120;
+
     public int CompletedDispatchRetentionDays { get; init; } = 7;
 
     public bool IsConfigured =>
@@ -46,4 +48,3 @@ public sealed class EmailOptions
 
     public bool IsProductionConfigured => IsConfigured && HasCredentials;
 }
-

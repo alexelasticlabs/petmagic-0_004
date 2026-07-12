@@ -56,9 +56,7 @@ bool _readIpv4Prefix(String host, bool Function(int first, int second) test) {
 
 (int, int)? _parseIpv4HostBytes(String host) {
   final parts = host.split('.');
-  if (parts.isEmpty ||
-      parts.length > 4 ||
-      parts.any((part) => part.isEmpty)) {
+  if (parts.isEmpty || parts.length > 4 || parts.any((part) => part.isEmpty)) {
     return null;
   }
 

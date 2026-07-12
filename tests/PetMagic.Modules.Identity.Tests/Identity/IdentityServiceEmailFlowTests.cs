@@ -1,10 +1,12 @@
 using System.Security.Cryptography;
 using System.Text;
 
+using Microsoft.Data.Sqlite;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -69,6 +71,68 @@ public sealed class IdentityServiceEmailFlowTests
             CancellationToken.None);
 
         Assert.True(loginResult.IsFailure);
+    }
+
+    [Fact]
+    public async Task RegisterAsync_ForExistingPendingEmail_ShouldNotOverwriteAccountCredentialsOrProfile()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = await CreateServiceAsync(dbContext);
+
+        var initialResult = await service.RegisterAsync(
+            new RegisterUserCommand(
+                "pending.owner@petmagic.app",
+                "OriginalPassword123",
+                "Original Owner",
+                true,
+                true,
+                CurrentLegalVersion,
+                CurrentLegalVersion,
+                true),
+            CancellationToken.None);
+        Assert.True(initialResult.IsSuccess);
+
+        var original = await dbContext.Users.SingleAsync();
+        var originalPasswordHash = original.PasswordHash;
+        var originalSecurityStamp = original.SecurityStamp;
+        var originalAccountStatusUpdatedAtUtc = original.AccountStatusUpdatedAtUtc;
+
+        var repeatedResult = await service.RegisterAsync(
+            new RegisterUserCommand(
+                "pending.owner@petmagic.app",
+                "AttackerPassword123",
+                "Attacker Name",
+                false,
+                false,
+                "attacker-terms-version",
+                "attacker-privacy-version",
+                false),
+            CancellationToken.None);
+
+        Assert.True(repeatedResult.IsSuccess);
+        var persisted = await dbContext.Users.SingleAsync();
+        Assert.Equal("Original Owner", persisted.DisplayName);
+        Assert.Equal(originalPasswordHash, persisted.PasswordHash);
+        Assert.Equal(originalSecurityStamp, persisted.SecurityStamp);
+        Assert.Equal(originalAccountStatusUpdatedAtUtc, persisted.AccountStatusUpdatedAtUtc);
+        Assert.True(persisted.TermsOfUseAccepted);
+        Assert.True(persisted.PrivacyPolicyAccepted);
+        Assert.True(persisted.MarketingEmailsEnabled);
+        Assert.Equal(AccountStatus.PendingEmailVerification, persisted.AccountStatus);
+
+        persisted.EmailConfirmed = true;
+        await dbContext.SaveChangesAsync();
+
+        var ownerLogin = await service.LoginAsync(
+            new LoginCommand("pending.owner@petmagic.app", "OriginalPassword123"),
+            CancellationToken.None);
+        var attackerLogin = await service.LoginAsync(
+            new LoginCommand("pending.owner@petmagic.app", "AttackerPassword123"),
+            CancellationToken.None);
+
+        Assert.True(ownerLogin.IsSuccess);
+        Assert.True(attackerLogin.IsFailure);
+        Assert.Equal(IdentityErrors.InvalidCredentials.Code, attackerLogin.Error.Code);
     }
 
     [Fact]
@@ -403,6 +467,48 @@ public sealed class IdentityServiceEmailFlowTests
 
         var persistedSession = await dbContext.RefreshTokenSessions.SingleAsync(x => x.UserId == user.Id);
         Assert.NotNull(persistedSession.RevokedAtUtc);
+    }
+
+    [Fact]
+    public async Task RefreshAsync_ShouldRollbackRotationWhenSuccessAuditCannotBePersisted()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<IdentityModuleDbContext>()
+            .UseSqlite(connection)
+            .AddInterceptors(new FailRefreshSuccessAuditInterceptor())
+            .Options;
+        await using var dbContext = new IdentityModuleDbContext(options);
+        var service = await CreateServiceAsync(dbContext);
+
+        Assert.True((await service.RegisterAsync(
+            new RegisterUserCommand(
+                "refresh.audit@petmagic.app",
+                "StrongPassword123",
+                "Refresh Audit",
+                true,
+                true,
+                CurrentLegalVersion,
+                CurrentLegalVersion,
+                false),
+            CancellationToken.None)).IsSuccess);
+        var user = await dbContext.Users.SingleAsync();
+        user.EmailConfirmed = true;
+        await dbContext.SaveChangesAsync();
+        var login = await service.LoginAsync(
+            new LoginCommand(user.Email!, "StrongPassword123"),
+            CancellationToken.None);
+        Assert.True(login.IsSuccess);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.RefreshAsync(
+            new RefreshTokenCommand(login.Value.RefreshToken),
+            CancellationToken.None));
+
+        dbContext.ChangeTracker.Clear();
+        var sessions = await dbContext.RefreshTokenSessions.AsNoTracking().ToListAsync();
+        var original = Assert.Single(sessions);
+        Assert.Null(original.RevokedAtUtc);
+        Assert.Equal(HashValue(login.Value.RefreshToken), original.TokenHash);
     }
 
     [Fact]
@@ -766,6 +872,24 @@ public sealed class IdentityServiceEmailFlowTests
     private sealed class StaticHttpContextAccessor(HttpContext? context) : IHttpContextAccessor
     {
         public HttpContext? HttpContext { get; set; } = context;
+    }
+
+    private sealed class FailRefreshSuccessAuditInterceptor : SaveChangesInterceptor
+    {
+        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (eventData.Context?.ChangeTracker.Entries<AuditEvent>().Any(entry =>
+                    entry.State == EntityState.Added
+                    && entry.Entity.Action == "auth.refresh.succeeded") == true)
+            {
+                throw new InvalidOperationException("refresh audit persistence failed");
+            }
+
+            return base.SavingChangesAsync(eventData, result, cancellationToken);
+        }
     }
 
     private sealed class CapturingLogger<T> : ILogger<T>

@@ -28,6 +28,7 @@ import {
   normalizeAdminTemplateGenerationsQuery,
   normalizeAdminTemplatesAnalyticsQuery,
   retryAdminTemplateGeneration,
+  resolveAdminLegacyGamificationDelivery,
   TEMPLATE_CATALOG_SEARCH_MAX_LENGTH,
   TEMPLATE_FEEDBACK_SEARCH_MAX_LENGTH,
   updateImageTemplate,
@@ -313,6 +314,7 @@ describe("api-client.templates query normalization", () => {
         completedJobs: 5,
         failedJobs: 3,
         cancelledJobs: 1,
+        cancellingJobs: 1,
         retryingJobs: 1,
         generatedAtUtc: "2026-06-07T00:00:00Z",
       })
@@ -533,6 +535,10 @@ describe("api-client.templates query normalization", () => {
     await fetchAdminTemplateTest("generation/one two?x");
     await cancelAdminTemplateGeneration("generation/one two?x");
     await retryAdminTemplateGeneration("generation/one two?x");
+    await resolveAdminLegacyGamificationDelivery("generation/one two?x", {
+      action: "replay",
+      reason: " verified delivery ledger ",
+    });
     await decideAdminModerationItem("event/one two?x", {
       action: "reject",
       reason: "Policy",
@@ -543,10 +549,16 @@ describe("api-client.templates query normalization", () => {
       "https://api.example.com/api/admin/templates/tests/generation%2Fone%20two%3Fx",
       "https://api.example.com/api/admin/templates/generations/generation%2Fone%20two%3Fx/cancel",
       "https://api.example.com/api/admin/templates/generations/generation%2Fone%20two%3Fx/retry",
+      "https://api.example.com/api/admin/templates/generations/generation%2Fone%20two%3Fx/resolve-legacy-gamification",
       "https://api.example.com/api/admin/templates/moderation/event%2Fone%20two%3Fx/decision",
     ]);
     expect(fetchMock.mock.calls[2]?.[1]?.method).toBe("POST");
     expect(fetchMock.mock.calls[3]?.[1]?.method).toBe("POST");
+    expect(fetchMock.mock.calls[4]?.[1]?.method).toBe("POST");
+    expect(JSON.parse(String(fetchMock.mock.calls[4]?.[1]?.body))).toEqual({
+      action: "replay",
+      reason: "verified delivery ledger",
+    });
   });
 
   it("bounds moderation decision reasons before sending audit payloads", async () => {

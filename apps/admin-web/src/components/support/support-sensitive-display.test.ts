@@ -79,7 +79,7 @@ describe("support sensitive display", () => {
     expect(source).toContain("title={panelText.removeTag}");
     expect(source).toContain("setTagInput(event.target.value.slice(0, 40))");
     expect(source).toContain("maxLength={40}");
-    expect(source).toContain("disabled={!canManageSupportWorkspace || !tagInput.trim()}");
+    expect(source).toContain("disabled={!canMutateConversation || !tagInput.trim()}");
     expect(contentSource).toContain('tagFallback: "Тег"');
     expect(contentSource).toContain('tagFallback: "Tag"');
     expect(source).not.toContain(
@@ -87,6 +87,20 @@ describe("support sensitive display", () => {
     );
     expect(source).not.toContain('{tag} <span aria-hidden="true">×</span>');
     expect(source).not.toContain("onChange={(event) => setTagInput(event.target.value)}");
+  });
+
+  it("renders submitted support feedback safely for the assigned operator", () => {
+    const source = readSupportInfoPanelLibrarySource();
+    const contentSource = readFileSync(supportContentPath, "utf8");
+
+    expect(source).toContain('typeof conversation.feedbackRating === "number"');
+    expect(source).toContain("panelText.feedbackRating(conversation.feedbackRating)");
+    expect(source).toContain(
+      "formatSafeSupportDisplay(conversation.feedbackComment, panelText.noData, 1000)"
+    );
+    expect(contentSource).toContain('feedbackTitle: "Оценка поддержки"');
+    expect(contentSource).toContain('feedbackTitle: "Support feedback"');
+    expect(source).not.toContain("{conversation.feedbackComment}</strong>");
   });
 
   it("sanitizes support attachment download filenames", () => {

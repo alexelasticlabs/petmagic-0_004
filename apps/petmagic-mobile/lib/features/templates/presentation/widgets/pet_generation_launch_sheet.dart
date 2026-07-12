@@ -127,6 +127,7 @@ class _PetGenerationLaunchSheetState
   bool _isUploading = false;
   bool _isStarting = false;
   String? _errorMessage;
+  String? _failedPreviewPhotoId;
 
   bool get _isBusy => _isUploading || _isStarting;
 
@@ -148,7 +149,16 @@ class _PetGenerationLaunchSheetState
       data: (photos) => _selectedPhoto(_mergePhotos(photos)),
       orElse: () => null,
     );
-    final startAction = selectedPhotoForStart == null || _isBusy
+    final selectedPhotoId = selectedPhotoForStart?.id.trim();
+    final selectedPhotoPreviewFailed =
+        selectedPhotoId != null &&
+        selectedPhotoId.isNotEmpty &&
+        selectedPhotoId == _failedPreviewPhotoId;
+    final startAction =
+        selectedPhotoForStart == null ||
+            _petPhotoDisplayUrl(selectedPhotoForStart) == null ||
+            selectedPhotoPreviewFailed ||
+            _isBusy
         ? null
         : () => _start(selectedPhotoForStart);
     final bottomBarHeight = widget.showChangeAction ? 130.0 : 78.0;
@@ -226,11 +236,13 @@ class _PetGenerationLaunchSheetState
                   context,
                   photos: _mergePhotos(photos),
                   isLoading: false,
+                  onPreviewLoadFailed: _markPreviewLoadFailed,
                 ),
                 loading: () => _buildPhotoPicker(
                   context,
                   photos: _uploadedPhotos,
                   isLoading: true,
+                  onPreviewLoadFailed: _markPreviewLoadFailed,
                 ),
                 error: (error, stackTrace) => _PetLaunchPhotoLoadError(
                   message: _petLaunchPhotoLoadErrorLabel(text),
@@ -275,6 +287,7 @@ class _PetGenerationLaunchSheetState
     BuildContext context, {
     required List<PetPhoto> photos,
     required bool isLoading,
+    required ValueChanged<PetPhoto> onPreviewLoadFailed,
   }) {
     final text = AppLocalizations.of(context);
     final selected = _selectedPhoto(photos);
@@ -310,6 +323,7 @@ class _PetGenerationLaunchSheetState
           photo: selected,
           isLoading: isLoading,
           onUpload: _isBusy ? null : _uploadPhoto,
+          onImageLoadFailed: onPreviewLoadFailed,
         ),
         const SizedBox(height: 12),
         if (photos.isNotEmpty)
@@ -334,6 +348,7 @@ class _PetGenerationLaunchSheetState
                       : () {
                           setState(() {
                             _selectedPhotoId = photo.id;
+                            _failedPreviewPhotoId = null;
                             _errorMessage = null;
                           });
                         },
@@ -416,6 +431,7 @@ class _PetGenerationLaunchSheetState
       setState(() {
         _uploadedPhotos.insert(0, uploaded);
         _selectedPhotoId = uploaded.id;
+        _failedPreviewPhotoId = null;
       });
       ref.invalidate(petPhotosProvider(widget.petId));
     } on Object catch (error) {
@@ -433,6 +449,15 @@ class _PetGenerationLaunchSheetState
         setState(() => _isUploading = false);
       }
     }
+  }
+
+  void _markPreviewLoadFailed(PetPhoto photo) {
+    final photoId = photo.id.trim();
+    if (photoId.isEmpty || _failedPreviewPhotoId == photoId) {
+      return;
+    }
+
+    setState(() => _failedPreviewPhotoId = photoId);
   }
 
   Future<void> _start(PetPhoto selectedPhoto) async {

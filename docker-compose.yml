@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}"
       POSTGRES_DB: petmagic_db
     ports:
-      - "${POSTGRES_HOST_PORT:-5432}:5432"
+      - "${DOCKER_BIND_ADDRESS:-127.0.0.1}:${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -22,8 +22,8 @@ services:
   mailpit:
     image: axllent/mailpit:v1.19
     ports:
-      - "${MAILPIT_SMTP_HOST_PORT:-1025}:1025"
-      - "${MAILPIT_WEB_HOST_PORT:-8025}:8025"
+      - "${DOCKER_BIND_ADDRESS:-127.0.0.1}:${MAILPIT_SMTP_HOST_PORT:-1025}:1025"
+      - "${DOCKER_BIND_ADDRESS:-127.0.0.1}:${MAILPIT_WEB_HOST_PORT:-8025}:8025"
     networks:
       - petmagic-network
 
@@ -51,6 +51,7 @@ services:
       APPLE_CLIENT_ID: "${APPLE_CLIENT_ID:-}"
       APPLE_CLIENT_SECRET: "${APPLE_CLIENT_SECRET:-}"
       APPLE_AUDIENCES: "${APPLE_AUDIENCES:-}"
+      ExternalAuth__MobileRedirectScheme: "${EXTERNAL_AUTH_MOBILE_REDIRECT_SCHEME:-petmagic}"
       APPLE_AUTHORIZATION_ENDPOINT: "${APPLE_AUTHORIZATION_ENDPOINT:-}"
       APPLE_TOKEN_ENDPOINT: "${APPLE_TOKEN_ENDPOINT:-}"
       EMAIL_HOST: "${EMAIL_HOST:-mailpit}"
@@ -76,6 +77,9 @@ services:
       GOOGLE_PLAY_PUBSUB_EXPECTED_EMAIL: "${GOOGLE_PLAY_PUBSUB_EXPECTED_EMAIL:-}"
       APP_STORE_SHARED_SECRET: "${APP_STORE_SHARED_SECRET:-}"
       APP_STORE_ENVIRONMENT: "${APP_STORE_ENVIRONMENT:-production}"
+      STORE_ACCOUNT_BINDING_MODE: "${STORE_ACCOUNT_BINDING_MODE:-compatibility}"
+      ForwardedHeaders__Enabled: "${FORWARDED_HEADERS_ENABLED:-false}"
+      ForwardedHeaders__TrustAll: "${FORWARDED_HEADERS_TRUST_ALL:-false}"
       FAL_AI_API_KEY: "${FAL_AI_API_KEY:-}"
       FAL_WEBHOOK_URL: "${FAL_WEBHOOK_URL:-}"
       R2_ACCOUNT_ID: "${R2_ACCOUNT_ID:-}"
@@ -147,7 +151,7 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
       AllowedHosts: "${BACKEND_ALLOWED_HOSTS:?Set BACKEND_ALLOWED_HOSTS to the public backend host names}"
     ports:
-      - "${BACKEND_HOST_PORT:-5001}:5000"
+      - "${DOCKER_BIND_ADDRESS:-127.0.0.1}:${BACKEND_HOST_PORT:-5001}:5000"
     healthcheck:
       test: [ "CMD-SHELL", "curl --fail --silent --header 'Host: ${BACKEND_HEALTHCHECK_HOST:?Set BACKEND_HEALTHCHECK_HOST to a host allowed by BACKEND_ALLOWED_HOSTS}' http://localhost:5000/health >/dev/null || exit 1" ]
       interval: 10s
@@ -178,6 +182,8 @@ services:
       ASPNETCORE_ENVIRONMENT: "${ASPNETCORE_ENVIRONMENT:-Production}"
       DOTNET_ENVIRONMENT: "${DOTNET_ENVIRONMENT:-${ASPNETCORE_ENVIRONMENT:-Production}}"
       ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=petmagic_db;Username=petmagic_user;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env};"
+      # Must match the API: it signs private pet media URLs that the worker sends to the generation provider.
+      Jwt__SigningKey: "${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY in .env. Generate with openssl rand -base64 64}"
       STRIPE_TEST_SECRET_KEY: "${STRIPE_TEST_SECRET_KEY:-}"
       STRIPE_TEST_PUBLISHABLE_KEY: "${STRIPE_TEST_PUBLISHABLE_KEY:-}"
       STRIPE_TEST_WEBHOOK_SECRET: "${STRIPE_TEST_WEBHOOK_SECRET:-}"
@@ -194,6 +200,9 @@ services:
       GOOGLE_PLAY_PUBSUB_EXPECTED_EMAIL: "${GOOGLE_PLAY_PUBSUB_EXPECTED_EMAIL:-}"
       APP_STORE_SHARED_SECRET: "${APP_STORE_SHARED_SECRET:-}"
       APP_STORE_ENVIRONMENT: "${APP_STORE_ENVIRONMENT:-production}"
+      STORE_ACCOUNT_BINDING_MODE: "${STORE_ACCOUNT_BINDING_MODE:-compatibility}"
+      ECONOMY_RECONCILIATION_ENABLED: "false"
+      ECONOMY_PUSH_OUTBOX_DISPATCHER_ENABLED: "false"
       FAL_AI_API_KEY: "${FAL_AI_API_KEY:-}"
       FAL_WEBHOOK_URL: "${FAL_WEBHOOK_URL:-}"
       R2_ACCOUNT_ID: "${R2_ACCOUNT_ID:-}"
@@ -279,8 +288,10 @@ services:
       INTERNAL_API_BASE_URL: "${INTERNAL_API_BASE_URL:?INTERNAL_API_BASE_URL is required for admin web runtime}"
       ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION: "${ADMIN_WEB_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION:-false}"
       NEXT_PUBLIC_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION: "${ADMIN_WEB_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION:-false}"
+      ADMIN_MEDIA_ORIGINS: "${ADMIN_MEDIA_ORIGINS:-}"
+      PETMAGIC_APP_DEEP_LINK_SCHEME: "${PETMAGIC_APP_DEEP_LINK_SCHEME:-petmagic}"
     ports:
-      - "${ADMIN_WEB_HOST_PORT:-3000}:3000"
+      - "${DOCKER_BIND_ADDRESS:-127.0.0.1}:${ADMIN_WEB_HOST_PORT:-3000}:3000"
     healthcheck:
       test: [ "CMD-SHELL", "node -e \"const http=require('node:http');const req=http.get('http://127.0.0.1:3000/ru',res=>{res.resume();process.exit(res.statusCode>=200&&res.statusCode<500?0:1);});req.on('error',()=>process.exit(1));req.setTimeout(5000,()=>{req.destroy();process.exit(1);});\"" ]
       interval: 10s
@@ -314,7 +325,7 @@ services:
     volumes:
       - tempo_data:/var/tempo
     ports:
-      - "${TEMPO_HOST_PORT:-3200}:3200"
+      - "${DOCKER_BIND_ADDRESS:-127.0.0.1}:${TEMPO_HOST_PORT:-3200}:3200"
     networks:
       - petmagic-network
 
@@ -330,7 +341,7 @@ services:
     volumes:
       - prometheus_data:/prometheus
     ports:
-      - "${PROMETHEUS_HOST_PORT:-9090}:9090"
+      - "${DOCKER_BIND_ADDRESS:-127.0.0.1}:${PROMETHEUS_HOST_PORT:-9090}:9090"
     depends_on:
       - otel-collector
       - alertmanager
@@ -354,7 +365,7 @@ services:
     volumes:
       - alertmanager_data:/alertmanager
     ports:
-      - "${ALERTMANAGER_HOST_PORT:-9093}:9093"
+      - "${DOCKER_BIND_ADDRESS:-127.0.0.1}:${ALERTMANAGER_HOST_PORT:-9093}:9093"
     networks:
       - petmagic-network
 
@@ -371,7 +382,7 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
     ports:
-      - "${GRAFANA_HOST_PORT:-3001}:3000"
+      - "${DOCKER_BIND_ADDRESS:-127.0.0.1}:${GRAFANA_HOST_PORT:-3001}:3000"
     depends_on:
       - prometheus
       - tempo

@@ -22,6 +22,72 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("PetMagic.BuildingBlocks.Notifications.PushOutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeduplicationKey")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("LastErrorCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime?>("LockExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("LockId")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("NextAttemptAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime?>("SentAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeduplicationKey")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("Status", "LockExpiresAtUtc");
+
+                    b.HasIndex("Status", "NextAttemptAtUtc", "CreatedAtUtc");
+
+                    b.ToTable("templates_push_outbox", (string)null);
+                });
+
             modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.CreditRefund", b =>
                 {
                     b.Property<Guid>("Id")
@@ -663,6 +729,31 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.Property<int>("AttemptCount")
                         .HasColumnType("integer");
 
+                    b.Property<DateTime?>("CancellationAcceptedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("CancellationAttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("CancellationLastAttemptedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CancellationLastErrorCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime?>("CancellationNextAttemptAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("CancellationPreviousStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("CancellationRequestedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CancellationRequestedByAdminUserId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime?>("CancelledAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -688,6 +779,38 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 
                     b.Property<int?>("EstimatedWaitSecondsAtQueue")
                         .HasColumnType("integer");
+
+                    b.Property<int>("GamificationAttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("GamificationLastErrorCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime?>("GamificationNextAttemptAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool?>("GamificationPremiumAtCompletion")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("GamificationProcessedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("GamificationShareAttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("GamificationShareLastErrorCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime?>("GamificationShareNextAttemptAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("GamificationShareProcessedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("GamificationShareRequestedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("GenerationMode")
                         .HasColumnType("integer");
@@ -752,6 +875,10 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.Property<double?>("MotionInferenceTimeSeconds")
                         .HasColumnType("double precision");
 
+                    b.Property<string>("MotionProviderCancelUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
                     b.Property<decimal?>("MotionProviderCostUsd")
                         .HasPrecision(12, 4)
                         .HasColumnType("numeric(12,4)");
@@ -795,6 +922,10 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 
                     b.Property<double?>("PreprocessingInferenceTimeSeconds")
                         .HasColumnType("double precision");
+
+                    b.Property<string>("PreprocessingProviderCancelUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
 
                     b.Property<string>("PreprocessingProviderRequestId")
                         .HasMaxLength(128)
@@ -989,6 +1120,14 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.HasIndex("CreatedAtUtc", "Id")
                         .HasDatabaseName("IX_tgj_CreatedAtUtc_Id");
 
+                    b.HasIndex("GamificationShareNextAttemptAtUtc", "GamificationShareRequestedAtUtc")
+                        .HasDatabaseName("IX_tgj_PendingGamificationShare")
+                        .HasFilter("\"GamificationShareRequestedAtUtc\" IS NOT NULL AND \"GamificationShareProcessedAtUtc\" IS NULL");
+
+                    b.HasIndex("Status", "CancellationNextAttemptAtUtc")
+                        .HasDatabaseName("IX_tgj_PendingCancellation")
+                        .HasFilter("\"Status\" = 11");
+
                     b.HasIndex("Status", "CompletedAtUtc");
 
                     b.HasIndex("Status", "LockedAtUtc")
@@ -1007,15 +1146,19 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.HasIndex("UserId", "IdempotencyKey")
                         .IsUnique()
                         .HasDatabaseName("UX_templates_generation_jobs_UserId_IdempotencyKey_active")
-                        .HasFilter(" \"Status\" IN (1, 2, 6, 7, 8, 9, 10) AND \"IdempotencyKey\" IS NOT NULL ");
+                        .HasFilter(" \"Status\" IN (1, 2, 6, 7, 8, 9, 10, 11) AND \"IdempotencyKey\" IS NOT NULL ");
 
                     b.HasIndex("UserId", "RequestHash")
                         .IsUnique()
                         .HasDatabaseName("UX_templates_generation_jobs_UserId_RequestHash_active")
-                        .HasFilter(" \"Status\" IN (1, 2, 6, 7, 8, 9, 10) AND \"RequestHash\" IS NOT NULL ");
+                        .HasFilter(" \"Status\" IN (1, 2, 6, 7, 8, 9, 10, 11) AND \"RequestHash\" IS NOT NULL ");
 
                     b.HasIndex("UserId", "Status")
                         .HasDatabaseName("IX_templates_generation_jobs_UserId_Status");
+
+                    b.HasIndex("Status", "GamificationNextAttemptAtUtc", "CompletedAtUtc")
+                        .HasDatabaseName("IX_tgj_PendingGamification")
+                        .HasFilter("\"Status\" = 3 AND \"GamificationProcessedAtUtc\" IS NULL");
 
                     b.HasIndex("Status", "QueueMediaType", "StartedAtUtc")
                         .HasDatabaseName("IX_tgj_Status_QueueMediaType_StartedAtUtc");

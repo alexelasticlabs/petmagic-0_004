@@ -1,5 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Identity.Domain.Enums;
 using PetMagic.Modules.SupportChat.Application.Contracts;
@@ -13,11 +16,23 @@ public sealed partial class SupportChatService
         UpdateSupportConversationStatusCommand command,
         CancellationToken cancellationToken)
     {
+        await using var transaction = await BeginSupportAdminActionTransactionAsync(cancellationToken);
+        if (transaction is not null)
+        {
+            await LockConversationRowForAdminActionAsync(command.ConversationId, cancellationToken);
+        }
+
         var conversation = await supportChatDbContext.SupportConversations
             .FirstOrDefaultAsync(x => x.Id == command.ConversationId, cancellationToken);
         if (conversation is null)
         {
             return Result.Failure<SupportConversationDetailResponse>(ConversationNotFound);
+        }
+
+        var ownershipError = ValidateAdminOwnership(conversation, command.AdminUserId);
+        if (ownershipError is not null)
+        {
+            return Result.Failure<SupportConversationDetailResponse>(ownershipError);
         }
 
         var now = DateTime.UtcNow;
@@ -34,7 +49,6 @@ public sealed partial class SupportChatService
             return Result.Failure<SupportConversationDetailResponse>(InvalidStatusTransition);
         }
 
-        conversation.AssignedAdminId ??= command.AdminUserId;
         if (nextStatus == SupportConversationStatus.Closed)
         {
             MarkClosed(conversation, now, command.AdminUserId);
@@ -64,6 +78,11 @@ public sealed partial class SupportChatService
         }
 
         await supportChatDbContext.SaveChangesAsync(cancellationToken);
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
+
         await NotifyConversationUpdatedAsync(conversation, cancellationToken);
         return Result.Success(await BuildConversationDetailAsync(conversation.Id, cancellationToken));
     }
@@ -86,11 +105,47 @@ public sealed partial class SupportChatService
         AssignSupportConversationCommand command,
         CancellationToken cancellationToken)
     {
+        await using var transaction = await BeginSupportAdminActionTransactionAsync(cancellationToken);
+        if (transaction is not null)
+        {
+            await LockConversationRowForAdminActionAsync(command.ConversationId, cancellationToken);
+        }
+
         var conversation = await supportChatDbContext.SupportConversations
             .FirstOrDefaultAsync(x => x.Id == command.ConversationId, cancellationToken);
         if (conversation is null)
         {
             return Result.Failure<SupportConversationDetailResponse>(ConversationNotFound);
+        }
+
+        if (command.AssignedAdminId.HasValue && command.AssignedAdminId.Value != command.AdminUserId)
+        {
+            return Result.Failure<SupportConversationDetailResponse>(SupportChatErrors.InvalidAssignedAdmin);
+        }
+
+        if (command.AssignedAdminId.HasValue
+            && conversation.AssignedAdminId.HasValue
+            && conversation.AssignedAdminId.Value != command.AdminUserId)
+        {
+            return Result.Failure<SupportConversationDetailResponse>(SupportChatErrors.ConversationAlreadyAssigned);
+        }
+
+        if (!command.AssignedAdminId.HasValue
+            && conversation.AssignedAdminId.HasValue
+            && conversation.AssignedAdminId.Value != command.AdminUserId)
+        {
+            return Result.Failure<SupportConversationDetailResponse>(SupportChatErrors.ConversationNotOwned);
+        }
+
+        var isIdempotent = conversation.AssignedAdminId == command.AssignedAdminId;
+        if (isIdempotent)
+        {
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+
+            return Result.Success(await BuildConversationDetailAsync(conversation.Id, cancellationToken));
         }
 
         var now = DateTime.UtcNow;
@@ -113,6 +168,7 @@ public sealed partial class SupportChatService
             }
         }
 
+        var previousAssignedAdminId = conversation.AssignedAdminId;
         conversation.AssignedAdminId = command.AssignedAdminId;
         conversation.UpdatedAtUtc = now;
         if (command.AssignedAdminId.HasValue && currentStatus == SupportConversationStatus.New)
@@ -130,8 +186,66 @@ public sealed partial class SupportChatService
             await AppendSystemEventAsync(conversation, "Ticket unassigned");
         }
 
+        var auditEntry = new AdminAuditEntry(
+            command.AssignedAdminId.HasValue ? "admin.support.ticket.assigned" : "admin.support.ticket.unassigned",
+            "SupportConversation",
+            conversation.Id.ToString("D"),
+            OldValue: previousAssignedAdminId?.ToString("D"),
+            NewValue: command.AssignedAdminId?.ToString("D"),
+            SubjectUserId: conversation.InitiatorUserId,
+            EventId: Guid.NewGuid(),
+            ActorUserId: command.AdminUserId,
+            CorrelationId: CorrelationContext.ResolveOrCreate());
+        SupportChatPushNotificationOutbox.EnqueueAdminAudit(supportChatDbContext, auditEntry);
+
         await supportChatDbContext.SaveChangesAsync(cancellationToken);
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
+
+        if (adminAuditLog is not null)
+        {
+            try
+            {
+                await adminAuditLog.WriteAsync(auditEntry, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                logger?.LogWarning(
+                    "Immediate support assignment audit was cancelled and remains queued. ConversationIdHash={ConversationIdHash}",
+                    SafeLogValues.StableHash(conversation.Id.ToString("D")));
+            }
+            catch (Exception exception)
+            {
+                logger?.LogWarning(
+                    "Immediate support assignment audit failed and remains queued. ConversationIdHash={ConversationIdHash} ExceptionType={ExceptionType}",
+                    SafeLogValues.StableHash(conversation.Id.ToString("D")),
+                    SafeLogValues.ExceptionType(exception));
+            }
+        }
+
         await NotifyConversationUpdatedAsync(conversation, cancellationToken);
         return Result.Success(await BuildConversationDetailAsync(conversation.Id, cancellationToken));
+    }
+
+    private async Task<IDbContextTransaction?> BeginSupportAdminActionTransactionAsync(CancellationToken cancellationToken)
+    {
+        return string.Equals(supportChatDbContext.Database.ProviderName, NpgsqlProviderName, StringComparison.Ordinal)
+            ? await supportChatDbContext.Database.BeginTransactionAsync(cancellationToken)
+            : null;
+    }
+
+    private async Task LockConversationRowForAdminActionAsync(Guid conversationId, CancellationToken cancellationToken)
+    {
+        await supportChatDbContext.Database.SqlQueryRaw<Guid>(
+            """
+            SELECT "Id" AS "Value"
+            FROM support_conversations
+            WHERE "Id" = {0}
+            FOR UPDATE
+            """,
+            conversationId)
+            .ToListAsync(cancellationToken);
     }
 }

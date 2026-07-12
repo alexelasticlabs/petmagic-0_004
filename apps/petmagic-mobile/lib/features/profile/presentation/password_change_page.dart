@@ -52,7 +52,8 @@ class _PasswordChangePageState extends ConsumerState<PasswordChangePage> {
   @override
   void didUpdateWidget(covariant PasswordChangePage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.email.trim() == oldWidget.email.trim()) {
+    final updatedEmail = widget.email.trim();
+    if (updatedEmail.isEmpty || updatedEmail == oldWidget.email.trim()) {
       return;
     }
 
@@ -92,7 +93,14 @@ class _PasswordChangePageState extends ConsumerState<PasswordChangePage> {
         return;
       }
 
-      final email = widget.email.trim();
+      final current = ref.read(passwordChangeControllerProvider);
+      final email = widget.email.trim().isNotEmpty
+          ? widget.email.trim()
+          : current.email.trim();
+      if (email.isEmpty || current.isSaving || current.codeRequested) {
+        return;
+      }
+
       ref.read(passwordChangeControllerProvider.notifier).reset(email: email);
       _syncControllers(ref.read(passwordChangeControllerProvider));
     });

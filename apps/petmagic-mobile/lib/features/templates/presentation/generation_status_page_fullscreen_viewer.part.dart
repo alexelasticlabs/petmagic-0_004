@@ -219,6 +219,9 @@ class _FullscreenResultViewerState extends State<_FullscreenResultViewer> {
                         children: [
                           IconButton(
                             onPressed: () => Navigator.of(context).pop(),
+                            tooltip: MaterialLocalizations.of(
+                              context,
+                            ).backButtonTooltip,
                             icon: const Icon(Icons.arrow_back_rounded),
                             color: Colors.white,
                           ),
@@ -238,6 +241,9 @@ class _FullscreenResultViewerState extends State<_FullscreenResultViewer> {
                           if (_isVideo)
                             IconButton(
                               onPressed: _toggleMute,
+                              tooltip: _isMuted
+                                  ? text.mediaUnmuteAction
+                                  : text.mediaMuteAction,
                               icon: Icon(
                                 _isMuted
                                     ? Icons.volume_off_rounded
@@ -329,6 +335,7 @@ class _FullscreenVideoControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     return SafeArea(
       top: false,
       child: Padding(
@@ -354,6 +361,9 @@ class _FullscreenVideoControls extends StatelessWidget {
                   children: [
                     IconButton(
                       visualDensity: VisualDensity.compact,
+                      tooltip: value.isPlaying
+                          ? text.mediaPauseAction
+                          : text.mediaPlayAction,
                       onPressed: () async {
                         if (value.isPlaying) {
                           await controller.pause();

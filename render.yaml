@@ -32,6 +32,8 @@ envVarGroups:
         value: "false"
       - key: PETMAGIC_QA_FIXTURES_ENABLED
         value: "false"
+      - key: STORE_ACCOUNT_BINDING_MODE
+        value: compatibility
       - key: GENERATION_GLOBAL_MAX_CONCURRENT
         value: "8"
       - key: GENERATION_IMAGE_RESERVED_CONCURRENT
@@ -152,6 +154,14 @@ services:
         value: "5000"
       - key: ASPNETCORE_HTTP_PORTS
         value: "5000"
+      - key: ExternalAuth__MobileRedirectScheme
+        value: petmagic-staging
+      - key: ForwardedHeaders__Enabled
+        value: "true"
+      - key: ForwardedHeaders__TrustAll
+        value: "true"
+      - key: ForwardedHeaders__ForwardLimit
+        value: "1"
       - key: APP_VOLUME_DIRS
         value: /var/petmagic
       - key: DataProtection__KeysPath
@@ -211,8 +221,14 @@ services:
       - key: STRIPE_CHECKOUT_CANCEL_URL
         value: https://admin.staging.petmagic.app/payments/cancel
       - key: STRIPE_BILLING_PORTAL_RETURN_URL
-        value: https://admin.staging.petmagic.app/ru/templates/image
+        value: https://admin.staging.petmagic.app/payments/return
       - key: GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL
+        sync: false
+      - key: GOOGLE_PLAY_PACKAGE_NAME
+        value: com.petmagic.app.staging
+      - key: GOOGLE_PLAY_PREMIUM_MONTHLY_PRODUCT_ID
+        sync: false
+      - key: GOOGLE_PLAY_PREMIUM_YEARLY_PRODUCT_ID
         sync: false
       - key: GOOGLE_PLAY_PRIVATE_KEY_PEM
         sync: false
@@ -223,6 +239,12 @@ services:
       - key: GOOGLE_PLAY_PUBSUB_EXPECTED_EMAIL
         sync: false
       - key: APP_STORE_SHARED_SECRET
+        sync: false
+      - key: APP_STORE_BUNDLE_ID
+        value: com.petmagic.app.staging
+      - key: APP_STORE_PREMIUM_MONTHLY_PRODUCT_ID
+        sync: false
+      - key: APP_STORE_PREMIUM_YEARLY_PRODUCT_ID
         sync: false
       - key: APP_STORE_ENVIRONMENT
         value: sandbox
@@ -288,6 +310,10 @@ services:
         value: /var/petmagic
       - key: Templates__GenerationWorkerEnabled
         value: "true"
+      - key: ECONOMY_RECONCILIATION_ENABLED
+        value: "false"
+      - key: ECONOMY_PUSH_OUTBOX_DISPATCHER_ENABLED
+        value: "false"
       - key: Templates__MediaCleanupWorkerEnabled
         value: "false"
       - key: Templates__TemplateOfTheDayAutoPickWorkerEnabled
@@ -329,8 +355,14 @@ services:
       - key: STRIPE_CHECKOUT_CANCEL_URL
         value: https://admin.staging.petmagic.app/payments/cancel
       - key: STRIPE_BILLING_PORTAL_RETURN_URL
-        value: https://admin.staging.petmagic.app/ru/templates/image
+        value: https://admin.staging.petmagic.app/payments/return
       - key: GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL
+        sync: false
+      - key: GOOGLE_PLAY_PACKAGE_NAME
+        value: com.petmagic.app.staging
+      - key: GOOGLE_PLAY_PREMIUM_MONTHLY_PRODUCT_ID
+        sync: false
+      - key: GOOGLE_PLAY_PREMIUM_YEARLY_PRODUCT_ID
         sync: false
       - key: GOOGLE_PLAY_PRIVATE_KEY_PEM
         sync: false
@@ -341,6 +373,12 @@ services:
       - key: GOOGLE_PLAY_PUBSUB_EXPECTED_EMAIL
         sync: false
       - key: APP_STORE_SHARED_SECRET
+        sync: false
+      - key: APP_STORE_BUNDLE_ID
+        value: com.petmagic.app.staging
+      - key: APP_STORE_PREMIUM_MONTHLY_PRODUCT_ID
+        sync: false
+      - key: APP_STORE_PREMIUM_YEARLY_PRODUCT_ID
         sync: false
       - key: APP_STORE_ENVIRONMENT
         value: sandbox
@@ -381,3 +419,7 @@ services:
         value: "false"
       - key: NEXT_PUBLIC_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION
         value: "false"
+      - key: ADMIN_MEDIA_ORIGINS
+        sync: false
+      - key: PETMAGIC_APP_DEEP_LINK_SCHEME
+        value: petmagic-staging

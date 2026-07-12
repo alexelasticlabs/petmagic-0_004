@@ -110,15 +110,16 @@ class _PremiumHeroCard extends StatelessWidget {
             ),
             const SizedBox(height: 10),
           ],
-          _InfoRow(
-            label: text.subscriptionAutoRenewLabel,
-            value: summary.cancelAtPeriodEnd == true
-                ? text.subscriptionAutoRenewOff
-                : text.subscriptionAutoRenewOn,
-            valueColor: summary.cancelAtPeriodEnd == true
-                ? colors.danger
-                : colors.accent,
-          ),
+          if (summary.isPremium)
+            _InfoRow(
+              label: text.subscriptionAutoRenewLabel,
+              value: summary.cancelAtPeriodEnd == true
+                  ? text.subscriptionAutoRenewOff
+                  : text.subscriptionAutoRenewOn,
+              valueColor: summary.cancelAtPeriodEnd == true
+                  ? colors.danger
+                  : colors.accent,
+            ),
         ],
       ),
     );

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Contracts;
 using PetMagic.Modules.Economy.Domain.Enums;
@@ -21,7 +22,9 @@ public sealed partial class EconomyService
             return Result.Failure<StoreWebhookResultResponse>(EconomyErrors.InvalidWebhookPayload);
         }
 
-        var googlePlayEventType = $"notification_{parsed.NotificationType}";
+        var googlePlayEventType = parsed.IsVoidedPurchaseNotification
+            ? $"voided_{parsed.VoidedProductType}_{parsed.RefundType}"
+            : $"notification_{parsed.NotificationType}";
         var safeGooglePlayEventId = EconomyLogSanitizer.SafeExternalId(parsed.EventId) ?? string.Empty;
         LogStoreWebhookReceived("google_play", safeGooglePlayEventId, googlePlayEventType);
 
@@ -38,34 +41,73 @@ public sealed partial class EconomyService
                 return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, false, "ignored_duplicate"));
             }
 
-            if (parsed.IsOneTimeProductNotification)
+            if (parsed.IsVoidedPurchaseNotification)
             {
-                var purchaseTokenExternalPaymentId = string.IsNullOrWhiteSpace(parsed.PurchaseToken)
+                var purchaseTokenReference = string.IsNullOrWhiteSpace(parsed.PurchaseToken)
                     ? null
-                    : ResolveStoreExternalPaymentId("google_play", parsed.PurchaseToken, null, parsed.PurchaseToken);
-                var legacyPurchaseTokenExternalPaymentId = string.IsNullOrWhiteSpace(parsed.PurchaseToken)
-                    ? null
-                    : ResolveLegacyStoreExternalPaymentId("google_play", parsed.PurchaseToken, null, parsed.PurchaseToken);
+                    : BuildGooglePlayPurchaseTokenReference(parsed.PurchaseToken);
+                var legacyPurchaseTokenReference = parsed.PurchaseToken?.Trim();
 
-                var pendingOrder = await dbContext.PurchaseOrders
-                    .Join(
-                        dbContext.CurrencyPacks.AsNoTracking(),
-                        order => order.PackId,
-                        pack => pack.Id,
-                        (order, pack) => new { order, pack })
-                    .Where(x =>
-                        x.order.PaymentProvider == "google_play"
-                        && x.order.Status == PurchaseOrderStatus.Pending
-                        && purchaseTokenExternalPaymentId != null
-                        && (x.order.ExternalPaymentId == purchaseTokenExternalPaymentId
-                            || (legacyPurchaseTokenExternalPaymentId != null && x.order.ExternalPaymentId == legacyPurchaseTokenExternalPaymentId)))
-                    .OrderByDescending(x => x.order.CreatedAtUtc)
-                    .Select(x => new { x.order, ExpectedProductId = ResolvePackStoreProductId(x.pack, "google_play") })
-                    .FirstOrDefaultAsync(cancellationToken);
+                if (parsed.VoidedProductType == 2)
+                {
+                    var refundedOrder = await dbContext.PurchaseOrders
+                        .FirstOrDefaultAsync(
+                            x => x.PaymentProvider == "google_play"
+                                && purchaseTokenReference != null
+                                && (x.ExternalPaymentId == purchaseTokenReference
+                                    || (legacyPurchaseTokenReference != null && x.ExternalPaymentId == legacyPurchaseTokenReference)),
+                            cancellationToken);
+                    if (refundedOrder is not null)
+                    {
+                        if (parsed.RefundType == 2)
+                        {
+                            await MarkPurchaseRefundForManualReviewAsync(
+                                refundedOrder,
+                                parsed.OrderId ?? parsed.EventId,
+                                "google_play_quantity_based_partial_refund",
+                                new { parsed.VoidedProductType, parsed.RefundType },
+                                cancellationToken);
+                        }
+                        else
+                        {
+                            var refundResult = await ApplyPurchaseRefundInternalAsync(
+                                refundedOrder,
+                                parsed.OrderId ?? parsed.EventId,
+                                cancellationToken);
+                            if (refundResult.IsFailure
+                                && !string.Equals(refundResult.Error.Code, EconomyErrors.PurchaseNotRefundable.Code, StringComparison.Ordinal))
+                            {
+                                return Result.Failure<StoreWebhookResultResponse>(refundResult.Error);
+                            }
+                        }
+                    }
 
-                if (pendingOrder is null
-                    || string.IsNullOrWhiteSpace(parsed.ProductId)
-                    || !string.Equals(pendingOrder.ExpectedProductId, parsed.ProductId, StringComparison.Ordinal))
+                    await dbContext.SaveChangesAsync(cancellationToken);
+                    if (transaction is not null)
+                    {
+                        await transaction.CommitAsync(cancellationToken);
+                    }
+
+                    var productStatus = refundedOrder is null ? "ignored_not_found" : "processed_voided_product";
+                    LogStoreWebhookProcessed("google_play", parsed.EventId, googlePlayEventType, refundedOrder?.UserId, productStatus);
+                    return Result.Success(new StoreWebhookResultResponse(
+                        "google_play",
+                        parsed.EventId,
+                        refundedOrder is not null,
+                        productStatus));
+                }
+
+                var voidedSubscription = await dbContext.UserSubscriptions
+                    .FirstOrDefaultAsync(
+                        x => x.Provider == "google_play"
+                            && purchaseTokenReference != null
+                            && (x.ExternalTransactionId == purchaseTokenReference
+                                || x.ExternalSubscriptionId == purchaseTokenReference
+                                || (legacyPurchaseTokenReference != null
+                                    && (x.ExternalTransactionId == legacyPurchaseTokenReference
+                                        || x.ExternalSubscriptionId == legacyPurchaseTokenReference))),
+                        cancellationToken);
+                if (voidedSubscription is null)
                 {
                     await dbContext.SaveChangesAsync(cancellationToken);
                     if (transaction is not null)
@@ -77,7 +119,166 @@ public sealed partial class EconomyService
                     return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, false, "ignored_not_found"));
                 }
 
-                var confirmResult = await ConfirmPurchaseInternalAsync(pendingOrder.order, cancellationToken);
+                var now = DateTime.UtcNow;
+                voidedSubscription.Status = "Expired";
+                voidedSubscription.CurrentPeriodEndUtc = !voidedSubscription.CurrentPeriodEndUtc.HasValue
+                    || voidedSubscription.CurrentPeriodEndUtc.Value > now
+                        ? now
+                        : voidedSubscription.CurrentPeriodEndUtc;
+                voidedSubscription.CancelAtPeriodEnd = false;
+                voidedSubscription.ExpiredAtUtc ??= now;
+                voidedSubscription.LastValidatedAtUtc = now;
+                voidedSubscription.UpdatedAtUtc = now;
+
+                await AppendSubscriptionEventAsync(
+                    voidedSubscription.UserId,
+                    voidedSubscription.Id,
+                    "google_play",
+                    "GooglePlayVoidedPurchase",
+                    voidedSubscription.Status,
+                    parsed.EventId,
+                    voidedSubscription.ExternalSubscriptionId,
+                    BuildSafeGooglePlayWebhookPayloadMetadata(parsed),
+                    cancellationToken);
+                await _pushNotificationSender.NotifyPremiumUpdateAsync(
+                    voidedSubscription.UserId,
+                    new PremiumPushNotification(
+                        Status: "inactive",
+                        Provider: "google_play",
+                        PlanCode: voidedSubscription.PlanId,
+                        EventKey: SafeLogValues.StableHash(parsed.EventId)),
+                    cancellationToken);
+                await dbContext.SaveChangesAsync(cancellationToken);
+                if (transaction is not null)
+                {
+                    await transaction.CommitAsync(cancellationToken);
+                }
+
+                _ = await SynchronizePremiumEntitlementAsync(
+                    voidedSubscription.UserId,
+                    false,
+                    "google_play",
+                    "GooglePlayVoidedPurchase",
+                    voidedSubscription.Id,
+                    voidedSubscription.ExternalSubscriptionId,
+                    cancellationToken);
+                LogStoreWebhookProcessed(
+                    "google_play",
+                    parsed.EventId,
+                    googlePlayEventType,
+                    voidedSubscription.UserId,
+                    "processed_voided_subscription");
+                return Result.Success(new StoreWebhookResultResponse(
+                    "google_play",
+                    parsed.EventId,
+                    true,
+                    "processed_voided_subscription"));
+            }
+
+            if (parsed.IsOneTimeProductNotification)
+            {
+                if (parsed.NotificationType != 1)
+                {
+                    await dbContext.SaveChangesAsync(cancellationToken);
+                    if (transaction is not null)
+                    {
+                        await transaction.CommitAsync(cancellationToken);
+                    }
+
+                    LogStoreWebhookProcessed("google_play", parsed.EventId, googlePlayEventType, null, "ignored_non_purchase_notification");
+                    return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, false, "ignored_non_purchase_notification"));
+                }
+
+                var purchaseTokenExternalPaymentId = string.IsNullOrWhiteSpace(parsed.PurchaseToken)
+                    ? null
+                    : ResolveStoreExternalPaymentId("google_play", parsed.PurchaseToken, null, parsed.PurchaseToken);
+                var legacyPurchaseTokenExternalPaymentId = string.IsNullOrWhiteSpace(parsed.PurchaseToken)
+                    ? null
+                    : ResolveLegacyStoreExternalPaymentId("google_play", parsed.PurchaseToken, null, parsed.PurchaseToken);
+
+                var exactPendingCandidates = await dbContext.PurchaseOrders
+                    .Join(
+                        dbContext.CurrencyPacks,
+                        order => order.PackId,
+                        pack => pack.Id,
+                        (order, pack) => new { order, pack })
+                    .Where(x =>
+                        x.order.PaymentProvider == "google_play"
+                        && x.order.Status == PurchaseOrderStatus.Pending
+                        && purchaseTokenExternalPaymentId != null
+                        && (x.order.ExternalPaymentId == purchaseTokenExternalPaymentId
+                            || (legacyPurchaseTokenExternalPaymentId != null && x.order.ExternalPaymentId == legacyPurchaseTokenExternalPaymentId)))
+                    .OrderByDescending(x => x.order.CreatedAtUtc)
+                    .Take(10)
+                    .ToListAsync(cancellationToken);
+                var pendingOrder = exactPendingCandidates
+                    .FirstOrDefault(x => string.Equals(
+                        ResolvePackStoreProductId(x.pack, "google_play"),
+                        parsed.ProductId,
+                        StringComparison.Ordinal))
+                    ?.order;
+
+                if (pendingOrder is null && !string.IsNullOrWhiteSpace(parsed.PurchaseToken))
+                {
+                    var productVerification = await storeSubscriptionVerifier.VerifyProductPurchaseAsync(
+                        new StoreProductVerificationRequest(
+                            Guid.Empty,
+                            "google_play",
+                            parsed.ProductId ?? string.Empty,
+                            parsed.PurchaseToken,
+                            null,
+                            parsed.PurchaseToken,
+                            null),
+                        cancellationToken);
+                    if (productVerification.IsSuccess
+                        && productVerification.Value.IsPurchased
+                        && productVerification.Value.BoundUserId.HasValue)
+                    {
+                        var boundPendingCandidates = await dbContext.PurchaseOrders
+                            .Join(
+                                dbContext.CurrencyPacks,
+                                order => order.PackId,
+                                pack => pack.Id,
+                                (order, pack) => new { order, pack })
+                            .Where(x =>
+                                x.order.PaymentProvider == "google_play"
+                                && x.order.Status == PurchaseOrderStatus.Pending
+                                && x.order.ExternalPaymentId == null
+                                && x.order.UserId == productVerification.Value.BoundUserId.Value)
+                            .OrderByDescending(x => x.order.CreatedAtUtc)
+                            .Take(10)
+                            .ToListAsync(cancellationToken);
+                        var productCandidates = boundPendingCandidates
+                            .Where(x => string.Equals(
+                                ResolvePackStoreProductId(x.pack, "google_play"),
+                                parsed.ProductId,
+                                StringComparison.Ordinal))
+                            .ToList();
+                        pendingOrder = productCandidates.Count == 1
+                            ? productCandidates[0].order
+                            : null;
+                    }
+                }
+
+                if (pendingOrder is null
+                    || string.IsNullOrWhiteSpace(parsed.ProductId)
+                    || string.IsNullOrWhiteSpace(purchaseTokenExternalPaymentId))
+                {
+                    await dbContext.SaveChangesAsync(cancellationToken);
+                    if (transaction is not null)
+                    {
+                        await transaction.CommitAsync(cancellationToken);
+                    }
+
+                    LogStoreWebhookProcessed("google_play", parsed.EventId, googlePlayEventType, null, "ignored_not_found");
+                    return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, false, "ignored_not_found"));
+                }
+
+                var confirmResult = await ConfirmStorePurchaseInternalAsync(
+                    pendingOrder,
+                    purchaseTokenExternalPaymentId,
+                    cancellationToken,
+                    legacyPurchaseTokenExternalPaymentId);
                 if (confirmResult.IsFailure
                     && !string.Equals(confirmResult.Error.Code, EconomyErrors.PurchaseAlreadyProcessed.Code, StringComparison.Ordinal))
                 {
@@ -90,7 +291,7 @@ public sealed partial class EconomyService
                     await transaction.CommitAsync(cancellationToken);
                 }
 
-                LogStoreWebhookProcessed("google_play", parsed.EventId, googlePlayEventType, pendingOrder.order.UserId, "processed_token_purchase");
+                LogStoreWebhookProcessed("google_play", parsed.EventId, googlePlayEventType, pendingOrder.UserId, "processed_token_purchase");
                 return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, true, "processed_token_purchase"));
             }
 
@@ -215,6 +416,15 @@ public sealed partial class EconomyService
                     cancellationToken);
             }
 
+            await _pushNotificationSender.NotifyPremiumUpdateAsync(
+                existingSubscription.UserId,
+                new PremiumPushNotification(
+                    Status: isPremium ? "active" : "inactive",
+                    Provider: "google_play",
+                    PlanCode: plan.PlanCode,
+                    EventKey: SafeLogValues.StableHash(parsed.EventId)),
+                cancellationToken);
+
             await dbContext.SaveChangesAsync(cancellationToken);
             if (transaction is not null)
             {
@@ -229,16 +439,7 @@ public sealed partial class EconomyService
                 subscription.Id,
                 subscription.ExternalSubscriptionId,
                 cancellationToken);
-            if (premiumSyncResult.IsSuccess)
-            {
-                await _pushNotificationSender.NotifyPremiumUpdateAsync(
-                    existingSubscription.UserId,
-                    new PremiumPushNotification(
-                        Status: isPremium ? "active" : "inactive",
-                        Provider: "google_play",
-                        PlanCode: plan.PlanCode),
-                    cancellationToken);
-            }
+            _ = premiumSyncResult;
 
             LogStoreWebhookProcessed("google_play", parsed.EventId, googlePlayEventType, existingSubscription.UserId, "processed");
             return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, true, "processed"));

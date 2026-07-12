@@ -14,6 +14,7 @@ class _SupportComposerPanel extends StatelessWidget {
     required this.onSendMessage,
     required this.onCloseConversation,
     required this.onReopenConversation,
+    required this.onSubmitFeedback,
     required this.replyToMessage,
     required this.onClearReplyToMessage,
   });
@@ -30,6 +31,7 @@ class _SupportComposerPanel extends StatelessWidget {
   final Future<void> Function() onSendMessage;
   final Future<void> Function() onCloseConversation;
   final Future<void> Function() onReopenConversation;
+  final Future<void> Function(int rating, String? comment) onSubmitFeedback;
   final SupportChatMessage? replyToMessage;
   final VoidCallback onClearReplyToMessage;
 
@@ -63,8 +65,10 @@ class _SupportComposerPanel extends StatelessWidget {
       return Padding(
         padding: EdgeInsets.fromLTRB(10, 2, 10, isKeyboardVisible ? 3 : 7),
         child: _SupportClosedConversationBanner(
+          feedbackRating: conversation?.feedbackRating,
           isBusy: state.isSending,
           onReopen: onReopenConversation,
+          onSubmitFeedback: onSubmitFeedback,
         ),
       );
     }
@@ -443,12 +447,16 @@ class _SupportPromptButton extends StatelessWidget {
 
 class _SupportClosedConversationBanner extends StatelessWidget {
   const _SupportClosedConversationBanner({
+    required this.feedbackRating,
     required this.isBusy,
     required this.onReopen,
+    required this.onSubmitFeedback,
   });
 
+  final int? feedbackRating;
   final bool isBusy;
   final Future<void> Function() onReopen;
+  final Future<void> Function(int rating, String? comment) onSubmitFeedback;
 
   @override
   Widget build(BuildContext context) {
@@ -465,46 +473,135 @@ class _SupportClosedConversationBanner extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.lock_outline_rounded, size: 15, color: colors.textMuted),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                text.supportChatConversationClosedLabel,
-                style: TextStyle(
-                  color: colors.textSoft,
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w600,
-                  height: 1.25,
+            Row(
+              children: [
+                Icon(
+                  Icons.lock_outline_rounded,
+                  size: 15,
+                  color: colors.textMuted,
                 ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    text.supportChatConversationClosedLabel,
+                    style: TextStyle(
+                      color: colors.textSoft,
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                      height: 1.25,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                TextButton(
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    foregroundColor: actionTone,
+                    textStyle: textTheme.labelLarge?.copyWith(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    backgroundColor: actionTone.withValues(alpha: 0.1),
+                  ),
+                  onPressed: isBusy ? null : onReopen,
+                  child: Text(text.supportChatReopenAction),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              feedbackRating == null
+                  ? text.supportChatRateTitle
+                  : text.supportChatRatedLabel(feedbackRating!),
+              style: TextStyle(
+                color: colors.textSoft,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(width: 8),
-            TextButton(
-              style: TextButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                foregroundColor: actionTone,
-                textStyle: textTheme.labelLarge?.copyWith(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                backgroundColor: actionTone.withValues(alpha: 0.1),
-              ),
-              onPressed: isBusy ? null : onReopen,
-              child: Text(text.supportChatReopenAction),
+            const SizedBox(height: 2),
+            Wrap(
+              spacing: 2,
+              children: [
+                for (var rating = 1; rating <= 5; rating++)
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    tooltip: text.supportChatRatedLabel(rating),
+                    onPressed: feedbackRating == null && !isBusy
+                        ? () async {
+                            final comment =
+                                await _showSupportFeedbackCommentDialog(
+                                  context,
+                                );
+                            if (comment == null || !context.mounted) {
+                              return;
+                            }
+                            await onSubmitFeedback(rating, comment);
+                          }
+                        : null,
+                    icon: Icon(
+                      rating <= (feedbackRating ?? 0)
+                          ? Icons.star_rounded
+                          : Icons.star_outline_rounded,
+                      color: rating <= (feedbackRating ?? 0)
+                          ? actionTone
+                          : colors.textMuted,
+                    ),
+                  ),
+              ],
             ),
           ],
         ),
       ),
     );
+  }
+}
+
+Future<String?> _showSupportFeedbackCommentDialog(BuildContext context) async {
+  final controller = TextEditingController();
+  final text = AppLocalizations.of(context);
+  try {
+    return await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(text.supportChatRateTitle),
+        content: TextField(
+          controller: controller,
+          minLines: 2,
+          maxLines: 4,
+          maxLength: 1000,
+          decoration: InputDecoration(
+            labelText: text.profileSettingsFeedbackMessageLabel,
+            hintText: text.profileSettingsFeedbackMessageHint,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(
+              MaterialLocalizations.of(dialogContext).cancelButtonLabel,
+            ),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(controller.text.trim()),
+            child: Text(text.profileSettingsFeedbackSubmitAction),
+          ),
+        ],
+      ),
+    );
+  } finally {
+    controller.dispose();
   }
 }

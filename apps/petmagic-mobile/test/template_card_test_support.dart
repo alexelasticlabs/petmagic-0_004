@@ -58,10 +58,12 @@ Widget buildTemplateCardHost(
   Size size = const Size(320, 240),
   TemplateFeedPlaybackManager? playbackManager,
   TemplateCardFeaturedData? featuredData,
+  Locale? locale,
 }) {
   final manager = playbackManager ?? TemplateFeedPlaybackManager();
   return MaterialApp(
     theme: theme ?? AppTheme.light(),
+    locale: locale,
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(

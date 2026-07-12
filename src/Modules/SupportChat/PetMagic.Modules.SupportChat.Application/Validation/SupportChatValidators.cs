@@ -1,6 +1,8 @@
 using FluentValidation;
 
 using PetMagic.Modules.SupportChat.Application.Contracts;
+using PetMagic.Modules.SupportChat.Domain.Enums;
+
 namespace PetMagic.Modules.SupportChat.Application.Validation;
 
 public sealed class OpenSupportConversationCommandValidator : AbstractValidator<OpenSupportConversationCommand>
@@ -12,10 +14,10 @@ public sealed class OpenSupportConversationCommandValidator : AbstractValidator<
             .MaximumLength(4000)
             .When(x => !string.IsNullOrWhiteSpace(x.InitialMessage));
         RuleFor(x => x.Priority)
-            .Must(priority => Enum.IsDefined(priority))
+            .Equal(SupportConversationPriority.Normal)
             .WithMessage("support.conversation_priority_invalid");
         RuleFor(x => x.Source)
-            .Must(source => Enum.IsDefined(source))
+            .Must(source => source is SupportConversationSource.MobileChat or SupportConversationSource.MobileAssistant)
             .WithMessage("support.conversation_source_invalid");
         RuleFor(x => x.AssistantScenario)
             .MaximumLength(64)

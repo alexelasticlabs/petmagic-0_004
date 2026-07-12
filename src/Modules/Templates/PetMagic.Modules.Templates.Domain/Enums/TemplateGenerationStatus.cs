@@ -11,5 +11,6 @@ public enum TemplateGenerationStatus
     SubmittingToProvider = 7,
     ProviderQueued = 8,
     ProviderProcessing = 9,
-    ImportingMedia = 10
+    ImportingMedia = 10,
+    CancellationRequested = 11
 }

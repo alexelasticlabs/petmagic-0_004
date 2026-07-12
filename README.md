@@ -50,6 +50,12 @@ When enabling the monitoring profile, set `OTEL_EXPORTER_OTLP_ENDPOINT=http://ot
 in your local `.env` so the API and generation worker export telemetry to the collector. Keep it
 empty for the core stack.
 
+## Database migrations
+
+The `backend` service applies EF Core migrations for the existing PetMagic modules during startup
+under `StartupMigrationLock`, then performs the configured seed operations. No manual migration
+container is needed for the current topology.
+
 Scale generation workers locally:
 
 ```bash
@@ -217,7 +223,7 @@ See [docs/SECURITY.md](docs/SECURITY.md) for the security policy and dependency 
 ## Release Readiness
 
 Current repo-wide production-readiness status is tracked in
-[docs/production-readiness-audit-2026-07-03.md](docs/production-readiness-audit-2026-07-03.md). Treat local green builds and
+[docs/RELEASE_READINESS.md](docs/RELEASE_READINESS.md). Treat local green builds and
 tests as pre-release evidence only; production release still requires real
 provider-backed staging proof and signed store artifacts.
 
@@ -229,25 +235,11 @@ provider-backed staging proof and signed store artifacts.
 - [Notifications contract](docs/notifications-contract.md) - push payload contracts shared by backend and clients.
 - [Generation media lifecycle audit](docs/generation-media-lifecycle-audit.md), [template content hygiene](docs/template-content-hygiene.md), and [scheduler rollout](docs/generation-scheduler-rollout.md) - generation/media operations.
 - [Admin web follow-ups](docs/admin-web-production-followups.md) and [admin style guide](docs/md/ADMIN_STYLE_GUIDE.md) - admin panel production and UI conventions.
-- [Staging FAL rollout checklist](docs/staging-fal-rollout-checklist.md) and [gallery release prep](docs/gallery-release-branch-prep-2026-07-03.md) - provider-backed rollout evidence.
+- [Staging FAL rollout checklist](docs/staging-fal-rollout-checklist.md) - provider-backed rollout evidence.
 - [Observability logging](docs/observability/logging.md) and [generation release gate](docs/observability/generation-release-gate.md) - production monitoring checks.
-- Historical audit and QA evidence:
-  [security audit](docs/security-audit-2026-06-17.md),
-  [notifications/tokens/purchases audit](docs/audit-notifications-tokens-purchases-economy-2026-07-03.md),
-  [economy release gate](docs/economy-release-gate-2026-07-03.md),
-  [economy technical validation](docs/economy-technical-validation-final.md),
-  [mobile backend notifications optimization](docs/mobile-backend-notifications-optimization-report-2026-06-13.md),
-  [mobile gallery behavior](docs/mobile-gallery-current-behavior-2026-06-14.md),
-  [mobile release size audit](docs/md/mobile_release_size_audit.md),
-  [mobile release size report](docs/md/mobile_release_size_report_2026-05-30.md),
-  [mobile background crash playbook](docs/md/MOBILE_BACKGROUND_CRASH_PLAYBOOK.md),
-  [template feed stability QA](docs/template-feed-stability-qa-2026-06-14.md),
-  [template feed TZ1-8 staging QA](docs/templates-feed-tz1-8-staging-qa.md),
-  [watermark monetization manual QA](docs/watermark-monetization-manual-qa.md),
-  [templates preview content profile](docs/md/TEMPLATES_PREVIEW_CONTENT_PROFILE.md),
-  [AI agent rules](docs/ai-agent-rules.md),
-  [auth email setup](docs/md/AUTH_EMAIL_SETUP.md), and
-  [logging standard](docs/md/LOGGING_STANDARD.md).
+- [Mobile release size audit](docs/md/mobile_release_size_audit.md) and [mobile background crash playbook](docs/md/MOBILE_BACKGROUND_CRASH_PLAYBOOK.md) - mobile release operations.
+- [Template feed TZ1-8 staging QA](docs/templates-feed-tz1-8-staging-qa.md), [watermark monetization manual QA](docs/watermark-monetization-manual-qa.md), and [templates preview content profile](docs/md/TEMPLATES_PREVIEW_CONTENT_PROFILE.md) - manual/staging QA protocols.
+- [AI agent rules](docs/ai-agent-rules.md), [auth email setup](docs/md/AUTH_EMAIL_SETUP.md), and [logging standard](docs/md/LOGGING_STANDARD.md) - engineering conventions.
 
 ## Useful Commands
 
