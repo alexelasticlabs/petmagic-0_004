@@ -14,6 +14,7 @@ import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
 import 'package:petmagic_mobile/core/network/authenticated_request_options.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
 import 'package:petmagic_mobile/features/premium/domain/premium_models.dart';
+import 'package:petmagic_mobile/features/premium/data/premium_dto_mapper.dart';
 import 'package:petmagic_mobile/features/premium/application/premium_repository.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_storage.dart';
 import 'package:petmagic_mobile/core/auth/auth_session.dart';
@@ -67,7 +68,7 @@ class PremiumRepository implements PremiumRepositoryPort {
         cancelToken: cancelToken,
       );
 
-      return PremiumPaywallConfigModel.fromJson(response.data ?? const {});
+      return mapPremiumPaywallConfigFromJson(response.data ?? const {});
     } on DioException catch (error) {
       if (CancelToken.isCancel(error)) {
         throw const RequestCancelledException();
@@ -85,7 +86,7 @@ class PremiumRepository implements PremiumRepositoryPort {
 
       return (response.data ?? const [])
           .whereType<Map<String, dynamic>>()
-          .map(PremiumPlanModel.fromJson)
+          .map(mapPremiumPlanFromJson)
           .toList(growable: false)
         ..sort((left, right) => left.sortOrder.compareTo(right.sortOrder));
     } on DioException catch (error) {
@@ -103,7 +104,7 @@ class PremiumRepository implements PremiumRepositoryPort {
       ),
     );
 
-    return PremiumStatusModel.fromJson(response.data ?? const {});
+    return mapPremiumStatusFromJson(response.data ?? const {});
   }
 
   @override
@@ -135,7 +136,7 @@ class PremiumRepository implements PremiumRepositoryPort {
       retryTransientFailures: false,
     );
 
-    final checkout = PremiumCheckoutModel.fromJson(response.data ?? const {});
+    final checkout = mapPremiumCheckoutFromJson(response.data ?? const {});
     if (platform == 'web' || checkout.checkoutUrl.trim().isNotEmpty) {
       return checkout;
     }
@@ -157,7 +158,7 @@ class PremiumRepository implements PremiumRepositoryPort {
       retryTransientFailures: false,
     );
 
-    return PremiumBillingPortalModel.fromJson(response.data ?? const {});
+    return mapPremiumBillingPortalFromJson(response.data ?? const {});
   }
 
   @override
@@ -175,7 +176,7 @@ class PremiumRepository implements PremiumRepositoryPort {
       retryTransientFailures: false,
     );
 
-    return PremiumStatusModel.fromJson(response.data ?? const {});
+    return mapPremiumStatusFromJson(response.data ?? const {});
   }
 
   @override
@@ -331,7 +332,7 @@ class PremiumRepository implements PremiumRepositoryPort {
       retryTransientFailures: false,
     );
 
-    return PremiumStoreVerificationModel.fromJson(response.data ?? const {});
+    return mapPremiumStoreVerificationFromJson(response.data ?? const {});
   }
 
   @override

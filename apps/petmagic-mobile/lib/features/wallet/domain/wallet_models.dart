@@ -15,22 +15,6 @@ class WalletStateModel {
   final int adRewardsRemainingToday;
   final bool isPremium;
   final DateTime? updatedAtUtc;
-
-  factory WalletStateModel.fromJson(Map<String, dynamic> json) {
-    return WalletStateModel(
-      userId: json['userId'] as String? ?? '',
-      balance: (json['balance'] as num?)?.toInt() ?? 0,
-      nextWeeklyGrantAtUtc: json['nextWeeklyGrantAtUtc'] is String
-          ? DateTime.tryParse(json['nextWeeklyGrantAtUtc'] as String)
-          : null,
-      adRewardsRemainingToday:
-          (json['adRewardsRemainingToday'] as num?)?.toInt() ?? 0,
-      isPremium: json['isPremium'] as bool? ?? false,
-      updatedAtUtc: json['updatedAtUtc'] is String
-          ? DateTime.tryParse(json['updatedAtUtc'] as String)
-          : null,
-    );
-  }
 }
 
 class WalletLedgerItem {
@@ -51,20 +35,6 @@ class WalletLedgerItem {
   final String source;
   final String reason;
   final DateTime? createdAtUtc;
-
-  factory WalletLedgerItem.fromJson(Map<String, dynamic> json) {
-    return WalletLedgerItem(
-      entryId: json['entryId'] as String? ?? '',
-      userId: json['userId'] as String? ?? '',
-      delta: (json['delta'] as num?)?.toInt() ?? 0,
-      balanceAfter: (json['balanceAfter'] as num?)?.toInt() ?? 0,
-      source: json['source'] as String? ?? '',
-      reason: json['reason'] as String? ?? '',
-      createdAtUtc: json['createdAtUtc'] is String
-          ? DateTime.tryParse(json['createdAtUtc'] as String)
-          : null,
-    );
-  }
 }
 
 class RewardsSummaryModel {
@@ -94,28 +64,6 @@ class RewardsSummaryModel {
 
   bool get hasActivatedReferral => referralStatus != 'none';
   bool get isReferralRewarded => referralStatus == 'rewarded';
-
-  factory RewardsSummaryModel.fromJson(Map<String, dynamic> json) {
-    return RewardsSummaryModel(
-      referralCode: json['referralCode'] as String? ?? '',
-      referralBonusSpark: (json['referralBonusSpark'] as num?)?.toInt() ?? 0,
-      referralStatus: json['referralStatus'] as String? ?? 'none',
-      referrerCode: json['referrerCode'] as String?,
-      referralActivatedAtUtc: json['referralActivatedAtUtc'] is String
-          ? DateTime.tryParse(json['referralActivatedAtUtc'] as String)
-          : null,
-      referralQualifiedAtUtc: json['referralQualifiedAtUtc'] is String
-          ? DateTime.tryParse(json['referralQualifiedAtUtc'] as String)
-          : null,
-      totalReferralBonusEarned:
-          (json['totalReferralBonusEarned'] as num?)?.toInt() ?? 0,
-      referredUsersCount: (json['referredUsersCount'] as num?)?.toInt() ?? 0,
-      pendingReferredUsersCount:
-          (json['pendingReferredUsersCount'] as num?)?.toInt() ?? 0,
-      rewardedReferredUsersCount:
-          (json['rewardedReferredUsersCount'] as num?)?.toInt() ?? 0,
-    );
-  }
 }
 
 class CurrencyPackModel {
@@ -142,22 +90,6 @@ class CurrencyPackModel {
   final int totalSpark;
   final String? googlePlayProductId;
   final String? appStoreProductId;
-
-  factory CurrencyPackModel.fromJson(Map<String, dynamic> json) {
-    return CurrencyPackModel(
-      packId: json['packId'] as String? ?? '',
-      code: json['code'] as String? ?? '',
-      displayName: json['displayName'] as String? ?? '',
-      currencyCode: json['currencyCode'] as String? ?? 'USD',
-      priceAmount: (json['priceAmount'] as num?)?.toDouble() ?? 0,
-      grantedSpark: (json['grantedSpark'] as num?)?.toInt() ?? 0,
-      bonusSpark: (json['bonusSpark'] as num?)?.toInt() ?? 0,
-      totalSpark: (json['totalSpark'] as num?)?.toInt() ?? 0,
-      googlePlayProductId: json['googlePlayProductId'] as String?,
-      appStoreProductId: json['appStoreProductId'] as String?,
-    );
-  }
-
   String? productIdForProvider(String provider) {
     final normalizedProvider = provider.trim().toLowerCase();
     return switch (normalizedProvider) {
@@ -209,28 +141,6 @@ class WalletPaymentMethodModel {
     final normalized = provider.toLowerCase();
     return normalized == 'google_play' || normalized == 'app_store';
   }
-
-  factory WalletPaymentMethodModel.fromJson(Map<String, dynamic> json) {
-    return WalletPaymentMethodModel(
-      provider: json['provider'] as String? ?? 'stripe',
-      purchaseChannel: json['purchaseChannel'] as String? ?? 'web',
-      platform: json['platform'] as String? ?? '',
-      region: json['region'] as String? ?? '',
-      isEnabled: json['isEnabled'] as bool? ?? false,
-      isSelectedByDefault: json['isSelectedByDefault'] as bool? ?? false,
-      requiresExternalWarning:
-          json['requiresExternalWarning'] as bool? ?? false,
-      requiresStoreDisclosure:
-          json['requiresStoreDisclosure'] as bool? ?? false,
-      isRecommended: json['isRecommended'] as bool? ?? false,
-      bonusTokensPercent: (json['bonusTokensPercent'] as num?)?.toInt() ?? 0,
-      displayLabel: json['displayLabel'] as String?,
-      displaySubtitle: json['displaySubtitle'] as String?,
-      warningTitle: json['warningTitle'] as String?,
-      warningMessage: json['warningMessage'] as String?,
-      notes: json['notes'] as String?,
-    );
-  }
 }
 
 class WalletCheckoutConfigModel {
@@ -243,22 +153,6 @@ class WalletCheckoutConfigModel {
   final List<CurrencyPackModel> packs;
   final List<WalletPaymentMethodModel> paymentMethods;
   final bool externalPaymentWarningRequired;
-
-  factory WalletCheckoutConfigModel.fromJson(Map<String, dynamic> json) {
-    return WalletCheckoutConfigModel(
-      packs: (json['packs'] as List<dynamic>? ?? const [])
-          .whereType<Map<String, dynamic>>()
-          .map(CurrencyPackModel.fromJson)
-          .toList(growable: false),
-      paymentMethods:
-          (json['availablePaymentMethods'] as List<dynamic>? ?? const [])
-              .whereType<Map<String, dynamic>>()
-              .map(WalletPaymentMethodModel.fromJson)
-              .toList(growable: false),
-      externalPaymentWarningRequired:
-          json['externalPaymentWarningRequired'] as bool? ?? false,
-    );
-  }
 }
 
 class PurchaseCheckoutModel {
@@ -275,16 +169,6 @@ class PurchaseCheckoutModel {
   final String checkoutUrl;
   final String externalPaymentId;
   final String status;
-
-  factory PurchaseCheckoutModel.fromJson(Map<String, dynamic> json) {
-    return PurchaseCheckoutModel(
-      orderId: json['orderId'] as String? ?? '',
-      paymentProvider: json['paymentProvider'] as String? ?? '',
-      checkoutUrl: json['checkoutUrl'] as String? ?? '',
-      externalPaymentId: json['externalPaymentId'] as String? ?? '',
-      status: json['status'] as String? ?? '',
-    );
-  }
 }
 
 class PurchaseHistoryItem {
@@ -309,24 +193,6 @@ class PurchaseHistoryItem {
   final int sparkToGrant;
   final DateTime? createdAtUtc;
   final DateTime? confirmedAtUtc;
-
-  factory PurchaseHistoryItem.fromJson(Map<String, dynamic> json) {
-    return PurchaseHistoryItem(
-      orderId: json['orderId'] as String? ?? '',
-      packDisplayName: json['packDisplayName'] as String? ?? '',
-      paymentProvider: json['paymentProvider'] as String? ?? '',
-      status: json['status'] as String? ?? '',
-      priceAmount: (json['priceAmount'] as num?)?.toDouble() ?? 0,
-      currencyCode: json['currencyCode'] as String? ?? 'USD',
-      sparkToGrant: (json['sparkToGrant'] as num?)?.toInt() ?? 0,
-      createdAtUtc: json['createdAtUtc'] is String
-          ? DateTime.tryParse(json['createdAtUtc'] as String)
-          : null,
-      confirmedAtUtc: json['confirmedAtUtc'] is String
-          ? DateTime.tryParse(json['confirmedAtUtc'] as String)
-          : null,
-    );
-  }
 }
 
 class StoreBillingValidationModel {
@@ -360,21 +226,6 @@ class StoreBillingValidationModel {
             normalizedStatus == 'settled' ||
             normalizedStatus == 'already_settled');
   }
-
-  factory StoreBillingValidationModel.fromJson(Map<String, dynamic> json) {
-    return StoreBillingValidationModel(
-      provider: json['provider'] as String? ?? '',
-      productType: json['productType'] as String? ?? '',
-      productId: json['productId'] as String? ?? '',
-      status: json['status'] as String? ?? '',
-      tokensGranted: json['tokensGranted'] as bool? ?? false,
-      tokenAmount: (json['tokenAmount'] as num?)?.toInt() ?? 0,
-      isPremium: json['isPremium'] as bool? ?? false,
-      expiresAtUtc: json['expiresAtUtc'] is String
-          ? DateTime.tryParse(json['expiresAtUtc'] as String)
-          : null,
-    );
-  }
 }
 
 class OffsetPagedModel<T> {
@@ -389,19 +240,4 @@ class OffsetPagedModel<T> {
   final int skip;
   final int take;
   final bool hasMore;
-
-  factory OffsetPagedModel.fromJson(
-    Map<String, dynamic> json,
-    T Function(Map<String, dynamic>) itemFromJson,
-  ) {
-    return OffsetPagedModel(
-      items: (json['items'] as List<dynamic>? ?? const [])
-          .whereType<Map<String, dynamic>>()
-          .map(itemFromJson)
-          .toList(growable: false),
-      skip: (json['skip'] as num?)?.toInt() ?? 0,
-      take: (json['take'] as num?)?.toInt() ?? 0,
-      hasMore: json['hasMore'] as bool? ?? false,
-    );
-  }
 }

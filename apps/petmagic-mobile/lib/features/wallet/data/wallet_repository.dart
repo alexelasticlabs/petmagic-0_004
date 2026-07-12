@@ -18,6 +18,7 @@ import 'package:petmagic_mobile/core/network/dio_provider.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_storage.dart';
 import 'package:petmagic_mobile/core/auth/auth_session.dart';
 import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
+import 'package:petmagic_mobile/features/wallet/data/wallet_dto_mapper.dart';
 import 'package:petmagic_mobile/features/wallet/application/wallet_repository.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_store_purchase_recovery_store.dart';
 import 'package:petmagic_mobile/shared/payments/store_product_availability_cache.dart';
@@ -76,7 +77,7 @@ class WalletRepository implements WalletRepositoryPort {
       ),
     );
 
-    return WalletStateModel.fromJson(response.data ?? const {});
+    return mapWalletStateFromJson(response.data ?? const {});
   }
 
   @override
@@ -95,9 +96,9 @@ class WalletRepository implements WalletRepositoryPort {
       ),
     );
 
-    return OffsetPagedModel.fromJson(
+    return mapOffsetPageFromJson(
       response.data ?? const {},
-      WalletLedgerItem.fromJson,
+      mapWalletLedgerItemFromJson,
     );
   }
 
@@ -111,7 +112,7 @@ class WalletRepository implements WalletRepositoryPort {
       ),
     );
 
-    return RewardsSummaryModel.fromJson(response.data ?? const {});
+    return mapRewardsSummaryFromJson(response.data ?? const {});
   }
 
   @override
@@ -120,7 +121,7 @@ class WalletRepository implements WalletRepositoryPort {
       final response = await _dio.get<List<dynamic>>('/api/economy/packs');
       return (response.data ?? const [])
           .whereType<Map<String, dynamic>>()
-          .map(CurrencyPackModel.fromJson)
+          .map(mapCurrencyPackFromJson)
           .toList(growable: false);
     } on DioException catch (error) {
       throw _mapDioException(error, fallbackMessage: 'wallet.packs_failed');
@@ -144,7 +145,7 @@ class WalletRepository implements WalletRepositoryPort {
         cancelToken: cancelToken,
       );
 
-      return WalletCheckoutConfigModel.fromJson(response.data ?? const {});
+      return mapWalletCheckoutConfigFromJson(response.data ?? const {});
     } on DioException catch (error) {
       if (CancelToken.isCancel(error)) {
         throw const RequestCancelledException();
@@ -169,9 +170,9 @@ class WalletRepository implements WalletRepositoryPort {
       ),
     );
 
-    return OffsetPagedModel.fromJson(
+    return mapOffsetPageFromJson(
       response.data ?? const {},
-      PurchaseHistoryItem.fromJson,
+      mapPurchaseHistoryItemFromJson,
     );
   }
 
@@ -189,7 +190,7 @@ class WalletRepository implements WalletRepositoryPort {
       ),
     );
 
-    return PurchaseHistoryItem.fromJson(response.data ?? const {});
+    return mapPurchaseHistoryItemFromJson(response.data ?? const {});
   }
 
   @override
@@ -223,7 +224,7 @@ class WalletRepository implements WalletRepositoryPort {
       retryTransientFailures: false,
     );
 
-    return PurchaseCheckoutModel.fromJson(response.data ?? const {});
+    return mapPurchaseCheckoutFromJson(response.data ?? const {});
   }
 
   @override
@@ -365,7 +366,7 @@ class WalletRepository implements WalletRepositoryPort {
       retryTransientFailures: false,
     );
 
-    return PurchaseHistoryItem.fromJson(response.data ?? const {});
+    return mapPurchaseHistoryItemFromJson(response.data ?? const {});
   }
 
   @override
@@ -406,7 +407,7 @@ class WalletRepository implements WalletRepositoryPort {
       throw const AppException('wallet.payment_unavailable');
     }, retryTransientFailures: false);
 
-    return StoreBillingValidationModel.fromJson(response.data ?? const {});
+    return mapStoreBillingValidationFromJson(response.data ?? const {});
   }
 
   @override
@@ -520,7 +521,7 @@ class WalletRepository implements WalletRepositoryPort {
       retryTransientFailures: false,
     );
 
-    return PurchaseHistoryItem.fromJson(response.data ?? const {});
+    return mapPurchaseHistoryItemFromJson(response.data ?? const {});
   }
 
   @override

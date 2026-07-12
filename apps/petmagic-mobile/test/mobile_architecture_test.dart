@@ -436,8 +436,4 @@ const _legacyApplicationPlatformDependencyFiles = <String>{
   'lib/features/wallet/application/wallet_repository.dart',
 };
 
-const _legacyDomainSerializationFiles = <String>{
-  'lib/features/premium/domain/premium_models.dart',
-  'lib/features/support/domain/support_chat_models.dart',
-  'lib/features/wallet/domain/wallet_models.dart',
-};
+const _legacyDomainSerializationFiles = <String>{};

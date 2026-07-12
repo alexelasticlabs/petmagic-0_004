@@ -27,22 +27,6 @@ class SupportChatAttachment {
 
   bool get isImage => mimeType.startsWith('image/');
   bool get isVideo => mimeType.startsWith('video/');
-
-  factory SupportChatAttachment.fromJson(Map<String, dynamic> json) {
-    return SupportChatAttachment(
-      fileUrl: json['fileUrl'] as String? ?? '',
-      type: json['type'] as String? ?? 'file',
-      mimeType: json['mimeType'] as String? ?? 'application/octet-stream',
-      fileName: json['fileName'] as String? ?? '',
-      sizeBytes: (json['sizeBytes'] as num?)?.toInt() ?? 0,
-      isDeleted: json['isDeleted'] as bool? ?? false,
-      expiresAtUtc: DateTime.tryParse(json['expiresAtUtc'] as String? ?? ''),
-      deletedAtUtc: DateTime.tryParse(json['deletedAtUtc'] as String? ?? ''),
-      durationSeconds: (json['durationSeconds'] as num?)?.toDouble(),
-      width: (json['width'] as num?)?.toInt(),
-      height: (json['height'] as num?)?.toInt(),
-    );
-  }
 }
 
 class SupportChatUploadAttachment {
@@ -67,14 +51,6 @@ class SupportChatPendingAttachment {
   final String fileName;
   final String mimeType;
   final int? sizeBytes;
-
-  factory SupportChatPendingAttachment.fromJson(Map<String, dynamic> json) {
-    return SupportChatPendingAttachment(
-      fileName: json['fileName'] as String? ?? '',
-      mimeType: json['mimeType'] as String? ?? 'application/octet-stream',
-      sizeBytes: (json['sizeBytes'] as num?)?.toInt(),
-    );
-  }
 }
 
 class SupportChatMessage {
@@ -205,47 +181,6 @@ class SupportChatMessage {
       readAtUtc: clearReadAt ? null : (readAtUtc ?? this.readAtUtc),
       deliveredAtUtc: deliveredAtUtc ?? this.deliveredAtUtc,
     );
-  }
-
-  factory SupportChatMessage.fromJson(Map<String, dynamic> json) {
-    final parsedAttachments = _parseAttachments(json);
-    final pendingAttachmentJson = json['pendingAttachment'];
-
-    return SupportChatMessage(
-      messageId: json['messageId'] as String? ?? '',
-      conversationId: json['conversationId'] as String? ?? '',
-      senderUserId: json['senderUserId'] as String? ?? '',
-      senderDisplayName: json['senderDisplayName'] as String? ?? '',
-      isFromAdmin: json['isFromAdmin'] as bool? ?? false,
-      senderType: json['senderType'] as String? ?? 'User',
-      body: json['body'] as String? ?? '',
-      replyToMessageId: json['replyToMessageId'] as String?,
-      replyToPreview: json['replyToPreview'] as String?,
-      isRead: json['isRead'] as bool? ?? false,
-      attachments: parsedAttachments,
-      attachmentUploadStatus: json['attachmentUploadStatus'] as String?,
-      attachmentUploadErrorCode: json['attachmentUploadErrorCode'] as String?,
-      pendingAttachment: pendingAttachmentJson is Map<String, dynamic>
-          ? SupportChatPendingAttachment.fromJson(pendingAttachmentJson)
-          : null,
-      createdAtUtc:
-          DateTime.tryParse(json['createdAtUtc'] as String? ?? '') ??
-          DateTime.fromMillisecondsSinceEpoch(0),
-      readAtUtc: DateTime.tryParse(json['readAtUtc'] as String? ?? ''),
-      deliveredAtUtc: DateTime.tryParse(
-        json['deliveredAtUtc'] as String? ?? '',
-      ),
-    );
-  }
-
-  static List<SupportChatAttachment> _parseAttachments(
-    Map<String, dynamic> json,
-  ) {
-    return (json['attachments'] as List<dynamic>? ?? const [])
-        .whereType<Map<String, dynamic>>()
-        .map(SupportChatAttachment.fromJson)
-        .where((attachment) => attachment.fileUrl.trim().isNotEmpty)
-        .toList(growable: false);
   }
 }
 
@@ -388,55 +323,6 @@ class SupportChatConversation {
           oldestLoadedMessageCreatedAtUtc ??
           this.oldestLoadedMessageCreatedAtUtc,
       messages: messages ?? this.messages,
-    );
-  }
-
-  factory SupportChatConversation.fromJson(Map<String, dynamic> json) {
-    return SupportChatConversation(
-      conversationId: json['conversationId'] as String? ?? '',
-      initiatorUserId: json['initiatorUserId'] as String? ?? '',
-      userEmail: json['userEmail'] as String? ?? '',
-      userDisplayName: json['userDisplayName'] as String?,
-      assignedAdminId: json['assignedAdminId'] as String?,
-      assignedAdminDisplayName: json['assignedAdminDisplayName'] as String?,
-      status: json['status'] as String? ?? 'New',
-      priority: json['priority'] as String? ?? 'Normal',
-      source: json['source'] as String? ?? 'MobileChat',
-      assistantScenario: json['assistantScenario'] as String?,
-      relatedGenerationId: json['relatedGenerationId'] as String?,
-      relatedPaymentId: json['relatedPaymentId'] as String?,
-      relatedSubscriptionId: json['relatedSubscriptionId'] as String?,
-      userUnreadCount: json['userUnreadCount'] as int? ?? 0,
-      adminUnreadCount: json['adminUnreadCount'] as int? ?? 0,
-      createdAtUtc:
-          DateTime.tryParse(json['createdAtUtc'] as String? ?? '') ??
-          DateTime.fromMillisecondsSinceEpoch(0),
-      updatedAtUtc:
-          DateTime.tryParse(json['updatedAtUtc'] as String? ?? '') ??
-          DateTime.fromMillisecondsSinceEpoch(0),
-      lastMessageAtUtc: DateTime.tryParse(
-        json['lastMessageAtUtc'] as String? ?? '',
-      ),
-      resolvedAtUtc: DateTime.tryParse(json['resolvedAtUtc'] as String? ?? ''),
-      reopenUntilUtc: DateTime.tryParse(
-        json['reopenUntilUtc'] as String? ?? '',
-      ),
-      closedAtUtc: DateTime.tryParse(json['closedAtUtc'] as String? ?? ''),
-      feedbackRating: json['feedbackRating'] as int?,
-      feedbackComment: json['feedbackComment'] as String?,
-      feedbackSubmittedAtUtc: DateTime.tryParse(
-        json['feedbackSubmittedAtUtc'] as String? ?? '',
-      ),
-      isReadOnly: json['isReadOnly'] as bool? ?? false,
-      canReopen: json['canReopen'] as bool? ?? false,
-      hasOlderMessages: json['hasOlderMessages'] as bool? ?? false,
-      oldestLoadedMessageCreatedAtUtc: DateTime.tryParse(
-        json['oldestLoadedMessageCreatedAtUtc'] as String? ?? '',
-      ),
-      messages: (json['messages'] as List<dynamic>? ?? const [])
-          .whereType<Map<String, dynamic>>()
-          .map(SupportChatMessage.fromJson)
-          .toList(growable: false),
     );
   }
 }

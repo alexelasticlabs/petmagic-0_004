@@ -17,6 +17,7 @@ import 'package:petmagic_mobile/core/auth/auth_session_storage.dart';
 import 'package:petmagic_mobile/core/auth/auth_session.dart';
 import 'package:petmagic_mobile/features/support/application/support_repository.dart';
 import 'package:petmagic_mobile/features/support/domain/support_chat_models.dart';
+import 'package:petmagic_mobile/features/support/data/support_chat_dto_mapper.dart';
 import 'package:petmagic_mobile/features/support/domain/support_attachment_validation.dart';
 import 'package:petmagic_mobile/shared/files/image_upload_optimizer.dart';
 import 'package:petmagic_mobile/shared/files/media_signature.dart';
@@ -90,7 +91,7 @@ class SupportChatRepository implements SupportRepository {
       retryTransientFailures: false,
     );
 
-    return SupportChatConversation.fromJson(response.data ?? const {});
+    return mapSupportChatConversationDto(response.data ?? const {});
   }
 
   @override
@@ -119,7 +120,7 @@ class SupportChatRepository implements SupportRepository {
       ),
     );
 
-    return SupportChatConversation.fromJson(response.data ?? const {});
+    return mapSupportChatConversationDto(response.data ?? const {});
   }
 
   @override
@@ -144,7 +145,7 @@ class SupportChatRepository implements SupportRepository {
       retryTransientFailures: false,
     );
 
-    return SupportChatMessage.fromJson(response.data ?? const {});
+    return mapSupportChatMessageDto(response.data ?? const {});
   }
 
   @override
@@ -189,7 +190,7 @@ class SupportChatRepository implements SupportRepository {
         retryTransientFailures: false,
       );
 
-      return SupportChatMessage.fromJson(response.data ?? const {});
+      return mapSupportChatMessageDto(response.data ?? const {});
     } finally {
       await prepared.dispose();
     }
@@ -256,7 +257,7 @@ class SupportChatRepository implements SupportRepository {
         retryTransientFailures: false,
       );
 
-      return SupportChatMessage.fromJson(response.data ?? const {});
+      return mapSupportChatMessageDto(response.data ?? const {});
     } finally {
       for (final prepared in preparedAttachments) {
         await prepared.dispose();
@@ -298,7 +299,7 @@ class SupportChatRepository implements SupportRepository {
         retryTransientFailures: false,
       );
 
-      return SupportChatMessage.fromJson(response.data ?? const {});
+      return mapSupportChatMessageDto(response.data ?? const {});
     } finally {
       await prepared.dispose();
     }
@@ -333,7 +334,7 @@ class SupportChatRepository implements SupportRepository {
       retryTransientFailures: false,
     );
 
-    return SupportChatConversation.fromJson(response.data ?? const {});
+    return mapSupportChatConversationDto(response.data ?? const {});
   }
 
   @override
@@ -349,7 +350,7 @@ class SupportChatRepository implements SupportRepository {
       retryTransientFailures: false,
     );
 
-    return SupportChatConversation.fromJson(response.data ?? const {});
+    return mapSupportChatConversationDto(response.data ?? const {});
   }
 
   @override
@@ -365,7 +366,7 @@ class SupportChatRepository implements SupportRepository {
       retryTransientFailures: false,
     );
 
-    return SupportChatConversation.fromJson(response.data ?? const {});
+    return mapSupportChatConversationDto(response.data ?? const {});
   }
 
   @override
@@ -388,7 +389,7 @@ class SupportChatRepository implements SupportRepository {
       retryTransientFailures: false,
     );
 
-    return SupportChatConversation.fromJson(response.data ?? const {});
+    return mapSupportChatConversationDto(response.data ?? const {});
   }
 
   @override
