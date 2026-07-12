@@ -4,6 +4,11 @@ import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 void main() {
   test('typed destinations preserve production route contracts', () {
     expect(const TemplatesDestination().location, '/templates');
+    expect(const CreateDestination().location, '/create');
+    expect(
+      const CreateDestination(source: 'pets').location,
+      '/create?source=pets',
+    );
     expect(
       const TemplatesDestination(
         petId: 'pet 1',

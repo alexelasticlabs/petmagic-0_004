@@ -9,6 +9,29 @@ class AppLocalizationsRu extends AppLocalizations {
   AppLocalizationsRu([String locale = 'ru']) : super(locale);
 
   @override
+  String get navDiscover => 'Обзор';
+
+  @override
+  String get navCreate => 'Создать';
+
+  @override
+  String get createHubTitle => 'Создайте магию с питомцем';
+
+  @override
+  String get createHubSubtitle =>
+      'Начните с шаблона или питомца — дальше мы проведём вас по шагам.';
+
+  @override
+  String get createHubBrowseAction => 'Выбрать шаблон';
+
+  @override
+  String get createHubPetsAction => 'Выбрать питомца';
+
+  @override
+  String get createHubGuestHint =>
+      'Сначала можно всё посмотреть. Если потребуется вход, выбранный сценарий сохранится.';
+
+  @override
   String get navTemplates => 'Шаблоны';
 
   @override

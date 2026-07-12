@@ -9,6 +9,29 @@ class AppLocalizationsPl extends AppLocalizations {
   AppLocalizationsPl([String locale = 'pl']) : super(locale);
 
   @override
+  String get navDiscover => 'Odkrywaj';
+
+  @override
+  String get navCreate => 'Twórz';
+
+  @override
+  String get createHubTitle => 'Stwórz magię ze swoim pupilem';
+
+  @override
+  String get createHubSubtitle =>
+      'Zacznij od szablonu lub pupila. Przeprowadzimy Cię przez kolejne kroki.';
+
+  @override
+  String get createHubBrowseAction => 'Przeglądaj szablony';
+
+  @override
+  String get createHubPetsAction => 'Wybierz mojego pupila';
+
+  @override
+  String get createHubGuestHint =>
+      'Możesz najpierw przeglądać. Twój wybór zostanie zachowany, jeśli logowanie będzie wymagane.';
+
+  @override
   String get navTemplates => 'Szablony';
 
   @override

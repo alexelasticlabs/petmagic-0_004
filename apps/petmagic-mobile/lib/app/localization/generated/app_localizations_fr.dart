@@ -9,6 +9,29 @@ class AppLocalizationsFr extends AppLocalizations {
   AppLocalizationsFr([String locale = 'fr']) : super(locale);
 
   @override
+  String get navDiscover => 'Découvrir';
+
+  @override
+  String get navCreate => 'Créer';
+
+  @override
+  String get createHubTitle => 'Créez de la magie avec votre animal';
+
+  @override
+  String get createHubSubtitle =>
+      'Commencez avec un modèle ou votre animal. Nous vous guiderons pour la suite.';
+
+  @override
+  String get createHubBrowseAction => 'Explorer les modèles';
+
+  @override
+  String get createHubPetsAction => 'Choisir mon animal';
+
+  @override
+  String get createHubGuestHint =>
+      'Vous pouvez d\'abord explorer. Votre choix est conservé si une connexion est nécessaire.';
+
+  @override
   String get navTemplates => 'Modèles';
 
   @override

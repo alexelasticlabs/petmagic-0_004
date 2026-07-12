@@ -27,15 +27,16 @@ class _FloatingBottomNav extends ConsumerWidget {
       generationHistoryControllerProvider.select((state) => state.unreadCount),
     );
     final items = [
-      _NavItem(0, Icons.play_arrow_rounded, text.navTemplates),
+      _NavItem(0, Icons.explore_outlined, text.navDiscover),
+      _NavItem(1, Icons.auto_awesome_rounded, text.navCreate, isPrimary: true),
       _NavItem(
-        1,
+        2,
         Icons.photo_library_outlined,
         text.navCreations,
         badgeCount: unreadCount,
       ),
-      _NavItem(2, Icons.card_giftcard_rounded, text.navRewards),
-      _NavItem(3, Icons.person_outline_rounded, text.navProfile),
+      _NavItem(3, Icons.card_giftcard_rounded, text.navRewards),
+      _NavItem(4, Icons.person_outline_rounded, text.navProfile),
     ];
     final navSurface = DecoratedBox(
       decoration: BoxDecoration(
@@ -177,6 +178,7 @@ class _BottomNavButton extends StatelessWidget {
     final colors = context.petMagicColors;
     final isLight = Theme.of(context).brightness == Brightness.light;
     final inactiveColor = Color.lerp(colors.textMuted, colors.textSoft, 0.62)!;
+    final isPrimary = item.isPrimary;
 
     return Semantics(
       selected: selected,
@@ -189,13 +191,15 @@ class _BottomNavButton extends StatelessWidget {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 2),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            color: selected
+            color: isPrimary
+                ? colors.accent.withValues(alpha: selected ? 0.24 : 0.14)
+                : selected
                 ? colors.accent.withValues(alpha: isLight ? 0.26 : 0.1)
                 : Colors.transparent,
-            border: selected
+            border: selected || isPrimary
                 ? Border.all(
                     color: colors.accent.withValues(
                       alpha: isLight ? 0.48 : 0.08,
@@ -214,10 +218,25 @@ class _BottomNavButton extends StatelessWidget {
                   clipBehavior: Clip.none,
                   alignment: Alignment.center,
                   children: [
-                    Icon(
-                      item.icon,
-                      color: selected ? colors.accent : inactiveColor,
-                      size: 17,
+                    DecoratedBox(
+                      decoration: isPrimary
+                          ? BoxDecoration(
+                              color: colors.accent,
+                              shape: BoxShape.circle,
+                            )
+                          : const BoxDecoration(),
+                      child: Padding(
+                        padding: EdgeInsets.all(isPrimary ? 3 : 0),
+                        child: Icon(
+                          item.icon,
+                          color: isPrimary
+                              ? colors.on(colors.accent)
+                              : selected
+                              ? colors.accent
+                              : inactiveColor,
+                          size: isPrimary ? 16 : 17,
+                        ),
+                      ),
                     ),
                     if (item.badgeCount > 0)
                       Positioned(
@@ -257,10 +276,17 @@ class _BottomNavButton extends StatelessWidget {
 }
 
 class _NavItem {
-  const _NavItem(this.index, this.icon, this.label, {this.badgeCount = 0});
+  const _NavItem(
+    this.index,
+    this.icon,
+    this.label, {
+    this.badgeCount = 0,
+    this.isPrimary = false,
+  });
 
   final int index;
   final IconData icon;
   final String label;
   final int badgeCount;
+  final bool isPrimary;
 }

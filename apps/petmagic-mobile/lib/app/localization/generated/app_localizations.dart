@@ -108,6 +108,48 @@ abstract class AppLocalizations {
     Locale('ru'),
   ];
 
+  /// No description provided for @navDiscover.
+  ///
+  /// In en, this message translates to:
+  /// **'Discover'**
+  String get navDiscover;
+
+  /// No description provided for @navCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get navCreate;
+
+  /// No description provided for @createHubTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create pet magic'**
+  String get createHubTitle;
+
+  /// No description provided for @createHubSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Start with a template or your pet. We will guide you through the rest.'**
+  String get createHubSubtitle;
+
+  /// No description provided for @createHubBrowseAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse templates'**
+  String get createHubBrowseAction;
+
+  /// No description provided for @createHubPetsAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose my pet'**
+  String get createHubPetsAction;
+
+  /// No description provided for @createHubGuestHint.
+  ///
+  /// In en, this message translates to:
+  /// **'You can explore first. Your creation intent is preserved when sign-in is required.'**
+  String get createHubGuestHint;
+
   /// No description provided for @navTemplates.
   ///
   /// In en, this message translates to:

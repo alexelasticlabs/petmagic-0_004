@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/core/performance/app_performance_monitor.dart';
 import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
+import 'package:petmagic_mobile/features/create/presentation/create_hub_page.dart';
 import 'package:petmagic_mobile/features/pets/presentation/my_pets_page.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
 import 'package:petmagic_mobile/features/premium/presentation/subscription_management_page.dart';
@@ -42,6 +43,9 @@ final _rootNavigatorKey = GlobalKey<NavigatorState>(
 );
 final _templatesNavigatorKey = GlobalKey<NavigatorState>(
   debugLabel: 'templatesNavigator',
+);
+final _createNavigatorKey = GlobalKey<NavigatorState>(
+  debugLabel: 'createNavigator',
 );
 final _creationsNavigatorKey = GlobalKey<NavigatorState>(
   debugLabel: 'creationsNavigator',
@@ -233,6 +237,21 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                   child: TemplatesPage(
                     initialPetId: state.uri.queryParameters['petId'],
                     initialPetPhotoId: state.uri.queryParameters['petPhotoId'],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            navigatorKey: _createNavigatorKey,
+            routes: [
+              GoRoute(
+                path: CreateHubPage.routePath,
+                pageBuilder: (context, state) => NoTransitionPage(
+                  child: CreateHubPage(
+                    initialSource: state
+                        .uri
+                        .queryParameters[CreateHubPage.sourceQueryParameter],
                   ),
                 ),
               ),

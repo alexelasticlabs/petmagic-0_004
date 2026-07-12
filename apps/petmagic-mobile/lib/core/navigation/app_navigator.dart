@@ -35,6 +35,21 @@ final class TemplatesDestination extends AppDestination {
   }
 }
 
+final class CreateDestination extends AppDestination {
+  const CreateDestination({this.source});
+
+  final String? source;
+
+  @override
+  String get location {
+    final normalized = _normalizeQueryValue(source, maxLength: 32);
+    return Uri(
+      path: '/create',
+      queryParameters: normalized == null ? null : {'source': normalized},
+    ).toString();
+  }
+}
+
 final class CreationsDestination extends AppDestination {
   const CreationsDestination();
 
