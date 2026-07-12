@@ -2,24 +2,24 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/permissions/media_permission_feedback.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
-import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
-import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
+import 'package:petmagic_mobile/features/premium/application/premium_controller.dart';
+import 'package:petmagic_mobile/shared/auth/auth_required_sheet.dart';
+import 'package:petmagic_mobile/shared/profile/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/features/support/application/support_contract.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_assistant_scenarios.dart';
-import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/template_generation_contract.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
+import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 
@@ -536,7 +536,7 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
         text.supportTicketFormSuccessMessage,
         tone: PetMagicToastTone.success,
       );
-      context.go(SupportChatPage.routePath);
+      context.appNavigator.go(const SupportChatDestination());
     } catch (error, stackTrace) {
       if (!mounted) {
         return;

@@ -164,10 +164,13 @@ void main() {
       expect(
         pageSource,
         contains(
-          "import 'package:petmagic_mobile/features/templates/presentation/mappers/generation_status_mappers.dart';",
+          "import 'package:petmagic_mobile/features/templates/application/template_generation_contract.dart';",
         ),
       );
-      expect(widgetsSource, contains('statusTitle(text, generation)'));
+      expect(
+        widgetsSource,
+        contains('_petGenerationStatusTitle(text, generation)'),
+      );
       expect(
         widgetsSource,
         isNot(

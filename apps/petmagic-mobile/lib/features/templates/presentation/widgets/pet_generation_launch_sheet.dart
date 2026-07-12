@@ -8,12 +8,10 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
-import 'package:petmagic_mobile/features/pets/presentation/pet_media_url_normalizer.dart';
-import 'package:petmagic_mobile/features/pets/presentation/pet_profile_providers.dart';
-import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
-import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
+import 'package:petmagic_mobile/features/pets/application/pets_contract.dart';
+import 'package:petmagic_mobile/features/templates/application/template_generation_contract.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
-import 'package:petmagic_mobile/features/templates/presentation/mappers/template_error_key_mapper.dart';
+import 'package:petmagic_mobile/features/templates/application/template_error_key_mapper.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_preview_image.dart';
 import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';

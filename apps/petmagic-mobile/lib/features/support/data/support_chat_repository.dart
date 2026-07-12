@@ -1,3 +1,6 @@
+export 'package:petmagic_mobile/features/support/application/support_repository.dart'
+    show SupportRepository, supportChatRepositoryProvider;
+
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -10,15 +13,16 @@ import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/authenticated_request_options.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
-import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
-import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
+import 'package:petmagic_mobile/core/auth/auth_session_storage.dart';
+import 'package:petmagic_mobile/core/auth/auth_session.dart';
+import 'package:petmagic_mobile/features/support/application/support_repository.dart';
+import 'package:petmagic_mobile/features/support/domain/support_chat_models.dart';
 import 'package:petmagic_mobile/features/support/domain/support_attachment_validation.dart';
 import 'package:petmagic_mobile/shared/files/image_upload_optimizer.dart';
 import 'package:petmagic_mobile/shared/files/media_signature.dart';
 import 'package:petmagic_mobile/shared/files/upload_media_policy.dart';
 
-final supportChatRepositoryProvider = Provider<SupportChatRepository>((ref) {
+final dioSupportRepositoryProvider = Provider<SupportRepository>((ref) {
   return SupportChatRepository(
     dio: ref.watch(dioProvider),
     sessionStorage: ref.watch(authSessionStorageProvider),
@@ -27,10 +31,10 @@ final supportChatRepositoryProvider = Provider<SupportChatRepository>((ref) {
   );
 });
 
-class SupportChatRepository {
+class SupportChatRepository implements SupportRepository {
   SupportChatRepository({
     required Dio dio,
-    required AuthSessionStorage sessionStorage,
+    required AuthSessionStore sessionStorage,
     ImageUploadOptimizer? imageUploadOptimizer,
     AuthSessionCoordinator? authSessionCoordinator,
   }) : _dio = dio,
@@ -49,6 +53,7 @@ class SupportChatRepository {
   static const _videoMaxFileSizeBytes = UploadMediaPolicy.supportVideoMaxBytes;
   static const _safeAttachmentFileNameMaxLength = 120;
 
+  @override
   Future<SupportChatConversation> openConversation({
     String? initialMessage,
     String source = 'MobileChat',
@@ -88,6 +93,7 @@ class SupportChatRepository {
     return SupportChatConversation.fromJson(response.data ?? const {});
   }
 
+  @override
   Future<SupportChatConversation> getConversation({
     int take = 60,
     DateTime? beforeMessageCreatedAtUtc,
@@ -116,6 +122,7 @@ class SupportChatRepository {
     return SupportChatConversation.fromJson(response.data ?? const {});
   }
 
+  @override
   Future<SupportChatMessage> sendMessage({
     required String conversationId,
     required String body,
@@ -140,6 +147,7 @@ class SupportChatRepository {
     return SupportChatMessage.fromJson(response.data ?? const {});
   }
 
+  @override
   Future<SupportChatMessage> sendAttachment({
     required String conversationId,
     required String filePath,
@@ -187,6 +195,7 @@ class SupportChatRepository {
     }
   }
 
+  @override
   Future<SupportChatMessage> sendAttachments({
     required String conversationId,
     required List<SupportChatUploadAttachment> attachments,
@@ -255,6 +264,7 @@ class SupportChatRepository {
     }
   }
 
+  @override
   Future<SupportChatMessage> retryAttachment({
     required String conversationId,
     required String messageId,
@@ -294,6 +304,7 @@ class SupportChatRepository {
     }
   }
 
+  @override
   Future<void> markConversationRead(
     String conversationId, {
     CancelToken? cancelToken,
@@ -309,6 +320,7 @@ class SupportChatRepository {
     );
   }
 
+  @override
   Future<SupportChatConversation> resolveConversation(
     String conversationId,
   ) async {
@@ -324,6 +336,7 @@ class SupportChatRepository {
     return SupportChatConversation.fromJson(response.data ?? const {});
   }
 
+  @override
   Future<SupportChatConversation> reopenConversation(
     String conversationId,
   ) async {
@@ -339,6 +352,7 @@ class SupportChatRepository {
     return SupportChatConversation.fromJson(response.data ?? const {});
   }
 
+  @override
   Future<SupportChatConversation> closeConversation(
     String conversationId,
   ) async {
@@ -354,6 +368,7 @@ class SupportChatRepository {
     return SupportChatConversation.fromJson(response.data ?? const {});
   }
 
+  @override
   Future<SupportChatConversation> submitFeedback({
     required String conversationId,
     required int rating,
@@ -376,6 +391,7 @@ class SupportChatRepository {
     return SupportChatConversation.fromJson(response.data ?? const {});
   }
 
+  @override
   Future<void> registerPushToken({
     required String token,
     required String platform,
@@ -400,6 +416,7 @@ class SupportChatRepository {
     );
   }
 
+  @override
   Future<void> unregisterPushToken(String token) async {
     await _authorizedRequest<void>(
       (session) => _dio.delete<void>(

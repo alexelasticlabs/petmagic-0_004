@@ -208,7 +208,7 @@ Future<void> _deletePet(
   await ref.read(templateGenerationRepositoryProvider).deletePet(petId);
   await _refreshPets(ref);
   if (context.mounted) {
-    context.pop();
+    context.appNavigator.pop();
   }
 }
 
@@ -257,21 +257,6 @@ Future<void> _ignoreRefreshFailure<T>(Future<T> future) async {
   } on Object {
     // Provider state renders the refresh error; keep the pull gesture finite.
   }
-}
-
-String _templatesWithPetLocation(String petId, {String? petPhotoId}) {
-  final normalizedPetId = petId.trim();
-  if (normalizedPetId.isEmpty) {
-    return TemplatesPage.routePath;
-  }
-
-  return Uri(
-    path: TemplatesPage.routePath,
-    queryParameters: {
-      'petId': normalizedPetId,
-      if (petPhotoId != null && petPhotoId.isNotEmpty) 'petPhotoId': petPhotoId,
-    },
-  ).toString();
 }
 
 String? _petPhotoDisplayUrl(PetPhoto photo) {

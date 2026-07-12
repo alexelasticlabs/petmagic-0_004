@@ -7,7 +7,7 @@ import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_gallery_store.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/generation_history_controller.dart';
 import 'generation_history_controller_test_support.dart';
 
 void main() {
@@ -17,7 +17,7 @@ void main() {
     'generation history controller does not watch dependencies into fields',
     () {
       final source = File(
-        'lib/features/templates/presentation/generation_history_controller.dart',
+        'lib/features/templates/application/generation_history_controller.dart',
       ).readAsStringSync();
 
       expect(

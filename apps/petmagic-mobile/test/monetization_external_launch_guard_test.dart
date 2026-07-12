@@ -76,10 +76,10 @@ void main() {
       'lib/features/premium/presentation/premium_page.dart',
     ).readAsStringSync();
     final premiumModelsSource = File(
-      'lib/features/premium/data/premium_models.dart',
+      'lib/features/premium/domain/premium_models.dart',
     ).readAsStringSync();
     final walletModelsSource = File(
-      'lib/features/wallet/data/wallet_models.dart',
+      'lib/features/wallet/domain/wallet_models.dart',
     ).readAsStringSync();
     final walletCheckoutSource = File(
       'lib/features/wallet/presentation/wallet_page_checkout.part.dart',

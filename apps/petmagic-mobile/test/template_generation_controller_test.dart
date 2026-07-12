@@ -14,8 +14,8 @@ import 'package:petmagic_mobile/features/templates/data/template_generation_repo
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
-import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -27,12 +27,12 @@ void main() {
 
     expect(
       source,
-      isNot(contains('late final TemplateGenerationRepository _repository')),
+      isNot(contains('late final GenerationRepository _repository')),
     );
     expect(
       source,
       contains(
-        'TemplateGenerationRepository get _repository =>\n'
+        'GenerationRepository get _repository =>\n'
         '      ref.read(templateGenerationRepositoryProvider)',
       ),
     );
@@ -1135,6 +1135,11 @@ class _FakeTemplateGenerationRepository
   final List<CancelToken?> startCancelTokens = <CancelToken?>[];
   final List<String?> fetchCorrelationIds = <String?>[];
   ({String generationId, String correlationId})? activeGeneration;
+
+  @override
+  TemplateGenerationResult parseRealtimePayload(Map<String, dynamic> payload) {
+    throw UnsupportedError('Realtime parsing is not used by this fake.');
+  }
 
   @override
   Future<TemplateGenerationResult> startGeneration({

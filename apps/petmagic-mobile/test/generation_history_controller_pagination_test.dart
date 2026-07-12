@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/generation_history_controller.dart';
 import 'generation_history_controller_test_support.dart';
 
 void main() {
@@ -307,13 +307,13 @@ void main() {
 
   test('generation history load cancel-token cleanup is identity safe', () {
     final contractSource = File(
-      'lib/features/templates/presentation/generation_history_controller.dart',
+      'lib/features/templates/application/generation_history_controller.dart',
     ).readAsStringSync();
     final lifecycleSource = File(
-      'lib/features/templates/presentation/generation_history_controller_lifecycle.part.dart',
+      'lib/features/templates/application/generation_history_controller_lifecycle.part.dart',
     ).readAsStringSync();
     final syncSource = File(
-      'lib/features/templates/presentation/generation_history_controller_sync.part.dart',
+      'lib/features/templates/application/generation_history_controller_sync.part.dart',
     ).readAsStringSync();
 
     expect(

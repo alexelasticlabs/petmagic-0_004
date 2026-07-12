@@ -1,44 +1,44 @@
+export 'package:petmagic_mobile/features/support/application/support_realtime_gateway.dart'
+    show
+        SupportChatRealtimeUpdate,
+        SupportChatRealtimeClient,
+        SupportRealtimeGateway,
+        supportChatRealtimeClientProvider;
+
 import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/network/api_base_url_resolver.dart';
 import 'package:petmagic_mobile/core/network/request_identity.dart';
-import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
+import 'package:petmagic_mobile/core/auth/auth_session_storage.dart';
+import 'package:petmagic_mobile/core/session/session_epoch.dart';
+import 'package:petmagic_mobile/features/support/application/support_realtime_gateway.dart';
 import 'package:signalr_netcore/http_connection_options.dart';
 import 'package:signalr_netcore/hub_connection.dart';
 import 'package:signalr_netcore/hub_connection_builder.dart';
 import 'package:signalr_netcore/ihub_protocol.dart';
 
-final supportChatRealtimeClientProvider = Provider<SupportChatRealtimeClient>((
-  ref,
-) {
-  final client = SignalRSupportChatRealtimeClient(
-    sessionStorage: ref.watch(authSessionStorageProvider),
-    apiBaseUrlResolver: ref.watch(apiBaseUrlResolverProvider),
-  );
-  ref.onDispose(() {
-    unawaited(client.dispose());
-  });
-  return client;
-});
+final signalRSupportRealtimeGatewayProvider =
+    Provider.family<SupportChatRealtimeClient, int>((ref, sessionEpoch) {
+      final client = SignalRSupportChatRealtimeClient(
+        sessionStorage: ref.watch(authSessionStorageProvider),
+        apiBaseUrlResolver: ref.watch(apiBaseUrlResolverProvider),
+      );
+      ref.onDispose(() {
+        unawaited(client.dispose());
+      });
+      return client;
+    });
 
-class SupportChatRealtimeUpdate {
-  const SupportChatRealtimeUpdate({required this.conversationId});
-
-  final String conversationId;
-}
-
-abstract interface class SupportChatRealtimeClient {
-  Stream<SupportChatRealtimeUpdate> get events;
-  Future<void> connect();
-  Future<void> disconnect();
-  Future<void> dispose();
+SupportChatRealtimeClient bindSignalRSupportRealtimeGateway(Ref ref) {
+  final sessionEpoch = ref.watch(sessionEpochProvider);
+  return ref.watch(signalRSupportRealtimeGatewayProvider(sessionEpoch));
 }
 
 class SignalRSupportChatRealtimeClient implements SupportChatRealtimeClient {
   SignalRSupportChatRealtimeClient({
-    required AuthSessionStorage sessionStorage,
+    required AuthSessionStore sessionStorage,
     required ApiBaseUrlResolver apiBaseUrlResolver,
     Duration requestTimeout = const Duration(seconds: 8),
   }) : _sessionStorage = sessionStorage,
@@ -48,7 +48,7 @@ class SignalRSupportChatRealtimeClient implements SupportChatRealtimeClient {
   static const _conversationUpdatedEvent = 'conversation-updated';
   static const _conversationIdMaxLength = 128;
 
-  final AuthSessionStorage _sessionStorage;
+  final AuthSessionStore _sessionStorage;
   final ApiBaseUrlResolver _apiBaseUrlResolver;
   final Duration _requestTimeout;
   final StreamController<SupportChatRealtimeUpdate> _eventsController =

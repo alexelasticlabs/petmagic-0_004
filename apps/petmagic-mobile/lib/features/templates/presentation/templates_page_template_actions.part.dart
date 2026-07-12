@@ -17,12 +17,13 @@ extension _TemplatesPageTemplateActions on _TemplatesPageState {
         .read(appLaunchControllerProvider)
         .isAuthenticated;
     final hasPremiumAccess = ref.read(templatePremiumAccessProvider);
-    final action = await context.push<TemplateDetailAction>(
-      TemplatePreviewPage.routePath,
-      extra: TemplatePreviewRouteArgs(
-        template: previewTemplate,
-        hasPremiumAccess: hasPremiumAccess,
-        isAuthenticated: isAuthenticated,
+    final action = await context.appNavigator.push<TemplateDetailAction>(
+      TemplatePreviewDestination(
+        payload: TemplatePreviewRouteArgs(
+          template: previewTemplate,
+          hasPremiumAccess: hasPremiumAccess,
+          isAuthenticated: isAuthenticated,
+        ),
       ),
     );
     if (!mounted || action != TemplateDetailAction.upload) {

@@ -2,25 +2,23 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
 import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
-import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/profile/presentation/legal_acceptance_gate_page.dart';
-import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
-import 'package:petmagic_mobile/features/templates/presentation/templates_controller.dart';
-import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/all_transactions_page.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/shared/auth/auth_required_sheet.dart';
+import 'package:petmagic_mobile/shared/profile/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/features/templates/application/template_catalog_contract.dart';
+import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_stripe_checkout_page.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
-import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_navigation_layout.dart';
+import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
 import 'package:petmagic_mobile/shared/payments/external_checkout_result.dart';
 import 'package:petmagic_mobile/shared/payments/payment_method_sheet.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
@@ -372,8 +370,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
     final legalAcceptanceRequired = isLegalAcceptanceRequiredError(
       state.errorMessage,
     );
-    final hasShell =
-        context.findAncestorWidgetOfExactType<PetMagicShell>() != null;
+    final hasShell = PetMagicShellScope.isPresent(context);
     final bottomNavInset = hasShell
         ? petMagicScrollableBottomInset(
             context,
@@ -414,7 +411,8 @@ class _WalletPageState extends ConsumerState<WalletPage>
                     preferAuthRequiredMessage: true,
                   ) ??
                   text.profileLegalAcceptanceRequired,
-              onAction: () => context.go(LegalAcceptanceGatePage.routePath),
+              onAction: () =>
+                  context.appNavigator.go(const LegalAcceptanceDestination()),
               actionLabel: text.profileLegalAcceptAction,
             ),
           ),
@@ -588,8 +586,9 @@ class _WalletPageState extends ConsumerState<WalletPage>
                           !(state.wallet?.isPremium ?? false)) ...[
                         const SizedBox(height: 14),
                         _PremiumUpsellCard(
-                          onOpenPremium: () =>
-                              context.push(PremiumPage.routePath),
+                          onOpenPremium: () => context.appNavigator.push(
+                            const PremiumDestination(),
+                          ),
                         ),
                       ],
                       const SizedBox(height: 16),
@@ -619,8 +618,9 @@ class _WalletPageState extends ConsumerState<WalletPage>
                       const SizedBox(height: 16),
                       _LedgerSection(
                         items: state.ledger,
-                        onViewAll: () =>
-                            context.pushNamed(AllTransactionsPage.routeName),
+                        onViewAll: () => context.appNavigator.push(
+                          const AllTransactionsDestination(),
+                        ),
                       ),
                       const SizedBox(height: 16),
                       _PurchasesSection(

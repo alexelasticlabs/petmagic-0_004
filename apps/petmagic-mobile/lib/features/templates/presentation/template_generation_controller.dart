@@ -11,12 +11,12 @@ import 'package:petmagic_mobile/core/logging/log_correlation_context.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/network/request_identity.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
+import 'package:petmagic_mobile/features/templates/application/generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
-import 'package:petmagic_mobile/features/templates/presentation/mappers/template_error_key_mapper.dart';
-import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/template_error_key_mapper.dart';
+import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 
 final templateGenerationControllerProvider =
     NotifierProvider<TemplateGenerationController, TemplateGenerationState>(
@@ -84,7 +84,7 @@ class TemplateGenerationState {
 }
 
 class TemplateGenerationController extends Notifier<TemplateGenerationState> {
-  TemplateGenerationRepository get _repository =>
+  GenerationRepository get _repository =>
       ref.read(templateGenerationRepositoryProvider);
   Timer? _pollTimer;
   bool _pollTickInFlight = false;

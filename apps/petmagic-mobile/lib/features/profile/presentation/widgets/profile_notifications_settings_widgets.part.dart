@@ -12,18 +12,18 @@ class _NotificationsDetailHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
-    final router = GoRouter.of(context);
+    final navigator = context.appNavigator;
 
     return Row(
       children: [
         IconButton(
           onPressed: () {
-            if (router.canPop()) {
-              router.pop();
+            if (navigator.canPop()) {
+              navigator.pop();
               return;
             }
 
-            router.go('/profile/settings');
+            navigator.go(const ProfileSettingsDestination());
           },
           icon: Icon(
             Icons.arrow_back_ios_new_rounded,

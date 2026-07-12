@@ -1,15 +1,19 @@
+export 'package:petmagic_mobile/features/templates/application/template_catalog_repository.dart'
+    show TemplatesRepository, templatesRepositoryProvider;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:petmagic_mobile/features/templates/application/template_catalog_repository.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/performance/template_media_cache.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_cache_data_source.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_dto.dart';
-import 'package:petmagic_mobile/features/templates/data/templates_query.dart';
+import 'package:petmagic_mobile/features/templates/domain/templates_query.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_remote_data_source.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 
-final templatesRepositoryProvider = Provider<TemplatesRepository>((ref) {
+final defaultTemplatesRepositoryProvider = Provider<TemplatesRepository>((ref) {
   return DefaultTemplatesRepository(
     remoteDataSource: ref.watch(templatesRemoteDataSourceProvider),
     cacheDataSource: ref.watch(templatesCacheDataSourceProvider),
@@ -17,52 +21,6 @@ final templatesRepositoryProvider = Provider<TemplatesRepository>((ref) {
 });
 
 typedef TemplateMediaCleanup = Future<void> Function(String url);
-
-abstract interface class TemplatesRepository {
-  Future<TemplatesFeedPage?> readCachedFirstPage(TemplatesQuery query);
-
-  Future<TemplatesFeedPage> fetchFeed(TemplatesQuery query);
-
-  void cancelPendingFeedRequest();
-
-  void cancelPendingRandomTemplateRequest();
-
-  void cancelPendingMetadataRequests();
-
-  Future<TemplateItem> fetchTemplate(
-    String templateId, {
-    bool forceRefresh = false,
-  });
-
-  Future<TemplateItem?> fetchRandomTemplate({
-    required TemplateRandomMode mode,
-    required String? category,
-    required bool includePremium,
-    TemplateRandomAccess access = TemplateRandomAccess.available,
-  });
-
-  Future<List<TemplateItem>> readSyncedCatalogItems();
-
-  Future<TemplateOfTheDayItem?> fetchTemplateOfTheDay();
-
-  Future<void> recordAnalyticsEvent({
-    required String templateId,
-    required String eventType,
-    String? source,
-    String? generationId,
-    Map<String, Object?>? metadata,
-  });
-
-  Future<List<String>> fetchCategories();
-
-  Future<int> readLocalCatalogVersion();
-
-  Future<int> fetchCatalogVersion();
-
-  Future<TemplatesCatalogChanges> fetchCatalogChanges(int sinceVersion);
-
-  Future<int> syncCatalog({int? knownRemoteVersion});
-}
 
 class DefaultTemplatesRepository implements TemplatesRepository {
   DefaultTemplatesRepository({

@@ -29,7 +29,9 @@ class _GamificationHighlightsWrapper extends ConsumerWidget {
     final statusMessage = switch (unavailableKind) {
       AppUnavailableKind.offline => text.appUnavailableOfflineTitle,
       AppUnavailableKind.serverUnavailable => text.appUnavailableServerTitle,
-      null when rawError != null => mapAchievementsLoadMessage(rawError, text),
+      null when rawError != null =>
+        mapCommonAuthFeedbackMessage(text, rawError) ??
+            text.gamificationLoadFailed,
       null => null,
     };
 
@@ -38,7 +40,8 @@ class _GamificationHighlightsWrapper extends ConsumerWidget {
       ref.invalidate(achievementsProvider);
     }
 
-    void openAchievements() => context.push(AchievementsPage.routePath);
+    void openAchievements() =>
+        context.appNavigator.push(const AchievementsDestination());
 
     void retry() => reloadPreview();
 
@@ -52,7 +55,7 @@ class _GamificationHighlightsWrapper extends ConsumerWidget {
               .length,
           totalAchievementsCount: achievements?.length,
           onOpenHub: openAchievements,
-          onPetTap: () => context.push(MyPetsPage.routePath),
+          onPetTap: () => context.appNavigator.push(const PetsDestination()),
         ),
         if (statusMessage != null) ...[
           const SizedBox(height: 10),

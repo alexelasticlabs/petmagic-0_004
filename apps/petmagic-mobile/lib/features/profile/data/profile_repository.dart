@@ -1,4 +1,10 @@
-import 'dart:async';
+export 'package:petmagic_mobile/features/profile/application/profile_repository.dart'
+    show
+        ProfileRepositoryPort,
+        currentLegalDocumentsProvider,
+        linkedAccountsProvider,
+        profileRepositoryProvider;
+
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -11,15 +17,14 @@ import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
 import 'package:petmagic_mobile/core/network/authenticated_request_options.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
-import 'package:petmagic_mobile/core/network/network_status_controller.dart';
-import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
+import 'package:petmagic_mobile/core/auth/auth_session_storage.dart';
+import 'package:petmagic_mobile/features/profile/domain/profile_models.dart';
+import 'package:petmagic_mobile/features/profile/application/profile_repository.dart';
 import 'package:petmagic_mobile/shared/files/image_upload_optimizer.dart';
 import 'package:petmagic_mobile/shared/files/media_signature.dart';
 import 'package:petmagic_mobile/shared/files/upload_media_policy.dart';
 
-final profileRepositoryProvider = Provider<ProfileRepository>((ref) {
+final dioProfileRepositoryProvider = Provider<ProfileRepositoryPort>((ref) {
   return ProfileRepository(
     dio: ref.watch(dioProvider),
     sessionStorage: ref.watch(authSessionStorageProvider),
@@ -28,63 +33,10 @@ final profileRepositoryProvider = Provider<ProfileRepository>((ref) {
   );
 });
 
-const _profileProviderCacheTtl = Duration(minutes: 5);
-
-final currentLegalDocumentsProvider =
-    FutureProvider.family<MobileLegalDocuments, String>((ref, locale) {
-      if (!ref.read(networkStatusControllerProvider).hasInternet) {
-        throw const AppException('templates.network_unavailable');
-      }
-
-      final cancelToken = CancelToken();
-      ref.onDispose(() {
-        if (!cancelToken.isCancelled) {
-          cancelToken.cancel('profile_legal_documents_cancelled');
-        }
-      });
-      return ref
-          .watch(profileRepositoryProvider)
-          .fetchCurrentLegalDocuments(locale: locale, cancelToken: cancelToken);
-    });
-
-final linkedAccountsProvider =
-    FutureProvider.autoDispose<List<MobileLinkedAccount>>((ref) {
-      if (!ref.watch(
-        appLaunchControllerProvider.select((state) => state.isAuthenticated),
-      )) {
-        throw const AppException('auth.session_expired');
-      }
-
-      if (!ref.read(networkStatusControllerProvider).hasInternet) {
-        throw const AppException('templates.network_unavailable');
-      }
-
-      final link = ref.keepAlive();
-      Timer? disposeTimer;
-      ref.onCancel(() {
-        disposeTimer?.cancel();
-        disposeTimer = Timer(_profileProviderCacheTtl, link.close);
-      });
-      ref.onResume(() {
-        disposeTimer?.cancel();
-        disposeTimer = null;
-      });
-      final cancelToken = CancelToken();
-      ref.onDispose(() {
-        disposeTimer?.cancel();
-        if (!cancelToken.isCancelled) {
-          cancelToken.cancel('profile_linked_accounts_cancelled');
-        }
-      });
-      return ref
-          .watch(profileRepositoryProvider)
-          .fetchLinkedAccounts(cancelToken: cancelToken);
-    });
-
-class ProfileRepository {
+class ProfileRepository implements ProfileRepositoryPort {
   ProfileRepository({
     required Dio dio,
-    required AuthSessionStorage sessionStorage,
+    required AuthSessionStore sessionStorage,
     AuthSessionCoordinator? authSessionCoordinator,
     ImageUploadOptimizer? imageUploadOptimizer,
   }) : _dio = dio,
@@ -96,14 +48,16 @@ class ProfileRepository {
            AuthSessionCoordinator(dio: dio, sessionStorage: sessionStorage);
 
   final Dio _dio;
-  final AuthSessionStorage _sessionStorage;
+  final AuthSessionStore _sessionStorage;
   final ImageUploadOptimizer _imageUploadOptimizer;
   final AuthSessionCoordinator _authSessionCoordinator;
 
   static const _maxAvatarBytes = UploadMediaPolicy.avatarMaxBytes;
 
+  @override
   Future<AuthSession?> readSession() => _sessionStorage.read();
 
+  @override
   Future<void> register({
     required String email,
     required String password,
@@ -143,6 +97,7 @@ class ProfileRepository {
     }
   }
 
+  @override
   Future<AuthSession> login({
     required String email,
     required String password,
@@ -163,6 +118,7 @@ class ProfileRepository {
     }
   }
 
+  @override
   Future<void> requestPasswordReset({
     required String email,
     CancelToken? cancelToken,
@@ -181,6 +137,7 @@ class ProfileRepository {
     }
   }
 
+  @override
   Future<void> confirmPasswordReset({
     required String email,
     required String code,
@@ -205,6 +162,7 @@ class ProfileRepository {
     }
   }
 
+  @override
   Future<void> requestCurrentPasswordChangeCode({
     CancelToken? cancelToken,
   }) async {
@@ -225,6 +183,7 @@ class ProfileRepository {
     }
   }
 
+  @override
   Future<void> confirmCurrentPasswordChange({
     required String code,
     required String newPassword,
@@ -252,6 +211,7 @@ class ProfileRepository {
     }
   }
 
+  @override
   Future<void> resendEmailVerificationCode({
     required String email,
     CancelToken? cancelToken,
@@ -270,6 +230,7 @@ class ProfileRepository {
     }
   }
 
+  @override
   Future<AuthSession> verifyEmailCode({
     required String email,
     required String code,
@@ -292,6 +253,7 @@ class ProfileRepository {
     }
   }
 
+  @override
   Future<void> logout() async {
     final session = await _sessionStorage.read();
     await _sessionStorage.clear();
@@ -319,6 +281,7 @@ class ProfileRepository {
     }
   }
 
+  @override
   Future<void> deleteCurrentAccount({CancelToken? cancelToken}) async {
     try {
       await _authorizedRequest<void>(
@@ -336,6 +299,7 @@ class ProfileRepository {
     }
   }
 
+  @override
   Future<MobileUserProfile> fetchProfile({CancelToken? cancelToken}) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.get<Map<String, dynamic>>(
@@ -350,6 +314,7 @@ class ProfileRepository {
     return profile;
   }
 
+  @override
   Future<MobileUserProfile> updateProfile({
     required String? displayName,
     CancelToken? cancelToken,
@@ -377,6 +342,7 @@ class ProfileRepository {
     }
   }
 
+  @override
   Future<List<MobileLinkedAccount>> fetchLinkedAccounts({
     CancelToken? cancelToken,
   }) async {
@@ -394,6 +360,7 @@ class ProfileRepository {
         .toList(growable: false);
   }
 
+  @override
   Future<MobileLegalDocuments> fetchCurrentLegalDocuments({
     required String locale,
     CancelToken? cancelToken,
@@ -414,6 +381,7 @@ class ProfileRepository {
     }
   }
 
+  @override
   Future<MobileUserProfile> acceptCurrentLegalDocuments({
     required MobileLegalDocuments documents,
     CancelToken? cancelToken,
@@ -436,6 +404,7 @@ class ProfileRepository {
     return profile;
   }
 
+  @override
   Future<MobileUserProfile> uploadAvatar(
     String filePath, {
     CancelToken? cancelToken,
@@ -481,6 +450,7 @@ class ProfileRepository {
     }
   }
 
+  @override
   Future<MobileUserProfile> removeAvatar({CancelToken? cancelToken}) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.delete<Map<String, dynamic>>(
@@ -496,6 +466,7 @@ class ProfileRepository {
     return profile;
   }
 
+  @override
   Future<List<MobileLinkedAccount>> unlinkLinkedAccount(
     String provider, {
     CancelToken? cancelToken,

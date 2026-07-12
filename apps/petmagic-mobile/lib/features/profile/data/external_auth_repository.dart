@@ -1,3 +1,9 @@
+export 'package:petmagic_mobile/features/profile/application/external_auth_gateway.dart'
+    show
+        ExternalAuthProvider,
+        ExternalAuthRepository,
+        externalAuthRepositoryProvider;
+
 import 'dart:async';
 
 import 'package:app_links/app_links.dart';
@@ -12,8 +18,9 @@ import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/authenticated_request_options.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
-import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
+import 'package:petmagic_mobile/core/auth/auth_session_storage.dart';
+import 'package:petmagic_mobile/features/profile/domain/profile_models.dart';
+import 'package:petmagic_mobile/features/profile/application/external_auth_gateway.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -21,7 +28,9 @@ final appLinksProvider = Provider<AppLinks>((ref) {
   return AppLinks();
 });
 
-final externalAuthRepositoryProvider = Provider<ExternalAuthRepository>((ref) {
+final mobileExternalAuthRepositoryProvider = Provider<ExternalAuthRepository>((
+  ref,
+) {
   return MobileExternalAuthRepository(
     dio: ref.watch(dioProvider),
     sessionStorage: ref.watch(authSessionStorageProvider),
@@ -29,15 +38,6 @@ final externalAuthRepositoryProvider = Provider<ExternalAuthRepository>((ref) {
     authSessionCoordinator: ref.watch(authSessionCoordinatorProvider),
   );
 });
-
-enum ExternalAuthProvider {
-  google('Google'),
-  apple('Apple');
-
-  const ExternalAuthProvider(this.apiValue);
-
-  final String apiValue;
-}
 
 void _logExternalAuthFailure(
   String stage,
@@ -54,20 +54,6 @@ void _logExternalAuthFailure(
   );
 }
 
-abstract class ExternalAuthRepository {
-  Future<AuthSession> authenticate(
-    ExternalAuthProvider provider, {
-    CancelToken? cancelToken,
-  });
-
-  Future<List<MobileLinkedAccount>> link(
-    ExternalAuthProvider provider, {
-    CancelToken? cancelToken,
-  });
-
-  Future<void> clearSession(ExternalAuthProvider provider);
-}
-
 class MobileExternalAuthRepository implements ExternalAuthRepository {
   static const _callbackFailedCode = 'auth.external_callback_failed';
   static const _launchFailedCode = 'auth.external_launch_failed';
@@ -77,7 +63,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
   static const _cancelledCode = 'auth.external_cancelled';
   MobileExternalAuthRepository({
     required Dio dio,
-    required AuthSessionStorage sessionStorage,
+    required AuthSessionStore sessionStorage,
     required AppLinks appLinks,
     AuthSessionCoordinator? authSessionCoordinator,
     Future<bool> Function(Uri uri, LaunchMode mode)? launchUrlDelegate,
@@ -110,7 +96,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
   );
 
   final Dio _dio;
-  final AuthSessionStorage _sessionStorage;
+  final AuthSessionStore _sessionStorage;
   final AuthSessionCoordinator _authSessionCoordinator;
   final Future<bool> Function(Uri uri, LaunchMode mode) _launchUrl;
   final GoogleSignInAdapter _googleSignInAdapter;

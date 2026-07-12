@@ -1,3 +1,6 @@
+export 'package:petmagic_mobile/features/wallet/application/wallet_repository.dart'
+    show WalletRepositoryPort, walletRepositoryProvider;
+
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -12,14 +15,15 @@ import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
 import 'package:petmagic_mobile/core/network/authenticated_request_options.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
-import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
-import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
+import 'package:petmagic_mobile/core/auth/auth_session_storage.dart';
+import 'package:petmagic_mobile/core/auth/auth_session.dart';
+import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_repository.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_store_purchase_recovery_store.dart';
 import 'package:petmagic_mobile/shared/payments/store_product_availability_cache.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-final walletRepositoryProvider = Provider<WalletRepository>((ref) {
+final dioWalletRepositoryProvider = Provider<WalletRepositoryPort>((ref) {
   return WalletRepository(
     dio: ref.watch(dioProvider),
     sessionStorage: ref.watch(authSessionStorageProvider),
@@ -30,12 +34,12 @@ final walletRepositoryProvider = Provider<WalletRepository>((ref) {
   );
 });
 
-class WalletRepository {
+class WalletRepository implements WalletRepositoryPort {
   static const _storeAvailabilityTimeout = Duration(seconds: 8);
 
   WalletRepository({
     required Dio dio,
-    required AuthSessionStorage sessionStorage,
+    required AuthSessionStore sessionStorage,
     AuthSessionCoordinator? authSessionCoordinator,
     InAppPurchase? inAppPurchase,
     WalletStorePurchaseRecoveryStore? storePurchaseRecoveryStore,
@@ -58,9 +62,11 @@ class WalletRepository {
   InAppPurchase get _inAppPurchase =>
       _inAppPurchaseOverride ?? InAppPurchase.instance;
 
+  @override
   Stream<List<PurchaseDetails>> get purchaseUpdates =>
       _inAppPurchase.purchaseStream;
 
+  @override
   Future<WalletStateModel> fetchWallet({CancelToken? cancelToken}) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.get<Map<String, dynamic>>(
@@ -73,6 +79,7 @@ class WalletRepository {
     return WalletStateModel.fromJson(response.data ?? const {});
   }
 
+  @override
   Future<OffsetPagedModel<WalletLedgerItem>> fetchLedger({
     int skip = 0,
     int take = 20,
@@ -94,6 +101,7 @@ class WalletRepository {
     );
   }
 
+  @override
   Future<RewardsSummaryModel> fetchRewards({CancelToken? cancelToken}) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.get<Map<String, dynamic>>(
@@ -106,6 +114,7 @@ class WalletRepository {
     return RewardsSummaryModel.fromJson(response.data ?? const {});
   }
 
+  @override
   Future<List<CurrencyPackModel>> fetchPacks() async {
     try {
       final response = await _dio.get<List<dynamic>>('/api/economy/packs');
@@ -118,6 +127,7 @@ class WalletRepository {
     }
   }
 
+  @override
   Future<WalletCheckoutConfigModel> fetchCheckoutConfig({
     required Locale locale,
     CancelToken? cancelToken,
@@ -143,6 +153,7 @@ class WalletRepository {
     }
   }
 
+  @override
   Future<OffsetPagedModel<PurchaseHistoryItem>> fetchPurchases({
     int skip = 0,
     int take = 20,
@@ -164,6 +175,7 @@ class WalletRepository {
     );
   }
 
+  @override
   Future<PurchaseHistoryItem> fetchPurchase(
     String orderId, {
     CancelToken? cancelToken,
@@ -180,6 +192,7 @@ class WalletRepository {
     return PurchaseHistoryItem.fromJson(response.data ?? const {});
   }
 
+  @override
   Future<PurchaseCheckoutModel> createPurchase(
     CurrencyPackModel pack,
     WalletPaymentMethodModel paymentMethod,
@@ -213,6 +226,7 @@ class WalletRepository {
     return PurchaseCheckoutModel.fromJson(response.data ?? const {});
   }
 
+  @override
   Future<
     ({
       bool isAvailable,
@@ -259,6 +273,7 @@ class WalletRepository {
     );
   }
 
+  @override
   Future<void> startStoreCheckout(
     CurrencyPackModel pack,
     WalletPaymentMethodModel paymentMethod,
@@ -325,6 +340,7 @@ class WalletRepository {
     );
   }
 
+  @override
   Future<PurchaseHistoryItem> verifyStorePurchase({
     required String orderId,
     required WalletPaymentMethodModel paymentMethod,
@@ -352,6 +368,7 @@ class WalletRepository {
     return PurchaseHistoryItem.fromJson(response.data ?? const {});
   }
 
+  @override
   Future<StoreBillingValidationModel> validateStorePurchase({
     required String provider,
     required PurchaseDetails purchase,
@@ -392,18 +409,22 @@ class WalletRepository {
     return StoreBillingValidationModel.fromJson(response.data ?? const {});
   }
 
+  @override
   Future<void> savePendingStorePurchase(PendingStoreWalletPurchase purchase) {
     return _storePurchaseRecoveryStore.savePendingPurchase(purchase);
   }
 
+  @override
   Future<PendingStoreWalletPurchase?> readPendingStorePurchase() {
     return _storePurchaseRecoveryStore.readPendingPurchase();
   }
 
+  @override
   Future<void> clearPendingStorePurchase({String? orderId}) {
     return _storePurchaseRecoveryStore.clearPendingPurchase(orderId: orderId);
   }
 
+  @override
   Future<void> restoreStorePurchases() async {
     final session = await _authSessionCoordinator.requireValidSession(
       mapError: _mapDioException,
@@ -415,10 +436,12 @@ class WalletRepository {
     );
   }
 
+  @override
   Future<void> completePurchase(PurchaseDetails purchase) {
     return _inAppPurchase.completePurchase(purchase);
   }
 
+  @override
   Future<void> consumeVerifiedPurchase(PurchaseDetails purchase) async {
     if (!Platform.isAndroid) {
       await _inAppPurchase.completePurchase(purchase);
@@ -433,6 +456,7 @@ class WalletRepository {
     }
   }
 
+  @override
   Future<WalletStateModel> claimAdReward() async {
     await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
@@ -445,6 +469,7 @@ class WalletRepository {
     return fetchWallet();
   }
 
+  @override
   Future<WalletStateModel> applyRedeemCode(String code) async {
     await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
@@ -458,6 +483,7 @@ class WalletRepository {
     return fetchWallet();
   }
 
+  @override
   Future<RewardsSummaryModel> applyReferralCode(String code) async {
     await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
@@ -471,6 +497,7 @@ class WalletRepository {
     return fetchRewards();
   }
 
+  @override
   Future<PurchaseHistoryItem> verifyStripeCheckoutSession({
     required String orderId,
     String? stripeReferenceId,
@@ -496,6 +523,7 @@ class WalletRepository {
     return PurchaseHistoryItem.fromJson(response.data ?? const {});
   }
 
+  @override
   Future<void> registerPushToken({
     required String token,
     required String platform,
@@ -517,6 +545,7 @@ class WalletRepository {
     );
   }
 
+  @override
   Future<void> unregisterPushToken(String token) async {
     await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.delete<Map<String, dynamic>>(

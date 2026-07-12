@@ -285,9 +285,9 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
         return;
       }
 
-      final generation = TemplateGenerationDto.fromJson(
-        Map<String, dynamic>.from(event.payload),
-      ).toDomain();
+      final generation = ref
+          .read(templateGenerationRepositoryProvider)
+          .parseRealtimePayload(Map<String, dynamic>.from(event.payload));
 
       _applyGenerationSnapshot(_reuseCurrentLocalMedia(generation));
     } catch (error, stackTrace) {
@@ -375,7 +375,7 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
   }
 
   Future<void> _showCachedOrMappedLoadError(
-    TemplateGenerationRepository repository,
+    GenerationRepository repository,
     Object error,
   ) async {
     if (!_canUsePrivateStatusApi) {

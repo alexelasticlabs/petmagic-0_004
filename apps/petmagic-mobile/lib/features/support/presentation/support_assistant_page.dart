@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
+import 'package:petmagic_mobile/shared/auth/auth_required_sheet.dart';
+import 'package:petmagic_mobile/shared/profile/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'support_assistant_scenarios.dart';
-import 'support_ticket_form_page.dart';
 
 class SupportAssistantPage extends ConsumerWidget {
   const SupportAssistantPage({required this.scenario, super.key});
@@ -104,8 +104,8 @@ class SupportAssistantPage extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     FilledButton.icon(
-                      onPressed: () => context.push(
-                        SupportTicketFormPage.location(scenarioData.key),
+                      onPressed: () => context.appNavigator.push(
+                        SupportTicketDestination(scenario: scenarioData.key),
                       ),
                       icon: const Icon(Icons.headset_mic_rounded, size: 18),
                       label: Text(text.supportAssistantCreateTicketAction),
@@ -122,7 +122,7 @@ class SupportAssistantPage extends ConsumerWidget {
                     ),
                     const SizedBox(height: 10),
                     OutlinedButton(
-                      onPressed: () => context.pop(),
+                      onPressed: () => context.appNavigator.pop(),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: colors.textSoft,
                         side: BorderSide(color: colors.border),

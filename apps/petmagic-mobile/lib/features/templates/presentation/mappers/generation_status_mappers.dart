@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+// Stable presentation mapping exposed by the generation application contract.
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
@@ -200,3 +202,5 @@ Color generationStatusColor(
 bool isVideoGeneration(TemplateGenerationResult generation) {
   return isVideoGenerationResult(generation);
 }
+
+// Presentation mapping for generation status.

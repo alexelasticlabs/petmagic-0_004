@@ -1,3 +1,6 @@
+export 'package:petmagic_mobile/features/premium/application/premium_repository.dart'
+    show PremiumRepositoryPort, premiumRepositoryProvider;
+
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -10,12 +13,13 @@ import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
 import 'package:petmagic_mobile/core/network/authenticated_request_options.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
-import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
-import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
+import 'package:petmagic_mobile/features/premium/domain/premium_models.dart';
+import 'package:petmagic_mobile/features/premium/application/premium_repository.dart';
+import 'package:petmagic_mobile/core/auth/auth_session_storage.dart';
+import 'package:petmagic_mobile/core/auth/auth_session.dart';
 import 'package:petmagic_mobile/shared/payments/store_product_availability_cache.dart';
 
-final premiumRepositoryProvider = Provider<PremiumRepository>((ref) {
+final dioPremiumRepositoryProvider = Provider<PremiumRepositoryPort>((ref) {
   return PremiumRepository(
     dio: ref.watch(dioProvider),
     sessionStorage: ref.watch(authSessionStorageProvider),
@@ -23,10 +27,10 @@ final premiumRepositoryProvider = Provider<PremiumRepository>((ref) {
   );
 });
 
-class PremiumRepository {
+class PremiumRepository implements PremiumRepositoryPort {
   PremiumRepository({
     required Dio dio,
-    required AuthSessionStorage sessionStorage,
+    required AuthSessionStore sessionStorage,
     AuthSessionCoordinator? authSessionCoordinator,
     InAppPurchase? inAppPurchase,
   }) : _dio = dio,
@@ -42,9 +46,11 @@ class PremiumRepository {
   InAppPurchase get _inAppPurchase =>
       _inAppPurchaseOverride ?? InAppPurchase.instance;
 
+  @override
   Stream<List<PurchaseDetails>> get purchaseUpdates =>
       _inAppPurchase.purchaseStream;
 
+  @override
   Future<PremiumPaywallConfigModel> fetchPaywallConfig({
     required Locale locale,
     CancelToken? cancelToken,
@@ -70,6 +76,7 @@ class PremiumRepository {
     }
   }
 
+  @override
   Future<List<PremiumPlanModel>> fetchPlans() async {
     try {
       final response = await _dio.get<List<dynamic>>(
@@ -86,6 +93,7 @@ class PremiumRepository {
     }
   }
 
+  @override
   Future<PremiumStatusModel> fetchStatus({CancelToken? cancelToken}) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.get<Map<String, dynamic>>(
@@ -98,6 +106,7 @@ class PremiumRepository {
     return PremiumStatusModel.fromJson(response.data ?? const {});
   }
 
+  @override
   Future<PremiumCheckoutModel> createStripeCheckout(
     PremiumPlanModel plan,
     Locale locale, {
@@ -134,6 +143,7 @@ class PremiumRepository {
     throw const AppException('premium.checkout_failed');
   }
 
+  @override
   Future<PremiumBillingPortalModel> createBillingPortal({
     CancelToken? cancelToken,
   }) async {
@@ -150,6 +160,7 @@ class PremiumRepository {
     return PremiumBillingPortalModel.fromJson(response.data ?? const {});
   }
 
+  @override
   Future<PremiumStatusModel> cancelSubscription({
     PremiumPaymentProvider provider = PremiumPaymentProvider.stripe,
     CancelToken? cancelToken,
@@ -167,6 +178,7 @@ class PremiumRepository {
     return PremiumStatusModel.fromJson(response.data ?? const {});
   }
 
+  @override
   Future<String> createManagementUrl(
     PremiumStatusModel status, {
     CancelToken? cancelToken,
@@ -184,6 +196,7 @@ class PremiumRepository {
     }
   }
 
+  @override
   Future<
     ({
       bool isAvailable,
@@ -222,6 +235,7 @@ class PremiumRepository {
     );
   }
 
+  @override
   Future<void> startStoreCheckout(
     PremiumPlanModel plan,
     PremiumPaymentProvider provider,
@@ -290,6 +304,7 @@ class PremiumRepository {
     );
   }
 
+  @override
   Future<PremiumStoreVerificationModel> verifyStorePurchase({
     required PremiumPlanModel plan,
     required PremiumPaymentProvider provider,
@@ -319,6 +334,7 @@ class PremiumRepository {
     return PremiumStoreVerificationModel.fromJson(response.data ?? const {});
   }
 
+  @override
   Future<void> verifyStripeSubscriptionCheckout({
     required String planCode,
     required String externalSubscriptionId,
@@ -350,6 +366,7 @@ class PremiumRepository {
     return 'web';
   }
 
+  @override
   Future<void> restoreStorePurchases() async {
     final session = await _authSessionCoordinator.requireValidSession(
       mapError: _mapDioException,
@@ -361,6 +378,7 @@ class PremiumRepository {
     );
   }
 
+  @override
   Future<void> completePurchase(PurchaseDetails purchase) {
     return _inAppPurchase.completePurchase(purchase);
   }

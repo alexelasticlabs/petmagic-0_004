@@ -12,16 +12,18 @@ import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
+import 'package:petmagic_mobile/features/profile/domain/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
+import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
-import 'package:petmagic_mobile/features/templates/data/templates_query.dart';
+import 'package:petmagic_mobile/features/templates/domain/templates_query.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
+import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
 import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
@@ -56,10 +58,12 @@ Future<void> pumpTestApp(
   ExternalAuthRepository? externalAuthRepository,
   AppLaunchController Function()? appLaunchController,
   Size surfaceSize = const Size(1080, 1920),
+  double textScaleFactor = 1.0,
 }) async {
   final view = tester.view;
   view.physicalSize = surfaceSize;
   view.devicePixelRatio = 1.0;
+  tester.platformDispatcher.textScaleFactorTestValue = textScaleFactor;
 
   final sharedPrefsWithoutSession = Map<String, Object>.from(sharedPrefs)
     ..remove(sessionKey);
@@ -87,6 +91,15 @@ Future<void> pumpTestApp(
         generationHistoryControllerProvider.overrideWith(
           IdleGenerationHistoryController.new,
         ),
+        templateGenerationRepositoryProvider.overrideWith(
+          (ref) => RouterTemplateGenerationRepository(),
+        ),
+        supportChatRepositoryProvider.overrideWith(
+          (ref) => ref.watch(dioSupportRepositoryProvider),
+        ),
+        walletRepositoryProvider.overrideWith(
+          (ref) => ref.watch(dioWalletRepositoryProvider),
+        ),
         walletControllerProvider.overrideWith(IdleWidgetWalletController.new),
         profileRepositoryProvider.overrideWith(
           (ref) => profileRepository ?? FakeProfileRepository(),
@@ -110,6 +123,7 @@ Future<void> pumpTestApp(
     await PetMagicNotificationCenter.instance.clearQueue();
     view.resetPhysicalSize();
     view.resetDevicePixelRatio();
+    tester.platformDispatcher.clearTextScaleFactorTestValue();
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
   });

@@ -7,36 +7,30 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
-import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
-import 'package:petmagic_mobile/features/templates/data/generation_gallery_store.dart';
-import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
-import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
+import 'package:petmagic_mobile/features/templates/application/generation_gallery_cache.dart';
+import 'package:petmagic_mobile/features/templates/application/template_generation_contract.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_result_input_page.dart';
-import 'package:petmagic_mobile/features/templates/presentation/mappers/template_error_key_mapper.dart';
+import 'package:petmagic_mobile/features/templates/application/template_error_key_mapper.dart';
 import 'package:petmagic_mobile/features/templates/presentation/mappers/generation_status_mappers.dart';
-import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
 import 'package:petmagic_mobile/shared/files/file_name_sanitizer.dart';
 import 'package:petmagic_mobile/shared/files/media_share_save.dart';
 import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
+import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
-import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_navigation_layout.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 import 'package:video_player/video_player.dart';
@@ -173,11 +167,11 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
   StreamSubscription<RealtimeEvent>? _realtimeSubscription;
   Future<void>? _realtimeConnectFuture;
   bool _isRealtimeConnected = false;
-  GenerationGalleryStore? _activeGalleryStore;
+  GenerationGalleryCache? _activeGalleryStore;
   final Set<String> _recordedTemplateOfTheDayTerminalEvents = <String>{};
   final Set<String> _recordedFeedbackPromptEvents = <String>{};
 
-  GenerationGalleryStore get _galleryStore {
+  GenerationGalleryCache get _galleryStore {
     final store = ref.read(generationGalleryStoreProvider);
     _activeGalleryStore = store;
     return store;
@@ -431,7 +425,9 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
                                 _showRemoveWatermarkSheet(generation),
                               )
                             : null,
-                        onUpgrade: () => context.push(PremiumPage.routePath),
+                        onUpgrade: () => context.appNavigator.push(
+                          const PremiumDestination(),
+                        ),
                         isGeneratingSimilar: _isGeneratingSimilar,
                       ),
                     const SizedBox(height: 10),
@@ -479,11 +475,13 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
                     _FailureCard(generation: generation),
                     const SizedBox(height: 14),
                     _FailedActions(
-                      onPickAnotherPhoto: () => context.go(
-                        _templatesLocationForGeneration(generation),
+                      onPickAnotherPhoto: () => context.appNavigator.go(
+                        _templatesDestinationForGeneration(generation),
                       ),
                       onRetry: () => _retrySoon(generation),
-                      onSupport: () => context.push(SupportChatPage.routePath),
+                      onSupport: () => context.appNavigator.push(
+                        const SupportChatDestination(),
+                      ),
                     ),
                     const SizedBox(height: 14),
                     if (_hasSubmittedFeedback)
@@ -529,7 +527,10 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
                   ] else if (generation.isCancelled) ...[
                     _CancelledCard(generation: generation),
                     const SizedBox(height: 14),
-                    _ActiveActions(onContinue: () => context.go('/creations')),
+                    _ActiveActions(
+                      onContinue: () =>
+                          context.appNavigator.go(const CreationsDestination()),
+                    ),
                     const SizedBox(height: 14),
                     _DetailsCard(
                       title: text.generationStatusDetailsTitle,
@@ -563,7 +564,10 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
                       ),
                       const SizedBox(height: 14),
                     ],
-                    _ActiveActions(onContinue: () => context.go('/creations')),
+                    _ActiveActions(
+                      onContinue: () =>
+                          context.appNavigator.go(const CreationsDestination()),
+                    ),
                     const SizedBox(height: 14),
                     _DetailsCard(
                       title: text.generationStatusDetailsTitle,

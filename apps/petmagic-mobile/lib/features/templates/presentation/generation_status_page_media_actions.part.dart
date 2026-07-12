@@ -8,7 +8,7 @@ extension _GenerationStatusPageMediaActions on _GenerationStatusPageState {
       return;
     }
 
-    context.go('/creations');
+    context.appNavigator.go(const CreationsDestination());
   }
 
   Future<void> _openActionsSheet(TemplateGenerationResult generation) async {
@@ -96,7 +96,9 @@ extension _GenerationStatusPageMediaActions on _GenerationStatusPageState {
                               label: text.generationStatusUpgradePremium,
                               onTap: () {
                                 Navigator.of(sheetContext).pop();
-                                context.push(PremiumPage.routePath);
+                                context.appNavigator.push(
+                                  const PremiumDestination(),
+                                );
                               },
                             ),
                           ],
@@ -143,8 +145,8 @@ extension _GenerationStatusPageMediaActions on _GenerationStatusPageState {
                             label: text.generationStatusPickAnotherPhotoAction,
                             onTap: () {
                               Navigator.of(sheetContext).pop();
-                              context.go(
-                                _templatesLocationForGeneration(generation),
+                              context.appNavigator.go(
+                                _templatesDestinationForGeneration(generation),
                               );
                             },
                           ),
@@ -161,7 +163,9 @@ extension _GenerationStatusPageMediaActions on _GenerationStatusPageState {
                             label: text.generationStatusContactSupportAction,
                             onTap: () {
                               Navigator.of(sheetContext).pop();
-                              context.push(SupportChatPage.routePath);
+                              context.appNavigator.push(
+                                const SupportChatDestination(),
+                              );
                             },
                           ),
                         ] else ...[
@@ -170,7 +174,9 @@ extension _GenerationStatusPageMediaActions on _GenerationStatusPageState {
                             label: text.generationStatusOpenGalleryAction,
                             onTap: () {
                               Navigator.of(sheetContext).pop();
-                              context.go('/creations');
+                              context.appNavigator.go(
+                                const CreationsDestination(),
+                              );
                             },
                           ),
                         ],

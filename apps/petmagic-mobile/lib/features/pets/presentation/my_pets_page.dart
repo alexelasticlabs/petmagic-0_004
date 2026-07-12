@@ -5,7 +5,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
@@ -14,25 +13,22 @@ import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/permissions/media_permission_feedback.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/pets/presentation/pet_media_url_normalizer.dart';
-import 'package:petmagic_mobile/features/pets/presentation/pet_profile_providers.dart';
-import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
-import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
-import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
-import 'package:petmagic_mobile/features/templates/presentation/mappers/generation_status_mappers.dart';
-import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
+import 'package:petmagic_mobile/features/pets/application/pet_media_url_normalizer.dart';
+import 'package:petmagic_mobile/features/pets/application/pet_profile_providers.dart';
+import 'package:petmagic_mobile/features/templates/application/template_generation_contract.dart';
 import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
-import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_navigation_layout.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_unavailable_view.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:share_plus/share_plus.dart';
 
-export 'package:petmagic_mobile/features/pets/presentation/pet_profile_providers.dart';
+export 'package:petmagic_mobile/features/pets/application/pet_profile_providers.dart';
 
 part 'my_pets_detail_page.part.dart';
 part 'my_pets_display_widgets.part.dart';
@@ -193,9 +189,12 @@ class _MyPetsPageState extends ConsumerState<MyPetsPage>
                   return _PetCard(
                     pet: pet,
                     text: text,
-                    onTap: () => context.push(PetDetailsPage.location(pet.id)),
-                    onGenerate: () =>
-                        context.go(_templatesWithPetLocation(pet.id)),
+                    onTap: () => context.appNavigator.push(
+                      PetDetailsDestination(pet.id),
+                    ),
+                    onGenerate: () => context.appNavigator.go(
+                      TemplatesDestination(petId: pet.id),
+                    ),
                   );
                 },
               ),

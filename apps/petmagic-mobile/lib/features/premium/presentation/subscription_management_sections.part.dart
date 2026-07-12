@@ -617,13 +617,26 @@ String _resolveStatusLabel(
   PremiumSubscriptionSummaryView summary,
   AppLocalizations text,
 ) {
-  return premiumSubscriptionStatusLabel(
-    text: text,
+  final kind = classifyPremiumSubscriptionStatus(
     isPremium: summary.isPremium,
     cancelAtPeriodEnd: summary.cancelAtPeriodEnd == true,
     status: summary.status,
   );
+  return _premiumSubscriptionStatusLabel(text, kind);
 }
+
+String _premiumSubscriptionStatusLabel(
+  AppLocalizations text,
+  PremiumSubscriptionStatusKind kind,
+) => switch (kind) {
+  PremiumSubscriptionStatusKind.inactive => text.subscriptionStatusInactive,
+  PremiumSubscriptionStatusKind.cancelled => text.subscriptionStatusCancelled,
+  PremiumSubscriptionStatusKind.active => text.subscriptionStatusActive,
+  PremiumSubscriptionStatusKind.paymentFailed =>
+    text.subscriptionStatusPaymentFailed,
+  PremiumSubscriptionStatusKind.expired => text.subscriptionStatusExpired,
+  PremiumSubscriptionStatusKind.pending => text.subscriptionStatusPending,
+};
 
 Color _resolveStatusColor(
   PremiumSubscriptionSummaryView summary,

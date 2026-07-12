@@ -12,10 +12,10 @@ import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
-import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
+import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_store_purchase_recovery_store.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
@@ -48,12 +48,15 @@ void main() {
     expect(buildBody, isNot(contains('purchaseUpdates.listen')));
     expect(source, isNot(contains('Timer.periodic')));
     expect(source, isNot(contains('_walletSyncTimer')));
-    expect(source, isNot(contains('late final WalletRepository _repository')));
+    expect(
+      source,
+      isNot(contains('late final WalletRepositoryPort _repository')),
+    );
     expect(source, isNot(contains('_repositoryInitialized')));
     expect(
       source,
       contains(
-        'WalletRepository get _repository => ref.read(walletRepositoryProvider)',
+        'WalletRepositoryPort get _repository => ref.read(walletRepositoryProvider)',
       ),
     );
 

@@ -11,10 +11,11 @@ class _PetAuthGate extends StatelessWidget {
     return ProtectedAuthGate(
       title: text.petsAuthRequiredTitle,
       subtitle: text.petsAuthRequiredMessage,
-      onSignIn: () => context.go(
-        '${AuthEntryPage.routePath}?redirect=${Uri.encodeQueryComponent(redirectPath)}',
+      onSignIn: () =>
+          context.appNavigator.go(AuthDestination(redirectPath: redirectPath)),
+      onSignUp: () => context.appNavigator.go(
+        RegisterDestination(redirectPath: redirectPath),
       ),
-      onSignUp: () => context.go(RegisterEntryPage.routePath),
     );
   }
 }
@@ -396,9 +397,9 @@ class _PhotoGridState extends ConsumerState<_PhotoGrid> {
             ),
             onUseForGeneration: isBusy
                 ? null
-                : () => context.go(
-                    _templatesWithPetLocation(
-                      widget.petId,
+                : () => context.appNavigator.go(
+                    TemplatesDestination(
+                      petId: widget.petId,
                       petPhotoId: photo.id,
                     ),
                   ),
@@ -733,15 +734,15 @@ class _PetGenerationHistoryTile extends StatelessWidget {
       child: ListTile(
         title: Text(generation.templateTitle ?? generation.templateId),
         subtitle: Text(
-          '${generation.templateType ?? text.petsTemplateFallback} • ${statusTitle(text, generation)} • ${_formatDate(context, generation.createdAtUtc)}',
+          '${generation.templateType ?? text.petsTemplateFallback} • ${_petGenerationStatusTitle(text, generation)} • ${_formatDate(context, generation.createdAtUtc)}',
         ),
         trailing: Wrap(
           spacing: 4,
           children: [
             IconButton(
               tooltip: text.petsOpenGenerationTooltip,
-              onPressed: () => context.push(
-                GenerationStatusPage.routeFor(generation.generationId),
+              onPressed: () => context.appNavigator.push(
+                GenerationDestination(generation.generationId),
               ),
               icon: const Icon(Icons.open_in_new_rounded),
             ),
@@ -756,9 +757,9 @@ class _PetGenerationHistoryTile extends StatelessWidget {
             ),
             IconButton(
               tooltip: text.petsUseGenerationAsInputTooltip,
-              onPressed: () => context.go(
-                _templatesWithPetLocation(
-                  generation.petId ?? '',
+              onPressed: () => context.appNavigator.go(
+                TemplatesDestination(
+                  petId: generation.petId,
                   petPhotoId: generation.petPhotoId,
                 ),
               ),
@@ -769,6 +770,23 @@ class _PetGenerationHistoryTile extends StatelessWidget {
       ),
     );
   }
+}
+
+String _petGenerationStatusTitle(
+  AppLocalizations text,
+  TemplateGenerationResult generation,
+) {
+  if (generation.isCompleted) return text.generationStatusStatusCompleted;
+  if (generation.isFailed) return text.generationStatusStatusFailed;
+  if (generation.isCancelled) return text.generationStatusStatusCancelled;
+
+  return switch (generation.stage) {
+    'queued' => text.generationStatusStageQueued,
+    'preprocessing' => text.templateFlowStepProcessPhoto,
+    'generating' => text.templateFlowStepCreateMagic,
+    'finalizing' => text.templateFlowStepFinalTouches,
+    _ => text.generationStatusStatusCreatingMagic,
+  };
 }
 
 class _PetAvatar extends StatelessWidget {

@@ -13,13 +13,13 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
-import 'package:petmagic_mobile/features/templates/presentation/templates_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/generation_history_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/templates_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
-import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
+import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/all_transactions_page.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
 
@@ -438,6 +438,13 @@ class FakeWalletRepository extends WalletRepository {
     );
   }
 }
+
+FakeWalletRepository defaultFakeWalletRepository() => FakeWalletRepository(
+  wallet: walletStateFixture,
+  ledger: ledgerItemsFixture,
+  packs: packsFixture,
+  purchases: purchasesFixture,
+);
 
 class RetryLedgerWalletRepository extends FakeWalletRepository {
   RetryLedgerWalletRepository({

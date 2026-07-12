@@ -8,7 +8,7 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/features/profile/presentation/avatar_crop_viewport.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/shared/profile/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/shared/files/image_upload_optimizer.dart';
 import 'package:petmagic_mobile/shared/files/temp_media_cleanup.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';

@@ -8,13 +8,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/app/router/go_router_app_navigator.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
@@ -63,8 +65,8 @@ void main() {
       'lib/features/templates/presentation/generation_status_page_lifecycle.part.dart',
     ).readAsStringSync();
 
-    expect(pageSource, isNot(contains('late final GenerationGalleryStore')));
-    expect(pageSource, contains('GenerationGalleryStore get _galleryStore {'));
+    expect(pageSource, isNot(contains('late final GenerationGalleryCache')));
+    expect(pageSource, contains('GenerationGalleryCache get _galleryStore {'));
     expect(pageSource, contains('ref.read(generationGalleryStoreProvider)'));
     expect(lifecycleSource, contains('final store = _activeGalleryStore;'));
     expect(
@@ -199,10 +201,17 @@ void main() {
       expect(backBody, contains('final navigator = Navigator.of(context);'));
       expect(backBody, contains('if (navigator.canPop())'));
       expect(backBody, contains('navigator.pop();'));
-      expect(backBody, contains("context.go('/creations');"));
+      expect(
+        backBody,
+        contains('context.appNavigator.go(const CreationsDestination());'),
+      );
       expect(
         backBody.indexOf('navigator.pop();'),
-        lessThan(backBody.indexOf("context.go('/creations');")),
+        lessThan(
+          backBody.indexOf(
+            'context.appNavigator.go(const CreationsDestination());',
+          ),
+        ),
       );
     },
   );
@@ -250,6 +259,10 @@ void main() {
             ),
           ],
           child: MaterialApp.router(
+            builder: (context, child) => AppNavigationScope(
+              navigator: GoRouterAppNavigator(router),
+              child: child!,
+            ),
             theme: AppTheme.dark(),
             locale: const Locale('en'),
             localizationsDelegates: const [
@@ -322,6 +335,10 @@ void main() {
             ),
           ],
           child: MaterialApp.router(
+            builder: (context, child) => AppNavigationScope(
+              navigator: GoRouterAppNavigator(router),
+              child: child!,
+            ),
             theme: AppTheme.dark(),
             locale: const Locale('en'),
             localizationsDelegates: const [
@@ -880,6 +897,10 @@ void main() {
           ),
         ],
         child: MaterialApp.router(
+          builder: (context, child) => AppNavigationScope(
+            navigator: GoRouterAppNavigator(router),
+            child: child!,
+          ),
           theme: AppTheme.dark(),
           locale: const Locale('en'),
           localizationsDelegates: const [
@@ -916,14 +937,19 @@ void main() {
     expect(buildBody, contains('onRetry: () => _retrySoon(generation)'));
     expect(
       RegExp(
-        r'_templatesLocationForGeneration\(generation\)',
+        r'_templatesDestinationForGeneration\(generation\)',
       ).allMatches(buildBody).length,
       greaterThanOrEqualTo(1),
     );
-    expect(sheetBody, contains('_templatesLocationForGeneration(generation)'));
+    expect(
+      sheetBody,
+      contains('_templatesDestinationForGeneration(generation)'),
+    );
     expect(
       retryBody,
-      contains('context.go(_templatesLocationForGeneration(generation))'),
+      contains(
+        'context.appNavigator.go(_templatesDestinationForGeneration(generation))',
+      ),
     );
   });
 

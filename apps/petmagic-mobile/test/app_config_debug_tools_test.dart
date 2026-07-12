@@ -143,11 +143,11 @@ void main() {
 
 String _readShellLibrarySource() {
   const files = [
-    'lib/shared/navigation/petmagic_shell.dart',
-    'lib/shared/navigation/petmagic_shell_active_generation.part.dart',
-    'lib/shared/navigation/petmagic_shell_backdrop.part.dart',
-    'lib/shared/navigation/petmagic_shell_navigation.part.dart',
-    'lib/shared/navigation/petmagic_shell_transition.part.dart',
+    'lib/app/shell/petmagic_shell.dart',
+    'lib/app/shell/petmagic_shell_active_generation.part.dart',
+    'lib/app/shell/petmagic_shell_backdrop.part.dart',
+    'lib/app/shell/petmagic_shell_navigation.part.dart',
+    'lib/app/shell/petmagic_shell_transition.part.dart',
   ];
 
   return files.map((path) => File(path).readAsStringSync()).join('\n');

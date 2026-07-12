@@ -4,7 +4,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations_en.dart';
@@ -13,19 +12,20 @@ import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
 import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
-import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
-import 'package:petmagic_mobile/features/premium/presentation/mappers/premium_error_key_mapper.dart';
+import 'package:petmagic_mobile/features/premium/domain/premium_models.dart';
+import 'package:petmagic_mobile/features/premium/application/premium_controller.dart';
+import 'package:petmagic_mobile/features/premium/application/premium_error_key_mapper.dart';
 import 'package:petmagic_mobile/features/premium/presentation/paywall_feedback_scope.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_stripe_checkout_page.dart';
-import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
-import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
-import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
-import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
+import 'package:petmagic_mobile/core/auth/auth_session_storage.dart';
+import 'package:petmagic_mobile/features/profile/application/profile_controller.dart';
+import 'package:petmagic_mobile/shared/auth/auth_required_sheet.dart';
+import 'package:petmagic_mobile/features/templates/application/template_generation_contract.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
+import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
 import 'package:petmagic_mobile/shared/payments/payment_method_sheet.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
@@ -158,7 +158,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
     }
 
     if (context.mounted) {
-      context.go(TemplatesPage.routePath);
+      context.appNavigator.go(const TemplatesDestination());
     }
   }
 
@@ -174,7 +174,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
       return;
     }
 
-    context.go(TemplatesPage.routePath);
+    context.appNavigator.go(const TemplatesDestination());
   }
 
   Future<void> _maybeAskPaywallFeedback() async {
@@ -773,12 +773,12 @@ Future<_PaywallFeedbackResult?> _showPaywallFeedbackSheet(
                                 setState(() => selected = option),
                           ),
                           const SizedBox(height: 16),
-                            TextField(
-                              controller: controller,
-                              minLines: 2,
-                              maxLines: 4,
-                              maxLength: 2000,
-                              decoration: InputDecoration(
+                          TextField(
+                            controller: controller,
+                            minLines: 2,
+                            maxLines: 4,
+                            maxLength: 2000,
+                            decoration: InputDecoration(
                               labelText: copy.commentLabel,
                               hintText: copy.commentHint,
                             ),

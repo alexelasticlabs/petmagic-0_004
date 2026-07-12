@@ -1,24 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
+import 'package:petmagic_mobile/features/profile/domain/profile_models.dart';
+import 'package:petmagic_mobile/features/profile/application/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_avatar_cropper_page.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
+import 'package:petmagic_mobile/features/profile/application/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
-import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
-import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/shared/auth/auth_required_sheet.dart';
+import 'package:petmagic_mobile/shared/profile/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/profile_linked_accounts_settings_section.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/profile_notifications_settings_section.dart';
-import 'package:petmagic_mobile/features/profile/presentation/widgets/profile_settings_bottom_sheets.dart';
+import 'package:petmagic_mobile/shared/settings/app_settings_bottom_sheets.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/legal_document_list_view.dart';
-import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_navigation_layout.dart';
+import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_unavailable_view.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
@@ -487,7 +487,7 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
       nextStep: nextStep,
       bottomInset: bottomInset,
       onOpenSupport: kind == ProfileSettingsDetailKind.helpCenter
-          ? () => context.push(SupportChatPage.routePath)
+          ? () => context.appNavigator.push(const SupportChatDestination())
           : null,
       onDeleteAccount: kind == ProfileSettingsDetailKind.deleteAccount
           ? () async {
@@ -669,7 +669,7 @@ class _DetailHeader extends StatelessWidget {
     return Row(
       children: [
         IconButton(
-          onPressed: () => context.pop(),
+          onPressed: () => context.appNavigator.pop(),
           icon: Icon(
             Icons.arrow_back_ios_new_rounded,
             color: colors.textStrong,

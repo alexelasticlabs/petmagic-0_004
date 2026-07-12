@@ -2,19 +2,19 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
-import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
-import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/shared/auth/auth_required_sheet.dart';
+import 'package:petmagic_mobile/shared/profile/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_navigation_layout.dart';
+import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_unavailable_view.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 
@@ -216,7 +216,7 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
       appLaunchControllerProvider.select((launch) => launch.isAuthenticated),
     );
     final state = ref.watch(walletControllerProvider);
-    final router = GoRouter.of(context);
+    final navigator = context.appNavigator;
     final showOfflineUnavailable =
         !_hasHydratedTransactionsSnapshot(state) && !hasInternet;
     final errorToShow = state.errorMessage != null && state.ledger.isEmpty
@@ -226,8 +226,7 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
         state.ledgerLoadMoreErrorMessage != null && state.ledger.isNotEmpty
         ? _friendlyTransactionsError(text, state.ledgerLoadMoreErrorMessage!)
         : null;
-    final hasShell =
-        context.findAncestorWidgetOfExactType<PetMagicShell>() != null;
+    final hasShell = PetMagicShellScope.isPresent(context);
     final bottomInset = hasShell
         ? petMagicScrollableBottomInset(
             context,
@@ -301,12 +300,12 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
                       return _AllTransactionsHeader(
                         title: text.walletViewAllTransactions,
                         onBack: () {
-                          if (router.canPop()) {
-                            router.pop();
+                          if (navigator.canPop()) {
+                            navigator.pop();
                             return;
                           }
 
-                          router.go(WalletPage.routePath);
+                          navigator.go(const WalletDestination());
                         },
                       );
                     }

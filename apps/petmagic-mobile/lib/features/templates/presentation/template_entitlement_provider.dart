@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/features/profile/application/profile_controller.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 
 final templatePremiumAccessProvider = Provider<bool>((ref) {
   final isAuthenticated = ref.watch(

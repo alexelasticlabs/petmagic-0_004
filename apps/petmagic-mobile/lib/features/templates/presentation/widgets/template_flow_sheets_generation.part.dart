@@ -177,7 +177,8 @@ class _GenerationCompletedPremiumGate extends StatelessWidget {
                     const Spacer(),
                     PremiumShimmerButton(
                       label: text.premiumContinueAction,
-                      onTap: () => context.push(PremiumPage.routePath),
+                      onTap: () =>
+                          context.appNavigator.push(const PremiumDestination()),
                       height: 46,
                     ),
                     const SizedBox(height: 10),
@@ -506,9 +507,9 @@ class _GenerationWorkingView extends ConsumerWidget {
           if (isBalanceError)
             FilledButton.icon(
               onPressed: () {
-                final router = GoRouter.of(context);
+                final appNavigator = context.appNavigator;
                 Navigator.of(context).pop();
-                router.push(WalletPage.routePath);
+                appNavigator.push(const WalletDestination());
               },
               icon: const Icon(Icons.account_balance_wallet_rounded),
               label: Text(text.templateFlowTopUpBalanceAction),

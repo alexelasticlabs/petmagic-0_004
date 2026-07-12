@@ -1,8 +1,11 @@
+export 'package:petmagic_mobile/features/wallet/domain/pending_store_wallet_purchase.dart';
+
 import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/features/wallet/domain/pending_store_wallet_purchase.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 final walletStorePurchaseRecoveryPreferencesProvider =
@@ -20,49 +23,6 @@ final walletStorePurchaseRecoveryStoreProvider =
         ),
       );
     });
-
-class PendingStoreWalletPurchase {
-  const PendingStoreWalletPurchase({
-    required this.orderId,
-    required this.provider,
-    required this.productId,
-    required this.packId,
-    required this.packCode,
-    required this.createdAtUtc,
-  });
-
-  final String orderId;
-  final String provider;
-  final String productId;
-  final String packId;
-  final String packCode;
-  final DateTime createdAtUtc;
-
-  Map<String, Object?> toJson() {
-    return {
-      'orderId': orderId,
-      'provider': provider,
-      'productId': productId,
-      'packId': packId,
-      'packCode': packCode,
-      'createdAtUtc': createdAtUtc.toUtc().toIso8601String(),
-    };
-  }
-
-  factory PendingStoreWalletPurchase.fromJson(Map<String, dynamic> json) {
-    return PendingStoreWalletPurchase(
-      orderId: json['orderId'] as String? ?? '',
-      provider: json['provider'] as String? ?? '',
-      productId: json['productId'] as String? ?? '',
-      packId: json['packId'] as String? ?? '',
-      packCode: json['packCode'] as String? ?? '',
-      createdAtUtc: json['createdAtUtc'] is String
-          ? DateTime.tryParse(json['createdAtUtc'] as String)?.toUtc() ??
-                DateTime.fromMillisecondsSinceEpoch(0, isUtc: true)
-          : DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
-    );
-  }
-}
 
 class WalletStorePurchaseRecoveryStore {
   const WalletStorePurchaseRecoveryStore({

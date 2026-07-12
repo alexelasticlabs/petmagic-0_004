@@ -51,6 +51,51 @@ flutter run --dart-define=API_BASE_URL=http://localhost:5001
 flutter run --dart-define=API_BASE_URL=https://api.petmagic.app
 ```
 
+## Architecture
+
+The mobile client uses a lean Clean Architecture that is intentionally easy to
+evolve with small, reviewable changes:
+
+- `app/` is the composition root: `GoRouter`, app lifecycle, push/deep-link
+  orchestration and session-scope invalidation live here. It may depend on
+  features.
+- `core/` contains cross-cutting contracts and infrastructure: auth session,
+  networking, logging, realtime, configuration and platform adapters. It must
+  not import `features/`.
+- `features/<name>/` owns a product capability. Complex capabilities use
+  `domain/`, `application/`, `data/` and `presentation/`; simple ones are not
+  artificially split. A feature may consume another feature only through its
+  public `application/` or `domain/` API. Direct cross-feature imports from
+  `data/` and `presentation/` are forbidden.
+- `shared/` contains reusable UI and utilities without product-flow ownership.
+
+For feature data access, `application/` owns the repository/gateway/storage
+port and its Riverpod provider token. `data/` owns the concrete implementation.
+`app/composition/mobile_provider_overrides.dart` is the only production place
+that binds these tokens. Controllers and feature UI never instantiate a Dio,
+Firebase, SharedPreferences, store-purchase or SignalR implementation.
+
+The navigation contract (`AppNavigator` and typed `AppDestination` values)
+lives in `core/navigation`; the GoRouter adapter and feature-aware shell live in
+`app/router` and `app/shell`. Shared widgets and layout helpers never import a
+feature module.
+
+Auth session JSON and the secure-storage key are a compatibility contract.
+Repositories depend on `AuthSessionStore`, while `AuthSessionStorage` remains
+the production implementation. Push and deep links navigate via typed
+`AppDestination` values through `AppNavigator`; route strings remain internal
+to the router boundary.
+
+`test/mobile_architecture_test.dart` enforces every layer direction, keeps
+domain code framework-independent, rejects `GoRouter` in feature/shared UI,
+checks the app composition bindings, and prevents new production files over
+600 lines. Existing oversized files are an explicit frozen debt list: entries
+may be removed as files are split, but new entries are not accepted. The same
+test also guards concrete `AuthSessionStorage` usage and app-owned push/session
+orchestration. UI quality gates include a `320×568` viewport, 200% system text
+scaling, button semantics, a deterministic compact welcome golden, and a
+1000+ item feed stress test that runs on an Android emulator in CI.
+
 ## Release Hardening Checklist
 
 - Every release build must target an explicit flavor and provide the matching
@@ -131,7 +176,7 @@ See the full setup guide in [../../docs/md/AUTH_EMAIL_SETUP.md](../../docs/md/AU
 ## Checks
 
 ```bash
-dart format lib test
+dart format lib test integration_test
 flutter analyze --fatal-infos
 flutter test
 ```
@@ -145,10 +190,10 @@ key parity.
 
 ```text
 lib/
-	app/                  App bootstrap, router, theme, generated localization
-	core/                 Config, networking, errors, realtime abstractions
-	features/templates/   Domain models, API/cache data sources, repository, state, UI
-	shared/               Navigation shell and reusable app-level UI
+  app/                  Composition root, router, shell, lifecycle orchestration
+  core/                 Cross-cutting contracts and infrastructure
+  features/<name>/      Domain, application API, data implementation, presentation
+  shared/               Feature-independent UI and utilities
 ```
 
 Templates are loaded from `GET /api/templates/feed`; users can browse without authentication. Feed pagination uses the `nextCursor` value from the previous response as the next request's `cursor` query parameter. Malformed or hand-built cursors are rejected by the backend with `400` and `templates.invalid_cursor`.

@@ -45,7 +45,7 @@ void main() {
     'profile logout unregisters push token before clearing auth session',
     () {
       final source = File(
-        'lib/features/profile/presentation/profile_controller.dart',
+        'lib/features/profile/application/profile_controller.dart',
       ).readAsStringSync();
       final logoutBody = _methodBody(source, 'logout');
       final cleanupBody = _methodBody(
@@ -63,22 +63,17 @@ void main() {
       expect(cleanupIndex, isNonNegative);
       expect(repositoryLogoutIndex, isNonNegative);
       expect(cleanupIndex, lessThan(repositoryLogoutIndex));
-      expect(cleanupBody, contains('PushTokenRegistrar('));
-      expect(cleanupBody, contains('templateGenerationRepositoryProvider'));
-      expect(cleanupBody, contains('supportChatRepositoryProvider'));
-      expect(cleanupBody, contains('walletRepositoryProvider'));
-      expect(cleanupBody, contains('registrar.unregisterToken('));
-      expect(cleanupBody, contains('token: token,'));
+      expect(cleanupBody, contains('pushTokenLifecyclePortProvider'));
+      expect(cleanupBody, contains('.unregisterCurrentToken('));
       expect(cleanupBody, contains('canContinue: () => ref.mounted'));
-      expect(cleanupBody, contains('final cachedToken ='));
+      expect(cleanupBody, contains('onFailure: (stage, error, stackTrace)'));
+      expect(cleanupBody, isNot(contains('FirebaseMessaging')));
       expect(
-        cleanupBody.indexOf('if (!ref.mounted)'),
-        greaterThan(cleanupBody.indexOf('registrar.readRegisteredToken()')),
+        cleanupBody,
+        isNot(contains('templateGenerationRepositoryProvider')),
       );
-      expect(
-        cleanupBody.indexOf('await _readFirebaseToken()'),
-        greaterThan(cleanupBody.indexOf('if (!ref.mounted)')),
-      );
+      expect(cleanupBody, isNot(contains('supportChatRepositoryProvider')));
+      expect(cleanupBody, isNot(contains('walletRepositoryProvider')));
       expect(cleanupBody, isNot(contains("'token'")));
       expect(cleanupBody, isNot(contains('context: {')));
     },
@@ -88,7 +83,7 @@ void main() {
     'profile account deletion unregisters push token before deleting account',
     () {
       final source = File(
-        'lib/features/profile/presentation/profile_controller.dart',
+        'lib/features/profile/application/profile_controller.dart',
       ).readAsStringSync();
       final deleteAccountBody = _methodBody(source, 'deleteAccount');
 

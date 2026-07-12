@@ -1,19 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/shared/widgets/motion.dart';
-
-CustomTransitionPage<T> buildPetMagicFadeSlidePage<T>({
-  required GoRouterState state,
-  required Widget child,
-}) {
-  return CustomTransitionPage<T>(
-    key: state.pageKey,
-    child: child,
-    transitionDuration: PetMotion.medium,
-    reverseTransitionDuration: const Duration(milliseconds: 220),
-    transitionsBuilder: petMagicFadeSlideTransition,
-  );
-}
 
 Widget petMagicFadeSlideTransition(
   BuildContext context,

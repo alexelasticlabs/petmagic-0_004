@@ -6,32 +6,28 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
-import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
-import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
-import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
-import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
+import 'package:petmagic_mobile/shared/auth/auth_required_sheet.dart';
+import 'package:petmagic_mobile/features/templates/application/template_generation_contract.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/mappers/generations_gallery_mappers.dart';
 import 'package:petmagic_mobile/features/templates/presentation/mappers/generation_status_mappers.dart'
     show galleryMediaStateIcon, galleryMediaStateMessage, statusTitle;
-import 'package:petmagic_mobile/features/templates/presentation/mappers/template_error_key_mapper.dart';
-import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/template_error_key_mapper.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
 import 'package:petmagic_mobile/shared/files/file_name_sanitizer.dart';
 import 'package:petmagic_mobile/shared/files/media_share_save.dart';
 import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
-import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_navigation_layout.dart';
 import 'package:petmagic_mobile/shared/widgets/motion.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
@@ -54,14 +50,16 @@ class GenerationsGalleryPage extends ConsumerStatefulWidget {
       _GenerationsGalleryPageState();
 }
 
-String _templatesLocationForGeneration(TemplateGenerationResult generation) {
+TemplatesDestination _templatesDestinationForGeneration(
+  TemplateGenerationResult generation,
+) {
   final petId = generation.petId?.trim();
   if (petId == null || petId.isEmpty) {
-    return TemplatesPage.routePath;
+    return const TemplatesDestination();
   }
 
   final petPhotoId = generation.petPhotoId?.trim();
-  return TemplatesPage.location(petId: petId, petPhotoId: petPhotoId);
+  return TemplatesDestination(petId: petId, petPhotoId: petPhotoId);
 }
 
 class _GalleryPageViewState {
@@ -580,11 +578,14 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
 
   Future<void> _openPremiumUpsell() async {
     if (ref.read(appLaunchControllerProvider).isAuthenticated) {
-      await context.push(PremiumPage.routePath);
+      await context.appNavigator.push(const PremiumDestination());
       return;
     }
 
-    await showAuthRequiredSheet(context, redirectPath: PremiumPage.routePath);
+    await showAuthRequiredSheet(
+      context,
+      redirectPath: const PremiumDestination().location,
+    );
   }
 
   CancelToken? _startMediaAction() {

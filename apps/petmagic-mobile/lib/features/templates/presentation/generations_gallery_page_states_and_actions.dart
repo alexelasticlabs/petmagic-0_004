@@ -446,10 +446,8 @@ Future<void> _showReadyCardActions(
                               )
                               .markRead(generation.generationId);
                         }
-                        context.push(
-                          GenerationStatusPage.routeFor(
-                            generation.generationId,
-                          ),
+                        context.appNavigator.push(
+                          GenerationDestination(generation.generationId),
                         );
                       },
                     ),
@@ -537,8 +535,8 @@ Future<void> _showReadyCardActions(
                       title: Text(text.generationStatusReportProblemAction),
                       onTap: () {
                         Navigator.of(sheetContext).pop();
-                        context.push(
-                          SupportChatPage.routeFor(
+                        context.appNavigator.push(
+                          SupportChatDestination(
                             initialMessage:
                                 _buildGenerationProblemReportMessage(
                                   text,
@@ -604,10 +602,8 @@ Future<void> _showFailedCardActions(
                               )
                               .markRead(generation.generationId);
                         }
-                        context.push(
-                          GenerationStatusPage.routeFor(
-                            generation.generationId,
-                          ),
+                        context.appNavigator.push(
+                          GenerationDestination(generation.generationId),
                         );
                       },
                     ),
@@ -616,7 +612,9 @@ Future<void> _showFailedCardActions(
                       title: Text(text.generationStatusPickAnotherPhotoAction),
                       onTap: () {
                         Navigator.of(sheetContext).pop();
-                        context.go(_templatesLocationForGeneration(generation));
+                        context.appNavigator.go(
+                          _templatesDestinationForGeneration(generation),
+                        );
                       },
                     ),
                     ListTile(
@@ -624,8 +622,8 @@ Future<void> _showFailedCardActions(
                       title: Text(text.generationStatusContactSupportAction),
                       onTap: () {
                         Navigator.of(sheetContext).pop();
-                        context.push(
-                          SupportChatPage.routeFor(
+                        context.appNavigator.push(
+                          SupportChatDestination(
                             initialMessage:
                                 _buildGenerationProblemReportMessage(
                                   text,

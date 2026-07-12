@@ -1,4 +1,10 @@
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
+import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
+
+String mapAchievementsLoadMessage(String? raw, AppLocalizations text) {
+  final authMessage = mapCommonAuthFeedbackMessage(text, raw);
+  return authMessage ?? text.gamificationLoadFailed;
+}
 
 String localizeAchievementTitle(AppLocalizations text, String key) {
   switch (key) {

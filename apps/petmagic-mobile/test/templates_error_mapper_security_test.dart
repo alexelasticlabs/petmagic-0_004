@@ -62,7 +62,7 @@ void main() {
       );
       expect(
         templatesPage,
-        contains("operation: 'read_route_query_parameter'"),
+        isNot(contains("operation: 'read_route_query_parameter'")),
       );
     },
   );

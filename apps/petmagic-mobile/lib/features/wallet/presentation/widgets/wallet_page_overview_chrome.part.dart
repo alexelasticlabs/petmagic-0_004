@@ -13,16 +13,16 @@ class _WalletHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
-    final router = GoRouter.of(context);
-    final canPop = router.canPop();
+    final navigator = context.appNavigator;
+    final canPop = navigator.canPop();
 
     void handleBack() {
-      if (router.canPop()) {
-        router.pop();
+      if (navigator.canPop()) {
+        navigator.pop();
         return;
       }
 
-      router.go('/profile');
+      navigator.go(const ProfileDestination());
     }
 
     return LayoutBuilder(

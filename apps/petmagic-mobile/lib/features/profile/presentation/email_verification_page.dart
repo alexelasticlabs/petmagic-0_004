@@ -3,16 +3,16 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
-import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
+import 'package:petmagic_mobile/features/profile/application/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
-import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
+import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
 
 class EmailVerificationPage extends ConsumerStatefulWidget {
   const EmailVerificationPage({
@@ -165,9 +165,10 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage>
             TextButton(
               onPressed: _isBusy
                   ? null
-                  : () => context.go(
-                      AuthEntryPage.routePath,
-                      extra: AuthEntryRouteArgs(initialEmail: widget.email),
+                  : () => context.appNavigator.go(
+                      AuthDestination(
+                        payload: AuthEntryRouteArgs(initialEmail: widget.email),
+                      ),
                     ),
               child: Text(text.emailVerificationChangeEmailAction),
             ),
@@ -219,7 +220,7 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage>
       setState(() {
         _info = text.emailVerificationConfirmedMessage;
       });
-      context.go(TemplatesPage.routePath);
+      context.appNavigator.go(const TemplatesDestination());
     } catch (error) {
       if (error is RequestCancelledException ||
           error is DioException && CancelToken.isCancel(error)) {

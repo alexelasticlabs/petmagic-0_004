@@ -188,8 +188,9 @@ class _PetDetailsPageState extends ConsumerState<PetDetailsPage> {
                         pet: pet,
                         text: text,
                         onEdit: () => _showPetForm(context, ref, pet: pet),
-                        onGenerate: () =>
-                            context.go(_templatesWithPetLocation(pet.id)),
+                        onGenerate: () => context.appNavigator.go(
+                          TemplatesDestination(petId: pet.id),
+                        ),
                         onAddPhoto: () =>
                             _addPhoto(pet.id, currentAvatarUrl: pet.avatarUrl),
                         isAddingPhoto: _isAddingPhoto,

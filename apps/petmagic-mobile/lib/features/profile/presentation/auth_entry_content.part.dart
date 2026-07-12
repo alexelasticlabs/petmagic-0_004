@@ -207,25 +207,30 @@ class _AuthFlowContentSection extends StatelessWidget {
           forgotPasswordAction: text.authForgotPasswordAction,
           onForgotPassword: () {
             final email = page._emailController.text.trim();
-            context.go(
-              PasswordResetPage.routePath,
-              extra: email.isEmpty
-                  ? null
-                  : PasswordResetRouteArgs(initialEmail: email),
+            context.appNavigator.go(
+              PasswordResetDestination(
+                email: email,
+                payload: email.isEmpty
+                    ? null
+                    : PasswordResetRouteArgs(initialEmail: email),
+              ),
             );
           },
           onSwitchMode: () {
-            final redirectQuery = page._redirectQuery();
             if (page._isSignUp) {
-              if (GoRouter.of(context).canPop()) {
-                context.pop();
+              if (context.appNavigator.canPop()) {
+                context.appNavigator.pop();
                 return;
               }
-              context.go('${AuthEntryPage.routePath}$redirectQuery');
+              context.appNavigator.go(
+                AuthDestination(redirectPath: page.widget.redirectPath),
+              );
               return;
             }
 
-            context.push('${RegisterEntryPage.routePath}$redirectQuery');
+            context.appNavigator.push(
+              RegisterDestination(redirectPath: page.widget.redirectPath),
+            );
           },
         ),
         SizedBox(height: compactLayout ? 6 : 10),

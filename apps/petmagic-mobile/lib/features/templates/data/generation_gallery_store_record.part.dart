@@ -2,7 +2,7 @@ part of 'generation_gallery_store.dart';
 
 const Object _copyWithUnset = Object();
 
-class GenerationGalleryMediaRecord {
+class GenerationGalleryMediaRecord implements GenerationGalleryMediaRecordView {
   const GenerationGalleryMediaRecord({
     required this.generationId,
     required this.accountScope,
@@ -26,25 +26,42 @@ class GenerationGalleryMediaRecord {
     this.localBytes = 0,
   });
 
+  @override
   final String generationId;
+  @override
   final String accountScope;
+  @override
   final String userId;
+  @override
   final String status;
+  @override
   final String? templateTitle;
+  @override
   final String? templateType;
+  @override
   final DateTime updatedAtUtc;
+  @override
   final String? previewRemoteUrl;
+  @override
   final String? outputRemoteUrl;
+  @override
   final String? previewLocalPath;
+  @override
   final String? outputLocalPath;
+  @override
   final bool isDeletedLocally;
+  @override
   final bool isDownloadComplete;
+  @override
   final DateTime lastSyncedAtUtc;
+  @override
   final int version;
+  @override
   final bool pendingServerDelete;
   final int materializationFailureCount;
   final DateTime? materializationBackoffUntilUtc;
   final String? materializationFailureCode;
+  @override
   final int localBytes;
 
   GenerationGalleryMediaRecord copyWith({

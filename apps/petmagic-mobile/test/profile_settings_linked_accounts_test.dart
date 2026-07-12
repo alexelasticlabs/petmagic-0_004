@@ -5,11 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
+import 'package:petmagic_mobile/app/router/go_router_app_navigator.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
+import 'package:petmagic_mobile/features/profile/domain/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
+import 'package:petmagic_mobile/features/profile/application/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 
@@ -270,16 +272,22 @@ Future<void> _pumpLinkedAccountsPageWithError(WidgetTester tester) async {
 }
 
 GoRouter _testRouter(Widget home) {
-  return GoRouter(
+  late final GoRouter router;
+  Widget withNavigation(Widget child) =>
+      AppNavigationScope(navigator: GoRouterAppNavigator(router), child: child);
+
+  router = GoRouter(
     routes: [
-      GoRoute(path: '/', builder: (context, state) => home),
+      GoRoute(path: '/', builder: (context, state) => withNavigation(home)),
       GoRoute(
         path: '/profile/settings/password-change',
-        builder: (context, state) =>
-            const Scaffold(body: Text('password-change-screen')),
+        builder: (context, state) => withNavigation(
+          const Scaffold(body: Text('password-change-screen')),
+        ),
       ),
     ],
   );
+  return router;
 }
 
 class _FakeProfileController extends ProfileController {

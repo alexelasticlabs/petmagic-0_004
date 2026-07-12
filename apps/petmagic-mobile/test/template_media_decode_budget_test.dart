@@ -156,10 +156,10 @@ void main() {
 
   test('active generation shell thumbnail is cached at thumbnail size', () async {
     final shellSource = await File(
-      'lib/shared/navigation/petmagic_shell.dart',
+      'lib/app/shell/petmagic_shell.dart',
     ).readAsString();
     final activeGenerationSource = await File(
-      'lib/shared/navigation/petmagic_shell_active_generation.part.dart',
+      'lib/app/shell/petmagic_shell_active_generation.part.dart',
     ).readAsString();
     final source = '$shellSource\n$activeGenerationSource';
 

@@ -7,9 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
-import 'package:petmagic_mobile/features/support/data/support_chat_realtime_client.dart';
-import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
+import 'package:petmagic_mobile/features/support/application/support_contract.dart';
 
 part 'support_chat_controller_conversation.part.dart';
 part 'support_chat_controller_messaging.part.dart';
@@ -87,8 +85,8 @@ class SupportChatState {
 }
 
 abstract class _SupportChatControllerScope {
-  SupportChatRepository get _repository;
-  SupportChatRealtimeClient get _realtimeClient;
+  SupportRepository get _repository;
+  SupportRealtimeGateway get _realtimeClient;
 
   bool _updateStateIfMounted(
     SupportChatState Function(SupportChatState current) update,
@@ -102,11 +100,11 @@ class SupportChatController extends _SupportChatControllerBase
     with
         _SupportChatControllerConversationMixin,
         _SupportChatControllerMessagingMixin {
-  SupportChatRepository? _activeRepository;
-  SupportChatRealtimeClient? _activeRealtimeClient;
+  SupportRepository? _activeRepository;
+  SupportRealtimeGateway? _activeRealtimeClient;
 
   @override
-  SupportChatRepository get _repository {
+  SupportRepository get _repository {
     final repository = _activeRepository;
     if (repository != null) {
       return repository;
@@ -116,7 +114,7 @@ class SupportChatController extends _SupportChatControllerBase
   }
 
   @override
-  SupportChatRealtimeClient get _realtimeClient {
+  SupportRealtimeGateway get _realtimeClient {
     final realtimeClient = _activeRealtimeClient;
     if (realtimeClient != null) {
       return realtimeClient;

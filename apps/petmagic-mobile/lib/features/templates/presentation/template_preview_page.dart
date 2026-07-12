@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
-import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
+import 'package:petmagic_mobile/shared/auth/auth_required_sheet.dart';
+import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_entitlement_provider.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_flow_sheets.dart';
@@ -91,10 +91,13 @@ class _TemplatePreviewPageState extends ConsumerState<TemplatePreviewPage> {
         return;
       }
 
-      context.push(PremiumPage.routePath);
+      context.appNavigator.push(const PremiumDestination());
       return;
     }
 
-    await showAuthRequiredSheet(context, redirectPath: PremiumPage.routePath);
+    await showAuthRequiredSheet(
+      context,
+      redirectPath: const PremiumDestination().location,
+    );
   }
 }

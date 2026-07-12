@@ -64,7 +64,7 @@ void main() {
 
   test('auth submit operations are guarded against duplicate starts', () async {
     final controller = await File(
-      'lib/features/profile/presentation/profile_controller.dart',
+      'lib/features/profile/application/profile_controller.dart',
     ).readAsString();
 
     for (final methodName in const [
@@ -83,7 +83,7 @@ void main() {
 
   test('profile presentation state does not retain auth tokens', () async {
     final controller = await File(
-      'lib/features/profile/presentation/profile_controller.dart',
+      'lib/features/profile/application/profile_controller.dart',
     ).readAsString();
 
     final stateClass = _classBody(controller, 'ProfileState');

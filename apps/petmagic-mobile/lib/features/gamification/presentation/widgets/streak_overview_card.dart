@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
-import 'package:petmagic_mobile/features/gamification/data/gamification_models.dart';
+import 'package:petmagic_mobile/features/gamification/domain/gamification_models.dart';
 import 'package:petmagic_mobile/features/gamification/presentation/widgets/streak_calendar.dart';
 
 class StreakOverviewCard extends StatelessWidget {

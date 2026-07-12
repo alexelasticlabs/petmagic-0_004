@@ -1,3 +1,9 @@
+export 'package:petmagic_mobile/features/templates/application/generation_gallery_cache.dart'
+    show
+        GenerationGalleryCache,
+        GenerationGalleryMediaRecordView,
+        generationGalleryStoreProvider;
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -9,8 +15,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
-import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
+import 'package:petmagic_mobile/core/auth/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/templates/domain/generation_media_kind.dart';
+import 'package:petmagic_mobile/features/templates/application/generation_gallery_cache.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
 import 'package:petmagic_mobile/shared/files/file_name_sanitizer.dart';
@@ -39,7 +46,9 @@ final generationGalleryRootDirectoryResolverProvider =
       };
     });
 
-final generationGalleryStoreProvider = Provider<GenerationGalleryStore>((ref) {
+final fileGenerationGalleryStoreProvider = Provider<GenerationGalleryCache>((
+  ref,
+) {
   final store = GenerationGalleryStore(
     dio: ref.watch(dioProvider),
     preferences: ref.watch(templateGenerationSharedPreferencesProvider),
@@ -54,11 +63,11 @@ final generationGalleryStoreProvider = Provider<GenerationGalleryStore>((ref) {
   return store;
 });
 
-class GenerationGalleryStore {
+class GenerationGalleryStore implements GenerationGalleryCache {
   GenerationGalleryStore({
     required Dio dio,
     required SharedPreferencesAsync preferences,
-    required AuthSessionStorage sessionStorage,
+    required AuthSessionStore sessionStorage,
     required GenerationGalleryRootDirectoryResolver rootDirectoryResolver,
     int maxBackgroundMaterializationsPerSession =
         _defaultMaxBackgroundMaterializationsPerSession,
@@ -100,7 +109,7 @@ class GenerationGalleryStore {
 
   final Dio _dio;
   final SharedPreferencesAsync _preferences;
-  final AuthSessionStorage _sessionStorage;
+  final AuthSessionStore _sessionStorage;
   final GenerationGalleryRootDirectoryResolver _rootDirectoryResolver;
   final int _maxBackgroundMaterializationsPerSession;
   final int _maxBackgroundVideoOutputsPerSession;
@@ -117,11 +126,13 @@ class GenerationGalleryStore {
   int _backgroundVideoOutputsThisSession = 0;
   int _backgroundBytesThisSession = 0;
 
+  @override
   Future<String?> readCurrentAccountScope() async {
     final session = await _sessionStorage.read();
     return _galleryResolveAccountScope(session?.user.userId);
   }
 
+  @override
   Future<List<GenerationGalleryMediaRecord>> loadLocalReadyItems() async {
     final entries = await _galleryReadEntries(this);
     return entries
@@ -129,6 +140,7 @@ class GenerationGalleryStore {
         .toList(growable: false);
   }
 
+  @override
   Future<GenerationGalleryMediaRecord?> readLocalRecord(
     String generationId,
   ) async {
@@ -141,6 +153,7 @@ class GenerationGalleryStore {
     return null;
   }
 
+  @override
   Future<Set<String>> loadDeletedGenerationIds() async {
     final entries = await _galleryReadEntries(this);
     return entries
@@ -149,6 +162,7 @@ class GenerationGalleryStore {
         .toSet();
   }
 
+  @override
   Future<List<String>> loadPendingServerDeleteIds() async {
     final entries = await _galleryReadEntries(this);
     return entries
@@ -157,6 +171,7 @@ class GenerationGalleryStore {
         .toList(growable: false);
   }
 
+  @override
   Future<void> clearPendingServerDelete(String generationId) async {
     final entries = await _galleryReadEntries(this);
     final updated = [
@@ -169,6 +184,7 @@ class GenerationGalleryStore {
     await _galleryWriteEntries(this, updated);
   }
 
+  @override
   Future<void> removeRecord(String generationId) async {
     final entries = await _galleryReadEntries(this);
     final target = entries
@@ -194,16 +210,19 @@ class GenerationGalleryStore {
     }
   }
 
+  @override
   Future<GenerationGalleryMediaRecord> upsertReadyItem(
     TemplateGenerationResult generation,
   ) {
     return _galleryUpsertReadyItem(this, generation);
   }
 
+  @override
   Future<void> markDeletedLocally(String generationId, {String? userId}) {
     return _galleryMarkDeletedLocally(this, generationId, userId: userId);
   }
 
+  @override
   Future<GenerationGalleryMediaRecord?> materializeGenerationMedia(
     TemplateGenerationResult generation, {
     bool background = false,
@@ -215,18 +234,22 @@ class GenerationGalleryStore {
     );
   }
 
+  @override
   Future<void> cancelActiveDownloads() {
     return _galleryCancelActiveDownloads(this);
   }
 
+  @override
   Future<void> purgeCurrentAccountScope() {
     return _galleryPurgeCurrentAccountScope(this);
   }
 
+  @override
   Future<void> purgeAllScopes() {
     return _galleryPurgeAllScopes(this);
   }
 
+  @override
   Future<void> cleanupCurrentAccountArtifacts() {
     return _galleryCleanupCurrentAccountArtifacts(this);
   }

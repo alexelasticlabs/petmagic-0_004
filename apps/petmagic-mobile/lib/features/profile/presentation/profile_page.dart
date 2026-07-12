@@ -2,35 +2,30 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
+import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/pets/presentation/my_pets_page.dart';
-import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
-import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
-import 'package:petmagic_mobile/features/premium/presentation/premium_subscription_status_presenter.dart';
-import 'package:petmagic_mobile/features/premium/presentation/subscription_management_page.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
+import 'package:petmagic_mobile/features/premium/application/premium_controller.dart';
+import 'package:petmagic_mobile/features/premium/application/premium_subscription_status_presenter.dart';
+import 'package:petmagic_mobile/features/profile/domain/profile_models.dart';
+import 'package:petmagic_mobile/features/profile/application/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_settings_page.dart';
-import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
-import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
-import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
-import 'package:petmagic_mobile/features/gamification/presentation/achievements_page_state.dart';
-import 'package:petmagic_mobile/features/gamification/presentation/gamification_providers.dart';
-import 'package:petmagic_mobile/features/gamification/presentation/widgets/gamification_summary_card.dart';
-import 'package:petmagic_mobile/features/gamification/presentation/achievements_page.dart';
-import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/shared/auth/auth_required_sheet.dart';
+import 'package:petmagic_mobile/shared/profile/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
+import 'package:petmagic_mobile/features/gamification/application/achievements_page_state.dart';
+import 'package:petmagic_mobile/features/gamification/application/gamification_providers.dart';
+import 'package:petmagic_mobile/features/profile/presentation/widgets/gamification_highlights_card.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_navigation_layout.dart';
+import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
 import 'package:petmagic_mobile/shared/widgets/android_loopback_backend_hint.dart';
 import 'package:petmagic_mobile/shared/widgets/motion_entrance.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
@@ -394,8 +389,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
                           const SizedBox(width: 12),
                           _HeaderActionIcon(
                             icon: Icons.settings_outlined,
-                            onTap: () =>
-                                context.push(ProfileSettingsPage.routePath),
+                            onTap: () => context.appNavigator.push(
+                              const ProfileSettingsDestination(),
+                            ),
                           ),
                         ],
                       ),
@@ -412,7 +408,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
                         child: _WalletHighlightCard(
                           wallet: wallet,
                           isWalletLoading: walletIsLoading,
-                          onTap: () => context.push(WalletPage.routePath),
+                          onTap: () => context.appNavigator.push(
+                            const WalletDestination(),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -453,7 +451,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
                                 title: text.profilePetsTitle,
                                 subtitle: text.profilePetsSubtitle,
                                 iconColor: colors.accent,
-                                onTap: () => context.push(MyPetsPage.routePath),
+                                onTap: () => context.appNavigator.push(
+                                  const PetsDestination(),
+                                ),
                               ),
                               ProfileSettingsRow(
                                 key: const ValueKey('profile_legal_shortcut'),
@@ -461,9 +461,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
                                 title: text.profileLegalShortcutTitle,
                                 subtitle: legalStatus,
                                 iconColor: colors.accent,
-                                onTap: () => context.push(
-                                  ProfileSettingsDetailPage.location(
-                                    ProfileSettingsDetailKind.terms,
+                                onTap: () => context.appNavigator.push(
+                                  ProfileSettingsDetailDestination(
+                                    ProfileSettingsDetailKind.terms.slug,
                                   ),
                                 ),
                               ),
@@ -472,16 +472,18 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
                                 title: text.profileSupportTitle,
                                 subtitle: text.profileSupportCompactSubtitle,
                                 iconColor: colors.blue,
-                                onTap: () =>
-                                    context.push(SupportChatPage.routePath),
+                                onTap: () => context.appNavigator.push(
+                                  const SupportChatDestination(),
+                                ),
                               ),
                               ProfileSettingsRow(
                                 icon: Icons.settings_outlined,
                                 title: text.profileSettingsShortcutTitle,
                                 subtitle: text.profileSettingsCompactSubtitle,
                                 showDivider: false,
-                                onTap: () =>
-                                    context.push(ProfileSettingsPage.routePath),
+                                onTap: () => context.appNavigator.push(
+                                  const ProfileSettingsDestination(),
+                                ),
                               ),
                             ],
                           ),
@@ -523,7 +525,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
     }
 
     if (mounted) {
-      context.push(PremiumPage.routePath);
+      context.appNavigator.push(const PremiumDestination());
     }
   }
 
@@ -538,14 +540,14 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
         !summary.isPremium ||
         !summary.canManageSubscription) {
       if (mounted) {
-        context.push(PremiumPage.routePath);
+        context.appNavigator.push(const PremiumDestination());
       }
 
       return;
     }
 
     setState(() => _isOpeningSubscription = true);
-    await context.push(SubscriptionManagementPage.routePath);
+    await context.appNavigator.push(const SubscriptionManagementDestination());
     if (!mounted) {
       return;
     }

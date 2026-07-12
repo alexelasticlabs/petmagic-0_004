@@ -4,10 +4,10 @@ import 'dart:io';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:petmagic_mobile/core/auth/auth_session_storage.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/api_base_url_resolver.dart';
 import 'package:petmagic_mobile/core/network/request_identity.dart';
-import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 
 abstract final class RealtimeTopics {
   static const templatesFeedInvalidated = 'templates.feed.invalidated';
@@ -113,7 +113,7 @@ class PollingRealtimeClient implements RealtimeClient {
 class ServerSentEventsRealtimeClient implements RealtimeClient {
   ServerSentEventsRealtimeClient({
     required ApiBaseUrlResolver apiBaseUrlResolver,
-    required AuthSessionStorage sessionStorage,
+    required AuthSessionStore sessionStorage,
     HttpClient? httpClient,
     this.reconnectDelay = const Duration(seconds: 3),
     Duration connectionTimeout = const Duration(seconds: 8),
@@ -126,7 +126,7 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
   }
 
   final ApiBaseUrlResolver _apiBaseUrlResolver;
-  final AuthSessionStorage _sessionStorage;
+  final AuthSessionStore _sessionStorage;
   HttpClient? _httpClient;
   final bool _ownsHttpClient;
   final Duration reconnectDelay;

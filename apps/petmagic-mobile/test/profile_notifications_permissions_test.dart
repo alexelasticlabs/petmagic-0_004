@@ -163,12 +163,13 @@ void main() {
       refreshPushBody,
       contains('_reconcilePushTokenRegistration(settings.authorizationStatus)'),
     );
-    expect(registerBody, contains('FirebaseMessaging.instance.getToken()'));
-    expect(source, contains('PushTokenRegistrar'));
-    expect(source, contains('templateGenerationRepositoryProvider'));
-    expect(source, contains('supportChatRepositoryProvider'));
-    expect(source, contains('walletRepositoryProvider'));
-    expect(registerBody, contains('_pushTokenRegistrar.registerToken'));
+    expect(
+      registerBody,
+      contains('_pushTokenLifecycle.readCurrentDeviceToken()'),
+    );
+    expect(source, contains('PushTokenLifecyclePort'));
+    expect(source, contains('pushTokenLifecyclePortProvider'));
+    expect(registerBody, contains('_pushTokenLifecycle.registerToken'));
     expect(registerBody, contains('defaultTargetPlatform.name'));
     expect(
       registerBody,
@@ -177,26 +178,26 @@ void main() {
     expect(
       registerBody,
       contains(
-        'final previousToken = await _pushTokenRegistrar.readRegisteredToken()',
+        'final previousToken = await _pushTokenLifecycle.readRegisteredToken()',
       ),
     );
     expect(
       registerBody.indexOf('if (!mounted)'),
       greaterThan(
         registerBody.indexOf(
-          'final previousToken = await _pushTokenRegistrar.readRegisteredToken()',
+          'final previousToken = await _pushTokenLifecycle.readRegisteredToken()',
         ),
       ),
     );
     expect(
-      registerBody.indexOf('FirebaseMessaging.instance.getToken()'),
+      registerBody.indexOf('_pushTokenLifecycle.readCurrentDeviceToken()'),
       greaterThan(registerBody.indexOf('if (!mounted)')),
     );
     expect(registerBody, contains('canContinue: () => mounted'));
     expect(registerBody, contains('await _unregisterStalePushToken('));
     expect(
       reconcileBody,
-      contains('await _pushTokenRegistrar.unregisterToken('),
+      contains('await _pushTokenLifecycle.unregisterToken('),
     );
     expect(staleUnregisterBody, contains('clearRegistrationState: false'));
     expect(
@@ -210,7 +211,7 @@ void main() {
       greaterThan(reconcileBody.indexOf('readRegisteredToken()')),
     );
     expect(
-      reconcileBody.indexOf('FirebaseMessaging.instance.getToken()'),
+      reconcileBody.indexOf('_pushTokenLifecycle.readCurrentDeviceToken()'),
       greaterThan(reconcileBody.indexOf('if (!mounted)')),
     );
   });

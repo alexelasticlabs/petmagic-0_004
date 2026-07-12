@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:petmagic_mobile/features/premium/presentation/mappers/premium_error_key_mapper.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/mappers/wallet_error_key_mapper.dart';
+import 'package:petmagic_mobile/features/premium/application/premium_error_key_mapper.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_error_key_mapper.dart';
 
 void main() {
   group('normalizeWalletErrorKey', () {

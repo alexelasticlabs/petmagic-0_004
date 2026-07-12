@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/core/performance/app_performance_monitor.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/features/pets/presentation/my_pets_page.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
 import 'package:petmagic_mobile/features/premium/presentation/subscription_management_page.dart';
@@ -33,7 +34,8 @@ import 'package:petmagic_mobile/features/gamification/presentation/achievements_
 import 'package:petmagic_mobile/features/wallet/presentation/all_transactions_page.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_page_transitions.dart';
-import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/shared/widgets/motion.dart';
+import 'package:petmagic_mobile/app/shell/petmagic_shell.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>(
   debugLabel: 'rootNavigator',
@@ -227,8 +229,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: TemplatesPage.routePath,
-                pageBuilder: (context, state) =>
-                    const NoTransitionPage(child: TemplatesPage()),
+                pageBuilder: (context, state) => NoTransitionPage(
+                  child: TemplatesPage(
+                    initialPetId: state.uri.queryParameters['petId'],
+                    initialPetPhotoId: state.uri.queryParameters['petPhotoId'],
+                  ),
+                ),
               ),
             ],
           ),
@@ -509,7 +515,13 @@ CustomTransitionPage<T> _buildFadeSlidePage<T>({
   required GoRouterState state,
   required Widget child,
 }) {
-  return buildPetMagicFadeSlidePage(state: state, child: child);
+  return CustomTransitionPage<T>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: PetMotion.medium,
+    reverseTransitionDuration: const Duration(milliseconds: 220),
+    transitionsBuilder: petMagicFadeSlideTransition,
+  );
 }
 
 CustomTransitionPage<dynamic>? _buildTemplatePreviewPageFromState(

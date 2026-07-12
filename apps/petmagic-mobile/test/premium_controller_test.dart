@@ -8,9 +8,9 @@ import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
+import 'package:petmagic_mobile/features/premium/domain/premium_models.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_repository.dart';
-import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
+import 'package:petmagic_mobile/features/premium/application/premium_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 
 import 'premium_controller_test_source.dart';
@@ -23,12 +23,12 @@ void main() {
     () {
       final source = readPremiumControllerLibrarySource();
 
-      expect(source, isNot(contains('late PremiumRepository _repository')));
+      expect(source, isNot(contains('late PremiumRepositoryPort _repository')));
       expect(
         source,
         isNot(contains('late PremiumRefreshProfile _refreshProfile')),
       );
-      expect(source, contains('PremiumRepository? _activeRepository;'));
+      expect(source, contains('PremiumRepositoryPort? _activeRepository;'));
       expect(source, contains('PremiumRefreshProfile? _activeRefreshProfile;'));
       expect(
         source,

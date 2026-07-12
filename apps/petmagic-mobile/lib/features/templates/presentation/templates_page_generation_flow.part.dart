@@ -5,8 +5,8 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
     TemplateItem template, {
     TemplateOfTheDayItem? templateOfTheDay,
   }) async {
-    final petId = _routeQueryParameter(context, 'petId');
-    final petPhotoId = _routeQueryParameter(context, 'petPhotoId');
+    final petId = widget.initialPetId;
+    final petPhotoId = widget.initialPetPhotoId;
     if (petId != null && petId.isNotEmpty) {
       await _startTemplateFromPetFlow(
         template,
@@ -21,7 +21,10 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
       if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
         await showAuthRequiredSheet(
           context,
-          redirectPath: _templatesPageLocation(context),
+          redirectPath: _templatesPageLocation(
+            currentPetId: widget.initialPetId,
+            currentPetPhotoId: widget.initialPetPhotoId,
+          ),
         );
         return;
       }
@@ -72,9 +75,9 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
 
         switch (blockerAction) {
           case TemplateBlockedAction.wallet:
-            context.push(WalletPage.routePath);
+            context.appNavigator.push(const WalletDestination());
           case TemplateBlockedAction.premium:
-            context.push(PremiumPage.routePath);
+            context.appNavigator.push(const PremiumDestination());
           case TemplateBlockedAction.chooseAnother:
             break;
         }
@@ -99,7 +102,6 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
         return;
       }
 
-      final router = GoRouter.of(context);
       final text = AppLocalizations.of(context);
       final generation = await generationController.startGeneration(template);
       if (!mounted) {
@@ -113,7 +115,10 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
         if (_isAuthRequiredError(errorMessage)) {
           await showAuthRequiredSheet(
             context,
-            redirectPath: _templatesPageLocation(context),
+            redirectPath: _templatesPageLocation(
+              currentPetId: widget.initialPetId,
+              currentPetPhotoId: widget.initialPetPhotoId,
+            ),
           );
           return;
         }
@@ -153,9 +158,8 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
         );
       }
 
-      router.push(
-        GenerationStatusPage.routeFor(generation.generationId),
-        extra: featured,
+      context.appNavigator.push(
+        GenerationDestination(generation.generationId, payload: featured),
       );
       return;
     }
@@ -174,7 +178,8 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
       await showAuthRequiredSheet(
         context,
         redirectPath: _templatesPageLocation(
-          context,
+          currentPetId: widget.initialPetId,
+          currentPetPhotoId: widget.initialPetPhotoId,
           petId: petId,
           petPhotoId: petPhotoId,
         ),
@@ -207,9 +212,9 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
 
       switch (blockerAction) {
         case TemplateBlockedAction.wallet:
-          context.push(WalletPage.routePath);
+          context.appNavigator.push(const WalletDestination());
         case TemplateBlockedAction.premium:
-          context.push(PremiumPage.routePath);
+          context.appNavigator.push(const PremiumDestination());
         case TemplateBlockedAction.chooseAnother:
           break;
       }
@@ -244,7 +249,7 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
     }
 
     if (action.changePet) {
-      context.push('/profile/pets');
+      context.appNavigator.push(const PetsDestination());
       return;
     }
 
@@ -272,9 +277,8 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
       );
     }
 
-    context.go(
-      GenerationStatusPage.routeFor(generation.generationId),
-      extra: featured,
+    context.appNavigator.go(
+      GenerationDestination(generation.generationId, payload: featured),
     );
   }
 
@@ -295,7 +299,7 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
           message: text.petsFirstPetToast,
           tone: PetMagicToastTone.info,
         );
-        context.push('/profile/pets');
+        context.appNavigator.push(const PetsDestination());
         return;
       }
 
@@ -491,36 +495,14 @@ TemplateItem? _findTemplateById(Iterable<TemplateItem> items, String id) {
   return null;
 }
 
-String? _routeQueryParameter(BuildContext context, String key) {
-  try {
-    final value = GoRouterState.of(context).uri.queryParameters[key];
-    if (value == null || value.isEmpty) {
-      return null;
-    }
-    return value;
-  } catch (error, stackTrace) {
-    AppLogger.warn(
-      feature: 'Templates.GenerationFlow',
-      operation: 'read_route_query_parameter',
-      message: 'Could not read templates route query parameter',
-      context: {'key': key},
-      error: error,
-      stackTrace: stackTrace,
-    );
-    return null;
-  }
-}
-
-String _templatesPageLocation(
-  BuildContext context, {
+String _templatesPageLocation({
+  required String? currentPetId,
+  required String? currentPetPhotoId,
   String? petId,
   String? petPhotoId,
 }) {
   return TemplatesPage.location(
-    petId:
-        petId ?? _routeQueryParameter(context, TemplatesPage.petIdQueryParam),
-    petPhotoId:
-        petPhotoId ??
-        _routeQueryParameter(context, TemplatesPage.petPhotoIdQueryParam),
+    petId: petId ?? currentPetId,
+    petPhotoId: petPhotoId ?? currentPetPhotoId,
   );
 }

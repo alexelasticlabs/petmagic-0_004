@@ -14,10 +14,10 @@ void main() {
       ).readAsStringSync(),
       readWalletControllerLibrarySource(),
       [
-        'lib/features/templates/presentation/generation_history_controller.dart',
-        'lib/features/templates/presentation/generation_history_controller_cache.part.dart',
-        'lib/features/templates/presentation/generation_history_controller_lifecycle.part.dart',
-        'lib/features/templates/presentation/generation_history_controller_sync.part.dart',
+        'lib/features/templates/application/generation_history_controller.dart',
+        'lib/features/templates/application/generation_history_controller_cache.part.dart',
+        'lib/features/templates/application/generation_history_controller_lifecycle.part.dart',
+        'lib/features/templates/application/generation_history_controller_sync.part.dart',
       ].map((p) => File(p).readAsStringSync()).join('\n'),
       File(
         'lib/features/templates/presentation/template_generation_controller.dart',

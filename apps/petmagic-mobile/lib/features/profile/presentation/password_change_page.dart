@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/password_change_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
-import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
+import 'package:petmagic_mobile/shared/profile/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/shared/auth/auth_required_sheet.dart';
+import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_flow_widgets.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
@@ -182,9 +182,9 @@ class _PasswordChangePageState extends ConsumerState<PasswordChangePage> {
                 children: [
                   IconButton(
                     onPressed: () {
-                      final router = GoRouter.of(context);
-                      if (router.canPop()) {
-                        router.pop();
+                      final navigator = context.appNavigator;
+                      if (navigator.canPop()) {
+                        navigator.pop();
                       }
                     },
                     icon: Icon(

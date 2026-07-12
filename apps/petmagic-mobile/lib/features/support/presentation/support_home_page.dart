@@ -3,24 +3,22 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
-import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
+import 'package:petmagic_mobile/shared/auth/auth_required_sheet.dart';
 import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
-import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
-import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
-import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
+import 'package:petmagic_mobile/shared/profile/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
+import 'package:petmagic_mobile/features/support/application/support_contract.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_unavailable_view.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 
-import 'support_assistant_page.dart';
 import 'support_assistant_scenarios.dart';
 
 enum _SupportHomeTab { active, archive }
@@ -347,7 +345,8 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
                 _ConversationCard(
                   conversation: _conversation!,
                   tab: _tab,
-                  onOpenChat: () => context.push(SupportChatPage.routePath),
+                  onOpenChat: () =>
+                      context.appNavigator.push(const SupportChatDestination()),
                   subtitle: _formatLastActivity(
                     context,
                     _conversation!.lastMessageAtUtc,
@@ -375,8 +374,9 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
                       ),
                       const SizedBox(height: 12),
                       TextButton(
-                        onPressed: () =>
-                            context.push(SupportChatPage.routePath),
+                        onPressed: () => context.appNavigator.push(
+                          const SupportChatDestination(),
+                        ),
                         child: Text(text.supportHomeOpenChatAction),
                       ),
                     ],
@@ -551,8 +551,9 @@ class _TopicCard extends StatelessWidget {
       child: ProfileGlassCard(
         padding: EdgeInsets.zero,
         child: InkWell(
-          onTap: () =>
-              context.push(SupportAssistantPage.location(topic.scenario)),
+          onTap: () => context.appNavigator.push(
+            SupportAssistantDestination(scenario: topic.scenario),
+          ),
           borderRadius: BorderRadius.circular(24),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),

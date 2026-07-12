@@ -5,7 +5,7 @@ import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_dto.dart';
-import 'package:petmagic_mobile/features/templates/data/templates_query.dart';
+import 'package:petmagic_mobile/features/templates/domain/templates_query.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 
 final templatesRemoteDataSourceProvider = Provider<TemplatesRemoteDataSource>((

@@ -32,7 +32,7 @@ class _ActiveCard extends ConsumerWidget {
             .read(generationHistoryControllerProvider.notifier)
             .markRead(generation.generationId);
       }
-      context.push(GenerationStatusPage.routeFor(generation.generationId));
+      context.appNavigator.push(GenerationDestination(generation.generationId));
     }
 
     return _CardEntrance(
@@ -244,7 +244,7 @@ class _ReadyGridCard extends ConsumerWidget {
               .markRead(generation.generationId),
         );
       }
-      context.push(GenerationStatusPage.routeFor(generation.generationId));
+      context.appNavigator.push(GenerationDestination(generation.generationId));
     }
 
     return _CardEntrance(
@@ -428,16 +428,16 @@ class _FailedCard extends ConsumerWidget {
             .read(generationHistoryControllerProvider.notifier)
             .markRead(generation.generationId);
       }
-      context.push(GenerationStatusPage.routeFor(generation.generationId));
+      context.appNavigator.push(GenerationDestination(generation.generationId));
     }
 
     void pickAnotherPhoto() {
-      context.go(_templatesLocationForGeneration(generation));
+      context.appNavigator.go(_templatesDestinationForGeneration(generation));
     }
 
     void openSupport() {
-      context.push(
-        SupportChatPage.routeFor(
+      context.appNavigator.push(
+        SupportChatDestination(
           initialMessage: _buildGenerationProblemReportMessage(
             text,
             generation,

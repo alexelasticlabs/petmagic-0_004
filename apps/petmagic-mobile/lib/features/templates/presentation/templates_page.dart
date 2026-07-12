@@ -2,32 +2,28 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/permissions/media_permission_feedback.dart';
 import 'package:petmagic_mobile/core/performance/decoded_image_cache_budget.dart';
 import 'package:petmagic_mobile/core/performance/template_media_cache.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/pets/presentation/pet_profile_providers.dart';
-import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
-import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
-import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
-import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart';
-import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
-import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
+import 'package:petmagic_mobile/features/pets/application/pets_contract.dart';
+import 'package:petmagic_mobile/features/profile/application/profile_controller.dart';
+import 'package:petmagic_mobile/shared/auth/auth_required_sheet.dart';
+import 'package:petmagic_mobile/features/templates/application/template_generation_contract.dart';
+import 'package:petmagic_mobile/features/templates/application/template_catalog_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_entitlement_provider.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_feed_playback_manager.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_preview_page.dart';
-import 'package:petmagic_mobile/features/templates/presentation/templates_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/templates_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_card.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_flow_sheets.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_type_filters.dart';
@@ -36,11 +32,11 @@ import 'package:petmagic_mobile/features/templates/presentation/widgets/pet_gene
 import 'package:petmagic_mobile/features/templates/presentation/widgets/random_template_sheet.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/templates_search_and_fab.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/templates_top_bar.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/loading/magic_loading_screen.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
-import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_navigation_layout.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_action_sheet.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_async_state_view.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
@@ -53,7 +49,10 @@ part 'templates_page_lifecycle.part.dart';
 part 'templates_page_template_actions.part.dart';
 
 class TemplatesPage extends ConsumerStatefulWidget {
-  const TemplatesPage({super.key});
+  const TemplatesPage({this.initialPetId, this.initialPetPhotoId, super.key});
+
+  final String? initialPetId;
+  final String? initialPetPhotoId;
 
   static const routePath = '/templates';
   static const petIdQueryParam = 'petId';
@@ -443,8 +442,8 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
     final subtitleStyle = Theme.of(context).textTheme.bodySmall;
     final bottomInset = petMagicScrollableBottomInset(context);
     final templateOfTheDay = headerState.templateOfTheDay;
-    final selectedPetId = _routeQueryParameter(context, 'petId');
-    final selectedPetPhotoId = _routeQueryParameter(context, 'petPhotoId');
+    final selectedPetId = widget.initialPetId;
+    final selectedPetPhotoId = widget.initialPetPhotoId;
     _trackTemplateOfTheDayViewed(templateOfTheDay);
 
     return DecoratedBox(
@@ -479,15 +478,23 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           TemplatesTopBarSlot(
-                            onAuthPressed: () => context.go(
-                              '${AuthEntryPage.routePath}?redirect=${Uri.encodeQueryComponent(_templatesPageLocation(context))}',
+                            onAuthPressed: () => context.appNavigator.go(
+                              AuthDestination(
+                                redirectPath: _templatesPageLocation(
+                                  currentPetId: widget.initialPetId,
+                                  currentPetPhotoId: widget.initialPetPhotoId,
+                                ),
+                              ),
                             ),
-                            onRewardsPressed: () =>
-                                context.go(RewardsPage.routePath),
-                            onTopUpPressed: () =>
-                                context.push(WalletPage.routePath),
-                            onWalletPressed: () =>
-                                context.push(WalletPage.routePath),
+                            onRewardsPressed: () => context.appNavigator.go(
+                              const RewardsDestination(),
+                            ),
+                            onTopUpPressed: () => context.appNavigator.push(
+                              const WalletDestination(),
+                            ),
+                            onWalletPressed: () => context.appNavigator.push(
+                              const WalletDestination(),
+                            ),
                           ),
                           const SizedBox(height: 6),
                           Text(

@@ -4,24 +4,26 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/app/router/go_router_app_navigator.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/gamification/data/gamification_models.dart';
-import 'package:petmagic_mobile/features/gamification/presentation/gamification_providers.dart';
-import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
+import 'package:petmagic_mobile/features/gamification/domain/gamification_models.dart';
+import 'package:petmagic_mobile/features/gamification/application/gamification_providers.dart';
+import 'package:petmagic_mobile/features/premium/application/premium_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
 import 'package:petmagic_mobile/features/premium/presentation/subscription_management_page.dart';
 import 'package:petmagic_mobile/features/gamification/presentation/achievements_page.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
+import 'package:petmagic_mobile/features/profile/domain/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
+import 'package:petmagic_mobile/features/profile/application/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_page.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
-import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 
 void main() {
@@ -69,6 +71,10 @@ void main() {
           }),
         ],
         child: MaterialApp.router(
+          builder: (context, child) => AppNavigationScope(
+            navigator: GoRouterAppNavigator(router),
+            child: child!,
+          ),
           routerConfig: router,
           theme: AppTheme.dark(),
           locale: const Locale('en'),
@@ -139,6 +145,10 @@ void main() {
           ),
         ],
         child: MaterialApp.router(
+          builder: (context, child) => AppNavigationScope(
+            navigator: GoRouterAppNavigator(router),
+            child: child!,
+          ),
           routerConfig: router,
           theme: AppTheme.dark(),
           locale: const Locale('en'),
@@ -214,6 +224,10 @@ void main() {
             ),
           ],
           child: MaterialApp.router(
+            builder: (context, child) => AppNavigationScope(
+              navigator: GoRouterAppNavigator(router),
+              child: child!,
+            ),
             routerConfig: router,
             theme: AppTheme.dark(),
             locale: const Locale('en'),
@@ -303,6 +317,10 @@ void main() {
             ),
           ],
           child: MaterialApp.router(
+            builder: (context, child) => AppNavigationScope(
+              navigator: GoRouterAppNavigator(router),
+              child: child!,
+            ),
             routerConfig: router,
             theme: AppTheme.dark(),
             locale: const Locale('en'),
@@ -377,6 +395,10 @@ void main() {
             ),
           ],
           child: MaterialApp.router(
+            builder: (context, child) => AppNavigationScope(
+              navigator: GoRouterAppNavigator(router),
+              child: child!,
+            ),
             routerConfig: router,
             theme: AppTheme.dark(),
             locale: const Locale('en'),
@@ -462,6 +484,10 @@ void main() {
           ),
         ],
         child: MaterialApp.router(
+          builder: (context, child) => AppNavigationScope(
+            navigator: GoRouterAppNavigator(router),
+            child: child!,
+          ),
           routerConfig: router,
           theme: AppTheme.dark(),
           locale: const Locale('en'),
@@ -541,6 +567,10 @@ void main() {
             ),
           ],
           child: MaterialApp.router(
+            builder: (context, child) => AppNavigationScope(
+              navigator: GoRouterAppNavigator(router),
+              child: child!,
+            ),
             routerConfig: router,
             theme: AppTheme.dark(),
             locale: const Locale('en'),
@@ -612,6 +642,10 @@ void main() {
             ),
           ],
           child: MaterialApp.router(
+            builder: (context, child) => AppNavigationScope(
+              navigator: GoRouterAppNavigator(router),
+              child: child!,
+            ),
             routerConfig: router,
             theme: AppTheme.dark(),
             locale: const Locale('en'),
@@ -692,6 +726,10 @@ void main() {
             ),
           ],
           child: MaterialApp.router(
+            builder: (context, child) => AppNavigationScope(
+              navigator: GoRouterAppNavigator(router),
+              child: child!,
+            ),
             routerConfig: router,
             theme: AppTheme.dark(),
             locale: const Locale('en'),
@@ -820,6 +858,10 @@ void main() {
           ),
         ],
         child: MaterialApp.router(
+          builder: (context, child) => AppNavigationScope(
+            navigator: GoRouterAppNavigator(router),
+            child: child!,
+          ),
           routerConfig: router,
           theme: AppTheme.dark(),
           locale: const Locale('ru'),
@@ -905,6 +947,10 @@ void main() {
           ),
         ],
         child: MaterialApp.router(
+          builder: (context, child) => AppNavigationScope(
+            navigator: GoRouterAppNavigator(router),
+            child: child!,
+          ),
           routerConfig: router,
           theme: AppTheme.dark(),
           locale: const Locale('en'),
@@ -995,6 +1041,10 @@ void main() {
             ),
           ],
           child: MaterialApp.router(
+            builder: (context, child) => AppNavigationScope(
+              navigator: GoRouterAppNavigator(router),
+              child: child!,
+            ),
             routerConfig: router,
             theme: AppTheme.dark(),
             locale: const Locale('en'),
@@ -1078,6 +1128,10 @@ void main() {
             ),
           ],
           child: MaterialApp.router(
+            builder: (context, child) => AppNavigationScope(
+              navigator: GoRouterAppNavigator(router),
+              child: child!,
+            ),
             routerConfig: router,
             theme: AppTheme.dark(),
             locale: const Locale('ru'),
@@ -1190,6 +1244,10 @@ void main() {
           ),
         ],
         child: MaterialApp.router(
+          builder: (context, child) => AppNavigationScope(
+            navigator: GoRouterAppNavigator(router),
+            child: child!,
+          ),
           routerConfig: router,
           theme: AppTheme.dark(),
           locale: const Locale('en'),
@@ -1288,6 +1346,10 @@ void main() {
             ),
           ],
           child: MaterialApp.router(
+            builder: (context, child) => AppNavigationScope(
+              navigator: GoRouterAppNavigator(router),
+              child: child!,
+            ),
             routerConfig: router,
             theme: AppTheme.dark(),
             locale: const Locale('en'),

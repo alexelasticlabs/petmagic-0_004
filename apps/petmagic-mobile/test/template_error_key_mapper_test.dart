@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:petmagic_mobile/features/templates/presentation/mappers/template_error_key_mapper.dart';
+import 'package:petmagic_mobile/features/templates/application/template_error_key_mapper.dart';
 
 void main() {
   group('normalizeTemplateErrorKey', () {

@@ -2,18 +2,17 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
-import 'package:petmagic_mobile/core/notifications/push_token_registrar.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/permissions/app_permission_coordinator.dart';
-import 'package:petmagic_mobile/features/profile/data/notification_preferences_storage.dart';
+import 'package:petmagic_mobile/features/profile/application/notification_preferences_port.dart';
+import 'package:petmagic_mobile/features/profile/application/push_token_lifecycle_port.dart';
+import 'package:petmagic_mobile/features/profile/domain/notification_preferences.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
-import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
-import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
-import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
+import 'package:petmagic_mobile/shared/profile/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
 
 part 'profile_notifications_settings_widgets.part.dart';
 
@@ -42,15 +41,12 @@ class ProfileNotificationsSettingsSection extends ConsumerStatefulWidget {
 
 class _ProfileNotificationsSettingsSectionState
     extends ConsumerState<ProfileNotificationsSettingsSection> {
-  final NotificationPreferencesStorage _storage =
-      NotificationPreferencesStorage();
+  NotificationPreferencesStoragePort get _storage =>
+      ref.read(notificationPreferencesStorageProvider);
   final AppPermissionCoordinator _permissionCoordinator =
       AppPermissionCoordinator();
-  late final PushTokenRegistrar _pushTokenRegistrar = PushTokenRegistrar(
-    templateRepository: ref.read(templateGenerationRepositoryProvider),
-    supportRepository: ref.read(supportChatRepositoryProvider),
-    walletRepository: ref.read(walletRepositoryProvider),
-  );
+  PushTokenLifecyclePort get _pushTokenLifecycle =>
+      ref.read(pushTokenLifecyclePortProvider);
 
   NotificationPreferences? _preferences;
   AuthorizationStatus? _pushAuthorizationStatus;
@@ -249,17 +245,17 @@ class _ProfileNotificationsSettingsSectionState
     }
 
     try {
-      final previousToken = await _pushTokenRegistrar.readRegisteredToken();
+      final previousToken = await _pushTokenLifecycle.readRegisteredToken();
       if (!mounted) {
         return;
       }
 
-      final token = await FirebaseMessaging.instance.getToken();
+      final token = await _pushTokenLifecycle.readCurrentDeviceToken();
       if (token == null || token.isEmpty || !mounted) {
         return;
       }
 
-      final registered = await _pushTokenRegistrar.registerToken(
+      final registered = await _pushTokenLifecycle.registerToken(
         token: token,
         platform: defaultTargetPlatform.name,
         locale: Localizations.localeOf(context).toLanguageTag(),
@@ -289,7 +285,7 @@ class _ProfileNotificationsSettingsSectionState
       return;
     }
 
-    await _pushTokenRegistrar.unregisterToken(
+    await _pushTokenLifecycle.unregisterToken(
       token: normalizedStaleToken,
       clearRegistrationState: false,
       canContinue: () => mounted,
@@ -311,17 +307,18 @@ class _ProfileNotificationsSettingsSectionState
       return;
     }
 
-    final cachedToken = await _pushTokenRegistrar.readRegisteredToken();
+    final cachedToken = await _pushTokenLifecycle.readRegisteredToken();
     if (!mounted) {
       return;
     }
 
-    final token = cachedToken ?? await FirebaseMessaging.instance.getToken();
+    final token =
+        cachedToken ?? await _pushTokenLifecycle.readCurrentDeviceToken();
     if (token == null || token.isEmpty || !mounted) {
       return;
     }
 
-    await _pushTokenRegistrar.unregisterToken(
+    await _pushTokenLifecycle.unregisterToken(
       token: token,
       canContinue: () => mounted,
       onFailure: (stage, error, stackTrace) {

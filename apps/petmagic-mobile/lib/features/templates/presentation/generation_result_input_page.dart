@@ -4,21 +4,19 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
-import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
-import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
+import 'package:petmagic_mobile/features/templates/application/template_generation_contract.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
+import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
-import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_navigation_layout.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_unavailable_view.dart';
@@ -228,7 +226,7 @@ class _GenerationResultInputPageState
                 Row(
                   children: [
                     IconButton(
-                      onPressed: () => context.pop(),
+                      onPressed: () => context.appNavigator.pop(),
                       icon: const Icon(Icons.arrow_back_rounded),
                       color: colors.textStrong,
                     ),
@@ -302,7 +300,7 @@ class _GenerationResultInputPageState
     final wallet = ref.read(walletControllerProvider).wallet;
     if ((wallet?.balance ?? 0) < template.tokenCost) {
       _showInfo(copy.noCredits);
-      context.push(WalletPage.routePath);
+      context.appNavigator.push(const WalletDestination());
       return;
     }
 
@@ -356,7 +354,7 @@ class _GenerationResultInputPageState
       if (!mounted || startCancelToken.isCancelled) {
         return;
       }
-      context.go(GenerationStatusPage.routeFor(generation.generationId));
+      context.appNavigator.go(GenerationDestination(generation.generationId));
     } on DioException catch (error) {
       if (CancelToken.isCancel(error) || startCancelToken.isCancelled) {
         return;

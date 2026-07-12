@@ -8,16 +8,18 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/app/router/go_router_app_navigator.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/templates/data/templates_query.dart';
+import 'package:petmagic_mobile/features/templates/domain/templates_query.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_preview_page.dart';
-import 'package:petmagic_mobile/features/templates/presentation/templates_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/templates_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
 import 'templates_page_lifecycle_test_support.dart';
@@ -220,6 +222,10 @@ void main() {
             ),
           ],
           child: MaterialApp.router(
+            builder: (context, child) => AppNavigationScope(
+              navigator: GoRouterAppNavigator(router),
+              child: child!,
+            ),
             theme: AppTheme.light(),
             locale: const Locale('en'),
             localizationsDelegates: const [
@@ -306,6 +312,10 @@ void main() {
         ],
         child: TemplatesTickerModeHost(
           child: MaterialApp.router(
+            builder: (context, child) => AppNavigationScope(
+              navigator: GoRouterAppNavigator(router),
+              child: child!,
+            ),
             theme: AppTheme.light(),
             locale: const Locale('en'),
             localizationsDelegates: const [

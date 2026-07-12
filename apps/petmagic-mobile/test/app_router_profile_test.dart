@@ -13,9 +13,8 @@ import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
+import 'package:petmagic_mobile/features/profile/application/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_page.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
@@ -25,11 +24,13 @@ import 'package:petmagic_mobile/features/templates/data/templates_repository.dar
 import 'package:petmagic_mobile/features/templates/presentation/generation_result_input_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generations_gallery_page.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/generation_history_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/generation_gallery_cache.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'widget_test_support.dart';
+import 'generation_status_page_test_support.dart';
 
 void main() {
   configureWidgetTestHarness();
@@ -290,6 +291,9 @@ void main() {
           ),
           generationHistoryControllerProvider.overrideWith(
             IdleGenerationHistoryController.new,
+          ),
+          generationGalleryStoreProvider.overrideWithValue(
+            NoopGenerationStatusGalleryStore(),
           ),
           walletControllerProvider.overrideWith(IdleWidgetWalletController.new),
           profileRepositoryProvider.overrideWith(

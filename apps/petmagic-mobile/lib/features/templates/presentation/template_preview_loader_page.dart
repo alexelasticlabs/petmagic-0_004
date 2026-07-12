@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
+import 'package:petmagic_mobile/features/templates/application/template_catalog_repository.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_preview_page.dart';
-import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
+import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
 
 class TemplatePreviewLoaderPage extends ConsumerStatefulWidget {
   const TemplatePreviewLoaderPage({required this.templateId, super.key});
@@ -34,17 +34,19 @@ class _TemplatePreviewLoaderPageState
       );
       if (!mounted) return;
 
-      context.pushReplacement(
-        '${TemplatePreviewPage.routePath}/${widget.templateId}',
-        extra: TemplatePreviewRouteArgs(
-          template: template,
-          hasPremiumAccess: false,
-          isAuthenticated: true,
+      context.appNavigator.replace(
+        TemplatePreviewDestination(
+          templateId: widget.templateId,
+          payload: TemplatePreviewRouteArgs(
+            template: template,
+            hasPremiumAccess: false,
+            isAuthenticated: true,
+          ),
         ),
       );
     } catch (e) {
       if (!mounted) return;
-      context.go(TemplatesPage.routePath);
+      context.appNavigator.go(const TemplatesDestination());
     }
   }
 

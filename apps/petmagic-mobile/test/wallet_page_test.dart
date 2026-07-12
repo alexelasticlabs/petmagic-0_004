@@ -9,12 +9,12 @@ import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
-import 'package:petmagic_mobile/features/templates/presentation/templates_controller.dart';
-import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
+import 'package:petmagic_mobile/shared/profile/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/features/templates/application/templates_controller.dart';
+import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/all_transactions_page.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 
@@ -232,6 +232,9 @@ void main() {
           overrides: [
             appLaunchControllerProvider.overrideWith(() => launchController),
             walletControllerProvider.overrideWith(() => walletController),
+            walletRepositoryProvider.overrideWithValue(
+              defaultFakeWalletRepository(),
+            ),
             templatesControllerProvider.overrideWith(
               StaticWalletTemplatesController.new,
             ),
@@ -294,6 +297,9 @@ void main() {
               AuthenticatedWalletAppLaunchController.new,
             ),
             walletControllerProvider.overrideWith(() => walletController),
+            walletRepositoryProvider.overrideWithValue(
+              defaultFakeWalletRepository(),
+            ),
             templatesControllerProvider.overrideWith(
               StaticWalletTemplatesController.new,
             ),
@@ -675,6 +681,9 @@ void main() {
           overrides: [
             appLaunchControllerProvider.overrideWith(() => launchController),
             walletControllerProvider.overrideWith(() => walletController),
+            walletRepositoryProvider.overrideWithValue(
+              defaultFakeWalletRepository(),
+            ),
           ],
           child: MaterialApp.router(
             theme: AppTheme.dark(),
@@ -734,6 +743,9 @@ void main() {
               AuthenticatedWalletAppLaunchController.new,
             ),
             walletControllerProvider.overrideWith(() => walletController),
+            walletRepositoryProvider.overrideWithValue(
+              defaultFakeWalletRepository(),
+            ),
           ],
           child: MaterialApp.router(
             theme: AppTheme.dark(),
