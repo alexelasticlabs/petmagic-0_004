@@ -120,6 +120,25 @@ void main() {
     }
   });
 
+  test('iOS Runner bundles a valid privacy manifest contract', () {
+    final manifest = File('ios/Runner/PrivacyInfo.xcprivacy');
+    final project = File(
+      'ios/Runner.xcodeproj/project.pbxproj',
+    ).readAsStringSync();
+
+    expect(manifest.existsSync(), isTrue);
+    final plist = manifest.readAsStringSync();
+    expect(plist, contains('<key>NSPrivacyTracking</key>'));
+    expect(plist, contains('<false/>'));
+    expect(plist, contains('NSPrivacyAccessedAPICategoryFileTimestamp'));
+    expect(plist, contains('<string>C617.1</string>'));
+    expect(plist, contains('NSPrivacyAccessedAPICategoryUserDefaults'));
+    expect(plist, contains('<string>CA92.1</string>'));
+    expect(plist, contains('NSPrivacyCollectedDataTypePhotosorVideos'));
+    expect(plist, contains('NSPrivacyCollectedDataTypeCustomerSupport'));
+    expect(project, contains('PrivacyInfo.xcprivacy in Resources'));
+  });
+
   test('mobile release configuration allows portrait and landscape', () {
     final mainSource = File('lib/main.dart').readAsStringSync();
     final androidManifest = File(

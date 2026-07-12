@@ -184,90 +184,92 @@ class _BottomNavButton extends StatelessWidget {
       selected: selected,
       button: true,
       label: item.label,
-      child: PressableScale(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        haptic: PressableScaleHaptic.selection,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 2),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            color: isPrimary
-                ? colors.accent.withValues(alpha: selected ? 0.24 : 0.14)
-                : selected
-                ? colors.accent.withValues(alpha: isLight ? 0.26 : 0.1)
-                : Colors.transparent,
-            border: selected || isPrimary
-                ? Border.all(
-                    color: colors.accent.withValues(
-                      alpha: isLight ? 0.48 : 0.08,
-                    ),
-                    width: isLight ? 1.05 : 1,
-                  )
-                : null,
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SizedBox(
-                width: 24,
-                height: 18,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  alignment: Alignment.center,
-                  children: [
-                    DecoratedBox(
-                      decoration: isPrimary
-                          ? BoxDecoration(
-                              color: colors.accent,
-                              shape: BoxShape.circle,
-                            )
-                          : const BoxDecoration(),
-                      child: Padding(
-                        padding: EdgeInsets.all(isPrimary ? 3 : 0),
-                        child: Icon(
-                          item.icon,
-                          color: isPrimary
-                              ? colors.on(colors.accent)
-                              : selected
-                              ? colors.accent
-                              : inactiveColor,
-                          size: isPrimary ? 16 : 17,
-                        ),
+      child: ExcludeSemantics(
+        child: PressableScale(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          haptic: PressableScaleHaptic.selection,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            curve: Curves.easeOutCubic,
+            padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 2),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              color: isPrimary
+                  ? colors.accent.withValues(alpha: selected ? 0.24 : 0.14)
+                  : selected
+                  ? colors.accent.withValues(alpha: isLight ? 0.26 : 0.1)
+                  : Colors.transparent,
+              border: selected || isPrimary
+                  ? Border.all(
+                      color: colors.accent.withValues(
+                        alpha: isLight ? 0.48 : 0.08,
                       ),
-                    ),
-                    if (item.badgeCount > 0)
-                      Positioned(
-                        right: 1,
-                        top: 0,
-                        child: Container(
-                          width: 7,
-                          height: 7,
-                          decoration: BoxDecoration(
-                            color: colors.accent,
-                            shape: BoxShape.circle,
+                      width: isLight ? 1.05 : 1,
+                    )
+                  : null,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 24,
+                  height: 18,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    alignment: Alignment.center,
+                    children: [
+                      DecoratedBox(
+                        decoration: isPrimary
+                            ? BoxDecoration(
+                                color: colors.accent,
+                                shape: BoxShape.circle,
+                              )
+                            : const BoxDecoration(),
+                        child: Padding(
+                          padding: EdgeInsets.all(isPrimary ? 3 : 0),
+                          child: Icon(
+                            item.icon,
+                            color: isPrimary
+                                ? colors.on(colors.accent)
+                                : selected
+                                ? colors.accent
+                                : inactiveColor,
+                            size: isPrimary ? 16 : 17,
                           ),
                         ),
                       ),
-                  ],
+                      if (item.badgeCount > 0)
+                        Positioned(
+                          right: 1,
+                          top: 0,
+                          child: Container(
+                            width: 7,
+                            height: 7,
+                            decoration: BoxDecoration(
+                              color: colors.accent,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 1),
-              Text(
-                item.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: selected ? colors.accent : inactiveColor,
-                  fontSize: 10,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                  letterSpacing: 0.05,
+                const SizedBox(height: 1),
+                Text(
+                  item.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: selected ? colors.accent : inactiveColor,
+                    fontSize: 10,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                    letterSpacing: 0.05,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

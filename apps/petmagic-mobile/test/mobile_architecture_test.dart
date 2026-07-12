@@ -378,7 +378,6 @@ String _relative(File file) => file.path.replaceAll('\\', '/');
 // enter the codebase, while each split removes one entry from this list.
 const _legacyOversizedProductionFiles = <String>{
   'lib/app/notifications/notification_coordinator.dart',
-  'lib/app/theme/app_theme.dart',
   'lib/core/logging/app_logger.dart',
   'lib/core/network/api_base_url_resolver.dart',
   'lib/core/performance/template_media_cache.dart',
@@ -404,7 +403,6 @@ const _legacyOversizedProductionFiles = <String>{
   'lib/features/templates/application/generation_history_controller_sync.part.dart',
   'lib/features/templates/application/templates_controller.dart',
   'lib/features/templates/data/generation_gallery_store_storage.part.dart',
-  'lib/features/templates/data/templates_dto.dart',
   'lib/features/templates/data/template_generation_repository.dart',
   'lib/features/templates/data/template_generation_repository_cache.part.dart',
   'lib/features/templates/presentation/generations_gallery_page.dart',

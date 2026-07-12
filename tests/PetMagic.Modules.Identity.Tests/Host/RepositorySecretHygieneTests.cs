@@ -774,7 +774,6 @@ public sealed class RepositorySecretHygieneTests
             "integration_test",
             "test",
             "tests",
-            "ux-audit-2026-06-13",
         };
 
         if (segments.Any(segment => ignoredDirectories.Contains(segment)))

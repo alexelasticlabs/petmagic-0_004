@@ -75,6 +75,48 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
+  testWidgets('five-tab shell exposes one TalkBack label per destination', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final semantics = tester.ensureSemantics();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          generationHistoryControllerProvider.overrideWith(
+            _IdleGenerationHistoryController.new,
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const PetMagicShell(
+            location: '/templates',
+            child: SizedBox.expand(),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final text = AppLocalizations.of(
+      tester.element(find.byType(PetMagicShell)),
+    );
+    for (final label in [
+      text.navDiscover,
+      text.navCreate,
+      text.navCreations,
+      text.navRewards,
+      text.navProfile,
+    ]) {
+      expect(tester.getSemantics(find.bySemanticsLabel(label)).label, label);
+    }
+    semantics.dispose();
+  });
+
   testWidgets('iOS shell keeps glass backdrop when motion is allowed', (
     tester,
   ) async {

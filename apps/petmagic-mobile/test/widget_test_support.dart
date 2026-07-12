@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -33,8 +35,9 @@ import 'package:visibility_detector/visibility_detector.dart';
 
 void configureWidgetTestHarness() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUpAll(() {
+  setUpAll(() async {
     VisibilityDetectorController.instance.updateInterval = Duration.zero;
+    await _loadMaterialIconsForGoldenTests();
   });
   setUp(() {
     SharedPreferencesAsyncPlatform.instance =
@@ -43,6 +46,30 @@ void configureWidgetTestHarness() {
   tearDown(() {
     PetMagicNotificationCenter.instance.clearQueue();
   });
+}
+
+Future<void> _loadMaterialIconsForGoldenTests() async {
+  var flutterRoot = Platform.environment['FLUTTER_ROOT'];
+  if (flutterRoot == null || flutterRoot.trim().isEmpty) {
+    var directory = File(Platform.resolvedExecutable).parent;
+    for (var index = 0; index < 4; index++) {
+      directory = directory.parent;
+    }
+    flutterRoot = directory.path;
+  }
+
+  final font = File(
+    '$flutterRoot${Platform.pathSeparator}bin${Platform.pathSeparator}cache'
+    '${Platform.pathSeparator}artifacts${Platform.pathSeparator}material_fonts'
+    '${Platform.pathSeparator}MaterialIcons-Regular.otf',
+  );
+  if (!font.existsSync()) {
+    return;
+  }
+  final bytes = await font.readAsBytes();
+  final loader = FontLoader('MaterialIcons')
+    ..addFont(Future.value(ByteData.sublistView(bytes)));
+  await loader.load();
 }
 
 GoRouter testRouter(Widget home) {

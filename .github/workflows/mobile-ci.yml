@@ -77,7 +77,14 @@ jobs:
             --dart-define=APP_ENVIRONMENT=staging \
             --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging \
             --dart-define=API_BASE_URL=https://api.staging.petmagic.app \
+            --build-number="$GITHUB_RUN_NUMBER" \
             --obfuscate --split-debug-info=build/symbols/staging
+      - name: Enforce Android release size budget
+        run: >-
+          dart run tool/check_release_size_budget.dart
+          --artifact build/app/outputs/bundle/stagingRelease/app-staging-release.aab
+          --baseline-bytes 95104021
+          --max-growth-percent 5
       - name: Build Android production release smoke
         env:
           ORG_GRADLE_PROJECT_allowInsecureReleaseSigning: "true"
@@ -90,6 +97,7 @@ jobs:
             --dart-define=APP_ENVIRONMENT=production \
             --dart-define=APP_PACKAGE_NAME=com.petmagic.app \
             --dart-define=API_BASE_URL=https://api.petmagic.app \
+            --build-number="$GITHUB_RUN_NUMBER" \
             --obfuscate --split-debug-info=build/symbols/production
 
   android-device-ui-smoke:
@@ -121,14 +129,11 @@ jobs:
           profile: pixel_7
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot-save
-          script: >-
-            cd apps/petmagic-mobile &&
-            flutter test integration_test/templates_feed_stress_test.dart
-            -d emulator-5554
-            --flavor staging
-            --dart-define=APP_ENVIRONMENT=staging
-            --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging
-            --dart-define=API_BASE_URL=https://api.staging.petmagic.app
+          script: |
+            cd apps/petmagic-mobile
+            flutter test integration_test/templates_feed_stress_test.dart -d emulator-5554 --flavor staging --dart-define=APP_ENVIRONMENT=staging --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging --dart-define=API_BASE_URL=https://api.staging.petmagic.app
+            flutter test integration_test/gallery_cross_flow_test.dart -d emulator-5554 --flavor staging --dart-define=APP_ENVIRONMENT=staging --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging --dart-define=API_BASE_URL=https://api.staging.petmagic.app
+            flutter test integration_test/watermark_result_flow_test.dart -d emulator-5554 --flavor staging --dart-define=APP_ENVIRONMENT=staging --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging --dart-define=API_BASE_URL=https://api.staging.petmagic.app
 
   ios-build:
     runs-on: macos-latest
@@ -151,7 +156,23 @@ jobs:
             --dart-define=APP_ENVIRONMENT=staging \
             --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging \
             --dart-define=API_BASE_URL=https://api.staging.petmagic.app \
+            --build-number="$GITHUB_RUN_NUMBER" \
             --obfuscate --split-debug-info=build/symbols/ios-staging
+      - name: Run deterministic iOS core flow
+        env:
+          PETMAGIC_ALLOW_PLACEHOLDER_FIREBASE: "true"
+        run: |
+          dart run tool/configure_firebase_smoke.dart --environment=staging
+          DEVICE_ID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; data=json.load(sys.stdin); print(next((d["udid"] for runtime in data["devices"].values() for d in runtime if d.get("isAvailable") and "iPhone" in d["name"]), ""))')
+          test -n "$DEVICE_ID"
+          xcrun simctl boot "$DEVICE_ID" || true
+          xcrun simctl bootstatus "$DEVICE_ID" -b
+          flutter test integration_test/gallery_cross_flow_test.dart \
+            -d "$DEVICE_ID" \
+            --flavor staging \
+            --dart-define=APP_ENVIRONMENT=staging \
+            --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging \
+            --dart-define=API_BASE_URL=https://api.staging.petmagic.app
       - name: Build iOS production release smoke
         env:
           PETMAGIC_ALLOW_PLACEHOLDER_FIREBASE: "true"
@@ -161,4 +182,5 @@ jobs:
             --dart-define=APP_ENVIRONMENT=production \
             --dart-define=APP_PACKAGE_NAME=com.petmagic.app \
             --dart-define=API_BASE_URL=https://api.petmagic.app \
+            --build-number="$GITHUB_RUN_NUMBER" \
             --obfuscate --split-debug-info=build/symbols/ios-production

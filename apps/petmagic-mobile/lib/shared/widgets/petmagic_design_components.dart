@@ -125,6 +125,24 @@ class PetMagicHeroCard extends StatelessWidget {
                 ),
               ),
             ),
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      stops: const [0, 0.52, 0.82],
+                      colors: [
+                        colors.surface.withValues(alpha: 0.86),
+                        colors.surface.withValues(alpha: 0.48),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
             Padding(
               padding: const EdgeInsets.all(PetMagicSpacing.xl),
               child: ConstrainedBox(

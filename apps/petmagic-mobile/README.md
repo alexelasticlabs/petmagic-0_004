@@ -80,6 +80,17 @@ lives in `core/navigation`; the GoRouter adapter and feature-aware shell live in
 `app/router` and `app/shell`. Shared widgets and layout helpers never import a
 feature module.
 
+The primary task-first information architecture is `Discover / Create /
+Creations / Rewards / Profile`. `/templates` remains the compatible Discover
+route, while `/create` is the guided entry point that preserves a guest's
+creation intent through authentication. Existing generation, notification and
+deep-link routes remain stable.
+
+The Premium Playful design system lives in `app/theme`: semantic color and
+typography themes are separated from spacing, radius, breakpoint, motion and
+accessibility tokens. Reusable production surfaces live in `shared/widgets`.
+Feature pages consume these tokens instead of defining local visual scales.
+
 Auth session JSON and the secure-storage key are a compatibility contract.
 Repositories depend on `AuthSessionStore`, while `AuthSessionStorage` remains
 the production implementation. Push and deep links navigate via typed
@@ -95,6 +106,9 @@ test also guards concrete `AuthSessionStorage` usage and app-owned push/session
 orchestration. UI quality gates include a `320×568` viewport, 200% system text
 scaling, button semantics, a deterministic compact welcome golden, and a
 1000+ item feed stress test that runs on an Android emulator in CI.
+Create reference screens additionally keep light/dark golden baselines for
+compact, phone and tablet viewports. The golden harness loads the real Material
+Icons font so missing glyphs cannot be accepted as a visual baseline.
 
 ## Release Hardening Checklist
 
@@ -125,6 +139,11 @@ keyPassword=CHANGE_ME
 - Release tasks fail fast if signing is missing. This is expected on machines
   without production signing material and must remain a blocker for store
   artifacts.
+- CI assigns a unique store build number from `GITHUB_RUN_NUMBER` and rejects a
+  staging AAB that grows by more than 5% from the recorded release baseline.
+- `ios/Runner/PrivacyInfo.xcprivacy` is bundled in the Runner target. Before an
+  App Store submission, generate Xcode's privacy report and reconcile it with
+  App Store Connect privacy answers and the current backend/privacy policy.
 - For local packaging/R8/resource experiments only, use the same explicit
   staging contract as CI. Generate placeholder Firebase configuration first;
   it is ignored by Git and must never be used for provider E2E or store rollout:

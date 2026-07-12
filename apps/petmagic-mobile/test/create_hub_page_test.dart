@@ -12,6 +12,38 @@ import 'widget_test_support.dart';
 void main() {
   configureWidgetTestHarness();
 
+  for (final configuration in const [
+    _GoldenConfiguration('compact', Size(320, 568)),
+    _GoldenConfiguration('phone', Size(390, 844)),
+    _GoldenConfiguration('tablet', Size(834, 1194)),
+  ]) {
+    for (final brightness in Brightness.values) {
+      testWidgets(
+        'create hub ${configuration.name} ${brightness.name} visual baseline',
+        (tester) async {
+          tester.view.physicalSize = configuration.size;
+          tester.view.devicePixelRatio = 1;
+          addTearDown(() {
+            tester.view.resetPhysicalSize();
+            tester.view.resetDevicePixelRatio();
+          });
+          await _pumpCreateHub(
+            tester,
+            navigator: _RecordingNavigator(),
+            authenticated: false,
+            brightness: brightness,
+          );
+          await expectLater(
+            find.byType(Scaffold),
+            matchesGoldenFile(
+              'goldens/create_hub_${configuration.name}_${brightness.name}.png',
+            ),
+          );
+        },
+      );
+    }
+  }
+
   testWidgets('create hub preserves guest pet intent through auth', (
     tester,
   ) async {
@@ -83,6 +115,7 @@ Future<void> _pumpCreateHub(
   WidgetTester tester, {
   required _RecordingNavigator navigator,
   required bool authenticated,
+  Brightness brightness = Brightness.light,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -95,6 +128,10 @@ Future<void> _pumpCreateHub(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         theme: AppTheme.light(),
+        darkTheme: AppTheme.dark(),
+        themeMode: brightness == Brightness.dark
+            ? ThemeMode.dark
+            : ThemeMode.light,
         home: AppNavigationScope(
           navigator: navigator,
           child: const Scaffold(body: CreateHubPage()),
@@ -103,6 +140,13 @@ Future<void> _pumpCreateHub(
     ),
   );
   await pumpTestFrames(tester);
+}
+
+class _GoldenConfiguration {
+  const _GoldenConfiguration(this.name, this.size);
+
+  final String name;
+  final Size size;
 }
 
 class _FixedAppLaunchController extends AppLaunchController {
