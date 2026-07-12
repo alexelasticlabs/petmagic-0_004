@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:dio/dio.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -68,7 +68,7 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
   List<XFile> _attachments = const [];
   bool _isSubmitting = false;
   bool _isPickingAttachment = false;
-  CancelToken? _submitCancelToken;
+  RequestCancellation? _submitCancelToken;
   ProviderSubscription<AppLaunchState>? _launchSubscription;
   bool _wasAuthenticated = false;
   bool _hasScheduledSupportContextPreload = false;
@@ -489,7 +489,7 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
       _isSubmitting = true;
     });
 
-    final submitCancelToken = CancelToken();
+    final submitCancelToken = RequestCancellation();
     _submitCancelToken = submitCancelToken;
 
     try {

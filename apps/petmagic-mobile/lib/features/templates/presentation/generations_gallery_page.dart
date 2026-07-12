@@ -2,7 +2,8 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:dio/dio.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
+import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -149,7 +150,7 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
   bool _isMediaActionInFlight = false;
   bool _hasLoadedInitially = false;
   bool? _isTabActive;
-  CancelToken? _activeMediaActionCancelToken;
+  RequestCancellation? _activeMediaActionCancelToken;
   GenerationHistoryController? _visibleHistoryController;
   ProviderSubscription<GenerationHistoryState>? _historySubscription;
   bool _historyScreenVisible = false;
@@ -588,18 +589,18 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
     );
   }
 
-  CancelToken? _startMediaAction() {
+  RequestCancellation? _startMediaAction() {
     if (!mounted || _activeMediaActionCancelToken != null) {
       return null;
     }
 
-    final cancelToken = CancelToken();
+    final cancelToken = RequestCancellation();
     _activeMediaActionCancelToken = cancelToken;
     setState(() => _isMediaActionInFlight = true);
     return cancelToken;
   }
 
-  void _completeMediaAction(CancelToken cancelToken) {
+  void _completeMediaAction(RequestCancellation cancelToken) {
     if (!identical(_activeMediaActionCancelToken, cancelToken)) {
       return;
     }

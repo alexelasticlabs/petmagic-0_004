@@ -1,8 +1,12 @@
 import 'package:petmagic_mobile/app/notifications/firebase_push_token_lifecycle_adapter.dart';
+import 'package:petmagic_mobile/app/platform/flutter_app_runtime_info.dart';
+import 'package:petmagic_mobile/core/platform/app_runtime_info.dart';
 import 'package:petmagic_mobile/features/gamification/data/gamification_repository.dart';
 import 'package:petmagic_mobile/features/pets/application/pet_repository.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_repository.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
+import 'package:petmagic_mobile/features/profile/application/avatar_media_gateway.dart';
+import 'package:petmagic_mobile/features/profile/data/mobile_avatar_media_gateway.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/data/notification_preferences_storage.dart';
 import 'package:petmagic_mobile/features/profile/application/push_token_lifecycle_port.dart';
@@ -15,6 +19,9 @@ import 'package:petmagic_mobile/features/templates/data/generation_gallery_store
 import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
 
 final mobileProviderOverrides = [
+  appRuntimeInfoProvider.overrideWith(
+    (ref) => ref.watch(flutterAppRuntimeInfoProvider),
+  ),
   gamificationRepositoryProvider.overrideWith(
     (ref) => ref.watch(dioGamificationRepositoryProvider),
   ),
@@ -31,6 +38,9 @@ final mobileProviderOverrides = [
   ),
   profileRepositoryProvider.overrideWith(
     (ref) => ref.watch(dioProfileRepositoryProvider),
+  ),
+  avatarMediaGatewayProvider.overrideWith(
+    (ref) => ref.watch(mobileAvatarMediaGatewayProvider),
   ),
   notificationPreferencesStorageProvider.overrideWith(
     (ref) => ref.watch(sharedPreferencesNotificationPreferencesStorageProvider),

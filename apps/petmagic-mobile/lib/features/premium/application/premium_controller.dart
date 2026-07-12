@@ -1,12 +1,10 @@
 import 'dart:async';
 
 // Public premium application state and use-case orchestration.
-import 'dart:io';
-
-import 'package:dio/dio.dart';
-import 'package:flutter/widgets.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
+import 'package:petmagic_mobile/core/platform/app_runtime_info.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:petmagic_mobile/core/payments/store_purchase.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
@@ -32,7 +30,7 @@ final premiumRefreshProfileProvider = Provider<PremiumRefreshProfile>((ref) {
 });
 
 final premiumPurchaseUpdatesProvider =
-    StreamProvider.autoDispose<List<PurchaseDetails>>((ref) {
+    StreamProvider.autoDispose<List<StorePurchaseDetails>>((ref) {
       return ref.watch(premiumRepositoryProvider).purchaseUpdates;
     });
 
@@ -150,7 +148,7 @@ final premiumSubscriptionSummaryProvider =
         disposeTimer = null;
       });
       final repository = ref.watch(premiumRepositoryProvider);
-      final cancelToken = CancelToken();
+      final cancelToken = RequestCancellation();
       ref.onDispose(() {
         disposeTimer?.cancel();
         if (!cancelToken.isCancelled) {
@@ -208,7 +206,7 @@ class PremiumSubscriptionManagementService {
 
   Future<String> createManagementUrl(
     String manageSubscriptionAction, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     switch (manageSubscriptionAction) {
       case 'AppleSettings':
@@ -226,7 +224,7 @@ class PremiumSubscriptionManagementService {
   }
 
   Future<PremiumSubscriptionSummaryView> requestCancelAtPeriodEnd({
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final status = await _repository.cancelSubscription(
       cancelToken: cancelToken,
@@ -472,6 +470,8 @@ abstract class _PremiumControllerBase extends Notifier<PremiumState> {
     return ref.read(premiumRepositoryProvider);
   }
 
+  AppRuntimeInfo get _runtimeInfo => ref.read(appRuntimeInfoProvider);
+
   PremiumRefreshProfile get _refreshProfile {
     final refreshProfile = _activeRefreshProfile;
     if (refreshProfile != null) {
@@ -483,10 +483,10 @@ abstract class _PremiumControllerBase extends Notifier<PremiumState> {
 
   Future<void>? _loadInFlight;
   Future<void>? _checkoutVerificationInFlight;
-  CancelToken? _activeLoadCancelToken;
-  CancelToken? _activeStatusRefreshCancelToken;
-  CancelToken? _activePremiumActionCancelToken;
-  CancelToken? _activeCheckoutVerificationCancelToken;
+  RequestCancellation? _activeLoadRequestCancellation;
+  RequestCancellation? _activeStatusRefreshRequestCancellation;
+  RequestCancellation? _activePremiumActionRequestCancellation;
+  RequestCancellation? _activeCheckoutVerificationRequestCancellation;
   final Set<String> _storePurchaseVerificationInFlightKeys = <String>{};
   final Set<String> _storePurchaseVerifiedKeys = <String>{};
   bool _premiumLifecycleStarted = false;
@@ -513,7 +513,7 @@ abstract class _PremiumControllerBase extends Notifier<PremiumState> {
     String? stripeExternalSubscriptionId,
   });
 
-  Future<void> _handlePurchaseUpdates(List<PurchaseDetails> purchases);
+  Future<void> _handlePurchaseUpdates(List<StorePurchaseDetails> purchases);
 }
 
 class PremiumController extends _PremiumControllerBase

@@ -10,7 +10,7 @@ mixin _PremiumControllerLoading
       return;
     }
 
-    final loadCancelToken = _startLoadCancelToken();
+    final loadRequestCancellation = _startLoadRequestCancellation();
     final isAuthenticated = ref
         .read(appLaunchControllerProvider)
         .isAuthenticated;
@@ -27,15 +27,15 @@ mixin _PremiumControllerLoading
       try {
         final results = await Future.wait<Object>([
           _repository.fetchPaywallConfig(
-            locale: WidgetsBinding.instance.platformDispatcher.locale,
-            cancelToken: loadCancelToken,
+            locale: _runtimeInfo.locale,
+            cancelToken: loadRequestCancellation,
           ),
           if (isAuthenticated)
-            _repository.fetchStatus(cancelToken: loadCancelToken)
+            _repository.fetchStatus(cancelToken: loadRequestCancellation)
           else
             Future<PremiumStatusModel>.value(_guestPremiumStatus),
         ]);
-        if (!ref.mounted || loadCancelToken.isCancelled) {
+        if (!ref.mounted || loadRequestCancellation.isCancelled) {
           return;
         }
 
@@ -51,7 +51,7 @@ mixin _PremiumControllerLoading
           plans,
           configuredProviders,
         );
-        if (!ref.mounted || loadCancelToken.isCancelled) {
+        if (!ref.mounted || loadRequestCancellation.isCancelled) {
           return;
         }
 
@@ -88,16 +88,6 @@ mixin _PremiumControllerLoading
         );
       } on RequestCancelledException {
         return;
-      } on DioException catch (error) {
-        if (CancelToken.isCancel(error)) {
-          return;
-        }
-        _updateStateIfMounted(
-          (state) => state.copyWith(
-            isLoading: false,
-            errorMessage: _premiumErrorMessage(error, 'premium.plans_failed'),
-          ),
-        );
       } catch (error) {
         _updateStateIfMounted(
           (state) => state.copyWith(
@@ -106,7 +96,7 @@ mixin _PremiumControllerLoading
           ),
         );
       } finally {
-        _clearActiveLoad(loadCancelToken);
+        _clearActiveLoad(loadRequestCancellation);
       }
     }();
 

@@ -99,14 +99,14 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
     }
   }
 
-  CancelToken _startLoadRequest() {
+  RequestCancellation _startLoadRequest() {
     _cancelActiveLoad();
-    final cancelToken = CancelToken();
+    final cancelToken = RequestCancellation();
     _activeLoadCancelToken = cancelToken;
     return cancelToken;
   }
 
-  void _completeLoadRequest(CancelToken cancelToken) {
+  void _completeLoadRequest(RequestCancellation cancelToken) {
     if (identical(_activeLoadCancelToken, cancelToken)) {
       _activeLoadCancelToken = null;
     }
@@ -120,17 +120,17 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
     _activeLoadCancelToken = null;
   }
 
-  CancelToken? _startGenerationCancelRequest() {
+  RequestCancellation? _startGenerationCancelRequest() {
     if (_activeGenerationCancelToken != null) {
       return null;
     }
 
-    final cancelToken = CancelToken();
+    final cancelToken = RequestCancellation();
     _activeGenerationCancelToken = cancelToken;
     return cancelToken;
   }
 
-  void _completeGenerationCancelRequest(CancelToken cancelToken) {
+  void _completeGenerationCancelRequest(RequestCancellation cancelToken) {
     if (identical(_activeGenerationCancelToken, cancelToken)) {
       _activeGenerationCancelToken = null;
     }
@@ -198,13 +198,8 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
       final generation = _reuseCurrentLocalMedia(fetchedGeneration);
       _consecutivePollFailures = 0;
       _applyGenerationSnapshot(generation);
-    } on DioException catch (error) {
-      if (CancelToken.isCancel(error)) {
-        return;
-      }
-
-      _consecutivePollFailures++;
-      await _showCachedOrMappedLoadError(repository, error);
+    } on RequestCancelledException {
+      return;
     } catch (error) {
       _consecutivePollFailures++;
       await _showCachedOrMappedLoadError(repository, error);
@@ -575,30 +570,8 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
         message: text.generationStatusCancelQueuedSuccess,
         tone: PetMagicToastTone.success,
       );
-    } on DioException catch (error) {
-      if (CancelToken.isCancel(error) || cancelToken.isCancelled) {
-        return;
-      }
-
-      if (!mounted) {
-        return;
-      }
-
-      _setPageState(() {
-        _isCancellingGeneration = false;
-      });
-
-      if (_isGenerationAlreadyStartedCancelError(error)) {
-        _showGenerationAlreadyStartedMessage();
-        unawaited(_load(silent: true));
-        return;
-      }
-
-      PetMagicToast.show(
-        context,
-        message: text.generationStatusCancelQueuedFailed,
-        tone: PetMagicToastTone.warning,
-      );
+    } on RequestCancelledException {
+      return;
     } catch (error) {
       if (!mounted) {
         return;

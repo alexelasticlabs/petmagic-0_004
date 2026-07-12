@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:dio/dio.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
@@ -21,7 +21,7 @@ final currentLegalDocumentsProvider =
         throw const AppException('templates.network_unavailable');
       }
 
-      final cancelToken = CancelToken();
+      final cancelToken = RequestCancellation();
       ref.onDispose(() {
         if (!cancelToken.isCancelled) {
           cancelToken.cancel('profile_legal_documents_cancelled');
@@ -53,7 +53,7 @@ final linkedAccountsProvider =
         disposeTimer?.cancel();
         disposeTimer = null;
       });
-      final cancelToken = CancelToken();
+      final cancelToken = RequestCancellation();
       ref.onDispose(() {
         disposeTimer?.cancel();
         if (!cancelToken.isCancelled) {
@@ -76,63 +76,65 @@ abstract interface class ProfileRepositoryPort {
     required String privacyPolicyVersion,
     required bool marketingEmailsEnabled,
     String? displayName,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<AuthSession> login({
     required String email,
     required String password,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<void> requestPasswordReset({
     required String email,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<void> confirmPasswordReset({
     required String email,
     required String code,
     required String newPassword,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
-  Future<void> requestCurrentPasswordChangeCode({CancelToken? cancelToken});
+  Future<void> requestCurrentPasswordChangeCode({
+    RequestCancellation? cancelToken,
+  });
   Future<void> confirmCurrentPasswordChange({
     required String code,
     required String newPassword,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<void> resendEmailVerificationCode({
     required String email,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<AuthSession> verifyEmailCode({
     required String email,
     required String code,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<void> logout();
-  Future<void> deleteCurrentAccount({CancelToken? cancelToken});
-  Future<MobileUserProfile> fetchProfile({CancelToken? cancelToken});
+  Future<void> deleteCurrentAccount({RequestCancellation? cancelToken});
+  Future<MobileUserProfile> fetchProfile({RequestCancellation? cancelToken});
   Future<MobileUserProfile> updateProfile({
     required String? displayName,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<List<MobileLinkedAccount>> fetchLinkedAccounts({
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<MobileLegalDocuments> fetchCurrentLegalDocuments({
     required String locale,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<MobileUserProfile> acceptCurrentLegalDocuments({
     required MobileLegalDocuments documents,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<MobileUserProfile> uploadAvatar(
     String filePath, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
-  Future<MobileUserProfile> removeAvatar({CancelToken? cancelToken});
+  Future<MobileUserProfile> removeAvatar({RequestCancellation? cancelToken});
   Future<List<MobileLinkedAccount>> unlinkLinkedAccount(
     String provider, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
 }

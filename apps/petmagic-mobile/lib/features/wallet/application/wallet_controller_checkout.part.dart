@@ -32,7 +32,7 @@ mixin _WalletControllerCheckout
       ),
     );
 
-    final checkoutCancelToken = _startCheckoutCancelToken();
+    final checkoutRequestCancellation = _startCheckoutRequestCancellation();
     try {
       if (paymentMethod.isStoreNative) {
         final expectedProductId = pack.productIdForProvider(
@@ -88,10 +88,10 @@ mixin _WalletControllerCheckout
       final checkout = await _repository.createPurchase(
         pack,
         paymentMethod,
-        WidgetsBinding.instance.platformDispatcher.locale,
-        cancelToken: checkoutCancelToken,
+        _runtimeInfo.locale,
+        cancelToken: checkoutRequestCancellation,
       );
-      if (!ref.mounted || checkoutCancelToken.isCancelled) {
+      if (!ref.mounted || checkoutRequestCancellation.isCancelled) {
         return null;
       }
 
@@ -194,33 +194,6 @@ mixin _WalletControllerCheckout
     } on RequestCancelledException {
       _updateStateIfMounted((state) => state.copyWith(isBuying: false));
       return null;
-    } on DioException catch (error) {
-      if (CancelToken.isCancel(error) || checkoutCancelToken.isCancelled) {
-        _updateStateIfMounted((state) => state.copyWith(isBuying: false));
-        return null;
-      }
-
-      if (durableStorePendingOrderId != null) {
-        await _repository.clearPendingStorePurchase(
-          orderId: durableStorePendingOrderId,
-        );
-      }
-      AppLogger.error(
-        feature: 'Wallet.Checkout',
-        operation: 'checkout_failed',
-        message: 'Checkout failed',
-        context: {'pack_code': pack.code, 'provider': paymentMethod.provider},
-        error: error,
-      );
-      _updateStateIfMounted(
-        (state) => state.copyWith(
-          isBuying: false,
-          clearPendingCheckout: true,
-          clearPendingStoreProvider: true,
-          errorMessage: _errorMessage(error),
-        ),
-      );
-      return null;
     } catch (error) {
       if (durableStorePendingOrderId != null) {
         await _repository.clearPendingStorePurchase(
@@ -244,7 +217,7 @@ mixin _WalletControllerCheckout
       );
       return null;
     } finally {
-      _clearActiveCheckout(checkoutCancelToken);
+      _clearActiveCheckout(checkoutRequestCancellation);
     }
   }
 
@@ -393,20 +366,21 @@ mixin _WalletControllerCheckout
       ),
     );
 
-    final verificationCancelToken = _startCheckoutVerificationCancelToken();
+    final verificationRequestCancellation =
+        _startCheckoutVerificationRequestCancellation();
     const maxAttempts = 6;
     try {
       for (var attempt = 0; attempt < maxAttempts; attempt++) {
-        if (!ref.mounted || verificationCancelToken.isCancelled) {
+        if (!ref.mounted || verificationRequestCancellation.isCancelled) {
           return;
         }
 
         try {
           final purchase = await _repository.fetchPurchase(
             pendingOrderId,
-            cancelToken: verificationCancelToken,
+            cancelToken: verificationRequestCancellation,
           );
-          if (!ref.mounted || verificationCancelToken.isCancelled) {
+          if (!ref.mounted || verificationRequestCancellation.isCancelled) {
             return;
           }
           if (purchase.status == 'succeeded') {
@@ -426,19 +400,6 @@ mixin _WalletControllerCheckout
           }
         } on RequestCancelledException {
           return;
-        } on DioException catch (error) {
-          if (CancelToken.isCancel(error) ||
-              verificationCancelToken.isCancelled) {
-            return;
-          }
-
-          _updateStateIfMounted(
-            (state) => state.copyWith(
-              checkoutVerificationState: WalletCheckoutVerificationState.error,
-              checkoutErrorMessage: _errorMessage(error),
-            ),
-          );
-          return;
         } catch (error) {
           _updateStateIfMounted(
             (state) => state.copyWith(
@@ -451,13 +412,13 @@ mixin _WalletControllerCheckout
 
         if (attempt < maxAttempts - 1) {
           await Future<void>.delayed(const Duration(seconds: 1));
-          if (!ref.mounted || verificationCancelToken.isCancelled) {
+          if (!ref.mounted || verificationRequestCancellation.isCancelled) {
             return;
           }
         }
       }
     } finally {
-      _clearActiveCheckoutVerification(verificationCancelToken);
+      _clearActiveCheckoutVerification(verificationRequestCancellation);
     }
 
     _updateStateIfMounted(
@@ -504,7 +465,8 @@ mixin _WalletControllerCheckout
       ),
     );
 
-    final verificationCancelToken = _startCheckoutVerificationCancelToken();
+    final verificationRequestCancellation =
+        _startCheckoutVerificationRequestCancellation();
     const maxAttempts = 5;
     final normalizedReference = _normalizeStripeCheckoutReferenceId(
       stripeReferenceId,
@@ -512,7 +474,7 @@ mixin _WalletControllerCheckout
 
     try {
       for (var attempt = 0; attempt < maxAttempts; attempt++) {
-        if (!ref.mounted || verificationCancelToken.isCancelled) {
+        if (!ref.mounted || verificationRequestCancellation.isCancelled) {
           return;
         }
 
@@ -520,9 +482,9 @@ mixin _WalletControllerCheckout
           final purchase = await _repository.verifyStripeCheckoutSession(
             orderId: pendingOrderId,
             stripeReferenceId: normalizedReference,
-            cancelToken: verificationCancelToken,
+            cancelToken: verificationRequestCancellation,
           );
-          if (!ref.mounted || verificationCancelToken.isCancelled) {
+          if (!ref.mounted || verificationRequestCancellation.isCancelled) {
             return;
           }
 
@@ -543,23 +505,6 @@ mixin _WalletControllerCheckout
           }
         } on RequestCancelledException {
           return;
-        } on DioException catch (error) {
-          if (CancelToken.isCancel(error) ||
-              verificationCancelToken.isCancelled) {
-            return;
-          }
-
-          AppLogger.warn(
-            feature: 'Wallet.Checkout',
-            operation: 'stripe_verify_attempt_failed',
-            message: 'Stripe verify attempt failed',
-            context: {
-              'order_id': pendingOrderId,
-              'attempt': attempt + 1,
-              'reference_type': _stripeReferenceType(normalizedReference),
-            },
-            error: error,
-          );
         } catch (error) {
           AppLogger.warn(
             feature: 'Wallet.Checkout',
@@ -577,9 +522,9 @@ mixin _WalletControllerCheckout
         try {
           final purchase = await _repository.fetchPurchase(
             pendingOrderId,
-            cancelToken: verificationCancelToken,
+            cancelToken: verificationRequestCancellation,
           );
-          if (!ref.mounted || verificationCancelToken.isCancelled) {
+          if (!ref.mounted || verificationRequestCancellation.isCancelled) {
             return;
           }
           if (purchase.status == 'succeeded') {
@@ -599,18 +544,6 @@ mixin _WalletControllerCheckout
           }
         } on RequestCancelledException {
           return;
-        } on DioException catch (error, stackTrace) {
-          if (CancelToken.isCancel(error) ||
-              verificationCancelToken.isCancelled) {
-            return;
-          }
-
-          _logWalletLoadFailure(
-            'fetch_purchase_for_verification',
-            error,
-            stackTrace,
-          );
-          // Keep retrying verify endpoint; failures here should not interrupt confirmation loop.
         } catch (error, stackTrace) {
           _logWalletLoadFailure(
             'fetch_purchase_for_verification',
@@ -622,13 +555,13 @@ mixin _WalletControllerCheckout
 
         if (attempt < maxAttempts - 1) {
           await Future<void>.delayed(const Duration(seconds: 1));
-          if (!ref.mounted || verificationCancelToken.isCancelled) {
+          if (!ref.mounted || verificationRequestCancellation.isCancelled) {
             return;
           }
         }
       }
     } finally {
-      _clearActiveCheckoutVerification(verificationCancelToken);
+      _clearActiveCheckoutVerification(verificationRequestCancellation);
     }
 
     await _performCheckoutStatusVerification();
@@ -647,23 +580,25 @@ mixin _WalletControllerCheckout
   }
 
   @override
-  Future<void> _handlePurchaseUpdates(List<PurchaseDetails> purchases) async {
+  Future<void> _handlePurchaseUpdates(
+    List<StorePurchaseDetails> purchases,
+  ) async {
     for (final purchase in purchases) {
       if (!ref.mounted) {
         return;
       }
 
       switch (purchase.status) {
-        case PurchaseStatus.pending:
+        case StorePurchaseStatus.pending:
           _updateStateIfMounted(
             (state) => state.copyWith(isBuying: true, clearError: true),
           );
           break;
-        case PurchaseStatus.purchased:
-        case PurchaseStatus.restored:
+        case StorePurchaseStatus.purchased:
+        case StorePurchaseStatus.restored:
           await _verifyStorePurchase(purchase);
           break;
-        case PurchaseStatus.error:
+        case StorePurchaseStatus.error:
           if (purchase.pendingCompletePurchase) {
             await _repository.completePurchase(purchase);
             if (!ref.mounted) {
@@ -681,7 +616,7 @@ mixin _WalletControllerCheckout
             ),
           );
           break;
-        case PurchaseStatus.canceled:
+        case StorePurchaseStatus.canceled:
           if (purchase.pendingCompletePurchase) {
             await _repository.completePurchase(purchase);
             if (!ref.mounted) {
@@ -699,7 +634,7 @@ mixin _WalletControllerCheckout
     }
   }
 
-  Future<void> _verifyStorePurchase(PurchaseDetails purchase) async {
+  Future<void> _verifyStorePurchase(StorePurchaseDetails purchase) async {
     final durablePending = await _repository.readPendingStorePurchase();
     if (!ref.mounted) {
       return;
@@ -944,7 +879,7 @@ mixin _WalletControllerCheckout
   }
 
   String? _pendingOrderIdForStorePurchase(
-    PurchaseDetails purchase,
+    StorePurchaseDetails purchase,
     PendingStoreWalletPurchase? durablePending,
   ) {
     final stateOrderId = state.pendingCheckoutOrderId?.trim();
@@ -966,7 +901,7 @@ mixin _WalletControllerCheckout
   }
 
   String? _providerForStorePurchase(
-    PurchaseDetails purchase,
+    StorePurchaseDetails purchase,
     PendingStoreWalletPurchase? durablePending,
   ) {
     if (durablePending != null) {
@@ -1023,7 +958,7 @@ mixin _WalletControllerCheckout
   String? _storePurchaseVerificationKey({
     required String orderId,
     required String provider,
-    required PurchaseDetails purchase,
+    required StorePurchaseDetails purchase,
   }) {
     final purchaseId = purchase.purchaseID?.trim();
     if (purchaseId != null && purchaseId.isNotEmpty) {

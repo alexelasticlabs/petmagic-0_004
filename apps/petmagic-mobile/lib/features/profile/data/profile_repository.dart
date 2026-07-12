@@ -8,6 +8,8 @@ export 'package:petmagic_mobile/features/profile/application/profile_repository.
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:petmagic_mobile/core/network/dio_request_cancellation.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
@@ -68,7 +70,7 @@ class ProfileRepository implements ProfileRepositoryPort {
     required String privacyPolicyVersion,
     required bool marketingEmailsEnabled,
     String? displayName,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     try {
       await _dio.post<Map<String, dynamic>>(
@@ -86,7 +88,7 @@ class ProfileRepository implements ProfileRepositoryPort {
               : displayName!.trim(),
         },
         options: anonymousRequestOptions(),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       );
 
       return;
@@ -102,13 +104,13 @@ class ProfileRepository implements ProfileRepositoryPort {
   Future<AuthSession> login({
     required String email,
     required String password,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         '/api/auth/login',
         data: {'email': email.trim(), 'password': password},
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       );
 
       final session = AuthSession.fromJson(response.data ?? const {});
@@ -122,13 +124,13 @@ class ProfileRepository implements ProfileRepositoryPort {
   @override
   Future<void> requestPasswordReset({
     required String email,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     try {
       await _dio.post<void>(
         '/api/auth/password-reset/request',
         data: {'email': email.trim()},
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       );
     } on DioException catch (error) {
       throw _mapDioException(
@@ -143,7 +145,7 @@ class ProfileRepository implements ProfileRepositoryPort {
     required String email,
     required String code,
     required String newPassword,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     try {
       await _dio.post<void>(
@@ -153,7 +155,7 @@ class ProfileRepository implements ProfileRepositoryPort {
           'code': code.trim(),
           'newPassword': newPassword,
         },
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       );
     } on DioException catch (error) {
       throw _mapDioException(
@@ -165,14 +167,14 @@ class ProfileRepository implements ProfileRepositoryPort {
 
   @override
   Future<void> requestCurrentPasswordChangeCode({
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     try {
       await _authorizedRequest<void>(
         (session) => _dio.post<void>(
           '/api/auth/me/password-change/request',
           options: authenticatedRequestOptions(session.accessToken),
-          cancelToken: cancelToken,
+          cancelToken: cancelToken.toDioCancelToken(),
         ),
         retryTransientFailures: false,
       );
@@ -188,7 +190,7 @@ class ProfileRepository implements ProfileRepositoryPort {
   Future<void> confirmCurrentPasswordChange({
     required String code,
     required String newPassword,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     try {
       await _authorizedRequest<void>(
@@ -200,7 +202,7 @@ class ProfileRepository implements ProfileRepositoryPort {
             'refreshToken': session.refreshToken,
           },
           options: authenticatedRequestOptions(session.accessToken),
-          cancelToken: cancelToken,
+          cancelToken: cancelToken.toDioCancelToken(),
         ),
         retryTransientFailures: false,
       );
@@ -215,13 +217,13 @@ class ProfileRepository implements ProfileRepositoryPort {
   @override
   Future<void> resendEmailVerificationCode({
     required String email,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     try {
       await _dio.post<void>(
         '/api/auth/resend-email-verification-code',
         data: {'email': email.trim()},
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       );
     } on DioException catch (error) {
       throw _mapDioException(
@@ -235,13 +237,13 @@ class ProfileRepository implements ProfileRepositoryPort {
   Future<AuthSession> verifyEmailCode({
     required String email,
     required String code,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         '/api/auth/verify-email-code',
         data: {'email': email.trim(), 'code': code.trim()},
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       );
       final session = AuthSession.fromJson(response.data ?? const {});
       await _sessionStorage.save(session);
@@ -283,13 +285,13 @@ class ProfileRepository implements ProfileRepositoryPort {
   }
 
   @override
-  Future<void> deleteCurrentAccount({CancelToken? cancelToken}) async {
+  Future<void> deleteCurrentAccount({RequestCancellation? cancelToken}) async {
     try {
       await _authorizedRequest<void>(
         (session) => _dio.delete<void>(
           '/api/auth/me',
           options: authenticatedRequestOptions(session.accessToken),
-          cancelToken: cancelToken,
+          cancelToken: cancelToken.toDioCancelToken(),
         ),
         retryTransientFailures: false,
       );
@@ -301,12 +303,14 @@ class ProfileRepository implements ProfileRepositoryPort {
   }
 
   @override
-  Future<MobileUserProfile> fetchProfile({CancelToken? cancelToken}) async {
+  Future<MobileUserProfile> fetchProfile({
+    RequestCancellation? cancelToken,
+  }) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.get<Map<String, dynamic>>(
         '/api/auth/me',
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
     );
 
@@ -318,7 +322,7 @@ class ProfileRepository implements ProfileRepositoryPort {
   @override
   Future<MobileUserProfile> updateProfile({
     required String? displayName,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     try {
       final response = await _authorizedRequest<Map<String, dynamic>>(
@@ -330,7 +334,7 @@ class ProfileRepository implements ProfileRepositoryPort {
                 : displayName!.trim(),
           },
           options: authenticatedRequestOptions(session.accessToken),
-          cancelToken: cancelToken,
+          cancelToken: cancelToken.toDioCancelToken(),
         ),
         retryTransientFailures: false,
       );
@@ -345,13 +349,13 @@ class ProfileRepository implements ProfileRepositoryPort {
 
   @override
   Future<List<MobileLinkedAccount>> fetchLinkedAccounts({
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final response = await _authorizedRequest<List<dynamic>>(
       (session) => _dio.get<List<dynamic>>(
         '/api/auth/me/linked-accounts',
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
     );
 
@@ -364,13 +368,13 @@ class ProfileRepository implements ProfileRepositoryPort {
   @override
   Future<MobileLegalDocuments> fetchCurrentLegalDocuments({
     required String locale,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         '/api/legal/current',
         queryParameters: {'locale': locale},
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       );
 
       return mapMobileLegalDocumentsDto(response.data ?? const {});
@@ -385,7 +389,7 @@ class ProfileRepository implements ProfileRepositoryPort {
   @override
   Future<MobileUserProfile> acceptCurrentLegalDocuments({
     required MobileLegalDocuments documents,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
@@ -395,7 +399,7 @@ class ProfileRepository implements ProfileRepositoryPort {
           'privacyPolicyVersion': documents.privacyPolicy.version,
         },
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
       retryTransientFailures: false,
     );
@@ -408,7 +412,7 @@ class ProfileRepository implements ProfileRepositoryPort {
   @override
   Future<MobileUserProfile> uploadAvatar(
     String filePath, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final fileName = filePath.split(Platform.pathSeparator).last;
     final mediaType = _resolveMediaType(fileName);
@@ -437,7 +441,7 @@ class ProfileRepository implements ProfileRepositoryPort {
               contentType: uploadMediaType,
             ),
           }),
-          cancelToken: cancelToken,
+          cancelToken: cancelToken.toDioCancelToken(),
           options: authenticatedMultipartRequestOptions(session.accessToken),
         ),
         retryTransientFailures: false,
@@ -452,12 +456,14 @@ class ProfileRepository implements ProfileRepositoryPort {
   }
 
   @override
-  Future<MobileUserProfile> removeAvatar({CancelToken? cancelToken}) async {
+  Future<MobileUserProfile> removeAvatar({
+    RequestCancellation? cancelToken,
+  }) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.delete<Map<String, dynamic>>(
         '/api/auth/me/avatar',
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
       retryTransientFailures: false,
     );
@@ -470,13 +476,13 @@ class ProfileRepository implements ProfileRepositoryPort {
   @override
   Future<List<MobileLinkedAccount>> unlinkLinkedAccount(
     String provider, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final response = await _authorizedRequest<List<dynamic>>(
       (session) => _dio.delete<List<dynamic>>(
         '/api/auth/me/linked-accounts/${Uri.encodeComponent(provider)}',
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
       retryTransientFailures: false,
     );

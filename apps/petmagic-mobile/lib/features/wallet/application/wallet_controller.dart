@@ -2,10 +2,10 @@ import 'dart:async';
 
 // Public wallet application state and use-case orchestration.
 
-import 'package:dio/dio.dart';
-import 'package:flutter/widgets.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
+import 'package:petmagic_mobile/core/platform/app_runtime_info.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:petmagic_mobile/core/payments/store_purchase.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/lifecycle/app_lifecycle_signal.dart';
@@ -203,21 +203,22 @@ abstract class _WalletControllerBase extends Notifier<WalletState> {
   static const int _maxStorePurchaseVerificationKeys = 32;
 
   WalletRepositoryPort get _repository => ref.read(walletRepositoryProvider);
+  AppRuntimeInfo get _runtimeInfo => ref.read(appRuntimeInfoProvider);
   Future<void>? _loadInFlight;
   Future<void>? _checkoutVerificationInFlight;
   Future<void>? _storePurchaseRecoveryInFlight;
-  CancelToken? _activeLoadCancelToken;
-  CancelToken? _activeWalletSyncCancelToken;
-  CancelToken? _activeLedgerLoadMoreCancelToken;
-  CancelToken? _activeCheckoutCancelToken;
-  CancelToken? _activeCheckoutVerificationCancelToken;
+  RequestCancellation? _activeLoadRequestCancellation;
+  RequestCancellation? _activeWalletSyncRequestCancellation;
+  RequestCancellation? _activeLedgerLoadMoreRequestCancellation;
+  RequestCancellation? _activeCheckoutRequestCancellation;
+  RequestCancellation? _activeCheckoutVerificationRequestCancellation;
   final Set<String> _storePurchaseVerificationInFlightKeys = <String>{};
   final Set<String> _storePurchaseVerifiedKeys = <String>{};
   bool _isWalletSyncInFlight = false;
   bool _walletLifecycleStarted = false;
   bool _isWalletPageVisible = false;
   bool _storePurchaseRestoreRequestedThisSession = false;
-  VoidCallback? _appLifecycleListener;
+  void Function()? _appLifecycleListener;
 
   bool _hasAuthenticatedWalletSession() {
     return ref.read(appLaunchControllerProvider).isAuthenticated;
@@ -258,7 +259,7 @@ abstract class _WalletControllerBase extends Notifier<WalletState> {
     required bool requestStoreRestore,
   });
 
-  Future<void> _handlePurchaseUpdates(List<PurchaseDetails> purchases);
+  Future<void> _handlePurchaseUpdates(List<StorePurchaseDetails> purchases);
 }
 
 class WalletController extends _WalletControllerBase

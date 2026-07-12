@@ -4,9 +4,12 @@ export 'package:petmagic_mobile/features/wallet/application/wallet_repository.da
 import 'dart:io';
 
 import 'package:dio/dio.dart';
-import 'package:flutter/widgets.dart';
+import 'package:petmagic_mobile/core/network/dio_request_cancellation.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
+import 'package:petmagic_mobile/core/platform/app_runtime_info.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:petmagic_mobile/core/payments/store_purchase.dart';
 import 'package:in_app_purchase_android/billing_client_wrappers.dart';
 import 'package:in_app_purchase_android/in_app_purchase_android.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
@@ -22,6 +25,7 @@ import 'package:petmagic_mobile/features/wallet/data/wallet_dto_mapper.dart';
 import 'package:petmagic_mobile/features/wallet/application/wallet_repository.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_store_purchase_recovery_store.dart';
 import 'package:petmagic_mobile/shared/payments/store_product_availability_cache.dart';
+import 'package:petmagic_mobile/shared/payments/store_purchase_adapter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 final dioWalletRepositoryProvider = Provider<WalletRepositoryPort>((ref) {
@@ -64,16 +68,21 @@ class WalletRepository implements WalletRepositoryPort {
       _inAppPurchaseOverride ?? InAppPurchase.instance;
 
   @override
-  Stream<List<PurchaseDetails>> get purchaseUpdates =>
-      _inAppPurchase.purchaseStream;
+  Stream<List<StorePurchaseDetails>> get purchaseUpdates =>
+      _inAppPurchase.purchaseStream.map(
+        (purchases) =>
+            purchases.map(mapPlatformStorePurchase).toList(growable: false),
+      );
 
   @override
-  Future<WalletStateModel> fetchWallet({CancelToken? cancelToken}) async {
+  Future<WalletStateModel> fetchWallet({
+    RequestCancellation? cancelToken,
+  }) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.get<Map<String, dynamic>>(
         '/api/economy/wallet',
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
     );
 
@@ -84,7 +93,7 @@ class WalletRepository implements WalletRepositoryPort {
   Future<OffsetPagedModel<WalletLedgerItem>> fetchLedger({
     int skip = 0,
     int take = 20,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final pagination = _walletOffsetPaginationQuery(skip: skip, take: take);
     final response = await _authorizedRequest<Map<String, dynamic>>(
@@ -92,7 +101,7 @@ class WalletRepository implements WalletRepositoryPort {
         '/api/economy/wallet/ledger',
         queryParameters: pagination,
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
     );
 
@@ -103,12 +112,14 @@ class WalletRepository implements WalletRepositoryPort {
   }
 
   @override
-  Future<RewardsSummaryModel> fetchRewards({CancelToken? cancelToken}) async {
+  Future<RewardsSummaryModel> fetchRewards({
+    RequestCancellation? cancelToken,
+  }) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.get<Map<String, dynamic>>(
         '/api/economy/rewards',
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
     );
 
@@ -130,8 +141,8 @@ class WalletRepository implements WalletRepositoryPort {
 
   @override
   Future<WalletCheckoutConfigModel> fetchCheckoutConfig({
-    required Locale locale,
-    CancelToken? cancelToken,
+    required AppLocale locale,
+    RequestCancellation? cancelToken,
   }) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
@@ -140,9 +151,9 @@ class WalletRepository implements WalletRepositoryPort {
           'platform': _platformValue(),
           'appVersion': AppConfig.appVersion,
           'country': locale.countryCode ?? '*',
-          'locale': locale.toLanguageTag(),
+          'locale': locale.languageTag,
         },
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       );
 
       return mapWalletCheckoutConfigFromJson(response.data ?? const {});
@@ -158,7 +169,7 @@ class WalletRepository implements WalletRepositoryPort {
   Future<OffsetPagedModel<PurchaseHistoryItem>> fetchPurchases({
     int skip = 0,
     int take = 20,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final pagination = _walletOffsetPaginationQuery(skip: skip, take: take);
     final response = await _authorizedRequest<Map<String, dynamic>>(
@@ -166,7 +177,7 @@ class WalletRepository implements WalletRepositoryPort {
         '/api/economy/purchases',
         queryParameters: pagination,
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
     );
 
@@ -179,14 +190,14 @@ class WalletRepository implements WalletRepositoryPort {
   @override
   Future<PurchaseHistoryItem> fetchPurchase(
     String orderId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final encodedOrderId = _walletPathSegment(orderId);
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.get<Map<String, dynamic>>(
         '/api/economy/purchases/$encodedOrderId',
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
     );
 
@@ -197,8 +208,8 @@ class WalletRepository implements WalletRepositoryPort {
   Future<PurchaseCheckoutModel> createPurchase(
     CurrencyPackModel pack,
     WalletPaymentMethodModel paymentMethod,
-    Locale locale, {
-    CancelToken? cancelToken,
+    AppLocale locale, {
+    RequestCancellation? cancelToken,
   }) async {
     final platform = _platformValue();
     final payload = <String, Object?>{
@@ -208,7 +219,7 @@ class WalletRepository implements WalletRepositoryPort {
       'platform': platform,
       'appVersion': AppConfig.appVersion,
       'country': locale.countryCode ?? '*',
-      'locale': locale.toLanguageTag(),
+      'locale': locale.languageTag,
     };
 
     final response = await _authorizedRequest<Map<String, dynamic>>(
@@ -219,7 +230,7 @@ class WalletRepository implements WalletRepositoryPort {
           session.accessToken,
           extraHeaders: {'X-PetMagic-Platform': platform},
         ),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
       retryTransientFailures: false,
     );
@@ -345,7 +356,7 @@ class WalletRepository implements WalletRepositoryPort {
   Future<PurchaseHistoryItem> verifyStorePurchase({
     required String orderId,
     required WalletPaymentMethodModel paymentMethod,
-    required PurchaseDetails purchase,
+    required StorePurchaseDetails purchase,
   }) async {
     final encodedOrderId = _walletPathSegment(orderId);
     final response = await _authorizedRequest<Map<String, dynamic>>(
@@ -372,7 +383,7 @@ class WalletRepository implements WalletRepositoryPort {
   @override
   Future<StoreBillingValidationModel> validateStorePurchase({
     required String provider,
-    required PurchaseDetails purchase,
+    required StorePurchaseDetails purchase,
   }) async {
     final normalizedProvider = provider.trim().toLowerCase();
     final serverVerificationData = purchase
@@ -438,20 +449,23 @@ class WalletRepository implements WalletRepositoryPort {
   }
 
   @override
-  Future<void> completePurchase(PurchaseDetails purchase) {
-    return _inAppPurchase.completePurchase(purchase);
+  Future<void> completePurchase(StorePurchaseDetails purchase) {
+    return _inAppPurchase.completePurchase(
+      requirePlatformStorePurchase(purchase),
+    );
   }
 
   @override
-  Future<void> consumeVerifiedPurchase(PurchaseDetails purchase) async {
+  Future<void> consumeVerifiedPurchase(StorePurchaseDetails purchase) async {
+    final platformPurchase = requirePlatformStorePurchase(purchase);
     if (!Platform.isAndroid) {
-      await _inAppPurchase.completePurchase(purchase);
+      await _inAppPurchase.completePurchase(platformPurchase);
       return;
     }
 
     final addition = _inAppPurchase
         .getPlatformAddition<InAppPurchaseAndroidPlatformAddition>();
-    final result = await addition.consumePurchase(purchase);
+    final result = await addition.consumePurchase(platformPurchase);
     if (result.responseCode != BillingResponse.ok) {
       throw const AppException('wallet.payment_unavailable');
     }
@@ -502,7 +516,7 @@ class WalletRepository implements WalletRepositoryPort {
   Future<PurchaseHistoryItem> verifyStripeCheckoutSession({
     required String orderId,
     String? stripeReferenceId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final normalizedReference = stripeReferenceId?.trim();
     final payload = <String, Object?>{};
@@ -516,7 +530,7 @@ class WalletRepository implements WalletRepositoryPort {
         '/api/economy/purchases/$encodedOrderId/verify-stripe',
         data: payload,
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
       retryTransientFailures: false,
     );

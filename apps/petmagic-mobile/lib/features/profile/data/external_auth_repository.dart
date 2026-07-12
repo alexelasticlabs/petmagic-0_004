@@ -8,6 +8,8 @@ import 'dart:async';
 
 import 'package:app_links/app_links.dart';
 import 'package:dio/dio.dart';
+import 'package:petmagic_mobile/core/network/dio_request_cancellation.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
@@ -107,7 +109,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
   @override
   Future<AuthSession> authenticate(
     ExternalAuthProvider provider, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     if (provider == ExternalAuthProvider.google) {
       return _authenticateWithNativeGoogle(cancelToken: cancelToken);
@@ -119,7 +121,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
   @override
   Future<List<MobileLinkedAccount>> link(
     ExternalAuthProvider provider, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) {
     if (provider == ExternalAuthProvider.google) {
       return _linkGoogleNatively(cancelToken: cancelToken);
@@ -138,7 +140,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
   }
 
   Future<AuthSession> _authenticateWithNativeGoogle({
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     try {
       final serverClientId = await _resolveGoogleServerClientId(
@@ -196,7 +198,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
         '/api/auth/external/google/native',
         data: {'idToken': idToken},
         options: Options(headers: {'X-Client-Platform': 'mobile'}),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       );
 
       final session = AuthSession.fromJson(response.data ?? const {});
@@ -301,12 +303,12 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
   }
 
   Future<String?> _resolveGoogleServerClientId({
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     try {
       final configResponse = await _dio.get<Map<String, dynamic>>(
         '/api/auth/external/google/mobile-config',
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       );
       final serverClientId =
           configResponse.data?['serverClientId'] as String? ??
@@ -340,7 +342,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
   }
 
   Future<AuthSession> _authenticateWithNativeApple({
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     try {
       final credential = await _appleSignIn();
@@ -359,7 +361,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
           'authorizationCode': authorizationCode,
         },
         options: Options(headers: {'X-Client-Platform': 'mobile'}),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       );
 
       final session = AuthSession.fromJson(response.data ?? const {});
@@ -433,7 +435,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
   }
 
   Future<List<MobileLinkedAccount>> _linkGoogleNatively({
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     try {
       final session = await _readAuthorizedSession();
@@ -452,7 +454,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
         '/api/auth/me/linked-accounts/google/native',
         data: {'idToken': idToken},
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       );
 
       return (response.data ?? const <dynamic>[])
@@ -491,13 +493,13 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
 
   Future<List<MobileLinkedAccount>> _linkWithBrowserFlow(
     ExternalAuthProvider provider, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final session = await _readAuthorizedSession();
     final prepareResponse = await _dio.post<Map<String, dynamic>>(
       '/api/auth/me/linked-accounts/${provider.apiValue}/prepare',
       options: authenticatedRequestOptions(session.accessToken),
-      cancelToken: cancelToken,
+      cancelToken: cancelToken.toDioCancelToken(),
     );
     final ticket =
         prepareResponse.data?['ticket'] as String? ??
@@ -561,7 +563,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
 
   Future<Uri> _waitForExternalAuthCallback(
     Future<Uri> callback, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) {
     final timedCallback = callback.timeout(
       const Duration(minutes: 3),
@@ -574,7 +576,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
 
     return Future.any<Uri>([
       timedCallback,
-      cancelToken.whenCancel.then(
+      cancelToken.whenCancelled.then(
         (_) => throw const RequestCancelledException(),
       ),
     ]);
@@ -657,13 +659,13 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
   }
 
   Future<List<MobileLinkedAccount>> _fetchLinkedAccounts({
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final session = await _readAuthorizedSession();
     final response = await _dio.get<List<dynamic>>(
       '/api/auth/me/linked-accounts',
       options: authenticatedRequestOptions(session.accessToken),
-      cancelToken: cancelToken,
+      cancelToken: cancelToken.toDioCancelToken(),
     );
 
     return (response.data ?? const <dynamic>[])

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -581,14 +582,14 @@ class PetFlowGenerationRepository extends TemplateGenerationRepository {
   }
 
   @override
-  Future<List<PetProfile>> fetchPets({CancelToken? cancelToken}) async {
+  Future<List<PetProfile>> fetchPets({RequestCancellation? cancelToken}) async {
     return const [];
   }
 
   @override
   Future<List<PetPhoto>> fetchPetPhotos(
     String petId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return [
       PetPhoto(
@@ -614,7 +615,7 @@ class PetFlowGenerationRepository extends TemplateGenerationRepository {
     required String templateId,
     int? expectedTemplateVersion,
     String? correlationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     startFromPetCalls++;
     lastPetId = petId;
@@ -651,7 +652,7 @@ class CrossGalleryPetFlowRepository extends PetFlowGenerationRepository {
   final createdCreations = <TemplateGenerationResult>[];
 
   @override
-  Future<List<PetProfile>> fetchPets({CancelToken? cancelToken}) async {
+  Future<List<PetProfile>> fetchPets({RequestCancellation? cancelToken}) async {
     return [
       PetProfile(
         id: 'pet-42',
@@ -670,7 +671,7 @@ class CrossGalleryPetFlowRepository extends PetFlowGenerationRepository {
   @override
   Future<List<PetPhoto>> fetchPetPhotos(
     String petId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return [
       PetPhoto(
@@ -692,7 +693,7 @@ class CrossGalleryPetFlowRepository extends PetFlowGenerationRepository {
   @override
   Future<List<TemplateGenerationResult>> fetchPetGenerations(
     String petId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return const [];
   }
@@ -704,7 +705,7 @@ class CrossGalleryPetFlowRepository extends PetFlowGenerationRepository {
     required String templateId,
     int? expectedTemplateVersion,
     String? correlationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final generation = await super.startGenerationFromPet(
       petId: petId,

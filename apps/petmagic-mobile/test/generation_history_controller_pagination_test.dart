@@ -1,7 +1,7 @@
 import 'dart:async';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'dart:io';
 
-import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
@@ -318,19 +318,23 @@ void main() {
 
     expect(
       contractSource,
-      contains('void _clearActiveLoadCancelToken(CancelToken cancelToken);'),
+      contains(
+        'void _clearActiveLoadRequestCancellation(RequestCancellation cancelToken);',
+      ),
     );
     expect(
       lifecycleSource,
-      contains('if (identical(_activeLoadCancelToken, cancelToken))'),
+      contains('if (identical(_activeLoadRequestCancellation, cancelToken))'),
     );
     expect(
       syncSource,
-      contains('_clearActiveLoadCancelToken(activeLoadCancelToken);'),
+      contains(
+        '_clearActiveLoadRequestCancellation(activeLoadRequestCancellation);',
+      ),
     );
     expect(
       lifecycleSource,
-      isNot(contains('void _clearActiveLoadCancelToken()')),
+      isNot(contains('void _clearActiveLoadRequestCancellation()')),
     );
   });
 }
@@ -348,7 +352,7 @@ class _SwitchingPaginationRepository extends FakeTemplateGenerationRepository {
     String? status,
     String? cursor,
     int? take,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) {
     if (status == 'completed' && cursor == null) {
       fetchPageCalls.add((status: status, cursor: cursor, take: take));

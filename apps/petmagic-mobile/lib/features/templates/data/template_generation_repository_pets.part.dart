@@ -4,7 +4,7 @@ Future<PetPhoto> _uploadPetPhoto(
   TemplateGenerationRepository repository, {
   required String petId,
   required XFile photo,
-  CancelToken? cancelToken,
+  RequestCancellation? cancelToken,
 }) async {
   OptimizedUploadFile? optimizedPhoto;
   try {
@@ -57,7 +57,7 @@ Future<PetPhoto> _uploadPetPhoto(
           ),
         }),
         options: authenticatedMultipartRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
       retryTransientFailures: false,
     );
@@ -102,14 +102,14 @@ Future<String> _validatePetPhotoUploadFile(
 Future<List<PetPhoto>> _fetchPetPhotos(
   TemplateGenerationRepository repository, {
   required String petId,
-  CancelToken? cancelToken,
+  RequestCancellation? cancelToken,
 }) async {
   final encodedPetId = repository._apiPathSegment(petId);
   final response = await repository._authorizedRequest<List<dynamic>>(
     (session) => repository._dio.get<List<dynamic>>(
       '/api/pets/$encodedPetId/photos',
       options: authenticatedRequestOptions(session.accessToken),
-      cancelToken: cancelToken,
+      cancelToken: cancelToken.toDioCancelToken(),
     ),
   );
 
@@ -123,7 +123,7 @@ Future<PetPhoto> _setPetPhotoAsAvatar(
   TemplateGenerationRepository repository, {
   required String petId,
   required String photoId,
-  CancelToken? cancelToken,
+  RequestCancellation? cancelToken,
 }) async {
   final encodedPetId = repository._apiPathSegment(petId);
   final encodedPhotoId = repository._apiPathSegment(photoId);
@@ -131,7 +131,7 @@ Future<PetPhoto> _setPetPhotoAsAvatar(
     (session) => repository._dio.post<Map<String, dynamic>>(
       '/api/pets/$encodedPetId/photos/$encodedPhotoId/set-avatar',
       options: authenticatedRequestOptions(session.accessToken),
-      cancelToken: cancelToken,
+      cancelToken: cancelToken.toDioCancelToken(),
     ),
     retryTransientFailures: false,
   );
@@ -144,7 +144,7 @@ Future<PetPhoto> _setPetPhotoFavorite(
   required String petId,
   required String photoId,
   required bool isFavorite,
-  CancelToken? cancelToken,
+  RequestCancellation? cancelToken,
 }) async {
   final encodedPetId = repository._apiPathSegment(petId);
   final encodedPhotoId = repository._apiPathSegment(photoId);
@@ -153,7 +153,7 @@ Future<PetPhoto> _setPetPhotoFavorite(
       '/api/pets/$encodedPetId/photos/$encodedPhotoId/favorite',
       data: {'isFavorite': isFavorite},
       options: authenticatedRequestOptions(session.accessToken),
-      cancelToken: cancelToken,
+      cancelToken: cancelToken.toDioCancelToken(),
     ),
     retryTransientFailures: false,
   );
@@ -165,7 +165,7 @@ Future<void> _deletePetPhoto(
   TemplateGenerationRepository repository, {
   required String petId,
   required String photoId,
-  CancelToken? cancelToken,
+  RequestCancellation? cancelToken,
 }) async {
   final encodedPetId = repository._apiPathSegment(petId);
   final encodedPhotoId = repository._apiPathSegment(photoId);
@@ -173,7 +173,7 @@ Future<void> _deletePetPhoto(
     (session) => repository._dio.delete<void>(
       '/api/pets/$encodedPetId/photos/$encodedPhotoId',
       options: authenticatedRequestOptions(session.accessToken),
-      cancelToken: cancelToken,
+      cancelToken: cancelToken.toDioCancelToken(),
     ),
     retryTransientFailures: false,
   );
@@ -182,14 +182,14 @@ Future<void> _deletePetPhoto(
 Future<List<TemplateGenerationResult>> _fetchPetGenerations(
   TemplateGenerationRepository repository, {
   required String petId,
-  CancelToken? cancelToken,
+  RequestCancellation? cancelToken,
 }) async {
   final encodedPetId = repository._apiPathSegment(petId);
   final response = await repository._authorizedRequest<List<dynamic>>(
     (session) => repository._dio.get<List<dynamic>>(
       '/api/pets/$encodedPetId/generations',
       options: authenticatedRequestOptions(session.accessToken),
-      cancelToken: cancelToken,
+      cancelToken: cancelToken.toDioCancelToken(),
     ),
   );
 

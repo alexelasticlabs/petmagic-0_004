@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 
 import 'package:dio/dio.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
@@ -68,7 +69,7 @@ class FakeSupportChatRepository extends SupportChatRepository {
     String? relatedGenerationId,
     String? relatedPaymentId,
     String? relatedSubscriptionId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     openConversationCalls += 1;
     lastOpenedInitialMessage = initialMessage;
@@ -123,7 +124,7 @@ class FakeSupportChatRepository extends SupportChatRepository {
     int take = 60,
     DateTime? beforeMessageCreatedAtUtc,
     String? beforeMessageId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     getConversationCalls += 1;
     if (!_hasConversation) {
@@ -176,7 +177,7 @@ class FakeSupportChatRepository extends SupportChatRepository {
   @override
   Future<void> markConversationRead(
     String conversationId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     _conversation = _conversation.copyWith(
       userUnreadCount: 0,
@@ -203,7 +204,7 @@ class ThrowingSupportChatRepository extends SupportChatRepository {
     int take = 60,
     DateTime? beforeMessageCreatedAtUtc,
     String? beforeMessageId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     throw Exception('unexpected support failure');
   }
@@ -218,7 +219,7 @@ class DelayedSupportChatRepository extends SupportChatRepository {
     int take = 60,
     DateTime? beforeMessageCreatedAtUtc,
     String? beforeMessageId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return Completer<SupportChatConversation>().future;
   }

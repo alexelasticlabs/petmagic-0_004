@@ -1,6 +1,6 @@
 import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/core/files/local_media_file.dart';
-import 'package:petmagic_mobile/core/network/dio_request_cancellation.dart';
+
 import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:petmagic_mobile/features/pets/application/pet_repository.dart';
 import 'package:petmagic_mobile/features/pets/domain/pet_generation_summary.dart';
@@ -13,7 +13,7 @@ final class TemplateGenerationPetRepositoryAdapter implements PetRepository {
 
   @override
   Future<List<PetProfile>> fetchPets({RequestCancellation? cancellation}) {
-    return _repository.fetchPets(cancelToken: cancellation.toDioCancelToken());
+    return _repository.fetchPets(cancelToken: cancellation);
   }
 
   @override
@@ -27,7 +27,7 @@ final class TemplateGenerationPetRepositoryAdapter implements PetRepository {
       name: name,
       type: type,
       breed: breed,
-      cancelToken: cancellation.toDioCancelToken(),
+      cancelToken: cancellation,
     );
   }
 
@@ -44,16 +44,13 @@ final class TemplateGenerationPetRepositoryAdapter implements PetRepository {
       name: name,
       type: type,
       breed: breed,
-      cancelToken: cancellation.toDioCancelToken(),
+      cancelToken: cancellation,
     );
   }
 
   @override
   Future<void> deletePet(String petId, {RequestCancellation? cancellation}) {
-    return _repository.deletePet(
-      petId,
-      cancelToken: cancellation.toDioCancelToken(),
-    );
+    return _repository.deletePet(petId, cancelToken: cancellation);
   }
 
   @override
@@ -65,7 +62,7 @@ final class TemplateGenerationPetRepositoryAdapter implements PetRepository {
     return _repository.uploadPetPhoto(
       petId: petId,
       photo: XFile(photo.path, name: photo.name, mimeType: photo.mimeType),
-      cancelToken: cancellation.toDioCancelToken(),
+      cancelToken: cancellation,
     );
   }
 
@@ -74,10 +71,7 @@ final class TemplateGenerationPetRepositoryAdapter implements PetRepository {
     String petId, {
     RequestCancellation? cancellation,
   }) {
-    return _repository.fetchPetPhotos(
-      petId,
-      cancelToken: cancellation.toDioCancelToken(),
-    );
+    return _repository.fetchPetPhotos(petId, cancelToken: cancellation);
   }
 
   @override
@@ -89,7 +83,7 @@ final class TemplateGenerationPetRepositoryAdapter implements PetRepository {
     return _repository.setPetPhotoAsAvatar(
       petId: petId,
       photoId: photoId,
-      cancelToken: cancellation.toDioCancelToken(),
+      cancelToken: cancellation,
     );
   }
 
@@ -104,7 +98,7 @@ final class TemplateGenerationPetRepositoryAdapter implements PetRepository {
       petId: petId,
       photoId: photoId,
       isFavorite: isFavorite,
-      cancelToken: cancellation.toDioCancelToken(),
+      cancelToken: cancellation,
     );
   }
 
@@ -117,7 +111,7 @@ final class TemplateGenerationPetRepositoryAdapter implements PetRepository {
     return _repository.deletePetPhoto(
       petId: petId,
       photoId: photoId,
-      cancelToken: cancellation.toDioCancelToken(),
+      cancelToken: cancellation,
     );
   }
 
@@ -128,7 +122,7 @@ final class TemplateGenerationPetRepositoryAdapter implements PetRepository {
   }) async {
     final generations = await _repository.fetchPetGenerations(
       petId,
-      cancelToken: cancellation.toDioCancelToken(),
+      cancelToken: cancellation,
     );
     return generations
         .map(

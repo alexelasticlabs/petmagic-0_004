@@ -217,6 +217,8 @@ void main() {
 
     test('application platform dependency debt is explicit and frozen', () {
       const forbiddenImports = <String>[
+        'dart:io',
+        'package:cached_network_image/',
         'package:dio/',
         'package:flutter/',
         'package:in_app_purchase/',
@@ -319,6 +321,7 @@ void main() {
       'lib/app/composition/mobile_provider_overrides.dart',
     ).readAsStringSync();
     for (final provider in const [
+      'appRuntimeInfoProvider',
       'templatesRepositoryProvider',
       'petRepositoryProvider',
       'gamificationRepositoryProvider',
@@ -326,6 +329,7 @@ void main() {
       'supportChatRealtimeClientProvider',
       'externalAuthRepositoryProvider',
       'profileRepositoryProvider',
+      'avatarMediaGatewayProvider',
       'pushTokenLifecyclePortProvider',
       'notificationPreferencesStorageProvider',
       'walletRepositoryProvider',
@@ -422,18 +426,6 @@ const _legacyOversizedProductionFiles = <String>{
   'lib/features/wallet/presentation/widgets/wallet_page_overview_chrome.part.dart',
 };
 
-const _legacyApplicationPlatformDependencyFiles = <String>{
-  'lib/features/premium/application/premium_controller.dart',
-  'lib/features/premium/application/premium_repository.dart',
-  'lib/features/profile/application/external_auth_gateway.dart',
-  'lib/features/profile/application/profile_controller.dart',
-  'lib/features/profile/application/profile_repository.dart',
-  'lib/features/support/application/support_repository.dart',
-  'lib/features/templates/application/generation_history_controller.dart',
-  'lib/features/templates/application/generation_repository.dart',
-  'lib/features/templates/application/templates_controller.dart',
-  'lib/features/wallet/application/wallet_controller.dart',
-  'lib/features/wallet/application/wallet_repository.dart',
-};
+const _legacyApplicationPlatformDependencyFiles = <String>{};
 
 const _legacyDomainSerializationFiles = <String>{};

@@ -2,7 +2,6 @@ import 'dart:async';
 
 // Public template catalog application state.
 
-import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
@@ -1054,7 +1053,7 @@ class TemplatesController extends Notifier<TemplatesState> {
           requestVersion != _requestVersion) {
         return;
       }
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      scheduleMicrotask(() {
         if (!ref.mounted ||
             !_isScreenVisible ||
             requestVersion != _requestVersion) {

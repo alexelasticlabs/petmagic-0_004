@@ -1,7 +1,7 @@
-import 'package:dio/dio.dart';
-import 'package:flutter/widgets.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
+import 'package:petmagic_mobile/core/platform/app_runtime_info.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:petmagic_mobile/core/payments/store_purchase.dart';
 import 'package:petmagic_mobile/features/wallet/domain/pending_store_wallet_purchase.dart';
 import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
 
@@ -12,33 +12,33 @@ final walletRepositoryProvider = Provider<WalletRepositoryPort>((ref) {
 });
 
 abstract interface class WalletRepositoryPort {
-  Stream<List<PurchaseDetails>> get purchaseUpdates;
-  Future<WalletStateModel> fetchWallet({CancelToken? cancelToken});
+  Stream<List<StorePurchaseDetails>> get purchaseUpdates;
+  Future<WalletStateModel> fetchWallet({RequestCancellation? cancelToken});
   Future<OffsetPagedModel<WalletLedgerItem>> fetchLedger({
     int skip = 0,
     int take = 20,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
-  Future<RewardsSummaryModel> fetchRewards({CancelToken? cancelToken});
+  Future<RewardsSummaryModel> fetchRewards({RequestCancellation? cancelToken});
   Future<List<CurrencyPackModel>> fetchPacks();
   Future<WalletCheckoutConfigModel> fetchCheckoutConfig({
-    required Locale locale,
-    CancelToken? cancelToken,
+    required AppLocale locale,
+    RequestCancellation? cancelToken,
   });
   Future<OffsetPagedModel<PurchaseHistoryItem>> fetchPurchases({
     int skip = 0,
     int take = 20,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<PurchaseHistoryItem> fetchPurchase(
     String orderId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<PurchaseCheckoutModel> createPurchase(
     CurrencyPackModel pack,
     WalletPaymentMethodModel paymentMethod,
-    Locale locale, {
-    CancelToken? cancelToken,
+    AppLocale locale, {
+    RequestCancellation? cancelToken,
   });
   Future<
     ({
@@ -58,25 +58,25 @@ abstract interface class WalletRepositoryPort {
   Future<PurchaseHistoryItem> verifyStorePurchase({
     required String orderId,
     required WalletPaymentMethodModel paymentMethod,
-    required PurchaseDetails purchase,
+    required StorePurchaseDetails purchase,
   });
   Future<StoreBillingValidationModel> validateStorePurchase({
     required String provider,
-    required PurchaseDetails purchase,
+    required StorePurchaseDetails purchase,
   });
   Future<void> savePendingStorePurchase(PendingStoreWalletPurchase purchase);
   Future<PendingStoreWalletPurchase?> readPendingStorePurchase();
   Future<void> clearPendingStorePurchase({String? orderId});
   Future<void> restoreStorePurchases();
-  Future<void> completePurchase(PurchaseDetails purchase);
-  Future<void> consumeVerifiedPurchase(PurchaseDetails purchase);
+  Future<void> completePurchase(StorePurchaseDetails purchase);
+  Future<void> consumeVerifiedPurchase(StorePurchaseDetails purchase);
   Future<WalletStateModel> claimAdReward();
   Future<WalletStateModel> applyRedeemCode(String code);
   Future<RewardsSummaryModel> applyReferralCode(String code);
   Future<PurchaseHistoryItem> verifyStripeCheckoutSession({
     required String orderId,
     String? stripeReferenceId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<void> registerPushToken({
     required String token,

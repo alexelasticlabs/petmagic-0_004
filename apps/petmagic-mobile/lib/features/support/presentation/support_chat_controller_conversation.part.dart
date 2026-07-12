@@ -4,10 +4,10 @@ mixin _SupportChatControllerConversationMixin
     on Notifier<SupportChatState>, _SupportChatControllerScope {
   StreamSubscription<SupportChatRealtimeUpdate>? _realtimeSubscription;
   Timer? _realtimeRefreshTimer;
-  CancelToken? _activeUploadCancelToken;
-  CancelToken? _activeConversationLoadCancelToken;
-  CancelToken? _activeLoadOlderCancelToken;
-  CancelToken? _activeMarkReadCancelToken;
+  RequestCancellation? _activeUploadCancelToken;
+  RequestCancellation? _activeConversationLoadCancelToken;
+  RequestCancellation? _activeLoadOlderCancelToken;
+  RequestCancellation? _activeMarkReadCancelToken;
   Future<void>? _conversationLoadInFlight;
   Future<void>? _realtimeConnectInFlight;
   bool _hasPendingRealtimeRefresh = false;
@@ -67,9 +67,9 @@ mixin _SupportChatControllerConversationMixin
     _isScreenVisible = false;
   }
 
-  CancelToken _newActiveUploadCancelToken() {
+  RequestCancellation _newActiveUploadCancelToken() {
     _cancelActiveUpload();
-    final cancelToken = CancelToken();
+    final cancelToken = RequestCancellation();
     _activeUploadCancelToken = cancelToken;
     return cancelToken;
   }
@@ -82,15 +82,15 @@ mixin _SupportChatControllerConversationMixin
     _activeUploadCancelToken = null;
   }
 
-  void _clearActiveUpload(CancelToken cancelToken) {
+  void _clearActiveUpload(RequestCancellation cancelToken) {
     if (identical(_activeUploadCancelToken, cancelToken)) {
       _activeUploadCancelToken = null;
     }
   }
 
-  CancelToken _newActiveConversationLoadCancelToken() {
+  RequestCancellation _newActiveConversationLoadCancelToken() {
     _cancelActiveConversationLoad();
-    final cancelToken = CancelToken();
+    final cancelToken = RequestCancellation();
     _activeConversationLoadCancelToken = cancelToken;
     return cancelToken;
   }
@@ -103,15 +103,15 @@ mixin _SupportChatControllerConversationMixin
     _activeConversationLoadCancelToken = null;
   }
 
-  void _clearActiveConversationLoad(CancelToken cancelToken) {
+  void _clearActiveConversationLoad(RequestCancellation cancelToken) {
     if (identical(_activeConversationLoadCancelToken, cancelToken)) {
       _activeConversationLoadCancelToken = null;
     }
   }
 
-  CancelToken _newActiveLoadOlderCancelToken() {
+  RequestCancellation _newActiveLoadOlderCancelToken() {
     _cancelActiveLoadOlder();
-    final cancelToken = CancelToken();
+    final cancelToken = RequestCancellation();
     _activeLoadOlderCancelToken = cancelToken;
     return cancelToken;
   }
@@ -124,15 +124,15 @@ mixin _SupportChatControllerConversationMixin
     _activeLoadOlderCancelToken = null;
   }
 
-  void _clearActiveLoadOlder(CancelToken cancelToken) {
+  void _clearActiveLoadOlder(RequestCancellation cancelToken) {
     if (identical(_activeLoadOlderCancelToken, cancelToken)) {
       _activeLoadOlderCancelToken = null;
     }
   }
 
-  CancelToken _newActiveMarkReadCancelToken() {
+  RequestCancellation _newActiveMarkReadCancelToken() {
     _cancelActiveMarkRead();
-    final cancelToken = CancelToken();
+    final cancelToken = RequestCancellation();
     _activeMarkReadCancelToken = cancelToken;
     return cancelToken;
   }
@@ -145,7 +145,7 @@ mixin _SupportChatControllerConversationMixin
     _activeMarkReadCancelToken = null;
   }
 
-  void _clearActiveMarkRead(CancelToken cancelToken) {
+  void _clearActiveMarkRead(RequestCancellation cancelToken) {
     if (identical(_activeMarkReadCancelToken, cancelToken)) {
       _activeMarkReadCancelToken = null;
     }

@@ -4,9 +4,12 @@ export 'package:petmagic_mobile/features/premium/application/premium_repository.
 import 'dart:io';
 
 import 'package:dio/dio.dart';
-import 'package:flutter/widgets.dart';
+import 'package:petmagic_mobile/core/network/dio_request_cancellation.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
+import 'package:petmagic_mobile/core/platform/app_runtime_info.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:petmagic_mobile/core/payments/store_purchase.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
@@ -19,6 +22,7 @@ import 'package:petmagic_mobile/features/premium/application/premium_repository.
 import 'package:petmagic_mobile/core/auth/auth_session_storage.dart';
 import 'package:petmagic_mobile/core/auth/auth_session.dart';
 import 'package:petmagic_mobile/shared/payments/store_product_availability_cache.dart';
+import 'package:petmagic_mobile/shared/payments/store_purchase_adapter.dart';
 
 final dioPremiumRepositoryProvider = Provider<PremiumRepositoryPort>((ref) {
   return PremiumRepository(
@@ -48,13 +52,16 @@ class PremiumRepository implements PremiumRepositoryPort {
       _inAppPurchaseOverride ?? InAppPurchase.instance;
 
   @override
-  Stream<List<PurchaseDetails>> get purchaseUpdates =>
-      _inAppPurchase.purchaseStream;
+  Stream<List<StorePurchaseDetails>> get purchaseUpdates =>
+      _inAppPurchase.purchaseStream.map(
+        (purchases) =>
+            purchases.map(mapPlatformStorePurchase).toList(growable: false),
+      );
 
   @override
   Future<PremiumPaywallConfigModel> fetchPaywallConfig({
-    required Locale locale,
-    CancelToken? cancelToken,
+    required AppLocale locale,
+    RequestCancellation? cancelToken,
   }) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
@@ -63,9 +70,9 @@ class PremiumRepository implements PremiumRepositoryPort {
           'platform': _platformValue(),
           'appVersion': AppConfig.appVersion,
           'country': locale.countryCode ?? '*',
-          'locale': locale.toLanguageTag(),
+          'locale': locale.languageTag,
         },
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       );
 
       return mapPremiumPaywallConfigFromJson(response.data ?? const {});
@@ -95,12 +102,14 @@ class PremiumRepository implements PremiumRepositoryPort {
   }
 
   @override
-  Future<PremiumStatusModel> fetchStatus({CancelToken? cancelToken}) async {
+  Future<PremiumStatusModel> fetchStatus({
+    RequestCancellation? cancelToken,
+  }) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.get<Map<String, dynamic>>(
         '/api/economy/me/subscription',
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
     );
 
@@ -110,8 +119,8 @@ class PremiumRepository implements PremiumRepositoryPort {
   @override
   Future<PremiumCheckoutModel> createStripeCheckout(
     PremiumPlanModel plan,
-    Locale locale, {
-    CancelToken? cancelToken,
+    AppLocale locale, {
+    RequestCancellation? cancelToken,
   }) async {
     final platform = _platformValue();
     final payload = <String, Object?>{
@@ -120,7 +129,7 @@ class PremiumRepository implements PremiumRepositoryPort {
       'platform': platform,
       'appVersion': AppConfig.appVersion,
       'country': locale.countryCode ?? '*',
-      'locale': locale.toLanguageTag(),
+      'locale': locale.languageTag,
     };
 
     final response = await _authorizedRequest<Map<String, dynamic>>(
@@ -131,7 +140,7 @@ class PremiumRepository implements PremiumRepositoryPort {
           session.accessToken,
           extraHeaders: {'X-PetMagic-Platform': platform},
         ),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
       retryTransientFailures: false,
     );
@@ -146,14 +155,14 @@ class PremiumRepository implements PremiumRepositoryPort {
 
   @override
   Future<PremiumBillingPortalModel> createBillingPortal({
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
         '/api/economy/premium/manage',
         data: {'paymentProvider': PremiumPaymentProvider.stripe.value},
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
       retryTransientFailures: false,
     );
@@ -164,14 +173,14 @@ class PremiumRepository implements PremiumRepositoryPort {
   @override
   Future<PremiumStatusModel> cancelSubscription({
     PremiumPaymentProvider provider = PremiumPaymentProvider.stripe,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
         '/api/economy/premium/cancel',
         data: {'paymentProvider': provider.value},
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
       retryTransientFailures: false,
     );
@@ -182,7 +191,7 @@ class PremiumRepository implements PremiumRepositoryPort {
   @override
   Future<String> createManagementUrl(
     PremiumStatusModel status, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     switch (status.manageSubscriptionAction) {
       case 'AppleSettings':
@@ -309,8 +318,8 @@ class PremiumRepository implements PremiumRepositoryPort {
   Future<PremiumStoreVerificationModel> verifyStorePurchase({
     required PremiumPlanModel plan,
     required PremiumPaymentProvider provider,
-    required PurchaseDetails purchase,
-    CancelToken? cancelToken,
+    required StorePurchaseDetails purchase,
+    RequestCancellation? cancelToken,
   }) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
@@ -327,7 +336,7 @@ class PremiumRepository implements PremiumRepositoryPort {
           'transactionDate': purchase.transactionDate,
         },
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
       retryTransientFailures: false,
     );
@@ -339,7 +348,7 @@ class PremiumRepository implements PremiumRepositoryPort {
   Future<void> verifyStripeSubscriptionCheckout({
     required String planCode,
     required String externalSubscriptionId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
@@ -349,7 +358,7 @@ class PremiumRepository implements PremiumRepositoryPort {
           'externalSubscriptionId': externalSubscriptionId,
         },
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
       retryTransientFailures: false,
     );
@@ -380,8 +389,10 @@ class PremiumRepository implements PremiumRepositoryPort {
   }
 
   @override
-  Future<void> completePurchase(PurchaseDetails purchase) {
-    return _inAppPurchase.completePurchase(purchase);
+  Future<void> completePurchase(StorePurchaseDetails purchase) {
+    return _inAppPurchase.completePurchase(
+      requirePlatformStorePurchase(purchase),
+    );
   }
 
   Future<Response<T>> _authorizedRequest<T>(

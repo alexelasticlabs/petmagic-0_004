@@ -383,7 +383,7 @@ class _PhotoGridState extends ConsumerState<_PhotoGrid> {
                 widget.petId,
                 photo,
                 currentAvatarUrl: widget.currentAvatarUrl,
-              cancelToken: cancelToken,
+                cancelToken: cancelToken,
               ),
             ),
             onSetFavorite: () => _runPhotoAction(
@@ -392,7 +392,7 @@ class _PhotoGridState extends ConsumerState<_PhotoGrid> {
                 ref,
                 widget.petId,
                 photo,
-            cancelToken: cancelToken,
+                cancelToken: cancelToken,
               ),
             ),
             onUseForGeneration: isBusy
@@ -410,7 +410,7 @@ class _PhotoGridState extends ConsumerState<_PhotoGrid> {
                 widget.petId,
                 photo,
                 currentAvatarUrl: widget.currentAvatarUrl,
-              cancelToken: cancelToken,
+                cancelToken: cancelToken,
               ),
             ),
           );

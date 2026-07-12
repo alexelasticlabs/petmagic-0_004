@@ -448,12 +448,7 @@ void main() {
           createdAtUtc: DateTime.utc(2026),
         ),
       ],
-      avatarError: DioException(
-        requestOptions: RequestOptions(
-          path: '/api/pets/pet-1/photos/photo-1/set-avatar',
-        ),
-        type: DioExceptionType.cancel,
-      ),
+      avatarError: const RequestCancelledException(),
     );
 
     await pumpPetDetails(tester, repository: repository);
@@ -517,10 +512,7 @@ void main() {
           createdAtUtc: DateTime.utc(2026),
         ),
       ],
-      uploadError: DioException(
-        requestOptions: RequestOptions(path: '/api/pets/pet-1/photos'),
-        type: DioExceptionType.cancel,
-      ),
+      uploadError: const RequestCancelledException(),
     );
 
     await pumpPetDetails(tester, repository: repository);

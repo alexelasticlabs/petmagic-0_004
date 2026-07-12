@@ -1,7 +1,7 @@
 import 'dart:async';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'dart:io' show Platform;
 
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -951,14 +951,14 @@ class MutableAuthenticatedWidgetAppLaunchController
 
 class DelayedProfileMutationRepository extends FakeProfileRepository {
   int updateProfileCalls = 0;
-  CancelToken? updateCancelToken;
+  RequestCancellation? updateCancelToken;
   final Completer<MobileUserProfile> _updateCompleter =
       Completer<MobileUserProfile>();
 
   @override
   Future<MobileUserProfile> updateProfile({
     required String? displayName,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) {
     updateProfileCalls++;
     updateCancelToken = cancelToken;

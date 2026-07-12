@@ -1,7 +1,7 @@
-import 'package:dio/dio.dart';
-import 'package:flutter/widgets.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
+import 'package:petmagic_mobile/core/platform/app_runtime_info.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:petmagic_mobile/core/payments/store_purchase.dart';
 import 'package:petmagic_mobile/features/premium/domain/premium_models.dart';
 
 final premiumRepositoryProvider = Provider<PremiumRepositoryPort>((ref) {
@@ -11,28 +11,28 @@ final premiumRepositoryProvider = Provider<PremiumRepositoryPort>((ref) {
 });
 
 abstract interface class PremiumRepositoryPort {
-  Stream<List<PurchaseDetails>> get purchaseUpdates;
+  Stream<List<StorePurchaseDetails>> get purchaseUpdates;
   Future<PremiumPaywallConfigModel> fetchPaywallConfig({
-    required Locale locale,
-    CancelToken? cancelToken,
+    required AppLocale locale,
+    RequestCancellation? cancelToken,
   });
   Future<List<PremiumPlanModel>> fetchPlans();
-  Future<PremiumStatusModel> fetchStatus({CancelToken? cancelToken});
+  Future<PremiumStatusModel> fetchStatus({RequestCancellation? cancelToken});
   Future<PremiumCheckoutModel> createStripeCheckout(
     PremiumPlanModel plan,
-    Locale locale, {
-    CancelToken? cancelToken,
+    AppLocale locale, {
+    RequestCancellation? cancelToken,
   });
   Future<PremiumBillingPortalModel> createBillingPortal({
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<PremiumStatusModel> cancelSubscription({
     PremiumPaymentProvider provider = PremiumPaymentProvider.stripe,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<String> createManagementUrl(
     PremiumStatusModel status, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<
     ({
@@ -52,14 +52,14 @@ abstract interface class PremiumRepositoryPort {
   Future<PremiumStoreVerificationModel> verifyStorePurchase({
     required PremiumPlanModel plan,
     required PremiumPaymentProvider provider,
-    required PurchaseDetails purchase,
-    CancelToken? cancelToken,
+    required StorePurchaseDetails purchase,
+    RequestCancellation? cancelToken,
   });
   Future<void> verifyStripeSubscriptionCheckout({
     required String planCode,
     required String externalSubscriptionId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<void> restoreStorePurchases();
-  Future<void> completePurchase(PurchaseDetails purchase);
+  Future<void> completePurchase(StorePurchaseDetails purchase);
 }

@@ -1,5 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/network/dio_request_cancellation.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:petmagic_mobile/shared/network/unsafe_remote_host.dart';
 import 'package:petmagic_mobile/shared/files/file_name_sanitizer.dart';
 import 'package:share_plus/share_plus.dart';
@@ -12,7 +15,7 @@ Future<List<int>> downloadFileBytes(
   String fileUrl, {
   Dio? client,
   Duration timeout = const Duration(seconds: 20),
-  CancelToken? cancelToken,
+  RequestCancellation? cancelToken,
   int maxBytes = defaultRemoteFileDownloadMaxBytes,
 }) async {
   if (maxBytes <= 0) {
@@ -35,7 +38,7 @@ Future<List<int>> downloadFileBytes(
     _throwIfDownloadCancelled(cancelToken);
     final response = await httpClient.get<ResponseBody>(
       safeUri.toString(),
-      cancelToken: cancelToken,
+      cancelToken: cancelToken.toDioCancelToken(),
       options: Options(
         responseType: ResponseType.stream,
         receiveTimeout: timeout,
@@ -80,7 +83,7 @@ Future<List<int>> downloadFileBytes(
     return bytes;
   } on DioException catch (error) {
     if (CancelToken.isCancel(error)) {
-      throw _downloadCancelledException();
+      throw const RequestCancelledException();
     }
 
     throw _sanitizeDownloadException(error, safeUri.toString());
@@ -113,7 +116,7 @@ Uri _parseDownloadUri(String fileUrl) {
   throw const FormatException('unsafe_download_url');
 }
 
-void _throwIfDownloadCancelled(CancelToken? cancelToken) {
+void _throwIfDownloadCancelled(RequestCancellation? cancelToken) {
   if (cancelToken?.isCancelled != true) {
     return;
   }
@@ -121,12 +124,8 @@ void _throwIfDownloadCancelled(CancelToken? cancelToken) {
   throw _downloadCancelledException();
 }
 
-DioException _downloadCancelledException() {
-  return DioException.requestCancelled(
-    requestOptions: RequestOptions(path: ''),
-    reason: 'download_cancelled',
-  );
-}
+RequestCancelledException _downloadCancelledException() =>
+    const RequestCancelledException();
 
 DioException _sanitizeDownloadException(DioException error, String fileUrl) {
   final safeRequestOptions = RequestOptions(

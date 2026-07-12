@@ -363,7 +363,7 @@ String _historyLoadErrorMessage(Object error) {
 }
 
 bool _isCancelledRequest(Object error) {
-  return error is DioException && CancelToken.isCancel(error);
+  return error is RequestCancelledException;
 }
 
 bool _localRecordMatchesGeneration(

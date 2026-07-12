@@ -463,7 +463,7 @@ Future<List<TemplateGenerationResult>> _fetchGenerations(
   String? status,
   int? skip,
   int? take,
-  CancelToken? cancelToken,
+  RequestCancellation? cancelToken,
 }) async {
   final page = await _fetchGenerationPage(
     repository,
@@ -482,7 +482,7 @@ Future<TemplateGenerationGalleryPage> _fetchGenerationPage(
   String? cursor,
   int? skip,
   int? take,
-  CancelToken? cancelToken,
+  RequestCancellation? cancelToken,
 }) async {
   final queryParameters = <String, Object?>{};
   if (status != null && status.isNotEmpty) {
@@ -503,7 +503,7 @@ Future<TemplateGenerationGalleryPage> _fetchGenerationPage(
       '/api/templates/generations',
       queryParameters: queryParameters,
       options: authenticatedRequestOptions(session.accessToken),
-      cancelToken: cancelToken,
+      cancelToken: cancelToken.toDioCancelToken(),
     ),
   );
 
@@ -550,13 +550,13 @@ Future<TemplateGenerationGalleryPage> _fetchGenerationPage(
 
 Future<int> _fetchUnreadGenerationCount(
   TemplateGenerationRepository repository, {
-  CancelToken? cancelToken,
+  RequestCancellation? cancelToken,
 }) async {
   final response = await repository._authorizedRequest<Map<String, dynamic>>(
     (session) => repository._dio.get<Map<String, dynamic>>(
       '/api/templates/generations/unread-count',
       options: authenticatedRequestOptions(session.accessToken),
-      cancelToken: cancelToken,
+      cancelToken: cancelToken.toDioCancelToken(),
     ),
   );
 
@@ -568,14 +568,14 @@ Future<int> _fetchUnreadGenerationCount(
 Future<void> _markGenerationRead(
   TemplateGenerationRepository repository,
   String generationId, {
-  CancelToken? cancelToken,
+  RequestCancellation? cancelToken,
 }) async {
   final encodedGenerationId = repository._apiPathSegment(generationId);
   await repository._authorizedRequest<void>(
     (session) => repository._dio.post<void>(
       '/api/templates/generations/$encodedGenerationId/mark-read',
       options: authenticatedRequestOptions(session.accessToken),
-      cancelToken: cancelToken,
+      cancelToken: cancelToken.toDioCancelToken(),
     ),
     retryTransientFailures: false,
   );

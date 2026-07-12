@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -811,7 +812,7 @@ class _DelayedSupportChatRepository extends SupportChatRepository {
 
   final openStarted = Completer<void>();
   final _openCompleter = Completer<SupportChatConversation>();
-  CancelToken? openCancelToken;
+  RequestCancellation? openCancelToken;
   int sendAttachmentCalls = 0;
 
   @override
@@ -822,7 +823,7 @@ class _DelayedSupportChatRepository extends SupportChatRepository {
     String? relatedGenerationId,
     String? relatedPaymentId,
     String? relatedSubscriptionId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) {
     openCancelToken = cancelToken;
     if (!openStarted.isCompleted) {
@@ -845,7 +846,7 @@ class _DelayedSupportChatRepository extends SupportChatRepository {
     String? body,
     String? replyToMessageId,
     ProgressCallback? onSendProgress,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     sendAttachmentCalls += 1;
     return SupportChatMessage(

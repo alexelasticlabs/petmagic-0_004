@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -142,14 +143,14 @@ class _DelayedPasswordRepository extends ProfileRepository {
   final Completer<void> passwordChangeCodeStarted = Completer<void>();
   final Completer<void> _passwordResetCompleter = Completer<void>();
   final Completer<void> _passwordChangeCodeCompleter = Completer<void>();
-  CancelToken? passwordResetCancelToken;
-  CancelToken? passwordChangeCodeCancelToken;
+  RequestCancellation? passwordResetCancelToken;
+  RequestCancellation? passwordChangeCodeCancelToken;
   int passwordChangeCodeCalls = 0;
 
   @override
   Future<void> requestPasswordReset({
     required String email,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) {
     passwordResetCancelToken = cancelToken;
     if (!passwordResetStarted.isCompleted) {
@@ -159,7 +160,9 @@ class _DelayedPasswordRepository extends ProfileRepository {
   }
 
   @override
-  Future<void> requestCurrentPasswordChangeCode({CancelToken? cancelToken}) {
+  Future<void> requestCurrentPasswordChangeCode({
+    RequestCancellation? cancelToken,
+  }) {
     passwordChangeCodeCalls++;
     passwordChangeCodeCancelToken = cancelToken;
     if (!passwordChangeCodeStarted.isCompleted) {

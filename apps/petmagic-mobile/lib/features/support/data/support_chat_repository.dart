@@ -4,6 +4,8 @@ export 'package:petmagic_mobile/features/support/application/support_repository.
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:petmagic_mobile/core/network/dio_request_cancellation.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
@@ -62,7 +64,7 @@ class SupportChatRepository implements SupportRepository {
     String? relatedGenerationId,
     String? relatedPaymentId,
     String? relatedSubscriptionId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) async => _dio.post<Map<String, dynamic>>(
@@ -86,7 +88,7 @@ class SupportChatRepository implements SupportRepository {
               : {'relatedSubscriptionId': relatedSubscriptionId},
         },
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
       retryTransientFailures: false,
     );
@@ -99,7 +101,7 @@ class SupportChatRepository implements SupportRepository {
     int take = 60,
     DateTime? beforeMessageCreatedAtUtc,
     String? beforeMessageId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final query = <String, dynamic>{'take': _supportPageSize(take)};
     if (beforeMessageCreatedAtUtc != null) {
@@ -116,7 +118,7 @@ class SupportChatRepository implements SupportRepository {
         '/api/support/conversation',
         queryParameters: query,
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
     );
 
@@ -157,8 +159,8 @@ class SupportChatRepository implements SupportRepository {
     required String localeTag,
     String? body,
     String? replyToMessageId,
-    ProgressCallback? onSendProgress,
-    CancelToken? cancelToken,
+    UploadProgressCallback? onSendProgress,
+    RequestCancellation? cancelToken,
   }) async {
     final encodedConversationId = _supportPathSegment(conversationId);
     final prepared = await _prepareAttachmentForUpload(
@@ -185,7 +187,7 @@ class SupportChatRepository implements SupportRepository {
           }),
           options: authenticatedMultipartRequestOptions(session.accessToken),
           onSendProgress: onSendProgress,
-          cancelToken: cancelToken,
+          cancelToken: cancelToken.toDioCancelToken(),
         ),
         retryTransientFailures: false,
       );
@@ -203,8 +205,8 @@ class SupportChatRepository implements SupportRepository {
     required String localeTag,
     String? body,
     String? replyToMessageId,
-    ProgressCallback? onSendProgress,
-    CancelToken? cancelToken,
+    UploadProgressCallback? onSendProgress,
+    RequestCancellation? cancelToken,
   }) async {
     final encodedConversationId = _supportPathSegment(conversationId);
     if (attachments.isEmpty) {
@@ -252,7 +254,7 @@ class SupportChatRepository implements SupportRepository {
           }),
           options: authenticatedMultipartRequestOptions(session.accessToken),
           onSendProgress: onSendProgress,
-          cancelToken: cancelToken,
+          cancelToken: cancelToken.toDioCancelToken(),
         ),
         retryTransientFailures: false,
       );
@@ -272,7 +274,7 @@ class SupportChatRepository implements SupportRepository {
     required String filePath,
     required String fileName,
     required String contentType,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final encodedConversationId = _supportPathSegment(conversationId);
     final encodedMessageId = _supportPathSegment(messageId);
@@ -294,7 +296,7 @@ class SupportChatRepository implements SupportRepository {
             ),
           }),
           options: authenticatedMultipartRequestOptions(session.accessToken),
-          cancelToken: cancelToken,
+          cancelToken: cancelToken.toDioCancelToken(),
         ),
         retryTransientFailures: false,
       );
@@ -308,14 +310,14 @@ class SupportChatRepository implements SupportRepository {
   @override
   Future<void> markConversationRead(
     String conversationId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final encodedConversationId = _supportPathSegment(conversationId);
     await _authorizedRequest<void>(
       (session) => _dio.post<void>(
         '/api/support/conversation/$encodedConversationId/read',
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
       retryTransientFailures: false,
     );
@@ -583,7 +585,7 @@ class SupportChatRepository implements SupportRepository {
     required String filePath,
     required String fileName,
     required String contentType,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final sourceContentType = await _validateAttachmentForUpload(
       filePath: filePath,

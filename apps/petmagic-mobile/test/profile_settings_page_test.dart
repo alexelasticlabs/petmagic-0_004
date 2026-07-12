@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -442,7 +443,7 @@ class _FakeTemplateGenerationRepository extends TemplateGenerationRepository {
     String? templateId,
     String? petId,
     String sourceScreen = 'settings',
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
     bool retryTransientFailures = false,
   }) async {
     submittedType = type;

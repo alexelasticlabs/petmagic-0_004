@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/widgets.dart';
@@ -231,7 +232,8 @@ class _CancellableSupportChatRepository extends SupportChatRepository {
   _CancellableSupportChatRepository()
     : super(dio: Dio(), sessionStorage: AuthSessionStorage());
 
-  final Completer<CancelToken> uploadStarted = Completer<CancelToken>();
+  final Completer<RequestCancellation> uploadStarted =
+      Completer<RequestCancellation>();
 
   @override
   Future<SupportChatConversation> openConversation({
@@ -241,7 +243,7 @@ class _CancellableSupportChatRepository extends SupportChatRepository {
     String? relatedGenerationId,
     String? relatedPaymentId,
     String? relatedSubscriptionId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return _conversation();
   }
@@ -254,9 +256,9 @@ class _CancellableSupportChatRepository extends SupportChatRepository {
     String? body,
     String? replyToMessageId,
     ProgressCallback? onSendProgress,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
-    final token = cancelToken ?? CancelToken();
+    final token = cancelToken ?? RequestCancellation();
     uploadStarted.complete(token);
     await token.whenCancel;
     throw const RequestCancelledException();
@@ -277,7 +279,7 @@ class _DelayedInitialLoadSupportChatRepository extends SupportChatRepository {
     int take = 60,
     DateTime? beforeMessageCreatedAtUtc,
     String? beforeMessageId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) {
     getConversationCalls += 1;
     if (!loadStarted.isCompleted) {
@@ -298,16 +300,17 @@ class _CancellableConversationLoadSupportChatRepository
   _CancellableConversationLoadSupportChatRepository()
     : super(dio: Dio(), sessionStorage: AuthSessionStorage());
 
-  final Completer<CancelToken> loadStarted = Completer<CancelToken>();
+  final Completer<RequestCancellation> loadStarted =
+      Completer<RequestCancellation>();
 
   @override
   Future<SupportChatConversation> getConversation({
     int take = 60,
     DateTime? beforeMessageCreatedAtUtc,
     String? beforeMessageId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
-    final token = cancelToken ?? CancelToken();
+    final token = cancelToken ?? RequestCancellation();
     if (!loadStarted.isCompleted) {
       loadStarted.complete(token);
     }
@@ -320,14 +323,15 @@ class _CancellableLoadOlderSupportChatRepository extends SupportChatRepository {
   _CancellableLoadOlderSupportChatRepository()
     : super(dio: Dio(), sessionStorage: AuthSessionStorage());
 
-  final Completer<CancelToken> loadOlderStarted = Completer<CancelToken>();
+  final Completer<RequestCancellation> loadOlderStarted =
+      Completer<RequestCancellation>();
 
   @override
   Future<SupportChatConversation> getConversation({
     int take = 60,
     DateTime? beforeMessageCreatedAtUtc,
     String? beforeMessageId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     if (beforeMessageCreatedAtUtc == null) {
       return _conversation(
@@ -350,7 +354,7 @@ class _CancellableLoadOlderSupportChatRepository extends SupportChatRepository {
       );
     }
 
-    final token = cancelToken ?? CancelToken();
+    final token = cancelToken ?? RequestCancellation();
     if (!loadOlderStarted.isCompleted) {
       loadOlderStarted.complete(token);
     }
@@ -363,14 +367,15 @@ class _CancellableMarkReadSupportChatRepository extends SupportChatRepository {
   _CancellableMarkReadSupportChatRepository()
     : super(dio: Dio(), sessionStorage: AuthSessionStorage());
 
-  final Completer<CancelToken> markReadStarted = Completer<CancelToken>();
+  final Completer<RequestCancellation> markReadStarted =
+      Completer<RequestCancellation>();
 
   @override
   Future<SupportChatConversation> getConversation({
     int take = 60,
     DateTime? beforeMessageCreatedAtUtc,
     String? beforeMessageId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return _conversation(
       messages: [
@@ -394,9 +399,9 @@ class _CancellableMarkReadSupportChatRepository extends SupportChatRepository {
   @override
   Future<void> markConversationRead(
     String conversationId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
-    final token = cancelToken ?? CancelToken();
+    final token = cancelToken ?? RequestCancellation();
     if (!markReadStarted.isCompleted) {
       markReadStarted.complete(token);
     }

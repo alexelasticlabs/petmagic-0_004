@@ -717,12 +717,8 @@ Future<void> _saveGenerationToGallery(
     }
 
     _notifySoon(context, text.generationStatusSavedToGalleryMessage);
-  } on DioException catch (error) {
-    if (!context.mounted || CancelToken.isCancel(error)) {
-      return;
-    }
-
-    _notifySoon(context, text.generationStatusFileSaveFailedMessage);
+  } on RequestCancelledException {
+    return;
   } on Object {
     if (!context.mounted) {
       return;
@@ -801,12 +797,8 @@ Future<void> _shareGenerationFile(
           shareText: safeShareUri.toString(),
           localPath: localOutputPath,
         );
-  } on DioException catch (error) {
-    if (!context.mounted || CancelToken.isCancel(error)) {
-      return;
-    }
-
-    _notifySoon(context, text.generationStatusShareFailedMessage);
+  } on RequestCancelledException {
+    return;
   } on Object {
     if (!context.mounted) {
       return;
@@ -878,7 +870,7 @@ Future<GenerationMediaAccessResult?> _fetchGenerationMediaAccess({
   required AppLocalizations text,
   required WidgetRef ref,
   required String generationId,
-  required CancelToken cancelToken,
+  required RequestCancellation cancelToken,
   required bool forShare,
 }) async {
   try {
@@ -889,17 +881,7 @@ Future<GenerationMediaAccessResult?> _fetchGenerationMediaAccess({
             generationId,
             cancelToken: cancelToken,
           );
-  } on DioException catch (error) {
-    if (!context.mounted || CancelToken.isCancel(error)) {
-      return null;
-    }
-
-    _notifySoon(
-      context,
-      forShare
-          ? text.generationStatusShareFailedMessage
-          : text.generationStatusFileSaveFailedMessage,
-    );
+  } on RequestCancelledException {
     return null;
   } on Object {
     if (!context.mounted) {

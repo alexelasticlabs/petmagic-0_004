@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:petmagic_mobile/core/platform/app_runtime_info.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -343,7 +345,9 @@ class FakeWalletRepository extends WalletRepository {
   int purchasesFetchCount = 0;
 
   @override
-  Future<WalletStateModel> fetchWallet({CancelToken? cancelToken}) async {
+  Future<WalletStateModel> fetchWallet({
+    RequestCancellation? cancelToken,
+  }) async {
     walletFetchCount++;
     final configuredWalletError = walletError;
     if (configuredWalletError != null) {
@@ -361,7 +365,7 @@ class FakeWalletRepository extends WalletRepository {
   Future<OffsetPagedModel<WalletLedgerItem>> fetchLedger({
     int skip = 0,
     int take = 20,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     ledgerFetchCount++;
     if (failLedger) {
@@ -381,8 +385,8 @@ class FakeWalletRepository extends WalletRepository {
 
   @override
   Future<WalletCheckoutConfigModel> fetchCheckoutConfig({
-    required Locale locale,
-    CancelToken? cancelToken,
+    required AppLocale locale,
+    RequestCancellation? cancelToken,
   }) async {
     checkoutConfigFetchCount++;
     return WalletCheckoutConfigModel(
@@ -393,14 +397,15 @@ class FakeWalletRepository extends WalletRepository {
   }
 
   @override
-  Future<RewardsSummaryModel> fetchRewards({CancelToken? cancelToken}) async =>
-      rewardsSummaryFixture;
+  Future<RewardsSummaryModel> fetchRewards({
+    RequestCancellation? cancelToken,
+  }) async => rewardsSummaryFixture;
 
   @override
   Future<OffsetPagedModel<PurchaseHistoryItem>> fetchPurchases({
     int skip = 0,
     int take = 20,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     purchasesFetchCount++;
     if (failPurchases) {
@@ -460,7 +465,7 @@ class RetryLedgerWalletRepository extends FakeWalletRepository {
   Future<OffsetPagedModel<WalletLedgerItem>> fetchLedger({
     int skip = 0,
     int take = 20,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     ledgerAttempts++;
     if (ledgerAttempts == 1) {
@@ -492,7 +497,7 @@ class PagedLedgerWalletRepository extends FakeWalletRepository {
   Future<OffsetPagedModel<WalletLedgerItem>> fetchLedger({
     int skip = 0,
     int take = 20,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     ledgerSkips.add(skip);
     final pending = delayedLedgerSkips[skip];
@@ -526,7 +531,7 @@ class RetryPagedLedgerWalletRepository extends PagedLedgerWalletRepository {
   Future<OffsetPagedModel<WalletLedgerItem>> fetchLedger({
     int skip = 0,
     int take = 20,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     ledgerSkips.add(skip);
     if (skip == 24 && !_failedSecondPage) {

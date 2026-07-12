@@ -192,14 +192,14 @@ extension _GenerationStatusPageMediaActions on _GenerationStatusPageState {
     );
   }
 
-  CancelToken? _startMediaAction() {
+  RequestCancellation? _startMediaAction() {
     if (_activeMediaActionCancelToken != null) {
       return null;
     }
 
     _stopPolling();
     _cancelActiveLoad();
-    final cancelToken = CancelToken();
+    final cancelToken = RequestCancellation();
     _activeMediaActionCancelToken = cancelToken;
     if (mounted) {
       _setPageState(() => _isMediaActionInFlight = true);
@@ -209,7 +209,7 @@ extension _GenerationStatusPageMediaActions on _GenerationStatusPageState {
     return cancelToken;
   }
 
-  void _completeMediaAction(CancelToken cancelToken) {
+  void _completeMediaAction(RequestCancellation cancelToken) {
     if (!identical(_activeMediaActionCancelToken, cancelToken)) {
       return;
     }
@@ -300,12 +300,8 @@ extension _GenerationStatusPageMediaActions on _GenerationStatusPageState {
       }
 
       _showInfo(text.generationStatusSavedToGalleryMessage);
-    } on DioException catch (error) {
-      if (!mounted || CancelToken.isCancel(error)) {
-        return;
-      }
-
-      _showInfo(text.generationStatusFileSaveFailedMessage);
+    } on RequestCancelledException {
+      return;
     } on Object {
       if (!mounted) {
         return;
@@ -389,12 +385,8 @@ extension _GenerationStatusPageMediaActions on _GenerationStatusPageState {
             shareText: safeShareUri.toString(),
             localPath: localOutputPath,
           );
-    } on DioException catch (error) {
-      if (!mounted || CancelToken.isCancel(error)) {
-        return;
-      }
-
-      _showInfo(text.generationStatusShareFailedMessage);
+    } on RequestCancelledException {
+      return;
     } on Object {
       if (!mounted) {
         return;
@@ -432,12 +424,8 @@ extension _GenerationStatusPageMediaActions on _GenerationStatusPageState {
       }
 
       _showInfo(text.generationStatusLinkCopiedMessage);
-    } on DioException catch (error) {
-      if (!mounted || CancelToken.isCancel(error)) {
-        return;
-      }
-
-      _showInfo(text.generationStatusShareFailedMessage);
+    } on RequestCancelledException {
+      return;
     } on Object {
       if (!mounted) {
         return;

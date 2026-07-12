@@ -1,6 +1,6 @@
-import 'package:dio/dio.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
+import 'package:petmagic_mobile/core/files/local_media_file.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_results.dart';
 
@@ -17,37 +17,37 @@ abstract interface class GenerationRepository {
 
   Future<TemplateGenerationResult> startGeneration({
     required String templateId,
-    required XFile sourceImage,
+    required LocalMediaFile sourceImage,
     int? expectedTemplateVersion,
     String? correlationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<TemplateGenerationResult> fetchGeneration(
     String generationId, {
     String? correlationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<GenerationCancelResult> cancelGeneration(
     String generationId, {
     String? correlationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<CompatibleGenerationTemplates> fetchCompatibleTemplates(
     String resultId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<TemplateGenerationResult> startGenerationFromResult({
     required String parentGenerationResultId,
     required String templateId,
     int? expectedTemplateVersion,
     String? correlationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<TemplateGenerationResult> generateSimilar({
     required String sourceGenerationId,
     String variationStrength = 'medium',
     String? correlationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<TemplateGenerationResult> startGenerationFromPet({
     required String petId,
@@ -55,7 +55,7 @@ abstract interface class GenerationRepository {
     required String templateId,
     int? expectedTemplateVersion,
     String? correlationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<void> recordTemplateAnalyticsEvent({
     required String templateId,
@@ -63,27 +63,27 @@ abstract interface class GenerationRepository {
     String source = 'mobile',
     String? generationId,
     Map<String, Object?>? metadata,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<RemoveGenerationWatermarkResult> removeWatermark(
     String generationId, {
     String paymentMethod = 'credit',
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<void> recordAnalyticsEvent({
     required String templateId,
     required String eventType,
     String? generationId,
     Map<String, Object?> metadata = const {},
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<GenerationMediaAccessResult> fetchDownloadUrl(
     String generationId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<GenerationMediaAccessResult> fetchShareUrl(
     String generationId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<List<TemplateGenerationResult>?> readCachedGenerations({
     String? status,
@@ -101,22 +101,22 @@ abstract interface class GenerationRepository {
     String? status,
     int? skip,
     int? take,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<TemplateGenerationGalleryPage> fetchGenerationPage({
     String? status,
     String? cursor,
     int? take,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
-  Future<int> fetchUnreadGenerationCount({CancelToken? cancelToken});
+  Future<int> fetchUnreadGenerationCount({RequestCancellation? cancelToken});
   Future<void> markGenerationRead(
     String generationId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<void> deleteGeneration(
     String generationId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<void> upsertCachedGeneration(TemplateGenerationResult generation);
   Future<void> submitGenerationFeedback({
@@ -135,7 +135,7 @@ abstract interface class GenerationRepository {
     String? templateId,
     String? petId,
     String sourceScreen = 'settings',
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
     bool retryTransientFailures = false,
   });
   Future<void> registerPushToken({

@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
+import 'package:petmagic_mobile/core/files/local_media_file.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -94,7 +96,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
   bool _canUsePrivateGenerationApi = true;
   int _generationFlowEpoch = 0;
   String? _activeCorrelationId;
-  CancelToken? _activeRequestCancelToken;
+  RequestCancellation? _activeRequestCancelToken;
   VoidCallback? _appLifecycleListener;
 
   @override
@@ -259,7 +261,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
     XFile photo,
   ) async {
     final repository = _repository;
-    CancelToken? requestCancelToken;
+    RequestCancellation? requestCancelToken;
     try {
       requestCancelToken = _newActiveRequestCancelToken();
       if (_disposed || !_canUsePrivateGenerationApi) {
@@ -267,7 +269,11 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
       }
       final generation = await repository.startGeneration(
         templateId: template.templateId,
-        sourceImage: photo,
+        sourceImage: LocalMediaFile(
+          path: photo.path,
+          name: photo.name,
+          mimeType: photo.mimeType,
+        ),
         expectedTemplateVersion: template.version,
         correlationId: _activeCorrelationId,
         cancelToken: requestCancelToken,
@@ -410,7 +416,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
 
     _pollTickInFlight = true;
     final repository = _repository;
-    CancelToken? requestCancelToken;
+    RequestCancellation? requestCancelToken;
     try {
       requestCancelToken = _newActiveRequestCancelToken();
       final generation = await repository.fetchGeneration(
@@ -468,9 +474,9 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
     _pollTimer = null;
   }
 
-  CancelToken _newActiveRequestCancelToken() {
+  RequestCancellation _newActiveRequestCancelToken() {
     _cancelActiveRequest();
-    final cancelToken = CancelToken();
+    final cancelToken = RequestCancellation();
     _activeRequestCancelToken = cancelToken;
     return cancelToken;
   }
@@ -483,7 +489,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
     _activeRequestCancelToken = null;
   }
 
-  void _clearActiveRequest(CancelToken cancelToken) {
+  void _clearActiveRequest(RequestCancellation cancelToken) {
     if (identical(_activeRequestCancelToken, cancelToken)) {
       _activeRequestCancelToken = null;
     }
@@ -507,7 +513,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
     _activeCorrelationId = active.correlationId;
     state = state.copyWith(isPolling: true, clearError: true);
 
-    CancelToken? requestCancelToken;
+    RequestCancellation? requestCancelToken;
     try {
       requestCancelToken = _newActiveRequestCancelToken();
       final generation = await repository.fetchGeneration(

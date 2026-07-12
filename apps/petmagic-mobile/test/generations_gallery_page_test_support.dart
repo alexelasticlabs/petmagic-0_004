@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -448,13 +449,13 @@ class FakeGalleryTemplateGenerationRepository
   final String durableShareUrl;
   final downloadCalls = <String>[];
   final shareCalls = <String>[];
-  CancelToken? downloadCancelToken;
-  CancelToken? shareCancelToken;
+  RequestCancellation? downloadCancelToken;
+  RequestCancellation? shareCancelToken;
 
   @override
   Future<GenerationMediaAccessResult> fetchDownloadUrl(
     String generationId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     downloadCalls.add(generationId);
     downloadCancelToken = cancelToken;
@@ -468,7 +469,7 @@ class FakeGalleryTemplateGenerationRepository
   @override
   Future<GenerationMediaAccessResult> fetchShareUrl(
     String generationId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     shareCalls.add(generationId);
     shareCancelToken = cancelToken;
@@ -492,8 +493,8 @@ class DelayedGalleryGenerationStatusMediaActions
   final bool delayShare;
   final saveStarted = Completer<void>();
   final shareStarted = Completer<void>();
-  CancelToken? saveCancelToken;
-  CancelToken? shareCancelToken;
+  RequestCancellation? saveCancelToken;
+  RequestCancellation? shareCancelToken;
   int saveCalls = 0;
   int shareCalls = 0;
   final savedUrls = <String>[];
@@ -510,7 +511,7 @@ class DelayedGalleryGenerationStatusMediaActions
     required String fileName,
     required bool isVideo,
     required String albumName,
-    required CancelToken cancelToken,
+    required RequestCancellation cancelToken,
     String? localPath,
   }) {
     saveCalls++;
@@ -532,7 +533,7 @@ class DelayedGalleryGenerationStatusMediaActions
     required String mediaUrl,
     required String fileName,
     required String title,
-    required CancelToken cancelToken,
+    required RequestCancellation cancelToken,
     String? shareText,
     String? localPath,
   }) {

@@ -1,7 +1,8 @@
 import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:dio/dio.dart';
+import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
@@ -50,8 +51,8 @@ class _GenerationResultInputPageState
   bool _isLoading = true;
   bool _isStarting = false;
   String? _error;
-  CancelToken? _cancelToken;
-  CancelToken? _startCancelToken;
+  RequestCancellation? _cancelToken;
+  RequestCancellation? _startCancelToken;
 
   @override
   void initState() {
@@ -81,7 +82,7 @@ class _GenerationResultInputPageState
 
   Future<void> _load() async {
     _cancelToken?.cancel('generation_result_input_reload');
-    final cancelToken = CancelToken();
+    final cancelToken = RequestCancellation();
     _cancelToken = cancelToken;
     setState(() {
       _isLoading = true;
@@ -108,14 +109,8 @@ class _GenerationResultInputPageState
         _compatible = results[1] as CompatibleGenerationTemplates;
         _isLoading = false;
       });
-    } on DioException catch (error) {
-      if (!mounted || CancelToken.isCancel(error)) {
-        return;
-      }
-      setState(() {
-        _isLoading = false;
-        _error = _copy.error;
-      });
+    } on RequestCancelledException {
+      return;
     } on Object {
       if (!mounted || cancelToken.isCancelled) {
         return;
@@ -317,7 +312,7 @@ class _GenerationResultInputPageState
     }
 
     _startCancelToken?.cancel('generation_result_input_start_replaced');
-    final startCancelToken = CancelToken();
+    final startCancelToken = RequestCancellation();
     _startCancelToken = startCancelToken;
     setState(() => _isStarting = true);
     try {
@@ -355,14 +350,8 @@ class _GenerationResultInputPageState
         return;
       }
       context.appNavigator.go(GenerationDestination(generation.generationId));
-    } on DioException catch (error) {
-      if (CancelToken.isCancel(error) || startCancelToken.isCancelled) {
-        return;
-      }
-      if (!mounted) {
-        return;
-      }
-      _showInfo(copy.error);
+    } on RequestCancelledException {
+      return;
     } on Object {
       if (!mounted || startCancelToken.isCancelled) {
         return;
@@ -383,7 +372,7 @@ class _GenerationResultInputPageState
     CompatibleGenerationTemplate template,
     String eventType, {
     String? generationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     try {
       await ref

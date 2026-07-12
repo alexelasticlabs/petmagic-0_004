@@ -53,21 +53,26 @@ void main() {
     final source = File(
       'lib/features/profile/application/profile_controller.dart',
     ).readAsStringSync();
+    final gatewaySource = File(
+      'lib/features/profile/data/mobile_avatar_media_gateway.dart',
+    ).readAsStringSync();
     final evictBody = _methodBody(source, 'Future<void> _evictAvatarCache');
 
     expect(evictBody, contains('parseSafeProfileAvatarUri(imageUrl)'));
     expect(
-      evictBody,
-      contains(
-        'final cacheKey = persistentSafeProfileAvatarUrl(safeImageUrl);',
-      ),
+      gatewaySource,
+      contains('final cacheKey = persistentSafeProfileAvatarUrl(imageUrl);'),
     );
     expect(
-      evictBody,
-      contains('evictFromCache(safeImageUrl, cacheKey: cacheKey)'),
+      gatewaySource,
+      contains('evictFromCache(imageUrl, cacheKey: cacheKey)'),
     );
-    expect(evictBody, isNot(contains('evictFromCache(safeImageUrl);')));
-    expect(evictBody, contains('NetworkImage(safeImageUrl)'));
+    expect(gatewaySource, isNot(contains('evictFromCache(imageUrl);')));
+    expect(gatewaySource, contains('NetworkImage(imageUrl)'));
+    expect(
+      evictBody,
+      contains('avatarMediaGatewayProvider).evictAvatarCache(safeImageUrl)'),
+    );
     expect(evictBody, isNot(contains('NetworkImage(imageUrl)')));
     expect(evictBody, contains("'avatar_cache_evict_failed'"));
     expect(evictBody, isNot(contains('avatar_url')));

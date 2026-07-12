@@ -3,6 +3,8 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
 import 'package:petmagic_mobile/shared/files/file_name_sanitizer.dart';
@@ -212,7 +214,7 @@ void main() {
 
     test('stops streamed download promptly when cancelled', () async {
       final stream = StreamController<Uint8List>();
-      final cancelToken = CancelToken();
+      final cancelToken = RequestCancellation();
       final dio = Dio()
         ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
           return ResponseBody(stream.stream, 200);
@@ -227,18 +229,11 @@ void main() {
       final expectation = expectLater(
         downloadFuture,
         throwsA(
-          isA<DioException>()
-              .having((error) => error.type, 'type', DioExceptionType.cancel)
-              .having(
-                (error) => error.requestOptions.path,
-                'path',
-                isNot(contains('signature=secret')),
-              )
-              .having(
-                (error) => error.message,
-                'message',
-                isNot(contains('signature=secret')),
-              ),
+          isA<RequestCancelledException>().having(
+            (error) => error.message,
+            'message',
+            isNot(contains('signature=secret')),
+          ),
         ),
       );
 
@@ -479,9 +474,9 @@ void main() {
       ).readAsString();
       final method = _extractMethodBody(source, 'void _throwIfCancelled(');
 
-      expect(method, contains("RequestOptions(path: '/local-media-action')"));
-      expect(method, isNot(contains('RequestOptions(path: path)')));
-      expect(method, isNot(contains('RequestOptions(path: filePath)')));
+      expect(method, contains('throw const RequestCancelledException()'));
+      expect(method, isNot(contains('path')));
+      expect(method, isNot(contains('filePath')));
     },
   );
 

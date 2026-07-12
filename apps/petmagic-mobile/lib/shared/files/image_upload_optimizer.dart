@@ -1,7 +1,8 @@
 import 'dart:io';
 import 'dart:math' as math;
 
-import 'package:dio/dio.dart';
+import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
@@ -86,7 +87,7 @@ class ImageUploadOptimizer {
 
   Future<OptimizedUploadFile> optimizeGenerationSource(
     XFile source, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return _optimizeImageFile(
       source,
@@ -97,7 +98,7 @@ class ImageUploadOptimizer {
 
   Future<OptimizedUploadFile> optimizeForAvatar(
     XFile source, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return _optimizeImageFile(
       source,
@@ -108,7 +109,7 @@ class ImageUploadOptimizer {
 
   Future<OptimizedUploadFile> optimizeForPetPhoto(
     XFile source, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return _optimizeImageFile(
       source,
@@ -119,7 +120,7 @@ class ImageUploadOptimizer {
 
   Future<OptimizedUploadFile> optimizeForSupportImage(
     XFile source, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return _optimizeImageFile(
       source,
@@ -131,7 +132,7 @@ class ImageUploadOptimizer {
   Future<OptimizedUploadFile> _optimizeImageFile(
     XFile source, {
     required ImageUploadOptimizationProfile profile,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     if (!profile.isEnabled) {
       _logSkippedOptimization(profile: profile, reason: 'profile_disabled');
@@ -339,12 +340,8 @@ Uint8List? optimizeAvatarCropBytes(Map<String, Object> request) {
   );
 }
 
-void _throwIfCancelled(CancelToken? cancelToken) {
+void _throwIfCancelled(RequestCancellation? cancelToken) {
   if (cancelToken?.isCancelled ?? false) {
-    throw DioException(
-      requestOptions: RequestOptions(path: ''),
-      type: DioExceptionType.cancel,
-      error: 'request_cancelled',
-    );
+    throw const RequestCancelledException();
   }
 }

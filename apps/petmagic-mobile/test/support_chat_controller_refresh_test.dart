@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -420,7 +421,7 @@ class _FlakyRefreshSupportChatRepository extends SupportChatRepository {
     int take = 60,
     DateTime? beforeMessageCreatedAtUtc,
     String? beforeMessageId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     getConversationCalls += 1;
     if (getConversationCalls == 1) {
@@ -443,7 +444,7 @@ class _DuplicateOlderMessagesSupportChatRepository
     int take = 60,
     DateTime? beforeMessageCreatedAtUtc,
     String? beforeMessageId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     getConversationCalls += 1;
     if (beforeMessageCreatedAtUtc == null) {

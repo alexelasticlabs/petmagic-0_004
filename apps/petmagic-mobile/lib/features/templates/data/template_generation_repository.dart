@@ -8,6 +8,9 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
+import 'package:petmagic_mobile/core/network/dio_request_cancellation.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
+import 'package:petmagic_mobile/core/files/local_media_file.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http_parser/http_parser.dart';
@@ -118,10 +121,10 @@ class TemplateGenerationRepository implements GenerationRepository {
   @override
   Future<TemplateGenerationResult> startGeneration({
     required String templateId,
-    required XFile sourceImage,
+    required LocalMediaFile sourceImage,
     int? expectedTemplateVersion,
     String? correlationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final encodedTemplateId = _apiPathSegment(templateId);
     final rawFileName = sourceImage.name.isNotEmpty
@@ -169,7 +172,7 @@ class TemplateGenerationRepository implements GenerationRepository {
             session.accessToken,
             correlationId: correlationId,
           ),
-          cancelToken: cancelToken,
+          cancelToken: cancelToken.toDioCancelToken(),
         ),
         retryTransientFailures: false,
       );
@@ -217,7 +220,7 @@ class TemplateGenerationRepository implements GenerationRepository {
   Future<TemplateGenerationResult> fetchGeneration(
     String generationId, {
     String? correlationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final encodedGenerationId = _apiPathSegment(generationId);
     final response = await _authorizedRequest<Map<String, dynamic>>(
@@ -227,7 +230,7 @@ class TemplateGenerationRepository implements GenerationRepository {
           session.accessToken,
           correlationId: correlationId,
         ),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
     );
 
@@ -238,7 +241,7 @@ class TemplateGenerationRepository implements GenerationRepository {
   Future<GenerationCancelResult> cancelGeneration(
     String generationId, {
     String? correlationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final encodedGenerationId = _apiPathSegment(generationId);
     final response = await _authorizedRequest<Map<String, dynamic>>(
@@ -248,7 +251,7 @@ class TemplateGenerationRepository implements GenerationRepository {
           session.accessToken,
           correlationId: correlationId,
         ),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
       retryTransientFailures: false,
     );
@@ -267,14 +270,14 @@ class TemplateGenerationRepository implements GenerationRepository {
   @override
   Future<CompatibleGenerationTemplates> fetchCompatibleTemplates(
     String resultId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final encodedResultId = _apiPathSegment(resultId);
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.get<Map<String, dynamic>>(
         '/api/templates/generation-results/$encodedResultId/compatible-templates',
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
     );
 
@@ -289,7 +292,7 @@ class TemplateGenerationRepository implements GenerationRepository {
     required String templateId,
     int? expectedTemplateVersion,
     String? correlationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
@@ -304,7 +307,7 @@ class TemplateGenerationRepository implements GenerationRepository {
           session.accessToken,
           correlationId: correlationId,
         ),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
       retryTransientFailures: false,
     );
@@ -317,7 +320,7 @@ class TemplateGenerationRepository implements GenerationRepository {
     required String sourceGenerationId,
     String variationStrength = 'medium',
     String? correlationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final encodedSourceGenerationId = _apiPathSegment(sourceGenerationId);
     final idempotencyKey =
@@ -331,7 +334,7 @@ class TemplateGenerationRepository implements GenerationRepository {
           correlationId: correlationId,
           extraHeaders: {'Idempotency-Key': idempotencyKey},
         ),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
       retryTransientFailures: false,
     );
@@ -355,7 +358,7 @@ class TemplateGenerationRepository implements GenerationRepository {
     required String templateId,
     int? expectedTemplateVersion,
     String? correlationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final idempotencyKey =
         'pet-$petId-${petPhotoId ?? 'auto'}-$templateId-${DateTime.now().microsecondsSinceEpoch}';
@@ -375,7 +378,7 @@ class TemplateGenerationRepository implements GenerationRepository {
           correlationId: correlationId,
           extraHeaders: {'Idempotency-Key': idempotencyKey},
         ),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
       retryTransientFailures: false,
     );
@@ -383,12 +386,12 @@ class TemplateGenerationRepository implements GenerationRepository {
     return TemplateGenerationDto.fromJson(response.data ?? const {}).toDomain();
   }
 
-  Future<List<PetProfile>> fetchPets({CancelToken? cancelToken}) async {
+  Future<List<PetProfile>> fetchPets({RequestCancellation? cancelToken}) async {
     final response = await _authorizedRequest<List<dynamic>>(
       (session) => _dio.get<List<dynamic>>(
         '/api/pets',
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
     );
 
@@ -402,14 +405,14 @@ class TemplateGenerationRepository implements GenerationRepository {
     required String name,
     required String type,
     String? breed,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
         '/api/pets',
         data: {'name': name, 'type': type, 'breed': ?breed},
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
       retryTransientFailures: false,
     );
@@ -422,7 +425,7 @@ class TemplateGenerationRepository implements GenerationRepository {
     required String name,
     required String type,
     String? breed,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final encodedPetId = _apiPathSegment(petId);
     final response = await _authorizedRequest<Map<String, dynamic>>(
@@ -430,7 +433,7 @@ class TemplateGenerationRepository implements GenerationRepository {
         '/api/pets/$encodedPetId',
         data: {'name': name, 'type': type, 'breed': ?breed},
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
       retryTransientFailures: false,
     );
@@ -438,13 +441,16 @@ class TemplateGenerationRepository implements GenerationRepository {
     return mapPetProfileDto(response.data ?? const {});
   }
 
-  Future<void> deletePet(String petId, {CancelToken? cancelToken}) async {
+  Future<void> deletePet(
+    String petId, {
+    RequestCancellation? cancelToken,
+  }) async {
     final encodedPetId = _apiPathSegment(petId);
     await _authorizedRequest<void>(
       (session) => _dio.delete<void>(
         '/api/pets/$encodedPetId',
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
       retryTransientFailures: false,
     );
@@ -453,7 +459,7 @@ class TemplateGenerationRepository implements GenerationRepository {
   Future<PetPhoto> uploadPetPhoto({
     required String petId,
     required XFile photo,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) => _uploadPetPhoto(
     this,
     petId: petId,
@@ -463,13 +469,13 @@ class TemplateGenerationRepository implements GenerationRepository {
 
   Future<List<PetPhoto>> fetchPetPhotos(
     String petId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) => _fetchPetPhotos(this, petId: petId, cancelToken: cancelToken);
 
   Future<PetPhoto> setPetPhotoAsAvatar({
     required String petId,
     required String photoId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) => _setPetPhotoAsAvatar(
     this,
     petId: petId,
@@ -481,7 +487,7 @@ class TemplateGenerationRepository implements GenerationRepository {
     required String petId,
     required String photoId,
     required bool isFavorite,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) => _setPetPhotoFavorite(
     this,
     petId: petId,
@@ -493,7 +499,7 @@ class TemplateGenerationRepository implements GenerationRepository {
   Future<void> deletePetPhoto({
     required String petId,
     required String photoId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) => _deletePetPhoto(
     this,
     petId: petId,
@@ -503,7 +509,7 @@ class TemplateGenerationRepository implements GenerationRepository {
 
   Future<List<TemplateGenerationResult>> fetchPetGenerations(
     String petId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) => _fetchPetGenerations(this, petId: petId, cancelToken: cancelToken);
 
   @override
@@ -513,7 +519,7 @@ class TemplateGenerationRepository implements GenerationRepository {
     String source = 'mobile',
     String? generationId,
     Map<String, Object?>? metadata,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final encodedTemplateId = _apiPathSegment(templateId);
     await _authorizedRequest<void>(
@@ -527,7 +533,7 @@ class TemplateGenerationRepository implements GenerationRepository {
           if (metadata != null && metadata.isNotEmpty) 'metadata': metadata,
         },
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
       retryTransientFailures: false,
     );
@@ -537,7 +543,7 @@ class TemplateGenerationRepository implements GenerationRepository {
   Future<RemoveGenerationWatermarkResult> removeWatermark(
     String generationId, {
     String paymentMethod = 'credit',
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final encodedGenerationId = _apiPathSegment(generationId);
     final response = await _authorizedRequest<Map<String, dynamic>>(
@@ -545,7 +551,7 @@ class TemplateGenerationRepository implements GenerationRepository {
         '/api/templates/generations/$encodedGenerationId/remove-watermark',
         data: {'paymentMethod': paymentMethod},
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
       retryTransientFailures: false,
     );
@@ -559,7 +565,7 @@ class TemplateGenerationRepository implements GenerationRepository {
     required String eventType,
     String? generationId,
     Map<String, Object?> metadata = const {},
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final encodedTemplateId = _apiPathSegment(templateId);
     await _authorizedRequest<void>(
@@ -573,7 +579,7 @@ class TemplateGenerationRepository implements GenerationRepository {
           if (metadata.isNotEmpty) 'metadata': metadata,
         },
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
       retryTransientFailures: false,
     );
@@ -582,13 +588,13 @@ class TemplateGenerationRepository implements GenerationRepository {
   @override
   Future<GenerationMediaAccessResult> fetchDownloadUrl(
     String generationId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) => _fetchDownloadUrl(this, generationId, cancelToken: cancelToken);
 
   @override
   Future<GenerationMediaAccessResult> fetchShareUrl(
     String generationId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) => _fetchShareUrl(this, generationId, cancelToken: cancelToken);
 
   @override
@@ -636,7 +642,7 @@ class TemplateGenerationRepository implements GenerationRepository {
     String? status,
     int? skip,
     int? take,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) => _fetchGenerations(
     this,
     status: status,
@@ -650,7 +656,7 @@ class TemplateGenerationRepository implements GenerationRepository {
     String? status,
     String? cursor,
     int? take,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) => _fetchGenerationPage(
     this,
     status: status,
@@ -660,26 +666,26 @@ class TemplateGenerationRepository implements GenerationRepository {
   );
 
   @override
-  Future<int> fetchUnreadGenerationCount({CancelToken? cancelToken}) =>
+  Future<int> fetchUnreadGenerationCount({RequestCancellation? cancelToken}) =>
       _fetchUnreadGenerationCount(this, cancelToken: cancelToken);
 
   @override
   Future<void> markGenerationRead(
     String generationId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) => _markGenerationRead(this, generationId, cancelToken: cancelToken);
 
   @override
   Future<void> deleteGeneration(
     String generationId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final encodedGenerationId = _apiPathSegment(generationId);
     await _authorizedRequest<void>(
       (session) => _dio.delete<void>(
         '/api/templates/generations/$encodedGenerationId',
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
       retryTransientFailures: false,
     );
@@ -732,7 +738,7 @@ class TemplateGenerationRepository implements GenerationRepository {
     String? templateId,
     String? petId,
     String sourceScreen = 'settings',
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
     bool retryTransientFailures = false,
   }) async {
     final feedbackMessage = _nonEmptyOptional(message);
@@ -769,7 +775,7 @@ class TemplateGenerationRepository implements GenerationRepository {
         '/api/feedback',
         data: data,
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
       retryTransientFailures: retryTransientFailures,
     );

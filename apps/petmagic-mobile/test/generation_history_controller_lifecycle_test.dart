@@ -96,23 +96,25 @@ void main() {
     expect(
       refetchBody,
       contains(
-        'if (_activeRealtimeRefetchCancelTokens.containsKey(generationId))',
+        'if (_activeRealtimeRefetchRequestCancellations.containsKey(generationId))',
       ),
     );
-    expect(refetchBody, contains('final cancelToken = CancelToken();'));
+    expect(refetchBody, contains('final cancelToken = RequestCancellation();'));
     expect(
       refetchBody,
       contains(
-        '_activeRealtimeRefetchCancelTokens[generationId] = cancelToken',
+        '_activeRealtimeRefetchRequestCancellations[generationId] = cancelToken',
       ),
     );
     expect(refetchBody, contains('cancelToken: cancelToken'));
     expect(refetchBody, contains('cancelToken.isCancelled'));
-    expect(refetchBody, contains('CancelToken.isCancel(error)'));
+    expect(refetchBody, contains('on RequestCancelledException'));
     expect(refetchBody, contains('return;'));
     expect(
       refetchBody,
-      contains('_activeRealtimeRefetchCancelTokens.remove(generationId)'),
+      contains(
+        '_activeRealtimeRefetchRequestCancellations.remove(generationId)',
+      ),
     );
     expect(
       pauseRealtimeBody,
@@ -122,7 +124,7 @@ void main() {
     );
     expect(
       cancelRealtimeBody,
-      contains('_activeRealtimeRefetchCancelTokens.clear()'),
+      contains('_activeRealtimeRefetchRequestCancellations.clear()'),
     );
     expect(cancelRealtimeBody, contains('cancelToken.cancel(reason)'));
   });

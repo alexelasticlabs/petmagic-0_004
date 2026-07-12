@@ -12,10 +12,12 @@ import 'package:petmagic_mobile/core/permissions/app_permission_coordinator.dart
 import 'package:petmagic_mobile/core/permissions/media_permission_feedback.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
+import 'package:petmagic_mobile/features/pets/application/pet_repository.dart';
 import 'package:petmagic_mobile/features/pets/presentation/my_pets_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/features/profile/application/profile_controller.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
+import 'package:petmagic_mobile/features/templates/data/template_generation_pet_repository_adapter.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
 import 'package:petmagic_mobile/features/templates/application/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
@@ -325,6 +327,9 @@ void main() {
           ),
           templateGenerationRepositoryProvider.overrideWithValue(
             generationRepository,
+          ),
+          petRepositoryProvider.overrideWithValue(
+            TemplateGenerationPetRepositoryAdapter(generationRepository),
           ),
           realtimeClientProvider.overrideWith(
             (ref) => const NoopRealtimeClient(),
@@ -726,6 +731,9 @@ void main() {
           templateGenerationRepositoryProvider.overrideWithValue(
             generationRepository,
           ),
+          petRepositoryProvider.overrideWithValue(
+            TemplateGenerationPetRepositoryAdapter(generationRepository),
+          ),
           realtimeClientProvider.overrideWith(
             (ref) => const NoopRealtimeClient(),
           ),
@@ -856,6 +864,9 @@ void main() {
           ),
           templateGenerationRepositoryProvider.overrideWithValue(
             generationRepository,
+          ),
+          petRepositoryProvider.overrideWithValue(
+            TemplateGenerationPetRepositoryAdapter(generationRepository),
           ),
           generationHistoryControllerProvider.overrideWith(
             () => historyController,

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -208,7 +209,7 @@ class FakeImageUploadOptimizer extends ImageUploadOptimizer {
   @override
   Future<OptimizedUploadFile> optimizeGenerationSource(
     XFile source, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     generationSourceOptimizeCalls++;
     final file = generationSource;
@@ -224,7 +225,7 @@ class FakeImageUploadOptimizer extends ImageUploadOptimizer {
   @override
   Future<OptimizedUploadFile> optimizeForPetPhoto(
     XFile source, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     petPhotoOptimizeCalls++;
     final file = petPhoto;

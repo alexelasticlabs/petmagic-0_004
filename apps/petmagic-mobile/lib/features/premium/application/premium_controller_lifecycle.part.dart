@@ -24,7 +24,7 @@ mixin _PremiumControllerLifecycle on _PremiumControllerBase {
     }
 
     _purchaseUpdatesListenerRegistered = true;
-    ref.listen<AsyncValue<List<PurchaseDetails>>>(
+    ref.listen<AsyncValue<List<StorePurchaseDetails>>>(
       premiumPurchaseUpdatesProvider,
       (previous, next) {
         final purchases = next.asData?.value;
@@ -69,87 +69,90 @@ mixin _PremiumControllerLifecycle on _PremiumControllerBase {
     );
   }
 
-  CancelToken _startLoadCancelToken() {
+  RequestCancellation _startLoadRequestCancellation() {
     _cancelActiveLoad();
-    final cancelToken = CancelToken();
-    _activeLoadCancelToken = cancelToken;
+    final cancelToken = RequestCancellation();
+    _activeLoadRequestCancellation = cancelToken;
     return cancelToken;
   }
 
   void _cancelActiveLoad() {
-    final cancelToken = _activeLoadCancelToken;
+    final cancelToken = _activeLoadRequestCancellation;
     if (cancelToken != null && !cancelToken.isCancelled) {
       cancelToken.cancel('premium_load_cancelled');
     }
-    _activeLoadCancelToken = null;
+    _activeLoadRequestCancellation = null;
   }
 
-  void _clearActiveLoad(CancelToken cancelToken) {
-    if (identical(_activeLoadCancelToken, cancelToken)) {
-      _activeLoadCancelToken = null;
+  void _clearActiveLoad(RequestCancellation cancelToken) {
+    if (identical(_activeLoadRequestCancellation, cancelToken)) {
+      _activeLoadRequestCancellation = null;
     }
   }
 
-  CancelToken _startStatusRefreshCancelToken() {
+  RequestCancellation _startStatusRefreshRequestCancellation() {
     _cancelActiveStatusRefresh();
-    final cancelToken = CancelToken();
-    _activeStatusRefreshCancelToken = cancelToken;
+    final cancelToken = RequestCancellation();
+    _activeStatusRefreshRequestCancellation = cancelToken;
     return cancelToken;
   }
 
   void _cancelActiveStatusRefresh() {
-    final cancelToken = _activeStatusRefreshCancelToken;
+    final cancelToken = _activeStatusRefreshRequestCancellation;
     if (cancelToken != null && !cancelToken.isCancelled) {
       cancelToken.cancel('premium_status_refresh_cancelled');
     }
-    _activeStatusRefreshCancelToken = null;
+    _activeStatusRefreshRequestCancellation = null;
   }
 
-  void _clearActiveStatusRefresh(CancelToken cancelToken) {
-    if (identical(_activeStatusRefreshCancelToken, cancelToken)) {
-      _activeStatusRefreshCancelToken = null;
+  void _clearActiveStatusRefresh(RequestCancellation cancelToken) {
+    if (identical(_activeStatusRefreshRequestCancellation, cancelToken)) {
+      _activeStatusRefreshRequestCancellation = null;
     }
   }
 
-  CancelToken _startPremiumActionCancelToken() {
+  RequestCancellation _startPremiumActionRequestCancellation() {
     _cancelActivePremiumAction();
-    final cancelToken = CancelToken();
-    _activePremiumActionCancelToken = cancelToken;
+    final cancelToken = RequestCancellation();
+    _activePremiumActionRequestCancellation = cancelToken;
     return cancelToken;
   }
 
   void _cancelActivePremiumAction() {
-    final cancelToken = _activePremiumActionCancelToken;
+    final cancelToken = _activePremiumActionRequestCancellation;
     if (cancelToken != null && !cancelToken.isCancelled) {
       cancelToken.cancel('premium_action_cancelled');
     }
-    _activePremiumActionCancelToken = null;
+    _activePremiumActionRequestCancellation = null;
   }
 
-  void _clearActivePremiumAction(CancelToken cancelToken) {
-    if (identical(_activePremiumActionCancelToken, cancelToken)) {
-      _activePremiumActionCancelToken = null;
+  void _clearActivePremiumAction(RequestCancellation cancelToken) {
+    if (identical(_activePremiumActionRequestCancellation, cancelToken)) {
+      _activePremiumActionRequestCancellation = null;
     }
   }
 
-  CancelToken _startCheckoutVerificationCancelToken() {
+  RequestCancellation _startCheckoutVerificationRequestCancellation() {
     _cancelActiveCheckoutVerification();
-    final cancelToken = CancelToken();
-    _activeCheckoutVerificationCancelToken = cancelToken;
+    final cancelToken = RequestCancellation();
+    _activeCheckoutVerificationRequestCancellation = cancelToken;
     return cancelToken;
   }
 
   void _cancelActiveCheckoutVerification() {
-    final cancelToken = _activeCheckoutVerificationCancelToken;
+    final cancelToken = _activeCheckoutVerificationRequestCancellation;
     if (cancelToken != null && !cancelToken.isCancelled) {
       cancelToken.cancel('premium_checkout_verification_cancelled');
     }
-    _activeCheckoutVerificationCancelToken = null;
+    _activeCheckoutVerificationRequestCancellation = null;
   }
 
-  void _clearActiveCheckoutVerification(CancelToken cancelToken) {
-    if (identical(_activeCheckoutVerificationCancelToken, cancelToken)) {
-      _activeCheckoutVerificationCancelToken = null;
+  void _clearActiveCheckoutVerification(RequestCancellation cancelToken) {
+    if (identical(
+      _activeCheckoutVerificationRequestCancellation,
+      cancelToken,
+    )) {
+      _activeCheckoutVerificationRequestCancellation = null;
     }
   }
 

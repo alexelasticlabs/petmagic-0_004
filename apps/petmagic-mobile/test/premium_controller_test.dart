@@ -1,10 +1,11 @@
 import 'dart:async';
+import 'package:petmagic_mobile/core/payments/store_purchase.dart';
+import 'package:petmagic_mobile/core/platform/app_runtime_info.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
@@ -52,27 +53,43 @@ void main() {
           ),
         ),
       );
-      expect(source, contains('CancelToken? _activePremiumActionCancelToken;'));
       expect(
         source,
-        contains('CancelToken? _activeCheckoutVerificationCancelToken;'),
+        contains(
+          'RequestCancellation? _activePremiumActionRequestCancellation;',
+        ),
+      );
+      expect(
+        source,
+        contains(
+          'RequestCancellation? _activeCheckoutVerificationRequestCancellation;',
+        ),
       );
       expect(source, contains('void _cancelActivePremiumAction()'));
       expect(source, contains('void _cancelActiveCheckoutVerification()'));
       expect(source, contains('_cancelActivePremiumAction();'));
       expect(source, contains('_cancelActiveCheckoutVerification();'));
-      expect(source, contains('CancelToken _startPremiumActionCancelToken()'));
       expect(
         source,
-        contains('CancelToken _startCheckoutVerificationCancelToken()'),
+        contains(
+          'RequestCancellation _startPremiumActionRequestCancellation()',
+        ),
+      );
+      expect(
+        source,
+        contains(
+          'RequestCancellation _startCheckoutVerificationRequestCancellation()',
+        ),
       );
       expect(source, contains('_clearActivePremiumAction(cancelToken)'));
       expect(
         source,
-        contains('_clearActiveCheckoutVerification(verificationCancelToken)'),
+        contains(
+          '_clearActiveCheckoutVerification(verificationRequestCancellation)',
+        ),
       );
       expect(source, contains('cancelToken: cancelToken'));
-      expect(source, contains('cancelToken: verificationCancelToken'));
+      expect(source, contains('cancelToken: verificationRequestCancellation'));
     },
   );
 
@@ -1308,7 +1325,8 @@ class _FakePremiumRepository extends PremiumRepository {
   final Object? paywallError;
   final Object? checkoutError;
 
-  final _streamController = StreamController<List<PurchaseDetails>>.broadcast();
+  final _streamController =
+      StreamController<List<StorePurchaseDetails>>.broadcast();
   int fetchPaywallConfigCalls = 0;
   int fetchStatusCalls = 0;
   int fetchStoreAvailabilityCalls = 0;
@@ -1318,12 +1336,13 @@ class _FakePremiumRepository extends PremiumRepository {
   int restoreStorePurchasesCalls = 0;
 
   @override
-  Stream<List<PurchaseDetails>> get purchaseUpdates => _streamController.stream;
+  Stream<List<StorePurchaseDetails>> get purchaseUpdates =>
+      _streamController.stream;
 
   @override
   Future<PremiumPaywallConfigModel> fetchPaywallConfig({
-    required Locale locale,
-    CancelToken? cancelToken,
+    required AppLocale locale,
+    RequestCancellation? cancelToken,
   }) async {
     fetchPaywallConfigCalls++;
     if (paywallError != null) {
@@ -1333,7 +1352,9 @@ class _FakePremiumRepository extends PremiumRepository {
   }
 
   @override
-  Future<PremiumStatusModel> fetchStatus({CancelToken? cancelToken}) async {
+  Future<PremiumStatusModel> fetchStatus({
+    RequestCancellation? cancelToken,
+  }) async {
     fetchStatusCalls++;
     if (statusSequence.isEmpty) {
       return status;
@@ -1350,8 +1371,8 @@ class _FakePremiumRepository extends PremiumRepository {
   @override
   Future<PremiumCheckoutModel> createStripeCheckout(
     PremiumPlanModel plan,
-    Locale locale, {
-    CancelToken? cancelToken,
+    AppLocale locale, {
+    RequestCancellation? cancelToken,
   }) async {
     createStripeCheckoutCalls++;
     if (checkoutError != null) {
@@ -1362,7 +1383,7 @@ class _FakePremiumRepository extends PremiumRepository {
 
   @override
   Future<PremiumBillingPortalModel> createBillingPortal({
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     createBillingPortalCalls++;
     return const PremiumBillingPortalModel(
@@ -1409,8 +1430,8 @@ class _FakePremiumRepository extends PremiumRepository {
   Future<PremiumStoreVerificationModel> verifyStorePurchase({
     required PremiumPlanModel plan,
     required PremiumPaymentProvider provider,
-    required PurchaseDetails purchase,
-    CancelToken? cancelToken,
+    required StorePurchaseDetails purchase,
+    RequestCancellation? cancelToken,
   }) async {
     return PremiumStoreVerificationModel(
       paymentProvider: provider.value,
@@ -1422,7 +1443,7 @@ class _FakePremiumRepository extends PremiumRepository {
   }
 
   @override
-  Future<void> completePurchase(PurchaseDetails purchase) async {}
+  Future<void> completePurchase(StorePurchaseDetails purchase) async {}
 }
 
 class _DelayedPremiumRepository extends _FakePremiumRepository {
@@ -1430,12 +1451,12 @@ class _DelayedPremiumRepository extends _FakePremiumRepository {
 
   final fetchPaywallStarted = Completer<void>();
   final _paywallConfig = Completer<PremiumPaywallConfigModel>();
-  CancelToken? paywallCancelToken;
+  RequestCancellation? paywallCancelToken;
 
   @override
   Future<PremiumPaywallConfigModel> fetchPaywallConfig({
-    required Locale locale,
-    CancelToken? cancelToken,
+    required AppLocale locale,
+    RequestCancellation? cancelToken,
   }) {
     fetchPaywallConfigCalls++;
     paywallCancelToken = cancelToken;
@@ -1454,17 +1475,17 @@ class _DelayedCheckoutPremiumRepository extends _FakePremiumRepository {
     required super.status,
   });
 
-  final checkoutStarted = Completer<CancelToken>();
+  final checkoutStarted = Completer<RequestCancellation>();
   final _checkout = Completer<PremiumCheckoutModel>();
 
   @override
   Future<PremiumCheckoutModel> createStripeCheckout(
     PremiumPlanModel plan,
-    Locale locale, {
-    CancelToken? cancelToken,
+    AppLocale locale, {
+    RequestCancellation? cancelToken,
   }) {
     createStripeCheckoutCalls++;
-    final token = cancelToken ?? CancelToken();
+    final token = cancelToken ?? RequestCancellation();
     if (!checkoutStarted.isCompleted) {
       checkoutStarted.complete(token);
     }
@@ -1496,16 +1517,16 @@ class _DelayedStripeVerificationPremiumRepository
     required super.status,
   });
 
-  final stripeVerificationStarted = Completer<CancelToken>();
+  final stripeVerificationStarted = Completer<RequestCancellation>();
   final _stripeVerification = Completer<void>();
 
   @override
   Future<void> verifyStripeSubscriptionCheckout({
     required String planCode,
     required String externalSubscriptionId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) {
-    final token = cancelToken ?? CancelToken();
+    final token = cancelToken ?? RequestCancellation();
     if (!stripeVerificationStarted.isCompleted) {
       stripeVerificationStarted.complete(token);
     }
@@ -1530,17 +1551,19 @@ class _DelayedVerificationStatusPremiumRepository
     required super.status,
   });
 
-  final statusRefreshStarted = Completer<CancelToken>();
+  final statusRefreshStarted = Completer<RequestCancellation>();
   final _statusRefresh = Completer<PremiumStatusModel>();
 
   @override
-  Future<PremiumStatusModel> fetchStatus({CancelToken? cancelToken}) async {
+  Future<PremiumStatusModel> fetchStatus({
+    RequestCancellation? cancelToken,
+  }) async {
     fetchStatusCalls++;
     if (fetchStatusCalls == 1) {
       return status;
     }
 
-    final token = cancelToken ?? CancelToken();
+    final token = cancelToken ?? RequestCancellation();
     if (!statusRefreshStarted.isCompleted) {
       statusRefreshStarted.complete(token);
     }

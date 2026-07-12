@@ -1,6 +1,8 @@
-import 'package:dio/dio.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/features/support/domain/support_chat_models.dart';
+
+typedef UploadProgressCallback = void Function(int sent, int total);
 
 final supportChatRepositoryProvider = Provider<SupportRepository>((ref) {
   throw StateError(
@@ -16,14 +18,14 @@ abstract interface class SupportRepository {
     String? relatedGenerationId,
     String? relatedPaymentId,
     String? relatedSubscriptionId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
 
   Future<SupportChatConversation> getConversation({
     int take = 60,
     DateTime? beforeMessageCreatedAtUtc,
     String? beforeMessageId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
 
   Future<SupportChatMessage> sendMessage({
@@ -41,8 +43,8 @@ abstract interface class SupportRepository {
     required String localeTag,
     String? body,
     String? replyToMessageId,
-    ProgressCallback? onSendProgress,
-    CancelToken? cancelToken,
+    UploadProgressCallback? onSendProgress,
+    RequestCancellation? cancelToken,
   });
 
   Future<SupportChatMessage> sendAttachments({
@@ -51,8 +53,8 @@ abstract interface class SupportRepository {
     required String localeTag,
     String? body,
     String? replyToMessageId,
-    ProgressCallback? onSendProgress,
-    CancelToken? cancelToken,
+    UploadProgressCallback? onSendProgress,
+    RequestCancellation? cancelToken,
   });
 
   Future<SupportChatMessage> retryAttachment({
@@ -61,12 +63,12 @@ abstract interface class SupportRepository {
     required String filePath,
     required String fileName,
     required String contentType,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
 
   Future<void> markConversationRead(
     String conversationId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   });
   Future<SupportChatConversation> resolveConversation(String conversationId);
   Future<SupportChatConversation> reopenConversation(String conversationId);

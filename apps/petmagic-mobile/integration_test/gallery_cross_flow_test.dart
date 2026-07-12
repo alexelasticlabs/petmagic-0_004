@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,11 +11,14 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/app/router/go_router_app_navigator.dart';
 import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/pets/presentation/my_pets_page.dart';
+import 'package:petmagic_mobile/features/pets/application/pet_repository.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
+import 'package:petmagic_mobile/features/templates/data/template_generation_pet_repository_adapter.dart';
 import 'package:petmagic_mobile/features/templates/domain/templates_query.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
@@ -58,7 +62,14 @@ void main() {
         ),
         GoRoute(
           path: TemplatesPage.routePath,
-          builder: (context, state) => const Scaffold(body: TemplatesPage()),
+          builder: (context, state) => Scaffold(
+            body: TemplatesPage(
+              initialPetId:
+                  state.uri.queryParameters[TemplatesPage.petIdQueryParam],
+              initialPetPhotoId:
+                  state.uri.queryParameters[TemplatesPage.petPhotoIdQueryParam],
+            ),
+          ),
         ),
         GoRoute(
           path: TemplatePreviewPage.routePath,
@@ -97,6 +108,9 @@ void main() {
       ProviderScope(
         overrides: [
           appLaunchControllerProvider.overrideWith(_AuthenticatedLaunch.new),
+          networkStatusControllerProvider.overrideWith(
+            _OnlineNetworkStatusController.new,
+          ),
           walletControllerProvider.overrideWith(_FundedWalletController.new),
           templatesControllerProvider.overrideWith(
             () => _SingleTemplateController(template),
@@ -106,6 +120,9 @@ void main() {
           ),
           templateGenerationRepositoryProvider.overrideWithValue(
             generationRepository,
+          ),
+          petRepositoryProvider.overrideWithValue(
+            TemplateGenerationPetRepositoryAdapter(generationRepository),
           ),
           generationHistoryControllerProvider.overrideWith(
             () => historyController,
@@ -159,6 +176,12 @@ void main() {
     await _pumpUntil(
       tester,
       () => find.text(text.templateFlowCreateMagicAction).evaluate().isNotEmpty,
+    );
+    expect(
+      find.text(text.templateFlowCreateMagicAction),
+      findsOneWidget,
+      reason:
+          'Expected the pet generation launch sheet after selecting Upload.',
     );
 
     await tester.tap(find.text(text.templateFlowCreateMagicAction));
@@ -260,6 +283,7 @@ void main() {
     ]);
     expect(mediaActions.saveLocalPaths, [null]);
     expect(generationRepository.downloadCalls, ['generation-pet-1']);
+    await tester.pump(const Duration(milliseconds: 300));
 
     await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
     await tester.pump();
@@ -272,9 +296,10 @@ void main() {
     ]);
     expect(mediaActions.shareLocalPaths, [null]);
     expect(mediaActions.shareTexts, [
-      'https://app.petmagic.test/share/generation/generation-pet-1',
+      'https://app.petmagic.app/share/generation/generation-pet-1',
     ]);
     expect(generationRepository.shareCalls, ['generation-pet-1']);
+    await tester.pump(const Duration(milliseconds: 300));
 
     await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
     await tester.pump();
@@ -285,7 +310,7 @@ void main() {
 
     expect(
       copied?.text,
-      'https://app.petmagic.test/share/generation/generation-pet-1',
+      'https://app.petmagic.app/share/generation/generation-pet-1',
     );
     expect(generationRepository.shareCalls, [
       'generation-pet-1',
@@ -364,7 +389,7 @@ class _RecordingGenerationStatusMediaActions
     required String fileName,
     required bool isVideo,
     required String albumName,
-    required CancelToken cancelToken,
+    required RequestCancellation cancelToken,
     String? localPath,
   }) async {
     saveCalls.add(mediaUrl);
@@ -377,7 +402,7 @@ class _RecordingGenerationStatusMediaActions
     required String mediaUrl,
     required String fileName,
     required String title,
-    required CancelToken cancelToken,
+    required RequestCancellation cancelToken,
     String? shareText,
     String? localPath,
   }) async {
@@ -398,6 +423,11 @@ class _AuthenticatedLaunch extends AppLaunchController {
       guestSessionReady: true,
     );
   }
+}
+
+class _OnlineNetworkStatusController extends NetworkStatusController {
+  @override
+  NetworkStatusState build() => const NetworkStatusState(hasInternet: true);
 }
 
 class _FundedWalletController extends WalletController {
@@ -629,7 +659,7 @@ class _CrossGalleryPetFlowRepository extends TemplateGenerationRepository {
   }
 
   @override
-  Future<List<PetProfile>> fetchPets({CancelToken? cancelToken}) async {
+  Future<List<PetProfile>> fetchPets({RequestCancellation? cancelToken}) async {
     return [
       PetProfile(
         id: 'pet-42',
@@ -648,7 +678,7 @@ class _CrossGalleryPetFlowRepository extends TemplateGenerationRepository {
   @override
   Future<List<PetPhoto>> fetchPetPhotos(
     String petId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return [
       PetPhoto(
@@ -670,7 +700,7 @@ class _CrossGalleryPetFlowRepository extends TemplateGenerationRepository {
   @override
   Future<List<TemplateGenerationResult>> fetchPetGenerations(
     String petId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return const [];
   }
@@ -682,7 +712,7 @@ class _CrossGalleryPetFlowRepository extends TemplateGenerationRepository {
     required String templateId,
     int? expectedTemplateVersion,
     String? correlationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     lastPetId = petId;
     lastPetPhotoId = petPhotoId;
@@ -735,7 +765,7 @@ class _CrossGalleryPetFlowRepository extends TemplateGenerationRepository {
   @override
   Future<GenerationMediaAccessResult> fetchDownloadUrl(
     String generationId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     downloadCalls.add(generationId);
     return const GenerationMediaAccessResult(
@@ -749,14 +779,14 @@ class _CrossGalleryPetFlowRepository extends TemplateGenerationRepository {
   @override
   Future<GenerationMediaAccessResult> fetchShareUrl(
     String generationId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     shareCalls.add(generationId);
     return GenerationMediaAccessResult(
       mediaUrl: 'https://cdn.petmagic.app/fresh-share-bella.jpg?sig=share',
       hasWatermark: false,
       fileName: 'fresh-share-bella.jpg',
-      shareUrl: 'https://app.petmagic.test/share/generation/$generationId',
+      shareUrl: 'https://app.petmagic.app/share/generation/$generationId',
     );
   }
 

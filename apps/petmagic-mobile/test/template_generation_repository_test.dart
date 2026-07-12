@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/files/local_media_file.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
@@ -177,7 +178,7 @@ void main() {
 
     final generation = await repository.startGeneration(
       templateId: templateId,
-      sourceImage: XFile(file.path, name: 'source.jpg'),
+      sourceImage: LocalMediaFile(path: file.path, name: 'source.jpg'),
       correlationId: 'corr-1',
     );
 
@@ -224,8 +225,8 @@ void main() {
 
     await repository.startGeneration(
       templateId: 'template-1',
-      sourceImage: XFile(
-        source.path,
+      sourceImage: LocalMediaFile(
+        path: source.path,
         name: 'source.bin',
         mimeType: 'image/png',
       ),
@@ -578,7 +579,10 @@ void main() {
       await expectLater(
         repository.startGeneration(
           templateId: 'template-1',
-          sourceImage: XFile(missingPath, name: 'missing-pet.jpg'),
+          sourceImage: LocalMediaFile(
+            path: missingPath,
+            name: 'missing-pet.jpg',
+          ),
         ),
         throwsA(
           isA<AppException>()
@@ -628,8 +632,8 @@ void main() {
     await expectLater(
       repository.startGeneration(
         templateId: 'template-1',
-        sourceImage: XFile(
-          file.path,
+        sourceImage: LocalMediaFile(
+          path: file.path,
           name: 'spoofed-pet.jpg',
           mimeType: 'image/jpeg',
         ),
@@ -683,8 +687,8 @@ void main() {
       await expectLater(
         repository.startGeneration(
           templateId: 'template-1',
-          sourceImage: XFile(
-            source.path,
+          sourceImage: LocalMediaFile(
+            path: source.path,
             name: 'source.jpg',
             mimeType: 'image/jpeg',
           ),

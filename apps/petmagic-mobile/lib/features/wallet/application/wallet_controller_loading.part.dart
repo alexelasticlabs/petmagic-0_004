@@ -10,10 +10,10 @@ mixin _WalletControllerLoading
       return;
     }
 
-    final loadCancelToken = _startLoadCancelToken();
+    final loadRequestCancellation = _startLoadRequestCancellation();
     final operation = _performLoad(
       refresh: refresh,
-      cancelToken: loadCancelToken,
+      cancelToken: loadRequestCancellation,
     );
     _loadInFlight = operation;
     try {
@@ -22,13 +22,13 @@ mixin _WalletControllerLoading
       if (identical(_loadInFlight, operation)) {
         _loadInFlight = null;
       }
-      _clearActiveLoad(loadCancelToken);
+      _clearActiveLoad(loadRequestCancellation);
     }
   }
 
   Future<void> _performLoad({
     required bool refresh,
-    required CancelToken cancelToken,
+    required RequestCancellation cancelToken,
   }) async {
     _cancelActiveLedgerLoadMore();
     _updateStateIfMounted(
@@ -88,7 +88,7 @@ mixin _WalletControllerLoading
         () async {
           try {
             final config = await _repository.fetchCheckoutConfig(
-              locale: WidgetsBinding.instance.platformDispatcher.locale,
+              locale: _runtimeInfo.locale,
               cancelToken: cancelToken,
             );
             packs = config.packs;
@@ -270,7 +270,8 @@ mixin _WalletControllerLoading
       return;
     }
 
-    final loadMoreCancelToken = _startLedgerLoadMoreCancelToken();
+    final loadMoreRequestCancellation =
+        _startLedgerLoadMoreRequestCancellation();
     _updateStateIfMounted(
       (state) => state.copyWith(
         isLoadingMoreLedger: true,
@@ -283,9 +284,9 @@ mixin _WalletControllerLoading
       final page = await _repository.fetchLedger(
         skip: skip,
         take: _WalletControllerBase.walletLedgerPageSize,
-        cancelToken: loadMoreCancelToken,
+        cancelToken: loadMoreRequestCancellation,
       );
-      if (!ref.mounted || loadMoreCancelToken.isCancelled) {
+      if (!ref.mounted || loadMoreRequestCancellation.isCancelled) {
         return;
       }
 
@@ -320,7 +321,7 @@ mixin _WalletControllerLoading
         ),
       );
     } finally {
-      _clearActiveLedgerLoadMore(loadMoreCancelToken);
+      _clearActiveLedgerLoadMore(loadMoreRequestCancellation);
     }
   }
 
@@ -380,12 +381,12 @@ mixin _WalletControllerLoading
     }
 
     _isWalletSyncInFlight = true;
-    final syncCancelToken = _startWalletSyncCancelToken();
+    final syncRequestCancellation = _startWalletSyncRequestCancellation();
     try {
       final nextWallet = await _repository.fetchWallet(
-        cancelToken: syncCancelToken,
+        cancelToken: syncRequestCancellation,
       );
-      if (!ref.mounted || syncCancelToken.isCancelled) {
+      if (!ref.mounted || syncRequestCancellation.isCancelled) {
         return;
       }
 
@@ -411,9 +412,9 @@ mixin _WalletControllerLoading
       try {
         latestLedgerPage = await _repository.fetchLedger(
           take: _WalletControllerBase.walletLedgerPageSize,
-          cancelToken: syncCancelToken,
+          cancelToken: syncRequestCancellation,
         );
-        if (!ref.mounted || syncCancelToken.isCancelled) {
+        if (!ref.mounted || syncRequestCancellation.isCancelled) {
           return;
         }
       } catch (error, stackTrace) {
@@ -423,7 +424,7 @@ mixin _WalletControllerLoading
         _logWalletLoadFailure('sync_fetch_ledger', error, stackTrace);
       }
 
-      if (!ref.mounted || syncCancelToken.isCancelled) {
+      if (!ref.mounted || syncRequestCancellation.isCancelled) {
         return;
       }
       _updateStateIfMounted(
@@ -447,7 +448,7 @@ mixin _WalletControllerLoading
       _logWalletLoadFailure('sync_fetch_wallet', error, stackTrace);
     } finally {
       _isWalletSyncInFlight = false;
-      _clearActiveWalletSync(syncCancelToken);
+      _clearActiveWalletSync(syncRequestCancellation);
     }
   }
 }

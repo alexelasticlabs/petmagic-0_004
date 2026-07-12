@@ -116,40 +116,40 @@ mixin _GenerationHistoryControllerLifecycle
   }
 
   @override
-  CancelToken _startLoadCancelToken() {
+  RequestCancellation _startLoadRequestCancellation() {
     _cancelActiveLoad('generation_history_superseded', clearPending: false);
-    final cancelToken = CancelToken();
-    _activeLoadCancelToken = cancelToken;
+    final cancelToken = RequestCancellation();
+    _activeLoadRequestCancellation = cancelToken;
     return cancelToken;
   }
 
   @override
-  void _clearActiveLoadCancelToken(CancelToken cancelToken) {
-    if (identical(_activeLoadCancelToken, cancelToken)) {
-      _activeLoadCancelToken = null;
+  void _clearActiveLoadRequestCancellation(RequestCancellation cancelToken) {
+    if (identical(_activeLoadRequestCancellation, cancelToken)) {
+      _activeLoadRequestCancellation = null;
     }
   }
 
   @override
-  CancelToken _startLoadMoreCancelToken() {
+  RequestCancellation _startLoadMoreRequestCancellation() {
     _cancelActiveLoadMore('generation_history_load_more_superseded');
-    final cancelToken = CancelToken();
-    _activeLoadMoreCancelToken = cancelToken;
+    final cancelToken = RequestCancellation();
+    _activeLoadMoreRequestCancellation = cancelToken;
     return cancelToken;
   }
 
   @override
-  void _clearActiveLoadMoreCancelToken() {
-    _activeLoadMoreCancelToken = null;
+  void _clearActiveLoadMoreRequestCancellation() {
+    _activeLoadMoreRequestCancellation = null;
   }
 
   @override
   void _cancelActiveLoadMore(String reason) {
-    final cancelToken = _activeLoadMoreCancelToken;
+    final cancelToken = _activeLoadMoreRequestCancellation;
     if (cancelToken != null && !cancelToken.isCancelled) {
       cancelToken.cancel(reason);
     }
-    _activeLoadMoreCancelToken = null;
+    _activeLoadMoreRequestCancellation = null;
     _isLoadMoreInFlight = false;
     if (ref.mounted && state.isLoadingMore) {
       state = state.copyWith(isLoadingMore: false);
@@ -161,11 +161,11 @@ mixin _GenerationHistoryControllerLifecycle
     required bool clearPending,
     bool clearLoadingState = true,
   }) {
-    final cancelToken = _activeLoadCancelToken;
+    final cancelToken = _activeLoadRequestCancellation;
     if (cancelToken != null && !cancelToken.isCancelled) {
       cancelToken.cancel(reason);
     }
-    _activeLoadCancelToken = null;
+    _activeLoadRequestCancellation = null;
     if (clearPending && clearLoadingState) {
       _completeCancelledLoad();
     }
@@ -182,19 +182,19 @@ mixin _GenerationHistoryControllerLifecycle
     }
   }
 
-  CancelToken _startUnreadRefreshCancelToken() {
+  RequestCancellation _startUnreadRefreshRequestCancellation() {
     _cancelActiveUnreadRefresh('generation_history_unread_superseded');
-    final cancelToken = CancelToken();
-    _activeUnreadRefreshCancelToken = cancelToken;
+    final cancelToken = RequestCancellation();
+    _activeUnreadRefreshRequestCancellation = cancelToken;
     return cancelToken;
   }
 
   void _cancelActiveUnreadRefresh(String reason) {
-    final cancelToken = _activeUnreadRefreshCancelToken;
+    final cancelToken = _activeUnreadRefreshRequestCancellation;
     if (cancelToken != null && !cancelToken.isCancelled) {
       cancelToken.cancel(reason);
     }
-    _activeUnreadRefreshCancelToken = null;
+    _activeUnreadRefreshRequestCancellation = null;
   }
 
   @override
@@ -351,7 +351,7 @@ mixin _GenerationHistoryControllerLifecycle
       return;
     }
 
-    final cancelToken = _startUnreadRefreshCancelToken();
+    final cancelToken = _startUnreadRefreshRequestCancellation();
     try {
       final unreadCount = await _repository.fetchUnreadGenerationCount(
         cancelToken: cancelToken,
@@ -364,22 +364,18 @@ mixin _GenerationHistoryControllerLifecycle
       }
 
       state = state.copyWith(unreadCount: _visibleUnreadCount(unreadCount));
-    } on DioException catch (error) {
-      if (CancelToken.isCancel(error) || cancelToken.isCancelled) {
-        return;
-      }
     } on Object {
       // Best-effort badge refresh; the next history load remains authoritative.
     } finally {
-      if (identical(_activeUnreadRefreshCancelToken, cancelToken)) {
-        _activeUnreadRefreshCancelToken = null;
+      if (identical(_activeUnreadRefreshRequestCancellation, cancelToken)) {
+        _activeUnreadRefreshRequestCancellation = null;
       }
     }
   }
 
   @override
   Future<int?> _fetchUnreadGenerationCountBestEffort(
-    CancelToken cancelToken,
+    RequestCancellation cancelToken,
   ) async {
     if (!_isAuthenticated) {
       return null;
@@ -456,12 +452,12 @@ mixin _GenerationHistoryControllerLifecycle
       return;
     }
 
-    if (_activeRealtimeRefetchCancelTokens.containsKey(generationId)) {
+    if (_activeRealtimeRefetchRequestCancellations.containsKey(generationId)) {
       return;
     }
 
-    final cancelToken = CancelToken();
-    _activeRealtimeRefetchCancelTokens[generationId] = cancelToken;
+    final cancelToken = RequestCancellation();
+    _activeRealtimeRefetchRequestCancellations[generationId] = cancelToken;
     try {
       final generation = await _repository.fetchGeneration(
         generationId,
@@ -480,19 +476,8 @@ mixin _GenerationHistoryControllerLifecycle
         refreshUnreadBadge: true,
         requireScreenVisible: true,
       );
-    } on DioException catch (error, stackTrace) {
-      if (CancelToken.isCancel(error) || cancelToken.isCancelled) {
-        return;
-      }
-
-      AppLogger.warn(
-        feature: 'Templates.GenerationHistory',
-        operation: 'realtime_refetch',
-        message: 'Generation history realtime refetch failed',
-        context: {'generation_id': generationId},
-        error: error,
-        stackTrace: stackTrace,
-      );
+    } on RequestCancelledException {
+      return;
     } catch (error, stackTrace) {
       AppLogger.warn(
         feature: 'Templates.GenerationHistory',
@@ -504,10 +489,10 @@ mixin _GenerationHistoryControllerLifecycle
       );
     } finally {
       if (identical(
-        _activeRealtimeRefetchCancelTokens[generationId],
+        _activeRealtimeRefetchRequestCancellations[generationId],
         cancelToken,
       )) {
-        _activeRealtimeRefetchCancelTokens.remove(generationId);
+        _activeRealtimeRefetchRequestCancellations.remove(generationId);
       }
     }
   }
@@ -581,10 +566,9 @@ mixin _GenerationHistoryControllerLifecycle
   }
 
   void _cancelActiveRealtimeRefetches(String reason) {
-    final cancelTokens = _activeRealtimeRefetchCancelTokens.values.toList(
-      growable: false,
-    );
-    _activeRealtimeRefetchCancelTokens.clear();
+    final cancelTokens = _activeRealtimeRefetchRequestCancellations.values
+        .toList(growable: false);
+    _activeRealtimeRefetchRequestCancellations.clear();
     for (final cancelToken in cancelTokens) {
       if (!cancelToken.isCancelled) {
         cancelToken.cancel(reason);

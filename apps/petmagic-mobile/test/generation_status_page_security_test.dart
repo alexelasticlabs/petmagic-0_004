@@ -42,7 +42,7 @@ void main() {
     );
 
     expect(loadBody, isNot(contains('error.toString()')));
-    expect(loadBody, contains('CancelToken.isCancel(error)'));
+    expect(loadBody, contains('on RequestCancelledException'));
     expect(
       loadBody,
       contains('_showCachedOrMappedLoadError(repository, error)'),
@@ -1174,7 +1174,7 @@ void main() {
       );
       final startCancelBody = methodBody(
         source,
-        'CancelToken? _startGenerationCancelRequest',
+        'RequestCancellation? _startGenerationCancelRequest',
       );
       final cancelActiveBody = methodBody(
         source,
@@ -1185,7 +1185,7 @@ void main() {
 
       expect(
         pageSource,
-        contains('CancelToken? _activeGenerationCancelToken;'),
+        contains('RequestCancellation? _activeGenerationCancelToken;'),
       );
       expect(startCancelBody, contains('_activeGenerationCancelToken != null'));
       expect(
@@ -1195,7 +1195,7 @@ void main() {
       expect(cancelBody, contains('final cancelToken ='));
       expect(cancelBody, contains('cancelToken: cancelToken'));
       expect(cancelBody, contains('cancelToken.isCancelled'));
-      expect(cancelBody, contains('CancelToken.isCancel(error)'));
+      expect(cancelBody, contains('on RequestCancelledException'));
       expect(
         cancelBody,
         contains('_completeGenerationCancelRequest(cancelToken)'),

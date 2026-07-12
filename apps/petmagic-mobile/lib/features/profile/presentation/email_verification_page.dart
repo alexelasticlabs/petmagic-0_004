@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:dio/dio.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
@@ -47,7 +47,7 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage>
 
   final _codeController = TextEditingController();
   Timer? _resendCooldownTimer;
-  CancelToken? _activeRequestCancelToken;
+  RequestCancellation? _activeRequestCancelToken;
   DateTime? _resendCooldownEndsAtUtc;
   bool _isBusy = false;
   int _resendSecondsRemaining = 0;
@@ -222,8 +222,7 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage>
       });
       context.appNavigator.go(const TemplatesDestination());
     } catch (error) {
-      if (error is RequestCancelledException ||
-          error is DioException && CancelToken.isCancel(error)) {
+      if (error is RequestCancelledException) {
         return;
       }
       if (!mounted) return;
@@ -276,8 +275,7 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage>
       });
       _startResendCooldown();
     } catch (error) {
-      if (error is RequestCancelledException ||
-          error is DioException && CancelToken.isCancel(error)) {
+      if (error is RequestCancelledException) {
         return;
       }
       if (!mounted) return;
@@ -294,9 +292,9 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage>
     }
   }
 
-  CancelToken _startRequestCancelToken() {
+  RequestCancellation _startRequestCancelToken() {
     _cancelActiveRequest();
-    final cancelToken = CancelToken();
+    final cancelToken = RequestCancellation();
     _activeRequestCancelToken = cancelToken;
     return cancelToken;
   }
@@ -309,7 +307,7 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage>
     _activeRequestCancelToken = null;
   }
 
-  void _clearActiveRequest(CancelToken cancelToken) {
+  void _clearActiveRequest(RequestCancellation cancelToken) {
     if (identical(_activeRequestCancelToken, cancelToken)) {
       _activeRequestCancelToken = null;
     }

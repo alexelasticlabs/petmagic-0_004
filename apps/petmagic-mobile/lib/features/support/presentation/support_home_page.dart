@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:dio/dio.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
@@ -37,7 +37,7 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
   bool _isLoadingConversation = false;
   String? _conversationError;
   SupportChatConversation? _conversation;
-  CancelToken? _conversationLoadCancelToken;
+  RequestCancellation? _conversationLoadCancelToken;
   ProviderSubscription<AppLaunchState>? _launchSubscription;
   bool _hasRequestedInitialConversationLoad = false;
   bool _hasResolvedConversationSnapshot = false;
@@ -113,7 +113,7 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
     }
 
     _cancelConversationLoad();
-    final loadCancelToken = CancelToken();
+    final loadCancelToken = RequestCancellation();
     _conversationLoadCancelToken = loadCancelToken;
 
     setState(() {

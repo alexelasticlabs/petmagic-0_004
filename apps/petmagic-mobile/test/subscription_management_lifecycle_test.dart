@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -241,13 +242,13 @@ void main() {
 
     expect(
       pageSource,
-      contains('CancelToken? _activeSubscriptionActionCancelToken;'),
+      contains('RequestCancellation? _activeSubscriptionActionCancelToken;'),
     );
     expect(disposeBody, contains('_cancelActiveSubscriptionAction();'));
     expect(openManageBody, contains('final cancelToken ='));
     expect(openManageBody, contains('cancelToken: cancelToken'));
     expect(openManageBody, contains('cancelToken.isCancelled'));
-    expect(openManageBody, contains('CancelToken.isCancel(error)'));
+    expect(openManageBody, contains('on RequestCancelledException'));
     expect(
       openManageBody,
       contains('_completeSubscriptionAction(cancelToken)'),
@@ -255,9 +256,9 @@ void main() {
     expect(cancelBody, contains('final cancelToken ='));
     expect(cancelBody, contains('cancelToken: cancelToken'));
     expect(cancelBody, contains('cancelToken.isCancelled'));
-    expect(cancelBody, contains('CancelToken.isCancel(error)'));
+    expect(cancelBody, contains('on RequestCancelledException'));
     expect(cancelBody, contains('_completeSubscriptionAction(cancelToken)'));
-    expect(controllerSource, contains('CancelToken? cancelToken'));
+    expect(controllerSource, contains('RequestCancellation? cancelToken'));
     expect(serviceCreateBody, contains('createBillingPortal('));
     expect(serviceCreateBody, contains('cancelToken: cancelToken'));
     expect(
@@ -272,7 +273,7 @@ void main() {
       repositorySource,
       contains('Future<PremiumBillingPortalModel> createBillingPortal({'),
     );
-    expect(repositorySource, contains('CancelToken? cancelToken'));
+    expect(repositorySource, contains('RequestCancellation? cancelToken'));
     expect(repositoryPortalBody, contains('cancelToken: cancelToken'));
     expect(
       repositorySource,
@@ -699,7 +700,9 @@ class _CountingSubscriptionManagementRepository extends PremiumRepository {
   int fetchStatusCalls = 0;
 
   @override
-  Future<PremiumStatusModel> fetchStatus({CancelToken? cancelToken}) async {
+  Future<PremiumStatusModel> fetchStatus({
+    RequestCancellation? cancelToken,
+  }) async {
     fetchStatusCalls++;
     return const PremiumStatusModel(
       isPremium: true,

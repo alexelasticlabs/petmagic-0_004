@@ -70,15 +70,8 @@ extension _SupportChatPageExternalMediaActions on _SupportChatPageState {
         text.supportChatImageSavedMessage,
         tone: PetMagicToastTone.success,
       );
-    } on DioException catch (error) {
-      if (!mounted || CancelToken.isCancel(error)) {
-        return;
-      }
-
-      _showSupportToast(
-        text.supportChatSaveImageFailedError,
-        tone: PetMagicToastTone.warning,
-      );
+    } on RequestCancelledException {
+      return;
     } on Object {
       if (!mounted) {
         return;
@@ -116,15 +109,8 @@ extension _SupportChatPageExternalMediaActions on _SupportChatPageState {
         downloadTimeout: _supportMediaDownloadTimeout,
         cancelToken: cancelToken,
       );
-    } on DioException catch (error) {
-      if (!mounted || CancelToken.isCancel(error)) {
-        return;
-      }
-
-      _showSupportToast(
-        text.supportChatShareImageFailedError,
-        tone: PetMagicToastTone.warning,
-      );
+    } on RequestCancelledException {
+      return;
     } on Object {
       if (!mounted) {
         return;
@@ -141,7 +127,7 @@ extension _SupportChatPageExternalMediaActions on _SupportChatPageState {
 
   Future<List<int>> _downloadImageBytesImpl(
     String imageUrl, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final safeUri = parseSafeSupportExternalUri(imageUrl);
     if (safeUri == null) {

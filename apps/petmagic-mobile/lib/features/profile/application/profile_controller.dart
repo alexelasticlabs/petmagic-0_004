@@ -1,23 +1,18 @@
-import 'dart:io';
-
 // Public profile application state and use-case orchestration.
 
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:dio/dio.dart';
-import 'package:flutter/painting.dart';
+import 'package:petmagic_mobile/core/files/local_media_file.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
+import 'package:petmagic_mobile/features/profile/application/avatar_media_gateway.dart';
 import 'package:petmagic_mobile/features/profile/application/external_auth_gateway.dart';
 import 'package:petmagic_mobile/features/profile/domain/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/application/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/application/push_token_lifecycle_port.dart';
 import 'package:petmagic_mobile/features/profile/domain/auth_password_policy.dart';
-import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
-import 'package:petmagic_mobile/shared/files/temp_media_cleanup.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 
 final profileControllerProvider =
@@ -91,7 +86,6 @@ class ProfileState {
 
 class ProfileController extends Notifier<ProfileState> {
   static const _genericActionError = 'profile.action_failed';
-  static const _managedAvatarTempFilePrefix = 'petmagic_avatar_';
 
   void _logProfileFailure(
     String stage,
@@ -117,11 +111,10 @@ class ProfileController extends Notifier<ProfileState> {
     );
   }
 
-  final ImagePicker _imagePicker = ImagePicker();
-  CancelToken? _activeAvatarUploadCancelToken;
-  CancelToken? _activeInitializeCancelToken;
-  CancelToken? _activeAuthCancelToken;
-  CancelToken? _activeProfileMutationCancelToken;
+  RequestCancellation? _activeAvatarUploadRequestCancellation;
+  RequestCancellation? _activeInitializeRequestCancellation;
+  RequestCancellation? _activeAuthRequestCancellation;
+  RequestCancellation? _activeProfileMutationRequestCancellation;
   Future<void>? _initializeInFlight;
 
   ProfileRepositoryPort get _repository => ref.read(profileRepositoryProvider);
@@ -183,48 +176,48 @@ class ProfileController extends Notifier<ProfileState> {
     state = update(state);
   }
 
-  CancelToken? _startAvatarUpload() {
-    if (_activeAvatarUploadCancelToken != null) {
+  RequestCancellation? _startAvatarUpload() {
+    if (_activeAvatarUploadRequestCancellation != null) {
       return null;
     }
 
-    final cancelToken = CancelToken();
-    _activeAvatarUploadCancelToken = cancelToken;
+    final cancelToken = RequestCancellation();
+    _activeAvatarUploadRequestCancellation = cancelToken;
     return cancelToken;
   }
 
   void _cancelActiveAvatarUpload() {
-    final cancelToken = _activeAvatarUploadCancelToken;
+    final cancelToken = _activeAvatarUploadRequestCancellation;
     if (cancelToken != null && !cancelToken.isCancelled) {
       cancelToken.cancel('profile_avatar_upload_cancelled');
     }
-    _activeAvatarUploadCancelToken = null;
+    _activeAvatarUploadRequestCancellation = null;
   }
 
-  void _clearActiveAvatarUpload(CancelToken cancelToken) {
-    if (identical(_activeAvatarUploadCancelToken, cancelToken)) {
-      _activeAvatarUploadCancelToken = null;
+  void _clearActiveAvatarUpload(RequestCancellation cancelToken) {
+    if (identical(_activeAvatarUploadRequestCancellation, cancelToken)) {
+      _activeAvatarUploadRequestCancellation = null;
     }
   }
 
-  CancelToken _startInitializeRequest() {
+  RequestCancellation _startInitializeRequest() {
     _cancelActiveInitialize();
-    final cancelToken = CancelToken();
-    _activeInitializeCancelToken = cancelToken;
+    final cancelToken = RequestCancellation();
+    _activeInitializeRequestCancellation = cancelToken;
     return cancelToken;
   }
 
   void _cancelActiveInitialize() {
-    final cancelToken = _activeInitializeCancelToken;
+    final cancelToken = _activeInitializeRequestCancellation;
     if (cancelToken != null && !cancelToken.isCancelled) {
       cancelToken.cancel('profile_initialize_cancelled');
     }
-    _activeInitializeCancelToken = null;
+    _activeInitializeRequestCancellation = null;
   }
 
-  void _clearActiveInitialize(CancelToken cancelToken) {
-    if (identical(_activeInitializeCancelToken, cancelToken)) {
-      _activeInitializeCancelToken = null;
+  void _clearActiveInitialize(RequestCancellation cancelToken) {
+    if (identical(_activeInitializeRequestCancellation, cancelToken)) {
+      _activeInitializeRequestCancellation = null;
     }
   }
 
@@ -245,29 +238,29 @@ class ProfileController extends Notifier<ProfileState> {
     );
   }
 
-  CancelToken _startAuthRequest() {
+  RequestCancellation _startAuthRequest() {
     _cancelActiveAuthRequest();
-    final cancelToken = CancelToken();
-    _activeAuthCancelToken = cancelToken;
+    final cancelToken = RequestCancellation();
+    _activeAuthRequestCancellation = cancelToken;
     return cancelToken;
   }
 
   void _cancelActiveAuthRequest() {
-    final cancelToken = _activeAuthCancelToken;
+    final cancelToken = _activeAuthRequestCancellation;
     if (cancelToken != null && !cancelToken.isCancelled) {
       cancelToken.cancel('profile_auth_cancelled');
     }
-    _activeAuthCancelToken = null;
+    _activeAuthRequestCancellation = null;
   }
 
-  void _clearActiveAuthRequest(CancelToken cancelToken) {
-    if (identical(_activeAuthCancelToken, cancelToken)) {
-      _activeAuthCancelToken = null;
+  void _clearActiveAuthRequest(RequestCancellation cancelToken) {
+    if (identical(_activeAuthRequestCancellation, cancelToken)) {
+      _activeAuthRequestCancellation = null;
     }
   }
 
-  void _handleCancelledAuthRequest(CancelToken cancelToken) {
-    if (!identical(_activeAuthCancelToken, cancelToken)) {
+  void _handleCancelledAuthRequest(RequestCancellation cancelToken) {
+    if (!identical(_activeAuthRequestCancellation, cancelToken)) {
       return;
     }
 
@@ -276,24 +269,24 @@ class ProfileController extends Notifier<ProfileState> {
     );
   }
 
-  CancelToken _startProfileMutation() {
+  RequestCancellation _startProfileMutation() {
     _cancelActiveProfileMutation();
-    final cancelToken = CancelToken();
-    _activeProfileMutationCancelToken = cancelToken;
+    final cancelToken = RequestCancellation();
+    _activeProfileMutationRequestCancellation = cancelToken;
     return cancelToken;
   }
 
   void _cancelActiveProfileMutation() {
-    final cancelToken = _activeProfileMutationCancelToken;
+    final cancelToken = _activeProfileMutationRequestCancellation;
     if (cancelToken != null && !cancelToken.isCancelled) {
       cancelToken.cancel('profile_mutation_cancelled');
     }
-    _activeProfileMutationCancelToken = null;
+    _activeProfileMutationRequestCancellation = null;
   }
 
-  void _clearActiveProfileMutation(CancelToken cancelToken) {
-    if (identical(_activeProfileMutationCancelToken, cancelToken)) {
-      _activeProfileMutationCancelToken = null;
+  void _clearActiveProfileMutation(RequestCancellation cancelToken) {
+    if (identical(_activeProfileMutationRequestCancellation, cancelToken)) {
+      _activeProfileMutationRequestCancellation = null;
     }
   }
 
@@ -312,7 +305,7 @@ class ProfileController extends Notifier<ProfileState> {
         clearSuccess: true,
       );
 
-      final initializeCancelToken = _startInitializeRequest();
+      final initializeRequestCancellation = _startInitializeRequest();
       try {
         final session = await repository.readSession();
         if (!ref.mounted) {
@@ -331,7 +324,7 @@ class ProfileController extends Notifier<ProfileState> {
         }
 
         final profile = await repository.fetchProfile(
-          cancelToken: initializeCancelToken,
+          cancelToken: initializeRequestCancellation,
         );
         if (!ref.mounted) {
           return;
@@ -417,7 +410,7 @@ class ProfileController extends Notifier<ProfileState> {
           clearProfile: true,
         );
       } finally {
-        _clearActiveInitialize(initializeCancelToken);
+        _clearActiveInitialize(initializeRequestCancellation);
       }
     }();
 
@@ -476,20 +469,20 @@ class ProfileController extends Notifier<ProfileState> {
     );
 
     final repository = _repository;
-    final authCancelToken = _startAuthRequest();
+    final authRequestCancellation = _startAuthRequest();
     try {
       await repository.login(
         email: state.email,
         password: state.password,
-        cancelToken: authCancelToken,
+        cancelToken: authRequestCancellation,
       );
-      if (!ref.mounted || authCancelToken.isCancelled) {
+      if (!ref.mounted || authRequestCancellation.isCancelled) {
         return;
       }
       final profile = await repository.fetchProfile(
-        cancelToken: authCancelToken,
+        cancelToken: authRequestCancellation,
       );
-      if (!ref.mounted || authCancelToken.isCancelled) {
+      if (!ref.mounted || authRequestCancellation.isCancelled) {
         return;
       }
       _updateStateIfMounted(
@@ -509,14 +502,14 @@ class ProfileController extends Notifier<ProfileState> {
             requiresLegalAcceptance: profile.legalAcceptance.requiresAcceptance,
           );
     } on RequestCancelledException {
-      _handleCancelledAuthRequest(authCancelToken);
+      _handleCancelledAuthRequest(authRequestCancellation);
     } on AppException catch (error) {
       _setFailure(message: error.message);
     } catch (error, stackTrace) {
       _logProfileFailure('login_unknown', error, stackTrace);
       _setFailure(message: _genericActionError);
     } finally {
-      _clearActiveAuthRequest(authCancelToken);
+      _clearActiveAuthRequest(authRequestCancellation);
     }
   }
 
@@ -568,7 +561,7 @@ class ProfileController extends Notifier<ProfileState> {
     );
 
     final repository = _repository;
-    final authCancelToken = _startAuthRequest();
+    final authRequestCancellation = _startAuthRequest();
     try {
       await repository.register(
         email: state.email,
@@ -579,9 +572,9 @@ class ProfileController extends Notifier<ProfileState> {
         termsOfUseVersion: legalDocuments.termsOfUse.version,
         privacyPolicyVersion: legalDocuments.privacyPolicy.version,
         marketingEmailsEnabled: marketingEmailsEnabled,
-        cancelToken: authCancelToken,
+        cancelToken: authRequestCancellation,
       );
-      if (!ref.mounted || authCancelToken.isCancelled) {
+      if (!ref.mounted || authRequestCancellation.isCancelled) {
         return;
       }
       _updateStateIfMounted(
@@ -595,14 +588,14 @@ class ProfileController extends Notifier<ProfileState> {
         ),
       );
     } on RequestCancelledException {
-      _handleCancelledAuthRequest(authCancelToken);
+      _handleCancelledAuthRequest(authRequestCancellation);
     } on AppException catch (error) {
       _setFailure(message: error.message);
     } catch (error, stackTrace) {
       _logProfileFailure('register_unknown', error, stackTrace);
       _setFailure(message: _genericActionError);
     } finally {
-      _clearActiveAuthRequest(authCancelToken);
+      _clearActiveAuthRequest(authRequestCancellation);
     }
   }
 
@@ -622,13 +615,13 @@ class ProfileController extends Notifier<ProfileState> {
     );
 
     final externalAuthRepository = ref.read(externalAuthRepositoryProvider);
-    final authCancelToken = _startAuthRequest();
+    final authRequestCancellation = _startAuthRequest();
     try {
       final session = await externalAuthRepository.authenticate(
         provider,
-        cancelToken: authCancelToken,
+        cancelToken: authRequestCancellation,
       );
-      if (!ref.mounted || authCancelToken.isCancelled) {
+      if (!ref.mounted || authRequestCancellation.isCancelled) {
         return;
       }
       _updateStateIfMounted(
@@ -649,14 +642,14 @@ class ProfileController extends Notifier<ProfileState> {
                 session.user.legalAcceptance.requiresAcceptance,
           );
     } on RequestCancelledException {
-      _handleCancelledAuthRequest(authCancelToken);
+      _handleCancelledAuthRequest(authRequestCancellation);
     } on AppException catch (error) {
       _setFailure(message: error.message);
     } catch (error, stackTrace) {
       _logProfileFailure('authenticate_provider_unknown', error, stackTrace);
       _setFailure(message: 'auth.external_invalid');
     } finally {
-      _clearActiveAuthRequest(authCancelToken);
+      _clearActiveAuthRequest(authRequestCancellation);
     }
   }
 
@@ -672,23 +665,26 @@ class ProfileController extends Notifier<ProfileState> {
     );
 
     final externalAuthRepository = ref.read(externalAuthRepositoryProvider);
-    final authCancelToken = _startAuthRequest();
+    final authRequestCancellation = _startAuthRequest();
     try {
-      await externalAuthRepository.link(provider, cancelToken: authCancelToken);
-      if (!ref.mounted || authCancelToken.isCancelled) {
+      await externalAuthRepository.link(
+        provider,
+        cancelToken: authRequestCancellation,
+      );
+      if (!ref.mounted || authRequestCancellation.isCancelled) {
         return;
       }
       ref.invalidate(linkedAccountsProvider);
       _updateStateIfMounted((state) => state.copyWith(isSaving: false));
     } on RequestCancelledException {
-      _handleCancelledAuthRequest(authCancelToken);
+      _handleCancelledAuthRequest(authRequestCancellation);
     } on AppException catch (error) {
       _setFailure(message: error.message);
     } catch (error, stackTrace) {
       _logProfileFailure('link_external_unknown', error, stackTrace);
       _setFailure(message: 'auth.external_invalid');
     } finally {
-      _clearActiveAuthRequest(authCancelToken);
+      _clearActiveAuthRequest(authRequestCancellation);
     }
   }
 
@@ -704,26 +700,26 @@ class ProfileController extends Notifier<ProfileState> {
     );
 
     final repository = _repository;
-    final authCancelToken = _startAuthRequest();
+    final authRequestCancellation = _startAuthRequest();
     try {
       await repository.unlinkLinkedAccount(
         provider.apiValue,
-        cancelToken: authCancelToken,
+        cancelToken: authRequestCancellation,
       );
-      if (!ref.mounted || authCancelToken.isCancelled) {
+      if (!ref.mounted || authRequestCancellation.isCancelled) {
         return;
       }
       ref.invalidate(linkedAccountsProvider);
       _updateStateIfMounted((state) => state.copyWith(isSaving: false));
     } on RequestCancelledException {
-      _handleCancelledAuthRequest(authCancelToken);
+      _handleCancelledAuthRequest(authRequestCancellation);
     } on AppException catch (error) {
       _setFailure(message: error.message);
     } catch (error, stackTrace) {
       _logProfileFailure('unlink_external_unknown', error, stackTrace);
       _setFailure(message: _genericActionError);
     } finally {
-      _clearActiveAuthRequest(authCancelToken);
+      _clearActiveAuthRequest(authRequestCancellation);
     }
   }
 
@@ -807,14 +803,16 @@ class ProfileController extends Notifier<ProfileState> {
 
     final repository = _repository;
     final externalAuthRepository = ref.read(externalAuthRepositoryProvider);
-    final mutationCancelToken = _startProfileMutation();
+    final mutationRequestCancellation = _startProfileMutation();
     try {
       await _unregisterPushTokenBeforeLogout();
-      if (!ref.mounted || mutationCancelToken.isCancelled) {
+      if (!ref.mounted || mutationRequestCancellation.isCancelled) {
         return;
       }
-      await repository.deleteCurrentAccount(cancelToken: mutationCancelToken);
-      if (!ref.mounted || mutationCancelToken.isCancelled) {
+      await repository.deleteCurrentAccount(
+        cancelToken: mutationRequestCancellation,
+      );
+      if (!ref.mounted || mutationRequestCancellation.isCancelled) {
         return;
       }
       await _clearExternalAuthSessions(
@@ -822,7 +820,7 @@ class ProfileController extends Notifier<ProfileState> {
         failureStage: 'delete_account_external_cleanup',
       );
 
-      if (!ref.mounted || mutationCancelToken.isCancelled) {
+      if (!ref.mounted || mutationRequestCancellation.isCancelled) {
         return;
       }
       _updateStateIfMounted(
@@ -835,7 +833,7 @@ class ProfileController extends Notifier<ProfileState> {
           successMessage: 'profile.account_deleted',
         ),
       );
-      if (!ref.mounted || mutationCancelToken.isCancelled) {
+      if (!ref.mounted || mutationRequestCancellation.isCancelled) {
         return;
       }
       ref.read(appLaunchControllerProvider.notifier).markSignedOut();
@@ -847,16 +845,12 @@ class ProfileController extends Notifier<ProfileState> {
       _logProfileFailure('delete_account_unknown', error, stackTrace);
       _setFailure(message: _genericActionError);
     } finally {
-      _clearActiveProfileMutation(mutationCancelToken);
+      _clearActiveProfileMutation(mutationRequestCancellation);
     }
   }
 
-  Future<XFile?> pickAvatarImage() {
-    return _imagePicker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 1600,
-      imageQuality: 90,
-    );
+  Future<LocalMediaFile?> pickAvatarImage() {
+    return ref.read(avatarMediaGatewayProvider).pickAvatarImage();
   }
 
   Future<void> _clearExternalAuthSessions(
@@ -879,13 +873,14 @@ class ProfileController extends Notifier<ProfileState> {
   }
 
   Future<void> uploadAvatarFromPath(String filePath) async {
+    final avatarMediaGateway = ref.read(avatarMediaGatewayProvider);
     if (!_ensureNetworkForAction()) {
-      await _deleteManagedAvatarTempFile(filePath);
+      await avatarMediaGateway.deleteManagedTempFile(filePath);
       return;
     }
 
-    final uploadCancelToken = _startAvatarUpload();
-    if (uploadCancelToken == null) {
+    final uploadRequestCancellation = _startAvatarUpload();
+    if (uploadRequestCancellation == null) {
       return;
     }
 
@@ -898,7 +893,7 @@ class ProfileController extends Notifier<ProfileState> {
       final previousAvatarUrl = state.profile?.avatar?.url;
       final profile = await _repository.uploadAvatar(
         filePath,
-        cancelToken: uploadCancelToken,
+        cancelToken: uploadRequestCancellation,
       );
       if (!ref.mounted) {
         return;
@@ -933,34 +928,14 @@ class ProfileController extends Notifier<ProfileState> {
           errorMessage: hasInternet ? null : 'templates.network_unavailable',
         ),
       );
-    } on DioException catch (error, stackTrace) {
-      if (CancelToken.isCancel(error)) {
-        if (!ref.mounted) {
-          return;
-        }
-        final hasInternet = ref
-            .read(networkStatusControllerProvider)
-            .hasInternet;
-        _updateStateIfMounted(
-          (state) => state.copyWith(
-            isSaving: false,
-            clearError: hasInternet,
-            errorMessage: hasInternet ? null : 'templates.network_unavailable',
-          ),
-        );
-        return;
-      }
-
-      _logProfileFailure('upload_avatar_dio', error, stackTrace);
-      _setFailure(message: _genericActionError);
     } on AppException catch (error) {
       _setFailure(message: error.message);
     } catch (error, stackTrace) {
       _logProfileFailure('upload_avatar_unknown', error, stackTrace);
       _setFailure(message: _genericActionError);
     } finally {
-      _clearActiveAvatarUpload(uploadCancelToken);
-      await _deleteManagedAvatarTempFile(filePath);
+      _clearActiveAvatarUpload(uploadRequestCancellation);
+      await avatarMediaGateway.deleteManagedTempFile(filePath);
     }
   }
 
@@ -974,12 +949,12 @@ class ProfileController extends Notifier<ProfileState> {
       clearError: true,
       clearSuccess: true,
     );
-    final mutationCancelToken = _startProfileMutation();
+    final mutationRequestCancellation = _startProfileMutation();
     try {
       final profile = await _repository.removeAvatar(
-        cancelToken: mutationCancelToken,
+        cancelToken: mutationRequestCancellation,
       );
-      if (!ref.mounted || mutationCancelToken.isCancelled) {
+      if (!ref.mounted || mutationRequestCancellation.isCancelled) {
         return;
       }
       _updateStateIfMounted(
@@ -993,7 +968,7 @@ class ProfileController extends Notifier<ProfileState> {
       _logProfileFailure('remove_avatar_unknown', error, stackTrace);
       _setFailure(message: _genericActionError);
     } finally {
-      _clearActiveProfileMutation(mutationCancelToken);
+      _clearActiveProfileMutation(mutationRequestCancellation);
     }
   }
 
@@ -1007,13 +982,13 @@ class ProfileController extends Notifier<ProfileState> {
       clearError: true,
       clearSuccess: true,
     );
-    final mutationCancelToken = _startProfileMutation();
+    final mutationRequestCancellation = _startProfileMutation();
     try {
       final profile = await _repository.updateProfile(
         displayName: displayName,
-        cancelToken: mutationCancelToken,
+        cancelToken: mutationRequestCancellation,
       );
-      if (!ref.mounted || mutationCancelToken.isCancelled) {
+      if (!ref.mounted || mutationRequestCancellation.isCancelled) {
         return;
       }
       _updateStateIfMounted(
@@ -1031,7 +1006,7 @@ class ProfileController extends Notifier<ProfileState> {
       _logProfileFailure('update_profile_unknown', error, stackTrace);
       _setFailure(message: _genericActionError);
     } finally {
-      _clearActiveProfileMutation(mutationCancelToken);
+      _clearActiveProfileMutation(mutationRequestCancellation);
     }
   }
 
@@ -1048,13 +1023,13 @@ class ProfileController extends Notifier<ProfileState> {
       clearSuccess: true,
     );
 
-    final mutationCancelToken = _startProfileMutation();
+    final mutationRequestCancellation = _startProfileMutation();
     try {
       final profile = await _repository.acceptCurrentLegalDocuments(
         documents: legalDocuments,
-        cancelToken: mutationCancelToken,
+        cancelToken: mutationRequestCancellation,
       );
-      if (!ref.mounted || mutationCancelToken.isCancelled) {
+      if (!ref.mounted || mutationRequestCancellation.isCancelled) {
         return;
       }
       _updateStateIfMounted(
@@ -1068,7 +1043,7 @@ class ProfileController extends Notifier<ProfileState> {
       _logProfileFailure('accept_legal_unknown', error, stackTrace);
       _setFailure(message: _genericActionError);
     } finally {
-      _clearActiveProfileMutation(mutationCancelToken);
+      _clearActiveProfileMutation(mutationRequestCancellation);
     }
   }
 
@@ -1106,44 +1081,11 @@ class ProfileController extends Notifier<ProfileState> {
       return;
     }
 
-    final cacheKey = persistentSafeProfileAvatarUrl(safeImageUrl);
     try {
-      await CachedNetworkImage.evictFromCache(safeImageUrl, cacheKey: cacheKey);
-      imageCache.evict(NetworkImage(safeImageUrl));
+      await ref.read(avatarMediaGatewayProvider).evictAvatarCache(safeImageUrl);
     } catch (error, stackTrace) {
       _logProfileFailure('avatar_cache_evict_failed', error, stackTrace);
     }
-  }
-
-  Future<void> _deleteManagedAvatarTempFile(String filePath) async {
-    if (!_isManagedAvatarTempFile(filePath)) {
-      return;
-    }
-
-    await TempMediaCleanup.deleteIfExists(File(filePath));
-  }
-
-  bool _isManagedAvatarTempFile(String filePath) {
-    final segments = Uri.file(filePath).pathSegments;
-    final fileName = segments.isEmpty ? filePath : segments.last;
-    if (!fileName.startsWith(_managedAvatarTempFilePrefix)) {
-      return false;
-    }
-
-    final normalizedPath = _normalizedFilePath(filePath);
-    final normalizedTempRoot = _normalizedDirectoryPath(
-      Directory.systemTemp.path,
-    );
-    return normalizedPath.startsWith(normalizedTempRoot);
-  }
-
-  String _normalizedFilePath(String value) {
-    return value.replaceAll('\\', '/').toLowerCase();
-  }
-
-  String _normalizedDirectoryPath(String value) {
-    final normalized = _normalizedFilePath(value);
-    return normalized.endsWith('/') ? normalized : '$normalized/';
   }
 }
 

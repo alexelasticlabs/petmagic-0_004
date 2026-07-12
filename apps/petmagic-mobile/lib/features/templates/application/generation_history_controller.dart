@@ -2,7 +2,7 @@ import 'dart:async';
 
 // Public generation history application state.
 
-import 'package:dio/dio.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
@@ -149,11 +149,11 @@ abstract class _GenerationHistoryControllerBase
   bool _isLoadInFlight = false;
   bool _isLoadMoreInFlight = false;
   bool _hasScheduledLocalArtifactCleanup = false;
-  CancelToken? _activeLoadCancelToken;
-  CancelToken? _activeLoadMoreCancelToken;
-  CancelToken? _activeUnreadRefreshCancelToken;
-  final Map<String, CancelToken> _activeRealtimeRefetchCancelTokens =
-      <String, CancelToken>{};
+  RequestCancellation? _activeLoadRequestCancellation;
+  RequestCancellation? _activeLoadMoreRequestCancellation;
+  RequestCancellation? _activeUnreadRefreshRequestCancellation;
+  final Map<String, RequestCancellation>
+  _activeRealtimeRefetchRequestCancellations = <String, RequestCancellation>{};
   _GenerationHistoryLoadRequest? _pendingLoadRequest;
   Completer<void>? _pendingLoadCompleter;
   Set<String> _locallyDeletedGenerationIds = const {};
@@ -216,13 +216,13 @@ abstract class _GenerationHistoryControllerBase
 
   void _completeCancelledLoad();
 
-  CancelToken _startLoadCancelToken();
+  RequestCancellation _startLoadRequestCancellation();
 
-  void _clearActiveLoadCancelToken(CancelToken cancelToken);
+  void _clearActiveLoadRequestCancellation(RequestCancellation cancelToken);
 
-  CancelToken _startLoadMoreCancelToken();
+  RequestCancellation _startLoadMoreRequestCancellation();
 
-  void _clearActiveLoadMoreCancelToken();
+  void _clearActiveLoadMoreRequestCancellation();
 
   void _cancelActiveLoadMore(String reason);
 
@@ -234,7 +234,9 @@ abstract class _GenerationHistoryControllerBase
 
   void _scheduleOfflineBannerHide();
 
-  Future<int?> _fetchUnreadGenerationCountBestEffort(CancelToken cancelToken);
+  Future<int?> _fetchUnreadGenerationCountBestEffort(
+    RequestCancellation cancelToken,
+  );
 
   Future<void> _resumeRealtimeIfNeeded();
 

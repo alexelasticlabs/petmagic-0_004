@@ -340,12 +340,14 @@ extension _GenerationStatusPageResultActions on _GenerationStatusPageState {
             : text.generationStatusRemoveWatermarkFailed,
       );
       await _load(silent: true);
-    } on DioException catch (error) {
-      if (!mounted || CancelToken.isCancel(error)) {
+    } on RequestCancelledException {
+      return;
+    } on AppException catch (error) {
+      if (!mounted) {
         return;
       }
 
-      if (error.response?.statusCode == 402) {
+      if (error.statusCode == 402) {
         await _showWatermarkNoCreditsSheet();
       } else {
         _showInfo(text.generationStatusRemoveWatermarkFailed);

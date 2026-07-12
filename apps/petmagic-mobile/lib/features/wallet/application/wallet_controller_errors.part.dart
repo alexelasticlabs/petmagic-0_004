@@ -33,8 +33,7 @@ String _purchaseErrorMessage(String? rawMessage) {
 }
 
 bool _isRequestCancelled(Object error) {
-  return error is RequestCancelledException ||
-      (error is DioException && CancelToken.isCancel(error));
+  return error is RequestCancelledException;
 }
 
 String? _normalizeStripeCheckoutReferenceId(String? value) {

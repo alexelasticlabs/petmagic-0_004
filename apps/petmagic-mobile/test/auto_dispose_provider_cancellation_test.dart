@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -232,11 +233,14 @@ class _CancellablePremiumStatusRepository extends PremiumRepository {
   _CancellablePremiumStatusRepository()
     : super(dio: Dio(), sessionStorage: AuthSessionStorage());
 
-  final Completer<CancelToken> statusStarted = Completer<CancelToken>();
+  final Completer<RequestCancellation> statusStarted =
+      Completer<RequestCancellation>();
 
   @override
-  Future<PremiumStatusModel> fetchStatus({CancelToken? cancelToken}) async {
-    final token = cancelToken ?? CancelToken();
+  Future<PremiumStatusModel> fetchStatus({
+    RequestCancellation? cancelToken,
+  }) async {
+    final token = cancelToken ?? RequestCancellation();
     if (!statusStarted.isCompleted) {
       statusStarted.complete(token);
     }
@@ -252,7 +256,9 @@ class _CountingPremiumStatusRepository extends PremiumRepository {
   int fetchStatusCalls = 0;
 
   @override
-  Future<PremiumStatusModel> fetchStatus({CancelToken? cancelToken}) async {
+  Future<PremiumStatusModel> fetchStatus({
+    RequestCancellation? cancelToken,
+  }) async {
     fetchStatusCalls++;
     return const PremiumStatusModel(
       isPremium: true,
@@ -273,14 +279,16 @@ class _CancellableProfileProviderRepository extends ProfileRepository {
   _CancellableProfileProviderRepository()
     : super(dio: Dio(), sessionStorage: AuthSessionStorage());
 
-  final Completer<CancelToken> linkedAccountsStarted = Completer<CancelToken>();
-  final Completer<CancelToken> legalDocumentsStarted = Completer<CancelToken>();
+  final Completer<RequestCancellation> linkedAccountsStarted =
+      Completer<RequestCancellation>();
+  final Completer<RequestCancellation> legalDocumentsStarted =
+      Completer<RequestCancellation>();
 
   @override
   Future<List<MobileLinkedAccount>> fetchLinkedAccounts({
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
-    final token = cancelToken ?? CancelToken();
+    final token = cancelToken ?? RequestCancellation();
     if (!linkedAccountsStarted.isCompleted) {
       linkedAccountsStarted.complete(token);
     }
@@ -291,9 +299,9 @@ class _CancellableProfileProviderRepository extends ProfileRepository {
   @override
   Future<MobileLegalDocuments> fetchCurrentLegalDocuments({
     required String locale,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
-    final token = cancelToken ?? CancelToken();
+    final token = cancelToken ?? RequestCancellation();
     if (!legalDocumentsStarted.isCompleted) {
       legalDocumentsStarted.complete(token);
     }
@@ -310,7 +318,7 @@ class _CountingProfileProviderRepository extends ProfileRepository {
 
   @override
   Future<List<MobileLinkedAccount>> fetchLinkedAccounts({
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     linkedAccountsFetchCount++;
     return const [

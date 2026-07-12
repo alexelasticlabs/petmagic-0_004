@@ -3,7 +3,8 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:dio/dio.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
+import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -153,7 +154,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
   SupportChatController? _activeController;
   Timer? _loadingFallbackTimer;
   Timer? _messageHighlightTimer;
-  CancelToken? _activeMediaDownloadCancelToken;
+  RequestCancellation? _activeMediaDownloadCancelToken;
   bool _showLoadingFallback = false;
   bool _composerHasText = false;
   bool _composerHasFocus = false;
@@ -477,17 +478,17 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
     });
   }
 
-  CancelToken? _startMediaDownload() {
+  RequestCancellation? _startMediaDownload() {
     if (_activeMediaDownloadCancelToken != null) {
       return null;
     }
 
-    final cancelToken = CancelToken();
+    final cancelToken = RequestCancellation();
     _activeMediaDownloadCancelToken = cancelToken;
     return cancelToken;
   }
 
-  void _completeMediaDownload(CancelToken cancelToken) {
+  void _completeMediaDownload(RequestCancellation cancelToken) {
     if (identical(_activeMediaDownloadCancelToken, cancelToken)) {
       _activeMediaDownloadCancelToken = null;
     }

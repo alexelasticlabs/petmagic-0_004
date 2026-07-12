@@ -56,7 +56,9 @@ mixin _WalletControllerLifecycle on _WalletControllerBase {
   }
 
   void _handleAppLifecycleSignal() {
-    didChangeAppLifecycleState(AppLifecycleSignal.instance.state);
+    if (AppLifecycleSignal.instance.isResumed) {
+      handleAppResumed();
+    }
   }
 
   @override
@@ -67,108 +69,111 @@ mixin _WalletControllerLifecycle on _WalletControllerBase {
     }
   }
 
-  CancelToken _startLoadCancelToken() {
+  RequestCancellation _startLoadRequestCancellation() {
     _cancelActiveLoad();
-    final cancelToken = CancelToken();
-    _activeLoadCancelToken = cancelToken;
+    final cancelToken = RequestCancellation();
+    _activeLoadRequestCancellation = cancelToken;
     return cancelToken;
   }
 
   void _cancelActiveLoad() {
-    final cancelToken = _activeLoadCancelToken;
+    final cancelToken = _activeLoadRequestCancellation;
     if (cancelToken != null && !cancelToken.isCancelled) {
       cancelToken.cancel('wallet_load_cancelled');
     }
-    _activeLoadCancelToken = null;
+    _activeLoadRequestCancellation = null;
   }
 
-  void _clearActiveLoad(CancelToken cancelToken) {
-    if (identical(_activeLoadCancelToken, cancelToken)) {
-      _activeLoadCancelToken = null;
+  void _clearActiveLoad(RequestCancellation cancelToken) {
+    if (identical(_activeLoadRequestCancellation, cancelToken)) {
+      _activeLoadRequestCancellation = null;
     }
   }
 
-  CancelToken _startWalletSyncCancelToken() {
+  RequestCancellation _startWalletSyncRequestCancellation() {
     _cancelActiveWalletSync();
-    final cancelToken = CancelToken();
-    _activeWalletSyncCancelToken = cancelToken;
+    final cancelToken = RequestCancellation();
+    _activeWalletSyncRequestCancellation = cancelToken;
     return cancelToken;
   }
 
   void _cancelActiveWalletSync() {
-    final cancelToken = _activeWalletSyncCancelToken;
+    final cancelToken = _activeWalletSyncRequestCancellation;
     if (cancelToken != null && !cancelToken.isCancelled) {
       cancelToken.cancel('wallet_sync_cancelled');
     }
-    _activeWalletSyncCancelToken = null;
+    _activeWalletSyncRequestCancellation = null;
   }
 
-  void _clearActiveWalletSync(CancelToken cancelToken) {
-    if (identical(_activeWalletSyncCancelToken, cancelToken)) {
-      _activeWalletSyncCancelToken = null;
+  void _clearActiveWalletSync(RequestCancellation cancelToken) {
+    if (identical(_activeWalletSyncRequestCancellation, cancelToken)) {
+      _activeWalletSyncRequestCancellation = null;
     }
   }
 
-  CancelToken _startLedgerLoadMoreCancelToken() {
+  RequestCancellation _startLedgerLoadMoreRequestCancellation() {
     _cancelActiveLedgerLoadMore();
-    final cancelToken = CancelToken();
-    _activeLedgerLoadMoreCancelToken = cancelToken;
+    final cancelToken = RequestCancellation();
+    _activeLedgerLoadMoreRequestCancellation = cancelToken;
     return cancelToken;
   }
 
   void _cancelActiveLedgerLoadMore() {
-    final cancelToken = _activeLedgerLoadMoreCancelToken;
+    final cancelToken = _activeLedgerLoadMoreRequestCancellation;
     if (cancelToken != null && !cancelToken.isCancelled) {
       cancelToken.cancel('wallet_ledger_load_more_cancelled');
     }
-    _activeLedgerLoadMoreCancelToken = null;
+    _activeLedgerLoadMoreRequestCancellation = null;
   }
 
-  void _clearActiveLedgerLoadMore(CancelToken cancelToken) {
-    if (identical(_activeLedgerLoadMoreCancelToken, cancelToken)) {
-      _activeLedgerLoadMoreCancelToken = null;
+  void _clearActiveLedgerLoadMore(RequestCancellation cancelToken) {
+    if (identical(_activeLedgerLoadMoreRequestCancellation, cancelToken)) {
+      _activeLedgerLoadMoreRequestCancellation = null;
     }
   }
 
-  CancelToken _startCheckoutCancelToken() {
+  RequestCancellation _startCheckoutRequestCancellation() {
     _cancelActiveCheckout();
-    final cancelToken = CancelToken();
-    _activeCheckoutCancelToken = cancelToken;
+    final cancelToken = RequestCancellation();
+    _activeCheckoutRequestCancellation = cancelToken;
     return cancelToken;
   }
 
   void _cancelActiveCheckout() {
-    final cancelToken = _activeCheckoutCancelToken;
+    final cancelToken = _activeCheckoutRequestCancellation;
     if (cancelToken != null && !cancelToken.isCancelled) {
       cancelToken.cancel('wallet_checkout_cancelled');
     }
-    _activeCheckoutCancelToken = null;
+    _activeCheckoutRequestCancellation = null;
   }
 
-  void _clearActiveCheckout(CancelToken cancelToken) {
-    if (identical(_activeCheckoutCancelToken, cancelToken)) {
-      _activeCheckoutCancelToken = null;
+  void _clearActiveCheckout(RequestCancellation cancelToken) {
+    if (identical(_activeCheckoutRequestCancellation, cancelToken)) {
+      _activeCheckoutRequestCancellation = null;
     }
   }
 
-  CancelToken _startCheckoutVerificationCancelToken() {
+  RequestCancellation _startCheckoutVerificationRequestCancellation() {
     _cancelActiveCheckoutVerification();
-    final cancelToken = CancelToken();
-    _activeCheckoutVerificationCancelToken = cancelToken;
+    final cancelToken = RequestCancellation();
+    _activeCheckoutVerificationRequestCancellation = cancelToken;
     return cancelToken;
   }
 
   void _cancelActiveCheckoutVerification() {
-    final cancelToken = _activeCheckoutVerificationCancelToken;
+    final cancelToken = _activeCheckoutVerificationRequestCancellation;
     if (cancelToken != null && !cancelToken.isCancelled) {
       cancelToken.cancel('wallet_checkout_verification_cancelled');
     }
-    _activeCheckoutVerificationCancelToken = null;
+    _activeCheckoutVerificationRequestCancellation = null;
   }
 
-  void _clearActiveCheckoutVerification(CancelToken cancelToken) {
-    if (identical(_activeCheckoutVerificationCancelToken, cancelToken)) {
-      _activeCheckoutVerificationCancelToken = null;
+  void _clearActiveCheckoutVerification(RequestCancellation cancelToken) {
+    if (identical(
+      _activeCheckoutVerificationRequestCancellation,
+      cancelToken,
+    )) {
+      _activeCheckoutVerificationRequestCancellation = null;
     }
   }
 
@@ -180,11 +185,7 @@ mixin _WalletControllerLifecycle on _WalletControllerBase {
     state = update(state);
   }
 
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state != AppLifecycleState.resumed) {
-      return;
-    }
-
+  void handleAppResumed() {
     if (!ref.read(appLaunchControllerProvider).isAuthenticated ||
         !ref.read(networkStatusControllerProvider).hasInternet) {
       return;

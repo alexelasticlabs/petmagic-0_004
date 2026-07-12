@@ -27,7 +27,7 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
     _isLoadInFlight = true;
     final loadEpoch = ++_loadEpoch;
     _cancelActiveLoadMore('generation_history_initial_load_started');
-    CancelToken? loadCancelToken;
+    RequestCancellation? loadRequestCancellation;
     try {
       await _resumeRealtimeIfNeeded();
       if (!ref.mounted || !_isAuthenticated) {
@@ -107,18 +107,20 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
         state = state.copyWith(cachedItemsByFilter: persistedCache);
       }
 
-      loadCancelToken = _startLoadCancelToken();
+      loadRequestCancellation = _startLoadRequestCancellation();
       try {
         if (refresh) {
-          await _fetchUnreadGenerationCountBestEffort(loadCancelToken);
+          await _fetchUnreadGenerationCountBestEffort(loadRequestCancellation);
         }
-        if (loadCancelToken.isCancelled) {
+        if (loadRequestCancellation.isCancelled) {
           _completeCancelledLoad();
           return;
         }
 
         await _flushPendingServerDeletes();
-        if (!ref.mounted || !_isAuthenticated || loadCancelToken.isCancelled) {
+        if (!ref.mounted ||
+            !_isAuthenticated ||
+            loadRequestCancellation.isCancelled) {
           _completeCancelledLoad();
           return;
         }
@@ -126,7 +128,7 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
         final page = await _repository.fetchGenerationPage(
           status: nextFilter.apiStatus,
           take: 50,
-          cancelToken: loadCancelToken,
+          cancelToken: loadRequestCancellation,
         );
         final remoteItems = page.items;
         final items = _decorateWithLocalMedia(
@@ -135,7 +137,9 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
           localReadyRecords,
         );
         final unreadCount = page.serverTimeUtc == null
-            ? await _fetchUnreadGenerationCountBestEffort(loadCancelToken)
+            ? await _fetchUnreadGenerationCountBestEffort(
+                loadRequestCancellation,
+              )
             : page.unreadCount;
         _reconcileLocallyReadIds(remoteItems);
         _locallyDeletedUnreadGenerationIds =
@@ -154,7 +158,7 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
           return;
         }
 
-        if (loadCancelToken.isCancelled ||
+        if (loadRequestCancellation.isCancelled ||
             nextFilter != state.filter ||
             loadEpoch != _loadEpoch) {
           _completeCancelledLoad();
@@ -214,9 +218,9 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
         );
       }
     } finally {
-      final activeLoadCancelToken = loadCancelToken;
-      if (activeLoadCancelToken != null) {
-        _clearActiveLoadCancelToken(activeLoadCancelToken);
+      final activeLoadRequestCancellation = loadRequestCancellation;
+      if (activeLoadRequestCancellation != null) {
+        _clearActiveLoadRequestCancellation(activeLoadRequestCancellation);
       }
       _isLoadInFlight = false;
       _drainPendingLoad();
@@ -240,7 +244,7 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
     final requestFilter = state.filter;
     final requestCursor = state.nextCursor!;
     final requestEpoch = _loadEpoch;
-    final loadCancelToken = _startLoadMoreCancelToken();
+    final loadRequestCancellation = _startLoadMoreRequestCancellation();
     state = state.copyWith(isLoadingMore: true, clearLoadMoreError: true);
 
     try {
@@ -249,7 +253,9 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
       final localReadyRecords = await _galleryStore.loadLocalReadyItems();
       _locallyDeletedGenerationIds = Set<String>.from(deletedGenerationIds);
 
-      if (!ref.mounted || !_isAuthenticated || loadCancelToken.isCancelled) {
+      if (!ref.mounted ||
+          !_isAuthenticated ||
+          loadRequestCancellation.isCancelled) {
         return;
       }
 
@@ -257,11 +263,11 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
         status: requestFilter.apiStatus,
         cursor: requestCursor,
         take: 50,
-        cancelToken: loadCancelToken,
+        cancelToken: loadRequestCancellation,
       );
       if (!ref.mounted ||
           !_isAuthenticated ||
-          loadCancelToken.isCancelled ||
+          loadRequestCancellation.isCancelled ||
           requestEpoch != _loadEpoch ||
           requestFilter != state.filter ||
           requestCursor != state.nextCursor) {
@@ -302,7 +308,7 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
       );
       unawaited(_syncCompletedMedia(decoratedItems));
     } catch (error) {
-      if (_isCancelledRequest(error) || loadCancelToken.isCancelled) {
+      if (_isCancelledRequest(error) || loadRequestCancellation.isCancelled) {
         return;
       }
       if (!ref.mounted ||
@@ -318,8 +324,11 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
         loadMoreError: _historyLoadErrorMessage(error),
       );
     } finally {
-      if (identical(_activeLoadMoreCancelToken, loadCancelToken)) {
-        _clearActiveLoadMoreCancelToken();
+      if (identical(
+        _activeLoadMoreRequestCancellation,
+        loadRequestCancellation,
+      )) {
+        _clearActiveLoadMoreRequestCancellation();
       }
       _isLoadMoreInFlight = false;
       if (ref.mounted && state.isLoadingMore) {
@@ -523,7 +532,7 @@ mixin _GenerationHistoryControllerSync on _GenerationHistoryControllerBase {
 
     final pendingDeletes = await _galleryStore.loadPendingServerDeleteIds();
     for (final generationId in pendingDeletes) {
-      final cancelToken = _activeLoadCancelToken;
+      final cancelToken = _activeLoadRequestCancellation;
       if (!ref.mounted ||
           !_isAuthenticated ||
           cancelToken == null ||

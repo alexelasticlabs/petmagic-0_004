@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:dio/dio.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
@@ -61,7 +61,7 @@ class PasswordResetState {
 
 class PasswordResetController extends Notifier<PasswordResetState> {
   static const _genericActionError = 'profile.action_failed';
-  CancelToken? _activeRequestCancelToken;
+  RequestCancellation? _activeRequestCancelToken;
 
   void _logPasswordResetFailure(
     String stage,
@@ -115,9 +115,9 @@ class PasswordResetController extends Notifier<PasswordResetState> {
     );
   }
 
-  CancelToken _startRequestCancelToken() {
+  RequestCancellation _startRequestCancelToken() {
     _cancelActiveRequest();
-    final cancelToken = CancelToken();
+    final cancelToken = RequestCancellation();
     _activeRequestCancelToken = cancelToken;
     return cancelToken;
   }
@@ -130,7 +130,7 @@ class PasswordResetController extends Notifier<PasswordResetState> {
     _activeRequestCancelToken = null;
   }
 
-  void _clearActiveRequest(CancelToken cancelToken) {
+  void _clearActiveRequest(RequestCancellation cancelToken) {
     if (identical(_activeRequestCancelToken, cancelToken)) {
       _activeRequestCancelToken = null;
     }

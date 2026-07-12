@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'package:petmagic_mobile/core/payments/store_purchase.dart';
+import 'package:petmagic_mobile/core/platform/app_runtime_info.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -6,7 +9,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
@@ -600,25 +602,29 @@ class _FakePremiumRepository extends PremiumRepository {
   final PremiumPaywallConfigModel config;
   final PremiumStatusModel status;
 
-  final _streamController = StreamController<List<PurchaseDetails>>.broadcast();
+  final _streamController =
+      StreamController<List<StorePurchaseDetails>>.broadcast();
   int fetchPaywallConfigCalls = 0;
   int fetchStatusCalls = 0;
   int createStripeCheckoutCalls = 0;
 
   @override
-  Stream<List<PurchaseDetails>> get purchaseUpdates => _streamController.stream;
+  Stream<List<StorePurchaseDetails>> get purchaseUpdates =>
+      _streamController.stream;
 
   @override
   Future<PremiumPaywallConfigModel> fetchPaywallConfig({
-    required Locale locale,
-    CancelToken? cancelToken,
+    required AppLocale locale,
+    RequestCancellation? cancelToken,
   }) async {
     fetchPaywallConfigCalls++;
     return config;
   }
 
   @override
-  Future<PremiumStatusModel> fetchStatus({CancelToken? cancelToken}) async {
+  Future<PremiumStatusModel> fetchStatus({
+    RequestCancellation? cancelToken,
+  }) async {
     fetchStatusCalls++;
     return status;
   }
@@ -626,8 +632,8 @@ class _FakePremiumRepository extends PremiumRepository {
   @override
   Future<PremiumCheckoutModel> createStripeCheckout(
     PremiumPlanModel plan,
-    Locale locale, {
-    CancelToken? cancelToken,
+    AppLocale locale, {
+    RequestCancellation? cancelToken,
   }) async {
     createStripeCheckoutCalls++;
     return const PremiumCheckoutModel(

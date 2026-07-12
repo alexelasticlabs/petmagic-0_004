@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -367,25 +368,25 @@ class FakePetRepository extends TemplateGenerationRepository {
   final List<String> createdPetNames = [];
   final List<String> createdPetTypes = [];
   final List<String?> createdPetBreeds = [];
-  final List<CancelToken> uploadCancelTokens = [];
-  final List<CancelToken> avatarCancelTokens = [];
+  final List<RequestCancellation> uploadCancelTokens = [];
+  final List<RequestCancellation> avatarCancelTokens = [];
   Completer<void>? petsFetchCompleter;
   Completer<void>? petPhotosRefreshCompleter;
   Completer<void>? petGenerationsFetchCompleter;
-  CancelToken? petsFetchCancelToken;
-  CancelToken? petPhotoFetchCancelToken;
-  CancelToken? petGenerationsFetchCancelToken;
-  CancelToken? uploadCancelToken;
-  CancelToken? avatarCancelToken;
-  CancelToken? favoriteCancelToken;
-  CancelToken? deletePhotoCancelToken;
+  RequestCancellation? petsFetchCancelToken;
+  RequestCancellation? petPhotoFetchCancelToken;
+  RequestCancellation? petGenerationsFetchCancelToken;
+  RequestCancellation? uploadCancelToken;
+  RequestCancellation? avatarCancelToken;
+  RequestCancellation? favoriteCancelToken;
+  RequestCancellation? deletePhotoCancelToken;
   int petsFetchCount = 0;
   int petPhotoFetchCount = 0;
   int petGenerationFetchCount = 0;
   int uploadCalls = 0;
 
   @override
-  Future<List<PetProfile>> fetchPets({CancelToken? cancelToken}) async {
+  Future<List<PetProfile>> fetchPets({RequestCancellation? cancelToken}) async {
     petsFetchCancelToken = cancelToken;
     petsFetchCount++;
     await petsFetchCompleter?.future;
@@ -401,7 +402,7 @@ class FakePetRepository extends TemplateGenerationRepository {
     required String name,
     required String type,
     String? breed,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     createdPetNames.add(name);
     createdPetTypes.add(type);
@@ -424,7 +425,7 @@ class FakePetRepository extends TemplateGenerationRepository {
     required String name,
     required String type,
     String? breed,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return PetProfile(
       id: petId,
@@ -439,13 +440,16 @@ class FakePetRepository extends TemplateGenerationRepository {
   }
 
   @override
-  Future<void> deletePet(String petId, {CancelToken? cancelToken}) async {}
+  Future<void> deletePet(
+    String petId, {
+    RequestCancellation? cancelToken,
+  }) async {}
 
   @override
   Future<PetPhoto> uploadPetPhoto({
     required String petId,
     required XFile photo,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     uploadCalls++;
     uploadCancelToken = cancelToken;
@@ -478,7 +482,7 @@ class FakePetRepository extends TemplateGenerationRepository {
   @override
   Future<List<PetPhoto>> fetchPetPhotos(
     String petId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     petPhotoFetchCancelToken = cancelToken;
     petPhotoFetchCount++;
@@ -499,7 +503,7 @@ class FakePetRepository extends TemplateGenerationRepository {
   Future<PetPhoto> setPetPhotoAsAvatar({
     required String petId,
     required String photoId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     avatarCancelToken = cancelToken;
     if (cancelToken != null) {
@@ -522,7 +526,7 @@ class FakePetRepository extends TemplateGenerationRepository {
     required String petId,
     required String photoId,
     required bool isFavorite,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     favoriteCancelToken = cancelToken;
     favoriteUpdates.add('$photoId:$isFavorite');
@@ -534,7 +538,7 @@ class FakePetRepository extends TemplateGenerationRepository {
   Future<void> deletePetPhoto({
     required String petId,
     required String photoId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     deletePhotoCancelToken = cancelToken;
     deletedPhotoIds.add(photoId);
@@ -544,7 +548,7 @@ class FakePetRepository extends TemplateGenerationRepository {
   @override
   Future<List<TemplateGenerationResult>> fetchPetGenerations(
     String petId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     petGenerationsFetchCancelToken = cancelToken;
     petGenerationFetchCount++;

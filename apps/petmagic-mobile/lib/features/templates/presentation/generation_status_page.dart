@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:dio/dio.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -61,7 +61,7 @@ class GenerationStatusMediaActions {
     required String fileName,
     required bool isVideo,
     required String albumName,
-    required CancelToken cancelToken,
+    required RequestCancellation cancelToken,
     String? localPath,
   }) async {
     final usableLocalPath = await usableLocalMediaPath(localPath);
@@ -93,7 +93,7 @@ class GenerationStatusMediaActions {
     required String mediaUrl,
     required String fileName,
     required String title,
-    required CancelToken cancelToken,
+    required RequestCancellation cancelToken,
     String? shareText,
     String? localPath,
   }) async {
@@ -160,9 +160,9 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
   String? _errorMessage;
   bool _isPollInFlight = false;
   bool _isPageActive = true;
-  CancelToken? _activeLoadCancelToken;
-  CancelToken? _activeMediaActionCancelToken;
-  CancelToken? _activeGenerationCancelToken;
+  RequestCancellation? _activeLoadCancelToken;
+  RequestCancellation? _activeMediaActionCancelToken;
+  RequestCancellation? _activeGenerationCancelToken;
   RealtimeClient? _activeRealtimeClient;
   StreamSubscription<RealtimeEvent>? _realtimeSubscription;
   Future<void>? _realtimeConnectFuture;

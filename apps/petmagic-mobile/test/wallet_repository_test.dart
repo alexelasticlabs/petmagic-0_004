@@ -1,8 +1,8 @@
 import 'dart:io';
+import 'package:petmagic_mobile/core/payments/store_purchase.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
@@ -129,16 +129,17 @@ Map<String, Object?> _purchaseJson(String orderId) {
   };
 }
 
-PurchaseDetails _storePurchase() {
-  return PurchaseDetails(
+StorePurchaseDetails _storePurchase() {
+  return StorePurchaseDetails(
     purchaseID: 'gp-purchase-1',
     productID: 'com.petmagic.app.tokens.google.pack100',
-    verificationData: PurchaseVerificationData(
+    verificationData: StorePurchaseVerificationData(
       localVerificationData: 'local-store-data',
       serverVerificationData: 'gp-token-pack-1',
       source: 'google_play',
     ),
     transactionDate: DateTime.utc(2026, 7, 2).millisecondsSinceEpoch.toString(),
-    status: PurchaseStatus.purchased,
+    status: StorePurchaseStatus.purchased,
+    pendingCompletePurchase: false,
   );
 }

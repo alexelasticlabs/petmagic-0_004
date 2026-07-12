@@ -3,7 +3,7 @@ part of 'template_generation_repository.dart';
 Future<GenerationMediaAccessResult> _fetchDownloadUrl(
   TemplateGenerationRepository repository,
   String generationId, {
-  CancelToken? cancelToken,
+  RequestCancellation? cancelToken,
 }) {
   final encodedGenerationId = repository._apiPathSegment(generationId);
   return _fetchMediaAccess(
@@ -18,7 +18,7 @@ Future<GenerationMediaAccessResult> _fetchDownloadUrl(
 Future<GenerationMediaAccessResult> _fetchShareUrl(
   TemplateGenerationRepository repository,
   String generationId, {
-  CancelToken? cancelToken,
+  RequestCancellation? cancelToken,
 }) {
   final encodedGenerationId = repository._apiPathSegment(generationId);
   return _fetchMediaAccess(
@@ -35,7 +35,7 @@ Future<GenerationMediaAccessResult> _fetchMediaAccess(
   String generationId,
   String path, {
   required String method,
-  CancelToken? cancelToken,
+  RequestCancellation? cancelToken,
 }) async {
   final response = await repository._authorizedRequest<Map<String, dynamic>>(
     (session) => repository._dio.request<Map<String, dynamic>>(
@@ -43,7 +43,7 @@ Future<GenerationMediaAccessResult> _fetchMediaAccess(
       options: authenticatedRequestOptions(
         session.accessToken,
       ).copyWith(method: method),
-      cancelToken: cancelToken,
+      cancelToken: cancelToken.toDioCancelToken(),
     ),
     retryTransientFailures: false,
   );

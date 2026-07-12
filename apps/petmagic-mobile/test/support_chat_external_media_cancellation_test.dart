@@ -63,10 +63,15 @@ void main() {
     ).readAsStringSync();
 
     final disposeBody = _methodBody(pageSource, 'void dispose()');
-    expect(pageSource, contains("import 'package:dio/dio.dart';"));
     expect(
       pageSource,
-      contains('CancelToken? _activeMediaDownloadCancelToken;'),
+      contains(
+        "import 'package:petmagic_mobile/core/errors/app_exception.dart';",
+      ),
+    );
+    expect(
+      pageSource,
+      contains('RequestCancellation? _activeMediaDownloadCancelToken;'),
     );
     expect(pageSource, isNot(contains('late final SupportChatController')));
     expect(pageSource, contains('SupportChatController? _activeController;'));
@@ -74,8 +79,11 @@ void main() {
     expect(disposeBody, contains('_activeController?.stop();'));
     expect(disposeBody, contains('_activeController = null;'));
     expect(disposeBody, contains('_cancelActiveMediaDownload();'));
-    expect(pageSource, contains('CancelToken? _startMediaDownload()'));
-    expect(pageSource, contains('void _completeMediaDownload(CancelToken'));
+    expect(pageSource, contains('RequestCancellation? _startMediaDownload()'));
+    expect(
+      pageSource,
+      contains('void _completeMediaDownload(RequestCancellation'),
+    );
     expect(pageSource, contains('void _cancelActiveMediaDownload()'));
     expect(
       pageSource,
@@ -89,8 +97,7 @@ void main() {
     expect(saveBody, contains('final cancelToken = _startMediaDownload();'));
     expect(saveBody, contains('if (cancelToken == null)'));
     expect(saveBody, contains('cancelToken: cancelToken'));
-    expect(saveBody, contains('on DioException catch (error)'));
-    expect(saveBody, contains('CancelToken.isCancel(error)'));
+    expect(saveBody, contains('on RequestCancelledException'));
     expect(saveBody, contains('_completeMediaDownload(cancelToken);'));
 
     final shareBody = _methodBody(
@@ -100,15 +107,14 @@ void main() {
     expect(shareBody, contains('final cancelToken = _startMediaDownload();'));
     expect(shareBody, contains('if (cancelToken == null)'));
     expect(shareBody, contains('cancelToken: cancelToken'));
-    expect(shareBody, contains('on DioException catch (error)'));
-    expect(shareBody, contains('CancelToken.isCancel(error)'));
+    expect(shareBody, contains('on RequestCancelledException'));
     expect(shareBody, contains('_completeMediaDownload(cancelToken);'));
 
     final downloadBody = _methodBody(
       mediaSource,
       'Future<List<int>> _downloadImageBytesImpl(',
     );
-    expect(mediaSource, contains('CancelToken? cancelToken'));
+    expect(mediaSource, contains('RequestCancellation? cancelToken'));
     expect(downloadBody, contains('downloadFileBytes('));
     expect(downloadBody, contains('cancelToken: cancelToken'));
   });

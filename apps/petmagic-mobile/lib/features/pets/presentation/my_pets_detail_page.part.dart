@@ -50,7 +50,7 @@ class _PetDetailsPageState extends ConsumerState<PetDetailsPage> {
           ref,
           petId,
           currentAvatarUrl: currentAvatarUrl,
-        cancelToken: cancelToken,
+          cancelToken: cancelToken,
         );
       } on Object catch (error) {
         if (_isPetPhotoRequestCancelled(error, cancelToken)) {
