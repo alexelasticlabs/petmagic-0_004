@@ -6,7 +6,6 @@ export 'package:petmagic_mobile/features/templates/domain/template_generation_re
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:petmagic_mobile/core/network/dio_request_cancellation.dart';
 import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
@@ -16,7 +15,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
-import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/authenticated_request_options.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
@@ -27,6 +25,9 @@ import 'package:petmagic_mobile/features/templates/data/template_generation_dtos
 import 'package:petmagic_mobile/features/templates/data/generation_repository_error_mapper.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_engagement_remote_data_source.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_active_state_store.dart';
+import 'package:petmagic_mobile/features/templates/data/generation_cache_codec.dart';
+import 'package:petmagic_mobile/features/templates/data/generation_cache_storage.dart';
+import 'package:petmagic_mobile/features/templates/data/generation_cache_reader.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_remote_data_source.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_source_upload_preparer.dart';
 import 'package:petmagic_mobile/features/templates/data/pet_profile_remote_data_source.dart';
@@ -39,7 +40,6 @@ import 'package:petmagic_mobile/features/templates/domain/template_generation_mo
 import 'package:petmagic_mobile/features/templates/domain/template_generation_results.dart';
 import 'package:petmagic_mobile/shared/files/image_upload_optimizer.dart';
 import 'package:petmagic_mobile/shared/files/upload_media_policy.dart';
-import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 export 'template_generation_dtos.dart';
@@ -102,35 +102,24 @@ class TemplateGenerationRepository implements GenerationRepository {
       authSessionCoordinator: _authSessionCoordinator,
       errorMapper: _errorMapper,
     );
+    _cacheStorage = GenerationCacheStorage(preferences: _preferences);
+    _cacheReader = GenerationCacheReader(
+      sessionStorage: _sessionStorage,
+      preferences: _preferences,
+      storage: _cacheStorage,
+    );
     _activeStateStore = GenerationActiveStateStore(
       preferences: _preferences,
       secureStorage: _secureStorage,
-      readScope: _readCacheScope,
-      readCacheString: ({required dataKey, required legacyDataKey}) =>
-          _readGenerationCacheString(
-            this,
-            dataKey: dataKey,
-            legacyDataKey: legacyDataKey,
-          ),
-      scopeFingerprint: _generationCacheScopeFingerprint,
+      readScope: _cacheReader.readScope,
+      readCacheString: _cacheStorage.readString,
+      scopeFingerprint: GenerationCacheReader.scopeFingerprint,
       createCorrelationId: _createGenerationCorrelationId,
     );
   }
 
-  static const _generationsCachePrefix = 'templates_generations_v1:';
-  static const _generationsCacheUpdatedAtPrefix =
-      'templates_generations_updated_at_v1:';
   static const _unreadCountCacheKey = 'templates_generations_unread_v1';
-  static const _unreadCountCacheUpdatedAtKey =
-      'templates_generations_unread_updated_at_v1';
   static const _maxPetPhotoBytes = UploadMediaPolicy.petPhotoMaxBytes;
-  static const _cacheAllStatusKey = 'all';
-  static const _cacheStatuses = <String>[
-    'all',
-    'active',
-    'completed',
-    'failed',
-  ];
   final Dio _dio;
   final AuthSessionStore _sessionStorage;
   final SharedPreferencesAsync _preferences;
@@ -143,7 +132,8 @@ class TemplateGenerationRepository implements GenerationRepository {
   late final GenerationRemoteDataSource _generationRemoteDataSource;
   late final PetProfileRemoteDataSource _petProfileRemoteDataSource;
   late final GenerationActiveStateStore _activeStateStore;
-  Future<String?>? _cacheScopeFuture;
+  late final GenerationCacheStorage _cacheStorage;
+  late final GenerationCacheReader _cacheReader;
 
   @override
   TemplateGenerationResult parseRealtimePayload(Map<String, dynamic> payload) {
@@ -399,15 +389,15 @@ class TemplateGenerationRepository implements GenerationRepository {
   @override
   Future<List<TemplateGenerationResult>?> readCachedGenerations({
     String? status,
-  }) => _readCachedGenerations(this, status: status);
+  }) => _cacheReader.readGenerations(status: status);
 
   @override
   Future<TemplateGenerationResult?> readCachedGeneration(String generationId) =>
-      _readCachedGeneration(this, generationId);
+      _cacheReader.readGeneration(generationId);
 
   @override
   Future<int?> readCachedUnreadGenerationCount() =>
-      _readCachedUnreadGenerationCount(this);
+      _cacheReader.readUnreadCount();
 
   @override
   Future<({String generationId, String correlationId})?>
@@ -430,10 +420,12 @@ class TemplateGenerationRepository implements GenerationRepository {
   Future<void> clearLocalCache() => _activeStateStore.clearAll();
 
   String _createGenerationCorrelationId() =>
-      _buildGenerationCorrelationId(this);
+      RequestIdentity.createCorrelationId().replaceFirst(
+        'flow-',
+        'generation-',
+      );
 
-  Future<String?> _readCacheScope() =>
-      _cacheScopeFuture ??= _resolveGenerationCacheScope(this);
+  Future<String?> _readCacheScope() => _cacheReader.readScope();
 
   @override
   Future<List<TemplateGenerationResult>> fetchGenerations({
@@ -567,11 +559,11 @@ class TemplateGenerationRepository implements GenerationRepository {
   bool _matchesCachedGenerationStatus(
     TemplateGenerationResult generation,
     String? status,
-  ) => _matchesCachedGenerationStatusImpl(this, generation, status);
+  ) => GenerationCacheCodec.matchesStatus(generation, status);
 
   Map<String, Object?> _generationToCachedJson(
     TemplateGenerationResult generation,
-  ) => _generationToCachedJsonImpl(this, generation);
+  ) => GenerationCacheCodec.generationToJson(generation);
 
   Future<Response<T>> _authorizedRequest<T>(
     Future<Response<T>> Function(AuthSession session) request, {

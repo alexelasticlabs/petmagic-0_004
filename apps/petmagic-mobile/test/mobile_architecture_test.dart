@@ -424,7 +424,6 @@ const _legacyOversizedProductionFiles = <String>{
   'lib/features/templates/application/generation_history_controller_sync.part.dart',
   'lib/features/templates/application/templates_controller.dart',
   'lib/features/templates/data/generation_gallery_store_storage.part.dart',
-  'lib/features/templates/data/template_generation_repository_cache.part.dart',
   'lib/features/templates/presentation/generations_gallery_page.dart',
   'lib/features/templates/presentation/generations_gallery_page_cards.dart',
   'lib/features/templates/presentation/generations_gallery_page_states_and_actions.dart',

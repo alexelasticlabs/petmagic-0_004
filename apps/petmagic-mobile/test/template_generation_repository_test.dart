@@ -553,15 +553,12 @@ void main() {
     final repositorySource = File(
       'lib/features/templates/data/template_generation_repository.dart',
     ).readAsStringSync();
-    final cacheSource = File(
-      'lib/features/templates/data/template_generation_repository_cache.part.dart',
-    ).readAsStringSync();
     final controllerSource = File(
       'lib/features/templates/presentation/template_generation_controller.dart',
     ).readAsStringSync();
 
     expect(repositorySource, contains('request_identity.dart'));
-    expect(cacheSource, contains('RequestIdentity.createCorrelationId()'));
+    expect(repositorySource, contains('RequestIdentity.createCorrelationId()'));
     expect(controllerSource, contains('RequestIdentity.createCorrelationId()'));
     expect(repositorySource, isNot(contains('Random.secure()')));
     expect(controllerSource, isNot(contains('Random.secure()')));
