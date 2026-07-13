@@ -4,7 +4,6 @@ export 'package:petmagic_mobile/features/pets/domain/pet_models.dart';
 export 'package:petmagic_mobile/features/templates/domain/template_generation_results.dart';
 
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:petmagic_mobile/core/network/dio_request_cancellation.dart';
@@ -12,8 +11,6 @@ import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:petmagic_mobile/core/files/local_media_file.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:http_parser/http_parser.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/authenticated_request_options.dart';
@@ -24,29 +21,27 @@ import 'package:petmagic_mobile/core/auth/auth_session.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_dtos.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_repository_error_mapper.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_engagement_remote_data_source.dart';
+import 'package:petmagic_mobile/features/templates/data/generation_engagement_repository_delegate.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_active_state_store.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_cache_codec.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_cache_storage.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_cache_reader.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_remote_data_source.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_source_upload_preparer.dart';
+import 'package:petmagic_mobile/features/templates/data/generation_pet_repository_delegate.dart';
+import 'package:petmagic_mobile/features/templates/data/pet_media_remote_data_source.dart';
 import 'package:petmagic_mobile/features/templates/data/pet_profile_remote_data_source.dart';
-import 'package:petmagic_mobile/features/templates/data/template_image_upload_support.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_result_dto_mapper.dart';
-import 'package:petmagic_mobile/features/templates/data/pet_dto_mapper.dart';
-import 'package:petmagic_mobile/features/pets/domain/pet_models.dart';
 import 'package:petmagic_mobile/features/templates/application/generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_results.dart';
 import 'package:petmagic_mobile/shared/files/image_upload_optimizer.dart';
-import 'package:petmagic_mobile/shared/files/upload_media_policy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 export 'template_generation_dtos.dart';
 
 part 'template_generation_repository_cache.part.dart';
 part 'template_generation_repository_media.part.dart';
-part 'template_generation_repository_pets.part.dart';
 
 final templateGenerationSharedPreferencesProvider =
     Provider<SharedPreferencesAsync>((ref) => SharedPreferencesAsync());
@@ -67,7 +62,9 @@ final dioTemplateGenerationRepositoryProvider =
       );
     });
 
-class TemplateGenerationRepository implements GenerationRepository {
+class TemplateGenerationRepository
+    with GenerationEngagementRepositoryDelegate, GenerationPetRepositoryDelegate
+    implements GenerationRepository {
   TemplateGenerationRepository({
     required Dio dio,
     required AuthSessionStore sessionStorage,
@@ -84,7 +81,7 @@ class TemplateGenerationRepository implements GenerationRepository {
        _authSessionCoordinator =
            authSessionCoordinator ??
            AuthSessionCoordinator(dio: dio, sessionStorage: sessionStorage) {
-    _engagementRemoteDataSource = GenerationEngagementRemoteDataSource(
+    engagementRemoteDataSource = GenerationEngagementRemoteDataSource(
       dio: dio,
       authSessionCoordinator: _authSessionCoordinator,
       errorMapper: _errorMapper,
@@ -97,10 +94,16 @@ class TemplateGenerationRepository implements GenerationRepository {
         imageUploadOptimizer: _imageUploadOptimizer,
       ),
     );
-    _petProfileRemoteDataSource = PetProfileRemoteDataSource(
+    petProfileRemoteDataSource = PetProfileRemoteDataSource(
       dio: dio,
       authSessionCoordinator: _authSessionCoordinator,
       errorMapper: _errorMapper,
+    );
+    petMediaRemoteDataSource = PetMediaRemoteDataSource(
+      dio: dio,
+      authSessionCoordinator: _authSessionCoordinator,
+      errorMapper: _errorMapper,
+      imageUploadOptimizer: _imageUploadOptimizer,
     );
     _cacheStorage = GenerationCacheStorage(preferences: _preferences);
     _cacheReader = GenerationCacheReader(
@@ -119,7 +122,6 @@ class TemplateGenerationRepository implements GenerationRepository {
   }
 
   static const _unreadCountCacheKey = 'templates_generations_unread_v1';
-  static const _maxPetPhotoBytes = UploadMediaPolicy.petPhotoMaxBytes;
   final Dio _dio;
   final AuthSessionStore _sessionStorage;
   final SharedPreferencesAsync _preferences;
@@ -128,9 +130,13 @@ class TemplateGenerationRepository implements GenerationRepository {
   final AuthSessionCoordinator _authSessionCoordinator;
   final GenerationRepositoryErrorMapper _errorMapper =
       const GenerationRepositoryErrorMapper();
-  late final GenerationEngagementRemoteDataSource _engagementRemoteDataSource;
+  @override
+  late final GenerationEngagementRemoteDataSource engagementRemoteDataSource;
   late final GenerationRemoteDataSource _generationRemoteDataSource;
-  late final PetProfileRemoteDataSource _petProfileRemoteDataSource;
+  @override
+  late final PetProfileRemoteDataSource petProfileRemoteDataSource;
+  @override
+  late final PetMediaRemoteDataSource petMediaRemoteDataSource;
   late final GenerationActiveStateStore _activeStateStore;
   late final GenerationCacheStorage _cacheStorage;
   late final GenerationCacheReader _cacheReader;
@@ -242,138 +248,6 @@ class TemplateGenerationRepository implements GenerationRepository {
     cancelToken: cancelToken,
   );
 
-  Future<List<PetProfile>> fetchPets({RequestCancellation? cancelToken}) =>
-      _petProfileRemoteDataSource.fetchPets(cancelToken: cancelToken);
-
-  Future<PetProfile> createPet({
-    required String name,
-    required String type,
-    String? breed,
-    RequestCancellation? cancelToken,
-  }) => _petProfileRemoteDataSource.createPet(
-    name: name,
-    type: type,
-    breed: breed,
-    cancelToken: cancelToken,
-  );
-
-  Future<PetProfile> updatePet({
-    required String petId,
-    required String name,
-    required String type,
-    String? breed,
-    RequestCancellation? cancelToken,
-  }) => _petProfileRemoteDataSource.updatePet(
-    petId: petId,
-    name: name,
-    type: type,
-    breed: breed,
-    cancelToken: cancelToken,
-  );
-
-  Future<void> deletePet(String petId, {RequestCancellation? cancelToken}) =>
-      _petProfileRemoteDataSource.deletePet(petId, cancelToken: cancelToken);
-
-  Future<PetPhoto> uploadPetPhoto({
-    required String petId,
-    required XFile photo,
-    RequestCancellation? cancelToken,
-  }) => _uploadPetPhoto(
-    this,
-    petId: petId,
-    photo: photo,
-    cancelToken: cancelToken,
-  );
-
-  Future<List<PetPhoto>> fetchPetPhotos(
-    String petId, {
-    RequestCancellation? cancelToken,
-  }) => _fetchPetPhotos(this, petId: petId, cancelToken: cancelToken);
-
-  Future<PetPhoto> setPetPhotoAsAvatar({
-    required String petId,
-    required String photoId,
-    RequestCancellation? cancelToken,
-  }) => _setPetPhotoAsAvatar(
-    this,
-    petId: petId,
-    photoId: photoId,
-    cancelToken: cancelToken,
-  );
-
-  Future<PetPhoto> setPetPhotoFavorite({
-    required String petId,
-    required String photoId,
-    required bool isFavorite,
-    RequestCancellation? cancelToken,
-  }) => _setPetPhotoFavorite(
-    this,
-    petId: petId,
-    photoId: photoId,
-    isFavorite: isFavorite,
-    cancelToken: cancelToken,
-  );
-
-  Future<void> deletePetPhoto({
-    required String petId,
-    required String photoId,
-    RequestCancellation? cancelToken,
-  }) => _deletePetPhoto(
-    this,
-    petId: petId,
-    photoId: photoId,
-    cancelToken: cancelToken,
-  );
-
-  Future<List<TemplateGenerationResult>> fetchPetGenerations(
-    String petId, {
-    RequestCancellation? cancelToken,
-  }) => _fetchPetGenerations(this, petId: petId, cancelToken: cancelToken);
-
-  @override
-  Future<void> recordTemplateAnalyticsEvent({
-    required String templateId,
-    required String eventType,
-    String source = 'mobile',
-    String? generationId,
-    Map<String, Object?>? metadata,
-    RequestCancellation? cancelToken,
-  }) => _engagementRemoteDataSource.recordAnalytics(
-    templateId: templateId,
-    eventType: eventType,
-    source: source,
-    generationId: generationId,
-    metadata: metadata ?? const {},
-    cancelToken: cancelToken,
-  );
-
-  @override
-  Future<RemoveGenerationWatermarkResult> removeWatermark(
-    String generationId, {
-    String paymentMethod = 'credit',
-    RequestCancellation? cancelToken,
-  }) => _engagementRemoteDataSource.removeWatermark(
-    generationId,
-    paymentMethod: paymentMethod,
-    cancelToken: cancelToken,
-  );
-
-  @override
-  Future<void> recordAnalyticsEvent({
-    required String templateId,
-    required String eventType,
-    String? generationId,
-    Map<String, Object?> metadata = const {},
-    RequestCancellation? cancelToken,
-  }) => _engagementRemoteDataSource.recordAnalytics(
-    templateId: templateId,
-    eventType: eventType,
-    source: 'mobile',
-    generationId: generationId,
-    metadata: metadata,
-    cancelToken: cancelToken,
-  );
-
   @override
   Future<GenerationMediaAccessResult> fetchDownloadUrl(
     String generationId, {
@@ -481,75 +355,6 @@ class TemplateGenerationRepository implements GenerationRepository {
   @override
   Future<void> upsertCachedGeneration(TemplateGenerationResult generation) =>
       _upsertCachedGeneration(this, generation);
-
-  @override
-  Future<void> submitGenerationFeedback({
-    required String generationId,
-    required int rating,
-    List<String> selectedReasons = const [],
-    String? comment,
-    double? inputPhotoQualityScore,
-  }) async {
-    await _engagementRemoteDataSource.submitGenerationFeedback(
-      generationId: generationId,
-      rating: rating,
-      selectedReasons: selectedReasons,
-      comment: comment,
-      inputPhotoQualityScore: inputPhotoQualityScore,
-      retryTransientFailures: false,
-    );
-  }
-
-  @override
-  Future<String> submitFeedback({
-    required String type,
-    required String category,
-    int? rating,
-    String? message,
-    String? generationId,
-    String? templateId,
-    String? petId,
-    String sourceScreen = 'settings',
-    RequestCancellation? cancelToken,
-    bool retryTransientFailures = false,
-  }) => _engagementRemoteDataSource.submitFeedback(
-    type: type,
-    category: category,
-    rating: rating,
-    message: message,
-    generationId: generationId,
-    templateId: templateId,
-    petId: petId,
-    sourceScreen: sourceScreen,
-    cancelToken: cancelToken,
-    retryTransientFailures: retryTransientFailures,
-  );
-
-  @override
-  Future<void> registerPushToken({
-    required String token,
-    required String platform,
-    String? deviceId,
-    String? appVersion,
-    String? locale,
-  }) async {
-    await _engagementRemoteDataSource.registerPushToken(
-      token: token,
-      platform: platform,
-      deviceId: deviceId,
-      appVersion: appVersion,
-      locale: locale,
-      retryTransientFailures: false,
-    );
-  }
-
-  @override
-  Future<void> unregisterPushToken(String token) async {
-    await _engagementRemoteDataSource.unregisterPushToken(
-      token,
-      retryTransientFailures: false,
-    );
-  }
 
   Future<void> _writeCachedGenerations({
     required String? status,

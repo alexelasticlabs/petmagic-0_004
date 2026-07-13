@@ -360,6 +360,25 @@ void main() {
       expect(composition, contains('$provider.overrideWith'));
     }
   });
+
+  test('production pet composition is independent from generation facade', () {
+    final composition = File(
+      'lib/app/composition/mobile_provider_overrides.dart',
+    ).readAsStringSync();
+    final adapter = File(
+      'lib/features/templates/data/template_generation_pet_repository_adapter.dart',
+    ).readAsStringSync();
+
+    expect(composition, contains('ref.watch(dioPetRepositoryProvider)'));
+    expect(
+      composition,
+      isNot(contains('TemplateGenerationPetRepositoryAdapter(')),
+    );
+    expect(
+      adapter,
+      contains('TemplateGenerationPetRepositoryAdapter.fromSources'),
+    );
+  });
 }
 
 Iterable<File> _dartFiles(Directory root) sync* {
@@ -467,7 +486,6 @@ const _legacyLayerLimitProductionFiles = <String>{
   'lib/features/templates/application/generation_history_controller_cache.part.dart',
   'lib/features/templates/application/generation_history_controller_lifecycle.part.dart',
   'lib/features/templates/data/generation_gallery_store_entries.part.dart',
-  'lib/features/templates/data/template_generation_repository.dart',
   'lib/features/templates/data/template_generation_dtos.dart',
   'lib/features/templates/data/templates_remote_data_source.dart',
   'lib/features/templates/data/templates_repository.dart',

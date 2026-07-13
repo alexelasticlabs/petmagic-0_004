@@ -26,9 +26,7 @@ final mobileProviderOverrides = [
     (ref) => ref.watch(dioGamificationRepositoryProvider),
   ),
   petRepositoryProvider.overrideWith(
-    (ref) => TemplateGenerationPetRepositoryAdapter(
-      ref.watch(dioTemplateGenerationRepositoryProvider),
-    ),
+    (ref) => ref.watch(dioPetRepositoryProvider),
   ),
   premiumRepositoryProvider.overrideWith(
     (ref) => ref.watch(dioPremiumRepositoryProvider),
