@@ -41,6 +41,8 @@ void main() {
       );
       final templatesControllerSource = _readSource(
         'lib/features/templates/application/templates_controller.dart',
+        'lib/features/templates/application/templates_metadata_coordinator.dart',
+        'lib/features/templates/application/templates_preview_warmup_coordinator.dart',
       );
       final generationControllerSource = _readSource(
         'lib/features/templates/presentation/template_generation_controller.dart',
