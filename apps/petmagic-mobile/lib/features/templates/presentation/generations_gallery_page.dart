@@ -39,7 +39,9 @@ import 'package:petmagic_mobile/shared/widgets/premium_shimmer_button.dart';
 part 'generations_gallery_page_cards.dart';
 part 'generations_gallery_page_card_chrome.part.dart';
 part 'generations_gallery_page_filters_and_chrome.dart';
-part 'generations_gallery_page_states_and_actions.dart';
+part 'generations_gallery_page_states.dart';
+part 'generations_gallery_page_action_sheets.dart';
+part 'generations_gallery_page_media_actions.dart';
 
 class GenerationsGalleryPage extends ConsumerStatefulWidget {
   const GenerationsGalleryPage({super.key});

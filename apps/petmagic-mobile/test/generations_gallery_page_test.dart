@@ -605,7 +605,7 @@ void main() {
       'lib/features/templates/presentation/generations_gallery_page.dart',
     ).readAsStringSync();
     final actionsSource = File(
-      'lib/features/templates/presentation/generations_gallery_page_states_and_actions.dart',
+      'lib/features/templates/presentation/generations_gallery_page_media_actions.dart',
     ).readAsStringSync();
 
     expect(
@@ -661,7 +661,7 @@ void main() {
 
   test('gallery type badge foreground is derived from badge tone', () {
     final actionsSource = File(
-      'lib/features/templates/presentation/generations_gallery_page_states_and_actions.dart',
+      'lib/features/templates/presentation/generations_gallery_page_states.dart',
     ).readAsStringSync();
 
     expect(

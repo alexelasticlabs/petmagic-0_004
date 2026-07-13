@@ -270,7 +270,7 @@ void main() {
     () {
       final source = File(
         'lib/features/templates/presentation/'
-        'generations_gallery_page_states_and_actions.dart',
+        'generations_gallery_page_media_actions.dart',
       ).readAsStringSync();
       final saveBody = source.substring(
         source.indexOf('Future<void> _saveGenerationToGallery'),

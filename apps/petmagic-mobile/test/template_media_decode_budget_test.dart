@@ -203,7 +203,7 @@ void main() {
       'lib/features/templates/presentation/generations_gallery_page_cards.dart',
     ).readAsString();
     final actionsSource = await File(
-      'lib/features/templates/presentation/generations_gallery_page_states_and_actions.dart',
+      'lib/features/templates/presentation/generations_gallery_page_media_actions.dart',
     ).readAsString();
 
     expect(

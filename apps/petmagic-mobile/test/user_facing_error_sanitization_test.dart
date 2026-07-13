@@ -32,9 +32,11 @@ void main() {
       File(
         'lib/features/pets/presentation/my_pets_page.dart',
       ).readAsStringSync(),
-      File(
-        'lib/features/templates/presentation/generations_gallery_page_states_and_actions.dart',
-      ).readAsStringSync(),
+      [
+        'lib/features/templates/presentation/generations_gallery_page_states.dart',
+        'lib/features/templates/presentation/generations_gallery_page_action_sheets.dart',
+        'lib/features/templates/presentation/generations_gallery_page_media_actions.dart',
+      ].map((path) => File(path).readAsStringSync()).join('\n'),
     ];
 
     for (final source in sources) {
