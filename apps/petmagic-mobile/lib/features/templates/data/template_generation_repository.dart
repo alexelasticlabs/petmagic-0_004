@@ -26,6 +26,7 @@ import 'package:petmagic_mobile/core/auth/auth_session.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_dtos.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_repository_error_mapper.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_engagement_remote_data_source.dart';
+import 'package:petmagic_mobile/features/templates/data/generation_active_state_store.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_remote_data_source.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_source_upload_preparer.dart';
 import 'package:petmagic_mobile/features/templates/data/pet_profile_remote_data_source.dart';
@@ -101,6 +102,19 @@ class TemplateGenerationRepository implements GenerationRepository {
       authSessionCoordinator: _authSessionCoordinator,
       errorMapper: _errorMapper,
     );
+    _activeStateStore = GenerationActiveStateStore(
+      preferences: _preferences,
+      secureStorage: _secureStorage,
+      readScope: _readCacheScope,
+      readCacheString: ({required dataKey, required legacyDataKey}) =>
+          _readGenerationCacheString(
+            this,
+            dataKey: dataKey,
+            legacyDataKey: legacyDataKey,
+          ),
+      scopeFingerprint: _generationCacheScopeFingerprint,
+      createCorrelationId: _createGenerationCorrelationId,
+    );
   }
 
   static const _generationsCachePrefix = 'templates_generations_v1:';
@@ -109,19 +123,10 @@ class TemplateGenerationRepository implements GenerationRepository {
   static const _unreadCountCacheKey = 'templates_generations_unread_v1';
   static const _unreadCountCacheUpdatedAtKey =
       'templates_generations_unread_updated_at_v1';
-  static const _activeGenerationIdKey = 'templates_active_generation_id_v1';
-  static const _activeGenerationCorrelationIdKey =
-      'templates_active_generation_correlation_id_v1';
-  static const _activeGenerationSecureScopeKey =
-      'petmagic_mobile_templates_active_generation_scope_v2';
-  static const _activeGenerationIdSecureStorageKey =
-      'petmagic_mobile_templates_active_generation_id_v2';
-  static const _activeGenerationCorrelationIdSecureStorageKey =
-      'petmagic_mobile_templates_active_generation_correlation_id_v2';
   static const _maxPetPhotoBytes = UploadMediaPolicy.petPhotoMaxBytes;
   static const _cacheAllStatusKey = 'all';
   static const _cacheStatuses = <String>[
-    _cacheAllStatusKey,
+    'all',
     'active',
     'completed',
     'failed',
@@ -137,6 +142,7 @@ class TemplateGenerationRepository implements GenerationRepository {
   late final GenerationEngagementRemoteDataSource _engagementRemoteDataSource;
   late final GenerationRemoteDataSource _generationRemoteDataSource;
   late final PetProfileRemoteDataSource _petProfileRemoteDataSource;
+  late final GenerationActiveStateStore _activeStateStore;
   Future<String?>? _cacheScopeFuture;
 
   @override
@@ -405,24 +411,23 @@ class TemplateGenerationRepository implements GenerationRepository {
 
   @override
   Future<({String generationId, String correlationId})?>
-  readActiveGeneration() => _readActiveGeneration(this);
+  readActiveGeneration() => _activeStateStore.read();
 
   @override
   Future<void> rememberActiveGeneration({
     required String generationId,
     String? correlationId,
-  }) => _rememberActiveGeneration(
-    this,
+  }) => _activeStateStore.remember(
     generationId: generationId,
     correlationId: correlationId,
   );
 
   @override
   Future<void> clearActiveGeneration(String generationId) =>
-      _clearActiveGeneration(this, generationId);
+      _activeStateStore.clear(generationId);
 
   @override
-  Future<void> clearLocalCache() => _clearLocalCache(this);
+  Future<void> clearLocalCache() => _activeStateStore.clearAll();
 
   String _createGenerationCorrelationId() =>
       _buildGenerationCorrelationId(this);
@@ -478,7 +483,7 @@ class TemplateGenerationRepository implements GenerationRepository {
       cancelToken: cancelToken,
       retryTransientFailures: false,
     );
-    await _removeCachedGeneration(generationId);
+    await _removeCachedGenerationImpl(this, generationId);
   }
 
   @override
@@ -559,9 +564,6 @@ class TemplateGenerationRepository implements GenerationRepository {
     required List<Map<String, Object?>> items,
   }) => _writeCachedGenerationsImpl(this, status: status, items: items);
 
-  Future<void> _writeCachedUnreadGenerationCount(int count) =>
-      _writeCachedUnreadGenerationCountImpl(this, count);
-
   bool _matchesCachedGenerationStatus(
     TemplateGenerationResult generation,
     String? status,
@@ -570,12 +572,6 @@ class TemplateGenerationRepository implements GenerationRepository {
   Map<String, Object?> _generationToCachedJson(
     TemplateGenerationResult generation,
   ) => _generationToCachedJsonImpl(this, generation);
-
-  Future<void> _markCachedGenerationRead(String generationId) =>
-      _markCachedGenerationReadImpl(this, generationId);
-
-  Future<void> _removeCachedGeneration(String generationId) =>
-      _removeCachedGenerationImpl(this, generationId);
 
   Future<Response<T>> _authorizedRequest<T>(
     Future<Response<T>> Function(AuthSession session) request, {
