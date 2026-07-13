@@ -112,8 +112,11 @@ void main() {
     final detailsSource = File(
       'lib/features/pets/presentation/my_pets_detail_page.part.dart',
     ).readAsStringSync();
-    final widgetsSource = File(
-      'lib/features/pets/presentation/my_pets_display_widgets.part.dart',
+    final overviewSource = File(
+      'lib/features/pets/presentation/my_pets_overview_widgets.part.dart',
+    ).readAsStringSync();
+    final photoGridSource = File(
+      'lib/features/pets/presentation/my_pets_photo_grid.part.dart',
     ).readAsStringSync();
     final actionsSource = File(
       'lib/features/pets/presentation/my_pets_photo_actions.part.dart',
@@ -121,7 +124,13 @@ void main() {
 
     expect(pageSource, contains("part 'my_pets_form_sheet.part.dart';"));
     expect(pageSource, contains("part 'my_pets_detail_page.part.dart';"));
-    expect(pageSource, contains("part 'my_pets_display_widgets.part.dart';"));
+    expect(pageSource, contains("part 'my_pets_overview_widgets.part.dart';"));
+    expect(pageSource, contains("part 'my_pets_photo_grid.part.dart';"));
+    expect(
+      pageSource,
+      contains("part 'my_pets_generation_widgets.part.dart';"),
+    );
+    expect(pageSource, contains("part 'my_pets_state_widgets.part.dart';"));
     expect(pageSource, contains("part 'my_pets_photo_actions.part.dart';"));
     expect(pageSource, isNot(contains('class _PetFormProgress')));
     expect(pageSource, isNot(contains('class _PetNameStep')));
@@ -138,9 +147,10 @@ void main() {
     expect(formSource, contains('class _PetPhotoStep'));
     expect(detailsSource, contains("part of 'my_pets_page.dart';"));
     expect(detailsSource, contains('class PetDetailsPage'));
-    expect(widgetsSource, contains("part of 'my_pets_page.dart';"));
-    expect(widgetsSource, contains('class _PetPhotoCard'));
-    expect(widgetsSource, contains('class _PetHeader'));
+    expect(overviewSource, contains("part of 'my_pets_page.dart';"));
+    expect(overviewSource, contains('class _PetHeader'));
+    expect(photoGridSource, contains("part of 'my_pets_page.dart';"));
+    expect(photoGridSource, contains('class _PetPhotoCard'));
     expect(actionsSource, contains("part of 'my_pets_page.dart';"));
     expect(actionsSource, contains('Future<void> _pickAndUploadPhoto'));
     expect(actionsSource, contains('Future<void> _deletePhoto'));
@@ -160,7 +170,7 @@ void main() {
         'lib/features/pets/presentation/my_pets_page.dart',
       ).readAsStringSync();
       final widgetsSource = File(
-        'lib/features/pets/presentation/my_pets_display_widgets.part.dart',
+        'lib/features/pets/presentation/my_pets_generation_widgets.part.dart',
       ).readAsStringSync();
 
       expect(

@@ -34,7 +34,10 @@ import 'package:share_plus/share_plus.dart';
 export 'package:petmagic_mobile/features/pets/application/pet_profile_providers.dart';
 
 part 'my_pets_detail_page.part.dart';
-part 'my_pets_display_widgets.part.dart';
+part 'my_pets_overview_widgets.part.dart';
+part 'my_pets_photo_grid.part.dart';
+part 'my_pets_generation_widgets.part.dart';
+part 'my_pets_state_widgets.part.dart';
 part 'my_pets_form_sheet.part.dart';
 part 'my_pets_photo_actions.part.dart';
 
