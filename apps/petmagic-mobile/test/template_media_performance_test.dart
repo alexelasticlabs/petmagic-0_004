@@ -143,9 +143,12 @@ void main() {
     'template surfaces do not cache stale notifiers across session resets',
     () async {
       final templatesSource = readTemplatesPageLibrarySource();
-      final gallerySource = await File(
-        'lib/features/templates/presentation/generations_gallery_page.dart',
-      ).readAsString();
+      final gallerySource = await Future.wait(
+        [
+          'lib/features/templates/presentation/generations_gallery_page.dart',
+          'lib/features/templates/presentation/generations_gallery_page_lifecycle.part.dart',
+        ].map((path) => File(path).readAsString()),
+      ).then((sources) => sources.join('\n'));
 
       expect(
         templatesSource,
