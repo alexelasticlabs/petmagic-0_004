@@ -7,7 +7,7 @@ import 'premium_controller_test_source.dart';
 void main() {
   test('premium checkout error mapper does not echo raw details', () {
     final premiumPage = File(
-      'lib/features/premium/presentation/premium_page.dart',
+      'lib/features/premium/presentation/premium_page_checkout.part.dart',
     ).readAsStringSync();
 
     final body = _functionBody(premiumPage, '_resolveCheckoutErrorMessage');

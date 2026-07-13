@@ -8,7 +8,7 @@ void main() {
       'lib/features/profile/presentation/profile_settings_feedback.part.dart',
     ).readAsStringSync();
     final paywallFeedback = File(
-      'lib/features/premium/presentation/premium_page.dart',
+      'lib/features/premium/presentation/premium_page_feedback.part.dart',
     ).readAsStringSync();
     final generationFeedback = File(
       'lib/features/templates/presentation/generation_status_page_feedback.part.dart',

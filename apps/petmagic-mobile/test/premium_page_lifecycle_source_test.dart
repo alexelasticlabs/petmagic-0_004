@@ -4,9 +4,10 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('external stripe checkout schedules verification on app resume', () {
-    final pageSource = File(
+    final pageSource = [
       'lib/features/premium/presentation/premium_page.dart',
-    ).readAsStringSync();
+      'lib/features/premium/presentation/premium_page_checkout.part.dart',
+    ].map((path) => File(path).readAsStringSync()).join('\n');
     final lifecycleBody = _methodBody(
       pageSource,
       '_handlePremiumPageLifecycleChange',
@@ -52,7 +53,7 @@ void main() {
 
   test('paywall feedback submit is best-effort and does not block close', () {
     final pageSource = File(
-      'lib/features/premium/presentation/premium_page.dart',
+      'lib/features/premium/presentation/premium_page_checkout.part.dart',
     ).readAsStringSync();
     final feedbackBody = _methodBody(pageSource, '_maybeAskPaywallFeedback');
 
@@ -68,14 +69,15 @@ void main() {
 
   test('paywall feedback removes legacy raw-scope cooldown key', () {
     final pageSource = File(
-      'lib/features/premium/presentation/premium_page.dart',
+      'lib/features/premium/presentation/premium_page_checkout.part.dart',
     ).readAsStringSync();
     final feedbackBody = _methodBody(pageSource, '_maybeAskPaywallFeedback');
     final legacyCleanupIndex = feedbackBody.indexOf(
       'await preferences.remove(legacyLastShownKey);',
     );
     final cooldownReturnIndex = feedbackBody.indexOf(
-      'now.difference(lastShown) < _paywallFeedbackCooldown',
+      'now.difference(lastShown) <\n'
+      '            _PremiumPageState._paywallFeedbackCooldown',
     );
 
     expect(feedbackBody, contains('legacyLastShownKey != lastShownKey'));
@@ -86,7 +88,7 @@ void main() {
 
   test('paywall feedback sheet disposes its text controller after close', () {
     final pageSource = File(
-      'lib/features/premium/presentation/premium_page.dart',
+      'lib/features/premium/presentation/premium_page_feedback.part.dart',
     ).readAsStringSync();
     final sheetBody = _methodBody(pageSource, '_showPaywallFeedbackSheet');
 
@@ -99,7 +101,7 @@ void main() {
     'paywall feedback sheet uses stable option grid instead of wrapping chips',
     () {
       final pageSource = File(
-        'lib/features/premium/presentation/premium_page.dart',
+        'lib/features/premium/presentation/premium_page_feedback.part.dart',
       ).readAsStringSync();
       final sheetBody = _methodBody(pageSource, '_showPaywallFeedbackSheet');
 

@@ -96,16 +96,16 @@ void main() {
   });
 
   test('premium provider fallback labels use shared localizations', () {
-    final pageSource = File(
-      'lib/features/premium/presentation/premium_page.dart',
+    final checkoutSource = File(
+      'lib/features/premium/presentation/premium_page_checkout.part.dart',
     ).readAsStringSync();
 
-    expect(pageSource, contains('text.premiumPaymentStripe'));
-    expect(pageSource, contains('text.premiumPaymentGooglePlay'));
-    expect(pageSource, contains('text.premiumPaymentApple'));
-    expect(pageSource, isNot(contains("=> 'Stripe'")));
-    expect(pageSource, isNot(contains("=> 'Google Play'")));
-    expect(pageSource, isNot(contains("=> 'App Store'")));
+    expect(checkoutSource, contains('text.premiumPaymentStripe'));
+    expect(checkoutSource, contains('text.premiumPaymentGooglePlay'));
+    expect(checkoutSource, contains('text.premiumPaymentApple'));
+    expect(checkoutSource, isNot(contains("=> 'Stripe'")));
+    expect(checkoutSource, isNot(contains("=> 'Google Play'")));
+    expect(checkoutSource, isNot(contains("=> 'App Store'")));
   });
 
   test('premium CTA and footer stay in dedicated part files', () {

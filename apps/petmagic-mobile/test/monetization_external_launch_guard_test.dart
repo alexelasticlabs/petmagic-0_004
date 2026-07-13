@@ -7,7 +7,7 @@ void main() {
     'monetization external launches fall back safely on launcher exceptions',
     () {
       final premiumPageSource = File(
-        'lib/features/premium/presentation/premium_page.dart',
+        'lib/features/premium/presentation/premium_page_checkout.part.dart',
       ).readAsStringSync();
       final premiumFooterSource = File(
         'lib/features/premium/presentation/premium_page_footer.part.dart',
@@ -73,7 +73,7 @@ void main() {
 
   test('monetization checkout does not keep unreachable PaymentSheet path', () {
     final premiumPageSource = File(
-      'lib/features/premium/presentation/premium_page.dart',
+      'lib/features/premium/presentation/premium_page_checkout.part.dart',
     ).readAsStringSync();
     final premiumModelsSource = File(
       'lib/features/premium/domain/premium_models.dart',

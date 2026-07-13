@@ -9,9 +9,11 @@ void main() {
   test('payment and generation controllers do not expose raw exceptions', () {
     final sources = [
       readPremiumControllerLibrarySource(),
-      File(
+      [
         'lib/features/premium/presentation/premium_page.dart',
-      ).readAsStringSync(),
+        'lib/features/premium/presentation/premium_page_checkout.part.dart',
+        'lib/features/premium/presentation/premium_page_feedback.part.dart',
+      ].map((path) => File(path).readAsStringSync()).join('\n'),
       readWalletControllerLibrarySource(),
       [
         'lib/features/templates/application/generation_history_controller.dart',
