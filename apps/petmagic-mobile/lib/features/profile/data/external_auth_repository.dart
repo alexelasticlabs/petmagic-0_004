@@ -3,9 +3,6 @@ export 'package:petmagic_mobile/features/profile/application/external_auth_gatew
         ExternalAuthProvider,
         ExternalAuthRepository,
         externalAuthRepositoryProvider;
-
-import 'dart:async';
-
 import 'package:app_links/app_links.dart';
 import 'package:dio/dio.dart';
 import 'package:petmagic_mobile/core/network/dio_request_cancellation.dart';
@@ -14,7 +11,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
 import 'package:petmagic_mobile/core/auth/google_sign_in_adapter.dart';
-import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
@@ -23,6 +19,7 @@ import 'package:petmagic_mobile/core/network/dio_provider.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/domain/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_dto_mapper.dart';
+import 'package:petmagic_mobile/features/profile/data/external_browser_link_flow.dart';
 import 'package:petmagic_mobile/features/profile/application/external_auth_gateway.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -58,10 +55,6 @@ void _logExternalAuthFailure(
 }
 
 class MobileExternalAuthRepository implements ExternalAuthRepository {
-  static const _callbackFailedCode = 'auth.external_callback_failed';
-  static const _launchFailedCode = 'auth.external_launch_failed';
-  static const _timedOutCode = 'auth.external_timed_out';
-  static const _invalidSessionCode = 'auth.external_ticket_invalid';
   static const _genericFailedCode = 'auth.external_invalid';
   static const _cancelledCode = 'auth.external_cancelled';
   MobileExternalAuthRepository({
@@ -78,8 +71,6 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
        _authSessionCoordinator =
            authSessionCoordinator ??
            AuthSessionCoordinator(dio: dio, sessionStorage: sessionStorage),
-       _launchUrl =
-           launchUrlDelegate ?? ((uri, mode) => launchUrl(uri, mode: mode)),
        _googleSignInAdapter =
            googleSignInAdapter ?? PluginGoogleSignInAdapter.shared,
        _appleSignIn =
@@ -89,22 +80,23 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
                AppleIDAuthorizationScopes.email,
                AppleIDAuthorizationScopes.fullName,
              ],
-           )),
-       _uriLinkStream = uriLinkStream ?? appLinks.uriLinkStream;
-
-  static final Uri _callbackUri = Uri(
-    scheme: AppConfig.deepLinkScheme,
-    host: 'auth',
-    path: '/external',
-  );
+           )) {
+    _browserLinkFlow = ExternalBrowserLinkFlow(
+      dio: dio,
+      uriLinkStream: uriLinkStream ?? appLinks.uriLinkStream,
+      launchUrl:
+          launchUrlDelegate ?? ((uri, mode) => launchUrl(uri, mode: mode)),
+      readAuthorizedSession: _readAuthorizedSession,
+      mapDioException: _mapDioException,
+    );
+  }
 
   final Dio _dio;
   final AuthSessionStore _sessionStorage;
   final AuthSessionCoordinator _authSessionCoordinator;
-  final Future<bool> Function(Uri uri, LaunchMode mode) _launchUrl;
   final GoogleSignInAdapter _googleSignInAdapter;
   final Future<AuthorizationCredentialAppleID> Function() _appleSignIn;
-  final Stream<Uri> _uriLinkStream;
+  late final ExternalBrowserLinkFlow _browserLinkFlow;
 
   @override
   Future<AuthSession> authenticate(
@@ -127,7 +119,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
       return _linkGoogleNatively(cancelToken: cancelToken);
     }
 
-    return _linkWithBrowserFlow(provider, cancelToken: cancelToken);
+    return _browserLinkFlow.link(provider, cancelToken: cancelToken);
   }
 
   @override
@@ -491,118 +483,6 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
     }
   }
 
-  Future<List<MobileLinkedAccount>> _linkWithBrowserFlow(
-    ExternalAuthProvider provider, {
-    RequestCancellation? cancelToken,
-  }) async {
-    final session = await _readAuthorizedSession();
-    final prepareResponse = await _dio.post<Map<String, dynamic>>(
-      '/api/auth/me/linked-accounts/${provider.apiValue}/prepare',
-      options: authenticatedRequestOptions(session.accessToken),
-      cancelToken: cancelToken.toDioCancelToken(),
-    );
-    final ticket =
-        prepareResponse.data?['ticket'] as String? ??
-        prepareResponse.data?['Ticket'] as String?;
-    if (ticket == null || ticket.isEmpty) {
-      throw const AppException(_invalidSessionCode);
-    }
-
-    final completer = Completer<Uri>();
-    late final StreamSubscription<Uri> subscription;
-
-    subscription = _uriLinkStream.listen(
-      (uri) {
-        if (_isExpectedCallback(uri) && !completer.isCompleted) {
-          completer.complete(uri);
-        }
-      },
-      onError: (Object _) {
-        if (!completer.isCompleted) {
-          completer.completeError(const AppException(_callbackFailedCode));
-        }
-      },
-    );
-
-    try {
-      final authUri = Uri.parse(_dio.options.baseUrl).replace(
-        path: '/api/auth/external/${provider.apiValue}',
-        queryParameters: {
-          'redirectUri': _callbackUri.toString(),
-          'mode': 'link',
-          'linkTicket': ticket,
-        },
-      );
-
-      final launched = await _launchAuthUri(authUri);
-      if (!launched) {
-        throw const AppException(_launchFailedCode);
-      }
-
-      final callbackUri = await _waitForExternalAuthCallback(
-        completer.future,
-        cancelToken: cancelToken,
-      );
-
-      final errorCode = callbackUri.queryParameters['error'];
-      if (errorCode != null && errorCode.isNotEmpty) {
-        throw AppException(_safeExternalCallbackErrorCode(errorCode));
-      }
-
-      if (callbackUri.queryParameters['linked'] != '1') {
-        throw const AppException(_genericFailedCode);
-      }
-
-      return _fetchLinkedAccounts(cancelToken: cancelToken);
-    } on DioException catch (error) {
-      throw _mapDioException(error, fallbackMessage: _genericFailedCode);
-    } finally {
-      await subscription.cancel();
-    }
-  }
-
-  Future<Uri> _waitForExternalAuthCallback(
-    Future<Uri> callback, {
-    RequestCancellation? cancelToken,
-  }) {
-    final timedCallback = callback.timeout(
-      const Duration(minutes: 3),
-      onTimeout: () => throw const AppException(_timedOutCode),
-    );
-
-    if (cancelToken == null) {
-      return timedCallback;
-    }
-
-    return Future.any<Uri>([
-      timedCallback,
-      cancelToken.whenCancelled.then(
-        (_) => throw const RequestCancelledException(),
-      ),
-    ]);
-  }
-
-  bool _isExpectedCallback(Uri uri) {
-    return uri.scheme == _callbackUri.scheme &&
-        uri.host == _callbackUri.host &&
-        uri.path == _callbackUri.path;
-  }
-
-  String _safeExternalCallbackErrorCode(String rawCode) {
-    final value = rawCode.trim();
-    return switch (value) {
-      _cancelledCode ||
-      _callbackFailedCode ||
-      _launchFailedCode ||
-      _timedOutCode ||
-      _invalidSessionCode ||
-      'auth.external_not_configured' ||
-      'auth.external_token_invalid' ||
-      _genericFailedCode => value,
-      _ => _genericFailedCode,
-    };
-  }
-
   void _trackSocialAuthEvent(
     String eventName, {
     required ExternalAuthProvider provider,
@@ -633,45 +513,11 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
     };
   }
 
-  Future<bool> _launchAuthUri(Uri authUri) async {
-    bool launchedInApp = false;
-    try {
-      launchedInApp = await _launchUrl(authUri, LaunchMode.inAppBrowserView);
-    } on Object {
-      launchedInApp = false;
-    }
-    if (launchedInApp) {
-      return true;
-    }
-
-    try {
-      return await _launchUrl(authUri, LaunchMode.externalApplication);
-    } on Object {
-      return false;
-    }
-  }
-
   Future<AuthSession> _readAuthorizedSession() async {
     return _authSessionCoordinator.requireValidSession(
       mapError: _mapDioException,
       sessionExpiredMessage: 'auth.session_expired',
     );
-  }
-
-  Future<List<MobileLinkedAccount>> _fetchLinkedAccounts({
-    RequestCancellation? cancelToken,
-  }) async {
-    final session = await _readAuthorizedSession();
-    final response = await _dio.get<List<dynamic>>(
-      '/api/auth/me/linked-accounts',
-      options: authenticatedRequestOptions(session.accessToken),
-      cancelToken: cancelToken.toDioCancelToken(),
-    );
-
-    return (response.data ?? const <dynamic>[])
-        .whereType<Map<String, dynamic>>()
-        .map(mapMobileLinkedAccountDto)
-        .toList(growable: false);
   }
 
   AppException _mapDioException(
