@@ -450,7 +450,6 @@ const _legacyOversizedProductionFiles = <String>{
   'lib/features/templates/presentation/generation_status_page_lifecycle.part.dart',
   'lib/features/templates/presentation/generation_status_page_media_actions.part.dart',
   'lib/features/templates/presentation/generation_status_page_result_sections.part.dart',
-  'lib/features/templates/presentation/template_generation_controller.dart',
   'lib/features/templates/presentation/widgets/pet_generation_launch_sheet.dart',
   'lib/features/templates/presentation/widgets/template_card.dart',
   'lib/features/templates/presentation/widgets/template_flow_sheets_generation.part.dart',

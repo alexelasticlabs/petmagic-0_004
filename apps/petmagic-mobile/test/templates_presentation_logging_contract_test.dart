@@ -46,6 +46,7 @@ void main() {
       );
       final generationControllerSource = _readSource(
         'lib/features/templates/presentation/template_generation_controller.dart',
+        'lib/features/templates/presentation/template_generation_wallet_coordinator.dart',
       );
 
       expect(generationStatusSource, contains('AppLogger.warn('));

@@ -19,9 +19,10 @@ void main() {
         'lib/features/templates/application/generation_history_controller_lifecycle.part.dart',
         'lib/features/templates/application/generation_history_controller_sync.part.dart',
       ].map((p) => File(p).readAsStringSync()).join('\n'),
-      File(
+      [
         'lib/features/templates/presentation/template_generation_controller.dart',
-      ).readAsStringSync(),
+        'lib/features/templates/presentation/template_generation_policy.dart',
+      ].map((path) => File(path).readAsStringSync()).join('\n'),
       File(
         'lib/features/gamification/presentation/achievements_page.dart',
       ).readAsStringSync(),

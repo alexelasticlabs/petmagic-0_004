@@ -553,9 +553,10 @@ void main() {
     final repositorySource = File(
       'lib/features/templates/data/template_generation_repository.dart',
     ).readAsStringSync();
-    final controllerSource = File(
+    final controllerSource = [
       'lib/features/templates/presentation/template_generation_controller.dart',
-    ).readAsStringSync();
+      'lib/features/templates/presentation/template_generation_policy.dart',
+    ].map((path) => File(path).readAsStringSync()).join('\n');
 
     expect(repositorySource, contains('request_identity.dart'));
     expect(repositorySource, contains('RequestIdentity.createCorrelationId()'));

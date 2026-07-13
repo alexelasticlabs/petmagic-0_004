@@ -1,89 +1,29 @@
 import 'dart:async';
 
-import 'package:dio/dio.dart';
 import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:petmagic_mobile/core/files/local_media_file.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/lifecycle/app_lifecycle_signal.dart';
-import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/logging/log_correlation_context.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
-import 'package:petmagic_mobile/core/network/request_identity.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/templates/application/generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
-import 'package:petmagic_mobile/features/templates/application/template_error_key_mapper.dart';
-import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
+import 'package:petmagic_mobile/features/templates/presentation/template_generation_policy.dart';
+import 'package:petmagic_mobile/features/templates/presentation/template_generation_request_tracker.dart';
+import 'package:petmagic_mobile/features/templates/presentation/template_generation_state.dart';
+import 'package:petmagic_mobile/features/templates/presentation/template_generation_wallet_coordinator.dart';
 import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
+
+export 'template_generation_state.dart';
 
 final templateGenerationControllerProvider =
     NotifierProvider<TemplateGenerationController, TemplateGenerationState>(
       TemplateGenerationController.new,
     );
-
-enum TemplateGenerationGateKind { allowed, notEnoughTokens, premiumRequired }
-
-class TemplateGenerationGate {
-  const TemplateGenerationGate({
-    required this.kind,
-    required this.balance,
-    required this.isPremium,
-  });
-
-  final TemplateGenerationGateKind kind;
-  final int balance;
-  final bool isPremium;
-
-  bool get isAllowed => kind == TemplateGenerationGateKind.allowed;
-}
-
-class TemplateGenerationState {
-  const TemplateGenerationState({
-    this.selectedPhoto,
-    this.generation,
-    this.isCreating = false,
-    this.isPolling = false,
-    this.errorMessage,
-    this.queueRejection,
-  });
-
-  final XFile? selectedPhoto;
-  final TemplateGenerationResult? generation;
-  final bool isCreating;
-  final bool isPolling;
-  final String? errorMessage;
-  final GenerationWaitTooLongException? queueRejection;
-
-  TemplateGenerationState copyWith({
-    XFile? selectedPhoto,
-    TemplateGenerationResult? generation,
-    bool? isCreating,
-    bool? isPolling,
-    String? errorMessage,
-    GenerationWaitTooLongException? queueRejection,
-    bool clearSelectedPhoto = false,
-    bool clearGeneration = false,
-    bool clearError = false,
-    bool clearQueueRejection = false,
-  }) {
-    return TemplateGenerationState(
-      selectedPhoto: clearSelectedPhoto
-          ? null
-          : selectedPhoto ?? this.selectedPhoto,
-      generation: clearGeneration ? null : generation ?? this.generation,
-      isCreating: isCreating ?? this.isCreating,
-      isPolling: isPolling ?? this.isPolling,
-      errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
-      queueRejection: clearQueueRejection
-          ? null
-          : queueRejection ?? this.queueRejection,
-    );
-  }
-}
 
 class TemplateGenerationController extends Notifier<TemplateGenerationState> {
   GenerationRepository get _repository =>
@@ -96,14 +36,24 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
   bool _canUsePrivateGenerationApi = true;
   int _generationFlowEpoch = 0;
   String? _activeCorrelationId;
-  RequestCancellation? _activeRequestCancelToken;
+  late final TemplateGenerationRequestTracker _requestTracker;
+  late final TemplateGenerationWalletCoordinator _walletCoordinator;
   VoidCallback? _appLifecycleListener;
 
   @override
   TemplateGenerationState build() {
+    _requestTracker = TemplateGenerationRequestTracker();
+    _walletCoordinator = TemplateGenerationWalletCoordinator(
+      readWallet: () => ref.read(walletControllerProvider).wallet,
+      loadWallet: () =>
+          ref.read(walletControllerProvider.notifier).load(refresh: true),
+      hasInternet: () => _hasInternet,
+      canUsePrivateApi: () => _canUsePrivateGenerationApi,
+      isDisposed: () => _disposed,
+    );
     _hasInternet = ref.read(networkStatusControllerProvider).hasInternet;
     _isForeground = AppLifecycleSignal.instance.isResumed;
-    _canUsePrivateGenerationApi = _isLaunchAuthorized(
+    _canUsePrivateGenerationApi = TemplateGenerationPolicy.canUsePrivateApi(
       ref.read(appLaunchControllerProvider),
     );
     _appLifecycleListener = _handleAppLifecycleSignal;
@@ -123,19 +73,17 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
         AppLifecycleSignal.instance.removeListener(lifecycleListener);
         _appLifecycleListener = null;
       }
-      _cancelActiveRequest();
+      _requestTracker.cancel();
       _stopPolling();
     });
     unawaited(_restoreActiveGeneration());
     return const TemplateGenerationState();
   }
 
-  bool _isLaunchAuthorized(AppLaunchState state) {
-    return state.isLoading || state.isAuthenticated;
-  }
-
   void _handleAuthStatusChanged(AppLaunchState launchState) {
-    final canUsePrivateApi = _isLaunchAuthorized(launchState);
+    final canUsePrivateApi = TemplateGenerationPolicy.canUsePrivateApi(
+      launchState,
+    );
     if (_canUsePrivateGenerationApi == canUsePrivateApi) {
       return;
     }
@@ -147,19 +95,24 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
 
     _generationFlowEpoch++;
     _stopPolling();
-    _cancelActiveRequest();
+    _requestTracker.cancel();
     _activeCorrelationId = null;
     _pollTickInFlight = false;
     state = const TemplateGenerationState();
   }
 
-  void selectPhoto(XFile photo) {
+  void selectPhoto(XFile photo) => _resetPhoto(photo);
+
+  void clearPhoto() => _resetPhoto(null);
+
+  void _resetPhoto(XFile? photo) {
     _generationFlowEpoch++;
     _stopPolling();
-    _cancelActiveRequest();
+    _requestTracker.cancel();
     _activeCorrelationId = null;
     state = state.copyWith(
       selectedPhoto: photo,
+      clearSelectedPhoto: photo == null,
       clearGeneration: true,
       clearError: true,
       clearQueueRejection: true,
@@ -168,67 +121,8 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
     );
   }
 
-  void clearPhoto() {
-    _generationFlowEpoch++;
-    _stopPolling();
-    _cancelActiveRequest();
-    _activeCorrelationId = null;
-    state = state.copyWith(
-      clearSelectedPhoto: true,
-      clearGeneration: true,
-      clearError: true,
-      clearQueueRejection: true,
-      isCreating: false,
-      isPolling: false,
-    );
-  }
-
-  Future<TemplateGenerationGate> checkGate(TemplateItem template) async {
-    if (!_canUsePrivateGenerationApi) {
-      return const TemplateGenerationGate(
-        kind: TemplateGenerationGateKind.notEnoughTokens,
-        balance: 0,
-        isPremium: false,
-      );
-    }
-
-    var wallet = ref.read(walletControllerProvider).wallet;
-    if (wallet == null &&
-        ref.read(networkStatusControllerProvider).hasInternet) {
-      await ref.read(walletControllerProvider.notifier).load(refresh: true);
-      wallet = ref.read(walletControllerProvider).wallet;
-    }
-
-    wallet ??= const WalletStateModel(
-      userId: '',
-      balance: 0,
-      adRewardsRemainingToday: 0,
-      isPremium: false,
-      updatedAtUtc: null,
-    );
-
-    if (template.isPremium && !wallet.isPremium) {
-      return TemplateGenerationGate(
-        kind: TemplateGenerationGateKind.premiumRequired,
-        balance: wallet.balance,
-        isPremium: wallet.isPremium,
-      );
-    }
-
-    if (wallet.balance < template.tokenCost) {
-      return TemplateGenerationGate(
-        kind: TemplateGenerationGateKind.notEnoughTokens,
-        balance: wallet.balance,
-        isPremium: wallet.isPremium,
-      );
-    }
-
-    return TemplateGenerationGate(
-      kind: TemplateGenerationGateKind.allowed,
-      balance: wallet.balance,
-      isPremium: wallet.isPremium,
-    );
-  }
+  Future<TemplateGenerationGate> checkGate(TemplateItem template) =>
+      _walletCoordinator.checkGate(template);
 
   Future<TemplateGenerationResult?> startGeneration(
     TemplateItem template,
@@ -240,8 +134,8 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
 
     _generationFlowEpoch++;
     _stopPolling();
-    _cancelActiveRequest();
-    _activeCorrelationId = _createGenerationCorrelationId();
+    _requestTracker.cancel();
+    _activeCorrelationId = TemplateGenerationPolicy.createCorrelationId();
     state = state.copyWith(
       isCreating: true,
       isPolling: false,
@@ -263,7 +157,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
     final repository = _repository;
     RequestCancellation? requestCancelToken;
     try {
-      requestCancelToken = _newActiveRequestCancelToken();
+      requestCancelToken = _requestTracker.start();
       if (_disposed || !_canUsePrivateGenerationApi) {
         return null;
       }
@@ -304,7 +198,8 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
         if (_disposed || !_canUsePrivateGenerationApi) {
           return generation;
         }
-        _startPolling(generation.generationId);
+        _stopPolling();
+        _scheduleNextPoll(generation);
       } else {
         await repository.clearActiveGeneration(generation.generationId);
         if (_disposed || !_canUsePrivateGenerationApi) {
@@ -312,31 +207,31 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
         }
       }
 
-      await _refreshWalletIfAlive();
+      await _walletCoordinator.refreshAfterGeneration();
       return generation;
     } catch (error) {
       if (_disposed) {
         return null;
       }
-      if (_isCancelled(error)) {
+      if (TemplateGenerationPolicy.isCancelled(error)) {
         state = state.copyWith(isCreating: false, isPolling: false);
         return null;
       }
-      await _refreshWalletIfAlive();
+      await _walletCoordinator.refreshAfterGeneration();
       if (_disposed) {
         return null;
       }
       state = state.copyWith(
         isCreating: false,
         isPolling: false,
-        errorMessage: _mapGenerationError(error),
-        queueRejection: error is GenerationWaitTooLongException ? error : null,
+        errorMessage: TemplateGenerationPolicy.mapError(error),
+        queueRejection: TemplateGenerationPolicy.queueRejection(error),
       );
       return null;
     } finally {
       final cancelToken = requestCancelToken;
       if (cancelToken != null) {
-        _clearActiveRequest(cancelToken);
+        _requestTracker.clear(cancelToken);
       }
     }
   }
@@ -354,15 +249,6 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
     await _pollGeneration(generationId);
   }
 
-  void _startPolling(String generationId) {
-    if (_disposed || !_canUsePrivateGenerationApi || !_isForeground) {
-      return;
-    }
-
-    _stopPolling();
-    _scheduleNextPoll(state.generation);
-  }
-
   void _scheduleNextPoll(TemplateGenerationResult? generation) {
     if (_disposed || !_canUsePrivateGenerationApi || !_isForeground) {
       return;
@@ -377,7 +263,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
     }
 
     _pollTimer?.cancel();
-    _pollTimer = Timer(_generationPollInterval(generation), () {
+    _pollTimer = Timer(TemplateGenerationPolicy.pollInterval(generation), () {
       _pollTimer = null;
       unawaited(_pollGeneration(generationId, scheduleNext: true));
     });
@@ -418,7 +304,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
     final repository = _repository;
     RequestCancellation? requestCancelToken;
     try {
-      requestCancelToken = _newActiveRequestCancelToken();
+      requestCancelToken = _requestTracker.start();
       final generation = await repository.fetchGeneration(
         generationId,
         correlationId: _activeCorrelationId,
@@ -442,7 +328,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
           return;
         }
         _activeCorrelationId = null;
-        await _refreshWalletIfAlive();
+        await _walletCoordinator.refreshAfterGeneration();
       } else if (scheduleNext) {
         _scheduleNextPoll(generation);
       }
@@ -450,20 +336,20 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
       if (_disposed) {
         return;
       }
-      if (_isCancelled(error)) {
+      if (TemplateGenerationPolicy.isCancelled(error)) {
         return;
       }
       _stopPolling();
       _activeCorrelationId = null;
       state = state.copyWith(
-        errorMessage: _mapGenerationError(error),
+        errorMessage: TemplateGenerationPolicy.mapError(error),
         isPolling: false,
-        queueRejection: error is GenerationWaitTooLongException ? error : null,
+        queueRejection: TemplateGenerationPolicy.queueRejection(error),
       );
     } finally {
       final cancelToken = requestCancelToken;
       if (cancelToken != null) {
-        _clearActiveRequest(cancelToken);
+        _requestTracker.clear(cancelToken);
       }
       _pollTickInFlight = false;
     }
@@ -472,27 +358,6 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
   void _stopPolling() {
     _pollTimer?.cancel();
     _pollTimer = null;
-  }
-
-  RequestCancellation _newActiveRequestCancelToken() {
-    _cancelActiveRequest();
-    final cancelToken = RequestCancellation();
-    _activeRequestCancelToken = cancelToken;
-    return cancelToken;
-  }
-
-  void _cancelActiveRequest() {
-    final cancelToken = _activeRequestCancelToken;
-    if (cancelToken != null && !cancelToken.isCancelled) {
-      cancelToken.cancel('generation_request_cancelled');
-    }
-    _activeRequestCancelToken = null;
-  }
-
-  void _clearActiveRequest(RequestCancellation cancelToken) {
-    if (identical(_activeRequestCancelToken, cancelToken)) {
-      _activeRequestCancelToken = null;
-    }
   }
 
   Future<void> _restoreActiveGeneration() async {
@@ -515,7 +380,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
 
     RequestCancellation? requestCancelToken;
     try {
-      requestCancelToken = _newActiveRequestCancelToken();
+      requestCancelToken = _requestTracker.start();
       final generation = await repository.fetchGeneration(
         active.generationId,
         correlationId: _activeCorrelationId,
@@ -538,7 +403,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
           return;
         }
         _activeCorrelationId = null;
-        await _refreshWalletIfAlive();
+        await _walletCoordinator.refreshAfterGeneration();
         return;
       }
 
@@ -549,24 +414,25 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
       if (!_isRestoreCurrent(restoreEpoch) || !_canUsePrivateGenerationApi) {
         return;
       }
-      _startPolling(generation.generationId);
+      _stopPolling();
+      _scheduleNextPoll(generation);
     } catch (error) {
       if (!_isRestoreCurrent(restoreEpoch)) {
         return;
       }
-      if (_isCancelled(error)) {
+      if (TemplateGenerationPolicy.isCancelled(error)) {
         return;
       }
 
       state = state.copyWith(
-        errorMessage: _mapGenerationError(error),
+        errorMessage: TemplateGenerationPolicy.mapError(error),
         isPolling: false,
-        queueRejection: error is GenerationWaitTooLongException ? error : null,
+        queueRejection: TemplateGenerationPolicy.queueRejection(error),
       );
     } finally {
       final cancelToken = requestCancelToken;
       if (cancelToken != null) {
-        _clearActiveRequest(cancelToken);
+        _requestTracker.clear(cancelToken);
       }
     }
   }
@@ -583,7 +449,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
     _hasInternet = hasInternet;
     if (!hasInternet) {
       _stopPolling();
-      _cancelActiveRequest();
+      _requestTracker.cancel();
       final generation = state.generation;
       if (state.isCreating || generation != null && !generation.isTerminal) {
         state = state.copyWith(isCreating: false, isPolling: false);
@@ -591,18 +457,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
       return;
     }
 
-    if (!_isForeground || !_canUsePrivateGenerationApi) {
-      return;
-    }
-
-    final generation = state.generation;
-    if (generation != null && !generation.isTerminal) {
-      state = state.copyWith(isPolling: true, clearError: true);
-      unawaited(_pollGeneration(generation.generationId, scheduleNext: true));
-      return;
-    }
-
-    unawaited(_restoreActiveGeneration());
+    _resumeGenerationWork();
   }
 
   void _handleAppLifecycleSignal() {
@@ -615,7 +470,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
     if (!isForeground) {
       _stopPolling();
       if (!state.isCreating) {
-        _cancelActiveRequest();
+        _requestTracker.cancel();
       }
 
       final generation = state.generation;
@@ -625,7 +480,11 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
       return;
     }
 
-    if (!_hasInternet || !_canUsePrivateGenerationApi) {
+    _resumeGenerationWork();
+  }
+
+  void _resumeGenerationWork() {
+    if (!_hasInternet || !_isForeground || !_canUsePrivateGenerationApi) {
       return;
     }
 
@@ -638,73 +497,4 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
 
     unawaited(_restoreActiveGeneration());
   }
-
-  Future<void> _refreshWalletIfAlive() async {
-    if (_disposed || !_canUsePrivateGenerationApi || !_hasInternet) {
-      return;
-    }
-
-    try {
-      await ref.read(walletControllerProvider.notifier).load(refresh: true);
-    } catch (error, stackTrace) {
-      AppLogger.warn(
-        feature: 'Templates.GenerationController',
-        operation: 'refresh_wallet_after_generation',
-        message: 'Wallet refresh failed after generation state change.',
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }
-  }
-
-  String _createGenerationCorrelationId() {
-    return RequestIdentity.createCorrelationId().replaceFirst(
-      'flow-',
-      'generation-',
-    );
-  }
-
-  bool _isCancelled(Object error) {
-    return error is RequestCancelledException ||
-        (error is DioException && error.type == DioExceptionType.cancel);
-  }
-
-  String _mapGenerationError(Object error) {
-    if (error is GenerationWaitTooLongException) {
-      return error.message;
-    }
-
-    if (error is AppException && error.statusCode == 401) {
-      return 'auth.sign_in_required';
-    }
-
-    if (error is AppException && error.statusCode == 402) {
-      return 'templates.insufficient_balance';
-    }
-
-    if (error is AppException) {
-      final message = normalizeTemplateErrorKey(error.message);
-      if (message != null) {
-        return message;
-      }
-    }
-
-    return 'templates.generation_failed';
-  }
-}
-
-Duration _generationPollInterval(TemplateGenerationResult? generation) {
-  return switch (generation?.status) {
-    TemplateGenerationStatus.queued => const Duration(seconds: 8),
-    TemplateGenerationStatus.submittingToProvider ||
-    TemplateGenerationStatus.providerQueued => const Duration(seconds: 5),
-    TemplateGenerationStatus.processing ||
-    TemplateGenerationStatus.preprocessing ||
-    TemplateGenerationStatus.generating ||
-    TemplateGenerationStatus.providerProcessing ||
-    TemplateGenerationStatus.importingMedia ||
-    TemplateGenerationStatus.cancellationRequested ||
-    TemplateGenerationStatus.finalizing => const Duration(seconds: 3),
-    _ => const Duration(seconds: 5),
-  };
 }
