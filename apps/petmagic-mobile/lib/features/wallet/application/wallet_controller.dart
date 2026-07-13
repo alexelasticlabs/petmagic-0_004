@@ -1,7 +1,5 @@
 import 'dart:async';
 
-// Public wallet application state and use-case orchestration.
-
 import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:petmagic_mobile/core/platform/app_runtime_info.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,6 +13,9 @@ import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/application/wallet_repository.dart';
 import 'package:petmagic_mobile/features/wallet/domain/pending_store_wallet_purchase.dart';
 import 'package:petmagic_mobile/features/wallet/application/wallet_error_key_mapper.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_checkout_verification_coordinator.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_store_purchase_coordinator.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_store_purchase_state_change.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 
 part 'wallet_controller_checkout.part.dart';
@@ -200,24 +201,19 @@ class WalletState {
 
 abstract class _WalletControllerBase extends Notifier<WalletState> {
   static const int walletLedgerPageSize = 24;
-  static const int _maxStorePurchaseVerificationKeys = 32;
-
   WalletRepositoryPort get _repository => ref.read(walletRepositoryProvider);
   AppRuntimeInfo get _runtimeInfo => ref.read(appRuntimeInfoProvider);
   Future<void>? _loadInFlight;
-  Future<void>? _checkoutVerificationInFlight;
-  Future<void>? _storePurchaseRecoveryInFlight;
+  WalletCheckoutVerificationCoordinator? _checkoutVerificationCoordinator;
+  WalletStorePurchaseCoordinator? _storePurchaseCoordinator;
   RequestCancellation? _activeLoadRequestCancellation;
   RequestCancellation? _activeWalletSyncRequestCancellation;
   RequestCancellation? _activeLedgerLoadMoreRequestCancellation;
   RequestCancellation? _activeCheckoutRequestCancellation;
   RequestCancellation? _activeCheckoutVerificationRequestCancellation;
-  final Set<String> _storePurchaseVerificationInFlightKeys = <String>{};
-  final Set<String> _storePurchaseVerifiedKeys = <String>{};
   bool _isWalletSyncInFlight = false;
   bool _walletLifecycleStarted = false;
   bool _isWalletPageVisible = false;
-  bool _storePurchaseRestoreRequestedThisSession = false;
   void Function()? _appLifecycleListener;
 
   bool _hasAuthenticatedWalletSession() {
@@ -231,6 +227,8 @@ abstract class _WalletControllerBase extends Notifier<WalletState> {
   Future<void> loadMoreLedger({bool force = false});
 
   Future<void> _syncWalletSnapshot({bool forceRefresh = false});
+
+  void _ensureCheckoutCoordinators();
 
   void setWalletPageVisible(bool visible);
 
@@ -269,8 +267,132 @@ class WalletController extends _WalletControllerBase
         _WalletControllerCheckout {
   @override
   WalletState build() {
+    _ensureCheckoutCoordinators();
     _ensureWalletLifecycleStarted();
     return const WalletState(isLoading: true);
+  }
+
+  @override
+  void _ensureCheckoutCoordinators() {
+    _checkoutVerificationCoordinator ??= WalletCheckoutVerificationCoordinator(
+      WalletCheckoutVerificationHost(
+        repository: _repository,
+        isActive: () => ref.mounted,
+        pendingOrderId: () => state.pendingCheckoutOrderId,
+        startCancellation: _startCheckoutVerificationRequestCancellation,
+        clearCancellation: _clearActiveCheckoutVerification,
+        errorMessage: _errorMessage,
+        onChecking: () => _updateStateIfMounted(
+          (state) => state.copyWith(
+            checkoutVerificationState: WalletCheckoutVerificationState.checking,
+            clearCheckoutGrantedSpark: true,
+            clearCheckoutError: true,
+            clearHighlightedPurchaseOrderId: true,
+          ),
+        ),
+        onSucceeded: _handleCheckoutVerificationSucceeded,
+        onError: (message) => _updateStateIfMounted(
+          (state) => state.copyWith(
+            checkoutVerificationState: WalletCheckoutVerificationState.error,
+            checkoutErrorMessage: message,
+          ),
+        ),
+        onPending: () => _updateStateIfMounted(
+          (state) => state.copyWith(
+            checkoutVerificationState: WalletCheckoutVerificationState.pending,
+            clearCheckoutError: true,
+          ),
+        ),
+      ),
+    );
+    _storePurchaseCoordinator ??= WalletStorePurchaseCoordinator(
+      WalletStorePurchaseHost(
+        repository: _repository,
+        isActive: () => ref.mounted,
+        hasAuthenticatedSession: _hasAuthenticatedWalletSession,
+        hasInternet: () =>
+            ref.read(networkStatusControllerProvider).hasInternet,
+        pendingOrderId: () => state.pendingCheckoutOrderId,
+        pendingProvider: () => state.pendingStoreProvider,
+        paymentMethods: () => state.paymentMethods,
+        packs: () => state.packs,
+        reloadWallet: () => load(refresh: true),
+        verifyCheckoutStatus: verifyCheckoutStatus,
+        errorMessage: _errorMessage,
+        purchaseErrorMessage: _purchaseErrorMessage,
+        onStateChange: _applyStorePurchaseStateChange,
+      ),
+    );
+  }
+
+  Future<void> _handleCheckoutVerificationSucceeded(
+    PurchaseHistoryItem purchase,
+  ) async {
+    await load(refresh: true);
+    _updateStateIfMounted(
+      (state) => state.copyWith(
+        checkoutVerificationState: WalletCheckoutVerificationState.succeeded,
+        checkoutGrantedSpark: purchase.sparkToGrant,
+        highlightedPurchaseOrderId: purchase.orderId,
+        clearPendingCheckout: true,
+        clearPendingStoreProvider: true,
+        clearCheckoutError: true,
+      ),
+    );
+  }
+
+  void _applyStorePurchaseStateChange(WalletStorePurchaseStateChange change) {
+    _updateStateIfMounted((state) {
+      return switch (change.phase) {
+        WalletStorePurchasePhase.purchasePending => state.copyWith(
+          isBuying: true,
+          clearError: true,
+        ),
+        WalletStorePurchasePhase.recoveredPending => state.copyWith(
+          pendingCheckoutOrderId: change.pendingPurchase?.orderId,
+          pendingStoreProvider: change.pendingPurchase?.provider,
+          checkoutVerificationState: WalletCheckoutVerificationState.pending,
+          clearCheckoutError: true,
+        ),
+        WalletStorePurchasePhase.pendingWithoutOrder => state.copyWith(
+          pendingCheckoutOrderId: change.pendingPurchase?.orderId,
+          pendingStoreProvider: change.pendingPurchase?.provider,
+          isBuying: false,
+          checkoutVerificationState: WalletCheckoutVerificationState.pending,
+          clearCheckoutError: true,
+        ),
+        WalletStorePurchasePhase.checking => state.copyWith(
+          checkoutVerificationState: WalletCheckoutVerificationState.checking,
+          clearCheckoutError: true,
+        ),
+        WalletStorePurchasePhase.succeeded => state.copyWith(
+          isBuying: false,
+          checkoutVerificationState: WalletCheckoutVerificationState.succeeded,
+          checkoutGrantedSpark: change.grantedSpark,
+          highlightedPurchaseOrderId: change.orderId,
+          clearPendingCheckout: true,
+          clearPendingStoreProvider: true,
+          clearCheckoutError: true,
+        ),
+        WalletStorePurchasePhase.pending => state.copyWith(
+          isBuying: false,
+          checkoutVerificationState: WalletCheckoutVerificationState.pending,
+          checkoutErrorMessage: change.errorMessage,
+          errorMessage: change.errorMessage,
+          clearCheckoutError: change.errorMessage == null,
+        ),
+        WalletStorePurchasePhase.error => state.copyWith(
+          isBuying: false,
+          checkoutVerificationState: WalletCheckoutVerificationState.error,
+          checkoutErrorMessage: change.errorMessage,
+          errorMessage: change.errorMessage,
+        ),
+        WalletStorePurchasePhase.cancelled => state.copyWith(
+          isBuying: false,
+          errorMessage: change.errorMessage,
+        ),
+      };
+    });
   }
 }
 

@@ -1,12 +1,5 @@
 part of 'wallet_controller.dart';
 
-final RegExp _stripeCheckoutSessionReferencePattern = RegExp(
-  r'^cs_(test|live)_[A-Za-z0-9_]{8,255}$',
-);
-final RegExp _stripePaymentIntentReferencePattern = RegExp(
-  r'^pi_[A-Za-z0-9_]{8,255}$',
-);
-
 String _errorMessage(Object error) {
   if (error is AppException) {
     final message = normalizeWalletErrorKey(error.message);
@@ -34,37 +27,6 @@ String _purchaseErrorMessage(String? rawMessage) {
 
 bool _isRequestCancelled(Object error) {
   return error is RequestCancelledException;
-}
-
-String? _normalizeStripeCheckoutReferenceId(String? value) {
-  final trimmed = value?.trim();
-  if (trimmed == null || trimmed.isEmpty) {
-    return null;
-  }
-
-  if (_stripeCheckoutSessionReferencePattern.hasMatch(trimmed) ||
-      _stripePaymentIntentReferencePattern.hasMatch(trimmed)) {
-    return trimmed;
-  }
-
-  return null;
-}
-
-String _stripeReferenceType(String? value) {
-  final trimmed = value?.trim();
-  if (trimmed == null || trimmed.isEmpty) {
-    return 'missing';
-  }
-
-  if (trimmed.startsWith('pi_')) {
-    return 'payment_intent';
-  }
-
-  if (trimmed.startsWith('cs_')) {
-    return 'checkout_session';
-  }
-
-  return 'unknown';
 }
 
 // Wallet application error mapping.

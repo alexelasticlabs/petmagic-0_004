@@ -122,42 +122,30 @@ void main() {
         contains('_clearActiveCheckout(checkoutRequestCancellation)'),
       );
 
+      expect(checkoutStatusBody, contains('_host.startCancellation()'));
+      expect(checkoutStatusBody, contains('cancelToken: cancellation'));
+      expect(checkoutStatusBody, contains('!_canContinue(cancellation)'));
       expect(
         checkoutStatusBody,
-        contains('_startCheckoutVerificationRequestCancellation()'),
-      );
-      expect(
-        checkoutStatusBody,
-        contains('cancelToken: verificationRequestCancellation'),
-      );
-      expect(
-        checkoutStatusBody,
-        contains('verificationRequestCancellation.isCancelled'),
-      );
-      expect(
-        checkoutStatusBody,
-        contains(
-          '_clearActiveCheckoutVerification(verificationRequestCancellation)',
-        ),
+        contains('_host.clearCancellation(cancellation)'),
       );
 
+      expect(stripeVerificationBody, contains('_host.startCancellation()'));
+      expect(stripeVerificationBody, contains('cancelToken: cancellation'));
+      expect(stripeVerificationBody, contains('!_canContinue(cancellation)'));
       expect(
         stripeVerificationBody,
-        contains('_startCheckoutVerificationRequestCancellation()'),
+        contains('_host.clearCancellation(cancellation)'),
       );
       expect(
-        stripeVerificationBody,
-        contains('cancelToken: verificationRequestCancellation'),
-      );
-      expect(
-        stripeVerificationBody,
-        contains('verificationRequestCancellation.isCancelled'),
-      );
-      expect(
-        stripeVerificationBody,
+        source,
         contains(
-          '_clearActiveCheckoutVerification(verificationRequestCancellation)',
+          'startCancellation: _startCheckoutVerificationRequestCancellation',
         ),
+      );
+      expect(
+        source,
+        contains('clearCancellation: _clearActiveCheckoutVerification'),
       );
 
       expect(
@@ -825,13 +813,17 @@ void main() {
       );
 
       expect(verifyBody, contains("'reference_type'"));
-      expect(verifyBody, contains('_stripeReferenceType(normalizedReference)'));
+      expect(verifyBody, contains('stripeCheckoutReferenceType('));
+      expect(verifyBody, contains('normalizedReference'));
       expect(verifyBody, isNot(contains("'reference': normalizedReference")));
       expect(
         verifyBody,
         isNot(contains("'reference': normalizedReference ??")),
       );
-      expect(source, contains("String _stripeReferenceType(String? value)"));
+      expect(
+        source,
+        contains('String stripeCheckoutReferenceType(String? value)'),
+      );
     },
   );
 
@@ -839,26 +831,18 @@ void main() {
     'store purchase verification deduplicates non-secret purchase updates',
     () {
       final source = readWalletControllerLibrarySource();
-      final verifyBody = _methodBody(source, '_verifyStorePurchase');
+      final verifyBody = _methodBody(source, '_verifyPurchase');
 
-      expect(
-        source,
-        contains('Set<String> _storePurchaseVerificationInFlightKeys'),
-      );
-      expect(source, contains('Set<String> _storePurchaseVerifiedKeys'));
-      expect(
-        verifyBody,
-        contains('_storePurchaseVerificationInFlightKeys.add'),
-      );
-      expect(verifyBody, contains('_storePurchaseVerifiedKeys.contains'));
-      expect(verifyBody, contains('_rememberStorePurchaseVerifiedKey'));
-      expect(
-        verifyBody,
-        contains('_storePurchaseVerificationInFlightKeys.remove'),
-      );
-      expect(source, contains('_maxStorePurchaseVerificationKeys = 32'));
-      expect(source, contains('_storePurchaseVerifiedKeys.remove'));
-      expect(source, contains('String? _storePurchaseVerificationKey'));
+      expect(source, contains('Set<String> _verificationInFlightKeys'));
+      expect(source, contains('Set<String> _verifiedKeys'));
+      expect(verifyBody, contains('_acquireVerification'));
+      expect(source, contains('_verificationInFlightKeys.add'));
+      expect(source, contains('_verifiedKeys.contains'));
+      expect(source, contains('_rememberVerifiedKey'));
+      expect(verifyBody, contains('_verificationInFlightKeys.remove'));
+      expect(source, contains('_maxVerificationKeys = 32'));
+      expect(source, contains('_verifiedKeys.remove'));
+      expect(source, contains('String? verificationKey'));
       expect(source, contains('orderId'));
       expect(source, contains('provider'));
       expect(source, contains('purchase.purchaseID'));
