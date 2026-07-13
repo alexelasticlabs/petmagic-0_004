@@ -429,7 +429,6 @@ const _legacyOversizedProductionFiles = <String>{
   'lib/features/premium/application/premium_controller_checkout.part.dart',
   'lib/features/premium/presentation/premium_page.dart',
   'lib/features/premium/presentation/subscription_management_sections.part.dart',
-  'lib/features/profile/application/profile_controller.dart',
   'lib/features/profile/presentation/profile_settings_detail_page.dart',
   'lib/features/profile/presentation/widgets/profile_notifications_settings_section.dart',
   'lib/features/rewards/presentation/rewards_page_shared_widgets.dart',

@@ -45,7 +45,7 @@ void main() {
     'profile logout unregisters push token before clearing auth session',
     () {
       final source = File(
-        'lib/features/profile/application/profile_controller.dart',
+        'lib/features/profile/application/profile_account_coordinator.dart',
       ).readAsStringSync();
       final logoutBody = _methodBody(source, 'logout');
       final cleanupBody = _methodBody(
@@ -57,15 +57,17 @@ void main() {
         'await _unregisterPushTokenBeforeLogout();',
       );
       final repositoryLogoutIndex = logoutBody.indexOf(
-        'await repository.logout();',
+        'await _repository().logout();',
       );
 
       expect(cleanupIndex, isNonNegative);
       expect(repositoryLogoutIndex, isNonNegative);
       expect(cleanupIndex, lessThan(repositoryLogoutIndex));
-      expect(cleanupBody, contains('pushTokenLifecyclePortProvider'));
-      expect(cleanupBody, contains('.unregisterCurrentToken('));
-      expect(cleanupBody, contains('canContinue: () => ref.mounted'));
+      expect(
+        cleanupBody,
+        contains('_pushTokenLifecycle().unregisterCurrentToken('),
+      );
+      expect(cleanupBody, contains('canContinue: _canContinue'));
       expect(cleanupBody, contains('onFailure: (stage, error, stackTrace)'));
       expect(cleanupBody, isNot(contains('FirebaseMessaging')));
       expect(
@@ -83,7 +85,7 @@ void main() {
     'profile account deletion unregisters push token before deleting account',
     () {
       final source = File(
-        'lib/features/profile/application/profile_controller.dart',
+        'lib/features/profile/application/profile_account_coordinator.dart',
       ).readAsStringSync();
       final deleteAccountBody = _methodBody(source, 'deleteAccount');
 
@@ -91,7 +93,7 @@ void main() {
         'await _unregisterPushTokenBeforeLogout();',
       );
       final deleteAccountIndex = deleteAccountBody.indexOf(
-        'await repository.deleteCurrentAccount(',
+        'await _repository().deleteCurrentAccount(',
       );
 
       expect(cleanupIndex, isNonNegative);

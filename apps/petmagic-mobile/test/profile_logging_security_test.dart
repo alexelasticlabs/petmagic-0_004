@@ -51,7 +51,7 @@ void main() {
 
   test('profile failure logs do not include raw avatar media urls', () {
     final source = File(
-      'lib/features/profile/application/profile_controller.dart',
+      'lib/features/profile/application/profile_avatar_coordinator.dart',
     ).readAsStringSync();
     final gatewaySource = File(
       'lib/features/profile/data/mobile_avatar_media_gateway.dart',
@@ -71,7 +71,7 @@ void main() {
     expect(gatewaySource, contains('NetworkImage(imageUrl)'));
     expect(
       evictBody,
-      contains('avatarMediaGatewayProvider).evictAvatarCache(safeImageUrl)'),
+      contains('_mediaGateway.evictAvatarCache(safeImageUrl)'),
     );
     expect(evictBody, isNot(contains('NetworkImage(imageUrl)')));
     expect(evictBody, contains("'avatar_cache_evict_failed'"));
