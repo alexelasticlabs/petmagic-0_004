@@ -431,7 +431,6 @@ const _legacyOversizedProductionFiles = <String>{
   'lib/features/profile/presentation/widgets/profile_notifications_settings_section.dart',
   'lib/features/rewards/presentation/rewards_page_shared_widgets.dart',
   'lib/features/support/presentation/support_chat_controller_conversation.part.dart',
-  'lib/features/support/presentation/support_chat_page.dart',
   'lib/features/support/presentation/support_ticket_form_page.dart',
   'lib/features/support/presentation/widgets/support_chat_attachment_picker.part.dart',
   'lib/features/support/presentation/widgets/support_chat_messages.part.dart',
