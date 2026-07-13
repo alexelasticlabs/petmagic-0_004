@@ -484,7 +484,6 @@ const _legacyLayerLimitProductionFiles = <String>{
   'lib/features/support/data/support_chat_repository.dart',
   'lib/features/templates/application/generation_history_controller_cache.part.dart',
   'lib/features/templates/application/generation_history_controller_lifecycle.part.dart',
-  'lib/features/templates/application/templates_controller.dart',
   'lib/features/templates/data/generation_gallery_store_entries.part.dart',
   'lib/features/templates/data/template_generation_dtos.dart',
   'lib/features/templates/data/templates_remote_data_source.dart',
