@@ -72,8 +72,11 @@ void main() {
     final cardBadgesSource = await File(
       'lib/features/templates/presentation/widgets/template_card_badges.part.dart',
     ).readAsString();
+    final cardMediaSource = await File(
+      'lib/features/templates/presentation/widgets/template_card_media.dart',
+    ).readAsString();
     final fullCardSource =
-        '$cardSource\n$cardPresentationSource\n$cardBadgesSource';
+        '$cardSource\n$cardPresentationSource\n$cardBadgesSource\n$cardMediaSource';
 
     expect(sheetSource, isNot(contains("languageCode.toLowerCase() == 'ru'")));
     expect(

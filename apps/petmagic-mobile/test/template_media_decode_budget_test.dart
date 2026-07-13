@@ -40,6 +40,10 @@ void main() {
     final cardSource = await File(
       'lib/features/templates/presentation/widgets/template_card.dart',
     ).readAsString();
+    final cardPlaybackSource = await File(
+      'lib/features/templates/presentation/widgets/template_card_playback_coordinator.dart',
+    ).readAsString();
+    final fullCardSource = '$cardSource\n$cardPlaybackSource';
     final playbackManagerSource = await File(
       'lib/features/templates/presentation/template_feed_playback_manager.dart',
     ).readAsString();
@@ -50,22 +54,19 @@ void main() {
       'lib/features/templates/presentation/widgets/template_flow_media_preview.part.dart',
     ).readAsString().then((source) => source.replaceAll('\r\n', '\n'));
 
-    expect(cardSource, contains('VisibilityDetector('));
+    expect(fullCardSource, contains('VisibilityDetector('));
     expect(
       playbackManagerSource,
       contains('videoEligibilityVisibilityFraction'),
     );
     expect(
-      cardSource,
+      fullCardSource,
       contains(
         "import 'package:petmagic_mobile/features/templates/presentation/template_feed_playback_manager.dart';",
       ),
     );
-    expect(cardSource, contains('TemplateFeedDisplayLevel.videoPreview'));
-    expect(
-      cardSource,
-      contains('widget.playbackManager?.updateCardVisibility('),
-    );
+    expect(fullCardSource, contains('TemplateFeedDisplayLevel.videoPreview'));
+    expect(fullCardSource, contains('_playbackManager?.updateCardVisibility('));
     expect(
       playbackManagerSource,
       contains(
@@ -80,9 +81,15 @@ void main() {
       playbackManagerSource,
       contains('MediaLifecyclePolicy.releaseVideoPreviewSlot()'),
     );
-    expect(cardSource, contains('createTemplatePreviewVideoController('));
-    expect(cardSource, contains('createCachedTemplatePreviewVideoController('));
-    expect(cardSource, isNot(contains('VideoPlayerController.networkUrl(')));
+    expect(fullCardSource, contains('createTemplatePreviewVideoController('));
+    expect(
+      fullCardSource,
+      contains('createCachedTemplatePreviewVideoController('),
+    );
+    expect(
+      fullCardSource,
+      isNot(contains('VideoPlayerController.networkUrl(')),
+    );
     expect(
       controllerSource,
       contains('parseSafeGenerationMediaUri(previewUrl)'),

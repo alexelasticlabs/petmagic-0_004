@@ -38,6 +38,7 @@ void main() {
       );
       final templateCardSource = _readSource(
         'lib/features/templates/presentation/widgets/template_card.dart',
+        'lib/features/templates/presentation/widgets/template_card_playback_coordinator.dart',
       );
       final templatesControllerSource = _readSource(
         'lib/features/templates/application/templates_controller.dart',

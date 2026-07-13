@@ -75,7 +75,7 @@ void main() {
     'template card fallback image path remains cached and bounded',
     () async {
       final source = await File(
-        'lib/features/templates/presentation/widgets/template_card.dart',
+        'lib/features/templates/presentation/widgets/template_card_media.dart',
       ).readAsString();
 
       expect(source, contains('parseSafeGenerationMediaUri(candidate)'));
@@ -102,7 +102,7 @@ void main() {
     'template card image decode width stays bounded for invalid constraints',
     () async {
       final source = await File(
-        'lib/features/templates/presentation/widgets/template_card.dart',
+        'lib/features/templates/presentation/widgets/template_card_media.dart',
       ).readAsString();
 
       expect(source, contains('final int imageCacheWidth;'));
@@ -171,7 +171,7 @@ void main() {
 
   test('template cards cache thumbnails at bounded size', () async {
     final source = await File(
-      'lib/features/templates/presentation/widgets/template_card.dart',
+      'lib/features/templates/presentation/widgets/template_card_media.dart',
     ).readAsString();
 
     expect(source, contains('TemplateMediaCache.fetchThumbnailFile'));
@@ -234,9 +234,16 @@ void main() {
   });
 
   test('template card video preview is visibility gated and cached', () async {
-    final source = await File(
+    final cardSource = await File(
       'lib/features/templates/presentation/widgets/template_card.dart',
     ).readAsString();
+    final coordinatorSource = await File(
+      'lib/features/templates/presentation/widgets/template_card_playback_coordinator.dart',
+    ).readAsString();
+    final mediaSource = await File(
+      'lib/features/templates/presentation/widgets/template_card_media.dart',
+    ).readAsString();
+    final source = '$cardSource\n$coordinatorSource\n$mediaSource';
     final playbackManagerSource = await File(
       'lib/features/templates/presentation/template_feed_playback_manager.dart',
     ).readAsString();
@@ -264,13 +271,13 @@ void main() {
       ),
     );
     expect(source, contains('_ensureVideoController()'));
-    expect(source, contains('widget.template.previewAsset'));
+    expect(source, contains('_template.previewAsset'));
     expect(source, contains('VisibilityDetector('));
     expect(
       playbackManagerSource,
       contains('videoEligibilityVisibilityFraction'),
     );
-    expect(source, contains('widget.playbackManager?.updateCardVisibility('));
+    expect(source, contains('_playbackManager?.updateCardVisibility('));
     expect(source, contains('TemplateFeedDisplayLevel.videoPreview'));
     expect(source, contains('snapshot?.mediaVersion'));
     expect(

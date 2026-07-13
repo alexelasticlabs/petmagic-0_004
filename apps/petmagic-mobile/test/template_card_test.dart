@@ -793,9 +793,13 @@ void main() {
   });
 
   test('TemplateCard prefers thumbnail over original image preview', () async {
-    final source = await File(
+    final cardSource = await File(
       'lib/features/templates/presentation/widgets/template_card.dart',
     ).readAsString();
+    final mediaSource = await File(
+      'lib/features/templates/presentation/widgets/template_card_media.dart',
+    ).readAsString();
+    final source = '$cardSource\n$mediaSource';
     final withThumbnail = imageTemplate(
       previewUrl: 'https://cdn.example.com/templates/thumb.jpg',
       assetUrl: 'https://cdn.example.com/templates/original.jpg',

@@ -44,6 +44,7 @@ void main() {
       'lib/features/templates/presentation/template_feed_playback_manager.dart',
       'lib/features/templates/application/templates_controller.dart',
       'lib/features/templates/presentation/widgets/template_card.dart',
+      'lib/features/templates/presentation/widgets/template_card_playback_coordinator.dart',
     ];
 
     for (final path in debugOnlySources) {
