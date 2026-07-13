@@ -5,14 +5,10 @@ export 'package:petmagic_mobile/features/profile/application/profile_repository.
         linkedAccountsProvider,
         profileRepositoryProvider;
 
-import 'dart:io';
-
 import 'package:dio/dio.dart';
 import 'package:petmagic_mobile/core/network/dio_request_cancellation.dart';
 import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:http_parser/http_parser.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
@@ -22,10 +18,9 @@ import 'package:petmagic_mobile/core/network/dio_provider.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/domain/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_dto_mapper.dart';
+import 'package:petmagic_mobile/features/profile/data/profile_avatar_upload_preparer.dart';
 import 'package:petmagic_mobile/features/profile/application/profile_repository.dart';
 import 'package:petmagic_mobile/shared/files/image_upload_optimizer.dart';
-import 'package:petmagic_mobile/shared/files/media_signature.dart';
-import 'package:petmagic_mobile/shared/files/upload_media_policy.dart';
 
 final dioProfileRepositoryProvider = Provider<ProfileRepositoryPort>((ref) {
   return ProfileRepository(
@@ -44,18 +39,18 @@ class ProfileRepository implements ProfileRepositoryPort {
     ImageUploadOptimizer? imageUploadOptimizer,
   }) : _dio = dio,
        _sessionStorage = sessionStorage,
-       _imageUploadOptimizer =
-           imageUploadOptimizer ?? const ImageUploadOptimizer(),
+       _avatarUploadPreparer = ProfileAvatarUploadPreparer(
+         imageUploadOptimizer:
+             imageUploadOptimizer ?? const ImageUploadOptimizer(),
+       ),
        _authSessionCoordinator =
            authSessionCoordinator ??
            AuthSessionCoordinator(dio: dio, sessionStorage: sessionStorage);
 
   final Dio _dio;
   final AuthSessionStore _sessionStorage;
-  final ImageUploadOptimizer _imageUploadOptimizer;
+  final ProfileAvatarUploadPreparer _avatarUploadPreparer;
   final AuthSessionCoordinator _authSessionCoordinator;
-
-  static const _maxAvatarBytes = UploadMediaPolicy.avatarMaxBytes;
 
   @override
   Future<AuthSession?> readSession() => _sessionStorage.read();
@@ -414,31 +409,19 @@ class ProfileRepository implements ProfileRepositoryPort {
     String filePath, {
     RequestCancellation? cancelToken,
   }) async {
-    final fileName = filePath.split(Platform.pathSeparator).last;
-    final mediaType = _resolveMediaType(fileName);
-    OptimizedUploadFile? optimizedAvatar;
+    final prepared = await _avatarUploadPreparer.prepare(
+      filePath,
+      cancelToken: cancelToken,
+    );
     try {
-      optimizedAvatar = await _imageUploadOptimizer.optimizeForAvatar(
-        XFile(filePath, name: fileName, mimeType: mediaType.toString()),
-        cancelToken: cancelToken,
-      );
-      final uploadFile = optimizedAvatar.file;
-      final uploadFileName = uploadFile.name.isNotEmpty
-          ? uploadFile.name
-          : uploadFile.path.split(Platform.pathSeparator).last;
-      final uploadMediaType = await _validateAvatarForUpload(
-        filePath: uploadFile.path,
-        mediaType: _resolveMediaType(uploadFileName),
-      );
-
       final response = await _authorizedRequest<Map<String, dynamic>>(
         (session) async => _dio.put<Map<String, dynamic>>(
           '/api/auth/me/avatar',
           data: FormData.fromMap({
             'file': await MultipartFile.fromFile(
-              uploadFile.path,
-              filename: uploadFileName,
-              contentType: uploadMediaType,
+              prepared.filePath,
+              filename: prepared.fileName,
+              contentType: prepared.mediaType,
             ),
           }),
           cancelToken: cancelToken.toDioCancelToken(),
@@ -451,7 +434,7 @@ class ProfileRepository implements ProfileRepositoryPort {
       await _replaceStoredUser(profile);
       return profile;
     } finally {
-      await optimizedAvatar?.dispose();
+      await prepared.dispose();
     }
   }
 
@@ -556,73 +539,5 @@ class ProfileRepository implements ProfileRepositoryPort {
     }
 
     return NetworkErrorMapper.fallback(error, fallbackMessage: fallbackMessage);
-  }
-
-  Future<MediaType> _validateAvatarForUpload({
-    required String filePath,
-    required MediaType mediaType,
-  }) async {
-    if (!_isAllowedAvatarMediaType(mediaType)) {
-      throw const AppException('profile.action_failed', statusCode: 400);
-    }
-
-    int fileSizeBytes;
-    try {
-      fileSizeBytes = await File(filePath).length();
-    } on FileSystemException catch (error) {
-      throw AppException(
-        'profile.action_failed',
-        statusCode: 400,
-        cause: error,
-      );
-    }
-
-    if (fileSizeBytes <= 0 || fileSizeBytes > _maxAvatarBytes) {
-      throw const AppException('profile.action_failed', statusCode: 400);
-    }
-
-    final detectedMediaType = await _detectAvatarMediaType(filePath);
-    if (detectedMediaType == null ||
-        !_isAllowedAvatarMediaType(detectedMediaType)) {
-      throw const AppException('profile.action_failed', statusCode: 400);
-    }
-
-    return detectedMediaType;
-  }
-
-  bool _isAllowedAvatarMediaType(MediaType mediaType) {
-    return mediaType.type == 'image' &&
-        (mediaType.subtype == 'jpeg' ||
-            mediaType.subtype == 'png' ||
-            mediaType.subtype == 'webp');
-  }
-
-  MediaType _resolveMediaType(String fileName) {
-    final extension = fileName.split('.').last.toLowerCase();
-    return switch (extension) {
-      'jpg' || 'jpeg' => MediaType('image', 'jpeg'),
-      'png' => MediaType('image', 'png'),
-      'webp' => MediaType('image', 'webp'),
-      _ => throw const AppException('profile.action_failed', statusCode: 400),
-    };
-  }
-
-  Future<MediaType?> _detectAvatarMediaType(String path) async {
-    final header = await _avatarHeader(path);
-    final contentType = detectAvatarUploadContentType(header);
-    return contentType == null ? null : MediaType.parse(contentType);
-  }
-
-  Future<List<int>> _avatarHeader(String path) async {
-    try {
-      final chunks = await File(path).openRead(0, 32).toList();
-      return [for (final chunk in chunks) ...chunk];
-    } on FileSystemException catch (error) {
-      throw AppException(
-        'profile.action_failed',
-        statusCode: 400,
-        cause: error,
-      );
-    }
   }
 }
