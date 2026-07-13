@@ -3,6 +3,8 @@ export 'package:petmagic_mobile/features/templates/application/generation_galler
         GenerationGalleryCache,
         GenerationGalleryMediaRecordView,
         generationGalleryStoreProvider;
+export 'package:petmagic_mobile/features/templates/data/generation_gallery_media_record.dart'
+    show GenerationGalleryMediaRecord;
 
 import 'dart:async';
 import 'dart:convert';
@@ -19,17 +21,17 @@ import 'package:petmagic_mobile/core/auth/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/templates/domain/generation_media_kind.dart';
 import 'package:petmagic_mobile/features/templates/application/generation_gallery_cache.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
-import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
-import 'package:petmagic_mobile/shared/files/file_name_sanitizer.dart';
-import 'package:petmagic_mobile/shared/files/media_signature.dart';
-import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
-import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'template_generation_repository.dart';
+import 'generation_gallery_file_storage.dart';
+import 'generation_gallery_deletion_coordinator.dart';
+import 'generation_gallery_media_record.dart';
+import 'generation_gallery_materialization_policy.dart';
+import 'generation_gallery_remote_file_materializer.dart';
+import 'generation_gallery_storage_codec.dart';
 
 part 'generation_gallery_store_entries.part.dart';
-part 'generation_gallery_store_record.part.dart';
 part 'generation_gallery_store_storage.part.dart';
 
 typedef GenerationGalleryRootDirectoryResolver = Future<Directory> Function();
@@ -80,20 +82,32 @@ class GenerationGalleryStore implements GenerationGalleryCache {
     Duration materializationRetryBaseBackoff =
         _defaultMaterializationRetryBaseBackoff,
     DateTime Function()? clock,
-  }) : _dio = dio,
-       _preferences = preferences,
+  }) : _preferences = preferences,
        _sessionStorage = sessionStorage,
-       _rootDirectoryResolver = rootDirectoryResolver,
        _maxBackgroundMaterializationsPerSession =
            maxBackgroundMaterializationsPerSession,
        _maxBackgroundVideoOutputsPerSession =
            maxBackgroundVideoOutputsPerSession,
        _maxBackgroundBytesPerSession = maxBackgroundBytesPerSession,
-       _maxBackgroundFileBytes = maxBackgroundFileBytes,
        _maxGalleryCacheBytesPerScope = maxGalleryCacheBytesPerScope,
        _maxMaterializationRetryCount = maxMaterializationRetryCount,
        _materializationRetryBaseBackoff = materializationRetryBaseBackoff,
-       _clock = clock ?? DateTime.now;
+       _clock = clock ?? DateTime.now,
+       _fileStorage = GenerationGalleryFileStorage(
+         rootDirectoryResolver: rootDirectoryResolver,
+         scopeRoot: _generationScopeRoot,
+       ),
+       _remoteFileMaterializer = GenerationGalleryRemoteFileMaterializer(
+         dio: dio,
+         maxBackgroundFileBytes: maxBackgroundFileBytes,
+       ),
+       _storageCodec = GenerationGalleryStorageCodec(
+         rootDirectoryResolver: rootDirectoryResolver,
+         fileStorage: GenerationGalleryFileStorage(
+           rootDirectoryResolver: rootDirectoryResolver,
+           scopeRoot: _generationScopeRoot,
+         ),
+       );
 
   static const _legacyEntriesKeyPrefix = 'generation_gallery_entries_v1:';
   static const _entriesKeyPrefix = 'generation_gallery_entries_v2:';
@@ -107,18 +121,18 @@ class GenerationGalleryStore implements GenerationGalleryCache {
   static const _defaultMaxMaterializationRetryCount = 3;
   static const _defaultMaterializationRetryBaseBackoff = Duration(minutes: 15);
 
-  final Dio _dio;
   final SharedPreferencesAsync _preferences;
   final AuthSessionStore _sessionStorage;
-  final GenerationGalleryRootDirectoryResolver _rootDirectoryResolver;
   final int _maxBackgroundMaterializationsPerSession;
   final int _maxBackgroundVideoOutputsPerSession;
   final int _maxBackgroundBytesPerSession;
-  final int _maxBackgroundFileBytes;
   final int _maxGalleryCacheBytesPerScope;
   final int _maxMaterializationRetryCount;
   final Duration _materializationRetryBaseBackoff;
   final DateTime Function() _clock;
+  final GenerationGalleryFileStorage _fileStorage;
+  final GenerationGalleryRemoteFileMaterializer _remoteFileMaterializer;
+  final GenerationGalleryStorageCodec _storageCodec;
   final Map<String, CancelToken> _downloadCancelTokens = {};
   final Map<String, Future<GenerationGalleryMediaRecord?>> _inFlightDownloads =
       {};
@@ -191,8 +205,7 @@ class GenerationGalleryStore implements GenerationGalleryCache {
         .where((entry) => entry.generationId == generationId)
         .toList(growable: false);
     for (final entry in target) {
-      await _galleryDeleteGenerationDirectory(
-        this,
+      await _fileStorage.deleteGenerationDirectory(
         entry.accountScope,
         generationId,
       );
@@ -252,5 +265,48 @@ class GenerationGalleryStore implements GenerationGalleryCache {
   @override
   Future<void> cleanupCurrentAccountArtifacts() {
     return _galleryCleanupCurrentAccountArtifacts(this);
+  }
+
+  Future<GenerationGalleryMaterializeFileResult> _materializeRemoteFile({
+    required String remoteUrl,
+    required Directory targetDirectory,
+    required String prefix,
+    required String fallbackExtension,
+    required CancelToken cancelToken,
+    required bool background,
+  }) {
+    return _remoteFileMaterializer.materialize(
+      remoteUrl: remoteUrl,
+      targetDirectory: targetDirectory,
+      prefix: prefix,
+      fallbackExtension: fallbackExtension,
+      cancelToken: cancelToken,
+      background: background,
+      remainingBackgroundBytes:
+          _maxBackgroundBytesPerSession - _backgroundBytesThisSession,
+    );
+  }
+
+  Future<void> _cleanupScopeArtifacts(String accountScope) async {
+    final entries = await _galleryReadEntriesForScope(this, accountScope);
+    await _cleanupScopeArtifactsForKnownIds(
+      accountScope,
+      entries.map((entry) => entry.generationId).toSet(),
+    );
+  }
+
+  Future<void> _cleanupScopeArtifactsForKnownIds(
+    String accountScope,
+    Set<String> knownGenerationIds,
+  ) {
+    final activeGenerationIds = _downloadCancelTokens.keys
+        .where((key) => key.startsWith('$accountScope\u{1F}'))
+        .map((key) => key.substring(accountScope.length + 1))
+        .toSet();
+    return _fileStorage.cleanupScopeArtifactsForKnownIds(
+      accountScope,
+      knownGenerationIds,
+      activeGenerationIds: activeGenerationIds,
+    );
   }
 }

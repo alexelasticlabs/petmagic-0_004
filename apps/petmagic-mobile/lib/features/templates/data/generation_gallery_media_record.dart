@@ -1,4 +1,8 @@
-part of 'generation_gallery_store.dart';
+import 'package:petmagic_mobile/features/templates/application/generation_gallery_cache.dart';
+import 'package:petmagic_mobile/features/templates/domain/generation_media_kind.dart';
+import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
+import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
+import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 
 const Object _copyWithUnset = Object();
 
@@ -183,11 +187,11 @@ class GenerationGalleryMediaRecord implements GenerationGalleryMediaRecordView {
   }
 }
 
-String? _previewUrl(TemplateGenerationResult generation) {
-  final resultPreview = _safeMediaUrl(generation.resultPreviewUrl);
-  final output = _safeMediaUrl(generation.outputUrl);
-  final source = _safeMediaUrl(generation.sourceImageAsset?.url);
-  final normalized = _safeMediaUrl(generation.normalizedImageUrl);
+String? galleryPreviewUrl(TemplateGenerationResult generation) {
+  final resultPreview = gallerySafeMediaUrl(generation.resultPreviewUrl);
+  final output = gallerySafeMediaUrl(generation.outputUrl);
+  final source = gallerySafeMediaUrl(generation.sourceImageAsset?.url);
+  final normalized = gallerySafeMediaUrl(generation.normalizedImageUrl);
   final generationIsVideo = isVideoGenerationResult(generation);
 
   if (resultPreview != null && !isLikelyGenerationVideoUrl(resultPreview)) {
@@ -216,37 +220,10 @@ String? _previewUrl(TemplateGenerationResult generation) {
   return null;
 }
 
-String? _safeMediaUrl(String? raw) {
+String? gallerySafeMediaUrl(String? raw) {
   return parseSafeGenerationMediaUri(raw)?.toString();
 }
 
-String _stableUrlStamp(String value) {
-  var hash = 0x811c9dc5;
-  for (final codeUnit in value.codeUnits) {
-    hash = (hash ^ codeUnit) & 0xffffffff;
-    hash = (hash * 0x01000193) & 0xffffffff;
-  }
-  return hash.toRadixString(16).padLeft(8, '0');
-}
-
-String _safePathSegment(String value, {required String fallback}) {
-  final trimmed = value.trim();
-  final sanitized = sanitizeFileName(trimmed, fallback: fallback);
-  final isSpecialDirectory = sanitized == '.' || sanitized == '..';
-  if (!isSpecialDirectory && sanitized == trimmed && sanitized.length <= 80) {
-    return sanitized;
-  }
-
-  final base = isSpecialDirectory ? fallback : sanitized;
-  final boundedBase = base.length <= 80 ? base : base.substring(0, 80);
-  return '${boundedBase}_${_stableUrlStamp(trimmed)}';
-}
-
-String _downloadKey(String accountScope, String generationId) {
+String galleryDownloadKey(String accountScope, String generationId) {
   return '$accountScope\u{1F}$generationId';
-}
-
-String _basename(String path) {
-  final parts = path.split(Platform.pathSeparator);
-  return parts.isEmpty ? path : parts.last;
 }
