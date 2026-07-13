@@ -29,7 +29,9 @@ void main() {
       final generationStatusSource = _readSource(
         'lib/features/templates/presentation/generation_status_page.dart',
         'lib/features/templates/presentation/generation_status_page_result_actions.part.dart',
-        'lib/features/templates/presentation/generation_status_page_result_sections.part.dart',
+        'lib/features/templates/presentation/generation_status_page_result_cards.part.dart',
+        'lib/features/templates/presentation/generation_status_page_result_action_widgets.part.dart',
+        'lib/features/templates/presentation/generation_status_page_result_details.part.dart',
         'lib/features/templates/presentation/generation_status_page_fullscreen_viewer.part.dart',
       );
       final templateFlowSource = _readSource(
@@ -102,9 +104,17 @@ String _readSource(
   String? secondPath,
   String? thirdPath,
   String? fourthPath,
+  String? fifthPath,
+  String? sixthPath,
 ]) {
   final buffer = StringBuffer(File(firstPath).readAsStringSync());
-  for (final path in [secondPath, thirdPath, fourthPath]) {
+  for (final path in [
+    secondPath,
+    thirdPath,
+    fourthPath,
+    fifthPath,
+    sixthPath,
+  ]) {
     if (path != null) {
       buffer
         ..writeln()

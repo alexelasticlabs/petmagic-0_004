@@ -46,7 +46,9 @@ String readGenerationStatusSectionsLibrarySource() {
     'lib/features/templates/presentation/generation_status_page_sections.dart',
     'lib/features/templates/presentation/generation_status_page_active_card.part.dart',
     'lib/features/templates/presentation/generation_status_page_active_chrome.part.dart',
-    'lib/features/templates/presentation/generation_status_page_result_sections.part.dart',
+    'lib/features/templates/presentation/generation_status_page_result_cards.part.dart',
+    'lib/features/templates/presentation/generation_status_page_result_action_widgets.part.dart',
+    'lib/features/templates/presentation/generation_status_page_result_details.part.dart',
   ];
 
   return files.map((path) => File(path).readAsStringSync()).join('\n');

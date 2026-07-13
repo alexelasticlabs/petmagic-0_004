@@ -45,7 +45,9 @@ part 'generation_status_page_active_chrome.part.dart';
 part 'generation_status_page_lifecycle.part.dart';
 part 'generation_status_page_media_actions.part.dart';
 part 'generation_status_page_result_actions.part.dart';
-part 'generation_status_page_result_sections.part.dart';
+part 'generation_status_page_result_cards.part.dart';
+part 'generation_status_page_result_action_widgets.part.dart';
+part 'generation_status_page_result_details.part.dart';
 part 'generation_status_page_sections.dart';
 
 final generationStatusMediaActionsProvider =
