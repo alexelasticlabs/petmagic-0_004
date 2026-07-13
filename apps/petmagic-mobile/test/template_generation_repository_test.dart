@@ -35,15 +35,22 @@ void main() {
   });
 
   test('sanitizes source image multipart filename without path fragments', () {
-    final source = File(
-      'lib/features/templates/data/template_generation_repository.dart',
+    final uploadSource = File(
+      'lib/features/templates/data/generation_source_upload_preparer.dart',
     ).readAsStringSync();
-    final startBody = methodBody(source, 'startGeneration');
-    final filenameBody = methodBody(source, '_safeSourceImageFileName');
+    final transportSource = File(
+      'lib/features/templates/data/generation_remote_data_source.dart',
+    ).readAsStringSync();
+    final supportSource = File(
+      'lib/features/templates/data/template_image_upload_support.dart',
+    ).readAsStringSync();
+    final prepareBody = methodBody(uploadSource, 'prepare');
+    final startBody = methodBody(transportSource, 'startGeneration');
+    final filenameBody = methodBody(supportSource, 'safeFileName');
 
-    expect(startBody, contains('_safeSourceImageFileName(rawFileName)'));
-    expect(startBody, contains('_safeSourceImageFileName(uploadRawFileName)'));
-    expect(startBody, contains('filename: uploadFileName'));
+    expect(prepareBody, contains('_fileName(sourceImage.name'));
+    expect(prepareBody, contains('_fileName(uploadFile.name'));
+    expect(startBody, contains('filename: prepared.fileName'));
     expect(filenameBody, contains("replaceAll(r'\\', '/')"));
     expect(filenameBody, contains("split('/')"));
     expect(filenameBody, contains('sanitizeFileName('));
@@ -52,12 +59,15 @@ void main() {
   });
 
   test('keeps pet generation and pet profile request contracts stable', () {
-    final source = File(
-      'lib/features/templates/data/template_generation_repository.dart',
+    final generationSource = File(
+      'lib/features/templates/data/generation_remote_data_source.dart',
     ).readAsStringSync();
-    final fromPetBody = methodBody(source, 'startGenerationFromPet');
-    final createPetBody = methodBody(source, 'createPet');
-    final updatePetBody = methodBody(source, 'updatePet');
+    final petSource = File(
+      'lib/features/templates/data/pet_profile_remote_data_source.dart',
+    ).readAsStringSync();
+    final fromPetBody = methodBody(generationSource, 'startGenerationFromPet');
+    final createPetBody = methodBody(petSource, 'createPet');
+    final updatePetBody = methodBody(petSource, 'updatePet');
 
     expect(fromPetBody, contains("'/api/templates/generations/from-pet'"));
     expect(fromPetBody, contains("'Idempotency-Key': idempotencyKey"));

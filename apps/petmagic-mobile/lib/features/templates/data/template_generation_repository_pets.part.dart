@@ -12,11 +12,12 @@ Future<PetPhoto> _uploadPetPhoto(
     final sourceRawFileName = photo.name.isNotEmpty
         ? photo.name
         : photo.path.split(Platform.pathSeparator).last;
-    final sourceFileName = repository._safeSourceImageFileName(
+    final sourceFileName = TemplateImageUploadSupport.safeFileName(
       sourceRawFileName,
     );
     final sourceDeclaredContentType =
-        photo.mimeType ?? repository._resolveImageContentType(sourceFileName);
+        photo.mimeType ??
+        TemplateImageUploadSupport.contentTypeFromName(sourceFileName);
 
     await _validatePetPhotoUploadFile(
       repository,
@@ -36,9 +37,10 @@ Future<PetPhoto> _uploadPetPhoto(
     final rawFileName = uploadFile.name.isNotEmpty
         ? uploadFile.name
         : uploadFile.path.split(Platform.pathSeparator).last;
-    final fileName = repository._safeSourceImageFileName(rawFileName);
+    final fileName = TemplateImageUploadSupport.safeFileName(rawFileName);
     final declaredContentType =
-        uploadFile.mimeType ?? repository._resolveImageContentType(fileName);
+        uploadFile.mimeType ??
+        TemplateImageUploadSupport.contentTypeFromName(fileName);
 
     final contentType = await _validatePetPhotoUploadFile(
       repository,
@@ -73,12 +75,12 @@ Future<String> _validatePetPhotoUploadFile(
   required String filePath,
   required String contentType,
 }) async {
-  if (!repository._isAllowedImageContentType(contentType) &&
-      !repository._isGenericBinaryContentType(contentType)) {
+  if (!TemplateImageUploadSupport.isAllowedImageContentType(contentType) &&
+      !TemplateImageUploadSupport.isGenericBinaryContentType(contentType)) {
     throw const AppException('pets.photo_type_not_allowed');
   }
 
-  final fileSize = await repository._uploadImageSizeBytes(
+  final fileSize = await TemplateImageUploadSupport.fileSize(
     filePath,
     unavailableMessage: 'pets.photo_type_not_allowed',
   );
@@ -87,12 +89,15 @@ Future<String> _validatePetPhotoUploadFile(
     throw const AppException('pets.photo_type_not_allowed');
   }
 
-  final detectedContentType = await repository._detectSourceImageContentType(
-    filePath,
-    unavailableMessage: 'pets.photo_type_not_allowed',
-  );
+  final detectedContentType =
+      await TemplateImageUploadSupport.detectContentType(
+        filePath,
+        unavailableMessage: 'pets.photo_type_not_allowed',
+      );
   if (detectedContentType == null ||
-      !repository._isAllowedImageContentType(detectedContentType)) {
+      !TemplateImageUploadSupport.isAllowedImageContentType(
+        detectedContentType,
+      )) {
     throw const AppException('pets.photo_type_not_allowed');
   }
 
@@ -201,58 +206,4 @@ Future<List<TemplateGenerationResult>> _fetchPetGenerations(
         ).toDomain(),
       )
       .toList(growable: false);
-}
-
-String _resolveImageContentTypeImpl(
-  TemplateGenerationRepository repository,
-  String fileName,
-) {
-  final lower = fileName.toLowerCase();
-  if (lower.endsWith('.png')) {
-    return 'image/png';
-  }
-  if (lower.endsWith('.webp')) {
-    return 'image/webp';
-  }
-  if (lower.endsWith('.heic')) {
-    return 'image/heic';
-  }
-  return 'image/jpeg';
-}
-
-Future<String?> _detectSourceImageContentTypeImpl(
-  TemplateGenerationRepository repository,
-  String path, {
-  required String unavailableMessage,
-}) async {
-  final header = await repository._sourceImageHeader(
-    path,
-    unavailableMessage: unavailableMessage,
-  );
-  return detectTemplateSourceImageContentType(header);
-}
-
-Future<List<int>> _sourceImageHeaderImpl(
-  TemplateGenerationRepository repository,
-  String path, {
-  required String unavailableMessage,
-}) async {
-  try {
-    final chunks = await File(path).openRead(0, 32).toList();
-    return [for (final chunk in chunks) ...chunk];
-  } on FileSystemException catch (error) {
-    throw AppException(unavailableMessage, cause: error);
-  }
-}
-
-Future<int> _uploadImageSizeBytesImpl(
-  TemplateGenerationRepository repository,
-  String path, {
-  required String unavailableMessage,
-}) async {
-  try {
-    return await File(path).length();
-  } on FileSystemException catch (error) {
-    throw AppException(unavailableMessage, cause: error);
-  }
 }
