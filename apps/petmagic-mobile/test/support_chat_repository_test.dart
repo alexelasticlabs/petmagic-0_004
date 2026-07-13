@@ -461,9 +461,13 @@ void main() {
   test(
     'uses async file APIs for attachment upload validation and multipart',
     () {
-      final source = File(
+      final repositorySource = File(
         'lib/features/support/data/support_chat_repository.dart',
       ).readAsStringSync();
+      final preparerSource = File(
+        'lib/features/support/data/support_attachment_upload_preparer.dart',
+      ).readAsStringSync();
+      final source = '$repositorySource\n$preparerSource';
 
       expect(source, isNot(contains('lengthSync(')));
       expect(source, isNot(contains('MultipartFile.fromFileSync')));
@@ -479,11 +483,11 @@ void main() {
 
   test('sanitizes attachment content type before logging upload failures', () {
     final source = File(
-      'lib/features/support/data/support_chat_repository.dart',
+      'lib/features/support/data/support_attachment_upload_preparer.dart',
     ).readAsStringSync();
 
-    expect(source, contains('_safeAttachmentContentTypeForLog(contentType)'));
-    expect(source, contains('String _safeAttachmentContentTypeForLog('));
+    expect(source, contains('_safeContentTypeForLog(contentType)'));
+    expect(source, contains('String _safeContentTypeForLog('));
     expect(source, contains(r"RegExp(r'[\x00-\x1F\x7F]')"));
     expect(source, contains('normalized.substring(0, 80)'));
     expect(source, isNot(contains("context: {'contentType': contentType}")));

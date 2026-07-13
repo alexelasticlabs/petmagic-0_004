@@ -1,18 +1,14 @@
 export 'package:petmagic_mobile/features/support/application/support_repository.dart'
     show SupportRepository, supportChatRepositoryProvider;
 
-import 'dart:io';
-
 import 'package:dio/dio.dart';
 import 'package:petmagic_mobile/core/network/dio_request_cancellation.dart';
 import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http_parser/http_parser.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
-import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/authenticated_request_options.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_storage.dart';
@@ -20,10 +16,8 @@ import 'package:petmagic_mobile/core/auth/auth_session.dart';
 import 'package:petmagic_mobile/features/support/application/support_repository.dart';
 import 'package:petmagic_mobile/features/support/domain/support_chat_models.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_dto_mapper.dart';
-import 'package:petmagic_mobile/features/support/domain/support_attachment_validation.dart';
+import 'package:petmagic_mobile/features/support/data/support_attachment_upload_preparer.dart';
 import 'package:petmagic_mobile/shared/files/image_upload_optimizer.dart';
-import 'package:petmagic_mobile/shared/files/media_signature.dart';
-import 'package:petmagic_mobile/shared/files/upload_media_policy.dart';
 
 final dioSupportRepositoryProvider = Provider<SupportRepository>((ref) {
   return SupportChatRepository(
@@ -41,20 +35,19 @@ class SupportChatRepository implements SupportRepository {
     ImageUploadOptimizer? imageUploadOptimizer,
     AuthSessionCoordinator? authSessionCoordinator,
   }) : _dio = dio,
-       _imageUploadOptimizer =
-           imageUploadOptimizer ?? const ImageUploadOptimizer(),
+       _attachmentUploadPreparer = SupportAttachmentUploadPreparer(
+         imageUploadOptimizer:
+             imageUploadOptimizer ?? const ImageUploadOptimizer(),
+       ),
        _authSessionCoordinator =
            authSessionCoordinator ??
            AuthSessionCoordinator(dio: dio, sessionStorage: sessionStorage);
 
   final Dio _dio;
-  final ImageUploadOptimizer _imageUploadOptimizer;
+  final SupportAttachmentUploadPreparer _attachmentUploadPreparer;
   final AuthSessionCoordinator _authSessionCoordinator;
 
   static const _maxAttachmentCount = 5;
-  static const _imageMaxFileSizeBytes = UploadMediaPolicy.supportImageMaxBytes;
-  static const _videoMaxFileSizeBytes = UploadMediaPolicy.supportVideoMaxBytes;
-  static const _safeAttachmentFileNameMaxLength = 120;
 
   @override
   Future<SupportChatConversation> openConversation({
@@ -163,7 +156,7 @@ class SupportChatRepository implements SupportRepository {
     RequestCancellation? cancelToken,
   }) async {
     final encodedConversationId = _supportPathSegment(conversationId);
-    final prepared = await _prepareAttachmentForUpload(
+    final prepared = await _attachmentUploadPreparer.prepare(
       filePath: filePath,
       fileName: fileName,
       contentType: contentType,
@@ -223,7 +216,7 @@ class SupportChatRepository implements SupportRepository {
     try {
       for (final attachment in attachments) {
         preparedAttachments.add(
-          await _prepareAttachmentForUpload(
+          await _attachmentUploadPreparer.prepare(
             filePath: attachment.filePath,
             fileName: attachment.fileName,
             contentType: attachment.contentType,
@@ -278,7 +271,7 @@ class SupportChatRepository implements SupportRepository {
   }) async {
     final encodedConversationId = _supportPathSegment(conversationId);
     final encodedMessageId = _supportPathSegment(messageId);
-    final prepared = await _prepareAttachmentForUpload(
+    final prepared = await _attachmentUploadPreparer.prepare(
       filePath: filePath,
       fileName: fileName,
       contentType: contentType,
@@ -444,193 +437,6 @@ class SupportChatRepository implements SupportRepository {
     );
   }
 
-  Future<String> _validateAttachmentForUpload({
-    required String filePath,
-    required String contentType,
-  }) async {
-    final normalizedContentType = contentType.trim().toLowerCase();
-    int fileSizeBytes;
-    try {
-      fileSizeBytes = await File(filePath).length();
-    } on FileSystemException {
-      throw const AppException(
-        'support.attachment_invalid_upload',
-        statusCode: 400,
-      );
-    }
-
-    if (fileSizeBytes <= 0) {
-      throw const AppException(
-        'support.attachment_invalid_upload',
-        statusCode: 400,
-      );
-    }
-
-    final declaredValidation = SupportAttachmentValidation.validate(
-      contentType: normalizedContentType,
-      fileSizeBytes: fileSizeBytes,
-      imageMaxBytes: _imageMaxFileSizeBytes,
-      videoMaxBytes: _videoMaxFileSizeBytes,
-      videoMaxDuration: Duration.zero,
-    );
-
-    if (!declaredValidation.isAllowed) {
-      _throwAttachmentValidationError(declaredValidation.error);
-    }
-
-    final detectedContentType = await _detectAttachmentContentType(filePath);
-    if (detectedContentType == null) {
-      throw const AppException(
-        'support.attachment_content_type_not_allowed',
-        statusCode: 400,
-      );
-    }
-
-    final detectedValidation = SupportAttachmentValidation.validate(
-      contentType: detectedContentType,
-      fileSizeBytes: fileSizeBytes,
-      imageMaxBytes: _imageMaxFileSizeBytes,
-      videoMaxBytes: _videoMaxFileSizeBytes,
-      videoMaxDuration: Duration.zero,
-    );
-    if (!detectedValidation.isAllowed) {
-      _throwAttachmentValidationError(detectedValidation.error);
-    }
-
-    return detectedContentType;
-  }
-
-  Never _throwAttachmentValidationError(
-    SupportAttachmentValidationError? error,
-  ) {
-    final message = switch (error) {
-      SupportAttachmentValidationError.unsupportedFormat =>
-        'support.attachment_content_type_not_allowed',
-      SupportAttachmentValidationError.fileTooLarge =>
-        'support.attachment_file_too_large',
-      SupportAttachmentValidationError.videoTooLong =>
-        'support.attachment_video_too_long',
-      null => 'support.attachment_invalid_upload',
-    };
-    throw AppException(message, statusCode: 400);
-  }
-
-  Future<String?> _detectAttachmentContentType(String path) async {
-    final header = await _attachmentHeader(path);
-    return detectSupportAttachmentContentType(header);
-  }
-
-  Future<List<int>> _attachmentHeader(String path) async {
-    try {
-      final chunks = await File(path).openRead(0, 32).toList();
-      return [for (final chunk in chunks) ...chunk];
-    } on FileSystemException {
-      throw const AppException(
-        'support.attachment_invalid_upload',
-        statusCode: 400,
-      );
-    }
-  }
-
-  String _safeMultipartFileName({
-    required String fileName,
-    required String filePath,
-  }) {
-    final preferred = _lastPathSegment(fileName);
-    final fallback = _lastPathSegment(filePath);
-    final sanitized = _sanitizeFileName(preferred);
-    if (sanitized.isNotEmpty) {
-      return sanitized;
-    }
-
-    final sanitizedFallback = _sanitizeFileName(fallback);
-    return sanitizedFallback.isEmpty ? 'attachment' : sanitizedFallback;
-  }
-
-  String _lastPathSegment(String value) {
-    final trimmed = value.trim();
-    if (trimmed.isEmpty) {
-      return '';
-    }
-
-    final normalized = trimmed.replaceAll('\\', '/');
-    final slashIndex = normalized.lastIndexOf('/');
-    return slashIndex < 0 ? normalized : normalized.substring(slashIndex + 1);
-  }
-
-  String _sanitizeFileName(String value) {
-    final sanitized = value
-        .trim()
-        .replaceAll(RegExp(r'\s+'), '_')
-        .replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_')
-        .replaceAll(RegExp(r'_+'), '_')
-        .replaceAll(RegExp(r'^_+|_+$'), '');
-    if (sanitized.length <= _safeAttachmentFileNameMaxLength) {
-      return sanitized;
-    }
-
-    final extensionIndex = sanitized.lastIndexOf('.');
-    final extension = extensionIndex > 0
-        ? sanitized.substring(extensionIndex)
-        : '';
-    if (extension.length > 1 && extension.length <= 16) {
-      final baseLength = _safeAttachmentFileNameMaxLength - extension.length;
-      return '${sanitized.substring(0, baseLength)}$extension';
-    }
-
-    return sanitized.substring(0, _safeAttachmentFileNameMaxLength);
-  }
-
-  Future<PreparedSupportAttachmentUpload> _prepareAttachmentForUpload({
-    required String filePath,
-    required String fileName,
-    required String contentType,
-    RequestCancellation? cancelToken,
-  }) async {
-    final sourceContentType = await _validateAttachmentForUpload(
-      filePath: filePath,
-      contentType: contentType,
-    );
-    OptimizedUploadFile? optimizedFile;
-    try {
-      final isImage = sourceContentType.toLowerCase().startsWith('image/');
-      optimizedFile = isImage
-          ? await _imageUploadOptimizer.optimizeForSupportImage(
-              XFile(filePath, name: fileName, mimeType: sourceContentType),
-              cancelToken: cancelToken,
-            )
-          : null;
-      final uploadFile =
-          optimizedFile?.file ??
-          XFile(filePath, name: fileName, mimeType: sourceContentType);
-      final uploadContentType = await _validateAttachmentForUpload(
-        filePath: uploadFile.path,
-        contentType: uploadFile.mimeType ?? sourceContentType,
-      );
-
-      return PreparedSupportAttachmentUpload(
-        filePath: uploadFile.path,
-        contentType: uploadContentType,
-        safeFileName: _safeMultipartFileName(
-          fileName: uploadFile.name,
-          filePath: uploadFile.path,
-        ),
-        optimizedFile: optimizedFile,
-      );
-    } catch (error, stackTrace) {
-      AppLogger.warn(
-        feature: 'Support.Chat',
-        operation: 'prepare_attachment_for_upload',
-        message: 'Failed to prepare support attachment upload',
-        context: {'contentType': _safeAttachmentContentTypeForLog(contentType)},
-        error: error,
-        stackTrace: stackTrace,
-      );
-      await optimizedFile?.dispose();
-      rethrow;
-    }
-  }
-
   AppException _mapDioException(
     DioException error, {
     required String fallbackMessage,
@@ -663,32 +469,4 @@ String _supportPathSegment(String value) {
 
 int _supportPageSize(int take) {
   return take.clamp(1, 100);
-}
-
-String _safeAttachmentContentTypeForLog(String contentType) {
-  final normalized = contentType.trim().toLowerCase().replaceAll(
-    RegExp(r'[\x00-\x1F\x7F]'),
-    '',
-  );
-  if (normalized.isEmpty) {
-    return 'unknown';
-  }
-
-  return normalized.length <= 80 ? normalized : normalized.substring(0, 80);
-}
-
-class PreparedSupportAttachmentUpload {
-  const PreparedSupportAttachmentUpload({
-    required this.filePath,
-    required this.contentType,
-    required this.safeFileName,
-    this.optimizedFile,
-  });
-
-  final String filePath;
-  final String contentType;
-  final String safeFileName;
-  final OptimizedUploadFile? optimizedFile;
-
-  Future<void> dispose() => optimizedFile?.dispose() ?? Future.value();
 }
