@@ -117,7 +117,7 @@ public sealed class FileMediaMetadataReaderTests
     }
 
     [Fact]
-    public async Task GetVideoDurationSecondsAsync_ShouldLogCleanupFailure_ForOwnedLockedTempFile()
+    public async Task GetVideoDurationSecondsAsync_ShouldRespectHostFileLockSemantics_ForOwnedTempFile()
     {
         var logger = new CapturingLogger<FileMediaMetadataReader>();
         var reader = new FileMediaMetadataReader(logger);
@@ -137,13 +137,26 @@ public sealed class FileMediaMetadataReaderTests
                 CancellationToken.None);
 
             Assert.True(result.IsFailure);
-            Assert.Contains(
-                logger.Entries,
-                entry => entry.Level == LogLevel.Warning
-                    && entry.Message.Contains("Template metadata temp file cleanup failed.", StringComparison.Ordinal)
-                    && Equals(entry.Properties["Operation"], "delete_owned")
-                    && Equals(entry.Properties["TempFileName"], Path.GetFileName(filePath))
-                    && Equals(entry.Properties["ExceptionType"], "IOException"));
+            if (OperatingSystem.IsWindows())
+            {
+                Assert.Contains(
+                    logger.Entries,
+                    entry => entry.Level == LogLevel.Warning
+                        && entry.Message.Contains("Template metadata temp file cleanup failed.", StringComparison.Ordinal)
+                        && Equals(entry.Properties["Operation"], "delete_owned")
+                        && Equals(entry.Properties["TempFileName"], Path.GetFileName(filePath))
+                        && Equals(entry.Properties["ExceptionType"], "IOException"));
+            }
+            else
+            {
+                Assert.Contains(
+                    logger.Entries,
+                    entry => entry.Level == LogLevel.Warning
+                        && entry.Message.Contains("Template media metadata read threw", StringComparison.Ordinal)
+                        && Equals(entry.Properties["Operation"], "read_mp4_duration")
+                        && Equals(entry.Properties["ExceptionType"], "IOException"));
+                Assert.False(File.Exists(filePath));
+            }
         }
         finally
         {

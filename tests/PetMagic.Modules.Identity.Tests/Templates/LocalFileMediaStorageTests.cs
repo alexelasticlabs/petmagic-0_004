@@ -347,7 +347,7 @@ public sealed class LocalFileMediaStorageTests
     }
 
     [Fact]
-    public async Task DeleteAsync_ShouldLogWarning_WhenManagedFileDeletionFails()
+    public async Task DeleteAsync_ShouldRespectHostFileLockSemantics_WhenManagedFileIsOpen()
     {
         var rootPath = CreateTempDirectory();
         var logger = new CapturingLogger<LocalFileMediaStorage>();
@@ -368,17 +368,25 @@ public sealed class LocalFileMediaStorageTests
 
             var deleted = await storage.DeleteAsync(stored.Value.StorageKey, CancellationToken.None);
 
-            Assert.True(deleted.IsFailure);
-            Assert.Equal("templates.media_storage_failed", deleted.Error.Code);
-            Assert.Contains(
-                logger.Entries,
-                entry => entry.Level == LogLevel.Warning
-                    && entry.Message.Contains("Local media delete failed.", StringComparison.Ordinal)
-                    && Equals(entry.Properties["Operation"], "delete")
-                    && Equals(entry.Properties["StorageKeyHash"], SafeLogValues.StableHash(stored.Value.StorageKey))
-                    && Equals(entry.Properties["ExceptionType"], "IOException")
-                    && !ContainsLogValue(entry, stored.Value.StorageKey)
-                    && !ContainsLogValue(entry, stored.Value.LocalPath!));
+            if (OperatingSystem.IsWindows())
+            {
+                Assert.True(deleted.IsFailure);
+                Assert.Equal("templates.media_storage_failed", deleted.Error.Code);
+                Assert.Contains(
+                    logger.Entries,
+                    entry => entry.Level == LogLevel.Warning
+                        && entry.Message.Contains("Local media delete failed.", StringComparison.Ordinal)
+                        && Equals(entry.Properties["Operation"], "delete")
+                        && Equals(entry.Properties["StorageKeyHash"], SafeLogValues.StableHash(stored.Value.StorageKey))
+                        && Equals(entry.Properties["ExceptionType"], "IOException")
+                        && !ContainsLogValue(entry, stored.Value.StorageKey)
+                        && !ContainsLogValue(entry, stored.Value.LocalPath!));
+            }
+            else
+            {
+                Assert.True(deleted.IsSuccess);
+                Assert.False(File.Exists(stored.Value.LocalPath));
+            }
         }
         finally
         {

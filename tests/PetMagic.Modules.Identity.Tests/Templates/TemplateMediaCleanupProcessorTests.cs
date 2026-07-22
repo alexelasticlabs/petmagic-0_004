@@ -278,7 +278,7 @@ public sealed class TemplateMediaCleanupProcessorTests
     }
 
     [Fact]
-    public async Task CleanupNextExpiredMetadataTempFileAsync_ShouldLogWarning_WhenOwnedFileIsLocked()
+    public async Task CleanupNextExpiredMetadataTempFileAsync_ShouldRespectHostFileLockSemantics_WhenOwnedFileIsOpen()
     {
         var path = await TemplateMediaTempFiles.WriteAsync("metadata"u8.ToArray(), ".tmp", CancellationToken.None);
         File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddHours(-6));
@@ -295,12 +295,20 @@ public sealed class TemplateMediaCleanupProcessorTests
 
             var processed = await processor.CleanupNextExpiredMetadataTempFileAsync(CancellationToken.None);
 
-            Assert.False(processed);
-            Assert.Contains(
-                logger.Entries,
-                entry => entry.Level == LogLevel.Warning
-                    && entry.Message.Contains("Template metadata temp file sweep failed.", StringComparison.Ordinal)
-                    && Equals(entry.Properties["Operation"], "sweep_expired"));
+            if (OperatingSystem.IsWindows())
+            {
+                Assert.False(processed);
+                Assert.Contains(
+                    logger.Entries,
+                    entry => entry.Level == LogLevel.Warning
+                        && entry.Message.Contains("Template metadata temp file sweep failed.", StringComparison.Ordinal)
+                        && Equals(entry.Properties["Operation"], "sweep_expired"));
+            }
+            else
+            {
+                Assert.True(processed);
+                Assert.False(File.Exists(path));
+            }
         }
         finally
         {

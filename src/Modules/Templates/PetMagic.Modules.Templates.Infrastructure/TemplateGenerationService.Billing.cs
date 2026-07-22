@@ -10,7 +10,10 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 
 internal sealed partial class TemplateGenerationService
 {
-    private static TemplateGenerationBillingCommand CreateGenerationBillingCommand(TemplateGenerationJob job, DateTime now)
+    private static TemplateGenerationBillingCommand CreateGenerationBillingCommand(
+        TemplateGenerationJob job,
+        DateTime now,
+        bool reserveForImmediateSettlement = false)
     {
         return new TemplateGenerationBillingCommand
         {
@@ -18,9 +21,12 @@ internal sealed partial class TemplateGenerationService
             GenerationId = job.Id,
             UserId = job.UserId,
             TokenCost = job.TokenCost,
-            Status = TemplateGenerationBillingCommandStatuses.Pending,
+            Status = reserveForImmediateSettlement
+                ? TemplateGenerationBillingCommandStatuses.Processing
+                : TemplateGenerationBillingCommandStatuses.Pending,
             CreatedAtUtc = now,
-            UpdatedAtUtc = now
+            UpdatedAtUtc = now,
+            LastAttemptedAtUtc = reserveForImmediateSettlement ? now : null
         };
     }
 

@@ -185,7 +185,8 @@ internal sealed partial class TemplateGenerationService
         };
 
         dbContext.TemplateGenerationJobs.Add(job);
-        dbContext.TemplateGenerationBillingCommands.Add(CreateGenerationBillingCommand(job, now));
+        dbContext.TemplateGenerationBillingCommands.Add(
+            CreateGenerationBillingCommand(job, now, reserveForImmediateSettlement: true));
         AddAnalyticsEvent(job, TemplateAnalyticsEventTypes.TemplateSelected);
         AddAnalyticsEvent(job, TemplateAnalyticsEventTypes.GenerationStarted);
         try

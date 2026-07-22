@@ -148,7 +148,8 @@ internal sealed partial class TemplateGenerationService
             templateId: template.Id,
             generationId: job.Id,
             cancellationToken: cancellationToken);
-        dbContext.TemplateGenerationBillingCommands.Add(CreateGenerationBillingCommand(job, now));
+        dbContext.TemplateGenerationBillingCommands.Add(
+            CreateGenerationBillingCommand(job, now, reserveForImmediateSettlement: true));
         try
         {
             await dbContext.SaveChangesAsync(cancellationToken);

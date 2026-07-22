@@ -279,7 +279,7 @@ public sealed class TemplateWatermarkRendererTests
             Assert.Equal(SafeLogValues.StableHash("clean.mp4"), entry.Properties["FileNameHash"]);
             Assert.Equal("video/mp4", entry.Properties["ContentType"]);
             Assert.Equal(7, entry.Properties["ExitCode"]);
-            Assert.Equal(27, entry.Properties["ErrorLength"]);
+            Assert.Equal(27L, entry.Properties["ErrorLength"]);
             Assert.Equal(true, entry.Properties["HasLocalPath"]);
             Assert.False(entry.Properties.ContainsKey("ErrorPreview"));
         }
