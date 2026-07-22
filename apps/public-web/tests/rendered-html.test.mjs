@@ -65,9 +65,16 @@ test("adds browser security headers to public responses", async () => {
 test("locale navigation preserves the current information route", async () => {
   const support = await readRoute("/support");
   assert.match(support, /href="\/ru\/support"/);
-  assert.match(support, /href="\/de\/support"/);
+  assert.doesNotMatch(support, /href="\/(de|es|fr|it|pl)\/support"/);
 
   const deletion = await readRoute("/account-deletion");
   assert.match(deletion, /href="\/ru\/account-deletion"/);
   assert.match(deletion, /href="\/account-deletion"/);
+});
+
+test("does not expose legal routes for locales without approved catalog content", async () => {
+  for (const locale of ["de", "es", "fr", "it", "pl"]) {
+    const response = await render(`/${locale}/privacy`);
+    assert.equal(response.status, 404, locale);
+  }
 });

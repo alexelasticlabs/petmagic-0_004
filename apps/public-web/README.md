@@ -23,6 +23,8 @@ This starter does not use `wrangler.jsonc`.
 - Site code lives under `app/`.
 - Approved legal text is loaded from
   `../../shared/legal/legal-documents.v2026-07-09.json`.
+- Public legal routes currently expose only the approved-content locales `en`
+  and `ru`; add another locale only together with its approved catalog content.
 - `.openai/hosting.json` keeps Sites bindings explicit; this static legal site
   does not require D1 or R2.
 - `vite.config.ts` produces the Cloudflare Worker-compatible build.
