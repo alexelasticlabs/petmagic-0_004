@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   test('premium paywall feedback copy comes from app localizations', () async {
     final source = await File(
-      'lib/features/premium/presentation/premium_page.dart',
+      'lib/features/premium/presentation/premium_page_feedback.part.dart',
     ).readAsString();
 
     expect(source, contains('premiumPaywallFeedbackTitle'));

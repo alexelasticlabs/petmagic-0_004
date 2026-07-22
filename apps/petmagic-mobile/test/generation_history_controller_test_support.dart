@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
@@ -11,7 +13,7 @@ import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart'
 import 'package:petmagic_mobile/features/templates/data/generation_gallery_store.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/generation_history_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
@@ -163,10 +165,10 @@ class FakeTemplateGenerationRepository extends TemplateGenerationRepository {
   final List<({String? status, int? take})> fetchCalls = [];
   final List<String> fetchGenerationCalls = [];
   final List<({String? status, String? cursor, int? take})> fetchPageCalls = [];
-  final List<CancelToken?> fetchCancelTokens = [];
-  final List<CancelToken?> fetchUnreadCancelTokens = [];
-  final List<CancelToken?> deleteCancelTokens = [];
-  final List<CancelToken?> markReadCancelTokens = [];
+  final List<RequestCancellation?> fetchCancelTokens = [];
+  final List<RequestCancellation?> fetchUnreadCancelTokens = [];
+  final List<RequestCancellation?> deleteCancelTokens = [];
+  final List<RequestCancellation?> markReadCancelTokens = [];
   final List<String> deleteGenerationCalls = [];
   final List<String> markReadCalls = [];
   final List<TemplateGenerationResult> cachedUpserts = [];
@@ -194,16 +196,11 @@ class FakeTemplateGenerationRepository extends TemplateGenerationRepository {
   Future<TemplateGenerationResult> fetchGeneration(
     String generationId, {
     String? correlationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     fetchGenerationCalls.add(generationId);
     if (cancelToken?.isCancelled == true) {
-      throw DioException(
-        requestOptions: RequestOptions(
-          path: '/api/templates/generations/$generationId',
-        ),
-        type: DioExceptionType.cancel,
-      );
+      throw const RequestCancelledException();
     }
 
     final direct = remoteById[generationId];
@@ -236,7 +233,7 @@ class FakeTemplateGenerationRepository extends TemplateGenerationRepository {
     String? status,
     int? skip,
     int? take,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     fetchCalls.add((status: status, take: take));
     fetchCancelTokens.add(cancelToken);
@@ -245,10 +242,7 @@ class FakeTemplateGenerationRepository extends TemplateGenerationRepository {
       await completer.future;
     }
     if (cancelToken?.isCancelled == true) {
-      throw DioException(
-        requestOptions: RequestOptions(path: '/api/templates/generations'),
-        type: DioExceptionType.cancel,
-      );
+      throw const RequestCancelledException();
     }
     final error = fetchError;
     if (error != null) {
@@ -262,7 +256,7 @@ class FakeTemplateGenerationRepository extends TemplateGenerationRepository {
     String? status,
     String? cursor,
     int? take,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     fetchCalls.add((status: status, take: take));
     fetchPageCalls.add((status: status, cursor: cursor, take: take));
@@ -272,10 +266,7 @@ class FakeTemplateGenerationRepository extends TemplateGenerationRepository {
       await completer.future;
     }
     if (cancelToken?.isCancelled == true) {
-      throw DioException(
-        requestOptions: RequestOptions(path: '/api/templates/generations'),
-        type: DioExceptionType.cancel,
-      );
+      throw const RequestCancelledException();
     }
     final error = fetchError;
     if (error != null) {
@@ -298,7 +289,9 @@ class FakeTemplateGenerationRepository extends TemplateGenerationRepository {
   }
 
   @override
-  Future<int> fetchUnreadGenerationCount({CancelToken? cancelToken}) async {
+  Future<int> fetchUnreadGenerationCount({
+    RequestCancellation? cancelToken,
+  }) async {
     fetchUnreadCountCalls++;
     fetchUnreadCancelTokens.add(cancelToken);
     final completer = unreadCountCompleter;
@@ -306,12 +299,7 @@ class FakeTemplateGenerationRepository extends TemplateGenerationRepository {
       await completer.future;
     }
     if (cancelToken?.isCancelled == true) {
-      throw DioException(
-        requestOptions: RequestOptions(
-          path: '/api/templates/generations/unread-count',
-        ),
-        type: DioExceptionType.cancel,
-      );
+      throw const RequestCancelledException();
     }
     final error = unreadCountError;
     if (error != null) {
@@ -323,7 +311,7 @@ class FakeTemplateGenerationRepository extends TemplateGenerationRepository {
   @override
   Future<void> deleteGeneration(
     String generationId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     deleteGenerationCalls.add(generationId);
     deleteCancelTokens.add(cancelToken);
@@ -332,12 +320,7 @@ class FakeTemplateGenerationRepository extends TemplateGenerationRepository {
       await completer.future;
     }
     if (cancelToken?.isCancelled == true) {
-      throw DioException(
-        requestOptions: RequestOptions(
-          path: '/api/templates/generations/$generationId',
-        ),
-        type: DioExceptionType.cancel,
-      );
+      throw const RequestCancelledException();
     }
     final error = deleteError;
     if (error != null) {
@@ -348,7 +331,7 @@ class FakeTemplateGenerationRepository extends TemplateGenerationRepository {
   @override
   Future<void> markGenerationRead(
     String generationId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     markReadCalls.add(generationId);
     markReadCancelTokens.add(cancelToken);

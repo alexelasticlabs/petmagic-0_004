@@ -2,6 +2,40 @@
 
 PetMagic is a modular ASP.NET Core backend with a Next.js admin panel and a Flutter mobile client. PostgreSQL is the source of truth for application data and template generation jobs.
 
+## Backend Architecture
+
+The ASP.NET backend is a **modular monolith** organised around bounded contexts and Clean Architecture principles. It is not a set of independently deployed microservices: `PetMagic.Host.Api` and `PetMagic.Host.GenerationWorker` compose the same modules against one PostgreSQL installation.
+
+| Module | Responsibility |
+| ------ | -------------- |
+| `Identity` | Accounts, authentication, sessions, legal acceptance, and user administration |
+| `Templates` | Template catalogue, pets, generated media, and generation lifecycle |
+| `Economy` | Wallet, Premium, purchases, subscriptions, and payment-provider webhooks |
+| `SupportChat` | User support conversations, attachments, and support notifications |
+| `Gamification` | Achievements, streaks, challenges, and progression |
+
+Each module is divided into the following projects:
+
+```text
+Domain          business rules and domain types; no module dependencies
+Application     use-case contracts, DTOs, validation, and abstractions
+Infrastructure  EF Core, migrations, provider clients, persistence, and implementations
+Api             HTTP endpoints and request/response binding
+```
+
+`PetMagic.BuildingBlocks` contains shared technical contracts and cross-cutting primitives. `PetMagic.Host.Api` is the HTTP composition root: it wires module implementations into DI and maps their endpoints. `PetMagic.Host.GenerationWorker` is a separate process that composes only the infrastructure required to process background generation work; it does not expose HTTP endpoints.
+
+### Dependency Rules
+
+- `Domain` must not depend on another module or infrastructure technology.
+- `Application` may depend only on its own `Domain` and `PetMagic.BuildingBlocks`.
+- `Infrastructure` may implement its own application abstractions and may consume another module only through that module's `Application` contracts; it must not reference another module's `Infrastructure`, `DbContext`, entities, or tables.
+- `Api` must keep HTTP concerns at the edge and use application contracts rather than persistence types.
+- Each module owns its `DbContext` and EF Core migrations. Cross-module operations use explicit application contracts or durable delivery/reconciliation flows, never direct access to another module's database model.
+- Only the host projects compose concrete module implementations.
+
+When adding a feature, choose the owning module first, keep the business rule in `Domain`/`Application`, put technical implementation in `Infrastructure`, and expose it through the module's `Api` project. Do not add feature logic directly to `Program.cs`.
+
 ## Services
 
 | Service             | Port                                                  | Role                                                        |

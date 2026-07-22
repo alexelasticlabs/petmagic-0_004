@@ -10,9 +10,10 @@ void main() {
     final passwordChangeSource = File(
       'lib/features/profile/presentation/password_change_page.dart',
     ).readAsStringSync();
-    final profilePageSource = File(
+    final profilePageSource = [
       'lib/features/profile/presentation/profile_page.dart',
-    ).readAsStringSync();
+      'lib/features/profile/presentation/profile_page_view.part.dart',
+    ].map((path) => File(path).readAsStringSync()).join('\n');
 
     expect(
       passwordResetSource,
@@ -45,7 +46,7 @@ void main() {
     'profile logout unregisters push token before clearing auth session',
     () {
       final source = File(
-        'lib/features/profile/presentation/profile_controller.dart',
+        'lib/features/profile/application/profile_account_coordinator.dart',
       ).readAsStringSync();
       final logoutBody = _methodBody(source, 'logout');
       final cleanupBody = _methodBody(
@@ -57,28 +58,25 @@ void main() {
         'await _unregisterPushTokenBeforeLogout();',
       );
       final repositoryLogoutIndex = logoutBody.indexOf(
-        'await repository.logout();',
+        'await _repository().logout();',
       );
 
       expect(cleanupIndex, isNonNegative);
       expect(repositoryLogoutIndex, isNonNegative);
       expect(cleanupIndex, lessThan(repositoryLogoutIndex));
-      expect(cleanupBody, contains('PushTokenRegistrar('));
-      expect(cleanupBody, contains('templateGenerationRepositoryProvider'));
-      expect(cleanupBody, contains('supportChatRepositoryProvider'));
-      expect(cleanupBody, contains('walletRepositoryProvider'));
-      expect(cleanupBody, contains('registrar.unregisterToken('));
-      expect(cleanupBody, contains('token: token,'));
-      expect(cleanupBody, contains('canContinue: () => ref.mounted'));
-      expect(cleanupBody, contains('final cachedToken ='));
       expect(
-        cleanupBody.indexOf('if (!ref.mounted)'),
-        greaterThan(cleanupBody.indexOf('registrar.readRegisteredToken()')),
+        cleanupBody,
+        contains('_pushTokenLifecycle().unregisterCurrentToken('),
       );
+      expect(cleanupBody, contains('canContinue: _canContinue'));
+      expect(cleanupBody, contains('onFailure: (stage, error, stackTrace)'));
+      expect(cleanupBody, isNot(contains('FirebaseMessaging')));
       expect(
-        cleanupBody.indexOf('await _readFirebaseToken()'),
-        greaterThan(cleanupBody.indexOf('if (!ref.mounted)')),
+        cleanupBody,
+        isNot(contains('templateGenerationRepositoryProvider')),
       );
+      expect(cleanupBody, isNot(contains('supportChatRepositoryProvider')));
+      expect(cleanupBody, isNot(contains('walletRepositoryProvider')));
       expect(cleanupBody, isNot(contains("'token'")));
       expect(cleanupBody, isNot(contains('context: {')));
     },
@@ -88,7 +86,7 @@ void main() {
     'profile account deletion unregisters push token before deleting account',
     () {
       final source = File(
-        'lib/features/profile/presentation/profile_controller.dart',
+        'lib/features/profile/application/profile_account_coordinator.dart',
       ).readAsStringSync();
       final deleteAccountBody = _methodBody(source, 'deleteAccount');
 
@@ -96,7 +94,7 @@ void main() {
         'await _unregisterPushTokenBeforeLogout();',
       );
       final deleteAccountIndex = deleteAccountBody.indexOf(
-        'await repository.deleteCurrentAccount(',
+        'await _repository().deleteCurrentAccount(',
       );
 
       expect(cleanupIndex, isNonNegative);

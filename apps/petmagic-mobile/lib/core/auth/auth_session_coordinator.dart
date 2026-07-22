@@ -4,8 +4,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
-import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
+import 'package:petmagic_mobile/core/auth/auth_session.dart';
+import 'package:petmagic_mobile/core/auth/auth_session_storage.dart';
 
 typedef DioExceptionToAppException =
     AppException Function(
@@ -26,12 +26,12 @@ class AuthSessionCoordinator {
 
   AuthSessionCoordinator({
     required Dio dio,
-    required AuthSessionStorage sessionStorage,
+    required AuthSessionStore sessionStorage,
   }) : _dio = dio,
        _sessionStorage = sessionStorage;
 
   final Dio _dio;
-  final AuthSessionStorage _sessionStorage;
+  final AuthSessionStore _sessionStorage;
 
   Completer<AuthSession>? _refreshInFlight;
 

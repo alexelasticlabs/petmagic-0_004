@@ -11,6 +11,7 @@ import 'package:petmagic_mobile/core/performance/template_media_cache.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_feed_playback_manager.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_card.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_interactive_surface.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_player_platform_interface/video_player_platform_interface.dart';
 import 'package:visibility_detector/visibility_detector.dart';
@@ -793,9 +794,13 @@ void main() {
   });
 
   test('TemplateCard prefers thumbnail over original image preview', () async {
-    final source = await File(
+    final cardSource = await File(
       'lib/features/templates/presentation/widgets/template_card.dart',
     ).readAsString();
+    final mediaSource = await File(
+      'lib/features/templates/presentation/widgets/template_card_media.dart',
+    ).readAsString();
+    final source = '$cardSource\n$mediaSource';
     final withThumbnail = imageTemplate(
       previewUrl: 'https://cdn.example.com/templates/thumb.jpg',
       assetUrl: 'https://cdn.example.com/templates/original.jpg',
@@ -945,6 +950,15 @@ void main() {
       await tester.pump();
 
       expect(find.text('Выбор дня'), findsOneWidget);
+      final actionLabel = find.text('Попробовать шаблон');
+      final actionSurface = find.ancestor(
+        of: actionLabel,
+        matching: find.byType(PetMagicInteractiveSurface),
+      );
+
+      expect(actionLabel, findsOneWidget);
+      expect(tester.getSize(actionLabel).height, greaterThan(16));
+      expect(tester.getSize(actionSurface).height, greaterThanOrEqualTo(48));
       expect(tester.takeException(), isNull);
     },
   );

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -10,7 +11,7 @@ import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
-import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
+import 'package:petmagic_mobile/features/support/domain/support_chat_models.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_home_page.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
@@ -364,7 +365,7 @@ class _CountingSupportChatRepository extends SupportChatRepository {
     int take = 60,
     DateTime? beforeMessageCreatedAtUtc,
     String? beforeMessageId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) {
     getConversationCalls++;
     throw AppException('support.unavailable', statusCode: 503);
@@ -376,14 +377,14 @@ class _CancellableSupportChatRepository extends SupportChatRepository {
     : super(dio: Dio(), sessionStorage: AuthSessionStorage());
 
   final Completer<void> loadStarted = Completer<void>();
-  CancelToken? lastCancelToken;
+  RequestCancellation? lastCancelToken;
 
   @override
   Future<SupportChatConversation> getConversation({
     int take = 60,
     DateTime? beforeMessageCreatedAtUtc,
     String? beforeMessageId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) {
     lastCancelToken = cancelToken;
     if (!loadStarted.isCompleted) {
@@ -403,7 +404,7 @@ class _FailingSupportChatRepository extends SupportChatRepository {
     int take = 60,
     DateTime? beforeMessageCreatedAtUtc,
     String? beforeMessageId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) {
     throw AppException('support.unavailable', statusCode: 503);
   }
@@ -422,7 +423,7 @@ class _SequencedSupportChatRepository extends SupportChatRepository {
     int take = 60,
     DateTime? beforeMessageCreatedAtUtc,
     String? beforeMessageId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) {
     getConversationCalls++;
     final completer = Completer<SupportChatConversation>();
@@ -445,7 +446,7 @@ class _ConversationNotFoundSupportChatRepository extends SupportChatRepository {
     int take = 60,
     DateTime? beforeMessageCreatedAtUtc,
     String? beforeMessageId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) {
     throw AppException('support.conversation_not_found', statusCode: 404);
   }

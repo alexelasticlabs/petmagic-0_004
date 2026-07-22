@@ -1,9 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:petmagic_mobile/core/auth/auth_session_storage.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/startup/guest_launch_storage.dart';
-import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 
 final appLaunchControllerProvider =
     NotifierProvider<AppLaunchController, AppLaunchState>(

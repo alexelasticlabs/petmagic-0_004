@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
@@ -398,11 +399,11 @@ void main() {
       sessionStorage: TestSessionStorage(sessionFixture()),
       preferences: SharedPreferencesAsync(),
     );
-    final fetchToken = CancelToken();
-    final uploadToken = CancelToken();
-    final avatarToken = CancelToken();
-    final favoriteToken = CancelToken();
-    final deleteToken = CancelToken();
+    final fetchToken = RequestCancellation();
+    final uploadToken = RequestCancellation();
+    final avatarToken = RequestCancellation();
+    final favoriteToken = RequestCancellation();
+    final deleteToken = RequestCancellation();
 
     await repository.fetchPetPhotos('pet-1', cancelToken: fetchToken);
     await repository.uploadPetPhoto(
@@ -427,13 +428,23 @@ void main() {
       cancelToken: deleteToken,
     );
 
-    expect(requests.map((request) => request.cancelToken).toList(), [
+    final requestCancellations = [
       fetchToken,
       uploadToken,
       avatarToken,
       favoriteToken,
       deleteToken,
-    ]);
+    ];
+    final dioCancelTokens = requests
+        .map((request) => request.cancelToken)
+        .toList(growable: false);
+    expect(dioCancelTokens, everyElement(isNotNull));
+    expect(dioCancelTokens, everyElement(isNot(isA<RequestCancellation>())));
+
+    for (var index = 0; index < requestCancellations.length; index++) {
+      requestCancellations[index].cancel('test_cancelled');
+      expect(dioCancelTokens[index]!.isCancelled, isTrue);
+    }
   });
 
   test(

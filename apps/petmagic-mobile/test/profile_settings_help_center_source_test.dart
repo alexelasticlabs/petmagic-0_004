@@ -12,7 +12,8 @@ void main() {
       'profile_settings_detail_generic_content.part.dart',
     ).readAsStringSync();
 
-    expect(pageSource, contains("context.push(SupportChatPage.routePath)"));
+    expect(pageSource, contains('context.appNavigator.push('));
+    expect(pageSource, contains('const SupportChatDestination()'));
     expect(contentSource, contains('if (onOpenSupport != null)'));
     expect(contentSource, contains('text.supportHomeOpenChatAction'));
   });

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -8,10 +9,11 @@ import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/preferences/app_preferences_controller.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/app/router/go_router_app_navigator.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/presentation/password_change_page.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
+import 'package:petmagic_mobile/features/profile/application/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_page.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
@@ -54,7 +56,7 @@ void main() {
       'lib/features/profile/presentation/profile_settings_page_content.part.dart',
     ).readAsStringSync();
     final bottomSheetSource = File(
-      'lib/features/profile/presentation/widgets/profile_settings_bottom_sheets.dart',
+      'lib/shared/settings/app_settings_bottom_sheets.dart',
     ).readAsStringSync();
 
     expect(pageSource, contains('options: profileLanguageSheetOptions'));
@@ -276,6 +278,21 @@ Future<void> _pumpSettingsPage(
   _FakeProfileController.deleteAccountCalls = 0;
   await tester.binding.setSurfaceSize(const Size(390, 900));
   addTearDown(() => tester.binding.setSurfaceSize(null));
+  final router = GoRouter(
+    routes: [
+      GoRoute(
+        path: '/',
+        builder: (context, state) =>
+            const Scaffold(body: ProfileSettingsPage()),
+      ),
+      GoRoute(
+        path: PasswordChangePage.routePath,
+        builder: (context, state) =>
+            const Scaffold(body: Text('password-change-screen')),
+      ),
+    ],
+  );
+  addTearDown(router.dispose);
 
   await tester.pumpWidget(
     ProviderScope(
@@ -291,6 +308,10 @@ Future<void> _pumpSettingsPage(
         ),
       ],
       child: MaterialApp.router(
+        builder: (context, child) => AppNavigationScope(
+          navigator: GoRouterAppNavigator(router),
+          child: child!,
+        ),
         theme: AppTheme.dark(),
         locale: const Locale('ru'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -303,20 +324,7 @@ Future<void> _pumpSettingsPage(
           Locale('it'),
           Locale('pl'),
         ],
-        routerConfig: GoRouter(
-          routes: [
-            GoRoute(
-              path: '/',
-              builder: (context, state) =>
-                  const Scaffold(body: ProfileSettingsPage()),
-            ),
-            GoRoute(
-              path: PasswordChangePage.routePath,
-              builder: (context, state) =>
-                  const Scaffold(body: Text('password-change-screen')),
-            ),
-          ],
-        ),
+        routerConfig: router,
       ),
     ),
   );
@@ -435,7 +443,7 @@ class _FakeTemplateGenerationRepository extends TemplateGenerationRepository {
     String? templateId,
     String? petId,
     String sourceScreen = 'settings',
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
     bool retryTransientFailures = false,
   }) async {
     submittedType = type;

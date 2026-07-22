@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -7,11 +8,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
+import 'package:petmagic_mobile/features/profile/application/avatar_media_gateway.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
+import 'package:petmagic_mobile/features/profile/data/mobile_avatar_media_gateway.dart';
+import 'package:petmagic_mobile/features/profile/domain/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
+import 'package:petmagic_mobile/features/profile/application/profile_controller.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -588,6 +591,7 @@ ProviderContainer _profileControllerTestContainer({
 }) {
   return ProviderContainer(
     overrides: [
+      avatarMediaGatewayProvider.overrideWithValue(MobileAvatarMediaGateway()),
       networkStatusControllerProvider.overrideWith(
         () =>
             networkStatusController ??
@@ -602,16 +606,17 @@ class _CancellableProfileRepository extends ProfileRepository {
   _CancellableProfileRepository()
     : super(dio: Dio(), sessionStorage: AuthSessionStorage());
 
-  final Completer<CancelToken> uploadStarted = Completer<CancelToken>();
+  final Completer<RequestCancellation> uploadStarted =
+      Completer<RequestCancellation>();
   int uploadCalls = 0;
 
   @override
   Future<MobileUserProfile> uploadAvatar(
     String filePath, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     uploadCalls++;
-    final token = cancelToken ?? CancelToken();
+    final token = cancelToken ?? RequestCancellation();
     if (!uploadStarted.isCompleted) {
       uploadStarted.complete(token);
     }
@@ -630,7 +635,7 @@ class _DelayedProfileActionRepository extends ProfileRepository {
       Completer<MobileUserProfile>();
 
   @override
-  Future<MobileUserProfile> removeAvatar({CancelToken? cancelToken}) {
+  Future<MobileUserProfile> removeAvatar({RequestCancellation? cancelToken}) {
     if (!removeStarted.isCompleted) {
       removeStarted.complete();
     }
@@ -654,13 +659,13 @@ class _DelayedProfileMutationRepository extends ProfileRepository {
   final Completer<void> removeStarted = Completer<void>();
   final Completer<MobileUserProfile> _removeCompleter =
       Completer<MobileUserProfile>();
-  CancelToken? updateCancelToken;
-  CancelToken? removeCancelToken;
+  RequestCancellation? updateCancelToken;
+  RequestCancellation? removeCancelToken;
 
   @override
   Future<MobileUserProfile> updateProfile({
     required String? displayName,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) {
     updateCancelToken = cancelToken;
     if (!updateStarted.isCompleted) {
@@ -670,7 +675,7 @@ class _DelayedProfileMutationRepository extends ProfileRepository {
   }
 
   @override
-  Future<MobileUserProfile> removeAvatar({CancelToken? cancelToken}) {
+  Future<MobileUserProfile> removeAvatar({RequestCancellation? cancelToken}) {
     removeCancelToken = cancelToken;
     if (!removeStarted.isCompleted) {
       removeStarted.complete();
@@ -700,7 +705,7 @@ class _SuccessfulAvatarUploadProfileRepository extends ProfileRepository {
   @override
   Future<MobileUserProfile> uploadAvatar(
     String filePath, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     uploadedPaths.add(filePath);
     return _profile();
@@ -713,14 +718,14 @@ class _DelayedLoginProfileRepository extends ProfileRepository {
 
   final Completer<void> loginStarted = Completer<void>();
   final Completer<AuthSession> _loginCompleter = Completer<AuthSession>();
-  CancelToken? loginCancelToken;
+  RequestCancellation? loginCancelToken;
   int fetchProfileCalls = 0;
 
   @override
   Future<AuthSession> login({
     required String email,
     required String password,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) {
     loginCancelToken = cancelToken;
     if (!loginStarted.isCompleted) {
@@ -730,7 +735,9 @@ class _DelayedLoginProfileRepository extends ProfileRepository {
   }
 
   @override
-  Future<MobileUserProfile> fetchProfile({CancelToken? cancelToken}) async {
+  Future<MobileUserProfile> fetchProfile({
+    RequestCancellation? cancelToken,
+  }) async {
     fetchProfileCalls++;
     return _profile();
   }
@@ -755,7 +762,7 @@ class _DelayedRegisterProfileRepository extends ProfileRepository {
 
   final Completer<void> registerStarted = Completer<void>();
   final Completer<void> _registerCompleter = Completer<void>();
-  CancelToken? registerCancelToken;
+  RequestCancellation? registerCancelToken;
 
   @override
   Future<void> register({
@@ -767,7 +774,7 @@ class _DelayedRegisterProfileRepository extends ProfileRepository {
     required String privacyPolicyVersion,
     required bool marketingEmailsEnabled,
     String? displayName,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) {
     registerCancelToken = cancelToken;
     if (!registerStarted.isCompleted) {
@@ -790,12 +797,12 @@ class _DelayedUnlinkProfileRepository extends ProfileRepository {
   final Completer<void> unlinkStarted = Completer<void>();
   final Completer<List<MobileLinkedAccount>> _unlinkCompleter =
       Completer<List<MobileLinkedAccount>>();
-  CancelToken? unlinkCancelToken;
+  RequestCancellation? unlinkCancelToken;
 
   @override
   Future<List<MobileLinkedAccount>> unlinkLinkedAccount(
     String provider, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) {
     unlinkCancelToken = cancelToken;
     if (!unlinkStarted.isCompleted) {
@@ -833,7 +840,7 @@ class _DelayedInitializeProfileRepository extends ProfileRepository {
   }
 
   @override
-  Future<MobileUserProfile> fetchProfile({CancelToken? cancelToken}) {
+  Future<MobileUserProfile> fetchProfile({RequestCancellation? cancelToken}) {
     fetchProfileCalls++;
     if (!fetchProfileStarted.isCompleted) {
       fetchProfileStarted.complete();
@@ -852,7 +859,8 @@ class _CancellableInitializeProfileRepository extends ProfileRepository {
   _CancellableInitializeProfileRepository()
     : super(dio: Dio(), sessionStorage: AuthSessionStorage());
 
-  final Completer<CancelToken> fetchProfileStarted = Completer<CancelToken>();
+  final Completer<RequestCancellation> fetchProfileStarted =
+      Completer<RequestCancellation>();
 
   @override
   Future<AuthSession?> readSession() async {
@@ -865,8 +873,10 @@ class _CancellableInitializeProfileRepository extends ProfileRepository {
   }
 
   @override
-  Future<MobileUserProfile> fetchProfile({CancelToken? cancelToken}) async {
-    final token = cancelToken ?? CancelToken();
+  Future<MobileUserProfile> fetchProfile({
+    RequestCancellation? cancelToken,
+  }) async {
+    final token = cancelToken ?? RequestCancellation();
     if (!fetchProfileStarted.isCompleted) {
       fetchProfileStarted.complete(token);
     }
@@ -919,7 +929,7 @@ class _NoopExternalAuthRepository implements ExternalAuthRepository {
   @override
   Future<AuthSession> authenticate(
     ExternalAuthProvider provider, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) {
     throw UnimplementedError();
   }
@@ -927,7 +937,7 @@ class _NoopExternalAuthRepository implements ExternalAuthRepository {
   @override
   Future<List<MobileLinkedAccount>> link(
     ExternalAuthProvider provider, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return const [];
   }
@@ -950,28 +960,30 @@ class _TrackingProfileWriteRepository extends ProfileRepository {
   @override
   Future<List<MobileLinkedAccount>> unlinkLinkedAccount(
     String provider, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     unlinkCalls++;
     return const [];
   }
 
   @override
-  Future<void> deleteCurrentAccount({CancelToken? cancelToken}) async {
+  Future<void> deleteCurrentAccount({RequestCancellation? cancelToken}) async {
     deleteAccountCalls++;
   }
 
   @override
   Future<MobileUserProfile> uploadAvatar(
     String filePath, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     uploadCalls++;
     return _profile();
   }
 
   @override
-  Future<MobileUserProfile> removeAvatar({CancelToken? cancelToken}) async {
+  Future<MobileUserProfile> removeAvatar({
+    RequestCancellation? cancelToken,
+  }) async {
     removeCalls++;
     return _profile();
   }
@@ -979,7 +991,7 @@ class _TrackingProfileWriteRepository extends ProfileRepository {
   @override
   Future<MobileUserProfile> updateProfile({
     required String? displayName,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     updateCalls++;
     return _profile();
@@ -988,7 +1000,7 @@ class _TrackingProfileWriteRepository extends ProfileRepository {
   @override
   Future<MobileUserProfile> acceptCurrentLegalDocuments({
     required MobileLegalDocuments documents,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     acceptLegalCalls++;
     return _profile();
@@ -1003,7 +1015,7 @@ class _TrackingExternalAuthRepository implements ExternalAuthRepository {
   @override
   Future<AuthSession> authenticate(
     ExternalAuthProvider provider, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     authenticateCalls++;
     return AuthSession(
@@ -1017,7 +1029,7 @@ class _TrackingExternalAuthRepository implements ExternalAuthRepository {
   @override
   Future<List<MobileLinkedAccount>> link(
     ExternalAuthProvider provider, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     linkCalls++;
     return const [];
@@ -1036,13 +1048,13 @@ class _DelayedExternalAuthRepository implements ExternalAuthRepository {
   final Completer<void> linkStarted = Completer<void>();
   final Completer<List<MobileLinkedAccount>> _linkCompleter =
       Completer<List<MobileLinkedAccount>>();
-  CancelToken? authenticateCancelToken;
-  CancelToken? linkCancelToken;
+  RequestCancellation? authenticateCancelToken;
+  RequestCancellation? linkCancelToken;
 
   @override
   Future<AuthSession> authenticate(
     ExternalAuthProvider provider, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) {
     authenticateCancelToken = cancelToken;
     if (!authenticateStarted.isCompleted) {
@@ -1054,7 +1066,7 @@ class _DelayedExternalAuthRepository implements ExternalAuthRepository {
   @override
   Future<List<MobileLinkedAccount>> link(
     ExternalAuthProvider provider, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) {
     linkCancelToken = cancelToken;
     if (!linkStarted.isCompleted) {

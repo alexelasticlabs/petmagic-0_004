@@ -2,20 +2,20 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/preferences/app_preferences_controller.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
-import 'package:petmagic_mobile/features/profile/presentation/widgets/profile_settings_bottom_sheets.dart';
+import 'package:petmagic_mobile/shared/settings/app_settings_bottom_sheets.dart';
+import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
 import 'package:petmagic_mobile/features/startup/presentation/widgets/startup_chrome.dart';
-import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 
 part 'guest_welcome_content.part.dart';
+part 'guest_welcome_feature_sections.part.dart';
 
 class GuestWelcomePage extends ConsumerStatefulWidget {
   const GuestWelcomePage({super.key});
@@ -157,7 +157,8 @@ class _GuestWelcomePageState extends ConsumerState<GuestWelcomePage>
                         guestLabel: text.startupWelcomeContinueGuest,
                         guestHint: text.startupWelcomeGuestHint,
                         compact: true,
-                        onSignIn: () => context.go(AuthEntryPage.routePath),
+                        onSignIn: () =>
+                            context.appNavigator.go(const AuthDestination()),
                         onContinueAsGuest: _continueAsGuest,
                       ),
                     ),
@@ -209,7 +210,8 @@ class _GuestWelcomePageState extends ConsumerState<GuestWelcomePage>
                         signInLabel: text.profileSignInAction,
                         guestLabel: text.startupWelcomeContinueGuest,
                         guestHint: text.startupWelcomeGuestHint,
-                        onSignIn: () => context.go(AuthEntryPage.routePath),
+                        onSignIn: () =>
+                            context.appNavigator.go(const AuthDestination()),
                         onContinueAsGuest: _continueAsGuest,
                       ),
                     ),
@@ -261,7 +263,7 @@ class _GuestWelcomePageState extends ConsumerState<GuestWelcomePage>
       if (!mounted) {
         return;
       }
-      context.go(TemplatesPage.routePath);
+      context.appNavigator.go(const TemplatesDestination());
     } catch (error, stackTrace) {
       _handleStartupActionFailure(
         operation: 'continue_as_guest',

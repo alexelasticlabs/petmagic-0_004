@@ -1,19 +1,18 @@
 import 'dart:io';
 
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/gamification/data/gamification_models.dart';
+import 'package:petmagic_mobile/features/gamification/domain/gamification_models.dart';
 import 'package:petmagic_mobile/features/gamification/data/gamification_repository.dart';
 import 'package:petmagic_mobile/features/gamification/presentation/achievements_page.dart';
-import 'package:petmagic_mobile/features/gamification/presentation/gamification_providers.dart';
-import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
+import 'package:petmagic_mobile/features/gamification/application/gamification_providers.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 
 void main() {
@@ -322,7 +321,7 @@ void main() {
 
   test('xp level badge uses theme contrast foreground', () async {
     final source = await File(
-      'lib/features/gamification/presentation/widgets/xp_progress_bar.dart',
+      'lib/shared/gamification/xp_progress_bar.dart',
     ).readAsString();
 
     expect(
@@ -390,7 +389,7 @@ void main() {
     'gamification streak summary passes the count to localized plural rules',
     () async {
       final summarySource = await File(
-        'lib/features/gamification/presentation/widgets/gamification_summary_card.dart',
+        'lib/features/profile/presentation/widgets/gamification_highlights_card.dart',
       ).readAsString();
       final russianLocalizations = await File(
         'lib/l10n/app_ru.arb',
@@ -408,7 +407,7 @@ void main() {
     'achievements provider keeps warm cache instead of dropping immediately',
     () async {
       final providersSource = await File(
-        'lib/features/gamification/presentation/gamification_providers.dart',
+        'lib/features/gamification/application/gamification_providers.dart',
       ).readAsString();
 
       expect(
@@ -434,7 +433,7 @@ void main() {
       );
       expect(
         providersSource,
-        contains("cancelToken.cancel('achievements_provider_disposed');"),
+        contains("cancellation.cancel('achievements_provider_disposed');"),
       );
       expect(
         providersSource,
@@ -511,7 +510,7 @@ void main() {
         pageSource,
         contains('isAchievementsLegalAcceptanceFailure(rawError)'),
       );
-      expect(pageSource, contains('LegalAcceptanceGatePage.routePath'));
+      expect(pageSource, contains('const LegalAcceptanceDestination()'));
       expect(pageSource, contains('text.profileLegalAcceptAction'));
     },
   );
@@ -525,17 +524,11 @@ void main() {
 
       expect(
         profileGamificationSource,
-        contains(
-          'void openAchievements() => context.push(AchievementsPage.routePath);',
-        ),
+        contains('context.appNavigator.push(const AchievementsDestination())'),
       );
       expect(
         profileGamificationSource,
-        isNot(
-          contains(
-            'void openAchievements() {\n      reloadPreview();\n      context.push(AchievementsPage.routePath);\n    }',
-          ),
-        ),
+        isNot(contains('void openAchievements() {\n      reloadPreview();')),
       );
     },
   );
@@ -578,11 +571,11 @@ Future<void> _pumpPage(
   });
 }
 
-class _ControlledAchievementsRepository extends GamificationRepository {
+class _ControlledAchievementsRepository implements GamificationRepository {
   _ControlledAchievementsRepository({
     required this.failUntilCall,
     this.failureMessage = 'gamification.request_failed',
-  }) : super(dio: Dio(), sessionStorage: _NoopAuthSessionStorage());
+  });
 
   int fetchCalls = 0;
   int summaryFetchCalls = 0;
@@ -591,7 +584,7 @@ class _ControlledAchievementsRepository extends GamificationRepository {
 
   @override
   Future<List<AchievementModel>> fetchAchievements({
-    CancelToken? cancelToken,
+    RequestCancellation? cancellation,
   }) async {
     fetchCalls += 1;
     if (fetchCalls <= failUntilCall) {
@@ -630,14 +623,12 @@ class _ControlledAchievementsRepository extends GamificationRepository {
 
   @override
   Future<GamificationSummaryModel> fetchSummary({
-    CancelToken? cancelToken,
+    RequestCancellation? cancellation,
   }) async {
     summaryFetchCalls += 1;
     return const GamificationSummaryModel();
   }
 }
-
-class _NoopAuthSessionStorage extends AuthSessionStorage {}
 
 class _AuthenticatedAppLaunchController extends AppLaunchController {
   @override

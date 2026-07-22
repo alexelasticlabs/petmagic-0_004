@@ -21,7 +21,6 @@ dependencies:
   flutter_cache_manager: ^3.4.1
   video_player: ^2.11.1
   visibility_detector: ^0.4.0+2
-  google_fonts: ^8.1.0
   shared_preferences: ^2.5.5
   crypto: ^3.0.7
   flutter_secure_storage: ^10.3.1
@@ -62,6 +61,7 @@ dev_dependencies:
   flutter_launcher_icons: ^0.14.3
 
   flutter_lints: ^6.0.0
+  flutter_native_splash: ^2.4.8
 
 flutter:
   generate: true
@@ -72,11 +72,34 @@ flutter:
     - assets/auth/
     - assets/branding/premium-hero-dark.png
     - assets/branding/premium-hero-light.png
-    - assets/fonts/
     - assets/rewards/
+
+  fonts:
+    - family: Comfortaa
+      fonts:
+        - asset: assets/fonts/Comfortaa-Regular.ttf
 
 flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/icons/app_icon.png"
+  adaptive_icon_background: "#4B21D1"
+  adaptive_icon_foreground: "assets/icons/app_icon_foreground.png"
   remove_alpha_ios: true
+
+flutter_native_splash:
+  color: "#F7F8FC"
+  color_dark: "#090A12"
+  image: "assets/icons/app_icon.png"
+  android: true
+  ios: true
+  web: false
+  fullscreen: false
+  android_gravity: center
+  ios_content_mode: center
+  android_12:
+    color: "#F7F8FC"
+    color_dark: "#090A12"
+    image: "assets/icons/app_icon.png"
+    icon_background_color: "#F7F8FC"
+    icon_background_color_dark: "#090A12"

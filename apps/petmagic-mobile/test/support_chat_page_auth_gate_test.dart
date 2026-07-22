@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -6,7 +7,7 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
-import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
+import 'package:petmagic_mobile/features/support/domain/support_chat_models.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_realtime_client.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
@@ -111,7 +112,7 @@ class _CountingSupportChatRepository extends SupportChatRepository {
     int take = 60,
     DateTime? beforeMessageCreatedAtUtc,
     String? beforeMessageId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     getConversationCalls++;
     throw UnimplementedError();

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -7,7 +8,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/email_verification_page.dart';
 
@@ -282,8 +282,8 @@ class _DuplicateGuardProfileRepository extends ProfileRepository {
 
   var verifyCalls = 0;
   var resendCalls = 0;
-  CancelToken? verifyCancelToken;
-  CancelToken? resendCancelToken;
+  RequestCancellation? verifyCancelToken;
+  RequestCancellation? resendCancelToken;
 
   final _verifyCompleter = Completer<AuthSession>();
   final _resendCompleter = Completer<void>();
@@ -292,7 +292,7 @@ class _DuplicateGuardProfileRepository extends ProfileRepository {
   Future<AuthSession> verifyEmailCode({
     required String email,
     required String code,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) {
     verifyCalls++;
     verifyCancelToken = cancelToken;
@@ -302,7 +302,7 @@ class _DuplicateGuardProfileRepository extends ProfileRepository {
   @override
   Future<void> resendEmailVerificationCode({
     required String email,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) {
     resendCalls++;
     resendCancelToken = cancelToken;
@@ -326,14 +326,14 @@ class _SequencedEmailVerificationProfileRepository extends ProfileRepository {
   _SequencedEmailVerificationProfileRepository()
     : super(dio: Dio(), sessionStorage: AuthSessionStorage());
 
-  final verifyCancelTokens = <CancelToken>[];
+  final verifyCancelTokens = <RequestCancellation>[];
   final _verifyCompleters = <Completer<AuthSession>>[];
 
   @override
   Future<AuthSession> verifyEmailCode({
     required String email,
     required String code,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) {
     verifyCancelTokens.add(cancelToken!);
     final completer = Completer<AuthSession>();

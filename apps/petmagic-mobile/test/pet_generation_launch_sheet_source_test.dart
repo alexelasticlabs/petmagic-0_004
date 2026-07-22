@@ -4,9 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('pet generation launch sheet uses explicit pet photo error keys', () {
-    final source = File(
-      'lib/features/templates/presentation/widgets/pet_generation_launch_sheet.dart',
-    ).readAsStringSync();
+    final source = _petGenerationLaunchSource();
 
     expect(source, contains('_normalizePetLaunchErrorKey(error.message)'));
     expect(source, contains('normalizeTemplateErrorKey(error.message)'));
@@ -26,19 +24,20 @@ void main() {
     );
   });
 
-  test('pet generation launch sheet disables creation for an unusable photo', () {
-    final source = File(
-      'lib/features/templates/presentation/widgets/pet_generation_launch_sheet.dart',
-    ).readAsStringSync();
+  test(
+    'pet generation launch sheet disables creation for an unusable photo',
+    () {
+      final source = _petGenerationLaunchSource();
 
-    expect(
-      source,
-      contains('_petPhotoDisplayUrl(selectedPhotoForStart) == null'),
-    );
-    expect(source, contains(': () => _start(selectedPhotoForStart);'));
-    expect(source, contains('selectedPhotoPreviewFailed ||'));
-    expect(source, contains('onPreviewLoadFailed: _markPreviewLoadFailed'));
-  });
+      expect(
+        source,
+        contains('_petPhotoDisplayUrl(selectedPhotoForStart) == null'),
+      );
+      expect(source, contains(': () => _start(selectedPhotoForStart);'));
+      expect(source, contains('selectedPhotoPreviewFailed ||'));
+      expect(source, contains('onPreviewLoadFailed: _markPreviewLoadFailed'));
+    },
+  );
 
   test('pet generation launch sheet reports selected preview failures', () {
     final mediaSource = File(
@@ -114,4 +113,11 @@ void main() {
       ),
     );
   });
+}
+
+String _petGenerationLaunchSource() {
+  return [
+    'lib/features/templates/presentation/widgets/pet_generation_launch_sheet.dart',
+    'lib/features/templates/presentation/widgets/pet_generation_launch_sheet_view.part.dart',
+  ].map((path) => File(path).readAsStringSync()).join('\n');
 }

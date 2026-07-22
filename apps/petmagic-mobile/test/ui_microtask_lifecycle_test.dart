@@ -36,12 +36,15 @@ void main() {
   });
 
   test('support ticket preload guards lifecycle before provider reads', () {
-    final source = File(
+    final pageSource = File(
       'lib/features/support/presentation/support_ticket_form_page.dart',
+    ).readAsStringSync();
+    final preloaderSource = File(
+      'lib/features/support/presentation/support_ticket_context_preloader.dart',
     ).readAsStringSync();
 
     expect(
-      source,
+      pageSource,
       contains(
         'Future.microtask(() async {\n'
         '        if (!mounted) {\n'
@@ -50,26 +53,17 @@ void main() {
         '        await _preloadSupportContext();',
       ),
     );
+    expect(pageSource, contains('isActive: () => mounted'));
     expect(
-      source,
+      preloaderSource,
       contains(
-        'Future<void> _preloadSupportContext() async {\n'
-        '    if (!mounted) {\n'
-        '      return;\n'
-        '    }',
+        'if (!isActive() ||\n'
+        '        !ref.read(appLaunchControllerProvider).isAuthenticated',
       ),
     );
-    expect(
-      source,
-      contains(
-        'try {\n'
-        '      await load();\n'
-        '    } catch (error, stackTrace) {\n'
-        '      if (!mounted) {\n'
-        '        return;\n'
-        '      }',
-      ),
-    );
+    expect(preloaderSource, contains('if (!isActive()) {'));
+    expect(preloaderSource, contains('if (isActive()) {'));
+    expect(preloaderSource, contains('onFailure(stage, error, stackTrace);'));
   });
 }
 

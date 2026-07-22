@@ -29,16 +29,13 @@ void main() {
     final mainBody = _methodBody(source, 'main');
 
     expect(mainBody, contains('unawaited(_configureFirebaseMessagingAsync())'));
-    expect(
-      mainBody,
-      contains('runApp(const ProviderScope(child: PetMagicApp()))'),
-    );
+    expect(mainBody, contains('runApp('));
+    expect(mainBody, contains('overrides: mobileProviderOverrides'));
+    expect(mainBody, contains('child: const PetMagicApp()'));
     expect(mainBody, isNot(contains('await _initializeFirebase()')));
     expect(
       mainBody.indexOf('unawaited(_configureFirebaseMessagingAsync())'),
-      lessThan(
-        mainBody.indexOf('runApp(const ProviderScope(child: PetMagicApp()))'),
-      ),
+      lessThan(mainBody.indexOf('runApp(')),
     );
   });
 }

@@ -82,6 +82,32 @@ void main() {
     );
   });
 
+  test('profile builds keep an explicit local API URL for device QA', () {
+    expect(
+      AppConfig.resolveApiBaseUrls(
+        configuredBaseUrl: 'http://127.0.0.1:5001',
+        isDebugBuild: false,
+        isReleaseBuild: false,
+        isWebBuild: false,
+        isAndroidDevice: true,
+      ),
+      const ['http://127.0.0.1:5001'],
+    );
+  });
+
+  test('release builds still reject an explicit local API URL', () {
+    expect(
+      AppConfig.resolveApiBaseUrls(
+        configuredBaseUrl: 'http://127.0.0.1:5001',
+        isDebugBuild: false,
+        isReleaseBuild: true,
+        isWebBuild: false,
+        isAndroidDevice: true,
+      ),
+      const [AppConfig.productionApiBaseUrl],
+    );
+  });
+
   test('deep-link schemes are isolated by release environment', () {
     expect(
       AppConfig.deepLinkSchemeForEnvironment('production'),
@@ -115,9 +141,12 @@ void main() {
   test(
     'production API base URL allowlist rejects configured debug candidates',
     () {
-      final configSource = File(
-        'lib/core/config/app_config.dart',
-      ).readAsStringSync();
+      final configSource = [
+        File('lib/core/config/app_config.dart').readAsStringSync(),
+        File(
+          'lib/core/config/api_base_url_config_resolver.dart',
+        ).readAsStringSync(),
+      ].join('\n');
       final debugApiCandidates = RegExp(r"'(http://[^']+)'")
           .allMatches(configSource)
           .map((match) => match.group(1)!)
@@ -151,12 +180,12 @@ void main() {
   );
 
   test('release API resolver normalizes persisted URLs through allowlist', () {
-    final resolverSource = File(
-      'lib/core/network/api_base_url_resolver.dart',
+    final policySource = File(
+      'lib/core/network/api_base_url_policy.dart',
     ).readAsStringSync();
 
     expect(
-      resolverSource,
+      policySource,
       contains('return AppConfig.normalizeProductionBaseUrl(trimmed);'),
     );
   });

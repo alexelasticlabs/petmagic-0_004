@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -12,6 +13,8 @@ import 'package:image_picker_platform_interface/image_picker_platform_interface.
     as image_picker_platform;
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/app/router/go_router_app_navigator.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/permissions/app_permission_coordinator.dart';
 import 'package:petmagic_mobile/core/permissions/media_permission_feedback.dart';
@@ -20,6 +23,8 @@ import 'package:petmagic_mobile/features/pets/presentation/my_pets_page.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
+import 'package:petmagic_mobile/features/templates/data/template_generation_pet_repository_adapter.dart';
+import 'package:petmagic_mobile/features/pets/application/pet_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -39,7 +44,10 @@ String readPetsPresentationSource() {
   const files = [
     'lib/features/pets/presentation/my_pets_page.dart',
     'lib/features/pets/presentation/my_pets_detail_page.part.dart',
-    'lib/features/pets/presentation/my_pets_display_widgets.part.dart',
+    'lib/features/pets/presentation/my_pets_overview_widgets.part.dart',
+    'lib/features/pets/presentation/my_pets_photo_grid.part.dart',
+    'lib/features/pets/presentation/my_pets_generation_widgets.part.dart',
+    'lib/features/pets/presentation/my_pets_state_widgets.part.dart',
     'lib/features/pets/presentation/my_pets_form_sheet.part.dart',
     'lib/features/pets/presentation/my_pets_photo_actions.part.dart',
   ];
@@ -93,6 +101,9 @@ Future<void> pumpMyPets(
               : UnauthenticatedAppLaunchController.new,
         ),
         templateGenerationRepositoryProvider.overrideWithValue(repository),
+        petRepositoryProvider.overrideWithValue(
+          TemplateGenerationPetRepositoryAdapter(repository),
+        ),
         appPermissionCoordinatorProvider.overrideWithValue(
           permissionCoordinator ?? FakeAppPermissionCoordinator(),
         ),
@@ -102,21 +113,24 @@ Future<void> pumpMyPets(
               TestMyPetsNetworkStatusController(initialHasInternet: true),
         ),
       ],
-      child: MaterialApp.router(
-        theme: AppTheme.light(),
-        darkTheme: AppTheme.dark(),
-        themeMode: brightness == Brightness.dark
-            ? ThemeMode.dark
-            : ThemeMode.light,
-        locale: const Locale('en'),
-        localizationsDelegates: const [
-          AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        supportedLocales: AppLocalizations.supportedLocales,
-        routerConfig: router,
+      child: AppNavigationScope(
+        navigator: GoRouterAppNavigator(router),
+        child: MaterialApp.router(
+          theme: AppTheme.light(),
+          darkTheme: AppTheme.dark(),
+          themeMode: brightness == Brightness.dark
+              ? ThemeMode.dark
+              : ThemeMode.light,
+          locale: const Locale('en'),
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          routerConfig: router,
+        ),
       ),
     ),
   );
@@ -171,22 +185,28 @@ Future<void> pumpPetDetailsWithRouter(
               : UnauthenticatedAppLaunchController.new,
         ),
         templateGenerationRepositoryProvider.overrideWithValue(repository),
+        petRepositoryProvider.overrideWithValue(
+          TemplateGenerationPetRepositoryAdapter(repository),
+        ),
         appPermissionCoordinatorProvider.overrideWithValue(
           permissionCoordinator ?? FakeAppPermissionCoordinator(),
         ),
       ],
-      child: MaterialApp.router(
-        theme: AppTheme.light(),
-        darkTheme: AppTheme.dark(),
-        locale: const Locale('en'),
-        localizationsDelegates: const [
-          AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        supportedLocales: AppLocalizations.supportedLocales,
-        routerConfig: router,
+      child: AppNavigationScope(
+        navigator: GoRouterAppNavigator(router),
+        child: MaterialApp.router(
+          theme: AppTheme.light(),
+          darkTheme: AppTheme.dark(),
+          locale: const Locale('en'),
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          routerConfig: router,
+        ),
       ),
     ),
   );
@@ -351,25 +371,25 @@ class FakePetRepository extends TemplateGenerationRepository {
   final List<String> createdPetNames = [];
   final List<String> createdPetTypes = [];
   final List<String?> createdPetBreeds = [];
-  final List<CancelToken> uploadCancelTokens = [];
-  final List<CancelToken> avatarCancelTokens = [];
+  final List<RequestCancellation> uploadCancelTokens = [];
+  final List<RequestCancellation> avatarCancelTokens = [];
   Completer<void>? petsFetchCompleter;
   Completer<void>? petPhotosRefreshCompleter;
   Completer<void>? petGenerationsFetchCompleter;
-  CancelToken? petsFetchCancelToken;
-  CancelToken? petPhotoFetchCancelToken;
-  CancelToken? petGenerationsFetchCancelToken;
-  CancelToken? uploadCancelToken;
-  CancelToken? avatarCancelToken;
-  CancelToken? favoriteCancelToken;
-  CancelToken? deletePhotoCancelToken;
+  RequestCancellation? petsFetchCancelToken;
+  RequestCancellation? petPhotoFetchCancelToken;
+  RequestCancellation? petGenerationsFetchCancelToken;
+  RequestCancellation? uploadCancelToken;
+  RequestCancellation? avatarCancelToken;
+  RequestCancellation? favoriteCancelToken;
+  RequestCancellation? deletePhotoCancelToken;
   int petsFetchCount = 0;
   int petPhotoFetchCount = 0;
   int petGenerationFetchCount = 0;
   int uploadCalls = 0;
 
   @override
-  Future<List<PetProfile>> fetchPets({CancelToken? cancelToken}) async {
+  Future<List<PetProfile>> fetchPets({RequestCancellation? cancelToken}) async {
     petsFetchCancelToken = cancelToken;
     petsFetchCount++;
     await petsFetchCompleter?.future;
@@ -385,7 +405,7 @@ class FakePetRepository extends TemplateGenerationRepository {
     required String name,
     required String type,
     String? breed,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     createdPetNames.add(name);
     createdPetTypes.add(type);
@@ -408,7 +428,7 @@ class FakePetRepository extends TemplateGenerationRepository {
     required String name,
     required String type,
     String? breed,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return PetProfile(
       id: petId,
@@ -423,13 +443,16 @@ class FakePetRepository extends TemplateGenerationRepository {
   }
 
   @override
-  Future<void> deletePet(String petId, {CancelToken? cancelToken}) async {}
+  Future<void> deletePet(
+    String petId, {
+    RequestCancellation? cancelToken,
+  }) async {}
 
   @override
   Future<PetPhoto> uploadPetPhoto({
     required String petId,
     required XFile photo,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     uploadCalls++;
     uploadCancelToken = cancelToken;
@@ -462,7 +485,7 @@ class FakePetRepository extends TemplateGenerationRepository {
   @override
   Future<List<PetPhoto>> fetchPetPhotos(
     String petId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     petPhotoFetchCancelToken = cancelToken;
     petPhotoFetchCount++;
@@ -483,7 +506,7 @@ class FakePetRepository extends TemplateGenerationRepository {
   Future<PetPhoto> setPetPhotoAsAvatar({
     required String petId,
     required String photoId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     avatarCancelToken = cancelToken;
     if (cancelToken != null) {
@@ -506,7 +529,7 @@ class FakePetRepository extends TemplateGenerationRepository {
     required String petId,
     required String photoId,
     required bool isFavorite,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     favoriteCancelToken = cancelToken;
     favoriteUpdates.add('$photoId:$isFavorite');
@@ -518,7 +541,7 @@ class FakePetRepository extends TemplateGenerationRepository {
   Future<void> deletePetPhoto({
     required String petId,
     required String photoId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     deletePhotoCancelToken = cancelToken;
     deletedPhotoIds.add(photoId);
@@ -528,7 +551,7 @@ class FakePetRepository extends TemplateGenerationRepository {
   @override
   Future<List<TemplateGenerationResult>> fetchPetGenerations(
     String petId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     petGenerationsFetchCancelToken = cancelToken;
     petGenerationFetchCount++;

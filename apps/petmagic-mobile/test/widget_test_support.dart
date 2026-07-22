@@ -1,45 +1,99 @@
 import 'dart:convert';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/app.dart';
+import 'package:petmagic_mobile/app/theme/petmagic_typography.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
+import 'package:petmagic_mobile/features/profile/domain/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
+import 'package:petmagic_mobile/features/support/application/support_realtime_gateway.dart';
+import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
-import 'package:petmagic_mobile/features/templates/data/templates_query.dart';
+import 'package:petmagic_mobile/features/templates/domain/templates_query.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
+import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
 import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
+import 'support_chat_test_support.dart';
+
 void configureWidgetTestHarness() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUpAll(() {
+  setUpAll(() async {
     VisibilityDetectorController.instance.updateInterval = Duration.zero;
+    await _loadDeterministicTestFonts();
   });
   setUp(() {
-    SharedPreferencesAsyncPlatform.instance =
-        InMemorySharedPreferencesAsync.empty();
+    resetInMemoryAsyncPreferences();
   });
   tearDown(() {
     PetMagicNotificationCenter.instance.clearQueue();
   });
+}
+
+const _goldenComfortaaFamily = 'PetMagicGoldenComfortaa';
+
+Future<void> _loadDeterministicTestFonts() async {
+  final fontManifest = await rootBundle.loadStructuredData<Iterable<Object?>>(
+    'FontManifest.json',
+    (source) async => (jsonDecode(source) as List<Object?>),
+  );
+
+  final comfortaaLoader = FontLoader(_goldenComfortaaFamily)
+    ..addFont(rootBundle.load('assets/fonts/Comfortaa-Regular.ttf'));
+  await comfortaaLoader.load();
+  PetMagicTypography.debugUseFontFamily(_goldenComfortaaFamily);
+
+  for (final entry in fontManifest) {
+    if (entry is! Map<String, Object?>) {
+      continue;
+    }
+    final family = entry['family'];
+    final fonts = entry['fonts'];
+    if (family is! String || fonts is! List<Object?>) {
+      continue;
+    }
+    if (family == PetMagicTypography.fontFamily) {
+      continue;
+    }
+
+    final loader = FontLoader(family);
+    for (final font in fonts) {
+      if (font is! Map<String, Object?>) {
+        continue;
+      }
+      final asset = font['asset'];
+      if (asset is String) {
+        loader.addFont(rootBundle.load(asset));
+      }
+    }
+    await loader.load();
+  }
+}
+
+void resetInMemoryAsyncPreferences() {
+  SharedPreferencesAsyncPlatform.instance =
+      InMemorySharedPreferencesAsync.empty();
 }
 
 GoRouter testRouter(Widget home) {
@@ -54,12 +108,17 @@ Future<void> pumpTestApp(
   TemplatesRepository? repository,
   ProfileRepository? profileRepository,
   ExternalAuthRepository? externalAuthRepository,
+  SupportChatRepository? supportChatRepository,
+  SupportChatRealtimeClient? supportChatRealtimeClient,
   AppLaunchController Function()? appLaunchController,
+  NetworkStatusController Function()? networkStatusController,
   Size surfaceSize = const Size(1080, 1920),
+  double textScaleFactor = 1.0,
 }) async {
   final view = tester.view;
   view.physicalSize = surfaceSize;
   view.devicePixelRatio = 1.0;
+  tester.platformDispatcher.textScaleFactorTestValue = textScaleFactor;
 
   final sharedPrefsWithoutSession = Map<String, Object>.from(sharedPrefs)
     ..remove(sessionKey);
@@ -87,6 +146,18 @@ Future<void> pumpTestApp(
         generationHistoryControllerProvider.overrideWith(
           IdleGenerationHistoryController.new,
         ),
+        templateGenerationRepositoryProvider.overrideWith(
+          (ref) => RouterTemplateGenerationRepository(),
+        ),
+        supportChatRepositoryProvider.overrideWith(
+          (ref) => supportChatRepository ?? FakeSupportChatRepository(),
+        ),
+        supportChatRealtimeClientProvider.overrideWithValue(
+          supportChatRealtimeClient ?? const FakeSupportChatRealtimeClient(),
+        ),
+        walletRepositoryProvider.overrideWith(
+          (ref) => ref.watch(dioWalletRepositoryProvider),
+        ),
         walletControllerProvider.overrideWith(IdleWidgetWalletController.new),
         profileRepositoryProvider.overrideWith(
           (ref) => profileRepository ?? FakeProfileRepository(),
@@ -96,6 +167,8 @@ Future<void> pumpTestApp(
         ),
         if (appLaunchController != null)
           appLaunchControllerProvider.overrideWith(appLaunchController),
+        if (networkStatusController != null)
+          networkStatusControllerProvider.overrideWith(networkStatusController),
         realtimeClientProvider.overrideWith(
           (ref) => const NoopRealtimeClient(),
         ),
@@ -110,6 +183,7 @@ Future<void> pumpTestApp(
     await PetMagicNotificationCenter.instance.clearQueue();
     view.resetPhysicalSize();
     view.resetDevicePixelRatio();
+    tester.platformDispatcher.clearTextScaleFactorTestValue();
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
   });
@@ -204,6 +278,11 @@ class AuthenticatedWidgetAppLaunchController extends AppLaunchController {
       guestSessionReady: true,
     );
   }
+}
+
+class OnlineWidgetNetworkStatusController extends NetworkStatusController {
+  @override
+  NetworkStatusState build() => const NetworkStatusState(hasInternet: true);
 }
 
 class IdleWidgetWalletController extends WalletController {
@@ -425,7 +504,7 @@ class RouterTemplateGenerationRepository extends TemplateGenerationRepository {
   int fetchPetGenerationsCalls = 0;
 
   @override
-  Future<List<PetProfile>> fetchPets({CancelToken? cancelToken}) async {
+  Future<List<PetProfile>> fetchPets({RequestCancellation? cancelToken}) async {
     fetchPetsCalls++;
     return [
       PetProfile(
@@ -445,7 +524,7 @@ class RouterTemplateGenerationRepository extends TemplateGenerationRepository {
   @override
   Future<List<PetPhoto>> fetchPetPhotos(
     String petId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     fetchPetPhotosCalls++;
     return const [];
@@ -454,7 +533,7 @@ class RouterTemplateGenerationRepository extends TemplateGenerationRepository {
   @override
   Future<List<TemplateGenerationResult>> fetchPetGenerations(
     String petId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     fetchPetGenerationsCalls++;
     return const [];
@@ -464,7 +543,7 @@ class RouterTemplateGenerationRepository extends TemplateGenerationRepository {
   Future<TemplateGenerationResult> fetchGeneration(
     String generationId, {
     String? correlationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     fetchGenerationCalls.add(generationId);
     final now = DateTime.utc(2035, 1, 1, 12);
@@ -489,7 +568,7 @@ class RouterTemplateGenerationRepository extends TemplateGenerationRepository {
   @override
   Future<CompatibleGenerationTemplates> fetchCompatibleTemplates(
     String resultId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     fetchCompatibleTemplateCalls.add(resultId);
     return CompatibleGenerationTemplates(
@@ -505,7 +584,7 @@ class RouterTemplateGenerationRepository extends TemplateGenerationRepository {
     required String eventType,
     String? generationId,
     Map<String, Object?> metadata = const {},
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {}
 }
 
@@ -542,7 +621,7 @@ class FakeProfileRepository extends ProfileRepository {
   Future<AuthSession> login({
     required String email,
     required String password,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final session = AuthSession(
       accessToken: 'access-token',
@@ -576,7 +655,7 @@ class FakeProfileRepository extends ProfileRepository {
     required String privacyPolicyVersion,
     required bool marketingEmailsEnabled,
     String? displayName,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     lastTermsOfUseAccepted = termsOfUseAccepted;
     lastMarketingEmailsEnabled = marketingEmailsEnabled;
@@ -618,7 +697,9 @@ class FakeProfileRepository extends ProfileRepository {
   }
 
   @override
-  Future<MobileUserProfile> fetchProfile({CancelToken? cancelToken}) async {
+  Future<MobileUserProfile> fetchProfile({
+    RequestCancellation? cancelToken,
+  }) async {
     final session = storedSession;
     if (session == null) {
       throw const AppException('Unauthorized', statusCode: 401);
@@ -642,7 +723,7 @@ class FakeProfileRepository extends ProfileRepository {
   @override
   Future<MobileLegalDocuments> fetchCurrentLegalDocuments({
     required String locale,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return sampleLegalDocuments;
   }
@@ -650,7 +731,7 @@ class FakeProfileRepository extends ProfileRepository {
   @override
   Future<MobileUserProfile> acceptCurrentLegalDocuments({
     required MobileLegalDocuments documents,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final session = storedSession;
     if (session == null) {
@@ -699,7 +780,7 @@ class FakeProfileRepository extends ProfileRepository {
   @override
   Future<void> requestPasswordReset({
     required String email,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     passwordResetRequestedFor = email;
   }
@@ -709,7 +790,7 @@ class FakeProfileRepository extends ProfileRepository {
     required String email,
     required String code,
     required String newPassword,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     passwordResetConfirmedFor = email;
   }
@@ -720,7 +801,7 @@ class CancelledLoginProfileRepository extends FakeProfileRepository {
   Future<AuthSession> login({
     required String email,
     required String password,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     throw const RequestCancelledException();
   }
@@ -730,7 +811,7 @@ class UnavailableLegalDocumentsProfileRepository extends FakeProfileRepository {
   @override
   Future<MobileLegalDocuments> fetchCurrentLegalDocuments({
     required String locale,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     throw const AppException('Legal documents unavailable', statusCode: 503);
   }
@@ -740,7 +821,7 @@ class FakeExternalAuthRepository implements ExternalAuthRepository {
   @override
   Future<AuthSession> authenticate(
     ExternalAuthProvider provider, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return AuthSession(
       accessToken: 'external-access-token',
@@ -769,7 +850,7 @@ class FakeExternalAuthRepository implements ExternalAuthRepository {
   @override
   Future<List<MobileLinkedAccount>> link(
     ExternalAuthProvider provider, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return const [];
   }
@@ -795,7 +876,7 @@ class FailingExternalAuthRepository implements ExternalAuthRepository {
   @override
   Future<AuthSession> authenticate(
     ExternalAuthProvider provider, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     throw error;
   }
@@ -803,7 +884,7 @@ class FailingExternalAuthRepository implements ExternalAuthRepository {
   @override
   Future<List<MobileLinkedAccount>> link(
     ExternalAuthProvider provider, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     throw error;
   }
@@ -818,7 +899,7 @@ class ThrowingExternalAuthRepository implements ExternalAuthRepository {
   @override
   Future<AuthSession> authenticate(
     ExternalAuthProvider provider, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     throw Exception('google sign-in failed unexpectedly');
   }
@@ -826,7 +907,7 @@ class ThrowingExternalAuthRepository implements ExternalAuthRepository {
   @override
   Future<List<MobileLinkedAccount>> link(
     ExternalAuthProvider provider, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     throw Exception('external account link failed unexpectedly');
   }
@@ -841,7 +922,7 @@ class CancelledExternalAuthRepository implements ExternalAuthRepository {
   @override
   Future<AuthSession> authenticate(
     ExternalAuthProvider provider, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     throw const RequestCancelledException();
   }
@@ -849,7 +930,7 @@ class CancelledExternalAuthRepository implements ExternalAuthRepository {
   @override
   Future<List<MobileLinkedAccount>> link(
     ExternalAuthProvider provider, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     throw const RequestCancelledException();
   }

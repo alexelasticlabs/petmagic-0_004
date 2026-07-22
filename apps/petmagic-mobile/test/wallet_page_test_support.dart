@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:petmagic_mobile/core/platform/app_runtime_info.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -13,13 +15,13 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
-import 'package:petmagic_mobile/features/templates/presentation/templates_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/generation_history_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/templates_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
-import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
+import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/all_transactions_page.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
 
@@ -218,6 +220,9 @@ Future<void> pumpRewardsPage(
   required WalletRepository repository,
   bool authenticated = true,
   NetworkStatusController? networkStatusController,
+  WalletController? walletController,
+  Brightness brightness = Brightness.dark,
+  bool disableAnimations = false,
 }) async {
   addTearDown(() => PetMagicNotificationCenter.instance.clearQueue());
 
@@ -230,13 +235,25 @@ Future<void> pumpRewardsPage(
               : UnauthenticatedWalletAppLaunchController.new,
         ),
         walletRepositoryProvider.overrideWithValue(repository),
+        if (walletController != null)
+          walletControllerProvider.overrideWith(() => walletController),
         if (networkStatusController != null)
           networkStatusControllerProvider.overrideWith(
             () => networkStatusController,
           ),
       ],
       child: MaterialApp.router(
-        theme: AppTheme.dark(),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(disableAnimations: disableAnimations),
+          child: child!,
+        ),
+        theme: AppTheme.light(),
+        darkTheme: AppTheme.dark(),
+        themeMode: brightness == Brightness.dark
+            ? ThemeMode.dark
+            : ThemeMode.light,
         locale: const Locale('ru'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: const [
@@ -252,7 +269,10 @@ Future<void> pumpRewardsPage(
           routes: [
             GoRoute(
               path: '/',
-              builder: (context, state) => const Material(child: RewardsPage()),
+              builder: (context, state) => const Material(
+                key: Key('rewards_test_surface'),
+                child: RewardsPage(),
+              ),
             ),
           ],
         ),
@@ -263,6 +283,21 @@ Future<void> pumpRewardsPage(
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 200));
   await tester.pump(const Duration(milliseconds: 300));
+}
+
+class StaticRewardsWalletController extends WalletController {
+  @override
+  WalletState build() => const WalletState(
+    wallet: walletStateFixture,
+    ledger: ledgerItemsFixture,
+    hasCompletedFullLoad: true,
+    packs: packsFixture,
+    paymentMethods: paymentMethodsFixture,
+    purchases: purchasesFixture,
+  );
+
+  @override
+  Future<void> load({bool refresh = false}) async {}
 }
 
 class AutoRefreshProbeWalletController extends WalletController {
@@ -343,7 +378,9 @@ class FakeWalletRepository extends WalletRepository {
   int purchasesFetchCount = 0;
 
   @override
-  Future<WalletStateModel> fetchWallet({CancelToken? cancelToken}) async {
+  Future<WalletStateModel> fetchWallet({
+    RequestCancellation? cancelToken,
+  }) async {
     walletFetchCount++;
     final configuredWalletError = walletError;
     if (configuredWalletError != null) {
@@ -361,7 +398,7 @@ class FakeWalletRepository extends WalletRepository {
   Future<OffsetPagedModel<WalletLedgerItem>> fetchLedger({
     int skip = 0,
     int take = 20,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     ledgerFetchCount++;
     if (failLedger) {
@@ -381,8 +418,8 @@ class FakeWalletRepository extends WalletRepository {
 
   @override
   Future<WalletCheckoutConfigModel> fetchCheckoutConfig({
-    required Locale locale,
-    CancelToken? cancelToken,
+    required AppLocale locale,
+    RequestCancellation? cancelToken,
   }) async {
     checkoutConfigFetchCount++;
     return WalletCheckoutConfigModel(
@@ -393,14 +430,15 @@ class FakeWalletRepository extends WalletRepository {
   }
 
   @override
-  Future<RewardsSummaryModel> fetchRewards({CancelToken? cancelToken}) async =>
-      rewardsSummaryFixture;
+  Future<RewardsSummaryModel> fetchRewards({
+    RequestCancellation? cancelToken,
+  }) async => rewardsSummaryFixture;
 
   @override
   Future<OffsetPagedModel<PurchaseHistoryItem>> fetchPurchases({
     int skip = 0,
     int take = 20,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     purchasesFetchCount++;
     if (failPurchases) {
@@ -439,6 +477,13 @@ class FakeWalletRepository extends WalletRepository {
   }
 }
 
+FakeWalletRepository defaultFakeWalletRepository() => FakeWalletRepository(
+  wallet: walletStateFixture,
+  ledger: ledgerItemsFixture,
+  packs: packsFixture,
+  purchases: purchasesFixture,
+);
+
 class RetryLedgerWalletRepository extends FakeWalletRepository {
   RetryLedgerWalletRepository({
     required super.wallet,
@@ -453,7 +498,7 @@ class RetryLedgerWalletRepository extends FakeWalletRepository {
   Future<OffsetPagedModel<WalletLedgerItem>> fetchLedger({
     int skip = 0,
     int take = 20,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     ledgerAttempts++;
     if (ledgerAttempts == 1) {
@@ -485,7 +530,7 @@ class PagedLedgerWalletRepository extends FakeWalletRepository {
   Future<OffsetPagedModel<WalletLedgerItem>> fetchLedger({
     int skip = 0,
     int take = 20,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     ledgerSkips.add(skip);
     final pending = delayedLedgerSkips[skip];
@@ -519,7 +564,7 @@ class RetryPagedLedgerWalletRepository extends PagedLedgerWalletRepository {
   Future<OffsetPagedModel<WalletLedgerItem>> fetchLedger({
     int skip = 0,
     int take = 20,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     ledgerSkips.add(skip);
     if (skip == 24 && !_failedSecondPage) {

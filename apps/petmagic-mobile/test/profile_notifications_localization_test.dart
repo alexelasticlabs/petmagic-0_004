@@ -5,9 +5,10 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('profile notification device labels use localized copy', () async {
-    final source = await File(
+    final source = [
       'lib/features/profile/presentation/widgets/profile_notifications_settings_section.dart',
-    ).readAsString();
+      'lib/features/profile/presentation/widgets/profile_notifications_settings_view.part.dart',
+    ].map((path) => File(path).readAsStringSync()).join('\n');
 
     expect(source, contains('text.profileNotificationsDeviceMicrophone'));
     expect(

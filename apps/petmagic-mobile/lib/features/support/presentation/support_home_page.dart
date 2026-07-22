@@ -2,26 +2,26 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:dio/dio.dart';
-import 'package:go_router/go_router.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
+import 'package:petmagic_mobile/shared/auth/auth_required_sheet.dart';
 import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
-import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
-import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
-import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
+import 'package:petmagic_mobile/shared/profile/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
+import 'package:petmagic_mobile/features/support/application/support_contract.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_unavailable_view.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 
-import 'support_assistant_page.dart';
 import 'support_assistant_scenarios.dart';
+
+part 'support_home_page_widgets.part.dart';
 
 enum _SupportHomeTab { active, archive }
 
@@ -39,7 +39,7 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
   bool _isLoadingConversation = false;
   String? _conversationError;
   SupportChatConversation? _conversation;
-  CancelToken? _conversationLoadCancelToken;
+  RequestCancellation? _conversationLoadCancelToken;
   ProviderSubscription<AppLaunchState>? _launchSubscription;
   bool _hasRequestedInitialConversationLoad = false;
   bool _hasResolvedConversationSnapshot = false;
@@ -115,7 +115,7 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
     }
 
     _cancelConversationLoad();
-    final loadCancelToken = CancelToken();
+    final loadCancelToken = RequestCancellation();
     _conversationLoadCancelToken = loadCancelToken;
 
     setState(() {
@@ -347,7 +347,8 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
                 _ConversationCard(
                   conversation: _conversation!,
                   tab: _tab,
-                  onOpenChat: () => context.push(SupportChatPage.routePath),
+                  onOpenChat: () =>
+                      context.appNavigator.push(const SupportChatDestination()),
                   subtitle: _formatLastActivity(
                     context,
                     _conversation!.lastMessageAtUtc,
@@ -375,8 +376,9 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
                       ),
                       const SizedBox(height: 12),
                       TextButton(
-                        onPressed: () =>
-                            context.push(SupportChatPage.routePath),
+                        onPressed: () => context.appNavigator.push(
+                          const SupportChatDestination(),
+                        ),
                         child: Text(text.supportHomeOpenChatAction),
                       ),
                     ],
@@ -411,185 +413,5 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
           ),
         )
         .toList(growable: false);
-  }
-}
-
-class _SupportTabButton extends StatelessWidget {
-  const _SupportTabButton({
-    required this.title,
-    required this.isActive,
-    required this.onTap,
-  });
-
-  final String title;
-  final bool isActive;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Ink(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isActive
-                  ? colors.accent.withValues(alpha: 0.75)
-                  : colors.border,
-            ),
-            color: isActive
-                ? colors.accent.withValues(alpha: 0.16)
-                : colors.surface,
-          ),
-          child: Text(
-            title,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: isActive ? colors.accent : colors.textSoft,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ConversationCard extends StatelessWidget {
-  const _ConversationCard({
-    required this.conversation,
-    required this.tab,
-    required this.onOpenChat,
-    required this.subtitle,
-  });
-
-  final SupportChatConversation conversation;
-  final _SupportHomeTab tab;
-  final VoidCallback onOpenChat;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = AppLocalizations.of(context);
-    final colors = context.petMagicColors;
-
-    return ProfileGlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            tab == _SupportHomeTab.archive
-                ? text.supportChatArchiveAction
-                : text.supportChatStatusOpen,
-            style: TextStyle(
-              color: colors.textStrong,
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            conversation.userDisplayName?.trim().isNotEmpty == true
-                ? conversation.userDisplayName!.trim()
-                : conversation.userEmail,
-            style: TextStyle(
-              color: colors.textStrong,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          if (subtitle.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                subtitle,
-                style: TextStyle(color: colors.textSoft, fontSize: 12),
-              ),
-            ),
-          const SizedBox(height: 10),
-          TextButton(
-            onPressed: onOpenChat,
-            child: Text(text.supportHomeOpenChatAction),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SupportTopic {
-  const _SupportTopic({
-    required this.icon,
-    this.isPremium = false,
-    required this.label,
-    required this.scenario,
-  });
-
-  final IconData icon;
-  final bool isPremium;
-  final String label;
-  final String scenario;
-}
-
-class _TopicCard extends StatelessWidget {
-  const _TopicCard({required this.topic});
-
-  final _SupportTopic topic;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: ProfileGlassCard(
-        padding: EdgeInsets.zero,
-        child: InkWell(
-          onTap: () =>
-              context.push(SupportAssistantPage.location(topic.scenario)),
-          borderRadius: BorderRadius.circular(24),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: colors.accent.withValues(alpha: 0.12),
-                  ),
-                  child: topic.isPremium
-                      ? const PremiumCrownIcon(size: 20)
-                      : Icon(topic.icon, color: colors.accent, size: 20),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Text(
-                    topic.label,
-                    style: TextStyle(
-                      color: colors.textStrong,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: colors.textSoft,
-                  size: 20,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
   }
 }

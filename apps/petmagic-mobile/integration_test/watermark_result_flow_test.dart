@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,7 +10,7 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -141,7 +142,7 @@ class _IntegrationTemplateGenerationRepository
   Future<TemplateGenerationResult> fetchGeneration(
     String generationId, {
     String? correlationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return generation;
   }
@@ -157,7 +158,7 @@ class _IntegrationTemplateGenerationRepository
   Future<RemoveGenerationWatermarkResult> removeWatermark(
     String generationId, {
     String paymentMethod = 'credit',
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     removeWatermarkCalls.add(generationId);
     generation = generation.copyWith(
@@ -181,7 +182,7 @@ class _IntegrationTemplateGenerationRepository
     required String eventType,
     String? generationId,
     Map<String, Object?> metadata = const {},
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     analyticsEvents.add(eventType);
   }

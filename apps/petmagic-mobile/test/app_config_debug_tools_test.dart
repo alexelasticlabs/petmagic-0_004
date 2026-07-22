@@ -11,9 +11,12 @@ void main() {
         'lib/core/config/app_config.dart',
       ).readAsString();
       final main = await File('lib/main.dart').readAsString();
-      final router = await File(
-        'lib/app/router/app_router.dart',
-      ).readAsString();
+      final router = await Future.wait(
+        [
+          'lib/app/router/app_router.dart',
+          'lib/app/router/app_routes.part.dart',
+        ].map((path) => File(path).readAsString()),
+      ).then((sources) => sources.join('\n'));
 
       expect(
         source,
@@ -33,10 +36,7 @@ void main() {
           'return (kDebugMode || kProfileMode) && _enableFrameTelemetry;',
         ),
       );
-      expect(
-        main,
-        contains('GoogleFonts.config.allowRuntimeFetching = false;'),
-      );
+      expect(main, isNot(contains('GoogleFonts.')));
       expect(
         File('lib/app/app.dart').readAsStringSync(),
         contains('debugShowCheckedModeBanner: false,'),
@@ -143,11 +143,11 @@ void main() {
 
 String _readShellLibrarySource() {
   const files = [
-    'lib/shared/navigation/petmagic_shell.dart',
-    'lib/shared/navigation/petmagic_shell_active_generation.part.dart',
-    'lib/shared/navigation/petmagic_shell_backdrop.part.dart',
-    'lib/shared/navigation/petmagic_shell_navigation.part.dart',
-    'lib/shared/navigation/petmagic_shell_transition.part.dart',
+    'lib/app/shell/petmagic_shell.dart',
+    'lib/app/shell/petmagic_shell_active_generation.part.dart',
+    'lib/app/shell/petmagic_shell_backdrop.part.dart',
+    'lib/app/shell/petmagic_shell_navigation.part.dart',
+    'lib/app/shell/petmagic_shell_transition.part.dart',
   ];
 
   return files.map((path) => File(path).readAsStringSync()).join('\n');
@@ -157,9 +157,12 @@ String _readTemplatesPageLibrarySource() {
   const files = [
     'lib/features/templates/presentation/templates_page.dart',
     'lib/features/templates/presentation/templates_page_feed.part.dart',
+    'lib/features/templates/presentation/templates_page_feed_slivers.part.dart',
     'lib/features/templates/presentation/templates_page_generation_flow.part.dart',
+    'lib/features/templates/presentation/templates_page_pet_photo_picker.part.dart',
     'lib/features/templates/presentation/templates_page_lifecycle.part.dart',
     'lib/features/templates/presentation/templates_page_template_actions.part.dart',
+    'lib/features/templates/presentation/templates_page_view.part.dart',
   ];
 
   return files.map((path) => File(path).readAsStringSync()).join('\n');

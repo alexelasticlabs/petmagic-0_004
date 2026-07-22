@@ -1,25 +1,25 @@
 import 'dart:async';
-import 'package:dio/dio.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
-import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
-import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/permissions/media_permission_feedback.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
-import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
-import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
+import 'package:petmagic_mobile/features/premium/application/premium_controller.dart';
+import 'package:petmagic_mobile/shared/auth/auth_required_sheet.dart';
+import 'package:petmagic_mobile/shared/profile/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/features/support/application/support_contract.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_assistant_scenarios.dart';
-import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
-import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
+import 'package:petmagic_mobile/features/support/presentation/support_ticket_context_preloader.dart';
+import 'package:petmagic_mobile/features/support/presentation/support_ticket_form_policy.dart';
+import 'package:petmagic_mobile/features/support/presentation/widgets/support_ticket_attachment_source_sheet.dart';
+import 'package:petmagic_mobile/features/templates/application/template_generation_contract.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
+import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 
@@ -68,34 +68,10 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
   List<XFile> _attachments = const [];
   bool _isSubmitting = false;
   bool _isPickingAttachment = false;
-  CancelToken? _submitCancelToken;
+  RequestCancellation? _submitCancelToken;
   ProviderSubscription<AppLaunchState>? _launchSubscription;
   bool _wasAuthenticated = false;
   bool _hasScheduledSupportContextPreload = false;
-
-  void _logSupportTicketFailure(
-    String stage,
-    Object error,
-    StackTrace stackTrace, {
-    Map<String, Object?> context = const {},
-  }) {
-    final payload = <String, Object>{'stage': stage};
-    for (final entry in context.entries) {
-      final value = entry.value;
-      if (value != null) {
-        payload[entry.key] = value.toString();
-      }
-    }
-
-    AppLogger.warn(
-      feature: 'Support.TicketForm',
-      operation: stage,
-      message: 'Support ticket step failed',
-      context: payload,
-      error: error,
-      stackTrace: stackTrace,
-    );
-  }
 
   @override
   void initState() {
@@ -201,7 +177,7 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
     );
     final subscriptionLabel = ref.watch(
       premiumControllerProvider.select(
-        (state) => _resolveSubscriptionLabel(text, state),
+        (state) => resolveSupportTicketSubscriptionLabel(text, state),
       ),
     );
 
@@ -225,8 +201,8 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
       },
       onSubmit: () => _submit(
         scenario: scenarioData.key,
-        relatedGenerationId: _asGuidOrNull(generationId),
-        relatedPaymentId: _asGuidOrNull(paymentId),
+        relatedGenerationId: supportTicketGuidOrNull(generationId),
+        relatedPaymentId: supportTicketGuidOrNull(paymentId),
       ),
     );
   }
@@ -245,100 +221,15 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
       return;
     }
 
-    final action = await showPetMagicModalBottomSheet<_AttachmentSource>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext, bottomInset) {
-        final text = AppLocalizations.of(sheetContext);
-        final colors = sheetContext.petMagicColors;
-        return SafeArea(
-          top: false,
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset),
-            child: Material(
-              color: colors.surfaceStrong,
-              clipBehavior: Clip.antiAlias,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(28),
-                side: BorderSide(color: colors.border.withValues(alpha: 0.9)),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const SizedBox(height: 8),
-                  Container(
-                    width: 42,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: colors.border.withValues(alpha: 0.9),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        text.supportChatAddPhotoTitle,
-                        style: TextStyle(
-                          color: colors.textStrong,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ),
-                  ListTile(
-                    leading: Icon(
-                      Icons.photo_camera_outlined,
-                      color: colors.textStrong,
-                    ),
-                    title: Text(
-                      text.supportChatTakePhotoAction,
-                      style: TextStyle(color: colors.textStrong),
-                    ),
-                    onTap: () => Navigator.of(
-                      sheetContext,
-                    ).pop(_AttachmentSource.camera),
-                  ),
-                  ListTile(
-                    leading: Icon(
-                      Icons.photo_library_outlined,
-                      color: colors.textStrong,
-                    ),
-                    title: Text(
-                      text.supportChatChooseGalleryAction,
-                      style: TextStyle(color: colors.textStrong),
-                    ),
-                    onTap: () => Navigator.of(
-                      sheetContext,
-                    ).pop(_AttachmentSource.gallery),
-                  ),
-                  ListTile(
-                    leading: Icon(Icons.close_rounded, color: colors.textMuted),
-                    title: Text(
-                      text.walletRedeemCancelAction,
-                      style: TextStyle(color: colors.textSoft),
-                    ),
-                    onTap: () => Navigator.of(sheetContext).pop(),
-                  ),
-                  const SizedBox(height: 6),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-
+    final action = await showSupportTicketAttachmentSourceSheet(context);
     if (!mounted || action == null) {
       return;
     }
 
     switch (action) {
-      case _AttachmentSource.camera:
+      case SupportTicketAttachmentSource.camera:
         await _pickFromCamera();
-      case _AttachmentSource.gallery:
+      case SupportTicketAttachmentSource.gallery:
         await _pickFromGallery();
     }
   }
@@ -443,10 +334,10 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
   }
 
   Future<XFile?> _validatePickedImage(XFile picked) async {
-    final type = _resolveContentTypeForUpload(picked.path).toLowerCase();
+    final type = resolveSupportTicketContentType(picked.path).toLowerCase();
     if (type != 'image/jpeg' && type != 'image/png' && type != 'image/webp') {
       _showToast(
-        _mapSupportError(
+        mapSupportTicketError(
           AppLocalizations.of(context),
           'support.attachment_content_type_not_allowed',
         ),
@@ -489,7 +380,7 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
       _isSubmitting = true;
     });
 
-    final submitCancelToken = CancelToken();
+    final submitCancelToken = RequestCancellation();
     _submitCancelToken = submitCancelToken;
 
     try {
@@ -518,7 +409,7 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
           conversationId: conversation.conversationId,
           filePath: file.path,
           fileName: file.name,
-          contentType: _resolveContentTypeForUpload(file.path),
+          contentType: resolveSupportTicketContentType(file.path),
           localeTag: localeTag,
           cancelToken: submitCancelToken,
         );
@@ -536,13 +427,13 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
         text.supportTicketFormSuccessMessage,
         tone: PetMagicToastTone.success,
       );
-      context.go(SupportChatPage.routePath);
+      context.appNavigator.go(const SupportChatDestination());
     } catch (error, stackTrace) {
       if (!mounted) {
         return;
       }
 
-      _logSupportTicketFailure(
+      logSupportTicketFailure(
         'submit_ticket',
         error,
         stackTrace,
@@ -578,162 +469,12 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
     _submitCancelToken = null;
   }
 
-  String _resolveContentTypeForUpload(String path) {
-    final normalized = path.toLowerCase();
-    if (normalized.endsWith('.png')) {
-      return 'image/png';
-    }
-    if (normalized.endsWith('.webp')) {
-      return 'image/webp';
-    }
-    return 'image/jpeg';
-  }
-
-  String? _asGuidOrNull(String? raw) {
-    if (raw == null) {
-      return null;
-    }
-
-    final value = raw.trim();
-    final guidPattern = RegExp(
-      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
+  Future<void> _preloadSupportContext() {
+    return const SupportTicketContextPreloader().preload(
+      ref: ref,
+      isActive: () => mounted,
+      onFailure: (stage, error, stackTrace) =>
+          logSupportTicketFailure(stage, error, stackTrace),
     );
-    return guidPattern.hasMatch(value) ? value : null;
-  }
-
-  String _mapSupportError(AppLocalizations text, String code) {
-    final authMessage = mapCommonAuthFeedbackMessage(text, code);
-    if (authMessage != null) {
-      return authMessage;
-    }
-
-    final normalized = code.toLowerCase();
-    if (normalized.contains('attachment_file_too_large')) {
-      return text.supportChatAttachmentTooLargeError;
-    }
-    if (normalized.contains('attachment_file_required') ||
-        normalized.contains('attachment_file_name_required') ||
-        normalized.contains('attachment_file_name_too_long') ||
-        normalized.contains('attachment_content_type_too_long')) {
-      return text.supportChatAttachmentUnavailableError;
-    }
-    if (normalized.contains('attachment_content_type_not_allowed')) {
-      return text.supportChatAttachmentUnavailableError;
-    }
-    return text.supportChatUnavailableError;
-  }
-
-  Future<void> _preloadSupportContext() async {
-    if (!mounted) {
-      return;
-    }
-
-    if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
-      return;
-    }
-
-    if (!ref.read(networkStatusControllerProvider).hasInternet) {
-      return;
-    }
-
-    final preloadTasks = <Future<void>>[];
-
-    final generationState = ref.read(generationHistoryControllerProvider);
-    if (_shouldPreloadGenerationContext(generationState)) {
-      preloadTasks.add(
-        _preloadContextStep(
-          'preload_generation_context',
-          () => ref.read(generationHistoryControllerProvider.notifier).load(),
-        ),
-      );
-    }
-
-    final walletState = ref.read(walletControllerProvider);
-    if (_shouldPreloadWalletContext(walletState)) {
-      preloadTasks.add(
-        _preloadContextStep(
-          'preload_wallet_context',
-          () => ref.read(walletControllerProvider.notifier).load(),
-        ),
-      );
-    }
-
-    final premiumState = ref.read(premiumControllerProvider);
-    if (_shouldPreloadPremiumContext(premiumState)) {
-      preloadTasks.add(
-        _preloadContextStep(
-          'preload_premium_context',
-          () => ref.read(premiumControllerProvider.notifier).load(),
-        ),
-      );
-    }
-
-    if (preloadTasks.isEmpty) {
-      return;
-    }
-
-    await Future.wait<void>(preloadTasks);
-  }
-
-  bool _shouldPreloadGenerationContext(GenerationHistoryState state) {
-    if (state.isLoading) {
-      return false;
-    }
-
-    return state.items.isEmpty && state.cachedItemsByFilter.isEmpty;
-  }
-
-  bool _shouldPreloadWalletContext(WalletState state) {
-    if (state.isLoading || state.isRefreshing) {
-      return false;
-    }
-
-    if (state.hasCompletedFullLoad) {
-      return false;
-    }
-
-    return state.wallet == null || state.purchases.isEmpty;
-  }
-
-  bool _shouldPreloadPremiumContext(PremiumState state) {
-    if (state.isLoading) {
-      return false;
-    }
-
-    return state.status == null;
-  }
-
-  String? _resolveSubscriptionLabel(AppLocalizations text, PremiumState state) {
-    final status = state.status;
-    if (status?.isPremium != true) {
-      return null;
-    }
-
-    final planName = status?.planName?.trim();
-    if (planName != null && planName.isNotEmpty) {
-      return planName;
-    }
-
-    return text.premiumLabel;
-  }
-
-  Future<void> _preloadContextStep(
-    String stage,
-    Future<void> Function() load,
-  ) async {
-    if (!mounted) {
-      return;
-    }
-
-    try {
-      await load();
-    } catch (error, stackTrace) {
-      if (!mounted) {
-        return;
-      }
-      _logSupportTicketFailure(stage, error, stackTrace);
-    }
   }
 }
-
-enum _AttachmentSource { camera, gallery }

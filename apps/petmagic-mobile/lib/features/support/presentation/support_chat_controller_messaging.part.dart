@@ -22,7 +22,8 @@ mixin _SupportChatControllerMessagingMixin
       return false;
     }
 
-    if (conversation != null && _isConversationReadOnlyForUser(conversation)) {
+    if (conversation != null &&
+        isSupportConversationReadOnlyForUser(conversation)) {
       return false;
     }
 
@@ -136,7 +137,8 @@ mixin _SupportChatControllerMessagingMixin
     }
 
     var conversation = state.conversation;
-    if (conversation != null && _isConversationReadOnlyForUser(conversation)) {
+    if (conversation != null &&
+        isSupportConversationReadOnlyForUser(conversation)) {
       return false;
     }
 
@@ -148,7 +150,7 @@ mixin _SupportChatControllerMessagingMixin
       sendingAttachmentTotal: attachments.length,
     );
 
-    CancelToken? uploadCancelToken;
+    RequestCancellation? uploadCancelToken;
     try {
       if (conversation == null) {
         conversation = await _repository.openConversation(source: 'MobileChat');
@@ -247,7 +249,8 @@ mixin _SupportChatControllerMessagingMixin
       return false;
     }
 
-    if (conversation != null && _isConversationReadOnlyForUser(conversation)) {
+    if (conversation != null &&
+        isSupportConversationReadOnlyForUser(conversation)) {
       return false;
     }
 
@@ -259,7 +262,7 @@ mixin _SupportChatControllerMessagingMixin
       sendingAttachmentTotal: attachmentBatchTotal,
     );
 
-    CancelToken? uploadCancelToken;
+    RequestCancellation? uploadCancelToken;
     try {
       if (conversation == null) {
         conversation = await _repository.openConversation(source: 'MobileChat');
@@ -359,7 +362,7 @@ mixin _SupportChatControllerMessagingMixin
 
     state = state.copyWith(isSending: true, clearError: true);
 
-    CancelToken? uploadCancelToken;
+    RequestCancellation? uploadCancelToken;
     try {
       uploadCancelToken = _newActiveUploadCancelToken();
       final message = await _repository.retryAttachment(

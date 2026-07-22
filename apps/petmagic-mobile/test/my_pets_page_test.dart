@@ -13,7 +13,9 @@ import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/pets/presentation/my_pets_page.dart';
+import 'package:petmagic_mobile/features/pets/application/pet_repository.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
+import 'package:petmagic_mobile/features/templates/data/template_generation_pet_repository_adapter.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'my_pets_page_test_support.dart';
@@ -100,18 +102,24 @@ void main() {
     expect(source, isNot(contains('ShareParams(text: safeOutputUrl)')));
   });
 
-  test('pet form step widgets stay in a dedicated part file', () {
+  test('pet form step widgets stay in a dedicated widget file', () {
     final pageSource = File(
       'lib/features/pets/presentation/my_pets_page.dart',
     ).readAsStringSync();
     final formSource = File(
       'lib/features/pets/presentation/my_pets_form_sheet.part.dart',
     ).readAsStringSync();
+    final formStepsSource = File(
+      'lib/features/pets/presentation/widgets/pet_form_steps.dart',
+    ).readAsStringSync();
     final detailsSource = File(
       'lib/features/pets/presentation/my_pets_detail_page.part.dart',
     ).readAsStringSync();
-    final widgetsSource = File(
-      'lib/features/pets/presentation/my_pets_display_widgets.part.dart',
+    final overviewSource = File(
+      'lib/features/pets/presentation/my_pets_overview_widgets.part.dart',
+    ).readAsStringSync();
+    final photoGridSource = File(
+      'lib/features/pets/presentation/my_pets_photo_grid.part.dart',
     ).readAsStringSync();
     final actionsSource = File(
       'lib/features/pets/presentation/my_pets_photo_actions.part.dart',
@@ -119,7 +127,13 @@ void main() {
 
     expect(pageSource, contains("part 'my_pets_form_sheet.part.dart';"));
     expect(pageSource, contains("part 'my_pets_detail_page.part.dart';"));
-    expect(pageSource, contains("part 'my_pets_display_widgets.part.dart';"));
+    expect(pageSource, contains("part 'my_pets_overview_widgets.part.dart';"));
+    expect(pageSource, contains("part 'my_pets_photo_grid.part.dart';"));
+    expect(
+      pageSource,
+      contains("part 'my_pets_generation_widgets.part.dart';"),
+    );
+    expect(pageSource, contains("part 'my_pets_state_widgets.part.dart';"));
     expect(pageSource, contains("part 'my_pets_photo_actions.part.dart';"));
     expect(pageSource, isNot(contains('class _PetFormProgress')));
     expect(pageSource, isNot(contains('class _PetNameStep')));
@@ -130,15 +144,17 @@ void main() {
     expect(pageSource, isNot(contains('Future<void> _pickAndUploadPhoto')));
     expect(pageSource, isNot(contains('Future<void> _deletePhoto')));
     expect(formSource, contains("part of 'my_pets_page.dart';"));
-    expect(formSource, contains('class _PetFormProgress'));
-    expect(formSource, contains('class _PetNameStep'));
-    expect(formSource, contains('class _PetTypeStep'));
-    expect(formSource, contains('class _PetPhotoStep'));
+    expect(formSource, isNot(contains('class PetFormProgress')));
+    expect(formStepsSource, contains('class PetFormProgress'));
+    expect(formStepsSource, contains('class PetNameStep'));
+    expect(formStepsSource, contains('class PetTypeStep'));
+    expect(formStepsSource, contains('class PetPhotoStep'));
     expect(detailsSource, contains("part of 'my_pets_page.dart';"));
     expect(detailsSource, contains('class PetDetailsPage'));
-    expect(widgetsSource, contains("part of 'my_pets_page.dart';"));
-    expect(widgetsSource, contains('class _PetPhotoCard'));
-    expect(widgetsSource, contains('class _PetHeader'));
+    expect(overviewSource, contains("part of 'my_pets_page.dart';"));
+    expect(overviewSource, contains('class _PetHeader'));
+    expect(photoGridSource, contains("part of 'my_pets_page.dart';"));
+    expect(photoGridSource, contains('class _PetPhotoCard'));
     expect(actionsSource, contains("part of 'my_pets_page.dart';"));
     expect(actionsSource, contains('Future<void> _pickAndUploadPhoto'));
     expect(actionsSource, contains('Future<void> _deletePhoto'));
@@ -146,8 +162,11 @@ void main() {
     expect(formSource, contains("feature: 'Pets.Form'"));
     expect(formSource, contains("operation: 'save_pet'"));
     expect(formSource, contains('text.profileActionFailed'));
-    expect(formSource, contains('Theme.of(context).colorScheme.onPrimary'));
-    expect(formSource, isNot(contains('isActive ? Colors.black')));
+    expect(
+      formStepsSource,
+      contains('Theme.of(context).colorScheme.onPrimary'),
+    );
+    expect(formStepsSource, isNot(contains('isActive ? Colors.black')));
     expect(formSource, isNot(contains('} catch (_) {')));
   });
 
@@ -158,16 +177,19 @@ void main() {
         'lib/features/pets/presentation/my_pets_page.dart',
       ).readAsStringSync();
       final widgetsSource = File(
-        'lib/features/pets/presentation/my_pets_display_widgets.part.dart',
+        'lib/features/pets/presentation/my_pets_generation_widgets.part.dart',
       ).readAsStringSync();
 
       expect(
         pageSource,
         contains(
-          "import 'package:petmagic_mobile/features/templates/presentation/mappers/generation_status_mappers.dart';",
+          "import 'package:petmagic_mobile/features/pets/domain/pet_generation_summary.dart';",
         ),
       );
-      expect(widgetsSource, contains('statusTitle(text, generation)'));
+      expect(
+        widgetsSource,
+        contains('_petGenerationStatusTitle(text, generation)'),
+      );
       expect(
         widgetsSource,
         isNot(
@@ -410,6 +432,9 @@ void main() {
           AuthenticatedAppLaunchController.new,
         ),
         templateGenerationRepositoryProvider.overrideWithValue(repository),
+        petRepositoryProvider.overrideWithValue(
+          TemplateGenerationPetRepositoryAdapter(repository),
+        ),
         networkStatusControllerProvider.overrideWith(
           () => TestMyPetsNetworkStatusController(initialHasInternet: true),
         ),
@@ -493,6 +518,9 @@ void main() {
             AuthenticatedAppLaunchController.new,
           ),
           templateGenerationRepositoryProvider.overrideWithValue(repository),
+          petRepositoryProvider.overrideWithValue(
+            TemplateGenerationPetRepositoryAdapter(repository),
+          ),
           networkStatusControllerProvider.overrideWith(() => networkController),
         ],
       );

@@ -16,7 +16,7 @@ class PetDetailsPage extends ConsumerStatefulWidget {
 
 class _PetDetailsPageState extends ConsumerState<PetDetailsPage> {
   bool _isAddingPhoto = false;
-  CancelToken? _addPhotoCancelToken;
+  RequestCancellation? _addPhotoCancelToken;
 
   @override
   void didUpdateWidget(covariant PetDetailsPage oldWidget) {
@@ -40,7 +40,7 @@ class _PetDetailsPageState extends ConsumerState<PetDetailsPage> {
       return;
     }
 
-    final cancelToken = CancelToken();
+    final cancelToken = RequestCancellation();
     _addPhotoCancelToken = cancelToken;
     setState(() => _isAddingPhoto = true);
     unawaited(() async {
@@ -188,8 +188,9 @@ class _PetDetailsPageState extends ConsumerState<PetDetailsPage> {
                         pet: pet,
                         text: text,
                         onEdit: () => _showPetForm(context, ref, pet: pet),
-                        onGenerate: () =>
-                            context.go(_templatesWithPetLocation(pet.id)),
+                        onGenerate: () => context.appNavigator.go(
+                          TemplatesDestination(petId: pet.id),
+                        ),
                         onAddPhoto: () =>
                             _addPhoto(pet.id, currentAvatarUrl: pet.avatarUrl),
                         isAddingPhoto: _isAddingPhoto,

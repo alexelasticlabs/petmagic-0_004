@@ -2,32 +2,29 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
+import 'package:petmagic_mobile/core/files/local_media_file.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/permissions/media_permission_feedback.dart';
 import 'package:petmagic_mobile/core/performance/decoded_image_cache_budget.dart';
 import 'package:petmagic_mobile/core/performance/template_media_cache.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/pets/presentation/pet_profile_providers.dart';
-import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
-import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
-import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
-import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart';
-import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
-import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
+import 'package:petmagic_mobile/features/pets/application/pets_contract.dart';
+import 'package:petmagic_mobile/features/profile/application/profile_controller.dart';
+import 'package:petmagic_mobile/shared/auth/auth_required_sheet.dart';
+import 'package:petmagic_mobile/features/templates/application/template_generation_contract.dart';
+import 'package:petmagic_mobile/features/templates/application/template_catalog_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_entitlement_provider.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_feed_playback_manager.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_preview_page.dart';
-import 'package:petmagic_mobile/features/templates/presentation/templates_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/templates_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_card.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_flow_sheets.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_type_filters.dart';
@@ -36,11 +33,11 @@ import 'package:petmagic_mobile/features/templates/presentation/widgets/pet_gene
 import 'package:petmagic_mobile/features/templates/presentation/widgets/random_template_sheet.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/templates_search_and_fab.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/templates_top_bar.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/loading/magic_loading_screen.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
-import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_navigation_layout.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_action_sheet.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_async_state_view.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
@@ -48,12 +45,18 @@ import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_unavailable_view.dart';
 
 part 'templates_page_feed.part.dart';
+part 'templates_page_feed_slivers.part.dart';
 part 'templates_page_generation_flow.part.dart';
+part 'templates_page_pet_photo_picker.part.dart';
 part 'templates_page_lifecycle.part.dart';
 part 'templates_page_template_actions.part.dart';
+part 'templates_page_view.part.dart';
 
 class TemplatesPage extends ConsumerStatefulWidget {
-  const TemplatesPage({super.key});
+  const TemplatesPage({this.initialPetId, this.initialPetPhotoId, super.key});
+
+  final String? initialPetId;
+  final String? initialPetPhotoId;
 
   static const routePath = '/templates';
   static const petIdQueryParam = 'petId';
@@ -393,169 +396,5 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    ref.listen<NetworkStatusState>(networkStatusControllerProvider, (
-      previous,
-      next,
-    ) {
-      if (previous?.hasInternet != false || !next.hasInternet || !mounted) {
-        return;
-      }
-
-      if (_shouldRefreshAccessOnReconnect) {
-        _refreshAccessForAuthenticatedUser(forceRefresh: true);
-      }
-
-      final state = ref.read(templatesControllerProvider);
-      if (state.items.isNotEmpty || state.isInitialLoading) {
-        return;
-      }
-      if (classifyAppUnavailable(
-            raw: state.errorMessage,
-            hasInternet: next.hasInternet,
-          ) ==
-          null) {
-        return;
-      }
-
-      unawaited(_refreshFeed(forceRefresh: true));
-    });
-    ref.listen<String?>(
-      templatesControllerProvider.select((state) => state.query.search),
-      (previous, next) => _syncSearchFieldWithQuery(next),
-    );
-    final headerState = ref.watch(
-      templatesControllerProvider.select(
-        (state) => (
-          query: state.query,
-          categories: state.categories,
-          templateOfTheDay: state.templateOfTheDay,
-          isTemplateOfTheDayLoading: state.isTemplateOfTheDayLoading,
-          templateOfTheDayError: state.templateOfTheDayError,
-          isInitialLoading: state.isInitialLoading,
-        ),
-      ),
-    );
-    final controller = ref.read(templatesControllerProvider.notifier);
-    final text = AppLocalizations.of(context);
-    final colors = context.petMagicColors;
-    final titleStyle = Theme.of(context).textTheme.titleLarge;
-    final subtitleStyle = Theme.of(context).textTheme.bodySmall;
-    final bottomInset = petMagicScrollableBottomInset(context);
-    final templateOfTheDay = headerState.templateOfTheDay;
-    final selectedPetId = _routeQueryParameter(context, 'petId');
-    final selectedPetPhotoId = _routeQueryParameter(context, 'petPhotoId');
-    _trackTemplateOfTheDayViewed(templateOfTheDay);
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [colors.backgroundTop, colors.backgroundBottom],
-        ),
-      ),
-      child: Stack(
-        children: [
-          RefreshIndicator.adaptive(
-            onRefresh: () async {
-              await PetMagicHaptics.medium();
-              await controller.refresh();
-            },
-            color: colors.accent,
-            child: CustomScrollView(
-              scrollCacheExtent: ScrollCacheExtent.pixels(_gridCacheExtent),
-              controller: _scrollController,
-              physics: const BouncingScrollPhysics(
-                parent: AlwaysScrollableScrollPhysics(),
-              ),
-              slivers: [
-                SliverToBoxAdapter(
-                  child: SafeArea(
-                    bottom: false,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(10, 6, 10, 1),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          TemplatesTopBarSlot(
-                            onAuthPressed: () => context.go(
-                              '${AuthEntryPage.routePath}?redirect=${Uri.encodeQueryComponent(_templatesPageLocation(context))}',
-                            ),
-                            onRewardsPressed: () =>
-                                context.go(RewardsPage.routePath),
-                            onTopUpPressed: () =>
-                                context.push(WalletPage.routePath),
-                            onWalletPressed: () =>
-                                context.push(WalletPage.routePath),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            text.createMagicTitle,
-                            style: titleStyle?.copyWith(
-                              color: colors.textStrong,
-                              fontSize: 17,
-                              height: 1.08,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            text.pickTemplateSubtitle,
-                            style: subtitleStyle?.copyWith(
-                              color: colors.textSoft,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          CreateWithPetBlockSlot(
-                            selectedPetId: selectedPetId,
-                            selectedPetPhotoId: selectedPetPhotoId,
-                          ),
-                          const SizedBox(height: 5),
-                          TemplatesSearchField(
-                            controller: _searchController,
-                            onChanged: _handleSearchChanged,
-                          ),
-                          const SizedBox(height: 6),
-                          TemplateTypeFilters(
-                            selectedType: headerState.query.type,
-                            categories: headerState.categories,
-                            selectedCategory: headerState.query.category,
-                            onTypeSelected: controller.setType,
-                            onCategorySelected: controller.setCategory,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                _TemplateFeedSlivers(
-                  bottomInset: bottomInset,
-                  templateOfTheDay: templateOfTheDay,
-                  selectedType: headerState.query.type,
-                  selectedCategory: headerState.query.category,
-                  searchQuery: headerState.query.search,
-                  onTemplateSelected: (template) =>
-                      unawaited(_handleTemplateSelected(template)),
-                  onTemplateOfTheDaySelected: (featured) =>
-                      unawaited(_handleTemplateOfTheDaySelected(featured)),
-                ),
-              ],
-            ),
-          ),
-          Positioned(
-            right: 16,
-            bottom: petMagicBottomNavInset(context, extraSpacing: 24),
-            child: FloatingRandomTemplateButton(
-              isLoading: _isRandomTemplateLoading,
-              isEnabled: !headerState.isInitialLoading,
-              onPressed: _handleRandomTemplatePressed,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => _buildTemplatesPage(context);
 }

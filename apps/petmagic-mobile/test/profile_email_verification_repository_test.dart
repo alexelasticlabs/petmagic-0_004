@@ -1,7 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 
 void main() {

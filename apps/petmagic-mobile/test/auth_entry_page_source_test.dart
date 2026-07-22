@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 
 void main() {
   test('auth redirect paths are constrained to safe internal routes', () {

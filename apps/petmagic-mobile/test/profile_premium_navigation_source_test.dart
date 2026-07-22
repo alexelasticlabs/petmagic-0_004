@@ -4,9 +4,10 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('only active subscriptions can open subscription management', () {
-    final source = File(
+    final source = [
       'lib/features/profile/presentation/profile_page.dart',
-    ).readAsStringSync();
+      'lib/features/profile/presentation/profile_page_view.part.dart',
+    ].map((path) => File(path).readAsStringSync()).join('\n');
 
     expect(
       source,

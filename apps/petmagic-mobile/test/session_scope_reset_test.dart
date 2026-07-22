@@ -5,17 +5,18 @@ import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/notifications/push_token_registration_cache.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/core/startup/session_scope_reset.dart';
-import 'package:petmagic_mobile/features/gamification/data/gamification_models.dart';
+import 'package:petmagic_mobile/app/session/session_scope_reset.dart';
+import 'package:petmagic_mobile/features/gamification/domain/gamification_models.dart';
 import 'package:petmagic_mobile/features/gamification/data/gamification_repository.dart';
-import 'package:petmagic_mobile/features/gamification/presentation/gamification_providers.dart';
-import 'package:petmagic_mobile/features/pets/presentation/pet_profile_providers.dart';
+import 'package:petmagic_mobile/features/gamification/application/gamification_providers.dart';
+import 'package:petmagic_mobile/features/pets/application/pet_profile_providers.dart';
+import 'package:petmagic_mobile/features/pets/domain/pet_generation_summary.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_realtime_client.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_gallery_store.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
@@ -173,7 +174,7 @@ void main() {
         fireImmediately: true,
       );
       final generationsSubscription = container
-          .listen<AsyncValue<List<TemplateGenerationResult>>>(
+          .listen<AsyncValue<List<PetGenerationSummary>>>(
             petGenerationsProvider('pet-1'),
             (_, _) {},
             fireImmediately: true,
@@ -257,6 +258,9 @@ void main() {
         overrides: [
           authSessionStorageProvider.overrideWithValue(
             _SignedOutAuthSessionStorage(),
+          ),
+          supportChatRealtimeClientProvider.overrideWith(
+            bindSignalRSupportRealtimeGateway,
           ),
           sessionMediaCacheCleanerProvider.overrideWithValue(() async {}),
         ],
@@ -548,16 +552,13 @@ class _NoopGenerationGalleryStore extends GenerationGalleryStore {
   Future<void> purgeAllScopes() async {}
 }
 
-class FakeGamificationRepository extends GamificationRepository {
-  FakeGamificationRepository()
-    : super(dio: Dio(), sessionStorage: AuthSessionStorage());
-
+class FakeGamificationRepository implements GamificationRepository {
   int summaryFetchCount = 0;
   int achievementsFetchCount = 0;
 
   @override
   Future<GamificationSummaryModel> fetchSummary({
-    CancelToken? cancelToken,
+    RequestCancellation? cancellation,
   }) async {
     summaryFetchCount++;
     return GamificationSummaryModel(
@@ -613,7 +614,7 @@ class FakeGamificationRepository extends GamificationRepository {
 
   @override
   Future<List<AchievementModel>> fetchAchievements({
-    CancelToken? cancelToken,
+    RequestCancellation? cancellation,
   }) async {
     achievementsFetchCount++;
     return const [

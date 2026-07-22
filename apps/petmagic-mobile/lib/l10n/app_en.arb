@@ -1,5 +1,12 @@
 {
   "@@locale": "en",
+  "navDiscover": "Discover",
+  "navCreate": "Create",
+  "createHubTitle": "Create pet magic",
+  "createHubSubtitle": "Start with a template or your pet. We will guide you through the rest.",
+  "createHubBrowseAction": "Browse templates",
+  "createHubPetsAction": "Choose my pet",
+  "createHubGuestHint": "You can explore first. Your creation intent is preserved when sign-in is required.",
   "navTemplates": "Templates",
   "navCreations": "Gallery",
   "navRewards": "Rewards",

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -10,7 +11,7 @@ import 'package:petmagic_mobile/features/templates/data/generation_gallery_store
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -32,8 +33,12 @@ String readGenerationStatusLibrarySource() {
   const files = [
     'lib/features/templates/presentation/generation_status_page.dart',
     'lib/features/templates/presentation/generation_status_page_lifecycle.part.dart',
+    'lib/features/templates/presentation/generation_status_page_recovery.part.dart',
+    'lib/features/templates/presentation/generation_status_page_view.part.dart',
     'lib/features/templates/presentation/generation_status_page_media_actions.part.dart',
+    'lib/features/templates/presentation/generation_status_page_actions_sheet.part.dart',
     'lib/features/templates/presentation/generation_status_page_result_actions.part.dart',
+    'lib/features/templates/presentation/generation_status_page_result_action_copy.part.dart',
     'lib/features/templates/presentation/generation_status_page_feedback_actions.part.dart',
   ];
 
@@ -45,7 +50,9 @@ String readGenerationStatusSectionsLibrarySource() {
     'lib/features/templates/presentation/generation_status_page_sections.dart',
     'lib/features/templates/presentation/generation_status_page_active_card.part.dart',
     'lib/features/templates/presentation/generation_status_page_active_chrome.part.dart',
-    'lib/features/templates/presentation/generation_status_page_result_sections.part.dart',
+    'lib/features/templates/presentation/generation_status_page_result_cards.part.dart',
+    'lib/features/templates/presentation/generation_status_page_result_action_widgets.part.dart',
+    'lib/features/templates/presentation/generation_status_page_result_details.part.dart',
   ];
 
   return files.map((path) => File(path).readAsStringSync()).join('\n');
@@ -84,7 +91,7 @@ class FakeGenerationStatusTemplateGenerationRepository
   Future<TemplateGenerationResult> fetchGeneration(
     String generationId, {
     String? correlationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     fetchGenerationCalls++;
     return generation;
@@ -101,7 +108,7 @@ class FakeGenerationStatusTemplateGenerationRepository
   Future<GenerationCancelResult> cancelGeneration(
     String generationId, {
     String? correlationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     cancelGenerationCalls++;
     final error = cancelError;
@@ -122,7 +129,7 @@ class FakeGenerationStatusTemplateGenerationRepository
   @override
   Future<GenerationMediaAccessResult> fetchDownloadUrl(
     String generationId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     fetchDownloadCalls++;
     return GenerationMediaAccessResult(
@@ -135,7 +142,7 @@ class FakeGenerationStatusTemplateGenerationRepository
   @override
   Future<GenerationMediaAccessResult> fetchShareUrl(
     String generationId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     fetchShareCalls++;
     return GenerationMediaAccessResult(
@@ -151,22 +158,13 @@ class FakeGenerationStatusTemplateGenerationRepository
   Future<RemoveGenerationWatermarkResult> removeWatermark(
     String generationId, {
     String paymentMethod = 'credit',
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     removeWatermarkCalls.add(generationId);
     if (removeWatermarkStatusCode != null) {
-      throw DioException.badResponse(
-        statusCode: removeWatermarkStatusCode!,
-        requestOptions: RequestOptions(
-          path: '/api/templates/generations/$generationId/remove-watermark',
-        ),
-        response: Response<Map<String, Object?>>(
-          requestOptions: RequestOptions(
-            path: '/api/templates/generations/$generationId/remove-watermark',
-          ),
-          statusCode: removeWatermarkStatusCode,
-          data: const {'title': 'economy.insufficient_balance'},
-        ),
+      throw AppException(
+        'economy.insufficient_balance',
+        statusCode: removeWatermarkStatusCode,
       );
     }
 
@@ -191,7 +189,7 @@ class FakeGenerationStatusTemplateGenerationRepository
     required String eventType,
     String? generationId,
     Map<String, Object?> metadata = const {},
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     analyticsEvents.add(eventType);
     analyticsCalls.add(
@@ -228,24 +226,21 @@ class DelayedLoadGenerationStatusTemplateGenerationRepository
         preferences: SharedPreferencesAsync(),
       );
 
-  final fetchStarted = Completer<CancelToken>();
+  final fetchStarted = Completer<RequestCancellation>();
 
   @override
   Future<TemplateGenerationResult> fetchGeneration(
     String generationId, {
     String? correlationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
-    final token = cancelToken ?? CancelToken();
+    final token = cancelToken ?? RequestCancellation();
     if (!fetchStarted.isCompleted) {
       fetchStarted.complete(token);
     }
 
     await token.whenCancel;
-    throw DioException.requestCancelled(
-      requestOptions: RequestOptions(path: ''),
-      reason: 'generation_status_load_cancelled',
-    );
+    throw const RequestCancelledException('generation_status_load_cancelled');
   }
 }
 
@@ -317,14 +312,14 @@ class TrackingGenerationStatusHistoryController
 
 class DelayedGenerationStatusMediaActions extends GenerationStatusMediaActions {
   final shareStarted = Completer<void>();
-  CancelToken? shareCancelToken;
+  RequestCancellation? shareCancelToken;
 
   @override
   Future<void> share({
     required String mediaUrl,
     required String fileName,
     required String title,
-    required CancelToken cancelToken,
+    required RequestCancellation cancelToken,
     String? shareText,
     String? localPath,
   }) {
@@ -352,7 +347,7 @@ class RecordingGenerationStatusMediaActions
     required String fileName,
     required bool isVideo,
     required String albumName,
-    required CancelToken cancelToken,
+    required RequestCancellation cancelToken,
     String? localPath,
   }) async {
     saveCalls++;
@@ -366,7 +361,7 @@ class RecordingGenerationStatusMediaActions
     required String mediaUrl,
     required String fileName,
     required String title,
-    required CancelToken cancelToken,
+    required RequestCancellation cancelToken,
     String? shareText,
     String? localPath,
   }) async {

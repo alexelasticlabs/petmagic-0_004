@@ -7,9 +7,10 @@ void main() {
     final previewSource = File(
       'lib/features/support/presentation/widgets/support_chat_actions_preview.part.dart',
     ).readAsStringSync();
-    final messagesSource = File(
+    final messagesSource = [
       'lib/features/support/presentation/widgets/support_chat_messages.part.dart',
-    ).readAsStringSync();
+      'lib/features/support/presentation/widgets/support_chat_message_bubbles.part.dart',
+    ].map((path) => File(path).readAsStringSync()).join('\n');
     final headerSource = File(
       'lib/features/support/presentation/widgets/support_chat_header.part.dart',
     ).readAsStringSync();
@@ -35,7 +36,7 @@ void main() {
     expect(
       messagesSource,
       contains(
-        'NumberFormat.decimalPatternDigits(\n      locale: localeTag,\n      decimalDigits: 1,',
+        'NumberFormat.decimalPatternDigits(\n    locale: localeTag,\n    decimalDigits: 1,',
       ),
     );
     expect(

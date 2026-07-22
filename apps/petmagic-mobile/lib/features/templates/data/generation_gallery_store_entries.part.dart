@@ -15,17 +15,17 @@ Future<GenerationGalleryMediaRecord> _galleryUpsertReadyItem(
 
   final entries = await _galleryReadEntriesForScope(store, accountScope);
   final existing = _galleryFindEntry(entries, generation.generationId);
-  final previewRemoteUrl = _previewUrl(generation);
-  final outputRemoteUrl = _safeMediaUrl(generation.outputUrl);
+  final previewRemoteUrl = galleryPreviewUrl(generation);
+  final outputRemoteUrl = gallerySafeMediaUrl(generation.outputUrl);
   final hasRemoteMedia = previewRemoteUrl != null || outputRemoteUrl != null;
   final canReuseLocalMedia =
       hasRemoteMedia &&
       existing != null &&
-      _gallerySafeNullableMediaUriEquals(
+      GenerationGalleryStorageCodec.safeNullableMediaUriEquals(
         existing.previewRemoteUrl,
         previewRemoteUrl,
       ) &&
-      _gallerySafeNullableMediaUriEquals(
+      GenerationGalleryStorageCodec.safeNullableMediaUriEquals(
         existing.outputRemoteUrl,
         outputRemoteUrl,
       );
@@ -96,8 +96,7 @@ Future<List<GenerationGalleryMediaRecord>> _galleryReadEntriesForScope(
       }
       return const [];
     }
-    final entries = await _gallerySanitizeLocalPathsForScope(
-      store,
+    final entries = await store._storageCodec.sanitizeLocalPaths(
       accountScope,
       decoded
           .whereType<Map>()
@@ -109,7 +108,7 @@ Future<List<GenerationGalleryMediaRecord>> _galleryReadEntriesForScope(
           )
           .toList(growable: false),
     );
-    final sanitizedRaw = await _galleryEncodeEntriesForStorage(store, entries);
+    final sanitizedRaw = await store._storageCodec.encode(entries);
     if (sanitizedRaw != raw) {
       await _galleryRewriteSanitizedEntriesForScope(
         store,
@@ -141,7 +140,7 @@ Future<void> _galleryRewriteSanitizedEntriesForScope(
 ) async {
   await store._preferences.setString(
     _galleryEntriesKeyForScope(accountScope),
-    await _galleryEncodeEntriesForStorage(store, entries),
+    await store._storageCodec.encode(entries),
   );
 }
 
@@ -172,7 +171,7 @@ Future<void> _galleryWriteEntriesForScope(
     );
     await store._preferences.setString(
       _galleryEntriesKeyForScope(accountScope),
-      await _galleryEncodeEntriesForStorage(store, prunedEntries),
+      await store._storageCodec.encode(prunedEntries),
     );
   } on Object catch (error, stackTrace) {
     _galleryLogStoreFailure(store, 'write_entries', error, stackTrace);
@@ -198,7 +197,7 @@ Future<List<GenerationGalleryMediaRecord>> _galleryPruneEntriesForScope(
   final activeDownloadIds = ordered
       .where(
         (entry) => store._downloadCancelTokens.containsKey(
-          _downloadKey(accountScope, entry.generationId),
+          galleryDownloadKey(accountScope, entry.generationId),
         ),
       )
       .map((entry) => entry.generationId)
@@ -232,8 +231,7 @@ Future<List<GenerationGalleryMediaRecord>> _galleryPruneEntriesForScope(
       continue;
     }
     if (!entry.isDeletedLocally) {
-      await _galleryDeleteGenerationDirectory(
-        store,
+      await store._fileStorage.deleteGenerationDirectory(
         accountScope,
         entry.generationId,
       );
@@ -245,8 +243,7 @@ Future<List<GenerationGalleryMediaRecord>> _galleryPruneEntriesForScope(
     accountScope,
     retained,
   );
-  await _galleryCleanupScopeArtifactsForKnownIds(
-    store,
+  await store._cleanupScopeArtifactsForKnownIds(
     accountScope,
     bytePruned.map((entry) => entry.generationId).toSet(),
   );
@@ -271,9 +268,9 @@ Future<List<GenerationGalleryMediaRecord>> _galleryPruneRetainedEntriesByBytes(
   final updated = <GenerationGalleryMediaRecord>[];
   for (final entry in retained) {
     final isActiveDownload = store._downloadCancelTokens.containsKey(
-      _downloadKey(accountScope, entry.generationId),
+      galleryDownloadKey(accountScope, entry.generationId),
     );
-    final localBytes = await _galleryCalculateLocalBytes([
+    final localBytes = await GenerationGalleryFileStorage.calculateLocalBytes([
       entry.previewLocalPath,
       entry.outputLocalPath,
     ]);
@@ -287,14 +284,12 @@ Future<List<GenerationGalleryMediaRecord>> _galleryPruneRetainedEntriesByBytes(
       continue;
     }
 
-    await _galleryDeleteLocalPath(
-      store,
+    await store._fileStorage.deleteLocalPath(
       accountScope,
       entry.generationId,
       entry.previewLocalPath,
     );
-    await _galleryDeleteLocalPath(
-      store,
+    await store._fileStorage.deleteLocalPath(
       accountScope,
       entry.generationId,
       entry.outputLocalPath,
@@ -356,147 +351,4 @@ GenerationGalleryMediaRecord? _galleryFindEntry(
     }
   }
   return null;
-}
-
-String _galleryEntriesKeyForScope(String accountScope) {
-  return '${GenerationGalleryStore._entriesKeyPrefix}'
-      '${_galleryScopeStorageFingerprint(accountScope)}';
-}
-
-String _galleryLegacyEntriesKeyForScope(String accountScope) {
-  return '${GenerationGalleryStore._legacyEntriesKeyPrefix}$accountScope';
-}
-
-String _galleryScopeStorageFingerprint(String accountScope) {
-  final normalized = accountScope.trim().toLowerCase();
-  return sha256.convert(utf8.encode(normalized)).toString();
-}
-
-String _galleryScopeStorageSegment(String accountScope) {
-  return 'scope_${_galleryScopeStorageFingerprint(accountScope)}';
-}
-
-Future<Set<String>> _galleryReadKnownAccountScopes(
-  GenerationGalleryStore store,
-) async {
-  try {
-    final keys = await store._preferences.getKeys();
-    final scopes = <String>{};
-    final entryKeys = keys
-        .where(
-          (key) =>
-              key.startsWith(GenerationGalleryStore._entriesKeyPrefix) ||
-              key.startsWith(GenerationGalleryStore._legacyEntriesKeyPrefix),
-        )
-        .toList(growable: false);
-    for (final key in entryKeys) {
-      final raw = await store._preferences.getString(key);
-      if (raw == null || raw.isEmpty) {
-        if (key.startsWith(GenerationGalleryStore._legacyEntriesKeyPrefix)) {
-          final legacyScope = key.substring(
-            GenerationGalleryStore._legacyEntriesKeyPrefix.length,
-          );
-          if (legacyScope.trim().isNotEmpty) {
-            scopes.add(legacyScope);
-          }
-        }
-        continue;
-      }
-      try {
-        final decoded = jsonDecode(raw);
-        if (decoded is List) {
-          for (final entry in decoded.whereType<Map>()) {
-            final scope = entry['accountScope'] as String?;
-            if (scope != null && scope.trim().isNotEmpty) {
-              scopes.add(scope);
-            }
-          }
-        }
-      } on Object {
-        if (key.startsWith(GenerationGalleryStore._legacyEntriesKeyPrefix)) {
-          final legacyScope = key.substring(
-            GenerationGalleryStore._legacyEntriesKeyPrefix.length,
-          );
-          if (legacyScope.trim().isNotEmpty) {
-            scopes.add(legacyScope);
-          }
-        }
-      }
-    }
-    return scopes;
-  } on Object catch (error, stackTrace) {
-    _galleryLogStoreFailure(
-      store,
-      'read_known_account_scopes',
-      error,
-      stackTrace,
-    );
-    final entries = await _galleryReadEntries(store);
-    return entries.map((entry) => entry.accountScope).toSet();
-  }
-}
-
-String? _galleryResolveAccountScope(String? rawUserId) {
-  final value = rawUserId?.trim();
-  return value == null || value.isEmpty ? null : value;
-}
-
-Future<void> _galleryPurgeCurrentAccountScope(
-  GenerationGalleryStore store,
-) async {
-  final accountScope = await store.readCurrentAccountScope();
-  if (accountScope == null) {
-    await _galleryPurgeAllScopes(store);
-    return;
-  }
-
-  await _galleryPurgeScope(store, accountScope);
-}
-
-Future<void> _galleryPurgeAllScopes(GenerationGalleryStore store) async {
-  await _galleryCancelActiveDownloads(store);
-  try {
-    final keys = await store._preferences.getKeys();
-    final removableKeys = keys
-        .where(
-          (key) =>
-              key.startsWith(GenerationGalleryStore._entriesKeyPrefix) ||
-              key.startsWith(GenerationGalleryStore._legacyEntriesKeyPrefix),
-        )
-        .toList(growable: false);
-    for (final key in removableKeys) {
-      await store._preferences.remove(key);
-    }
-  } on Object catch (error, stackTrace) {
-    _galleryLogStoreFailure(store, 'purge_all_scope_keys', error, stackTrace);
-    final scopes = await _galleryReadKnownAccountScopes(store);
-    for (final scope in scopes) {
-      await store._preferences.remove(_galleryEntriesKeyForScope(scope));
-      await store._preferences.remove(_galleryLegacyEntriesKeyForScope(scope));
-    }
-  }
-  await _galleryDeleteRootDirectory(store);
-}
-
-Future<void> _galleryCleanupCurrentAccountArtifacts(
-  GenerationGalleryStore store,
-) async {
-  final accountScope = await store.readCurrentAccountScope();
-  if (accountScope == null) {
-    return;
-  }
-
-  await _galleryCleanupScopeArtifacts(store, accountScope);
-}
-
-Future<void> _galleryPurgeScope(
-  GenerationGalleryStore store,
-  String accountScope,
-) async {
-  await _galleryCancelActiveDownloads(store);
-  await store._preferences.remove(_galleryEntriesKeyForScope(accountScope));
-  await store._preferences.remove(
-    _galleryLegacyEntriesKeyForScope(accountScope),
-  );
-  await _galleryDeleteScopeDirectory(store, accountScope);
 }

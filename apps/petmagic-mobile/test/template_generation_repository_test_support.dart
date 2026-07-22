@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -6,7 +7,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/shared/files/image_upload_optimizer.dart';
 
 Future<void> safeDeleteTempDir(Directory dir) async {
@@ -209,7 +209,7 @@ class FakeImageUploadOptimizer extends ImageUploadOptimizer {
   @override
   Future<OptimizedUploadFile> optimizeGenerationSource(
     XFile source, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     generationSourceOptimizeCalls++;
     final file = generationSource;
@@ -225,7 +225,7 @@ class FakeImageUploadOptimizer extends ImageUploadOptimizer {
   @override
   Future<OptimizedUploadFile> optimizeForPetPhoto(
     XFile source, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     petPhotoOptimizeCalls++;
     final file = petPhoto;

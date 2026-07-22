@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -12,16 +13,16 @@ import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/permissions/app_permission_coordinator.dart';
 import 'package:petmagic_mobile/core/permissions/media_permission_feedback.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
+import 'package:petmagic_mobile/features/premium/domain/premium_models.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
-import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
-import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
+import 'package:petmagic_mobile/features/premium/application/premium_controller.dart';
+import 'package:petmagic_mobile/features/support/domain/support_chat_models.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_ticket_form_page.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
-import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/generation_history_controller.dart';
+import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'test_permission_fakes.dart';
@@ -811,7 +812,7 @@ class _DelayedSupportChatRepository extends SupportChatRepository {
 
   final openStarted = Completer<void>();
   final _openCompleter = Completer<SupportChatConversation>();
-  CancelToken? openCancelToken;
+  RequestCancellation? openCancelToken;
   int sendAttachmentCalls = 0;
 
   @override
@@ -822,7 +823,7 @@ class _DelayedSupportChatRepository extends SupportChatRepository {
     String? relatedGenerationId,
     String? relatedPaymentId,
     String? relatedSubscriptionId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) {
     openCancelToken = cancelToken;
     if (!openStarted.isCompleted) {
@@ -845,7 +846,7 @@ class _DelayedSupportChatRepository extends SupportChatRepository {
     String? body,
     String? replyToMessageId,
     ProgressCallback? onSendProgress,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     sendAttachmentCalls += 1;
     return SupportChatMessage(

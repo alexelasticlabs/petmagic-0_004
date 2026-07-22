@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generations_gallery_page.dart';
 import 'generations_gallery_page_test_support.dart';
 
@@ -270,7 +270,7 @@ void main() {
     () {
       final source = File(
         'lib/features/templates/presentation/'
-        'generations_gallery_page_states_and_actions.dart',
+        'generations_gallery_page_media_actions.dart',
       ).readAsStringSync();
       final saveBody = source.substring(
         source.indexOf('Future<void> _saveGenerationToGallery'),

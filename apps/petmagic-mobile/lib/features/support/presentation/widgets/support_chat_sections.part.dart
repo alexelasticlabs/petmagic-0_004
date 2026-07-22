@@ -158,7 +158,9 @@ class _SupportConversationViewport extends StatelessWidget {
                         ? text.profileLegalAcceptAction
                         : text.retryAction,
                     onAction: legalAcceptanceRequired
-                        ? () => context.go(LegalAcceptanceGatePage.routePath)
+                        ? () => context.appNavigator.go(
+                            const LegalAcceptanceDestination(),
+                          )
                         : onRetryInitialize,
                   );
                 },

@@ -9,8 +9,8 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/features/startup/presentation/guest_welcome_page.dart';
 import 'package:petmagic_mobile/features/startup/presentation/widgets/startup_chrome.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
-import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/features/templates/application/generation_history_controller.dart';
+import 'package:petmagic_mobile/app/shell/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
 import 'package:petmagic_mobile/shared/widgets/network_status_banner.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_action_sheet.dart';
@@ -73,6 +73,48 @@ void main() {
 
     expect(find.byType(BackdropFilter), findsNothing);
     debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('five-tab shell exposes one TalkBack label per destination', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final semantics = tester.ensureSemantics();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          generationHistoryControllerProvider.overrideWith(
+            _IdleGenerationHistoryController.new,
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const PetMagicShell(
+            location: '/templates',
+            child: SizedBox.expand(),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final text = AppLocalizations.of(
+      tester.element(find.byType(PetMagicShell)),
+    );
+    for (final label in [
+      text.navDiscover,
+      text.navCreate,
+      text.navCreations,
+      text.navRewards,
+      text.navProfile,
+    ]) {
+      expect(tester.getSemantics(find.bySemanticsLabel(label)).label, label);
+    }
+    semantics.dispose();
   });
 
   testWidgets('iOS shell keeps glass backdrop when motion is allowed', (

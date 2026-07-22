@@ -72,6 +72,8 @@ const sameValueAllowlistByLocale = <String, Set<String>>{
     ..._sharedProductAndTechnicalKeys,
     'generationStatusWaitMinutes',
     'mediaPauseAction',
+    'profileAccountRoleAdmin',
+    'profileAccountRoleModerator',
   },
   'es': {..._sharedProductAndTechnicalKeys, 'generationStatusWaitMinutes'},
   'fr': {
@@ -82,7 +84,12 @@ const sameValueAllowlistByLocale = <String, Set<String>>{
     'profileNotificationsDeviceMicrophone',
   },
   'it': {..._sharedProductAndTechnicalKeys, 'generationStatusWaitMinutes'},
-  'pl': {..._sharedProductAndTechnicalKeys, 'generationStatusWaitMinutes'},
+  'pl': {
+    ..._sharedProductAndTechnicalKeys,
+    'generationStatusWaitMinutes',
+    'profileAccountRoleAdmin',
+    'profileAccountRoleModerator',
+  },
 };
 
 bool isSameValueAllowed(String locale, String key) {

@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/files/local_media_file.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
@@ -34,15 +35,22 @@ void main() {
   });
 
   test('sanitizes source image multipart filename without path fragments', () {
-    final source = File(
-      'lib/features/templates/data/template_generation_repository.dart',
+    final uploadSource = File(
+      'lib/features/templates/data/generation_source_upload_preparer.dart',
     ).readAsStringSync();
-    final startBody = methodBody(source, 'startGeneration');
-    final filenameBody = methodBody(source, '_safeSourceImageFileName');
+    final transportSource = File(
+      'lib/features/templates/data/generation_remote_data_source.dart',
+    ).readAsStringSync();
+    final supportSource = File(
+      'lib/features/templates/data/template_image_upload_support.dart',
+    ).readAsStringSync();
+    final prepareBody = methodBody(uploadSource, 'prepare');
+    final startBody = methodBody(transportSource, 'startGeneration');
+    final filenameBody = methodBody(supportSource, 'safeFileName');
 
-    expect(startBody, contains('_safeSourceImageFileName(rawFileName)'));
-    expect(startBody, contains('_safeSourceImageFileName(uploadRawFileName)'));
-    expect(startBody, contains('filename: uploadFileName'));
+    expect(prepareBody, contains('_fileName(sourceImage.name'));
+    expect(prepareBody, contains('_fileName(uploadFile.name'));
+    expect(startBody, contains('filename: prepared.fileName'));
     expect(filenameBody, contains("replaceAll(r'\\', '/')"));
     expect(filenameBody, contains("split('/')"));
     expect(filenameBody, contains('sanitizeFileName('));
@@ -51,12 +59,15 @@ void main() {
   });
 
   test('keeps pet generation and pet profile request contracts stable', () {
-    final source = File(
-      'lib/features/templates/data/template_generation_repository.dart',
+    final generationSource = File(
+      'lib/features/templates/data/generation_remote_data_source.dart',
     ).readAsStringSync();
-    final fromPetBody = methodBody(source, 'startGenerationFromPet');
-    final createPetBody = methodBody(source, 'createPet');
-    final updatePetBody = methodBody(source, 'updatePet');
+    final petSource = File(
+      'lib/features/templates/data/pet_profile_remote_data_source.dart',
+    ).readAsStringSync();
+    final fromPetBody = methodBody(generationSource, 'startGenerationFromPet');
+    final createPetBody = methodBody(petSource, 'createPet');
+    final updatePetBody = methodBody(petSource, 'updatePet');
 
     expect(fromPetBody, contains("'/api/templates/generations/from-pet'"));
     expect(fromPetBody, contains("'Idempotency-Key': idempotencyKey"));
@@ -177,7 +188,7 @@ void main() {
 
     final generation = await repository.startGeneration(
       templateId: templateId,
-      sourceImage: XFile(file.path, name: 'source.jpg'),
+      sourceImage: LocalMediaFile(path: file.path, name: 'source.jpg'),
       correlationId: 'corr-1',
     );
 
@@ -224,8 +235,8 @@ void main() {
 
     await repository.startGeneration(
       templateId: 'template-1',
-      sourceImage: XFile(
-        source.path,
+      sourceImage: LocalMediaFile(
+        path: source.path,
         name: 'source.bin',
         mimeType: 'image/png',
       ),
@@ -542,15 +553,13 @@ void main() {
     final repositorySource = File(
       'lib/features/templates/data/template_generation_repository.dart',
     ).readAsStringSync();
-    final cacheSource = File(
-      'lib/features/templates/data/template_generation_repository_cache.part.dart',
-    ).readAsStringSync();
-    final controllerSource = File(
+    final controllerSource = [
       'lib/features/templates/presentation/template_generation_controller.dart',
-    ).readAsStringSync();
+      'lib/features/templates/presentation/template_generation_policy.dart',
+    ].map((path) => File(path).readAsStringSync()).join('\n');
 
     expect(repositorySource, contains('request_identity.dart'));
-    expect(cacheSource, contains('RequestIdentity.createCorrelationId()'));
+    expect(repositorySource, contains('RequestIdentity.createCorrelationId()'));
     expect(controllerSource, contains('RequestIdentity.createCorrelationId()'));
     expect(repositorySource, isNot(contains('Random.secure()')));
     expect(controllerSource, isNot(contains('Random.secure()')));
@@ -578,7 +587,10 @@ void main() {
       await expectLater(
         repository.startGeneration(
           templateId: 'template-1',
-          sourceImage: XFile(missingPath, name: 'missing-pet.jpg'),
+          sourceImage: LocalMediaFile(
+            path: missingPath,
+            name: 'missing-pet.jpg',
+          ),
         ),
         throwsA(
           isA<AppException>()
@@ -628,8 +640,8 @@ void main() {
     await expectLater(
       repository.startGeneration(
         templateId: 'template-1',
-        sourceImage: XFile(
-          file.path,
+        sourceImage: LocalMediaFile(
+          path: file.path,
           name: 'spoofed-pet.jpg',
           mimeType: 'image/jpeg',
         ),
@@ -683,8 +695,8 @@ void main() {
       await expectLater(
         repository.startGeneration(
           templateId: 'template-1',
-          sourceImage: XFile(
-            source.path,
+          sourceImage: LocalMediaFile(
+            path: source.path,
             name: 'source.jpg',
             mimeType: 'image/jpeg',
           ),

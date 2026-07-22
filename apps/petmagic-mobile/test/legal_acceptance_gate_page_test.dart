@@ -1,14 +1,15 @@
 import 'package:dio/dio.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
+import 'package:petmagic_mobile/features/profile/domain/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/legal_acceptance_gate_page.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
+import 'package:petmagic_mobile/features/profile/application/profile_controller.dart';
 
 void main() {
   testWidgets(
@@ -101,7 +102,7 @@ class _LegalDocumentsRepository extends ProfileRepository {
   @override
   Future<MobileLegalDocuments> fetchCurrentLegalDocuments({
     required String locale,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     fetchCurrentLegalDocumentsCalls++;
     return const MobileLegalDocuments(

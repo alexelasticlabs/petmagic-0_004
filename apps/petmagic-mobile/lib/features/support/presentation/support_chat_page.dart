@@ -3,11 +3,11 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:dio/dio.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
+import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
@@ -15,25 +15,26 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
 import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';
 import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 import 'package:petmagic_mobile/core/permissions/app_permission_coordinator.dart';
 import 'package:petmagic_mobile/core/permissions/media_permission_feedback.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/profile/presentation/legal_acceptance_gate_page.dart';
-import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_page.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
-import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
+import 'package:petmagic_mobile/shared/auth/auth_required_sheet.dart';
+import 'package:petmagic_mobile/shared/profile/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/features/support/domain/support_chat_models.dart';
 import 'package:petmagic_mobile/features/support/domain/support_attachment_validation.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_controller.dart';
+import 'package:petmagic_mobile/features/support/presentation/support_chat_route_policy.dart';
 import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
 import 'package:petmagic_mobile/shared/files/file_name_sanitizer.dart';
 import 'package:petmagic_mobile/shared/files/media_share_save.dart';
 import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 import 'package:petmagic_mobile/shared/files/upload_media_policy.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
-import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_navigation_layout.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_unavailable_view.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
@@ -46,6 +47,7 @@ part 'widgets/support_chat_actions_attachment_flow.part.dart';
 part 'widgets/support_chat_actions_message_flow.part.dart';
 part 'widgets/support_chat_actions_preview.part.dart';
 part 'widgets/support_chat_attachment_picker.part.dart';
+part 'widgets/support_chat_attachment_picker_view.part.dart';
 part 'widgets/support_chat_attachment_picker_asset_tile.part.dart';
 part 'widgets/support_chat_attachment_picker_quick_tiles.part.dart';
 part 'widgets/support_chat_external_media.part.dart';
@@ -53,15 +55,20 @@ part 'widgets/support_chat_composer.part.dart';
 part 'widgets/support_chat_dialogs.part.dart';
 part 'widgets/support_chat_header.part.dart';
 part 'widgets/support_chat_messages.part.dart';
+part 'widgets/support_chat_message_bubbles.part.dart';
 part 'widgets/support_chat_messages_meta.part.dart';
 part 'widgets/support_chat_messages_reply.part.dart';
 part 'widgets/support_chat_message_media_grid.part.dart';
 part 'widgets/support_chat_message_media.part.dart';
+part 'widgets/support_chat_video_attachment_preview.part.dart';
 part 'widgets/support_chat_models.part.dart';
 part 'widgets/support_chat_sections_composer.part.dart';
+part 'widgets/support_chat_resolution_surfaces.part.dart';
 part 'widgets/support_chat_sections_interactions.part.dart';
 part 'widgets/support_chat_sections.part.dart';
 part 'widgets/support_chat_states.part.dart';
+part 'support_chat_page_lifecycle.part.dart';
+part 'support_chat_page_interactions.part.dart';
 
 const int _supportReplyThumbnailCacheWidth = 160;
 const int _supportComposerAttachmentPreviewCacheExtent = 220;
@@ -79,11 +86,10 @@ class SupportChatPage extends ConsumerStatefulWidget {
   static const routePath = '/profile/support/chat';
   static const initialMessageQueryParam = 'initialMessage';
   static const relatedGenerationIdQueryParam = 'relatedGenerationId';
-  static const int maxInitialMessageQueryLength = 500;
-  static const int maxRelatedGenerationIdQueryLength = 128;
-  static final RegExp _relatedGenerationIdPattern = RegExp(
-    r'^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$',
-  );
+  static const int maxInitialMessageQueryLength =
+      SupportChatRoutePolicy.maxInitialMessageQueryLength;
+  static const int maxRelatedGenerationIdQueryLength =
+      SupportChatRoutePolicy.maxRelatedGenerationIdQueryLength;
 
   final String? initialMessage;
   final String? relatedGenerationId;
@@ -92,50 +98,21 @@ class SupportChatPage extends ConsumerStatefulWidget {
     String? initialMessage,
     String? relatedGenerationId,
   }) {
-    final queryParameters = <String, String>{};
-    final normalizedInitialMessage = normalizeInitialMessageQuery(
-      initialMessage,
+    return SupportChatRoutePolicy.buildRoute(
+      routePath: routePath,
+      initialMessageQueryParam: initialMessageQueryParam,
+      relatedGenerationIdQueryParam: relatedGenerationIdQueryParam,
+      initialMessage: initialMessage,
+      relatedGenerationId: relatedGenerationId,
     );
-    if (normalizedInitialMessage != null &&
-        normalizedInitialMessage.isNotEmpty) {
-      queryParameters[initialMessageQueryParam] = normalizedInitialMessage;
-    }
-    final normalizedGenerationId = normalizeRelatedGenerationIdQuery(
-      relatedGenerationId,
-    );
-    if (normalizedGenerationId != null && normalizedGenerationId.isNotEmpty) {
-      queryParameters[relatedGenerationIdQueryParam] = normalizedGenerationId;
-    }
-
-    return Uri(
-      path: routePath,
-      queryParameters: queryParameters.isEmpty ? null : queryParameters,
-    ).toString();
   }
 
   static String? normalizeInitialMessageQuery(String? value) {
-    final normalized = value?.trim();
-    if (normalized == null || normalized.isEmpty) {
-      return null;
-    }
-
-    return normalized.length <= maxInitialMessageQueryLength
-        ? normalized
-        : normalized.substring(0, maxInitialMessageQueryLength);
+    return SupportChatRoutePolicy.normalizeInitialMessage(value);
   }
 
   static String? normalizeRelatedGenerationIdQuery(String? value) {
-    final normalized = value?.trim();
-    if (normalized == null || normalized.isEmpty) {
-      return null;
-    }
-
-    if (normalized.length > maxRelatedGenerationIdQueryLength ||
-        !_relatedGenerationIdPattern.hasMatch(normalized)) {
-      return null;
-    }
-
-    return normalized;
+    return SupportChatRoutePolicy.normalizeRelatedGenerationId(value);
   }
 
   @override
@@ -154,7 +131,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
   SupportChatController? _activeController;
   Timer? _loadingFallbackTimer;
   Timer? _messageHighlightTimer;
-  CancelToken? _activeMediaDownloadCancelToken;
+  RequestCancellation? _activeMediaDownloadCancelToken;
   bool _showLoadingFallback = false;
   bool _composerHasText = false;
   bool _composerHasFocus = false;
@@ -167,19 +144,6 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
   double _keyboardInset = 0;
   bool _hasRequestedControllerStart = false;
 
-  void _showSupportToast(
-    String message, {
-    PetMagicToastTone tone = PetMagicToastTone.info,
-  }) {
-    PetMagicToast.show(context, message: message, tone: tone);
-  }
-
-  bool get _hasPendingAttachment => _pendingAttachments.isNotEmpty;
-
-  bool get _composerCanSend => _composerHasText || _hasPendingAttachment;
-
-  bool get _isExternalMediaPickerOpen => _externalMediaPickerDepth > 0;
-
   SupportChatController get _controller {
     final controller = ref.read(supportChatControllerProvider.notifier);
     if (!identical(_activeController, controller)) {
@@ -188,39 +152,6 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
     }
 
     return controller;
-  }
-
-  bool _isWaitingForInitialConversation(SupportChatState state) {
-    return state.isLoading && state.conversation == null;
-  }
-
-  void _scheduleLoadingFallbackIfNeeded() {
-    _loadingFallbackTimer ??= Timer(_loadingFallbackDelay, () {
-      _loadingFallbackTimer = null;
-      if (!mounted ||
-          !_isWaitingForInitialConversation(
-            ref.read(supportChatControllerProvider),
-          )) {
-        return;
-      }
-
-      setState(() {
-        _showLoadingFallback = true;
-      });
-    });
-  }
-
-  void _clearLoadingFallback({bool notify = false}) {
-    _loadingFallbackTimer?.cancel();
-    _loadingFallbackTimer = null;
-    if (notify && mounted && _showLoadingFallback) {
-      setState(() {
-        _showLoadingFallback = false;
-      });
-      return;
-    }
-
-    _showLoadingFallback = false;
   }
 
   @override
@@ -305,58 +236,6 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
     super.dispose();
   }
 
-  void _prefillComposer(String value) {
-    _messageController.value = TextEditingValue(
-      text: value,
-      selection: TextSelection.collapsed(offset: value.length),
-    );
-    _messageFocusNode.requestFocus();
-  }
-
-  void _applyInitialMessage(String? value, {bool notify = false}) {
-    final normalized = value?.trim();
-    if (normalized == null || normalized.isEmpty) {
-      return;
-    }
-    if (_messageController.text.trim() == normalized) {
-      return;
-    }
-
-    _messageController.value = TextEditingValue(
-      text: normalized,
-      selection: TextSelection.collapsed(offset: normalized.length),
-    );
-    if (notify && mounted) {
-      setState(() {
-        _composerHasText = true;
-      });
-      return;
-    }
-    _composerHasText = true;
-  }
-
-  void _handleComposerChanged() {
-    final hasText = _messageController.text.trim().isNotEmpty;
-    if (hasText == _composerHasText || !mounted) {
-      return;
-    }
-
-    setState(() {
-      _composerHasText = hasText;
-    });
-  }
-
-  void _handleComposerFocusChanged() {
-    final hasFocus = _messageFocusNode.hasFocus;
-    if (hasFocus == _composerHasFocus || !mounted) {
-      return;
-    }
-
-    setState(() {
-      _composerHasFocus = hasFocus;
-    });
-  }
-
   void _applyState(VoidCallback action) {
     if (!mounted) {
       return;
@@ -365,130 +244,17 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
     setState(action);
   }
 
-  void _ensureControllerStarted() {
-    if (_hasRequestedControllerStart ||
-        !ref.read(appLaunchControllerProvider).isAuthenticated) {
-      return;
-    }
-
-    _hasRequestedControllerStart = true;
-    _scheduleLoadingFallbackIfNeeded();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !ref.read(appLaunchControllerProvider).isAuthenticated) {
-        return;
-      }
-
-      _controller.start();
-      _controller.setScreenVisible(true);
-    });
-  }
-
-  Future<T> _runExternalMediaPicker<T>(Future<T> Function() action) async {
-    _externalMediaPickerDepth += 1;
-    if (_externalMediaPickerDepth == 1) {
-      _controller.setScreenVisible(false);
-      _clearLoadingFallback();
-      _controller.suspend();
-    }
-    try {
-      return await action();
-    } finally {
-      _externalMediaPickerDepth = math.max(0, _externalMediaPickerDepth - 1);
-      if (mounted &&
-          !_isExternalMediaPickerOpen &&
-          ref.read(appLaunchControllerProvider).isAuthenticated) {
-        _controller.setScreenVisible(true);
-        _scheduleLoadingFallbackIfNeeded();
-        unawaited(_controller.start());
-      }
-    }
-  }
-
-  Future<T?> _runAttachmentPickerSession<T>(
-    Future<T?> Function() action,
-  ) async {
-    if (_attachmentPickerBusy) {
-      return null;
-    }
-
-    _applyState(() {
-      _attachmentPickerBusy = true;
-    });
-    try {
-      return await action();
-    } finally {
-      if (mounted) {
-        _applyState(() {
-          _attachmentPickerBusy = false;
-        });
-      } else {
-        _attachmentPickerBusy = false;
-      }
-    }
-  }
-
-  Future<void> _showAttachmentOptions() {
-    return _showAttachmentOptionsImpl();
-  }
-
-  Future<void> _sendCurrentMessage(String localeTag) {
-    return _sendCurrentMessageImpl(localeTag);
-  }
-
-  void _removePendingAttachment(int index) {
-    _removePendingAttachmentImpl(index);
-  }
-
-  Future<void> _retryAttachmentForMessage(SupportChatMessage message) {
-    return _retryAttachmentForMessageImpl(message);
-  }
-
-  Future<void> _openImageFullscreen({
-    required String imageUrl,
-    String? fileName,
-  }) {
-    return _openImageFullscreenImpl(imageUrl: imageUrl, fileName: fileName);
-  }
-
-  Future<void> _openVideoFullscreen({
-    required String videoUrl,
-    String? fileName,
-  }) {
-    return _openVideoFullscreenImpl(videoUrl: videoUrl, fileName: fileName);
-  }
-
-  void _setReplyToMessage(SupportChatMessage message) {
-    if (_isSupportSystemMessage(message) || !mounted) {
-      return;
-    }
-
-    _applyState(() {
-      _replyToMessage = message;
-    });
-    _messageFocusNode.requestFocus();
-  }
-
-  void _clearReplyToMessage() {
-    if (!mounted || _replyToMessage == null) {
-      return;
-    }
-
-    _applyState(() {
-      _replyToMessage = null;
-    });
-  }
-
-  CancelToken? _startMediaDownload() {
+  RequestCancellation? _startMediaDownload() {
     if (_activeMediaDownloadCancelToken != null) {
       return null;
     }
 
-    final cancelToken = CancelToken();
+    final cancelToken = RequestCancellation();
     _activeMediaDownloadCancelToken = cancelToken;
     return cancelToken;
   }
 
-  void _completeMediaDownload(CancelToken cancelToken) {
+  void _completeMediaDownload(RequestCancellation cancelToken) {
     if (identical(_activeMediaDownloadCancelToken, cancelToken)) {
       _activeMediaDownloadCancelToken = null;
     }
@@ -500,61 +266,6 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
       cancelToken.cancel('support_media_download_cancelled');
     }
     _activeMediaDownloadCancelToken = null;
-  }
-
-  GlobalKey _messageItemKeyForId(String messageId) {
-    final normalizedMessageId = messageId.trim();
-    return _messageKeys.putIfAbsent(
-      normalizedMessageId,
-      () => GlobalKey(debugLabel: 'support-message-$normalizedMessageId'),
-    );
-  }
-
-  void _retainMessageKeys(Iterable<SupportChatMessage> messages) {
-    final activeIds = <String>{
-      for (final message in messages)
-        if (message.messageId.trim().isNotEmpty) message.messageId.trim(),
-    };
-    _messageKeys.removeWhere((messageId, _) => !activeIds.contains(messageId));
-  }
-
-  Future<void> _jumpToMessage(String messageId) async {
-    final normalizedMessageId = messageId.trim();
-    if (!mounted || normalizedMessageId.isEmpty) {
-      return;
-    }
-
-    final targetKey = _messageKeys[normalizedMessageId];
-    final targetContext = targetKey?.currentContext;
-    if (targetContext == null) {
-      final text = AppLocalizations.of(context);
-      _showSupportToast(text.supportChatReplyOriginalUnavailable);
-      return;
-    }
-
-    await Scrollable.ensureVisible(
-      targetContext,
-      duration: const Duration(milliseconds: 320),
-      curve: Curves.easeOutCubic,
-      alignment: 0.25,
-    );
-    if (!mounted) {
-      return;
-    }
-
-    _messageHighlightTimer?.cancel();
-    _applyState(() {
-      _highlightedMessageId = normalizedMessageId;
-    });
-    _messageHighlightTimer = Timer(const Duration(milliseconds: 1300), () {
-      if (!mounted || _highlightedMessageId != normalizedMessageId) {
-        return;
-      }
-
-      _applyState(() {
-        _highlightedMessageId = null;
-      });
-    });
   }
 
   @override
@@ -681,10 +392,10 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
                     title: text.supportChatTeamTitle,
                     subtitle: text.supportChatTeamStatus,
                     onBack: () {
-                      if (context.canPop()) {
-                        context.pop();
+                      if (context.appNavigator.canPop()) {
+                        context.appNavigator.pop();
                       } else {
-                        context.go(ProfilePage.routePath);
+                        context.appNavigator.go(const ProfileDestination());
                       }
                     },
                   ),
@@ -759,21 +470,5 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
         ),
       ),
     );
-  }
-
-  String _formatDayLabel(DateTime value) {
-    return _formatDayLabelImpl(value);
-  }
-
-  bool _isSameDay(DateTime left, DateTime right) {
-    return _isSameDayImpl(left, right);
-  }
-
-  bool _isPinnedToBottom({double threshold = 72}) {
-    if (!_scrollController.hasClients) {
-      return true;
-    }
-    final position = _scrollController.position;
-    return (position.maxScrollExtent - position.pixels) <= threshold;
   }
 }

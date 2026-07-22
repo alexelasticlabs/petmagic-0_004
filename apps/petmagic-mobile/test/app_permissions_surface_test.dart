@@ -40,6 +40,7 @@ void main() {
       expect(manifest, contains('android.permission.READ_MEDIA_IMAGES'));
       expect(manifest, contains('android.permission.READ_MEDIA_VIDEO'));
       expect(manifest, contains('android:maxSdkVersion="32"'));
+      expect(manifest, contains('android:allowBackup="false"'));
       expect(
         manifest,
         contains(

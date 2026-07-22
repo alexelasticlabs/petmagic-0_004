@@ -3,26 +3,29 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/app/router/go_router_app_navigator.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/permissions/app_permission_coordinator.dart';
 import 'package:petmagic_mobile/core/permissions/media_permission_feedback.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
+import 'package:petmagic_mobile/features/pets/application/pet_repository.dart';
 import 'package:petmagic_mobile/features/pets/presentation/my_pets_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
+import 'package:petmagic_mobile/features/profile/application/profile_controller.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
+import 'package:petmagic_mobile/features/templates/data/template_generation_pet_repository_adapter.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generations_gallery_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_preview_page.dart';
-import 'package:petmagic_mobile/features/templates/presentation/templates_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/templates_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_flow_sheets.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
@@ -32,10 +35,6 @@ import 'templates_page_lifecycle_test_support.dart';
 import 'test_permission_fakes.dart';
 
 void main() {
-  setUpAll(() {
-    GoogleFonts.config.allowRuntimeFetching = false;
-  });
-
   setUp(() {
     VisibilityDetectorController.instance.updateInterval = Duration.zero;
   });
@@ -93,7 +92,7 @@ void main() {
       routes: [
         GoRoute(
           path: '/',
-          builder: (context, state) => const Scaffold(body: TemplatesPage()),
+          builder: (context, state) => _templatesPageForState(state),
         ),
         GoRoute(
           path: TemplatePreviewPage.routePath,
@@ -125,6 +124,10 @@ void main() {
           ),
         ],
         child: MaterialApp.router(
+          builder: (context, child) => AppNavigationScope(
+            navigator: GoRouterAppNavigator(router),
+            child: child!,
+          ),
           theme: AppTheme.light(),
           locale: const Locale('en'),
           localizationsDelegates: const [
@@ -169,7 +172,7 @@ void main() {
       routes: [
         GoRoute(
           path: '/',
-          builder: (context, state) => const Scaffold(body: TemplatesPage()),
+          builder: (context, state) => _templatesPageForState(state),
         ),
         GoRoute(
           path: TemplatePreviewPage.routePath,
@@ -210,6 +213,10 @@ void main() {
           ),
         ],
         child: MaterialApp.router(
+          builder: (context, child) => AppNavigationScope(
+            navigator: GoRouterAppNavigator(router),
+            child: child!,
+          ),
           theme: AppTheme.light(),
           locale: const Locale('en'),
           localizationsDelegates: const [
@@ -271,7 +278,7 @@ void main() {
       routes: [
         GoRoute(
           path: TemplatesPage.routePath,
-          builder: (context, state) => const Scaffold(body: TemplatesPage()),
+          builder: (context, state) => _templatesPageForState(state),
         ),
         GoRoute(
           path: TemplatePreviewPage.routePath,
@@ -316,11 +323,18 @@ void main() {
           templateGenerationRepositoryProvider.overrideWithValue(
             generationRepository,
           ),
+          petRepositoryProvider.overrideWithValue(
+            TemplateGenerationPetRepositoryAdapter(generationRepository),
+          ),
           realtimeClientProvider.overrideWith(
             (ref) => const NoopRealtimeClient(),
           ),
         ],
         child: MaterialApp.router(
+          builder: (context, child) => AppNavigationScope(
+            navigator: GoRouterAppNavigator(router),
+            child: child!,
+          ),
           theme: AppTheme.light(),
           locale: const Locale('en'),
           localizationsDelegates: const [
@@ -382,7 +396,7 @@ void main() {
       routes: [
         GoRoute(
           path: TemplatesPage.routePath,
-          builder: (context, state) => const Scaffold(body: TemplatesPage()),
+          builder: (context, state) => _templatesPageForState(state),
         ),
         GoRoute(
           path: TemplatePreviewPage.routePath,
@@ -434,6 +448,10 @@ void main() {
           ),
         ],
         child: MaterialApp.router(
+          builder: (context, child) => AppNavigationScope(
+            navigator: GoRouterAppNavigator(router),
+            child: child!,
+          ),
           theme: AppTheme.light(),
           locale: const Locale('en'),
           localizationsDelegates: const [
@@ -482,7 +500,7 @@ void main() {
       routes: [
         GoRoute(
           path: TemplatesPage.routePath,
-          builder: (context, state) => const Scaffold(body: TemplatesPage()),
+          builder: (context, state) => _templatesPageForState(state),
         ),
         GoRoute(
           path: AuthEntryPage.routePath,
@@ -508,6 +526,10 @@ void main() {
           ),
         ],
         child: MaterialApp.router(
+          builder: (context, child) => AppNavigationScope(
+            navigator: GoRouterAppNavigator(router),
+            child: child!,
+          ),
           theme: AppTheme.light(),
           locale: const Locale('en'),
           localizationsDelegates: const [
@@ -555,7 +577,7 @@ void main() {
       routes: [
         GoRoute(
           path: TemplatesPage.routePath,
-          builder: (context, state) => const Scaffold(body: TemplatesPage()),
+          builder: (context, state) => _templatesPageForState(state),
         ),
         GoRoute(
           path: TemplatePreviewPage.routePath,
@@ -607,6 +629,10 @@ void main() {
           ),
         ],
         child: MaterialApp.router(
+          builder: (context, child) => AppNavigationScope(
+            navigator: GoRouterAppNavigator(router),
+            child: child!,
+          ),
           theme: AppTheme.light(),
           locale: const Locale('en'),
           localizationsDelegates: const [
@@ -655,7 +681,7 @@ void main() {
       routes: [
         GoRoute(
           path: TemplatesPage.routePath,
-          builder: (context, state) => const Scaffold(body: TemplatesPage()),
+          builder: (context, state) => _templatesPageForState(state),
         ),
         GoRoute(
           path: TemplatePreviewPage.routePath,
@@ -700,11 +726,18 @@ void main() {
           templateGenerationRepositoryProvider.overrideWithValue(
             generationRepository,
           ),
+          petRepositoryProvider.overrideWithValue(
+            TemplateGenerationPetRepositoryAdapter(generationRepository),
+          ),
           realtimeClientProvider.overrideWith(
             (ref) => const NoopRealtimeClient(),
           ),
         ],
         child: MaterialApp.router(
+          builder: (context, child) => AppNavigationScope(
+            navigator: GoRouterAppNavigator(router),
+            child: child!,
+          ),
           theme: AppTheme.light(),
           locale: const Locale('en'),
           localizationsDelegates: const [
@@ -778,7 +811,7 @@ void main() {
         ),
         GoRoute(
           path: TemplatesPage.routePath,
-          builder: (context, state) => const Scaffold(body: TemplatesPage()),
+          builder: (context, state) => _templatesPageForState(state),
         ),
         GoRoute(
           path: TemplatePreviewPage.routePath,
@@ -827,6 +860,9 @@ void main() {
           templateGenerationRepositoryProvider.overrideWithValue(
             generationRepository,
           ),
+          petRepositoryProvider.overrideWithValue(
+            TemplateGenerationPetRepositoryAdapter(generationRepository),
+          ),
           generationHistoryControllerProvider.overrideWith(
             () => historyController,
           ),
@@ -835,6 +871,10 @@ void main() {
           ),
         ],
         child: MaterialApp.router(
+          builder: (context, child) => AppNavigationScope(
+            navigator: GoRouterAppNavigator(router),
+            child: child!,
+          ),
           theme: AppTheme.light(),
           locale: const Locale('en'),
           localizationsDelegates: const [
@@ -895,4 +935,14 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Open status'), findsOneWidget);
   });
+}
+
+Widget _templatesPageForState(GoRouterState state) {
+  return Scaffold(
+    body: TemplatesPage(
+      initialPetId: state.uri.queryParameters[TemplatesPage.petIdQueryParam],
+      initialPetPhotoId:
+          state.uri.queryParameters[TemplatesPage.petPhotoIdQueryParam],
+    ),
+  );
 }

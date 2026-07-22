@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:dio/dio.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -12,11 +12,11 @@ import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
-import 'package:petmagic_mobile/features/premium/presentation/premium_subscription_status_presenter.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
-import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/features/premium/application/premium_controller.dart';
+import 'package:petmagic_mobile/features/premium/application/premium_subscription_status_presenter.dart';
+import 'package:petmagic_mobile/features/profile/application/profile_controller.dart';
+import 'package:petmagic_mobile/shared/auth/auth_required_sheet.dart';
+import 'package:petmagic_mobile/shared/profile/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_unavailable_view.dart';
@@ -26,6 +26,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 part 'subscription_management_content.part.dart';
 part 'subscription_management_sections.part.dart';
+part 'subscription_management_billing_sections.part.dart';
 part 'subscription_management_progress.part.dart';
 part 'subscription_management_shared.part.dart';
 part 'subscription_management_visuals.part.dart';
@@ -43,7 +44,7 @@ class SubscriptionManagementPage extends ConsumerStatefulWidget {
 class _SubscriptionManagementPageState
     extends ConsumerState<SubscriptionManagementPage> {
   bool _isProcessing = false;
-  CancelToken? _activeSubscriptionActionCancelToken;
+  RequestCancellation? _activeSubscriptionActionCancelToken;
 
   @override
   void dispose() {
@@ -229,17 +230,8 @@ class _SubscriptionManagementPageState
           tone: PetMagicToastTone.warning,
         );
       }
-    } on DioException catch (error) {
-      if (CancelToken.isCancel(error) || cancelToken.isCancelled) {
-        return;
-      }
-
-      _logSubscriptionActionFailure(
-        'open_manage_target',
-        error,
-        error.stackTrace,
-      );
-      _showSubscriptionActionFailed();
+    } on RequestCancelledException {
+      return;
     } catch (error, stackTrace) {
       _logSubscriptionActionFailure('open_manage_target', error, stackTrace);
       _showSubscriptionActionFailed();
@@ -292,17 +284,8 @@ class _SubscriptionManagementPageState
           tone: PetMagicToastTone.success,
         );
       }
-    } on DioException catch (error) {
-      if (CancelToken.isCancel(error) || cancelToken.isCancelled) {
-        return;
-      }
-
-      _logSubscriptionActionFailure(
-        'cancel_at_period_end',
-        error,
-        error.stackTrace,
-      );
-      _showSubscriptionActionFailed();
+    } on RequestCancelledException {
+      return;
     } catch (error, stackTrace) {
       _logSubscriptionActionFailure('cancel_at_period_end', error, stackTrace);
       _showSubscriptionActionFailed();
@@ -361,14 +344,14 @@ class _SubscriptionManagementPageState
     );
   }
 
-  CancelToken _startSubscriptionActionCancelToken() {
+  RequestCancellation _startSubscriptionActionCancelToken() {
     _cancelActiveSubscriptionAction();
-    final cancelToken = CancelToken();
+    final cancelToken = RequestCancellation();
     _activeSubscriptionActionCancelToken = cancelToken;
     return cancelToken;
   }
 
-  void _completeSubscriptionAction(CancelToken cancelToken) {
+  void _completeSubscriptionAction(RequestCancellation cancelToken) {
     if (identical(_activeSubscriptionActionCancelToken, cancelToken)) {
       _activeSubscriptionActionCancelToken = null;
     }

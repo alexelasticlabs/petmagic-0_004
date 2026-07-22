@@ -1,6 +1,6 @@
 import catalogJson from "../../../shared/legal/legal-documents.v2026-07-09.json";
 
-export const supportedLocales = ["en", "ru", "de", "es", "fr", "it", "pl"] as const;
+export const supportedLocales = ["en", "ru"] as const;
 export type SupportedLocale = (typeof supportedLocales)[number];
 export type DocumentRoute = "privacy" | "terms" | "support" | "account-deletion";
 

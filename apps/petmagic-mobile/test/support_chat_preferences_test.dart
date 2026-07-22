@@ -6,7 +6,7 @@ import 'package:petmagic_mobile/app/preferences/app_preferences_controller.dart'
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
+import 'package:petmagic_mobile/features/support/domain/support_chat_models.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_realtime_client.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_controller.dart';

@@ -1,8 +1,12 @@
+export 'package:petmagic_mobile/features/wallet/domain/pending_store_wallet_purchase.dart';
+
 import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/features/wallet/domain/pending_store_wallet_purchase.dart';
+import 'package:petmagic_mobile/features/wallet/data/pending_store_purchase_dto_mapper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 final walletStorePurchaseRecoveryPreferencesProvider =
@@ -20,49 +24,6 @@ final walletStorePurchaseRecoveryStoreProvider =
         ),
       );
     });
-
-class PendingStoreWalletPurchase {
-  const PendingStoreWalletPurchase({
-    required this.orderId,
-    required this.provider,
-    required this.productId,
-    required this.packId,
-    required this.packCode,
-    required this.createdAtUtc,
-  });
-
-  final String orderId;
-  final String provider;
-  final String productId;
-  final String packId;
-  final String packCode;
-  final DateTime createdAtUtc;
-
-  Map<String, Object?> toJson() {
-    return {
-      'orderId': orderId,
-      'provider': provider,
-      'productId': productId,
-      'packId': packId,
-      'packCode': packCode,
-      'createdAtUtc': createdAtUtc.toUtc().toIso8601String(),
-    };
-  }
-
-  factory PendingStoreWalletPurchase.fromJson(Map<String, dynamic> json) {
-    return PendingStoreWalletPurchase(
-      orderId: json['orderId'] as String? ?? '',
-      provider: json['provider'] as String? ?? '',
-      productId: json['productId'] as String? ?? '',
-      packId: json['packId'] as String? ?? '',
-      packCode: json['packCode'] as String? ?? '',
-      createdAtUtc: json['createdAtUtc'] is String
-          ? DateTime.tryParse(json['createdAtUtc'] as String)?.toUtc() ??
-                DateTime.fromMillisecondsSinceEpoch(0, isUtc: true)
-          : DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
-    );
-  }
-}
 
 class WalletStorePurchaseRecoveryStore {
   const WalletStorePurchaseRecoveryStore({
@@ -108,7 +69,7 @@ class WalletStorePurchaseRecoveryStore {
 
     await _secureStorage.write(
       key: pendingPurchaseSecureStorageKey,
-      value: jsonEncode(pending),
+      value: jsonEncode(mapPendingStorePurchaseToJson(pending)),
     );
     await _preferences.remove(legacyPendingPurchaseKey);
     return pending;
@@ -130,7 +91,7 @@ class WalletStorePurchaseRecoveryStore {
         return null;
       }
 
-      final pending = PendingStoreWalletPurchase.fromJson(decoded);
+      final pending = mapPendingStorePurchaseDto(decoded);
       if (pending.orderId.trim().isEmpty ||
           pending.provider.trim().isEmpty ||
           pending.productId.trim().isEmpty ||
@@ -157,7 +118,7 @@ class WalletStorePurchaseRecoveryStore {
   Future<void> savePendingPurchase(PendingStoreWalletPurchase purchase) async {
     await _secureStorage.write(
       key: pendingPurchaseSecureStorageKey,
-      value: jsonEncode(purchase),
+      value: jsonEncode(mapPendingStorePurchaseToJson(purchase)),
     );
     await _preferences.remove(legacyPendingPurchaseKey);
   }

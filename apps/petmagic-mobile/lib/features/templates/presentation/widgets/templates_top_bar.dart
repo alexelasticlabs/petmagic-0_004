@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/app/theme/petmagic_typography.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_interactive_surface.dart';
 
@@ -77,7 +77,8 @@ class _TopBar extends StatelessWidget {
             'PetMagic',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.comfortaa(
+            style: TextStyle(
+              fontFamily: PetMagicTypography.resolvedFontFamily,
               color: colors.textStrong,
               fontSize: 16,
               fontWeight: FontWeight.w700,

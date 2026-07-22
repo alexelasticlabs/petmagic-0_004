@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +9,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/app/router/go_router_app_navigator.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
@@ -15,12 +18,12 @@ import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart'
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generations_gallery_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
-import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
@@ -144,7 +147,10 @@ class GalleryHarness {
   final NetworkStatusController? networkStatusController;
   final FakeGalleryTemplateGenerationRepository? repository;
 
-  Widget app() {
+  Widget app({
+    Brightness brightness = Brightness.dark,
+    bool disableAnimations = false,
+  }) {
     return ProviderScope(
       overrides: [
         appLaunchControllerProvider.overrideWith(
@@ -175,17 +181,30 @@ class GalleryHarness {
         if (mediaActions != null)
           generationStatusMediaActionsProvider.overrideWithValue(mediaActions!),
       ],
-      child: MaterialApp.router(
-        routerConfig: router,
-        theme: AppTheme.dark(),
-        locale: const Locale('ru'),
-        localizationsDelegates: const [
-          AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        supportedLocales: AppLocalizations.supportedLocales,
+      child: AppNavigationScope(
+        navigator: GoRouterAppNavigator(router),
+        child: MaterialApp.router(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(disableAnimations: disableAnimations),
+            child: child!,
+          ),
+          routerConfig: router,
+          theme: AppTheme.light(),
+          darkTheme: AppTheme.dark(),
+          themeMode: brightness == Brightness.dark
+              ? ThemeMode.dark
+              : ThemeMode.light,
+          locale: const Locale('ru'),
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+        ),
       ),
     );
   }
@@ -443,13 +462,13 @@ class FakeGalleryTemplateGenerationRepository
   final String durableShareUrl;
   final downloadCalls = <String>[];
   final shareCalls = <String>[];
-  CancelToken? downloadCancelToken;
-  CancelToken? shareCancelToken;
+  RequestCancellation? downloadCancelToken;
+  RequestCancellation? shareCancelToken;
 
   @override
   Future<GenerationMediaAccessResult> fetchDownloadUrl(
     String generationId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     downloadCalls.add(generationId);
     downloadCancelToken = cancelToken;
@@ -463,7 +482,7 @@ class FakeGalleryTemplateGenerationRepository
   @override
   Future<GenerationMediaAccessResult> fetchShareUrl(
     String generationId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     shareCalls.add(generationId);
     shareCancelToken = cancelToken;
@@ -487,8 +506,8 @@ class DelayedGalleryGenerationStatusMediaActions
   final bool delayShare;
   final saveStarted = Completer<void>();
   final shareStarted = Completer<void>();
-  CancelToken? saveCancelToken;
-  CancelToken? shareCancelToken;
+  RequestCancellation? saveCancelToken;
+  RequestCancellation? shareCancelToken;
   int saveCalls = 0;
   int shareCalls = 0;
   final savedUrls = <String>[];
@@ -505,7 +524,7 @@ class DelayedGalleryGenerationStatusMediaActions
     required String fileName,
     required bool isVideo,
     required String albumName,
-    required CancelToken cancelToken,
+    required RequestCancellation cancelToken,
     String? localPath,
   }) {
     saveCalls++;
@@ -527,7 +546,7 @@ class DelayedGalleryGenerationStatusMediaActions
     required String mediaUrl,
     required String fileName,
     required String title,
-    required CancelToken cancelToken,
+    required RequestCancellation cancelToken,
     String? shareText,
     String? localPath,
   }) {

@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   test('gallery history error mapper does not echo raw details', () {
     final source = File(
-      'lib/features/templates/presentation/generations_gallery_page_states_and_actions.dart',
+      'lib/features/templates/presentation/generations_gallery_page_states.dart',
     ).readAsStringSync();
 
     final body = _functionBody(source, '_galleryHistoryErrorText');

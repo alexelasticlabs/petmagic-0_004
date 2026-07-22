@@ -1,12 +1,12 @@
 import 'dart:io';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
-import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
+import 'package:petmagic_mobile/features/support/domain/support_chat_models.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
 import 'package:petmagic_mobile/shared/files/image_upload_optimizer.dart';
 
@@ -458,32 +458,34 @@ void main() {
     expect(requests[1].queryParameters['take'], 1);
   });
 
-  test(
-    'uses async file APIs for attachment upload validation and multipart',
-    () {
-      final source = File(
-        'lib/features/support/data/support_chat_repository.dart',
-      ).readAsStringSync();
+  test('uses async file APIs for attachment upload validation and multipart', () {
+    final repositorySource = [
+      'lib/features/support/data/support_chat_repository.dart',
+      'lib/features/support/data/support_attachment_repository_mixin.part.dart',
+    ].map((path) => File(path).readAsStringSync()).join('\n');
+    final preparerSource = File(
+      'lib/features/support/data/support_attachment_upload_preparer.dart',
+    ).readAsStringSync();
+    final source = '$repositorySource\n$preparerSource';
 
-      expect(source, isNot(contains('lengthSync(')));
-      expect(source, isNot(contains('MultipartFile.fromFileSync')));
-      expect(source, contains('await File(filePath).length()'));
-      expect(source, contains('await MultipartFile.fromFile('));
-      expect(source, contains('authenticatedMultipartRequestOptions'));
-      expect(
-        source,
-        contains("query['beforeMessageId'] = beforeMessageId!.trim();"),
-      );
-    },
-  );
+    expect(source, isNot(contains('lengthSync(')));
+    expect(source, isNot(contains('MultipartFile.fromFileSync')));
+    expect(source, contains('await File(filePath).length()'));
+    expect(source, contains('await MultipartFile.fromFile('));
+    expect(source, contains('authenticatedMultipartRequestOptions'));
+    expect(
+      source,
+      contains("query['beforeMessageId'] = beforeMessageId!.trim();"),
+    );
+  });
 
   test('sanitizes attachment content type before logging upload failures', () {
     final source = File(
-      'lib/features/support/data/support_chat_repository.dart',
+      'lib/features/support/data/support_attachment_upload_preparer.dart',
     ).readAsStringSync();
 
-    expect(source, contains('_safeAttachmentContentTypeForLog(contentType)'));
-    expect(source, contains('String _safeAttachmentContentTypeForLog('));
+    expect(source, contains('_safeContentTypeForLog(contentType)'));
+    expect(source, contains('String _safeContentTypeForLog('));
     expect(source, contains(r"RegExp(r'[\x00-\x1F\x7F]')"));
     expect(source, contains('normalized.substring(0, 80)'));
     expect(source, isNot(contains("context: {'contentType': contentType}")));
@@ -606,7 +608,7 @@ class _FakeImageUploadOptimizer extends ImageUploadOptimizer {
   @override
   Future<OptimizedUploadFile> optimizeForSupportImage(
     XFile source, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     supportOptimizeCalls++;
     final file = supportImage;

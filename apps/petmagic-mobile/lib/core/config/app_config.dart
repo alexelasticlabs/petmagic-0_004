@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:petmagic_mobile/core/config/api_base_url_config_resolver.dart';
 
 @immutable
 class AndroidLoopbackBackendHintConfig {
@@ -158,64 +159,31 @@ class AppConfig {
   }
 
   static List<String> get apiBaseUrls {
-    if (configuredApiBaseUrl.isNotEmpty) {
-      if (!kDebugMode) {
-        final releaseBaseUrl = normalizeReleaseBaseUrl(
-          configuredApiBaseUrl,
-          environment: appEnvironment,
-        );
-        return releaseBaseUrl == null
-            ? const [productionApiBaseUrl]
-            : [releaseBaseUrl];
-      }
+    return resolveApiBaseUrls(
+      configuredBaseUrl: configuredApiBaseUrl,
+      isDebugBuild: kDebugMode,
+      isReleaseBuild: kReleaseMode,
+      isWebBuild: kIsWeb,
+    );
+  }
 
-      if (kDebugMode &&
-          !kIsWeb &&
-          Platform.isAndroid &&
-          _isConfiguredLoopbackBaseUrl) {
-        return _orderedUniqueUrls([
-          configuredApiBaseUrl,
-          'http://10.0.2.2:5000',
-          'http://10.0.2.2:5001',
-          'http://host.docker.internal:5000',
-          'http://host.docker.internal:5001',
-          'http://10.0.3.2:5000',
-          'http://10.0.3.2:5001',
-          'http://127.0.0.1:5000',
-          'http://127.0.0.1:5001',
-          'http://localhost:5000',
-          'http://localhost:5001',
-        ]);
-      }
-
-      return [configuredApiBaseUrl];
-    }
-
-    if (kDebugMode && !kIsWeb && Platform.isAndroid) {
-      return const [
-        'http://10.0.2.2:5000',
-        'http://10.0.2.2:5001',
-        'http://host.docker.internal:5000',
-        'http://host.docker.internal:5001',
-        'http://10.0.3.2:5000',
-        'http://10.0.3.2:5001',
-        'http://127.0.0.1:5000',
-        'http://127.0.0.1:5001',
-        'http://localhost:5000',
-        'http://localhost:5001',
-      ];
-    }
-
-    if (kDebugMode) {
-      return const [
-        'http://localhost:5000',
-        'http://localhost:5001',
-        'http://127.0.0.1:5000',
-        'http://127.0.0.1:5001',
-      ];
-    }
-
-    return const [productionApiBaseUrl];
+  static List<String> resolveApiBaseUrls({
+    required String configuredBaseUrl,
+    required bool isDebugBuild,
+    required bool isReleaseBuild,
+    required bool isWebBuild,
+    bool? isAndroidDevice,
+  }) {
+    return resolveConfiguredApiBaseUrls(
+      configuredBaseUrl: configuredBaseUrl,
+      isDebugBuild: isDebugBuild,
+      isReleaseBuild: isReleaseBuild,
+      isWebBuild: isWebBuild,
+      isAndroidDevice: isAndroidDevice,
+      appEnvironment: appEnvironment,
+      productionBaseUrl: productionApiBaseUrl,
+      normalizeReleaseBaseUrl: normalizeReleaseBaseUrl,
+    );
   }
 
   static String get apiBaseUrl {
@@ -242,16 +210,6 @@ class AppConfig {
     final expectedScheme = deepLinkSchemeForEnvironment(environment);
     return expectedScheme != null &&
         scheme.trim().toLowerCase() == expectedScheme;
-  }
-
-  static bool get _isConfiguredLoopbackBaseUrl {
-    final uri = Uri.tryParse(configuredApiBaseUrl.trim());
-    if (uri == null) {
-      return false;
-    }
-
-    final host = uri.host;
-    return host == 'localhost' || host == '127.0.0.1';
   }
 
   static bool isProductionSafeBaseUrl(String rawUrl) {
@@ -372,20 +330,5 @@ class AppConfig {
     }
 
     return 'https://$host';
-  }
-
-  static List<String> _orderedUniqueUrls(Iterable<String> rawUrls) {
-    final unique = <String>{};
-    final ordered = <String>[];
-    for (final rawUrl in rawUrls) {
-      final value = rawUrl.trim();
-      if (value.isEmpty) {
-        continue;
-      }
-      if (unique.add(value)) {
-        ordered.add(value);
-      }
-    }
-    return ordered;
   }
 }

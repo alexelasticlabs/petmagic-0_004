@@ -1,5 +1,12 @@
 {
   "@@locale": "de",
+  "navDiscover": "Entdecken",
+  "navCreate": "Erstellen",
+  "createHubTitle": "Magie mit deinem Haustier",
+  "createHubSubtitle": "Beginne mit einer Vorlage oder deinem Haustier. Wir führen dich durch die nächsten Schritte.",
+  "createHubBrowseAction": "Vorlagen entdecken",
+  "createHubPetsAction": "Mein Haustier wählen",
+  "createHubGuestHint": "Du kannst zuerst alles ansehen. Deine Auswahl bleibt erhalten, wenn eine Anmeldung nötig ist.",
   "navTemplates": "Vorlagen",
   "navCreations": "Galerie",
   "navProfile": "Profil",

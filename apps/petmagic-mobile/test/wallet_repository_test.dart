@@ -1,9 +1,9 @@
 import 'dart:io';
+import 'package:petmagic_mobile/core/payments/store_purchase.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:in_app_purchase/in_app_purchase.dart';
-import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
+import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
@@ -113,6 +113,42 @@ void main() {
     expect(requests[0].queryParameters, {'skip': 0, 'take': 100});
     expect(requests[1].queryParameters, {'skip': 0, 'take': 1});
   });
+
+  test(
+    'wallet repository isolates store plugin operations without changing semantics',
+    () {
+      final repositorySource = [
+        'lib/features/wallet/data/wallet_repository.dart',
+        'lib/features/wallet/data/wallet_store_repository_mixin.part.dart',
+        'lib/features/wallet/data/wallet_actions_repository_mixin.part.dart',
+      ].map((path) => File(path).readAsStringSync()).join('\n');
+      final storeServiceSource = File(
+        'lib/features/wallet/data/wallet_store_purchase_service.dart',
+      ).readAsStringSync();
+
+      expect(repositorySource, contains('WalletStorePurchaseService('));
+      expect(
+        repositorySource,
+        contains('_storePurchaseService.purchaseUpdates'),
+      );
+      expect(
+        repositorySource,
+        contains('_storePurchaseService.startCheckout('),
+      );
+      expect(
+        repositorySource,
+        contains('applicationUserName: session.user.userId'),
+      );
+      expect(storeServiceSource, contains('autoConsume: false'));
+      expect(
+        storeServiceSource,
+        contains('applicationUserName: applicationUserName'),
+      );
+      expect(storeServiceSource, contains('.restorePurchases('));
+      expect(storeServiceSource, contains('consumePurchase(platformPurchase)'));
+      expect(storeServiceSource, contains('BillingResponse.ok'));
+    },
+  );
 }
 
 Map<String, Object?> _purchaseJson(String orderId) {
@@ -129,16 +165,17 @@ Map<String, Object?> _purchaseJson(String orderId) {
   };
 }
 
-PurchaseDetails _storePurchase() {
-  return PurchaseDetails(
+StorePurchaseDetails _storePurchase() {
+  return StorePurchaseDetails(
     purchaseID: 'gp-purchase-1',
     productID: 'com.petmagic.app.tokens.google.pack100',
-    verificationData: PurchaseVerificationData(
+    verificationData: StorePurchaseVerificationData(
       localVerificationData: 'local-store-data',
       serverVerificationData: 'gp-token-pack-1',
       source: 'google_play',
     ),
     transactionDate: DateTime.utc(2026, 7, 2).millisecondsSinceEpoch.toString(),
-    status: PurchaseStatus.purchased,
+    status: StorePurchaseStatus.purchased,
+    pendingCompletePurchase: false,
   );
 }

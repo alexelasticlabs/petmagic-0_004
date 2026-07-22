@@ -3,22 +3,22 @@ import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
-import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
+import 'package:petmagic_mobile/features/profile/application/external_auth_gateway.dart';
+import 'package:petmagic_mobile/features/profile/domain/profile_models.dart';
+import 'package:petmagic_mobile/features/profile/application/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/email_verification_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/password_reset_page.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
+import 'package:petmagic_mobile/features/profile/application/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_flow_widgets.dart';
-import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/shared/widgets/motion.dart';
+import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_animated_button_child.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 
@@ -62,29 +62,6 @@ class RegisterEntryPage extends StatelessWidget {
   }
 }
 
-const int maxAuthRedirectPathLength = 1024;
-final RegExp _authRedirectControlPattern = RegExp(r'[\x00-\x1F\x7F]');
-
-String? normalizeAuthRedirectPath(String? redirectPath) {
-  final normalized = redirectPath?.trim();
-  if (normalized == null ||
-      normalized.isEmpty ||
-      normalized.length > maxAuthRedirectPathLength ||
-      !normalized.startsWith('/') ||
-      normalized.startsWith('//') ||
-      normalized.contains(r'\') ||
-      _authRedirectControlPattern.hasMatch(normalized)) {
-    return null;
-  }
-
-  final uri = Uri.tryParse(normalized);
-  if (uri == null || uri.hasScheme || uri.hasAuthority) {
-    return null;
-  }
-
-  return normalized;
-}
-
 enum _AuthMode { signIn, signUp }
 
 @visibleForTesting
@@ -116,7 +93,6 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  GoRouter? _router;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _acceptedTerms = false;
@@ -178,12 +154,6 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _router = GoRouter.of(context);
   }
 
   @override
@@ -356,10 +326,7 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
 
   Future<void> _submit() async {
     final controller = ref.read(profileControllerProvider.notifier);
-    final router = _router;
-    if (router == null) {
-      return;
-    }
+    final navigator = context.appNavigator;
     if (_isSignUp) {
       final locale = Localizations.localeOf(context).toLanguageTag();
 
@@ -409,25 +376,29 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
           normalizeProfileSuccessKey(nextState.successMessage) ==
               'auth.registration_pending_verification') {
         final email = nextState.email.trim();
-        router.go(
-          EmailVerificationPage.routePath,
-          extra: EmailVerificationRouteArgs(
+        navigator.go(
+          EmailVerificationDestination(
             email: email,
-            startResendCooldown: true,
+            payload: EmailVerificationRouteArgs(
+              email: email,
+              startResendCooldown: true,
+            ),
           ),
         );
       } else if (!_isSignUp &&
           normalizeProfileFeedbackKey(nextState.errorMessage) ==
               'auth.email_not_confirmed') {
         final email = nextState.email.trim();
-        router.go(
-          EmailVerificationPage.routePath,
-          extra: EmailVerificationRouteArgs(email: email),
+        navigator.go(
+          EmailVerificationDestination(
+            email: email,
+            payload: EmailVerificationRouteArgs(email: email),
+          ),
         );
       }
       return;
     }
-    router.go(_resolvePostAuthRoute());
+    navigator.go(SafeRedirectDestination(_resolvePostAuthRoute()));
   }
 
   Future<void> _submitExternal(ExternalAuthProvider provider) async {
@@ -447,10 +418,7 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
       },
     );
     final controller = ref.read(profileControllerProvider.notifier);
-    final router = _router;
-    if (router == null) {
-      return;
-    }
+    final navigator = context.appNavigator;
     await controller.authenticateWithProvider(provider);
 
     if (!mounted) {
@@ -462,7 +430,7 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
       return;
     }
 
-    router.go(_resolvePostAuthRoute());
+    navigator.go(SafeRedirectDestination(_resolvePostAuthRoute()));
   }
 
   void _syncControllers(ProfileState state) {
@@ -485,16 +453,7 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
 
   String _resolvePostAuthRoute() {
     return normalizeAuthRedirectPath(widget.redirectPath) ??
-        TemplatesPage.routePath;
-  }
-
-  String _redirectQuery() {
-    final redirectPath = normalizeAuthRedirectPath(widget.redirectPath);
-    if (redirectPath == null) {
-      return '';
-    }
-
-    return '?redirect=${Uri.encodeQueryComponent(redirectPath)}';
+        const TemplatesDestination().location;
   }
 
   String _mapErrorMessage(String raw, AppLocalizations text) {
@@ -506,7 +465,7 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
   }
 
   void _openLegalDocument(ProfileSettingsDetailKind kind) {
-    context.push(ProfileSettingsDetailPage.location(kind));
+    context.appNavigator.push(ProfileSettingsDetailDestination(kind.slug));
   }
 
   bool _hasConsentErrorCode(String key) {

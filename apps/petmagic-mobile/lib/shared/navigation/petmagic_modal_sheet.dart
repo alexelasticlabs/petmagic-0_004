@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_navigation_layout.dart';
 
 typedef PetMagicModalSheetBuilder =
     Widget Function(BuildContext context, double bottomInset);

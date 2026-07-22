@@ -1,5 +1,12 @@
 {
   "@@locale": "fr",
+  "navDiscover": "Découvrir",
+  "navCreate": "Créer",
+  "createHubTitle": "Créez de la magie avec votre animal",
+  "createHubSubtitle": "Commencez avec un modèle ou votre animal. Nous vous guiderons pour la suite.",
+  "createHubBrowseAction": "Explorer les modèles",
+  "createHubPetsAction": "Choisir mon animal",
+  "createHubGuestHint": "Vous pouvez d'abord explorer. Votre choix est conservé si une connexion est nécessaire.",
   "navTemplates": "Modèles",
   "navCreations": "Galerie",
   "navProfile": "Profil",

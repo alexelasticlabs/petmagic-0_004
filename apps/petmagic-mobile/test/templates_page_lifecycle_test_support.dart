@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -10,18 +11,17 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
+import 'package:petmagic_mobile/features/profile/application/profile_controller.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
-import 'package:petmagic_mobile/features/templates/data/templates_query.dart';
+import 'package:petmagic_mobile/features/templates/domain/templates_query.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
-import 'package:petmagic_mobile/features/templates/presentation/templates_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/generation_history_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/templates_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
-import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 Finder randomTemplateActionFinder() {
@@ -582,14 +582,14 @@ class PetFlowGenerationRepository extends TemplateGenerationRepository {
   }
 
   @override
-  Future<List<PetProfile>> fetchPets({CancelToken? cancelToken}) async {
+  Future<List<PetProfile>> fetchPets({RequestCancellation? cancelToken}) async {
     return const [];
   }
 
   @override
   Future<List<PetPhoto>> fetchPetPhotos(
     String petId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return [
       PetPhoto(
@@ -615,7 +615,7 @@ class PetFlowGenerationRepository extends TemplateGenerationRepository {
     required String templateId,
     int? expectedTemplateVersion,
     String? correlationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     startFromPetCalls++;
     lastPetId = petId;
@@ -652,7 +652,7 @@ class CrossGalleryPetFlowRepository extends PetFlowGenerationRepository {
   final createdCreations = <TemplateGenerationResult>[];
 
   @override
-  Future<List<PetProfile>> fetchPets({CancelToken? cancelToken}) async {
+  Future<List<PetProfile>> fetchPets({RequestCancellation? cancelToken}) async {
     return [
       PetProfile(
         id: 'pet-42',
@@ -671,7 +671,7 @@ class CrossGalleryPetFlowRepository extends PetFlowGenerationRepository {
   @override
   Future<List<PetPhoto>> fetchPetPhotos(
     String petId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return [
       PetPhoto(
@@ -693,7 +693,7 @@ class CrossGalleryPetFlowRepository extends PetFlowGenerationRepository {
   @override
   Future<List<TemplateGenerationResult>> fetchPetGenerations(
     String petId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return const [];
   }
@@ -705,7 +705,7 @@ class CrossGalleryPetFlowRepository extends PetFlowGenerationRepository {
     required String templateId,
     int? expectedTemplateVersion,
     String? correlationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final generation = await super.startGenerationFromPet(
       petId: petId,
@@ -797,9 +797,12 @@ String readTemplatesPageLibrarySource() {
   const files = [
     'lib/features/templates/presentation/templates_page.dart',
     'lib/features/templates/presentation/templates_page_feed.part.dart',
+    'lib/features/templates/presentation/templates_page_feed_slivers.part.dart',
     'lib/features/templates/presentation/templates_page_generation_flow.part.dart',
+    'lib/features/templates/presentation/templates_page_pet_photo_picker.part.dart',
     'lib/features/templates/presentation/templates_page_lifecycle.part.dart',
     'lib/features/templates/presentation/templates_page_template_actions.part.dart',
+    'lib/features/templates/presentation/templates_page_view.part.dart',
   ];
 
   return files.map((path) => File(path).readAsStringSync()).join('\n');

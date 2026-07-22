@@ -9,6 +9,29 @@ class AppLocalizationsDe extends AppLocalizations {
   AppLocalizationsDe([String locale = 'de']) : super(locale);
 
   @override
+  String get navDiscover => 'Entdecken';
+
+  @override
+  String get navCreate => 'Erstellen';
+
+  @override
+  String get createHubTitle => 'Magie mit deinem Haustier';
+
+  @override
+  String get createHubSubtitle =>
+      'Beginne mit einer Vorlage oder deinem Haustier. Wir führen dich durch die nächsten Schritte.';
+
+  @override
+  String get createHubBrowseAction => 'Vorlagen entdecken';
+
+  @override
+  String get createHubPetsAction => 'Mein Haustier wählen';
+
+  @override
+  String get createHubGuestHint =>
+      'Du kannst zuerst alles ansehen. Deine Auswahl bleibt erhalten, wenn eine Anmeldung nötig ist.';
+
+  @override
   String get navTemplates => 'Vorlagen';
 
   @override

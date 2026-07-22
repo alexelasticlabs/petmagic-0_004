@@ -27,12 +27,21 @@ class _SubscriptionSummaryCard extends StatelessWidget {
     final subtitle = summary.planName?.trim().isNotEmpty == true
         ? summary.planName!
         : providerLabel;
-    final statusLabel = premiumSubscriptionStatusLabel(
-      text: text,
+    final statusKind = classifyPremiumSubscriptionStatus(
       isPremium: summary.isPremium,
       cancelAtPeriodEnd: summary.cancelAtPeriodEnd == true,
       status: summary.status,
     );
+    final statusLabel = switch (statusKind) {
+      PremiumSubscriptionStatusKind.inactive => text.subscriptionStatusInactive,
+      PremiumSubscriptionStatusKind.cancelled =>
+        text.subscriptionStatusCancelled,
+      PremiumSubscriptionStatusKind.active => text.subscriptionStatusActive,
+      PremiumSubscriptionStatusKind.paymentFailed =>
+        text.subscriptionStatusPaymentFailed,
+      PremiumSubscriptionStatusKind.expired => text.subscriptionStatusExpired,
+      PremiumSubscriptionStatusKind.pending => text.subscriptionStatusPending,
+    };
     final nextBillingValue = summary.currentPeriodEndUtc == null
         ? null
         : format.format(summary.currentPeriodEndUtc!.toLocal());

@@ -21,7 +21,7 @@ void main() {
         ),
         _ControllerSyncPolicy(
           path:
-              'lib/features/profile/presentation/profile_settings_detail_page.dart',
+              'lib/features/profile/presentation/profile_account_info_page.dart',
           expectedSyncCall: '_syncDisplayNameController(next);',
         ),
       ]) {
@@ -85,10 +85,18 @@ void main() {
   });
 
   test('password change step labels use localizations', () {
-    final source = File(
+    final pageSource = File(
       'lib/features/profile/presentation/password_change_page.dart',
     ).readAsStringSync();
+    final progressSource = File(
+      'lib/features/profile/presentation/password_change_progress_widgets.part.dart',
+    ).readAsStringSync();
+    final source = '$pageSource\n$progressSource';
 
+    expect(
+      pageSource,
+      contains("part 'password_change_progress_widgets.part.dart';"),
+    );
     expect(source, contains('passwordChangeStepRequestCode'));
     expect(source, contains('passwordChangeStepNewPassword'));
     expect(source, isNot(contains('Запрос кода')));
@@ -175,8 +183,10 @@ void main() {
     expect(formSource, contains('colors.surfaceGlass.withValues(alpha: 0.72)'));
     expect(formSource, contains('colors.surfaceStrong : colors.surface'));
     expect(
-      formSource,
-      contains('colors.border.withValues(alpha: isDark ? 0.64 : 0.72)'),
+      RegExp(
+        r'colors\.border\.withValues\(\s*alpha:\s*isDark\s*\?\s*0\.64\s*:\s*0\.72,?\s*\)',
+      ).hasMatch(formSource),
+      isTrue,
     );
     expect(formSource, contains('colors.surfaceGlass.withValues(alpha: 0.86)'));
     for (final rawColor in const [
@@ -198,7 +208,7 @@ void main() {
     'profile account info page keeps account cards split from orchestration',
     () {
       final pageSource = File(
-        'lib/features/profile/presentation/profile_settings_detail_page.dart',
+        'lib/features/profile/presentation/profile_account_info_page.dart',
       ).readAsStringSync();
       final accountContentSource = File(
         'lib/features/profile/presentation/profile_account_info_content.part.dart',

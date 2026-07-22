@@ -1,17 +1,19 @@
 import 'dart:io';
+import 'package:petmagic_mobile/core/payments/store_purchase.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:in_app_purchase/in_app_purchase.dart';
-import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
+import 'package:petmagic_mobile/features/premium/domain/premium_models.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_repository.dart';
 
 import 'template_generation_repository_test_support.dart';
 
 void main() {
   test('store purchase verification forwards cancel token', () async {
-    final cancelToken = CancelToken();
+    final cancelToken = RequestCancellation();
     RequestOptions? request;
+    CancelToken? dioCancelToken;
     final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
       ..httpClientAdapter = FakeHttpClientAdapter((options) async {
         request = options;
@@ -20,7 +22,9 @@ void main() {
           options.headers[HttpHeaders.authorizationHeader],
           'Bearer access-token',
         );
-        expect(options.cancelToken, same(cancelToken));
+        dioCancelToken = options.cancelToken;
+        expect(dioCancelToken, isNotNull);
+        expect(dioCancelToken!.isCancelled, isFalse);
         return jsonResponse({
           'paymentProvider': 'google_play',
           'productId': 'com.petmagic.app.premium.monthly',
@@ -43,6 +47,8 @@ void main() {
 
     expect(request, isNotNull);
     expect(result.isActive, isTrue);
+    cancelToken.cancel('test_cancelled');
+    expect(dioCancelToken!.isCancelled, isTrue);
   });
 }
 
@@ -61,16 +67,17 @@ PremiumPlanModel _premiumPlan() {
   );
 }
 
-PurchaseDetails _storePurchase() {
-  return PurchaseDetails(
+StorePurchaseDetails _storePurchase() {
+  return StorePurchaseDetails(
     purchaseID: 'gp-subscription-1',
     productID: 'com.petmagic.app.premium.monthly',
-    verificationData: PurchaseVerificationData(
+    verificationData: StorePurchaseVerificationData(
       localVerificationData: 'local-store-data',
       serverVerificationData: 'gp-premium-token-1',
       source: 'google_play',
     ),
     transactionDate: DateTime.utc(2026, 7, 4).millisecondsSinceEpoch.toString(),
-    status: PurchaseStatus.purchased,
+    status: StorePurchaseStatus.purchased,
+    pendingCompletePurchase: false,
   );
 }

@@ -12,7 +12,6 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Configuration;
 
-using PetMagic.Modules.Identity.Api.Authentication;
 using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Identity.Application.Contracts;
 
@@ -74,8 +73,8 @@ public static partial class AuthEndpoints
         HttpContext httpContext,
         IValidator<ExternalLoginCallbackCommand> validator,
         IIdentityService service,
-        ExternalLoginCompletionStore completionStore,
-        ExternalAccountLinkStore linkStore,
+        [FromServices] IExternalLoginCompletionStore completionStore,
+        [FromServices] IExternalAccountLinkStore linkStore,
         IConfiguration configuration,
         CancellationToken cancellationToken)
     {
@@ -310,7 +309,7 @@ public static partial class AuthEndpoints
     private static async Task<Results<Ok<TokenPairResponse>, ValidationProblem, ProblemHttpResult>> ExchangeExternalLoginAsync(
         HttpContext context,
         ExternalLoginExchangeRequest request,
-        ExternalLoginCompletionStore completionStore,
+        [FromServices] IExternalLoginCompletionStore completionStore,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Ticket))

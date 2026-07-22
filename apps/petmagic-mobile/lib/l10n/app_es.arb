@@ -1,5 +1,12 @@
 {
   "@@locale": "es",
+  "navDiscover": "Descubrir",
+  "navCreate": "Crear",
+  "createHubTitle": "Crea magia con tu mascota",
+  "createHubSubtitle": "Empieza con una plantilla o tu mascota. Te guiaremos en los siguientes pasos.",
+  "createHubBrowseAction": "Explorar plantillas",
+  "createHubPetsAction": "Elegir mi mascota",
+  "createHubGuestHint": "Puedes explorar primero. Tu elección se conserva si es necesario iniciar sesión.",
   "navTemplates": "Plantillas",
   "navCreations": "Galería",
   "navProfile": "Perfil",

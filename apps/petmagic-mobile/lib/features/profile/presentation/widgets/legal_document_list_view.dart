@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
+import 'package:petmagic_mobile/features/profile/domain/profile_models.dart';
 
 class LegalDocumentListView extends StatelessWidget {
   const LegalDocumentListView({

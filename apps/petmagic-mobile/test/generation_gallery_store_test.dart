@@ -462,7 +462,7 @@ void main() {
       );
 
       expect(body, contains('latestEntry?.isDeletedLocally == true'));
-      expect(body, contains('await _galleryDeleteLocalPath('));
+      expect(body, contains('await store._fileStorage.deleteLocalPath('));
       expect(body, contains('baseEntry.accountScope'));
       expect(body, contains('generation.generationId'));
       expect(body, contains('previewLocalPath'));

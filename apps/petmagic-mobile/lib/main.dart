@@ -7,8 +7,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:petmagic_mobile/app/app.dart';
+import 'package:petmagic_mobile/app/composition/mobile_provider_overrides.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/logging/app_crash_reporter.dart';
@@ -26,7 +26,6 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   AppConfig.validateReleaseConfiguration();
-  GoogleFonts.config.allowRuntimeFetching = false;
   _installGlobalErrorHandlers();
   configureDecodedImageCacheBudget();
 
@@ -49,7 +48,12 @@ Future<void> main() async {
         operation: 'app_startup',
         message: 'Application startup completed',
       );
-      runApp(const ProviderScope(child: PetMagicApp()));
+      runApp(
+        ProviderScope(
+          overrides: mobileProviderOverrides,
+          child: const PetMagicApp(),
+        ),
+      );
     },
     (error, stackTrace) {
       AppCrashReporter.recordFatal(

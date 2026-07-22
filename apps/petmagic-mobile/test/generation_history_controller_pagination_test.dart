@@ -1,12 +1,12 @@
 import 'dart:async';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'dart:io';
 
-import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/generation_history_controller.dart';
 import 'generation_history_controller_test_support.dart';
 
 void main() {
@@ -307,30 +307,35 @@ void main() {
 
   test('generation history load cancel-token cleanup is identity safe', () {
     final contractSource = File(
-      'lib/features/templates/presentation/generation_history_controller.dart',
+      'lib/features/templates/application/generation_history_controller.dart',
     ).readAsStringSync();
     final lifecycleSource = File(
-      'lib/features/templates/presentation/generation_history_controller_lifecycle.part.dart',
+      'lib/features/templates/application/generation_history_controller_lifecycle.part.dart',
     ).readAsStringSync();
-    final syncSource = File(
-      'lib/features/templates/presentation/generation_history_controller_sync.part.dart',
-    ).readAsStringSync();
+    final syncSource = [
+      'lib/features/templates/application/generation_history_controller_sync.part.dart',
+      'lib/features/templates/application/generation_history_controller_mutations.part.dart',
+    ].map((path) => File(path).readAsStringSync()).join('\n');
 
     expect(
       contractSource,
-      contains('void _clearActiveLoadCancelToken(CancelToken cancelToken);'),
+      contains(
+        'void _clearActiveLoadRequestCancellation(RequestCancellation cancelToken);',
+      ),
     );
     expect(
       lifecycleSource,
-      contains('if (identical(_activeLoadCancelToken, cancelToken))'),
+      contains('if (identical(_activeLoadRequestCancellation, cancelToken))'),
     );
     expect(
       syncSource,
-      contains('_clearActiveLoadCancelToken(activeLoadCancelToken);'),
+      contains(
+        '_clearActiveLoadRequestCancellation(activeLoadRequestCancellation);',
+      ),
     );
     expect(
       lifecycleSource,
-      isNot(contains('void _clearActiveLoadCancelToken()')),
+      isNot(contains('void _clearActiveLoadRequestCancellation()')),
     );
   });
 }
@@ -348,7 +353,7 @@ class _SwitchingPaginationRepository extends FakeTemplateGenerationRepository {
     String? status,
     String? cursor,
     int? take,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) {
     if (status == 'completed' && cursor == null) {
       fetchPageCalls.add((status: status, cursor: cursor, take: take));

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -9,9 +10,9 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
+import 'package:petmagic_mobile/features/premium/domain/premium_models.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_repository.dart';
-import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
+import 'package:petmagic_mobile/features/premium/application/premium_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/subscription_management_page.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
@@ -24,9 +25,10 @@ void main() {
     final contentSource = await File(
       'lib/features/premium/presentation/subscription_management_content.part.dart',
     ).readAsString();
-    final sectionsSource = await File(
+    final sectionsSource = [
       'lib/features/premium/presentation/subscription_management_sections.part.dart',
-    ).readAsString();
+      'lib/features/premium/presentation/subscription_management_billing_sections.part.dart',
+    ].map((path) => File(path).readAsStringSync()).join('\n');
     final progressSource = await File(
       'lib/features/premium/presentation/subscription_management_progress.part.dart',
     ).readAsString();
@@ -207,9 +209,12 @@ void main() {
     final pageSource = await File(
       'lib/features/premium/presentation/subscription_management_page.dart',
     ).readAsString();
-    final controllerSource = await File(
-      'lib/features/premium/presentation/premium_controller.dart',
-    ).readAsString();
+    final controllerSource = await Future.wait(
+      [
+        'lib/features/premium/application/premium_controller.dart',
+        'lib/features/premium/application/premium_controller_models.part.dart',
+      ].map((path) => File(path).readAsString()),
+    ).then((sources) => sources.join('\n'));
     final repositorySource = await File(
       'lib/features/premium/data/premium_repository.dart',
     ).readAsString();
@@ -241,13 +246,13 @@ void main() {
 
     expect(
       pageSource,
-      contains('CancelToken? _activeSubscriptionActionCancelToken;'),
+      contains('RequestCancellation? _activeSubscriptionActionCancelToken;'),
     );
     expect(disposeBody, contains('_cancelActiveSubscriptionAction();'));
     expect(openManageBody, contains('final cancelToken ='));
     expect(openManageBody, contains('cancelToken: cancelToken'));
     expect(openManageBody, contains('cancelToken.isCancelled'));
-    expect(openManageBody, contains('CancelToken.isCancel(error)'));
+    expect(openManageBody, contains('on RequestCancelledException'));
     expect(
       openManageBody,
       contains('_completeSubscriptionAction(cancelToken)'),
@@ -255,9 +260,9 @@ void main() {
     expect(cancelBody, contains('final cancelToken ='));
     expect(cancelBody, contains('cancelToken: cancelToken'));
     expect(cancelBody, contains('cancelToken.isCancelled'));
-    expect(cancelBody, contains('CancelToken.isCancel(error)'));
+    expect(cancelBody, contains('on RequestCancelledException'));
     expect(cancelBody, contains('_completeSubscriptionAction(cancelToken)'));
-    expect(controllerSource, contains('CancelToken? cancelToken'));
+    expect(controllerSource, contains('RequestCancellation? cancelToken'));
     expect(serviceCreateBody, contains('createBillingPortal('));
     expect(serviceCreateBody, contains('cancelToken: cancelToken'));
     expect(
@@ -272,7 +277,7 @@ void main() {
       repositorySource,
       contains('Future<PremiumBillingPortalModel> createBillingPortal({'),
     );
-    expect(repositorySource, contains('CancelToken? cancelToken'));
+    expect(repositorySource, contains('RequestCancellation? cancelToken'));
     expect(repositoryPortalBody, contains('cancelToken: cancelToken'));
     expect(
       repositorySource,
@@ -699,7 +704,9 @@ class _CountingSubscriptionManagementRepository extends PremiumRepository {
   int fetchStatusCalls = 0;
 
   @override
-  Future<PremiumStatusModel> fetchStatus({CancelToken? cancelToken}) async {
+  Future<PremiumStatusModel> fetchStatus({
+    RequestCancellation? cancelToken,
+  }) async {
     fetchStatusCalls++;
     return const PremiumStatusModel(
       isPremium: true,

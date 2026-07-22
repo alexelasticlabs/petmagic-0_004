@@ -3,24 +3,19 @@ part of 'generation_status_page.dart';
 extension _GenerationStatusPageResultActions on _GenerationStatusPageState {
   void _retrySoon(TemplateGenerationResult generation) {
     _showInfo(AppLocalizations.of(context).generationStatusRetrySoonMessage);
-    context.go(_templatesLocationForGeneration(generation));
+    context.appNavigator.go(_templatesDestinationForGeneration(generation));
   }
 
-  String _templatesLocationForGeneration(TemplateGenerationResult generation) {
+  TemplatesDestination _templatesDestinationForGeneration(
+    TemplateGenerationResult generation,
+  ) {
     final petId = generation.petId?.trim();
     if (petId == null || petId.isEmpty) {
-      return TemplatesPage.routePath;
+      return const TemplatesDestination();
     }
 
     final petPhotoId = generation.petPhotoId?.trim();
-    return Uri(
-      path: TemplatesPage.routePath,
-      queryParameters: {
-        'petId': petId,
-        if (petPhotoId != null && petPhotoId.isNotEmpty)
-          'petPhotoId': petPhotoId,
-      },
-    ).toString();
+    return TemplatesDestination(petId: petId, petPhotoId: petPhotoId);
   }
 
   bool _canGenerateSimilar(TemplateGenerationResult generation) {
@@ -48,7 +43,7 @@ extension _GenerationStatusPageResultActions on _GenerationStatusPageState {
       }
 
       _showInfo(text.generationStatusDeletedMessage);
-      context.go('/creations');
+      context.appNavigator.go(const CreationsDestination());
     } on Object {
       if (!mounted) {
         return;
@@ -98,7 +93,7 @@ extension _GenerationStatusPageResultActions on _GenerationStatusPageState {
         return;
       }
 
-      context.go(GenerationStatusPage.routeFor(next.generationId));
+      context.appNavigator.go(GenerationDestination(next.generationId));
     } on AppException catch (error) {
       if (!mounted) {
         return;
@@ -227,7 +222,9 @@ extension _GenerationStatusPageResultActions on _GenerationStatusPageState {
     if (!mounted) {
       return;
     }
-    context.push(GenerationResultInputPage.routeFor(generation.generationId));
+    context.appNavigator.push(
+      GenerationResultInputDestination(generation.generationId),
+    );
   }
 
   Future<void> _showRemoveWatermarkSheet(
@@ -315,7 +312,7 @@ extension _GenerationStatusPageResultActions on _GenerationStatusPageState {
     }
 
     if (action == _RemoveWatermarkAction.premium) {
-      context.push(PremiumPage.routePath);
+      context.appNavigator.push(const PremiumDestination());
       return;
     }
 
@@ -343,12 +340,14 @@ extension _GenerationStatusPageResultActions on _GenerationStatusPageState {
             : text.generationStatusRemoveWatermarkFailed,
       );
       await _load(silent: true);
-    } on DioException catch (error) {
-      if (!mounted || CancelToken.isCancel(error)) {
+    } on RequestCancelledException {
+      return;
+    } on AppException catch (error) {
+      if (!mounted) {
         return;
       }
 
-      if (error.response?.statusCode == 402) {
+      if (error.statusCode == 402) {
         await _showWatermarkNoCreditsSheet();
       } else {
         _showInfo(text.generationStatusRemoveWatermarkFailed);
@@ -438,11 +437,11 @@ extension _GenerationStatusPageResultActions on _GenerationStatusPageState {
     }
 
     if (action == _RemoveWatermarkAction.credits) {
-      context.push(WalletPage.routePath);
+      context.appNavigator.push(const WalletDestination());
       return;
     }
 
-    context.push(PremiumPage.routePath);
+    context.appNavigator.push(const PremiumDestination());
   }
 
   Future<void> _recordWatermarkAnalytics(
@@ -489,42 +488,4 @@ extension _GenerationStatusPageResultActions on _GenerationStatusPageState {
       );
     }
   }
-}
-
-enum _RemoveWatermarkAction { credit, credits, premium }
-
-String _generateSimilarImageCostMessage(AppLocalizations text) =>
-    text.generationStatusGenerateSimilarCost(1);
-
-String _generateSimilarVideoCostMessage(AppLocalizations text) =>
-    text.generationStatusGenerateSimilarCost(5);
-
-String _generateSimilarConfirmLabel(AppLocalizations text) =>
-    text.generationStatusGenerateSimilarConfirmAction;
-
-String _cancelLabel(AppLocalizations text) =>
-    text.generationStatusGenerateSimilarCancelAction;
-
-String _sourceUnavailableMessage(AppLocalizations text) =>
-    text.generationStatusGenerateSimilarSourceUnavailable;
-
-String _insufficientCreditsMessage(AppLocalizations text) =>
-    text.generationStatusGenerateSimilarInsufficientBalance;
-
-String _generateSimilarGenericErrorMessage(AppLocalizations text) =>
-    text.generationStatusGenerateSimilarFailed;
-
-String _generateSimilarErrorMessage(AppLocalizations text, AppException error) {
-  final message = error.message.toLowerCase();
-  if (error.statusCode == 402 || message.contains('insufficient')) {
-    return _insufficientCreditsMessage(text);
-  }
-
-  if (message.contains('source_media_unavailable') ||
-      message.contains('generation_result_input_unavailable') ||
-      message.contains('unavailable')) {
-    return _sourceUnavailableMessage(text);
-  }
-
-  return _generateSimilarGenericErrorMessage(text);
 }

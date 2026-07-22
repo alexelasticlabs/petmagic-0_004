@@ -1,5 +1,12 @@
 {
   "@@locale": "ru",
+  "navDiscover": "Обзор",
+  "navCreate": "Создать",
+  "createHubTitle": "Создайте магию с питомцем",
+  "createHubSubtitle": "Начните с шаблона или питомца — дальше мы проведём вас по шагам.",
+  "createHubBrowseAction": "Выбрать шаблон",
+  "createHubPetsAction": "Выбрать питомца",
+  "createHubGuestHint": "Сначала можно всё посмотреть. Если потребуется вход, выбранный сценарий сохранится.",
   "navTemplates": "Шаблоны",
   "navCreations": "Галерея",
   "navRewards": "Бонусы",

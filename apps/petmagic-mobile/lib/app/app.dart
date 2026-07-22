@@ -3,21 +3,23 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:petmagic_mobile/app/notifications/push_notifications_bootstrap.dart';
+import 'package:petmagic_mobile/app/session/session_scope_reset.dart';
+import 'package:petmagic_mobile/core/auth/auth_session_storage.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/performance/app_performance_monitor.dart';
 import 'package:petmagic_mobile/core/performance/decoded_image_cache_budget.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/preferences/app_preferences_controller.dart';
 import 'package:petmagic_mobile/app/router/app_router.dart';
+import 'package:petmagic_mobile/app/router/go_router_app_navigator.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
-import 'package:petmagic_mobile/core/notifications/push_notifications_bootstrap.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/core/startup/session_scope_reset.dart';
-import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/shared/widgets/network_status_banner.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_notification_host.dart';
 
@@ -130,6 +132,7 @@ class PetMagicApp extends ConsumerWidget {
     });
 
     final router = ref.watch(appRouterProvider);
+    final appNavigator = GoRouterAppNavigator(router);
     final preferences = ref.watch(
       appPreferencesControllerProvider.select(
         (state) => (themeMode: state.themeMode, locale: state.locale),
@@ -161,29 +164,32 @@ class PetMagicApp extends ConsumerWidget {
                       : Brightness.dark,
                 );
         final appChild = PushNotificationsBootstrap(
-          router: router,
+          navigator: appNavigator,
           child: child ?? const SizedBox.shrink(),
         );
-        final hostedChild = AnnotatedRegion<SystemUiOverlayStyle>(
-          value: overlayStyle,
-          child: Stack(
-            children: [
-              PetMagicNotificationHost(child: appChild),
-              Positioned.fill(
-                child: SafeArea(
-                  child: Align(
-                    alignment: Alignment.topCenter,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 560),
-                        child: const NetworkStatusBanner(),
+        final hostedChild = AppNavigationScope(
+          navigator: appNavigator,
+          child: AnnotatedRegion<SystemUiOverlayStyle>(
+            value: overlayStyle,
+            child: Stack(
+              children: [
+                PetMagicNotificationHost(child: appChild),
+                Positioned.fill(
+                  child: SafeArea(
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 560),
+                          child: const NetworkStatusBanner(),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
         final lifecycleAwareChild = DecodedImageCacheLifecycleObserver(

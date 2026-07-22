@@ -36,13 +36,22 @@ jobs:
       - name: Generate localization
         run: flutter gen-l10n
       - name: Format
-        run: dart format --output=none --set-exit-if-changed lib test tool
+        run: dart format --output=none --set-exit-if-changed lib test integration_test tool
       - name: Verify localization catalogs
         run: |
           dart tool/check_generation_status_l10n.dart
           dart tool/check_l10n_completeness.dart
       - name: Analyze
         run: flutter analyze --fatal-infos
+      - name: Verify architecture boundaries
+        run: flutter test test/mobile_architecture_test.dart
+      - name: Verify responsive and accessible UI contracts
+        run: >-
+          flutter test --concurrency=1
+          test/widget_test.dart
+          test/welcome_compact_golden_test.dart
+          test/app_theme_test.dart
+          test/shared_ui_performance_regression_test.dart
       - name: Test
         run: flutter test --concurrency=1
       - name: Verify release signing guard
@@ -68,7 +77,14 @@ jobs:
             --dart-define=APP_ENVIRONMENT=staging \
             --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging \
             --dart-define=API_BASE_URL=https://api.staging.petmagic.app \
+            --build-number="$GITHUB_RUN_NUMBER" \
             --obfuscate --split-debug-info=build/symbols/staging
+      - name: Enforce Android release size budget
+        run: >-
+          dart run tool/check_release_size_budget.dart
+          --artifact build/app/outputs/bundle/stagingRelease/app-staging-release.aab
+          --baseline-bytes 95104021
+          --max-growth-percent 5
       - name: Build Android production release smoke
         env:
           ORG_GRADLE_PROJECT_allowInsecureReleaseSigning: "true"
@@ -81,7 +97,44 @@ jobs:
             --dart-define=APP_ENVIRONMENT=production \
             --dart-define=APP_PACKAGE_NAME=com.petmagic.app \
             --dart-define=API_BASE_URL=https://api.petmagic.app \
+            --build-number="$GITHUB_RUN_NUMBER" \
             --obfuscate --split-debug-info=build/symbols/production
+
+  android-device-ui-smoke:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/petmagic-mobile
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: '3.44.5'
+          cache: true
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Resolve dependencies
+        run: flutter pub get
+      - name: Generate staging Firebase smoke configuration
+        run: dart run tool/configure_firebase_smoke.dart --environment=staging
+      - name: Run deterministic mobile core flows on Android
+        uses: reactivecircus/android-emulator-runner@e89f39f1abbbd05b1113a29cf4db69e7540cae5a # v2.37.0
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot-save
+          script: |
+            cd apps/petmagic-mobile
+            flutter test integration_test/core_user_journey_test.dart -d emulator-5554 --flavor staging --dart-define=APP_ENVIRONMENT=staging --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging --dart-define=API_BASE_URL=https://api.staging.petmagic.app
+            flutter test integration_test/templates_feed_stress_test.dart -d emulator-5554 --flavor staging --dart-define=APP_ENVIRONMENT=staging --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging --dart-define=API_BASE_URL=https://api.staging.petmagic.app
+            flutter test integration_test/gallery_cross_flow_test.dart -d emulator-5554 --flavor staging --dart-define=APP_ENVIRONMENT=staging --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging --dart-define=API_BASE_URL=https://api.staging.petmagic.app
+            flutter test integration_test/watermark_result_flow_test.dart -d emulator-5554 --flavor staging --dart-define=APP_ENVIRONMENT=staging --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging --dart-define=API_BASE_URL=https://api.staging.petmagic.app
 
   ios-build:
     runs-on: macos-latest
@@ -104,7 +157,41 @@ jobs:
             --dart-define=APP_ENVIRONMENT=staging \
             --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging \
             --dart-define=API_BASE_URL=https://api.staging.petmagic.app \
+            --build-number="$GITHUB_RUN_NUMBER" \
             --obfuscate --split-debug-info=build/symbols/ios-staging
+      - name: Run deterministic iOS core flow
+        env:
+          PETMAGIC_ALLOW_PLACEHOLDER_FIREBASE: "true"
+        run: |
+          dart run tool/configure_firebase_smoke.dart --environment=staging
+          DEVICE_ID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; data=json.load(sys.stdin); print(next((d["udid"] for runtime in data["devices"].values() for d in runtime if d.get("isAvailable") and "iPhone" in d["name"]), ""))')
+          test -n "$DEVICE_ID"
+          xcrun simctl boot "$DEVICE_ID" || true
+          xcrun simctl bootstatus "$DEVICE_ID" -b
+          flutter test integration_test/core_user_journey_test.dart \
+            -d "$DEVICE_ID" \
+            --flavor staging \
+            --dart-define=APP_ENVIRONMENT=staging \
+            --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging \
+            --dart-define=API_BASE_URL=https://api.staging.petmagic.app
+          flutter test integration_test/templates_feed_stress_test.dart \
+            -d "$DEVICE_ID" \
+            --flavor staging \
+            --dart-define=APP_ENVIRONMENT=staging \
+            --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging \
+            --dart-define=API_BASE_URL=https://api.staging.petmagic.app
+          flutter test integration_test/gallery_cross_flow_test.dart \
+            -d "$DEVICE_ID" \
+            --flavor staging \
+            --dart-define=APP_ENVIRONMENT=staging \
+            --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging \
+            --dart-define=API_BASE_URL=https://api.staging.petmagic.app
+          flutter test integration_test/watermark_result_flow_test.dart \
+            -d "$DEVICE_ID" \
+            --flavor staging \
+            --dart-define=APP_ENVIRONMENT=staging \
+            --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging \
+            --dart-define=API_BASE_URL=https://api.staging.petmagic.app
       - name: Build iOS production release smoke
         env:
           PETMAGIC_ALLOW_PLACEHOLDER_FIREBASE: "true"
@@ -114,4 +201,5 @@ jobs:
             --dart-define=APP_ENVIRONMENT=production \
             --dart-define=APP_PACKAGE_NAME=com.petmagic.app \
             --dart-define=API_BASE_URL=https://api.petmagic.app \
+            --build-number="$GITHUB_RUN_NUMBER" \
             --obfuscate --split-debug-info=build/symbols/ios-production

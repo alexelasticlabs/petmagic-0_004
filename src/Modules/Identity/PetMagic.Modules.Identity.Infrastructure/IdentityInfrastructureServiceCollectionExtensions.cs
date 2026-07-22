@@ -17,6 +17,7 @@ using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Identity.Domain.Enums;
 using PetMagic.Modules.Identity.Infrastructure.Data;
 using PetMagic.Modules.Identity.Infrastructure.Entities;
+using PetMagic.Modules.Identity.Infrastructure.ExternalAuthentication;
 using PetMagic.Modules.Identity.Infrastructure.Options;
 
 namespace PetMagic.Modules.Identity.Infrastructure;
@@ -140,6 +141,8 @@ public static class IdentityInfrastructureServiceCollectionExtensions
         services.AddSingleton<IAvatarReadUrlSigner, AvatarReadUrlSigner>();
         services.AddScoped<IGoogleIdentityTokenVerifier, GoogleIdentityTokenVerifier>();
         services.AddScoped<IAppleIdentityTokenVerifier, AppleIdentityTokenVerifier>();
+        services.AddSingleton<IExternalLoginCompletionStore, ExternalLoginCompletionStore>();
+        services.AddSingleton<IExternalAccountLinkStore, ExternalAccountLinkStore>();
         services.AddScoped<IIdentityUserLookupService, IdentityUserLookupService>();
         services.AddScoped<IAdminAuditLog, IdentityAdminAuditLog>();
         services.AddScoped<IEmailSender, SmtpEmailSender>();

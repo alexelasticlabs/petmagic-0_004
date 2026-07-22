@@ -4,7 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('legacy support settings route redirects to canonical support home', () {
-    final source = File('lib/app/router/app_router.dart').readAsStringSync();
+    final source = File(
+      'lib/app/router/app_routes.part.dart',
+    ).readAsStringSync();
 
     expect(source, contains('path: ProfileSettingsDetailPage.routePath,'));
     expect(

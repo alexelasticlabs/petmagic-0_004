@@ -4,9 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('push token retry stops after sign-out or coordinator dispose', () {
-    final source = File(
-      'lib/core/notifications/notification_coordinator.dart',
-    ).readAsStringSync();
+    final source = _readNotificationCoordinatorSource();
 
     expect(source, contains('int _registrationEpoch = 0;'));
     expect(source, contains('Future<bool> _registerTokenWithRetry('));
@@ -44,9 +42,7 @@ void main() {
   test(
     'notification coordinator stops token re-registration and clears dedupe state after sign-out',
     () {
-      final source = File(
-        'lib/core/notifications/notification_coordinator.dart',
-      ).readAsStringSync();
+      final source = _readNotificationCoordinatorSource();
       final initBody = _methodBody(source, 'initializeForAuthenticatedUser');
       final registerBody = _methodBody(source, 'registerCurrentToken');
       final unregisterBody = _methodBody(source, '_unregisterCurrentToken');
@@ -103,9 +99,7 @@ void main() {
   );
 
   test('notification failure logs do not include push token context', () {
-    final source = File(
-      'lib/core/notifications/notification_coordinator.dart',
-    ).readAsStringSync();
+    final source = _readNotificationCoordinatorSource();
     final body = _methodBody(source, '_logNotificationFailure');
 
     expect(body, contains('AppLogger.error'));
@@ -117,15 +111,15 @@ void main() {
 
   test('notification routes are constrained to safe internal destinations', () {
     final source = File(
-      'lib/core/notifications/notification_coordinator.dart',
+      'lib/core/notifications/notification_route_resolver.dart',
     ).readAsStringSync();
-    final routeBody = _methodBody(source, '_routeFromMap');
-    final safeRouteBody = _methodBody(source, '_safeInternalRoute');
-    final generationRouteBody = _methodBody(source, '_generationRoute');
+    final routeBody = _methodBody(source, 'routeFromMap');
+    final safeRouteBody = _methodBody(source, 'safeInternalRoute');
+    final generationRouteBody = _methodBody(source, 'generationRouteFor');
 
     expect(routeBody, isNot(contains('return route;')));
-    expect(routeBody, contains('_safeInternalRoute(route)'));
-    expect(routeBody, contains('_generationRoute(generationId)'));
+    expect(routeBody, contains('safeInternalRoute(route)'));
+    expect(routeBody, contains("generationRouteFor(payload['generationId'])"));
     expect(routeBody, contains("if (type == 'wallet')"));
     expect(routeBody, contains("return '/profile/wallet';"));
     expect(routeBody, contains("if (type == 'premium')"));
@@ -145,12 +139,8 @@ void main() {
   test(
     'auth bootstrap requests notification permission before token register',
     () {
-      final coordinatorSource = File(
-        'lib/core/notifications/notification_coordinator.dart',
-      ).readAsStringSync();
-      final settingsSource = File(
-        'lib/features/profile/presentation/widgets/profile_notifications_settings_section.dart',
-      ).readAsStringSync();
+      final coordinatorSource = _readNotificationCoordinatorSource();
+      final settingsSource = _readProfileNotificationsSettingsSource();
 
       expect(
         coordinatorSource,
@@ -164,9 +154,7 @@ void main() {
   );
 
   test('foreground push notifications can route from their toast action', () {
-    final source = File(
-      'lib/core/notifications/notification_coordinator.dart',
-    ).readAsStringSync();
+    final source = _readNotificationCoordinatorSource();
     final foregroundBody = _methodBody(source, 'handleForegroundMessage');
 
     expect(
@@ -189,9 +177,7 @@ void main() {
   });
 
   test('foreground push coverage matches backend economy statuses', () {
-    final source = File(
-      'lib/core/notifications/notification_coordinator.dart',
-    ).readAsStringSync();
+    final source = _readNotificationCoordinatorSource();
     final foregroundCopySource = File(
       'lib/core/notifications/notification_foreground_copy.dart',
     ).readAsStringSync();
@@ -230,9 +216,7 @@ void main() {
   });
 
   test('notification tap handling deduplicates repeated message opens', () {
-    final source = File(
-      'lib/core/notifications/notification_coordinator.dart',
-    ).readAsStringSync();
+    final source = _readNotificationCoordinatorSource();
     final routeBody = _methodBody(source, '_handleRemoteMessageRoute');
     final dedupeBody = _methodBody(source, '_markInteractionHandled');
 
@@ -254,9 +238,10 @@ void main() {
   });
 
   test('push bootstrap keeps lifecycle side effects out of build', () {
-    final source = File(
-      'lib/core/notifications/push_notifications_bootstrap.dart',
-    ).readAsStringSync();
+    final source = [
+      'lib/app/notifications/push_notifications_bootstrap.dart',
+      'lib/app/notifications/push_notification_route_policy.part.dart',
+    ].map((path) => File(path).readAsStringSync()).join('\n');
     final initStateBody = _methodBody(source, 'initState');
     final disposeBody = _methodBody(source, 'dispose');
     final launchStateBody = _methodBody(source, '_handleLaunchState');
@@ -298,7 +283,7 @@ void main() {
       routeBody,
       contains('final destination = _resolvedRouteDestination'),
     );
-    expect(routeBody, contains('_pendingRoute = route'));
+    expect(routeBody, contains('_pendingRoute = _destinationForRoute(route)'));
     expect(deepLinkBody, contains('if (!mounted)'));
     expect(
       deepLinkBody,
@@ -319,9 +304,12 @@ void main() {
     expect(initialLinkBody, isNot(contains('Firebase.apps')));
     expect(
       flushPendingBody,
-      contains('final destination = _resolvedRouteDestination'),
+      contains('final resolvedDestination = _resolvedRouteDestination'),
     );
-    expect(flushPendingBody, contains('widget.router.go(destination)'));
+    expect(
+      flushPendingBody,
+      contains('widget.navigator.go(resolvedDestination)'),
+    );
     expect(
       queueCheckoutBody,
       contains('_pendingCheckoutVerificationRequested = true;'),
@@ -359,7 +347,7 @@ void main() {
     expect(resolvedRouteBody, contains('launchState.guestSessionReady'));
     expect(resolvedRouteBody, contains('_isAuthOnlyRoute(route)'));
     expect(resolvedRouteBody, contains('_authRedirectRoute(route)'));
-    expect(source, contains('AuthEntryPage.routePath'));
+    expect(source, contains('AuthDestination'));
     expect(buildBody, contains('return widget.child;'));
     expect(
       buildBody,
@@ -374,9 +362,7 @@ void main() {
   test(
     'notification settings reconcile push token registration on permission changes',
     () {
-      final source = File(
-        'lib/features/profile/presentation/widgets/profile_notifications_settings_section.dart',
-      ).readAsStringSync();
+      final source = _readProfileNotificationsSettingsSource();
       final reconcileBody = _methodBody(
         source,
         '_reconcilePushTokenRegistration',
@@ -387,19 +373,22 @@ void main() {
       expect(reconcileBody, contains('_registerPushTokenIfAllowed(status)'));
       expect(
         reconcileBody,
-        contains('_pushTokenRegistrar.readRegisteredToken()'),
+        contains('_pushTokenLifecycle.readRegisteredToken()'),
       );
       expect(reconcileBody, contains('final cachedToken ='));
       expect(
         reconcileBody.indexOf('if (!mounted)'),
         greaterThan(reconcileBody.indexOf('readRegisteredToken()')),
       );
-      expect(reconcileBody, contains('FirebaseMessaging.instance.getToken()'));
       expect(
-        reconcileBody.indexOf('FirebaseMessaging.instance.getToken()'),
+        reconcileBody,
+        contains('_pushTokenLifecycle.readCurrentDeviceToken()'),
+      );
+      expect(
+        reconcileBody.indexOf('_pushTokenLifecycle.readCurrentDeviceToken()'),
         greaterThan(reconcileBody.indexOf('if (!mounted)')),
       );
-      expect(reconcileBody, contains('_pushTokenRegistrar.unregisterToken('));
+      expect(reconcileBody, contains('_pushTokenLifecycle.unregisterToken('));
       expect(
         reconcileBody,
         contains("unregister_\${stage}_token_after_permission_change"),
@@ -425,9 +414,10 @@ void main() {
   test(
     'push token registrar persists successful registrations for cross-launch dedupe',
     () {
-      final registrarSource = File(
-        'lib/core/notifications/push_token_registrar.dart',
-      ).readAsStringSync();
+      final registrarSource = [
+        'lib/app/notifications/push_token_registrar.dart',
+        'lib/app/notifications/push_token_registrar_policy.part.dart',
+      ].map((path) => File(path).readAsStringSync()).join('\n');
       final cacheSource = File(
         'lib/core/notifications/push_token_registration_cache.dart',
       ).readAsStringSync();
@@ -493,9 +483,18 @@ void main() {
   );
 }
 
+String _readNotificationCoordinatorSource() {
+  return [
+    'lib/app/notifications/notification_coordinator.dart',
+    'lib/app/notifications/notification_interaction_coordinator.part.dart',
+  ].map((path) => File(path).readAsStringSync()).join('\n');
+}
+
 String _methodBody(String source, String methodName) {
   final methodMatch = RegExp(
-    r'(?:void|bool|String\??|Widget|Future<[^>]+>)\s+' + methodName + r'\s*\(',
+    r'(?:void|bool|String\??|AppDestination\??|Widget|Future<[^>]+>)\s+' +
+        methodName +
+        r'\s*\(',
   ).firstMatch(source);
   if (methodMatch == null) {
     fail('Method $methodName was not found.');
@@ -544,4 +543,11 @@ int _methodOpenBraceIndex(String source, RegExpMatch methodMatch) {
   }
 
   return -1;
+}
+
+String _readProfileNotificationsSettingsSource() {
+  return [
+    'lib/features/profile/presentation/widgets/profile_notifications_settings_section.dart',
+    'lib/features/profile/presentation/widgets/profile_notifications_settings_view.part.dart',
+  ].map((path) => File(path).readAsStringSync()).join('\n');
 }

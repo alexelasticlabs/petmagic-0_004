@@ -1,8 +1,9 @@
 import 'dart:async';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'dart:io' show Platform;
 
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
@@ -10,10 +11,9 @@ import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
+import 'package:petmagic_mobile/features/profile/application/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
 import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -72,6 +72,20 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('compact welcome remains scrollable at 200 percent text scale', (
+    tester,
+  ) async {
+    await pumpTestApp(
+      tester,
+      sharedPrefs: const {onboardingSeenKey: true},
+      surfaceSize: const Size(320, 568),
+      textScaleFactor: 2.0,
+    );
+
+    expect(find.byType(Scrollable), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('password visibility control exposes its semantic action', (
     tester,
   ) async {
@@ -90,6 +104,36 @@ void main() {
 
     expect(find.byTooltip(text.authHidePassword), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('welcome primary actions expose accessible semantics', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await pumpTestApp(tester, surfaceSize: const Size(320, 568));
+
+    final text = AppLocalizations.of(
+      tester.element(find.byType(Scaffold).first),
+    );
+    final signIn = tester.getSemantics(
+      find.bySemanticsLabel(text.profileSignInAction),
+    );
+    final continueAsGuest = tester.getSemantics(
+      find.bySemanticsLabel(text.startupWelcomeContinueGuest),
+    );
+
+    expect(signIn.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
+    expect(signIn.getSemanticsData().label, contains(text.profileSignInAction));
+    expect(
+      continueAsGuest.getSemanticsData().hasAction(SemanticsAction.tap),
+      isTrue,
+    );
+    expect(
+      continueAsGuest.getSemanticsData().label,
+      contains(text.startupWelcomeContinueGuest),
+    );
+    expect(tester.takeException(), isNull);
+    semantics.dispose();
   });
 
   test('auth social providers are platform-specific and ordered', () {
@@ -907,14 +951,14 @@ class MutableAuthenticatedWidgetAppLaunchController
 
 class DelayedProfileMutationRepository extends FakeProfileRepository {
   int updateProfileCalls = 0;
-  CancelToken? updateCancelToken;
+  RequestCancellation? updateCancelToken;
   final Completer<MobileUserProfile> _updateCompleter =
       Completer<MobileUserProfile>();
 
   @override
   Future<MobileUserProfile> updateProfile({
     required String? displayName,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) {
     updateProfileCalls++;
     updateCancelToken = cancelToken;

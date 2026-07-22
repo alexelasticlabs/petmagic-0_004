@@ -7,7 +7,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/core/network/api_base_url_resolver.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
@@ -63,7 +62,7 @@ void main() {
 
   test('polling realtime client uses disposable one-shot timers', () {
     final source = File(
-      'lib/core/realtime/realtime_client.dart',
+      'lib/core/realtime/polling_realtime_client.part.dart',
     ).readAsStringSync();
 
     expect(source, contains('void _scheduleNextPoll()'));
@@ -304,7 +303,7 @@ void main() {
 
   test('server-sent events realtime logs safe base URL origin only', () {
     final source = File(
-      'lib/core/realtime/realtime_client.dart',
+      'lib/core/realtime/server_sent_events_realtime_client.part.dart',
     ).readAsStringSync();
 
     expect(

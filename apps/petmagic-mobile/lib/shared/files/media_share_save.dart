@@ -3,7 +3,9 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 
 import 'device_file_saver.dart';
 import 'file_name_sanitizer.dart';
@@ -15,7 +17,7 @@ Future<File> cacheRemoteMediaFile({
   required String fileName,
   Dio? client,
   Duration downloadTimeout = const Duration(seconds: 20),
-  CancelToken? cancelToken,
+  RequestCancellation? cancelToken,
   int maxBytes = defaultRemoteFileDownloadMaxBytes,
 }) async {
   final bytes = await downloadFileBytes(
@@ -54,7 +56,7 @@ Future<void> shareRemoteMediaFile({
   String? title,
   String? text,
   Duration downloadTimeout = const Duration(seconds: 20),
-  CancelToken? cancelToken,
+  RequestCancellation? cancelToken,
   int maxBytes = defaultRemoteFileDownloadMaxBytes,
 }) async {
   final tempFile = await cacheRemoteMediaFile(
@@ -83,7 +85,7 @@ Future<void> shareLocalMediaFile({
   required String fileName,
   String? title,
   String? text,
-  CancelToken? cancelToken,
+  RequestCancellation? cancelToken,
 }) async {
   _throwIfCancelled(cancelToken);
   final usablePath = await usableLocalMediaPath(filePath);
@@ -111,7 +113,7 @@ Future<bool> saveRemoteMediaToGallery({
   required bool isVideo,
   String? albumName,
   Duration downloadTimeout = const Duration(seconds: 20),
-  CancelToken? cancelToken,
+  RequestCancellation? cancelToken,
   int maxBytes = defaultRemoteFileDownloadMaxBytes,
 }) async {
   final tempFile = await cacheRemoteMediaFile(
@@ -163,7 +165,7 @@ Future<bool> saveLocalMediaToGallery({
   required String fileName,
   required bool isVideo,
   String? albumName,
-  CancelToken? cancelToken,
+  RequestCancellation? cancelToken,
 }) async {
   _throwIfCancelled(cancelToken);
   final usablePath = await usableLocalMediaPath(filePath);
@@ -190,24 +192,10 @@ Future<bool> saveLocalMediaToGallery({
       );
     }
     return true;
-  } on DioException catch (error) {
-    if (CancelToken.isCancel(error)) {
+  } catch (error, stackTrace) {
+    if (error is RequestCancelledException) {
       rethrow;
     }
-    AppLogger.warn(
-      feature: 'Shared.MediaShareSave',
-      operation: 'save_local_to_gallery',
-      message: 'Local media save to gallery failed',
-      context: {
-        'isVideo': isVideo,
-        'hasAlbumName': albumName?.trim().isNotEmpty ?? false,
-        'extension': extractFileExtension(fileName) ?? '',
-      },
-      error: error,
-      stackTrace: error.stackTrace,
-    );
-    return false;
-  } catch (error, stackTrace) {
     AppLogger.warn(
       feature: 'Shared.MediaShareSave',
       operation: 'save_local_to_gallery',
@@ -266,15 +254,12 @@ String? usableLocalMediaPathSync(String? localPath) {
   }
 }
 
-void _throwIfCancelled(CancelToken? cancelToken) {
+void _throwIfCancelled(RequestCancellation? cancelToken) {
   if (cancelToken?.isCancelled != true) {
     return;
   }
 
-  throw DioException.requestCancelled(
-    requestOptions: RequestOptions(path: '/local-media-action'),
-    reason: 'media_action_cancelled',
-  );
+  throw const RequestCancelledException();
 }
 
 String _safePathLabel(String path) {

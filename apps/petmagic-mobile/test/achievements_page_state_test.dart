@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:petmagic_mobile/features/gamification/data/gamification_models.dart';
-import 'package:petmagic_mobile/features/gamification/presentation/achievements_page_state.dart';
+import 'package:petmagic_mobile/features/gamification/domain/gamification_models.dart';
+import 'package:petmagic_mobile/features/gamification/application/achievements_page_state.dart';
 
 void main() {
   group('applyAchievementFilter', () {

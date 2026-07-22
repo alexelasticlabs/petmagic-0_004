@@ -9,9 +9,12 @@ void main() {
       final authEntry = await File(
         'lib/features/profile/presentation/auth_entry_page.dart',
       ).readAsString();
-      final router = await File(
-        'lib/app/router/app_router.dart',
-      ).readAsString();
+      final router = await Future.wait(
+        [
+          'lib/app/router/app_router.dart',
+          'lib/app/router/app_routes.part.dart',
+        ].map((path) => File(path).readAsString()),
+      ).then((sources) => sources.join('\n'));
       final verificationPage = await File(
         'lib/features/profile/presentation/email_verification_page.dart',
       ).readAsString();
@@ -63,30 +66,33 @@ void main() {
   );
 
   test('auth submit operations are guarded against duplicate starts', () async {
-    final controller = await File(
-      'lib/features/profile/presentation/profile_controller.dart',
+    final coordinator = await File(
+      'lib/features/profile/application/profile_auth_coordinator.dart',
     ).readAsString();
 
-    for (final methodName in const [
-      'login',
-      'register',
-      'authenticateWithProvider',
-    ]) {
-      final body = _methodBody(controller, methodName);
+    for (final entry in const {
+      'login': 'if (_readState().isSaving) {',
+      'register': 'if (current.isSaving) {',
+      'authenticateWithProvider': 'if (_readState().isSaving) {',
+    }.entries) {
+      final body = _methodBody(coordinator, entry.key);
       expect(
         body,
-        contains('if (state.isSaving) {\n      return;\n    }'),
-        reason: '$methodName must ignore duplicate in-flight auth submits.',
+        contains(entry.value),
+        reason: '${entry.key} must ignore duplicate in-flight auth submits.',
       );
     }
   });
 
   test('profile presentation state does not retain auth tokens', () async {
     final controller = await File(
-      'lib/features/profile/presentation/profile_controller.dart',
+      'lib/features/profile/application/profile_controller.dart',
+    ).readAsString();
+    final stateSource = await File(
+      'lib/features/profile/application/profile_state.dart',
     ).readAsString();
 
-    final stateClass = _classBody(controller, 'ProfileState');
+    final stateClass = _classBody(stateSource, 'ProfileState');
 
     expect(stateClass, isNot(contains('AuthSession')));
     expect(stateClass, isNot(contains('accessToken')));

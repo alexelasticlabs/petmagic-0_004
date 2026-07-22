@@ -4,9 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('profile notification setting subtitles use localizations', () async {
-    final source = await File(
-      'lib/features/profile/presentation/widgets/profile_notifications_settings_section.dart',
-    ).readAsString();
+    final source = _readProfileNotificationsSettingsSource();
 
     const expectedGetters = <String>[
       'profileNotificationsPushPhotoReadySubtitle',
@@ -75,9 +73,7 @@ void main() {
   test(
     'profile notification settings does not read or request media permissions',
     () async {
-      final source = await File(
-        'lib/features/profile/presentation/widgets/profile_notifications_settings_section.dart',
-      ).readAsString();
+      final source = _readProfileNotificationsSettingsSource();
 
       final refreshDeviceBody = _methodBody(
         source,
@@ -111,9 +107,7 @@ void main() {
   );
 
   test('profile notification settings async actions are guarded', () async {
-    final source = await File(
-      'lib/features/profile/presentation/widgets/profile_notifications_settings_section.dart',
-    ).readAsString();
+    final source = _readProfileNotificationsSettingsSource();
 
     final updateBody = _methodBody(source, '_update');
     final refreshDeviceBody = _methodBody(source, '_refreshDevicePermissions');
@@ -134,9 +128,7 @@ void main() {
   });
 
   test('profile notification permission grant registers push token', () async {
-    final source = await File(
-      'lib/features/profile/presentation/widgets/profile_notifications_settings_section.dart',
-    ).readAsString();
+    final source = _readProfileNotificationsSettingsSource();
 
     final loadBody = _methodBody(source, '_load');
     final requestPushBody = _methodBody(source, '_requestPushPermission');
@@ -163,12 +155,13 @@ void main() {
       refreshPushBody,
       contains('_reconcilePushTokenRegistration(settings.authorizationStatus)'),
     );
-    expect(registerBody, contains('FirebaseMessaging.instance.getToken()'));
-    expect(source, contains('PushTokenRegistrar'));
-    expect(source, contains('templateGenerationRepositoryProvider'));
-    expect(source, contains('supportChatRepositoryProvider'));
-    expect(source, contains('walletRepositoryProvider'));
-    expect(registerBody, contains('_pushTokenRegistrar.registerToken'));
+    expect(
+      registerBody,
+      contains('_pushTokenLifecycle.readCurrentDeviceToken()'),
+    );
+    expect(source, contains('PushTokenLifecyclePort'));
+    expect(source, contains('pushTokenLifecyclePortProvider'));
+    expect(registerBody, contains('_pushTokenLifecycle.registerToken'));
     expect(registerBody, contains('defaultTargetPlatform.name'));
     expect(
       registerBody,
@@ -177,26 +170,26 @@ void main() {
     expect(
       registerBody,
       contains(
-        'final previousToken = await _pushTokenRegistrar.readRegisteredToken()',
+        'final previousToken = await _pushTokenLifecycle.readRegisteredToken()',
       ),
     );
     expect(
       registerBody.indexOf('if (!mounted)'),
       greaterThan(
         registerBody.indexOf(
-          'final previousToken = await _pushTokenRegistrar.readRegisteredToken()',
+          'final previousToken = await _pushTokenLifecycle.readRegisteredToken()',
         ),
       ),
     );
     expect(
-      registerBody.indexOf('FirebaseMessaging.instance.getToken()'),
+      registerBody.indexOf('_pushTokenLifecycle.readCurrentDeviceToken()'),
       greaterThan(registerBody.indexOf('if (!mounted)')),
     );
     expect(registerBody, contains('canContinue: () => mounted'));
     expect(registerBody, contains('await _unregisterStalePushToken('));
     expect(
       reconcileBody,
-      contains('await _pushTokenRegistrar.unregisterToken('),
+      contains('await _pushTokenLifecycle.unregisterToken('),
     );
     expect(staleUnregisterBody, contains('clearRegistrationState: false'));
     expect(
@@ -210,10 +203,17 @@ void main() {
       greaterThan(reconcileBody.indexOf('readRegisteredToken()')),
     );
     expect(
-      reconcileBody.indexOf('FirebaseMessaging.instance.getToken()'),
+      reconcileBody.indexOf('_pushTokenLifecycle.readCurrentDeviceToken()'),
       greaterThan(reconcileBody.indexOf('if (!mounted)')),
     );
   });
+}
+
+String _readProfileNotificationsSettingsSource() {
+  return [
+    'lib/features/profile/presentation/widgets/profile_notifications_settings_section.dart',
+    'lib/features/profile/presentation/widgets/profile_notifications_settings_view.part.dart',
+  ].map((path) => File(path).readAsStringSync()).join('\n');
 }
 
 String _methodBody(String source, String methodName) {

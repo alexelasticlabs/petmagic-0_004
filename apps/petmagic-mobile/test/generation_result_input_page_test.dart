@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -8,14 +9,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_result_input_page.dart';
-import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
@@ -293,9 +295,9 @@ class _ResultInputRepository extends TemplateGenerationRepository {
   int fetchGenerationCalls = 0;
   int fetchCompatibleTemplatesCalls = 0;
   int startCalls = 0;
-  CancelToken? fetchGenerationCancelToken;
-  CancelToken? fetchCompatibleTemplatesCancelToken;
-  CancelToken? startCancelToken;
+  RequestCancellation? fetchGenerationCancelToken;
+  RequestCancellation? fetchCompatibleTemplatesCancelToken;
+  RequestCancellation? startCancelToken;
 
   void completeStart() {
     if (!_startCompleter.isCompleted) {
@@ -307,7 +309,7 @@ class _ResultInputRepository extends TemplateGenerationRepository {
   Future<TemplateGenerationResult> fetchGeneration(
     String generationId, {
     String? correlationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     fetchGenerationCalls++;
     fetchGenerationCancelToken = cancelToken;
@@ -316,10 +318,7 @@ class _ResultInputRepository extends TemplateGenerationRepository {
     }
     await loadCompleter?.future;
     if (cancelToken?.isCancelled ?? false) {
-      throw DioException(
-        requestOptions: RequestOptions(path: '/api/templates/generations'),
-        type: DioExceptionType.cancel,
-      );
+      throw const RequestCancelledException();
     }
     return _generation(
       generationId: generationId,
@@ -330,7 +329,7 @@ class _ResultInputRepository extends TemplateGenerationRepository {
   @override
   Future<CompatibleGenerationTemplates> fetchCompatibleTemplates(
     String resultId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     fetchCompatibleTemplatesCalls++;
     fetchCompatibleTemplatesCancelToken = cancelToken;
@@ -339,12 +338,7 @@ class _ResultInputRepository extends TemplateGenerationRepository {
     }
     await loadCompleter?.future;
     if (cancelToken?.isCancelled ?? false) {
-      throw DioException(
-        requestOptions: RequestOptions(
-          path: '/api/templates/generations/compatible',
-        ),
-        type: DioExceptionType.cancel,
-      );
+      throw const RequestCancelledException();
     }
     return const CompatibleGenerationTemplates(
       resultId: 'parent/1?source=ready',
@@ -370,7 +364,7 @@ class _ResultInputRepository extends TemplateGenerationRepository {
     String source = 'mobile',
     String? generationId,
     Map<String, Object?>? metadata,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     analyticsEvents.add(eventType);
   }
@@ -381,7 +375,7 @@ class _ResultInputRepository extends TemplateGenerationRepository {
     required String templateId,
     int? expectedTemplateVersion,
     String? correlationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     startCalls++;
     startCancelToken = cancelToken;
@@ -390,12 +384,7 @@ class _ResultInputRepository extends TemplateGenerationRepository {
     }
     await _startCompleter.future;
     if (cancelToken?.isCancelled ?? false) {
-      throw DioException(
-        requestOptions: RequestOptions(
-          path: '/api/templates/generations/from-result',
-        ),
-        type: DioExceptionType.cancel,
-      );
+      throw const RequestCancelledException();
     }
     return _generation(
       generationId: 'child-generation-1',

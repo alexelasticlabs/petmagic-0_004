@@ -1,29 +1,30 @@
 import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:dio/dio.dart';
+import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
-import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
-import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
+import 'package:petmagic_mobile/features/templates/application/template_generation_contract.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
+import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
-import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_navigation_layout.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_unavailable_view.dart';
 
 part 'generation_result_input_page_chrome.part.dart';
+
+part 'generation_result_input_widgets.part.dart';
 
 class GenerationResultInputPage extends ConsumerStatefulWidget {
   const GenerationResultInputPage({required this.generationId, super.key});
@@ -52,8 +53,8 @@ class _GenerationResultInputPageState
   bool _isLoading = true;
   bool _isStarting = false;
   String? _error;
-  CancelToken? _cancelToken;
-  CancelToken? _startCancelToken;
+  RequestCancellation? _cancelToken;
+  RequestCancellation? _startCancelToken;
 
   @override
   void initState() {
@@ -83,7 +84,7 @@ class _GenerationResultInputPageState
 
   Future<void> _load() async {
     _cancelToken?.cancel('generation_result_input_reload');
-    final cancelToken = CancelToken();
+    final cancelToken = RequestCancellation();
     _cancelToken = cancelToken;
     setState(() {
       _isLoading = true;
@@ -110,14 +111,8 @@ class _GenerationResultInputPageState
         _compatible = results[1] as CompatibleGenerationTemplates;
         _isLoading = false;
       });
-    } on DioException catch (error) {
-      if (!mounted || CancelToken.isCancel(error)) {
-        return;
-      }
-      setState(() {
-        _isLoading = false;
-        _error = _copy.error;
-      });
+    } on RequestCancelledException {
+      return;
     } on Object {
       if (!mounted || cancelToken.isCancelled) {
         return;
@@ -228,7 +223,7 @@ class _GenerationResultInputPageState
                 Row(
                   children: [
                     IconButton(
-                      onPressed: () => context.pop(),
+                      onPressed: () => context.appNavigator.pop(),
                       icon: const Icon(Icons.arrow_back_rounded),
                       color: colors.textStrong,
                     ),
@@ -302,7 +297,7 @@ class _GenerationResultInputPageState
     final wallet = ref.read(walletControllerProvider).wallet;
     if ((wallet?.balance ?? 0) < template.tokenCost) {
       _showInfo(copy.noCredits);
-      context.push(WalletPage.routePath);
+      context.appNavigator.push(const WalletDestination());
       return;
     }
 
@@ -319,7 +314,7 @@ class _GenerationResultInputPageState
     }
 
     _startCancelToken?.cancel('generation_result_input_start_replaced');
-    final startCancelToken = CancelToken();
+    final startCancelToken = RequestCancellation();
     _startCancelToken = startCancelToken;
     setState(() => _isStarting = true);
     try {
@@ -356,15 +351,9 @@ class _GenerationResultInputPageState
       if (!mounted || startCancelToken.isCancelled) {
         return;
       }
-      context.go(GenerationStatusPage.routeFor(generation.generationId));
-    } on DioException catch (error) {
-      if (CancelToken.isCancel(error) || startCancelToken.isCancelled) {
-        return;
-      }
-      if (!mounted) {
-        return;
-      }
-      _showInfo(copy.error);
+      context.appNavigator.go(GenerationDestination(generation.generationId));
+    } on RequestCancelledException {
+      return;
     } on Object {
       if (!mounted || startCancelToken.isCancelled) {
         return;
@@ -385,7 +374,7 @@ class _GenerationResultInputPageState
     CompatibleGenerationTemplate template,
     String eventType, {
     String? generationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     try {
       await ref
@@ -406,277 +395,5 @@ class _GenerationResultInputPageState
       return;
     }
     PetMagicToast.show(context, message: message);
-  }
-}
-
-class _ParentPreviewCard extends StatelessWidget {
-  const _ParentPreviewCard({required this.generation, required this.copy});
-
-  final TemplateGenerationResult generation;
-  final _GenerationResultInputCopy copy;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-    final mediaUrl = parseSafeGenerationMediaUri(generation.outputUrl ?? '');
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: colors.border.withValues(alpha: 0.75)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AspectRatio(
-              aspectRatio: 1,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: mediaUrl == null
-                    ? ColoredBox(
-                        color: colors.surfaceStrong,
-                        child: Center(child: Text(copy.mediaUnavailable)),
-                      )
-                    : CachedNetworkImage(
-                        imageUrl: mediaUrl.toString(),
-                        cacheKey: persistentSafeGenerationMediaUrl(
-                          mediaUrl.toString(),
-                        ),
-                        fit: BoxFit.cover,
-                        memCacheWidth: _parentPreviewCacheWidth,
-                        maxWidthDiskCache: _parentPreviewCacheWidth,
-                        filterQuality: FilterQuality.medium,
-                      ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              generation.templateTitle ?? copy.parentTitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: colors.textStrong,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              copy.parentHint,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: colors.textSoft,
-                height: 1.35,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CompatibleTemplateTile extends StatelessWidget {
-  const _CompatibleTemplateTile({
-    required this.template,
-    required this.isBusy,
-    required this.copy,
-    required this.onTap,
-  });
-
-  final CompatibleGenerationTemplate template;
-  final bool isBusy;
-  final _GenerationResultInputCopy copy;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = AppLocalizations.of(context);
-    final colors = context.petMagicColors;
-    final safeThumb = parseSafeGenerationMediaUri(template.thumbnailUrl ?? '');
-    return Material(
-      color: colors.surface,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: isBusy ? null : onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: SizedBox.square(
-                  dimension: 74,
-                  child: safeThumb == null
-                      ? ColoredBox(
-                          color: colors.surfaceStrong,
-                          child: Icon(
-                            template.isVideo
-                                ? Icons.movie_creation_rounded
-                                : Icons.image_rounded,
-                            color: colors.textMuted,
-                          ),
-                        )
-                      : CachedNetworkImage(
-                          imageUrl: safeThumb.toString(),
-                          cacheKey: persistentSafeGenerationMediaUrl(
-                            safeThumb.toString(),
-                          ),
-                          fit: BoxFit.cover,
-                          memCacheWidth: _compatibleTemplateThumbnailCacheWidth,
-                          maxWidthDiskCache:
-                              _compatibleTemplateThumbnailCacheWidth,
-                          filterQuality: FilterQuality.medium,
-                        ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          template.isVideo
-                              ? Icons.play_circle_rounded
-                              : Icons.auto_awesome_rounded,
-                          size: 16,
-                          color: colors.accent,
-                        ),
-                        const SizedBox(width: 5),
-                        Expanded(
-                          child: Text(
-                            template.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleSmall
-                                ?.copyWith(
-                                  color: colors.textStrong,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        _MiniBadge(
-                          label: template.isVideo ? copy.video : copy.image,
-                        ),
-                        if (template.isRecommended)
-                          _MiniBadge(label: copy.recommended),
-                        if (template.isPremium)
-                          _MiniBadge(label: text.premiumLabel),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '${template.tokenCost} ${text.walletBalanceUnit}',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colors.textMuted,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Icon(Icons.chevron_right_rounded, color: colors.textMuted),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ResultInputErrorCard extends StatelessWidget {
-  const _ResultInputErrorCard({required this.message, required this.onRetry});
-
-  final String message;
-  final Future<void> Function() onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = AppLocalizations.of(context);
-    final colors = context.petMagicColors;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colors.border.withValues(alpha: 0.75)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(message, style: TextStyle(color: colors.textSoft)),
-            const SizedBox(height: 12),
-            OutlinedButton(
-              onPressed: () => unawaited(onRetry()),
-              child: Text(text.retryAction),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _GenerationResultInputCopy {
-  const _GenerationResultInputCopy({
-    required this.title,
-    required this.parentTitle,
-    required this.parentHint,
-    required this.mediaUnavailable,
-    required this.all,
-    required this.image,
-    required this.video,
-    required this.recommended,
-    required this.empty,
-    required this.error,
-    required this.noCredits,
-    required this.start,
-    required this.costBuilder,
-  });
-
-  final String title;
-  final String parentTitle;
-  final String parentHint;
-  final String mediaUnavailable;
-  final String all;
-  final String image;
-  final String video;
-  final String recommended;
-  final String empty;
-  final String error;
-  final String noCredits;
-  final String start;
-  final String Function(int credits) costBuilder;
-
-  String cost(int credits) => costBuilder(credits);
-
-  static _GenerationResultInputCopy forLocale(AppLocalizations text) {
-    return _GenerationResultInputCopy(
-      title: text.generationResultInputTitle,
-      parentTitle: text.generationResultInputParentTitle,
-      parentHint: text.generationResultInputParentHint,
-      mediaUnavailable: text.generationResultInputMediaUnavailable,
-      all: text.allFilter,
-      image: text.imageLabel,
-      video: text.videoLabel,
-      recommended: text.generationResultInputRecommendedBadge,
-      empty: text.generationResultInputEmpty,
-      error: text.generationResultInputError,
-      noCredits: text.generationResultInputNoCredits,
-      start: text.generationResultInputStartAction,
-      costBuilder: text.generationResultInputCostEstimate,
-    );
   }
 }

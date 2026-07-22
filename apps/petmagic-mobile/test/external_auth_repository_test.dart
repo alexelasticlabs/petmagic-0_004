@@ -11,7 +11,6 @@ import 'package:petmagic_mobile/core/auth/google_sign_in_adapter.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -315,9 +314,12 @@ void main() {
   test(
     'external auth logs google sdk failures instead of swallowing them',
     () async {
-      final source = await File(
-        'lib/features/profile/data/external_auth_repository.dart',
-      ).readAsString();
+      final source = await Future.wait(
+        [
+          'lib/features/profile/data/external_auth_repository.dart',
+          'lib/features/profile/data/external_auth_google_flow.part.dart',
+        ].map((path) => File(path).readAsString()),
+      ).then((sources) => sources.join('\n'));
 
       expect(source, contains('AppLogger.warn('));
       expect(

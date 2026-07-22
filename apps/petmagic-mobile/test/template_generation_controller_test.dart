@@ -1,10 +1,11 @@
 import 'dart:async';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
+import 'package:petmagic_mobile/core/files/local_media_file.dart';
 import 'dart:io';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:dio/dio.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/logging/log_correlation_context.dart';
@@ -14,8 +15,8 @@ import 'package:petmagic_mobile/features/templates/data/template_generation_repo
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
-import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -27,12 +28,12 @@ void main() {
 
     expect(
       source,
-      isNot(contains('late final TemplateGenerationRepository _repository')),
+      isNot(contains('late final GenerationRepository _repository')),
     );
     expect(
       source,
       contains(
-        'TemplateGenerationRepository get _repository =>\n'
+        'GenerationRepository get _repository =>\n'
         '      ref.read(templateGenerationRepositoryProvider)',
       ),
     );
@@ -1107,8 +1108,7 @@ void main() {
   });
 }
 
-class _FakeTemplateGenerationRepository
-    implements TemplateGenerationRepository {
+class _FakeTemplateGenerationRepository implements GenerationRepository {
   _FakeTemplateGenerationRepository({
     this.startResult,
     this.startError,
@@ -1130,19 +1130,24 @@ class _FakeTemplateGenerationRepository
   int fetchCalls = 0;
   int rememberActiveCalls = 0;
   int clearActiveCalls = 0;
-  final List<XFile> startSourceImages = <XFile>[];
+  final List<LocalMediaFile> startSourceImages = <LocalMediaFile>[];
   final List<String?> startCorrelationIds = <String?>[];
-  final List<CancelToken?> startCancelTokens = <CancelToken?>[];
+  final List<RequestCancellation?> startCancelTokens = <RequestCancellation?>[];
   final List<String?> fetchCorrelationIds = <String?>[];
   ({String generationId, String correlationId})? activeGeneration;
 
   @override
+  TemplateGenerationResult parseRealtimePayload(Map<String, dynamic> payload) {
+    throw UnsupportedError('Realtime parsing is not used by this fake.');
+  }
+
+  @override
   Future<TemplateGenerationResult> startGeneration({
     required String templateId,
-    required XFile sourceImage,
+    required LocalMediaFile sourceImage,
     int? expectedTemplateVersion,
     String? correlationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     startCalls++;
     if (!startStarted.isCompleted) {
@@ -1167,7 +1172,7 @@ class _FakeTemplateGenerationRepository
   Future<TemplateGenerationResult> fetchGeneration(
     String generationId, {
     String? correlationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     fetchCalls++;
     fetchCorrelationIds.add(correlationId);
@@ -1183,7 +1188,7 @@ class _FakeTemplateGenerationRepository
   Future<GenerationCancelResult> cancelGeneration(
     String generationId, {
     String? correlationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return GenerationCancelResult(
       generation: _generation(
@@ -1254,7 +1259,7 @@ class _FakeTemplateGenerationRepository
   Future<RemoveGenerationWatermarkResult> removeWatermark(
     String generationId, {
     String paymentMethod = 'credit',
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return const RemoveGenerationWatermarkResult(
       watermarkRemoved: true,
@@ -1265,7 +1270,7 @@ class _FakeTemplateGenerationRepository
   @override
   Future<GenerationMediaAccessResult> fetchDownloadUrl(
     String generationId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return const GenerationMediaAccessResult(
       mediaUrl: 'https://cdn.example.com/result.jpg',
@@ -1277,7 +1282,7 @@ class _FakeTemplateGenerationRepository
   @override
   Future<GenerationMediaAccessResult> fetchShareUrl(
     String generationId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return const GenerationMediaAccessResult(
       mediaUrl: 'https://cdn.example.com/result.jpg',
@@ -1299,7 +1304,7 @@ class _FakeTemplateGenerationRepository
     String? status,
     int? skip,
     int? take,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return const [];
   }
@@ -1309,7 +1314,7 @@ class _FakeTemplateGenerationRepository
     String? status,
     String? cursor,
     int? take,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return TemplateGenerationGalleryPage(
       items: const [],
@@ -1320,20 +1325,22 @@ class _FakeTemplateGenerationRepository
   }
 
   @override
-  Future<int> fetchUnreadGenerationCount({CancelToken? cancelToken}) async {
+  Future<int> fetchUnreadGenerationCount({
+    RequestCancellation? cancelToken,
+  }) async {
     return 0;
   }
 
   @override
   Future<void> markGenerationRead(
     String generationId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {}
 
   @override
   Future<void> deleteGeneration(
     String generationId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {}
 
   @override
@@ -1355,7 +1362,7 @@ class _FakeTemplateGenerationRepository
     String? templateId,
     String? petId,
     String sourceScreen = 'settings',
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
     bool retryTransientFailures = false,
   }) async {
     return 'feedback-1';
@@ -1380,7 +1387,7 @@ class _FakeTemplateGenerationRepository
     String source = 'mobile',
     String? generationId,
     Map<String, Object?>? metadata,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {}
 
   @override
@@ -1389,13 +1396,13 @@ class _FakeTemplateGenerationRepository
     required String eventType,
     String? generationId,
     Map<String, Object?> metadata = const {},
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {}
 
   @override
   Future<CompatibleGenerationTemplates> fetchCompatibleTemplates(
     String resultId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return const CompatibleGenerationTemplates(
       resultId: 'result-1',
@@ -1410,7 +1417,7 @@ class _FakeTemplateGenerationRepository
     required String templateId,
     int? expectedTemplateVersion,
     String? correlationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return startResult ?? _generation(status: TemplateGenerationStatus.queued);
   }
@@ -1422,7 +1429,7 @@ class _FakeTemplateGenerationRepository
     required String templateId,
     int? expectedTemplateVersion,
     String? correlationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return startResult ?? _generation(status: TemplateGenerationStatus.queued);
   }
@@ -1432,140 +1439,9 @@ class _FakeTemplateGenerationRepository
     required String sourceGenerationId,
     String variationStrength = 'medium',
     String? correlationId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return startResult ?? _generation(status: TemplateGenerationStatus.queued);
-  }
-
-  @override
-  Future<List<PetProfile>> fetchPets({CancelToken? cancelToken}) async {
-    return const [];
-  }
-
-  @override
-  Future<PetProfile> createPet({
-    required String name,
-    required String type,
-    String? breed,
-    CancelToken? cancelToken,
-  }) async {
-    return PetProfile(
-      id: 'pet-1',
-      name: name,
-      type: type,
-      breed: breed,
-      photosCount: 0,
-      generationsCount: 0,
-      createdAtUtc: DateTime(2026),
-      updatedAtUtc: DateTime(2026),
-    );
-  }
-
-  @override
-  Future<PetProfile> updatePet({
-    required String petId,
-    required String name,
-    required String type,
-    String? breed,
-    CancelToken? cancelToken,
-  }) async {
-    return PetProfile(
-      id: petId,
-      name: name,
-      type: type,
-      breed: breed,
-      photosCount: 0,
-      generationsCount: 0,
-      createdAtUtc: DateTime(2026),
-      updatedAtUtc: DateTime(2026),
-    );
-  }
-
-  @override
-  Future<void> deletePet(String petId, {CancelToken? cancelToken}) async {}
-
-  @override
-  Future<PetPhoto> uploadPetPhoto({
-    required String petId,
-    required XFile photo,
-    CancelToken? cancelToken,
-  }) async {
-    return PetPhoto(
-      id: 'photo-1',
-      petId: petId,
-      mediaAssetId: 'media-1',
-      url: photo.path,
-      fileName: photo.name,
-      contentType: 'image/jpeg',
-      isFavorite: false,
-      isAvatar: true,
-      sortOrder: 1,
-      createdAtUtc: DateTime(2026),
-    );
-  }
-
-  @override
-  Future<List<PetPhoto>> fetchPetPhotos(
-    String petId, {
-    CancelToken? cancelToken,
-  }) async {
-    return const [];
-  }
-
-  @override
-  Future<PetPhoto> setPetPhotoAsAvatar({
-    required String petId,
-    required String photoId,
-    CancelToken? cancelToken,
-  }) async {
-    return PetPhoto(
-      id: photoId,
-      petId: petId,
-      mediaAssetId: 'media-1',
-      url: 'https://cdn.example.com/pet.jpg',
-      fileName: 'pet.jpg',
-      contentType: 'image/jpeg',
-      isFavorite: false,
-      isAvatar: true,
-      sortOrder: 1,
-      createdAtUtc: DateTime(2026),
-    );
-  }
-
-  @override
-  Future<PetPhoto> setPetPhotoFavorite({
-    required String petId,
-    required String photoId,
-    required bool isFavorite,
-    CancelToken? cancelToken,
-  }) async {
-    return PetPhoto(
-      id: photoId,
-      petId: petId,
-      mediaAssetId: 'media-1',
-      url: 'https://cdn.example.com/pet.jpg',
-      fileName: 'pet.jpg',
-      contentType: 'image/jpeg',
-      isFavorite: isFavorite,
-      isAvatar: false,
-      sortOrder: 1,
-      createdAtUtc: DateTime(2026),
-    );
-  }
-
-  @override
-  Future<void> deletePetPhoto({
-    required String petId,
-    required String photoId,
-    CancelToken? cancelToken,
-  }) async {}
-
-  @override
-  Future<List<TemplateGenerationResult>> fetchPetGenerations(
-    String petId, {
-    CancelToken? cancelToken,
-  }) async {
-    return const [];
   }
 }
 

@@ -62,7 +62,7 @@ void main() {
       );
       expect(
         templatesPage,
-        contains("operation: 'read_route_query_parameter'"),
+        isNot(contains("operation: 'read_route_query_parameter'")),
       );
     },
   );
@@ -95,9 +95,12 @@ String _readTemplatesPageLibrarySource() {
   const files = [
     'lib/features/templates/presentation/templates_page.dart',
     'lib/features/templates/presentation/templates_page_feed.part.dart',
+    'lib/features/templates/presentation/templates_page_feed_slivers.part.dart',
     'lib/features/templates/presentation/templates_page_generation_flow.part.dart',
+    'lib/features/templates/presentation/templates_page_pet_photo_picker.part.dart',
     'lib/features/templates/presentation/templates_page_lifecycle.part.dart',
     'lib/features/templates/presentation/templates_page_template_actions.part.dart',
+    'lib/features/templates/presentation/templates_page_view.part.dart',
   ];
 
   return files.map((path) => File(path).readAsStringSync()).join('\n');

@@ -1,8 +1,8 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/app/theme/petmagic_typography.dart';
 import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 
 class StartupBackdrop extends StatelessWidget {
@@ -92,7 +92,8 @@ class BrandHeader extends StatelessWidget {
             'PetMagic',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.comfortaa(
+            style: TextStyle(
+              fontFamily: PetMagicTypography.resolvedFontFamily,
               fontSize: 24,
               fontWeight: FontWeight.w700,
               letterSpacing: -0.4,

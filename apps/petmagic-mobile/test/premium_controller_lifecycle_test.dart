@@ -18,7 +18,7 @@ void main() {
     expect(lifecycleBody, contains('premiumPurchaseUpdatesProvider'));
     expect(
       lifecycleBody,
-      contains('ref.listen<AsyncValue<List<PurchaseDetails>>>'),
+      contains('ref.listen<AsyncValue<List<StorePurchaseDetails>>>'),
     );
     expect(lifecycleBody, contains('_handlePurchaseUpdates(purchases)'));
   });
@@ -30,15 +30,20 @@ void main() {
     expect(
       verifyBody,
       contains(
-        'final verificationCancelToken = _startCheckoutVerificationCancelToken();',
+        'final verificationRequestCancellation =\n        _startCheckoutVerificationRequestCancellation();',
       ),
     );
-    expect(verifyBody, contains('cancelToken: verificationCancelToken'));
-    expect(verifyBody, contains('verificationCancelToken.isCancelled'));
-    expect(verifyBody, contains('CancelToken.isCancel(error)'));
     expect(
       verifyBody,
-      contains('_clearActiveCheckoutVerification(verificationCancelToken);'),
+      contains('cancelToken: verificationRequestCancellation'),
+    );
+    expect(verifyBody, contains('verificationRequestCancellation.isCancelled'));
+    expect(verifyBody, contains('on RequestCancelledException'));
+    expect(
+      verifyBody,
+      contains(
+        '_clearActiveCheckoutVerification(verificationRequestCancellation);',
+      ),
     );
     expect(verifyBody, contains('} on RequestCancelledException {'));
     expect(verifyBody, contains('return;'));

@@ -1,11 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
-import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
-import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_dto.dart';
-import 'package:petmagic_mobile/features/templates/data/templates_query.dart';
+import 'package:petmagic_mobile/features/templates/data/templates_remote_error_policy.dart';
+import 'package:petmagic_mobile/features/templates/domain/templates_query.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 
 final templatesRemoteDataSourceProvider = Provider<TemplatesRemoteDataSource>((
@@ -48,12 +47,12 @@ class TemplatesRemoteDataSource {
 
       return TemplatesFeedDto.fromJson(data);
     } on DioException catch (error) {
-      if (_isCancelledRequest(error)) {
+      if (TemplatesRemoteErrorPolicy.isCancelledRequest(error)) {
         throw const RequestCancelledException();
       }
 
       throw AppException(
-        _mapMessage(error),
+        TemplatesRemoteErrorPolicy.mapMessage(error),
         statusCode: error.response?.statusCode,
         cause: error,
       );
@@ -81,12 +80,12 @@ class TemplatesRemoteDataSource {
 
       return TemplatesFeedDto.fromJson(data);
     } on DioException catch (error) {
-      if (_isCancelledRequest(error)) {
+      if (TemplatesRemoteErrorPolicy.isCancelledRequest(error)) {
         throw const RequestCancelledException();
       }
 
       throw AppException(
-        _mapMessage(error),
+        TemplatesRemoteErrorPolicy.mapMessage(error),
         statusCode: error.response?.statusCode,
         cause: error,
       );
@@ -96,7 +95,7 @@ class TemplatesRemoteDataSource {
   Future<TemplateItemDto> fetchTemplate(String templateId) async {
     try {
       final response = await _dio.get<Map<String, Object?>>(
-        '/api/templates/${_encodePathSegment(templateId)}',
+        '/api/templates/${encodeTemplatePathSegment(templateId)}',
       );
       final data = response.data;
       if (data == null) {
@@ -105,12 +104,12 @@ class TemplatesRemoteDataSource {
 
       return TemplateItemDto.fromJson(data);
     } on DioException catch (error) {
-      if (_isCancelledRequest(error)) {
+      if (TemplatesRemoteErrorPolicy.isCancelledRequest(error)) {
         throw const RequestCancelledException();
       }
 
       throw AppException(
-        _mapMessage(error),
+        TemplatesRemoteErrorPolicy.mapMessage(error),
         statusCode: error.response?.statusCode,
         cause: error,
       );
@@ -152,12 +151,12 @@ class TemplatesRemoteDataSource {
 
       return PublicRandomTemplateDto.fromJson(data);
     } on DioException catch (error) {
-      if (_isCancelledRequest(error)) {
+      if (TemplatesRemoteErrorPolicy.isCancelledRequest(error)) {
         throw const RequestCancelledException();
       }
 
       throw AppException(
-        _mapMessage(error),
+        TemplatesRemoteErrorPolicy.mapMessage(error),
         statusCode: error.response?.statusCode,
         cause: error,
       );
@@ -196,12 +195,12 @@ class TemplatesRemoteDataSource {
 
       return categories;
     } on DioException catch (error) {
-      if (_isCancelledRequest(error)) {
+      if (TemplatesRemoteErrorPolicy.isCancelledRequest(error)) {
         throw const RequestCancelledException();
       }
 
       throw AppException(
-        _mapMessage(error),
+        TemplatesRemoteErrorPolicy.mapMessage(error),
         statusCode: error.response?.statusCode,
         cause: error,
       );
@@ -231,12 +230,12 @@ class TemplatesRemoteDataSource {
 
       return PublicTemplateOfTheDayDto.fromJson(data);
     } on DioException catch (error) {
-      if (_isCancelledRequest(error)) {
+      if (TemplatesRemoteErrorPolicy.isCancelledRequest(error)) {
         throw const RequestCancelledException();
       }
 
       throw AppException(
-        _mapMessage(error),
+        TemplatesRemoteErrorPolicy.mapMessage(error),
         statusCode: error.response?.statusCode,
         cause: error,
       );
@@ -256,7 +255,7 @@ class TemplatesRemoteDataSource {
   }) async {
     try {
       await _dio.post<void>(
-        '/api/templates/${_encodePathSegment(templateId)}/analytics/events',
+        '/api/templates/${encodeTemplatePathSegment(templateId)}/analytics/events',
         data: <String, Object?>{
           'eventType': eventType,
           if (source != null && source.trim().isNotEmpty)
@@ -267,12 +266,12 @@ class TemplatesRemoteDataSource {
         },
       );
     } on DioException catch (error) {
-      if (_isCancelledRequest(error)) {
+      if (TemplatesRemoteErrorPolicy.isCancelledRequest(error)) {
         throw const RequestCancelledException();
       }
 
       throw AppException(
-        _mapMessage(error),
+        TemplatesRemoteErrorPolicy.mapMessage(error),
         statusCode: error.response?.statusCode,
         cause: error,
       );
@@ -291,12 +290,12 @@ class TemplatesRemoteDataSource {
 
       return TemplatesCatalogVersionDto.fromJson(data);
     } on DioException catch (error) {
-      if (_isCancelledRequest(error)) {
+      if (TemplatesRemoteErrorPolicy.isCancelledRequest(error)) {
         throw const RequestCancelledException();
       }
 
       throw AppException(
-        _mapMessage(error),
+        TemplatesRemoteErrorPolicy.mapMessage(error),
         statusCode: error.response?.statusCode,
         cause: error,
       );
@@ -318,12 +317,12 @@ class TemplatesRemoteDataSource {
 
       return TemplatesCatalogChangesDto.fromJson(data);
     } on DioException catch (error) {
-      if (_isCancelledRequest(error)) {
+      if (TemplatesRemoteErrorPolicy.isCancelledRequest(error)) {
         throw const RequestCancelledException();
       }
 
       throw AppException(
-        _mapMessage(error),
+        TemplatesRemoteErrorPolicy.mapMessage(error),
         statusCode: error.response?.statusCode,
         cause: error,
       );
@@ -373,67 +372,5 @@ class TemplatesRemoteDataSource {
 
     cancelToken.cancel('Superseded by hidden templates metadata lifecycle.');
     _templateOfTheDayCancelToken = null;
-  }
-
-  String _encodePathSegment(String value) {
-    return Uri.encodeComponent(value);
-  }
-
-  bool _isCancelledRequest(DioException error) {
-    final innerError = error.error;
-    if (innerError is RequestCancelledException) {
-      return true;
-    }
-
-    if (innerError is DioException && _isCancelledRequest(innerError)) {
-      return true;
-    }
-
-    return CancelToken.isCancel(error) ||
-        error.type == DioExceptionType.cancel ||
-        _containsCancellationMarker(error.message) ||
-        (innerError is AppException && innerError.isRequestCancelled) ||
-        (innerError is String && _containsCancellationMarker(innerError));
-  }
-
-  bool _containsCancellationMarker(String? value) {
-    final message = value?.trim();
-    if (message == null || message.isEmpty) {
-      return false;
-    }
-
-    return message.toLowerCase() == 'request_cancelled';
-  }
-
-  String _mapMessage(DioException error) {
-    if (error.type == DioExceptionType.connectionTimeout ||
-        error.type == DioExceptionType.connectionError) {
-      return 'templates.connection_timeout';
-    }
-
-    if (error.type == DioExceptionType.receiveTimeout) {
-      return 'templates.server_timeout';
-    }
-
-    try {
-      final safePayloadMessage = NetworkErrorMapper.safePayloadMessage(
-        NetworkErrorMapper.parseApiPayload(error),
-      );
-      if (safePayloadMessage != null) {
-        return safePayloadMessage;
-      }
-    } catch (mappingError, stackTrace) {
-      AppLogger.warn(
-        feature: 'Templates.Api',
-        operation: 'detail_extract',
-        message: 'API error payload mapping failed',
-        context: {'stage': 'detail_extract'},
-        error: mappingError,
-        stackTrace: stackTrace,
-      );
-      // Keep a safe fallback below.
-    }
-
-    return 'templates.request_failed';
   }
 }

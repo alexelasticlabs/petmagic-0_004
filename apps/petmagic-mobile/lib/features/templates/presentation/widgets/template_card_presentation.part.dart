@@ -303,43 +303,47 @@ class _TemplateActionButton extends StatelessWidget {
             ),
           ],
         ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textStyle?.copyWith(
-                    color: foregroundColor,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: textStyle?.copyWith(
+                      color: foregroundColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      height: 1.05,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 6),
-              Container(
-                width: usePremiumStyle ? 22 : null,
-                height: usePremiumStyle ? 22 : null,
-                decoration: usePremiumStyle
-                    ? BoxDecoration(
-                        color: const Color(0x3DFFF3D2),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xAAFFF0C0)),
-                      )
-                    : null,
-                child: isPremiumLockCta
-                    ? const PremiumCrownIcon(size: 13.5)
-                    : Icon(
-                        Icons.arrow_forward_rounded,
-                        color: foregroundColor,
-                        size: usePremiumStyle ? 13.5 : 16,
-                      ),
-              ),
-            ],
+                const SizedBox(width: 5),
+                Container(
+                  width: usePremiumStyle ? 22 : null,
+                  height: usePremiumStyle ? 22 : null,
+                  decoration: usePremiumStyle
+                      ? BoxDecoration(
+                          color: const Color(0x3DFFF3D2),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: const Color(0xAAFFF0C0)),
+                        )
+                      : null,
+                  child: isPremiumLockCta
+                      ? const PremiumCrownIcon(size: 13.5)
+                      : Icon(
+                          Icons.arrow_forward_rounded,
+                          color: foregroundColor,
+                          size: usePremiumStyle ? 13.5 : 16,
+                        ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -377,107 +381,6 @@ class _TemplateStatusChip extends StatelessWidget {
             fontWeight: FontWeight.w700,
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _MediaSkeletonPlaceholder extends StatelessWidget {
-  const _MediaSkeletonPlaceholder();
-
-  @override
-  Widget build(BuildContext context) => const PetMagicImageSkeleton();
-}
-
-class _MediaErrorPlaceholder extends StatelessWidget {
-  const _MediaErrorPlaceholder({required this.isVideo, this.onRetry});
-
-  final bool isVideo;
-  final VoidCallback? onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = AppLocalizations.of(context);
-    final colors = context.petMagicColors;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colors.surfaceStrong.withValues(alpha: 0.92),
-            colors.surface.withValues(alpha: 0.92),
-          ],
-        ),
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final detailsReserve = constraints.maxHeight < 250 ? 118.0 : 132.0;
-          final mediaHeight = (constraints.maxHeight - detailsReserve).clamp(
-            76.0,
-            constraints.maxHeight,
-          );
-
-          return Align(
-            alignment: Alignment.topCenter,
-            child: SizedBox(
-              height: mediaHeight,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        isVideo
-                            ? Icons.videocam_off_rounded
-                            : Icons.broken_image_outlined,
-                        color: colors.textMuted,
-                        size: 24,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        text.templateFlowPreviewUnavailable,
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.labelMedium
-                            ?.copyWith(
-                              color: colors.textSoft,
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w700,
-                            ),
-                      ),
-                      if (onRetry != null) ...[
-                        const SizedBox(height: 4),
-                        TextButton.icon(
-                          onPressed: onRetry,
-                          icon: const Icon(Icons.refresh_rounded, size: 14),
-                          label: Text(
-                            text.retryAction,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          style: TextButton.styleFrom(
-                            visualDensity: VisualDensity.compact,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            minimumSize: Size.zero,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
       ),
     );
   }

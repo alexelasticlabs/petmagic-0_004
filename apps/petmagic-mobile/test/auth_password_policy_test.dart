@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:petmagic_mobile/features/profile/presentation/auth_password_policy.dart';
+import 'package:petmagic_mobile/features/profile/domain/auth_password_policy.dart';
 
 void main() {
   test('auth password policy matches backend registration requirements', () {

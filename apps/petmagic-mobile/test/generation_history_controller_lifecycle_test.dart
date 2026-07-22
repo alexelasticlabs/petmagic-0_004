@@ -5,10 +5,13 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   test('generation history controller guards async state updates after dispose', () {
     final source = [
-      'lib/features/templates/presentation/generation_history_controller.dart',
-      'lib/features/templates/presentation/generation_history_controller_cache.part.dart',
-      'lib/features/templates/presentation/generation_history_controller_lifecycle.part.dart',
-      'lib/features/templates/presentation/generation_history_controller_sync.part.dart',
+      'lib/features/templates/application/generation_history_controller.dart',
+      'lib/features/templates/application/generation_history_controller_cache.part.dart',
+      'lib/features/templates/application/generation_history_controller_cache_policy.part.dart',
+      'lib/features/templates/application/generation_history_controller_lifecycle.part.dart',
+      'lib/features/templates/application/generation_history_controller_realtime.part.dart',
+      'lib/features/templates/application/generation_history_controller_sync.part.dart',
+      'lib/features/templates/application/generation_history_controller_mutations.part.dart',
     ].map((path) => File(path).readAsStringSync()).join('\n');
 
     final buildBody = _methodBody(source, 'build');
@@ -96,23 +99,25 @@ void main() {
     expect(
       refetchBody,
       contains(
-        'if (_activeRealtimeRefetchCancelTokens.containsKey(generationId))',
+        'if (_activeRealtimeRefetchRequestCancellations.containsKey(generationId))',
       ),
     );
-    expect(refetchBody, contains('final cancelToken = CancelToken();'));
+    expect(refetchBody, contains('final cancelToken = RequestCancellation();'));
     expect(
       refetchBody,
       contains(
-        '_activeRealtimeRefetchCancelTokens[generationId] = cancelToken',
+        '_activeRealtimeRefetchRequestCancellations[generationId] = cancelToken',
       ),
     );
     expect(refetchBody, contains('cancelToken: cancelToken'));
     expect(refetchBody, contains('cancelToken.isCancelled'));
-    expect(refetchBody, contains('CancelToken.isCancel(error)'));
+    expect(refetchBody, contains('on RequestCancelledException'));
     expect(refetchBody, contains('return;'));
     expect(
       refetchBody,
-      contains('_activeRealtimeRefetchCancelTokens.remove(generationId)'),
+      contains(
+        '_activeRealtimeRefetchRequestCancellations.remove(generationId)',
+      ),
     );
     expect(
       pauseRealtimeBody,
@@ -122,7 +127,7 @@ void main() {
     );
     expect(
       cancelRealtimeBody,
-      contains('_activeRealtimeRefetchCancelTokens.clear()'),
+      contains('_activeRealtimeRefetchRequestCancellations.clear()'),
     );
     expect(cancelRealtimeBody, contains('cancelToken.cancel(reason)'));
   });

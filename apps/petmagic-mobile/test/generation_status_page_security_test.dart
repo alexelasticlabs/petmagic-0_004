@@ -8,13 +8,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/app/router/go_router_app_navigator.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
@@ -22,9 +24,10 @@ import 'package:petmagic_mobile/shared/notifications/petmagic_notification_cente
 import 'generation_status_page_test_support.dart';
 
 void main() {
-  final generationStatusPageSource = File(
+  final generationStatusPageSource = [
     'lib/features/templates/presentation/generation_status_page.dart',
-  ).readAsStringSync();
+    'lib/features/templates/presentation/generation_status_page_view.part.dart',
+  ].map((path) => File(path).readAsStringSync()).join('\n');
   final generationStatusLibrarySource = readGenerationStatusLibrarySource();
   final generationStatusSectionsLibrarySource =
       readGenerationStatusSectionsLibrarySource();
@@ -40,7 +43,7 @@ void main() {
     );
 
     expect(loadBody, isNot(contains('error.toString()')));
-    expect(loadBody, contains('CancelToken.isCancel(error)'));
+    expect(loadBody, contains('on RequestCancelledException'));
     expect(
       loadBody,
       contains('_showCachedOrMappedLoadError(repository, error)'),
@@ -63,8 +66,8 @@ void main() {
       'lib/features/templates/presentation/generation_status_page_lifecycle.part.dart',
     ).readAsStringSync();
 
-    expect(pageSource, isNot(contains('late final GenerationGalleryStore')));
-    expect(pageSource, contains('GenerationGalleryStore get _galleryStore {'));
+    expect(pageSource, isNot(contains('late final GenerationGalleryCache')));
+    expect(pageSource, contains('GenerationGalleryCache get _galleryStore {'));
     expect(pageSource, contains('ref.read(generationGalleryStoreProvider)'));
     expect(lifecycleSource, contains('final store = _activeGalleryStore;'));
     expect(
@@ -192,17 +195,24 @@ void main() {
     'generation status back button preserves existing navigation stack first',
     () {
       final source = generationStatusLibrarySource;
-      final buildBody = methodBody(source, 'Widget build');
+      final buildBody = methodBody(source, 'Widget _buildPage');
       final backBody = methodBody(source, 'void _handleBackNavigation');
 
       expect(buildBody, contains('onBack: _handleBackNavigation'));
       expect(backBody, contains('final navigator = Navigator.of(context);'));
       expect(backBody, contains('if (navigator.canPop())'));
       expect(backBody, contains('navigator.pop();'));
-      expect(backBody, contains("context.go('/creations');"));
+      expect(
+        backBody,
+        contains('context.appNavigator.go(const CreationsDestination());'),
+      );
       expect(
         backBody.indexOf('navigator.pop();'),
-        lessThan(backBody.indexOf("context.go('/creations');")),
+        lessThan(
+          backBody.indexOf(
+            'context.appNavigator.go(const CreationsDestination());',
+          ),
+        ),
       );
     },
   );
@@ -250,6 +260,10 @@ void main() {
             ),
           ],
           child: MaterialApp.router(
+            builder: (context, child) => AppNavigationScope(
+              navigator: GoRouterAppNavigator(router),
+              child: child!,
+            ),
             theme: AppTheme.dark(),
             locale: const Locale('en'),
             localizationsDelegates: const [
@@ -322,6 +336,10 @@ void main() {
             ),
           ],
           child: MaterialApp.router(
+            builder: (context, child) => AppNavigationScope(
+              navigator: GoRouterAppNavigator(router),
+              child: child!,
+            ),
             theme: AppTheme.dark(),
             locale: const Locale('en'),
             localizationsDelegates: const [
@@ -352,6 +370,10 @@ void main() {
       await tester.tapAt(const Offset(8, 8));
       await tester.pumpAndSettle();
 
+      await tester.scrollUntilVisible(
+        find.text(text.generationStatusContinueInAppAction),
+        240,
+      );
       await tester.tap(find.text(text.generationStatusContinueInAppAction));
       await tester.pumpAndSettle();
       expect(find.text('creations-route'), findsOneWidget);
@@ -404,6 +426,10 @@ void main() {
       tester.element(find.byType(GenerationStatusPage)),
     );
 
+    await tester.scrollUntilVisible(
+      find.text(text.generationStatusCancelQueuedAction),
+      240,
+    );
     expect(find.text(text.generationStatusCancelQueuedAction), findsOneWidget);
     expect(
       find.text(
@@ -482,6 +508,10 @@ void main() {
       tester.element(find.byType(GenerationStatusPage)),
     );
 
+    await tester.scrollUntilVisible(
+      find.text(text.generationStatusCancelQueuedAction),
+      240,
+    );
     await tester.tap(
       find
           .widgetWithText(
@@ -880,6 +910,10 @@ void main() {
           ),
         ],
         child: MaterialApp.router(
+          builder: (context, child) => AppNavigationScope(
+            navigator: GoRouterAppNavigator(router),
+            child: child!,
+          ),
           theme: AppTheme.dark(),
           locale: const Locale('en'),
           localizationsDelegates: const [
@@ -909,21 +943,26 @@ void main() {
 
   test('generation status failed retry and sheet keep pet context helper', () {
     final source = generationStatusLibrarySource;
-    final buildBody = methodBody(source, 'Widget build');
+    final buildBody = methodBody(source, 'Widget _buildPage');
     final sheetBody = methodBody(source, 'Future<void> _openActionsSheet');
     final retryBody = methodBody(source, 'void _retrySoon');
 
     expect(buildBody, contains('onRetry: () => _retrySoon(generation)'));
     expect(
       RegExp(
-        r'_templatesLocationForGeneration\(generation\)',
+        r'_templatesDestinationForGeneration\(generation\)',
       ).allMatches(buildBody).length,
       greaterThanOrEqualTo(1),
     );
-    expect(sheetBody, contains('_templatesLocationForGeneration(generation)'));
+    expect(
+      sheetBody,
+      contains('_templatesDestinationForGeneration(generation)'),
+    );
     expect(
       retryBody,
-      contains('context.go(_templatesLocationForGeneration(generation))'),
+      contains(
+        'context.appNavigator.go(_templatesDestinationForGeneration(generation))',
+      ),
     );
   });
 
@@ -1148,7 +1187,7 @@ void main() {
       );
       final startCancelBody = methodBody(
         source,
-        'CancelToken? _startGenerationCancelRequest',
+        'RequestCancellation? _startGenerationCancelRequest',
       );
       final cancelActiveBody = methodBody(
         source,
@@ -1159,7 +1198,7 @@ void main() {
 
       expect(
         pageSource,
-        contains('CancelToken? _activeGenerationCancelToken;'),
+        contains('RequestCancellation? _activeGenerationCancelToken;'),
       );
       expect(startCancelBody, contains('_activeGenerationCancelToken != null'));
       expect(
@@ -1169,7 +1208,7 @@ void main() {
       expect(cancelBody, contains('final cancelToken ='));
       expect(cancelBody, contains('cancelToken: cancelToken'));
       expect(cancelBody, contains('cancelToken.isCancelled'));
-      expect(cancelBody, contains('CancelToken.isCancel(error)'));
+      expect(cancelBody, contains('on RequestCancelledException'));
       expect(
         cancelBody,
         contains('_completeGenerationCancelRequest(cancelToken)'),

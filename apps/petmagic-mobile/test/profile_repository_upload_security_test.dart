@@ -112,9 +112,13 @@ void main() {
   });
 
   test('uses async file size validation for avatar uploads', () {
-    final source = File(
+    final repositorySource = File(
       'lib/features/profile/data/profile_repository.dart',
     ).readAsStringSync();
+    final preparerSource = File(
+      'lib/features/profile/data/profile_avatar_upload_preparer.dart',
+    ).readAsStringSync();
+    final source = '$repositorySource\n$preparerSource';
 
     expect(source, isNot(contains('lengthSync(')));
     expect(source, contains('await File(filePath).length()'));
@@ -125,8 +129,11 @@ void main() {
   });
 
   test('avatar upload optimizes payload and disposes temporary file', () {
-    final source = File(
+    final repositorySource = File(
       'lib/features/profile/data/profile_repository.dart',
+    ).readAsStringSync();
+    final source = File(
+      'lib/features/profile/data/profile_avatar_upload_preparer.dart',
     ).readAsStringSync();
 
     expect(
@@ -136,6 +143,7 @@ void main() {
     expect(source, contains('OptimizedUploadFile? optimizedAvatar;'));
     expect(source, contains('await _imageUploadOptimizer.optimizeForAvatar('));
     expect(source, contains('await optimizedAvatar?.dispose();'));
+    expect(repositorySource, contains('await prepared.dispose();'));
   });
 }
 

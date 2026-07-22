@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
@@ -8,6 +8,7 @@ import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_m
 import 'package:petmagic_mobile/features/profile/presentation/password_reset_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_flow_widgets.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
+import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
 
 class PasswordResetPage extends ConsumerStatefulWidget {
   const PasswordResetPage({super.key, this.initialEmail});
@@ -31,7 +32,6 @@ class _PasswordResetPageState extends ConsumerState<PasswordResetPage> {
   final _codeController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  GoRouter? _router;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
@@ -58,12 +58,6 @@ class _PasswordResetPageState extends ConsumerState<PasswordResetPage> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _router = GoRouter.of(context);
   }
 
   @override
@@ -341,9 +335,10 @@ class _PasswordResetPageState extends ConsumerState<PasswordResetPage> {
 
   void _goToAuth() {
     final email = ref.read(passwordResetControllerProvider).email.trim();
-    _router?.go(
-      AuthEntryPage.routePath,
-      extra: email.isEmpty ? null : AuthEntryRouteArgs(initialEmail: email),
+    context.appNavigator.go(
+      AuthDestination(
+        payload: email.isEmpty ? null : AuthEntryRouteArgs(initialEmail: email),
+      ),
     );
   }
 

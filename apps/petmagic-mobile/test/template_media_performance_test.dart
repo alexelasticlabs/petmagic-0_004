@@ -75,7 +75,7 @@ void main() {
     'template card fallback image path remains cached and bounded',
     () async {
       final source = await File(
-        'lib/features/templates/presentation/widgets/template_card.dart',
+        'lib/features/templates/presentation/widgets/template_card_media.dart',
       ).readAsString();
 
       expect(source, contains('parseSafeGenerationMediaUri(candidate)'));
@@ -102,7 +102,7 @@ void main() {
     'template card image decode width stays bounded for invalid constraints',
     () async {
       final source = await File(
-        'lib/features/templates/presentation/widgets/template_card.dart',
+        'lib/features/templates/presentation/widgets/template_card_media.dart',
       ).readAsString();
 
       expect(source, contains('final int imageCacheWidth;'));
@@ -143,9 +143,12 @@ void main() {
     'template surfaces do not cache stale notifiers across session resets',
     () async {
       final templatesSource = readTemplatesPageLibrarySource();
-      final gallerySource = await File(
-        'lib/features/templates/presentation/generations_gallery_page.dart',
-      ).readAsString();
+      final gallerySource = await Future.wait(
+        [
+          'lib/features/templates/presentation/generations_gallery_page.dart',
+          'lib/features/templates/presentation/generations_gallery_page_lifecycle.part.dart',
+        ].map((path) => File(path).readAsString()),
+      ).then((sources) => sources.join('\n'));
 
       expect(
         templatesSource,
@@ -171,7 +174,7 @@ void main() {
 
   test('template cards cache thumbnails at bounded size', () async {
     final source = await File(
-      'lib/features/templates/presentation/widgets/template_card.dart',
+      'lib/features/templates/presentation/widgets/template_card_media.dart',
     ).readAsString();
 
     expect(source, contains('TemplateMediaCache.fetchThumbnailFile'));
@@ -234,9 +237,16 @@ void main() {
   });
 
   test('template card video preview is visibility gated and cached', () async {
-    final source = await File(
+    final cardSource = await File(
       'lib/features/templates/presentation/widgets/template_card.dart',
     ).readAsString();
+    final coordinatorSource = await File(
+      'lib/features/templates/presentation/widgets/template_card_playback_coordinator.dart',
+    ).readAsString();
+    final mediaSource = await File(
+      'lib/features/templates/presentation/widgets/template_card_media.dart',
+    ).readAsString();
+    final source = '$cardSource\n$coordinatorSource\n$mediaSource';
     final playbackManagerSource = await File(
       'lib/features/templates/presentation/template_feed_playback_manager.dart',
     ).readAsString();
@@ -264,13 +274,13 @@ void main() {
       ),
     );
     expect(source, contains('_ensureVideoController()'));
-    expect(source, contains('widget.template.previewAsset'));
+    expect(source, contains('_template.previewAsset'));
     expect(source, contains('VisibilityDetector('));
     expect(
       playbackManagerSource,
       contains('videoEligibilityVisibilityFraction'),
     );
-    expect(source, contains('widget.playbackManager?.updateCardVisibility('));
+    expect(source, contains('_playbackManager?.updateCardVisibility('));
     expect(source, contains('TemplateFeedDisplayLevel.videoPreview'));
     expect(source, contains('snapshot?.mediaVersion'));
     expect(
@@ -303,9 +313,21 @@ void main() {
   });
 
   test('template media caches use bounded object counts and app TTL', () async {
-    final source = await File(
+    final cacheSource = await File(
       'lib/core/performance/template_media_cache.dart',
     ).readAsString();
+    final supportSource = await Directory('lib/core/performance')
+        .list()
+        .where(
+          (entity) =>
+              entity is File &&
+              entity.path.endsWith('.dart') &&
+              !entity.path.endsWith('template_media_cache.dart'),
+        )
+        .cast<File>()
+        .asyncMap((file) => file.readAsString())
+        .join('\n');
+    final source = '$cacheSource\n$supportSource';
     final presentationSource =
         await Directory('lib/features/templates/presentation')
             .list(recursive: true)
@@ -375,14 +397,14 @@ void main() {
     expect(source, contains('_previewInvalidationByUrl.clear();'));
     expect(source, contains('_latestThumbnailFetchGenerationByUrl.clear();'));
     expect(source, contains('_latestPreviewFetchGenerationByUrl.clear();'));
-    expect(source, contains('_rememberLatestFetchGeneration('));
+    expect(source, contains('MediaCacheTracking.rememberLatestGeneration('));
     expect(source, contains('_canInvalidateCompletedFetch('));
-    expect(source, contains('_trimInvalidationMap('));
-    expect(source, contains('_trimBlockedCacheUrls('));
+    expect(source, contains('MediaCacheTracking.trimInvalidations('));
+    expect(source, contains('MediaCacheTracking.trimBlockedUrls('));
     expect(source, contains('_blockedThumbnailCacheUrls.remove(url);'));
     expect(source, contains('_blockedPreviewCacheUrls.remove(url);'));
     expect(source, contains('AppConfig.mediaCacheMaxBytesSafe'));
-    expect(source, contains('_scheduleThumbnailBudgetCleanup(file.parent)'));
+    expect(source, contains('TemplateMediaCacheBudget.scheduleThumbnail('));
     expect(source, contains('thumbnail_budget_cleanup'));
     expect(
       presentationSource,

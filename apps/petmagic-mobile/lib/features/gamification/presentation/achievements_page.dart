@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/gamification/presentation/achievements_page_state.dart';
-import 'package:petmagic_mobile/features/gamification/presentation/gamification_providers.dart';
+import 'package:petmagic_mobile/features/gamification/application/achievements_page_state.dart';
+import 'package:petmagic_mobile/features/gamification/application/gamification_providers.dart';
 import 'package:petmagic_mobile/features/gamification/presentation/gamification_text_mapper.dart';
 import 'package:petmagic_mobile/features/gamification/presentation/widgets/achievement_card.dart';
 import 'package:petmagic_mobile/features/gamification/presentation/widgets/achievements_empty_filter_state.dart';
@@ -16,9 +16,9 @@ import 'package:petmagic_mobile/features/gamification/presentation/widgets/achie
 import 'package:petmagic_mobile/features/gamification/presentation/widgets/achievements_next_milestone_card.dart';
 import 'package:petmagic_mobile/features/gamification/presentation/widgets/achievements_overview_card.dart';
 import 'package:petmagic_mobile/features/gamification/presentation/widgets/achievements_weekly_focus_section.dart';
-import 'package:petmagic_mobile/features/profile/presentation/legal_acceptance_gate_page.dart';
 import 'package:petmagic_mobile/shared/widgets/android_loopback_backend_hint.dart';
-import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
+import 'package:petmagic_mobile/shared/auth/auth_required_sheet.dart';
+import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_unavailable_view.dart';
 
@@ -184,8 +184,8 @@ class _AchievementsPageState extends ConsumerState<AchievementsPage>
                         FilledButton(
                           onPressed:
                               isAchievementsLegalAcceptanceFailure(rawError)
-                              ? () => context.go(
-                                  LegalAcceptanceGatePage.routePath,
+                              ? () => context.appNavigator.go(
+                                  const LegalAcceptanceDestination(),
                                 )
                               : _reloadAll,
                           child: Text(

@@ -1,21 +1,32 @@
+export 'package:petmagic_mobile/features/premium/application/premium_repository.dart'
+    show PremiumRepositoryPort, premiumRepositoryProvider;
+
 import 'dart:io';
 
 import 'package:dio/dio.dart';
-import 'package:flutter/widgets.dart';
+import 'package:petmagic_mobile/core/network/dio_request_cancellation.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
+import 'package:petmagic_mobile/core/platform/app_runtime_info.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:petmagic_mobile/core/payments/store_purchase.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
 import 'package:petmagic_mobile/core/network/authenticated_request_options.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
-import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
-import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
+import 'package:petmagic_mobile/features/premium/domain/premium_models.dart';
+import 'package:petmagic_mobile/features/premium/data/premium_dto_mapper.dart';
+import 'package:petmagic_mobile/features/premium/application/premium_repository.dart';
+import 'package:petmagic_mobile/core/auth/auth_session_storage.dart';
+import 'package:petmagic_mobile/core/auth/auth_session.dart';
 import 'package:petmagic_mobile/shared/payments/store_product_availability_cache.dart';
+import 'package:petmagic_mobile/shared/payments/store_purchase_adapter.dart';
 
-final premiumRepositoryProvider = Provider<PremiumRepository>((ref) {
+part 'premium_repository_transport.part.dart';
+
+final dioPremiumRepositoryProvider = Provider<PremiumRepositoryPort>((ref) {
   return PremiumRepository(
     dio: ref.watch(dioProvider),
     sessionStorage: ref.watch(authSessionStorageProvider),
@@ -23,10 +34,10 @@ final premiumRepositoryProvider = Provider<PremiumRepository>((ref) {
   );
 });
 
-class PremiumRepository {
+class PremiumRepository implements PremiumRepositoryPort {
   PremiumRepository({
     required Dio dio,
-    required AuthSessionStorage sessionStorage,
+    required AuthSessionStore sessionStorage,
     AuthSessionCoordinator? authSessionCoordinator,
     InAppPurchase? inAppPurchase,
   }) : _dio = dio,
@@ -42,12 +53,17 @@ class PremiumRepository {
   InAppPurchase get _inAppPurchase =>
       _inAppPurchaseOverride ?? InAppPurchase.instance;
 
-  Stream<List<PurchaseDetails>> get purchaseUpdates =>
-      _inAppPurchase.purchaseStream;
+  @override
+  Stream<List<StorePurchaseDetails>> get purchaseUpdates =>
+      _inAppPurchase.purchaseStream.map(
+        (purchases) =>
+            purchases.map(mapPlatformStorePurchase).toList(growable: false),
+      );
 
+  @override
   Future<PremiumPaywallConfigModel> fetchPaywallConfig({
-    required Locale locale,
-    CancelToken? cancelToken,
+    required AppLocale locale,
+    RequestCancellation? cancelToken,
   }) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
@@ -56,12 +72,12 @@ class PremiumRepository {
           'platform': _platformValue(),
           'appVersion': AppConfig.appVersion,
           'country': locale.countryCode ?? '*',
-          'locale': locale.toLanguageTag(),
+          'locale': locale.languageTag,
         },
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       );
 
-      return PremiumPaywallConfigModel.fromJson(response.data ?? const {});
+      return mapPremiumPaywallConfigFromJson(response.data ?? const {});
     } on DioException catch (error) {
       if (CancelToken.isCancel(error)) {
         throw const RequestCancelledException();
@@ -70,6 +86,7 @@ class PremiumRepository {
     }
   }
 
+  @override
   Future<List<PremiumPlanModel>> fetchPlans() async {
     try {
       final response = await _dio.get<List<dynamic>>(
@@ -78,7 +95,7 @@ class PremiumRepository {
 
       return (response.data ?? const [])
           .whereType<Map<String, dynamic>>()
-          .map(PremiumPlanModel.fromJson)
+          .map(mapPremiumPlanFromJson)
           .toList(growable: false)
         ..sort((left, right) => left.sortOrder.compareTo(right.sortOrder));
     } on DioException catch (error) {
@@ -86,22 +103,26 @@ class PremiumRepository {
     }
   }
 
-  Future<PremiumStatusModel> fetchStatus({CancelToken? cancelToken}) async {
+  @override
+  Future<PremiumStatusModel> fetchStatus({
+    RequestCancellation? cancelToken,
+  }) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.get<Map<String, dynamic>>(
         '/api/economy/me/subscription',
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
     );
 
-    return PremiumStatusModel.fromJson(response.data ?? const {});
+    return mapPremiumStatusFromJson(response.data ?? const {});
   }
 
+  @override
   Future<PremiumCheckoutModel> createStripeCheckout(
     PremiumPlanModel plan,
-    Locale locale, {
-    CancelToken? cancelToken,
+    AppLocale locale, {
+    RequestCancellation? cancelToken,
   }) async {
     final platform = _platformValue();
     final payload = <String, Object?>{
@@ -110,7 +131,7 @@ class PremiumRepository {
       'platform': platform,
       'appVersion': AppConfig.appVersion,
       'country': locale.countryCode ?? '*',
-      'locale': locale.toLanguageTag(),
+      'locale': locale.languageTag,
     };
 
     final response = await _authorizedRequest<Map<String, dynamic>>(
@@ -121,12 +142,12 @@ class PremiumRepository {
           session.accessToken,
           extraHeaders: {'X-PetMagic-Platform': platform},
         ),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
       retryTransientFailures: false,
     );
 
-    final checkout = PremiumCheckoutModel.fromJson(response.data ?? const {});
+    final checkout = mapPremiumCheckoutFromJson(response.data ?? const {});
     if (platform == 'web' || checkout.checkoutUrl.trim().isNotEmpty) {
       return checkout;
     }
@@ -134,42 +155,45 @@ class PremiumRepository {
     throw const AppException('premium.checkout_failed');
   }
 
+  @override
   Future<PremiumBillingPortalModel> createBillingPortal({
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
         '/api/economy/premium/manage',
         data: {'paymentProvider': PremiumPaymentProvider.stripe.value},
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
       retryTransientFailures: false,
     );
 
-    return PremiumBillingPortalModel.fromJson(response.data ?? const {});
+    return mapPremiumBillingPortalFromJson(response.data ?? const {});
   }
 
+  @override
   Future<PremiumStatusModel> cancelSubscription({
     PremiumPaymentProvider provider = PremiumPaymentProvider.stripe,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
         '/api/economy/premium/cancel',
         data: {'paymentProvider': provider.value},
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
       retryTransientFailures: false,
     );
 
-    return PremiumStatusModel.fromJson(response.data ?? const {});
+    return mapPremiumStatusFromJson(response.data ?? const {});
   }
 
+  @override
   Future<String> createManagementUrl(
     PremiumStatusModel status, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     switch (status.manageSubscriptionAction) {
       case 'AppleSettings':
@@ -184,6 +208,7 @@ class PremiumRepository {
     }
   }
 
+  @override
   Future<
     ({
       bool isAvailable,
@@ -222,6 +247,7 @@ class PremiumRepository {
     );
   }
 
+  @override
   Future<void> startStoreCheckout(
     PremiumPlanModel plan,
     PremiumPaymentProvider provider,
@@ -264,37 +290,17 @@ class PremiumRepository {
 
   Future<StoreProductAvailabilitySnapshot> _loadStoreAvailabilitySnapshot(
     Set<String> requestedProductIds,
-  ) async {
-    final isAvailable = await _inAppPurchase.isAvailable();
-    if (!isAvailable) {
-      return const StoreProductAvailabilitySnapshot(isAvailable: false);
-    }
+  ) => _PremiumRepositoryTransport.loadStoreAvailabilitySnapshot(
+    _inAppPurchase,
+    requestedProductIds,
+  );
 
-    final response = await _inAppPurchase.queryProductDetails(
-      requestedProductIds,
-    );
-    if (response.error != null) {
-      throw const AppException('premium.store_unavailable');
-    }
-
-    return StoreProductAvailabilitySnapshot(
-      isAvailable: true,
-      productIds: response.productDetails.map((product) => product.id).toSet(),
-      productPrices: {
-        for (final product in response.productDetails)
-          product.id: product.price,
-      },
-      productDetailsById: {
-        for (final product in response.productDetails) product.id: product,
-      },
-    );
-  }
-
+  @override
   Future<PremiumStoreVerificationModel> verifyStorePurchase({
     required PremiumPlanModel plan,
     required PremiumPaymentProvider provider,
-    required PurchaseDetails purchase,
-    CancelToken? cancelToken,
+    required StorePurchaseDetails purchase,
+    RequestCancellation? cancelToken,
   }) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
@@ -311,18 +317,19 @@ class PremiumRepository {
           'transactionDate': purchase.transactionDate,
         },
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
       retryTransientFailures: false,
     );
 
-    return PremiumStoreVerificationModel.fromJson(response.data ?? const {});
+    return mapPremiumStoreVerificationFromJson(response.data ?? const {});
   }
 
+  @override
   Future<void> verifyStripeSubscriptionCheckout({
     required String planCode,
     required String externalSubscriptionId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
@@ -332,24 +339,15 @@ class PremiumRepository {
           'externalSubscriptionId': externalSubscriptionId,
         },
         options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
+        cancelToken: cancelToken.toDioCancelToken(),
       ),
       retryTransientFailures: false,
     );
   }
 
-  String _platformValue() {
-    if (Platform.isIOS) {
-      return 'ios';
-    }
+  String _platformValue() => _PremiumRepositoryTransport.platformValue();
 
-    if (Platform.isAndroid) {
-      return 'android';
-    }
-
-    return 'web';
-  }
-
+  @override
   Future<void> restoreStorePurchases() async {
     final session = await _authSessionCoordinator.requireValidSession(
       mapError: _mapDioException,
@@ -361,49 +359,27 @@ class PremiumRepository {
     );
   }
 
-  Future<void> completePurchase(PurchaseDetails purchase) {
-    return _inAppPurchase.completePurchase(purchase);
+  @override
+  Future<void> completePurchase(StorePurchaseDetails purchase) {
+    return _inAppPurchase.completePurchase(
+      requirePlatformStorePurchase(purchase),
+    );
   }
 
   Future<Response<T>> _authorizedRequest<T>(
     Future<Response<T>> Function(AuthSession session) request, {
     bool retryTransientFailures = true,
-  }) async {
-    return _authSessionCoordinator.authorizedRequest(
-      request: request,
-      mapError: _mapDioException,
-      requestFailedMessage: 'premium.request_failed',
-      sessionExpiredMessage: 'auth.session_expired',
-      transientRetryAttempts: retryTransientFailures ? 2 : 1,
-    );
-  }
+  }) => _PremiumRepositoryTransport.authorizedRequest(
+    _authSessionCoordinator,
+    request,
+    retryTransientFailures: retryTransientFailures,
+  );
 
   AppException _mapDioException(
     DioException error, {
     required String fallbackMessage,
-  }) {
-    if (NetworkErrorMapper.isConnectivityIssue(error)) {
-      return NetworkErrorMapper.fromMessage(
-        error,
-        'templates.network_unavailable',
-        includeCause: false,
-      );
-    }
-
-    if (NetworkErrorMapper.isServerError(error)) {
-      return NetworkErrorMapper.fromMessage(
-        error,
-        'premium.store_unavailable',
-        includeCause: false,
-      );
-    }
-
-    final payload = NetworkErrorMapper.parseApiPayload(error);
-    final safeMessage = NetworkErrorMapper.safePayloadMessage(payload);
-    if (safeMessage != null) {
-      return NetworkErrorMapper.fromMessage(error, safeMessage);
-    }
-
-    return NetworkErrorMapper.fallback(error, fallbackMessage: fallbackMessage);
-  }
+  }) => _PremiumRepositoryTransport.mapDioException(
+    error,
+    fallbackMessage: fallbackMessage,
+  );
 }

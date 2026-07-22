@@ -1,5 +1,12 @@
 {
   "@@locale": "pl",
+  "navDiscover": "Odkrywaj",
+  "navCreate": "Twórz",
+  "createHubTitle": "Stwórz magię ze swoim pupilem",
+  "createHubSubtitle": "Zacznij od szablonu lub pupila. Przeprowadzimy Cię przez kolejne kroki.",
+  "createHubBrowseAction": "Przeglądaj szablony",
+  "createHubPetsAction": "Wybierz mojego pupila",
+  "createHubGuestHint": "Możesz najpierw przeglądać. Twój wybór zostanie zachowany, jeśli logowanie będzie wymagane.",
   "navTemplates": "Szablony",
   "navCreations": "Galeria",
   "navProfile": "Profil",

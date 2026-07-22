@@ -1,10 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:dio/dio.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
-import 'package:petmagic_mobile/features/profile/presentation/auth_password_policy.dart';
+import 'package:petmagic_mobile/features/profile/application/profile_repository.dart';
+import 'package:petmagic_mobile/features/profile/domain/auth_password_policy.dart';
 
 final passwordResetControllerProvider =
     NotifierProvider<PasswordResetController, PasswordResetState>(
@@ -61,7 +61,7 @@ class PasswordResetState {
 
 class PasswordResetController extends Notifier<PasswordResetState> {
   static const _genericActionError = 'profile.action_failed';
-  CancelToken? _activeRequestCancelToken;
+  RequestCancellation? _activeRequestCancelToken;
 
   void _logPasswordResetFailure(
     String stage,
@@ -78,7 +78,7 @@ class PasswordResetController extends Notifier<PasswordResetState> {
     );
   }
 
-  ProfileRepository get _repository => ref.read(profileRepositoryProvider);
+  ProfileRepositoryPort get _repository => ref.read(profileRepositoryProvider);
 
   @override
   PasswordResetState build() {
@@ -115,9 +115,9 @@ class PasswordResetController extends Notifier<PasswordResetState> {
     );
   }
 
-  CancelToken _startRequestCancelToken() {
+  RequestCancellation _startRequestCancelToken() {
     _cancelActiveRequest();
-    final cancelToken = CancelToken();
+    final cancelToken = RequestCancellation();
     _activeRequestCancelToken = cancelToken;
     return cancelToken;
   }
@@ -130,7 +130,7 @@ class PasswordResetController extends Notifier<PasswordResetState> {
     _activeRequestCancelToken = null;
   }
 
-  void _clearActiveRequest(CancelToken cancelToken) {
+  void _clearActiveRequest(RequestCancellation cancelToken) {
     if (identical(_activeRequestCancelToken, cancelToken)) {
       _activeRequestCancelToken = null;
     }

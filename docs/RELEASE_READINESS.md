@@ -46,9 +46,10 @@ do not append command transcripts to this file.
 
 ## Production Evidence Still Required
 
-- Approved legal translations for every locale exposed by the public site. The
-  current catalog is missing `de`, `es`, `fr`, `it`, and `pl`, so publication is
-  intentionally blocked by `npm run validate:legal`.
+- Formal legal approval for the current English and Russian Terms of Use and
+  Privacy Policy. The public site intentionally exposes only `en` and `ru` until
+  additional locale translations are approved and added to both the catalog and
+  its required-locale gate.
 - Privacy/legal approval for release Crashlytics collection, including the
   intended Firebase processor disclosure and retention basis.
 - A signed Android AAB built with protected production signing material.

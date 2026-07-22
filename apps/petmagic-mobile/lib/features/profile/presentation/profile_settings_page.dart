@@ -1,23 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/preferences/app_preferences_controller.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/features/profile/presentation/password_change_page.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
+import 'package:petmagic_mobile/features/profile/application/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
-import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
-import 'package:petmagic_mobile/features/profile/presentation/widgets/profile_settings_bottom_sheets.dart';
-import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
-import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
-import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/shared/profile/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/shared/auth/auth_required_sheet.dart';
+import 'package:petmagic_mobile/shared/settings/app_settings_bottom_sheets.dart';
+import 'package:petmagic_mobile/features/templates/application/template_generation_contract.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_navigation_layout.dart';
+import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 
@@ -42,7 +41,7 @@ class ProfileSettingsPage extends ConsumerWidget {
       appPreferencesControllerProvider.notifier,
     );
     final profileController = ref.read(profileControllerProvider.notifier);
-    final router = GoRouter.of(context);
+    final navigator = context.appNavigator;
 
     if (!state.isLoading && !state.isAuthenticated) {
       return ProfileScreenBackground(
@@ -68,17 +67,18 @@ class ProfileSettingsPage extends ConsumerWidget {
       themeMode: preferences.themeMode,
       isLight: isLight,
       onBack: () {
-        if (router.canPop()) {
-          router.pop();
+        if (navigator.canPop()) {
+          navigator.pop();
           return;
         }
 
-        router.go(ProfilePage.routePath);
+        navigator.go(const ProfileDestination());
       },
-      onOpenAccountInfo: () => context.push(ProfileAccountInfoPage.routePath),
-      onOpenLinkedAccounts: () => context.push(
-        ProfileSettingsDetailPage.location(
-          ProfileSettingsDetailKind.linkedAccounts,
+      onOpenAccountInfo: () =>
+          navigator.push(const ProfileAccountDestination()),
+      onOpenLinkedAccounts: () => navigator.push(
+        ProfileSettingsDetailDestination(
+          ProfileSettingsDetailKind.linkedAccounts.slug,
         ),
       ),
       onOpenPassword: () {
@@ -92,14 +92,15 @@ class ProfileSettingsPage extends ConsumerWidget {
           return;
         }
 
-        context.push(
-          PasswordChangePage.routePath,
-          extra: PasswordChangeRouteArgs(email: email),
+        navigator.push(
+          PasswordChangeDestination(
+            payload: PasswordChangeRouteArgs(email: email),
+          ),
         );
       },
-      onOpenNotifications: () => context.push(
-        ProfileSettingsDetailPage.location(
-          ProfileSettingsDetailKind.notifications,
+      onOpenNotifications: () => navigator.push(
+        ProfileSettingsDetailDestination(
+          ProfileSettingsDetailKind.notifications.slug,
         ),
       ),
       onOpenLanguageSheet: () => showProfileLanguageSheet(
@@ -113,19 +114,22 @@ class ProfileSettingsPage extends ConsumerWidget {
         selectedThemeMode: preferences.themeMode,
         onSelect: preferencesController.updateThemeMode,
       ),
-      onOpenHelpCenter: () => context.push(
-        ProfileSettingsDetailPage.location(
-          ProfileSettingsDetailKind.helpCenter,
+      onOpenHelpCenter: () => navigator.push(
+        ProfileSettingsDetailDestination(
+          ProfileSettingsDetailKind.helpCenter.slug,
         ),
       ),
-      onOpenSupport: () => context.push(SupportChatPage.routePath),
+      onOpenSupport: () =>
+          context.appNavigator.push(const SupportChatDestination()),
       onOpenFeedback: () =>
           _handleSettingsFeedbackSubmission(context: context, ref: ref),
-      onOpenTerms: () => context.push(
-        ProfileSettingsDetailPage.location(ProfileSettingsDetailKind.terms),
+      onOpenTerms: () => navigator.push(
+        ProfileSettingsDetailDestination(ProfileSettingsDetailKind.terms.slug),
       ),
-      onOpenPrivacy: () => context.push(
-        ProfileSettingsDetailPage.location(ProfileSettingsDetailKind.privacy),
+      onOpenPrivacy: () => navigator.push(
+        ProfileSettingsDetailDestination(
+          ProfileSettingsDetailKind.privacy.slug,
+        ),
       ),
       onDeleteAccount: () => showProfileDeleteAccountConfirmationSheet(
         context: context,

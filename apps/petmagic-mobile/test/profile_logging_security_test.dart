@@ -17,16 +17,16 @@ void main() {
 
   test('profile avatar rendering checks URLs before network image use', () {
     final hostSource = File(
-      'lib/features/profile/presentation/profile_surface_widgets.dart',
+      'lib/shared/profile/profile_surface_widgets.dart',
     ).readAsStringSync();
     final cardsSource = File(
-      'lib/features/profile/presentation/profile_surface_cards.part.dart',
+      'lib/shared/profile/profile_surface_cards.part.dart',
     ).readAsStringSync();
     final identitySource = File(
-      'lib/features/profile/presentation/profile_surface_identity.part.dart',
+      'lib/shared/profile/profile_surface_identity.part.dart',
     ).readAsStringSync();
     final metaSource = File(
-      'lib/features/profile/presentation/profile_surface_meta.part.dart',
+      'lib/shared/profile/profile_surface_meta.part.dart',
     ).readAsStringSync();
     final source = '$hostSource\n$cardsSource\n$identitySource\n$metaSource';
 
@@ -51,23 +51,25 @@ void main() {
 
   test('profile failure logs do not include raw avatar media urls', () {
     final source = File(
-      'lib/features/profile/presentation/profile_controller.dart',
+      'lib/features/profile/application/profile_avatar_coordinator.dart',
+    ).readAsStringSync();
+    final gatewaySource = File(
+      'lib/features/profile/data/mobile_avatar_media_gateway.dart',
     ).readAsStringSync();
     final evictBody = _methodBody(source, 'Future<void> _evictAvatarCache');
 
     expect(evictBody, contains('parseSafeProfileAvatarUri(imageUrl)'));
     expect(
-      evictBody,
-      contains(
-        'final cacheKey = persistentSafeProfileAvatarUrl(safeImageUrl);',
-      ),
+      gatewaySource,
+      contains('final cacheKey = persistentSafeProfileAvatarUrl(imageUrl);'),
     );
     expect(
-      evictBody,
-      contains('evictFromCache(safeImageUrl, cacheKey: cacheKey)'),
+      gatewaySource,
+      contains('evictFromCache(imageUrl, cacheKey: cacheKey)'),
     );
-    expect(evictBody, isNot(contains('evictFromCache(safeImageUrl);')));
-    expect(evictBody, contains('NetworkImage(safeImageUrl)'));
+    expect(gatewaySource, isNot(contains('evictFromCache(imageUrl);')));
+    expect(gatewaySource, contains('NetworkImage(imageUrl)'));
+    expect(evictBody, contains('_mediaGateway.evictAvatarCache(safeImageUrl)'));
     expect(evictBody, isNot(contains('NetworkImage(imageUrl)')));
     expect(evictBody, contains("'avatar_cache_evict_failed'"));
     expect(evictBody, isNot(contains('avatar_url')));

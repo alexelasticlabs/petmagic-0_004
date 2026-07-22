@@ -4,24 +4,23 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
-import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
 import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/profile/presentation/legal_acceptance_gate_page.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/shared/profile/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/rewards/presentation/mappers/rewards_error_mapper.dart';
-import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
-import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/shared/auth/auth_required_sheet.dart';
+import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
-import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_navigation_layout.dart';
+import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_banner_style.dart';
@@ -37,6 +36,7 @@ part 'rewards_page_referral_share.part.dart';
 part 'rewards_page_friend_code_card.part.dart';
 part 'rewards_page_premium_upsell.part.dart';
 part 'rewards_page_shared_widgets.dart';
+part 'rewards_page_action_widgets.part.dart';
 part 'rewards_page_shell_widgets.dart';
 part 'rewards_page_support.part.dart';
 
@@ -165,8 +165,7 @@ class _RewardsPageState extends ConsumerState<RewardsPage>
     final hasInternet = ref.watch(
       networkStatusControllerProvider.select((status) => status.hasInternet),
     );
-    final hasShell =
-        context.findAncestorWidgetOfExactType<PetMagicShell>() != null;
+    final hasShell = PetMagicShellScope.isPresent(context);
     final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
     final bottomNavInset = hasShell
         ? petMagicScrollableBottomInset(context)
@@ -237,7 +236,7 @@ class _RewardsPageState extends ConsumerState<RewardsPage>
                   ) ??
                   text.profileLegalAcceptanceRequired,
               onOpenLegalGate: () =>
-                  context.go(LegalAcceptanceGatePage.routePath),
+                  context.appNavigator.go(const LegalAcceptanceDestination()),
             ),
           ),
         ),
@@ -331,8 +330,9 @@ class _RewardsPageState extends ConsumerState<RewardsPage>
                     const SizedBox(height: 16),
                     if (isAuthenticated && !isPremiumUser) ...[
                       _RewardsPremiumUpsellCard(
-                        onOpenPremium: () =>
-                            context.push(PremiumPage.routePath),
+                        onOpenPremium: () => context.appNavigator.push(
+                          const PremiumDestination(),
+                        ),
                       ),
                       const SizedBox(height: 16),
                     ],

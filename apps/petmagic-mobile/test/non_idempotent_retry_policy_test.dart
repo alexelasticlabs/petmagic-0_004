@@ -8,10 +8,13 @@ void main() {
       'lib/features/templates/data/template_generation_repository.dart': [
         'startGeneration',
         'deleteGeneration',
-        'submitGenerationFeedback',
-        'registerPushToken',
-        'unregisterPushToken',
       ],
+      'lib/features/templates/data/generation_engagement_repository_delegate.dart':
+          [
+            'submitGenerationFeedback',
+            'registerPushToken',
+            'unregisterPushToken',
+          ],
       'lib/features/support/data/support_chat_repository.dart': [
         'openConversation',
         'sendMessage',
@@ -56,7 +59,7 @@ void main() {
     };
 
     for (final entry in expectations.entries) {
-      final source = File(entry.key).readAsStringSync();
+      final source = _readRepositorySource(entry.key);
       for (final methodName in entry.value) {
         final body = _methodBody(source, methodName);
         expect(
@@ -68,6 +71,26 @@ void main() {
       }
     }
   });
+}
+
+String _readRepositorySource(String path) {
+  final paths = switch (path) {
+    'lib/features/profile/data/profile_repository.dart' => [
+      path,
+      'lib/features/profile/data/profile_auth_repository_mixin.part.dart',
+    ],
+    'lib/features/support/data/support_chat_repository.dart' => [
+      path,
+      'lib/features/support/data/support_attachment_repository_mixin.part.dart',
+    ],
+    'lib/features/wallet/data/wallet_repository.dart' => [
+      path,
+      'lib/features/wallet/data/wallet_store_repository_mixin.part.dart',
+      'lib/features/wallet/data/wallet_actions_repository_mixin.part.dart',
+    ],
+    _ => [path],
+  };
+  return paths.map((item) => File(item).readAsStringSync()).join('\n');
 }
 
 String _methodBody(String source, String methodName) {

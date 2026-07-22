@@ -23,7 +23,7 @@
   "dependencies": {
     "@microsoft/signalr": "^10.0.0",
     "@tanstack/react-query": "^5.101.2",
-    "next": "^16.2.10",
+    "next": "^16.2.11",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },
@@ -34,17 +34,25 @@
     "@types/react-dom": "^19",
     "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^9",
-    "eslint-config-next": "^16.2.10",
+    "eslint-config-next": "^16.2.11",
     "eslint-plugin-import": "^2.32.0",
     "prettier": "^3.9.4",
     "typescript": "^6.0.3",
     "vitest": "^4.1.10"
   },
   "overrides": {
-    "postcss": "8.5.15"
+    "postcss": "8.5.15",
+    "js-yaml": "4.3.0",
+    "minimatch@3.1.5": {
+      "brace-expansion": "1.1.16"
+    },
+    "minimatch@10.2.5": {
+      "brace-expansion": "5.0.7"
+    },
+    "sharp": "0.35.3"
   },
   "allowScripts": {
-    "sharp@0.34.5": true,
+    "sharp@0.35.3": true,
     "unrs-resolver@1.11.1": true
   }
 }

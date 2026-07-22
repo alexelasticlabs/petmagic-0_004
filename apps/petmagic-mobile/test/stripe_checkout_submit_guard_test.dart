@@ -8,9 +8,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
-import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
+import 'package:petmagic_mobile/features/premium/domain/premium_models.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_stripe_checkout_page.dart';
-import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
+import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_stripe_checkout_page.dart';
 
 void main() {

@@ -40,6 +40,10 @@ void main() {
     final cardSource = await File(
       'lib/features/templates/presentation/widgets/template_card.dart',
     ).readAsString();
+    final cardPlaybackSource = await File(
+      'lib/features/templates/presentation/widgets/template_card_playback_coordinator.dart',
+    ).readAsString();
+    final fullCardSource = '$cardSource\n$cardPlaybackSource';
     final playbackManagerSource = await File(
       'lib/features/templates/presentation/template_feed_playback_manager.dart',
     ).readAsString();
@@ -50,22 +54,19 @@ void main() {
       'lib/features/templates/presentation/widgets/template_flow_media_preview.part.dart',
     ).readAsString().then((source) => source.replaceAll('\r\n', '\n'));
 
-    expect(cardSource, contains('VisibilityDetector('));
+    expect(fullCardSource, contains('VisibilityDetector('));
     expect(
       playbackManagerSource,
       contains('videoEligibilityVisibilityFraction'),
     );
     expect(
-      cardSource,
+      fullCardSource,
       contains(
         "import 'package:petmagic_mobile/features/templates/presentation/template_feed_playback_manager.dart';",
       ),
     );
-    expect(cardSource, contains('TemplateFeedDisplayLevel.videoPreview'));
-    expect(
-      cardSource,
-      contains('widget.playbackManager?.updateCardVisibility('),
-    );
+    expect(fullCardSource, contains('TemplateFeedDisplayLevel.videoPreview'));
+    expect(fullCardSource, contains('_playbackManager?.updateCardVisibility('));
     expect(
       playbackManagerSource,
       contains(
@@ -80,9 +81,15 @@ void main() {
       playbackManagerSource,
       contains('MediaLifecyclePolicy.releaseVideoPreviewSlot()'),
     );
-    expect(cardSource, contains('createTemplatePreviewVideoController('));
-    expect(cardSource, contains('createCachedTemplatePreviewVideoController('));
-    expect(cardSource, isNot(contains('VideoPlayerController.networkUrl(')));
+    expect(fullCardSource, contains('createTemplatePreviewVideoController('));
+    expect(
+      fullCardSource,
+      contains('createCachedTemplatePreviewVideoController('),
+    );
+    expect(
+      fullCardSource,
+      isNot(contains('VideoPlayerController.networkUrl(')),
+    );
     expect(
       controllerSource,
       contains('parseSafeGenerationMediaUri(previewUrl)'),
@@ -156,10 +163,10 @@ void main() {
 
   test('active generation shell thumbnail is cached at thumbnail size', () async {
     final shellSource = await File(
-      'lib/shared/navigation/petmagic_shell.dart',
+      'lib/app/shell/petmagic_shell.dart',
     ).readAsString();
     final activeGenerationSource = await File(
-      'lib/shared/navigation/petmagic_shell_active_generation.part.dart',
+      'lib/app/shell/petmagic_shell_active_generation.part.dart',
     ).readAsString();
     final source = '$shellSource\n$activeGenerationSource';
 
@@ -192,11 +199,12 @@ void main() {
     final gallerySource = await File(
       'lib/features/templates/presentation/generations_gallery_page.dart',
     ).readAsString();
-    final cardsSource = await File(
+    final cardsSource = [
       'lib/features/templates/presentation/generations_gallery_page_cards.dart',
-    ).readAsString();
+      'lib/features/templates/presentation/generations_gallery_page_failed_card.part.dart',
+    ].map((path) => File(path).readAsStringSync()).join('\n');
     final actionsSource = await File(
-      'lib/features/templates/presentation/generations_gallery_page_states_and_actions.dart',
+      'lib/features/templates/presentation/generations_gallery_page_media_actions.dart',
     ).readAsString();
 
     expect(
@@ -332,35 +340,33 @@ void main() {
     expect(source, isNot(contains('memCacheWidth: 1440')));
   });
 
-  test(
-    'generation result input media decodes with bounded cache sizes',
-    () async {
-      final source = await File(
-        'lib/features/templates/presentation/generation_result_input_page.dart',
-      ).readAsString();
+  test('generation result input media decodes with bounded cache sizes', () async {
+    final source = [
+      'lib/features/templates/presentation/generation_result_input_page.dart',
+      'lib/features/templates/presentation/generation_result_input_widgets.part.dart',
+    ].map((path) => File(path).readAsStringSync()).join('\n');
 
-      expect(source, contains('const int _parentPreviewCacheWidth = 900;'));
-      expect(
-        source,
-        contains('const int _compatibleTemplateThumbnailCacheWidth = 240;'),
-      );
-      expect(source, contains('memCacheWidth: _parentPreviewCacheWidth'));
-      expect(source, contains('maxWidthDiskCache: _parentPreviewCacheWidth'));
-      expect(
-        source,
-        contains('memCacheWidth: _compatibleTemplateThumbnailCacheWidth'),
-      );
-      expect(
-        source,
-        contains(
-          'maxWidthDiskCache:\n                              _compatibleTemplateThumbnailCacheWidth',
-        ),
-      );
-      expect(source, contains('filterQuality: FilterQuality.medium'));
-      expect(source, isNot(contains('memCacheWidth: 900')));
-      expect(source, isNot(contains('memCacheWidth: 240')));
-    },
-  );
+    expect(source, contains('const int _parentPreviewCacheWidth = 900;'));
+    expect(
+      source,
+      contains('const int _compatibleTemplateThumbnailCacheWidth = 240;'),
+    );
+    expect(source, contains('memCacheWidth: _parentPreviewCacheWidth'));
+    expect(source, contains('maxWidthDiskCache: _parentPreviewCacheWidth'));
+    expect(
+      source,
+      contains('memCacheWidth: _compatibleTemplateThumbnailCacheWidth'),
+    );
+    expect(
+      source,
+      contains(
+        'maxWidthDiskCache:\n                              _compatibleTemplateThumbnailCacheWidth',
+      ),
+    );
+    expect(source, contains('filterQuality: FilterQuality.medium'));
+    expect(source, isNot(contains('memCacheWidth: 900')));
+    expect(source, isNot(contains('memCacheWidth: 240')));
+  });
 
   test('template blocked balance sheet keeps a lazy scroll surface', () async {
     final source = readTemplateFlowSheetsLibrarySource();

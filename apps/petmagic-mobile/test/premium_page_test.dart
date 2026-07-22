@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'package:petmagic_mobile/core/payments/store_purchase.dart';
+import 'package:petmagic_mobile/core/platform/app_runtime_info.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -6,14 +9,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
+import 'package:petmagic_mobile/features/premium/domain/premium_models.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_repository.dart';
-import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
+import 'package:petmagic_mobile/features/premium/application/premium_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 
@@ -75,9 +77,10 @@ void main() {
     final contentSource = File(
       'lib/features/premium/presentation/premium_page_content.part.dart',
     ).readAsStringSync();
-    final sectionsSource = File(
+    final sectionsSource = [
       'lib/features/premium/presentation/premium_page_sections.part.dart',
-    ).readAsStringSync();
+      'lib/features/premium/presentation/premium_page_benefits.part.dart',
+    ].map((path) => File(path).readAsStringSync()).join('\n');
 
     expect(pageSource, contains("part 'premium_page_sections.part.dart';"));
     expect(contentSource, isNot(contains('class _Header')));
@@ -94,16 +97,16 @@ void main() {
   });
 
   test('premium provider fallback labels use shared localizations', () {
-    final pageSource = File(
-      'lib/features/premium/presentation/premium_page.dart',
+    final checkoutSource = File(
+      'lib/features/premium/presentation/premium_page_checkout.part.dart',
     ).readAsStringSync();
 
-    expect(pageSource, contains('text.premiumPaymentStripe'));
-    expect(pageSource, contains('text.premiumPaymentGooglePlay'));
-    expect(pageSource, contains('text.premiumPaymentApple'));
-    expect(pageSource, isNot(contains("=> 'Stripe'")));
-    expect(pageSource, isNot(contains("=> 'Google Play'")));
-    expect(pageSource, isNot(contains("=> 'App Store'")));
+    expect(checkoutSource, contains('text.premiumPaymentStripe'));
+    expect(checkoutSource, contains('text.premiumPaymentGooglePlay'));
+    expect(checkoutSource, contains('text.premiumPaymentApple'));
+    expect(checkoutSource, isNot(contains("=> 'Stripe'")));
+    expect(checkoutSource, isNot(contains("=> 'Google Play'")));
+    expect(checkoutSource, isNot(contains("=> 'App Store'")));
   });
 
   test('premium CTA and footer stay in dedicated part files', () {
@@ -600,25 +603,29 @@ class _FakePremiumRepository extends PremiumRepository {
   final PremiumPaywallConfigModel config;
   final PremiumStatusModel status;
 
-  final _streamController = StreamController<List<PurchaseDetails>>.broadcast();
+  final _streamController =
+      StreamController<List<StorePurchaseDetails>>.broadcast();
   int fetchPaywallConfigCalls = 0;
   int fetchStatusCalls = 0;
   int createStripeCheckoutCalls = 0;
 
   @override
-  Stream<List<PurchaseDetails>> get purchaseUpdates => _streamController.stream;
+  Stream<List<StorePurchaseDetails>> get purchaseUpdates =>
+      _streamController.stream;
 
   @override
   Future<PremiumPaywallConfigModel> fetchPaywallConfig({
-    required Locale locale,
-    CancelToken? cancelToken,
+    required AppLocale locale,
+    RequestCancellation? cancelToken,
   }) async {
     fetchPaywallConfigCalls++;
     return config;
   }
 
   @override
-  Future<PremiumStatusModel> fetchStatus({CancelToken? cancelToken}) async {
+  Future<PremiumStatusModel> fetchStatus({
+    RequestCancellation? cancelToken,
+  }) async {
     fetchStatusCalls++;
     return status;
   }
@@ -626,8 +633,8 @@ class _FakePremiumRepository extends PremiumRepository {
   @override
   Future<PremiumCheckoutModel> createStripeCheckout(
     PremiumPlanModel plan,
-    Locale locale, {
-    CancelToken? cancelToken,
+    AppLocale locale, {
+    RequestCancellation? cancelToken,
   }) async {
     createStripeCheckoutCalls++;
     return const PremiumCheckoutModel(

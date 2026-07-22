@@ -1,19 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
+import 'package:petmagic_mobile/features/profile/domain/profile_models.dart';
+import 'package:petmagic_mobile/features/profile/application/profile_repository.dart';
+import 'package:petmagic_mobile/features/profile/application/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/legal_document_list_view.dart';
-import 'package:petmagic_mobile/features/startup/presentation/guest_welcome_page.dart';
-import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_unavailable_view.dart';
+import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
 
 class LegalAcceptanceGatePage extends ConsumerStatefulWidget {
   const LegalAcceptanceGatePage({super.key});
@@ -167,7 +166,8 @@ class _LegalAcceptanceGatePageState
                   profile.legalAcceptance.requiresAcceptance == false) ...[
                 const SizedBox(height: 8),
                 OutlinedButton(
-                  onPressed: () => context.go(TemplatesPage.routePath),
+                  onPressed: () =>
+                      context.appNavigator.go(const TemplatesDestination()),
                   child: Text(text.premiumContinueAction),
                 ),
               ],
@@ -202,7 +202,7 @@ class _LegalAcceptanceGatePageState
         .read(appLaunchControllerProvider.notifier)
         .markSignedInWithLegalStatus(requiresLegalAcceptance: requires);
     if (!requires) {
-      context.go(TemplatesPage.routePath);
+      context.appNavigator.go(const TemplatesDestination());
     }
   }
 
@@ -211,6 +211,6 @@ class _LegalAcceptanceGatePageState
     if (!mounted) {
       return;
     }
-    context.go(GuestWelcomePage.routePath);
+    context.appNavigator.go(const WelcomeDestination());
   }
 }

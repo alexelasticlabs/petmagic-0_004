@@ -6,13 +6,35 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
+using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Identity.Infrastructure;
+using PetMagic.Modules.Identity.Infrastructure.ExternalAuthentication;
 using PetMagic.Modules.Identity.Infrastructure.Options;
 
 namespace PetMagic.Modules.Identity.Tests.Identity;
 
 public sealed class IdentityInfrastructureConfigurationTests
 {
+    [Fact]
+    public void AddIdentityInfrastructure_ShouldRegisterExternalAuthTicketStoresBehindApplicationContracts()
+    {
+        var services = CreateServices();
+
+        services.AddIdentityInfrastructure(CreateConfiguration([]));
+
+        var completionStore = Assert.Single(
+            services,
+            descriptor => descriptor.ServiceType == typeof(IExternalLoginCompletionStore));
+        Assert.Equal(ServiceLifetime.Singleton, completionStore.Lifetime);
+        Assert.Equal(typeof(ExternalLoginCompletionStore), completionStore.ImplementationType);
+
+        var accountLinkStore = Assert.Single(
+            services,
+            descriptor => descriptor.ServiceType == typeof(IExternalAccountLinkStore));
+        Assert.Equal(ServiceLifetime.Singleton, accountLinkStore.Lifetime);
+        Assert.Equal(typeof(ExternalAccountLinkStore), accountLinkStore.ImplementationType);
+    }
+
     [Fact]
     public async Task AddIdentityInfrastructure_ShouldReadGoogleSettingsFromEnvironment()
     {

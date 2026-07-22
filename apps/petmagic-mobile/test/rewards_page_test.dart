@@ -9,12 +9,14 @@ import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
-import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/templates_controller.dart';
+import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_repository.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
-import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/app/shell/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 
@@ -23,6 +25,50 @@ import 'widget_test_support.dart';
 
 void main() {
   configureWidgetTestHarness();
+
+  for (final configuration in const [
+    _RewardsGoldenConfiguration('compact', Size(320, 568)),
+    _RewardsGoldenConfiguration('phone', Size(390, 844)),
+    _RewardsGoldenConfiguration('tablet', Size(834, 1194)),
+  ]) {
+    for (final brightness in Brightness.values) {
+      testWidgets(
+        'rewards ${configuration.name} ${brightness.name} visual baseline',
+        (tester) async {
+          tester.view.physicalSize = configuration.size;
+          tester.view.devicePixelRatio = 1;
+          addTearDown(() {
+            tester.view.resetPhysicalSize();
+            tester.view.resetDevicePixelRatio();
+          });
+
+          await pumpRewardsPage(
+            tester,
+            repository: FakeWalletRepository(
+              wallet: walletStateFixture,
+              ledger: ledgerItemsFixture,
+              packs: packsFixture,
+              purchases: purchasesFixture,
+            ),
+            networkStatusController: TestWalletNetworkStatusController(
+              initialHasInternet: true,
+            ),
+            walletController: StaticRewardsWalletController(),
+            brightness: brightness,
+            disableAnimations: true,
+          );
+
+          expect(tester.takeException(), isNull);
+          await expectLater(
+            find.byKey(const Key('rewards_test_surface')),
+            matchesGoldenFile(
+              'goldens/rewards_${configuration.name}_${brightness.name}.png',
+            ),
+          );
+        },
+      );
+    }
+  }
 
   testWidgets('wallet auto refresh does not reschedule after page disposal', (
     tester,
@@ -45,6 +91,12 @@ void main() {
             AuthenticatedWalletAppLaunchController.new,
           ),
           walletControllerProvider.overrideWith(() => controller),
+          walletRepositoryProvider.overrideWithValue(
+            defaultFakeWalletRepository(),
+          ),
+          templatesControllerProvider.overrideWith(
+            StaticWalletTemplatesController.new,
+          ),
         ],
         child: MaterialApp.router(
           routerConfig: router,
@@ -193,6 +245,9 @@ void main() {
           overrides: [
             appLaunchControllerProvider.overrideWith(() => launchController),
             walletControllerProvider.overrideWith(() => walletController),
+            walletRepositoryProvider.overrideWithValue(
+              defaultFakeWalletRepository(),
+            ),
           ],
           child: MaterialApp.router(
             theme: AppTheme.dark(),
@@ -253,6 +308,9 @@ void main() {
               AuthenticatedWalletAppLaunchController.new,
             ),
             walletControllerProvider.overrideWith(() => walletController),
+            walletRepositoryProvider.overrideWithValue(
+              defaultFakeWalletRepository(),
+            ),
           ],
           child: MaterialApp.router(
             theme: AppTheme.dark(),
@@ -747,6 +805,13 @@ void main() {
     expect(find.text('Reward history row 0'), findsOneWidget);
     expect(find.text('Reward history row 119'), findsNothing);
   });
+}
+
+class _RewardsGoldenConfiguration {
+  const _RewardsGoldenConfiguration(this.name, this.size);
+
+  final String name;
+  final Size size;
 }
 
 class _MutableRewardsAppLaunchController extends AppLaunchController {

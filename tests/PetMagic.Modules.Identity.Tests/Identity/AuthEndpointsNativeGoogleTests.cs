@@ -557,6 +557,8 @@ public sealed class AuthEndpointsNativeGoogleTests
             builder.Services.AddSingleton(appleVerifier ?? new FakeAppleIdentityTokenVerifier());
             builder.Services.AddSingleton<ILegalDocumentsCatalog>(new FakeLegalDocumentsCatalog());
             builder.Services.AddSingleton<IIdentityService>(service);
+            builder.Services.AddSingleton<IExternalLoginCompletionStore, FakeExternalAuthTicketStore>();
+            builder.Services.AddSingleton<IExternalAccountLinkStore, FakeExternalAuthTicketStore>();
 
             var app = builder.Build();
             app.UseRateLimiter();
@@ -619,6 +621,21 @@ public sealed class AuthEndpointsNativeGoogleTests
 
             return Task.FromResult(Result.Success(verifiedCommand));
         }
+    }
+
+    private sealed class FakeExternalAuthTicketStore : IExternalLoginCompletionStore, IExternalAccountLinkStore
+    {
+        public Task<string> CreateAsync(TokenPairResponse session, CancellationToken cancellationToken) =>
+            Task.FromResult("test-completion-ticket");
+
+        public Task<TokenPairResponse?> TryTakeAsync(string ticket, CancellationToken cancellationToken) =>
+            Task.FromResult<TokenPairResponse?>(null);
+
+        public Task<string> CreateAsync(Guid userId, CancellationToken cancellationToken) =>
+            Task.FromResult("test-link-ticket");
+
+        Task<Guid?> IExternalAccountLinkStore.TryTakeAsync(string ticket, CancellationToken cancellationToken) =>
+            Task.FromResult<Guid?>(null);
     }
 
     private sealed class FakeGoogleIdentityTokenVerifier(

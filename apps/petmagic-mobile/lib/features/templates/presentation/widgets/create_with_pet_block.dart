@@ -1,17 +1,16 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/pets/presentation/pet_media_url_normalizer.dart';
-import 'package:petmagic_mobile/features/pets/presentation/pet_profile_providers.dart';
-import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
+import 'package:petmagic_mobile/features/pets/application/pets_contract.dart';
+import 'package:petmagic_mobile/features/templates/application/template_generation_contract.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/pet_generation_launch_sheet.dart';
-import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
+import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
 
 class CreateWithPetBlockSlot extends ConsumerWidget {
   const CreateWithPetBlockSlot({
@@ -82,7 +81,7 @@ class _CreateWithPetBlock extends StatelessWidget {
             ),
             child: InkWell(
               borderRadius: BorderRadius.circular(18),
-              onTap: () => context.push('/profile/pets'),
+              onTap: () => context.appNavigator.push(const PetsDestination()),
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
                 child: Row(
@@ -124,8 +123,8 @@ class _CreateWithPetBlock extends StatelessWidget {
                     return;
                   }
 
-                  context.go(
-                    _templatesPetShortcutLocation(
+                  context.appNavigator.go(
+                    _templatesPetShortcutDestination(
                       petId: pickedPet.id,
                       selectedPetId: selectedPetId,
                       selectedPetPhotoId: selectedPetPhotoId,
@@ -136,7 +135,8 @@ class _CreateWithPetBlock extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             OutlinedButton(
-              onPressed: () => context.push('/profile/pets'),
+              onPressed: () =>
+                  context.appNavigator.push(const PetsDestination()),
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size(92, 46),
                 padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -295,7 +295,7 @@ class _PetShortcutIcon extends StatelessWidget {
   }
 }
 
-String _templatesPetShortcutLocation({
+TemplatesDestination _templatesPetShortcutDestination({
   required String petId,
   required String? selectedPetId,
   required String? selectedPetPhotoId,
@@ -304,13 +304,10 @@ String _templatesPetShortcutLocation({
       selectedPetId == petId &&
       selectedPetPhotoId != null &&
       selectedPetPhotoId.isNotEmpty;
-  return Uri(
-    path: TemplatesPage.routePath,
-    queryParameters: {
-      'petId': petId,
-      if (keepSelectedPhoto) 'petPhotoId': selectedPetPhotoId,
-    },
-  ).toString();
+  return TemplatesDestination(
+    petId: petId,
+    petPhotoId: keepSelectedPhoto ? selectedPetPhotoId : null,
+  );
 }
 
 Future<PetProfile?> _showPetPickerSheet(

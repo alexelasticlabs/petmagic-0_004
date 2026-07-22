@@ -1,25 +1,30 @@
-import 'dart:async';
-import 'dart:io';
+export 'package:petmagic_mobile/features/profile/application/profile_repository.dart'
+    show
+        ProfileRepositoryPort,
+        currentLegalDocumentsProvider,
+        linkedAccountsProvider,
+        profileRepositoryProvider;
 
 import 'package:dio/dio.dart';
+import 'package:petmagic_mobile/core/network/dio_request_cancellation.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:http_parser/http_parser.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
 import 'package:petmagic_mobile/core/network/authenticated_request_options.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
-import 'package:petmagic_mobile/core/network/network_status_controller.dart';
-import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
+import 'package:petmagic_mobile/core/auth/auth_session_storage.dart';
+import 'package:petmagic_mobile/features/profile/domain/profile_models.dart';
+import 'package:petmagic_mobile/features/profile/data/profile_dto_mapper.dart';
+import 'package:petmagic_mobile/features/profile/data/profile_avatar_upload_preparer.dart';
+import 'package:petmagic_mobile/features/profile/application/profile_repository.dart';
 import 'package:petmagic_mobile/shared/files/image_upload_optimizer.dart';
-import 'package:petmagic_mobile/shared/files/media_signature.dart';
-import 'package:petmagic_mobile/shared/files/upload_media_policy.dart';
 
-final profileRepositoryProvider = Provider<ProfileRepository>((ref) {
+part 'profile_auth_repository_mixin.part.dart';
+
+final dioProfileRepositoryProvider = Provider<ProfileRepositoryPort>((ref) {
   return ProfileRepository(
     dio: ref.watch(dioProvider),
     sessionStorage: ref.watch(authSessionStorageProvider),
@@ -28,492 +33,26 @@ final profileRepositoryProvider = Provider<ProfileRepository>((ref) {
   );
 });
 
-const _profileProviderCacheTtl = Duration(minutes: 5);
-
-final currentLegalDocumentsProvider =
-    FutureProvider.family<MobileLegalDocuments, String>((ref, locale) {
-      if (!ref.read(networkStatusControllerProvider).hasInternet) {
-        throw const AppException('templates.network_unavailable');
-      }
-
-      final cancelToken = CancelToken();
-      ref.onDispose(() {
-        if (!cancelToken.isCancelled) {
-          cancelToken.cancel('profile_legal_documents_cancelled');
-        }
-      });
-      return ref
-          .watch(profileRepositoryProvider)
-          .fetchCurrentLegalDocuments(locale: locale, cancelToken: cancelToken);
-    });
-
-final linkedAccountsProvider =
-    FutureProvider.autoDispose<List<MobileLinkedAccount>>((ref) {
-      if (!ref.watch(
-        appLaunchControllerProvider.select((state) => state.isAuthenticated),
-      )) {
-        throw const AppException('auth.session_expired');
-      }
-
-      if (!ref.read(networkStatusControllerProvider).hasInternet) {
-        throw const AppException('templates.network_unavailable');
-      }
-
-      final link = ref.keepAlive();
-      Timer? disposeTimer;
-      ref.onCancel(() {
-        disposeTimer?.cancel();
-        disposeTimer = Timer(_profileProviderCacheTtl, link.close);
-      });
-      ref.onResume(() {
-        disposeTimer?.cancel();
-        disposeTimer = null;
-      });
-      final cancelToken = CancelToken();
-      ref.onDispose(() {
-        disposeTimer?.cancel();
-        if (!cancelToken.isCancelled) {
-          cancelToken.cancel('profile_linked_accounts_cancelled');
-        }
-      });
-      return ref
-          .watch(profileRepositoryProvider)
-          .fetchLinkedAccounts(cancelToken: cancelToken);
-    });
-
-class ProfileRepository {
-  ProfileRepository({
+abstract class _ProfileRepositoryBase implements ProfileRepositoryPort {
+  _ProfileRepositoryBase({
     required Dio dio,
-    required AuthSessionStorage sessionStorage,
+    required AuthSessionStore sessionStorage,
     AuthSessionCoordinator? authSessionCoordinator,
     ImageUploadOptimizer? imageUploadOptimizer,
   }) : _dio = dio,
        _sessionStorage = sessionStorage,
-       _imageUploadOptimizer =
-           imageUploadOptimizer ?? const ImageUploadOptimizer(),
+       _avatarUploadPreparer = ProfileAvatarUploadPreparer(
+         imageUploadOptimizer:
+             imageUploadOptimizer ?? const ImageUploadOptimizer(),
+       ),
        _authSessionCoordinator =
            authSessionCoordinator ??
            AuthSessionCoordinator(dio: dio, sessionStorage: sessionStorage);
 
   final Dio _dio;
-  final AuthSessionStorage _sessionStorage;
-  final ImageUploadOptimizer _imageUploadOptimizer;
+  final AuthSessionStore _sessionStorage;
+  final ProfileAvatarUploadPreparer _avatarUploadPreparer;
   final AuthSessionCoordinator _authSessionCoordinator;
-
-  static const _maxAvatarBytes = UploadMediaPolicy.avatarMaxBytes;
-
-  Future<AuthSession?> readSession() => _sessionStorage.read();
-
-  Future<void> register({
-    required String email,
-    required String password,
-    required bool termsOfUseAccepted,
-    required bool privacyPolicyAccepted,
-    required String termsOfUseVersion,
-    required String privacyPolicyVersion,
-    required bool marketingEmailsEnabled,
-    String? displayName,
-    CancelToken? cancelToken,
-  }) async {
-    try {
-      await _dio.post<Map<String, dynamic>>(
-        '/api/auth/register',
-        data: {
-          'email': email.trim(),
-          'password': password,
-          'termsOfUseAccepted': termsOfUseAccepted,
-          'privacyPolicyAccepted': privacyPolicyAccepted,
-          'termsOfUseVersion': termsOfUseVersion,
-          'privacyPolicyVersion': privacyPolicyVersion,
-          'marketingEmailsEnabled': marketingEmailsEnabled,
-          'displayName': displayName?.trim().isEmpty ?? true
-              ? null
-              : displayName!.trim(),
-        },
-        options: anonymousRequestOptions(),
-        cancelToken: cancelToken,
-      );
-
-      return;
-    } on DioException catch (error) {
-      throw _mapDioException(
-        error,
-        fallbackMessage: 'auth.registration_failed',
-      );
-    }
-  }
-
-  Future<AuthSession> login({
-    required String email,
-    required String password,
-    CancelToken? cancelToken,
-  }) async {
-    try {
-      final response = await _dio.post<Map<String, dynamic>>(
-        '/api/auth/login',
-        data: {'email': email.trim(), 'password': password},
-        cancelToken: cancelToken,
-      );
-
-      final session = AuthSession.fromJson(response.data ?? const {});
-      await _sessionStorage.save(session);
-      return session;
-    } on DioException catch (error) {
-      throw _mapDioException(error, fallbackMessage: 'auth.login_failed');
-    }
-  }
-
-  Future<void> requestPasswordReset({
-    required String email,
-    CancelToken? cancelToken,
-  }) async {
-    try {
-      await _dio.post<void>(
-        '/api/auth/password-reset/request',
-        data: {'email': email.trim()},
-        cancelToken: cancelToken,
-      );
-    } on DioException catch (error) {
-      throw _mapDioException(
-        error,
-        fallbackMessage: 'auth.password_reset_request_failed',
-      );
-    }
-  }
-
-  Future<void> confirmPasswordReset({
-    required String email,
-    required String code,
-    required String newPassword,
-    CancelToken? cancelToken,
-  }) async {
-    try {
-      await _dio.post<void>(
-        '/api/auth/password-reset/confirm',
-        data: {
-          'email': email.trim(),
-          'code': code.trim(),
-          'newPassword': newPassword,
-        },
-        cancelToken: cancelToken,
-      );
-    } on DioException catch (error) {
-      throw _mapDioException(
-        error,
-        fallbackMessage: 'auth.password_reset_failed',
-      );
-    }
-  }
-
-  Future<void> requestCurrentPasswordChangeCode({
-    CancelToken? cancelToken,
-  }) async {
-    try {
-      await _authorizedRequest<void>(
-        (session) => _dio.post<void>(
-          '/api/auth/me/password-change/request',
-          options: authenticatedRequestOptions(session.accessToken),
-          cancelToken: cancelToken,
-        ),
-        retryTransientFailures: false,
-      );
-    } on DioException catch (error) {
-      throw _mapDioException(
-        error,
-        fallbackMessage: 'auth.password_reset_request_failed',
-      );
-    }
-  }
-
-  Future<void> confirmCurrentPasswordChange({
-    required String code,
-    required String newPassword,
-    CancelToken? cancelToken,
-  }) async {
-    try {
-      await _authorizedRequest<void>(
-        (session) => _dio.post<void>(
-          '/api/auth/me/password-change/confirm',
-          data: {
-            'code': code.trim(),
-            'newPassword': newPassword,
-            'refreshToken': session.refreshToken,
-          },
-          options: authenticatedRequestOptions(session.accessToken),
-          cancelToken: cancelToken,
-        ),
-        retryTransientFailures: false,
-      );
-    } on DioException catch (error) {
-      throw _mapDioException(
-        error,
-        fallbackMessage: 'auth.password_reset_failed',
-      );
-    }
-  }
-
-  Future<void> resendEmailVerificationCode({
-    required String email,
-    CancelToken? cancelToken,
-  }) async {
-    try {
-      await _dio.post<void>(
-        '/api/auth/resend-email-verification-code',
-        data: {'email': email.trim()},
-        cancelToken: cancelToken,
-      );
-    } on DioException catch (error) {
-      throw _mapDioException(
-        error,
-        fallbackMessage: 'auth.email_verification_resend_failed',
-      );
-    }
-  }
-
-  Future<AuthSession> verifyEmailCode({
-    required String email,
-    required String code,
-    CancelToken? cancelToken,
-  }) async {
-    try {
-      final response = await _dio.post<Map<String, dynamic>>(
-        '/api/auth/verify-email-code',
-        data: {'email': email.trim(), 'code': code.trim()},
-        cancelToken: cancelToken,
-      );
-      final session = AuthSession.fromJson(response.data ?? const {});
-      await _sessionStorage.save(session);
-      return session;
-    } on DioException catch (error) {
-      throw _mapDioException(
-        error,
-        fallbackMessage: 'auth.email_verification_failed',
-      );
-    }
-  }
-
-  Future<void> logout() async {
-    final session = await _sessionStorage.read();
-    await _sessionStorage.clear();
-
-    if (session == null) {
-      return;
-    }
-
-    try {
-      await _dio.post<void>(
-        '/api/auth/logout',
-        data: {'refreshToken': session.refreshToken},
-        options: authenticatedRequestOptions(session.accessToken),
-      );
-    } catch (error, stackTrace) {
-      AppLogger.warn(
-        feature: 'Profile.Auth',
-        operation: 'remote_logout',
-        message: 'Remote logout failed after local session clear',
-        context: {'stage': 'remote_logout'},
-        error: error,
-        stackTrace: stackTrace,
-      );
-      // Keep logout local-first.
-    }
-  }
-
-  Future<void> deleteCurrentAccount({CancelToken? cancelToken}) async {
-    try {
-      await _authorizedRequest<void>(
-        (session) => _dio.delete<void>(
-          '/api/auth/me',
-          options: authenticatedRequestOptions(session.accessToken),
-          cancelToken: cancelToken,
-        ),
-        retryTransientFailures: false,
-      );
-
-      await _sessionStorage.clear();
-    } on DioException catch (error) {
-      throw _mapDioException(error, fallbackMessage: 'profile.action_failed');
-    }
-  }
-
-  Future<MobileUserProfile> fetchProfile({CancelToken? cancelToken}) async {
-    final response = await _authorizedRequest<Map<String, dynamic>>(
-      (session) => _dio.get<Map<String, dynamic>>(
-        '/api/auth/me',
-        options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
-      ),
-    );
-
-    final profile = MobileUserProfile.fromJson(response.data ?? const {});
-    await _replaceStoredUser(profile);
-    return profile;
-  }
-
-  Future<MobileUserProfile> updateProfile({
-    required String? displayName,
-    CancelToken? cancelToken,
-  }) async {
-    try {
-      final response = await _authorizedRequest<Map<String, dynamic>>(
-        (session) => _dio.put<Map<String, dynamic>>(
-          '/api/auth/me/profile',
-          data: {
-            'displayName': displayName?.trim().isEmpty ?? true
-                ? null
-                : displayName!.trim(),
-          },
-          options: authenticatedRequestOptions(session.accessToken),
-          cancelToken: cancelToken,
-        ),
-        retryTransientFailures: false,
-      );
-
-      final profile = MobileUserProfile.fromJson(response.data ?? const {});
-      await _replaceStoredUser(profile);
-      return profile;
-    } on DioException catch (error) {
-      throw _mapDioException(error, fallbackMessage: 'profile.action_failed');
-    }
-  }
-
-  Future<List<MobileLinkedAccount>> fetchLinkedAccounts({
-    CancelToken? cancelToken,
-  }) async {
-    final response = await _authorizedRequest<List<dynamic>>(
-      (session) => _dio.get<List<dynamic>>(
-        '/api/auth/me/linked-accounts',
-        options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
-      ),
-    );
-
-    return (response.data ?? const <dynamic>[])
-        .whereType<Map<String, dynamic>>()
-        .map(MobileLinkedAccount.fromJson)
-        .toList(growable: false);
-  }
-
-  Future<MobileLegalDocuments> fetchCurrentLegalDocuments({
-    required String locale,
-    CancelToken? cancelToken,
-  }) async {
-    try {
-      final response = await _dio.get<Map<String, dynamic>>(
-        '/api/legal/current',
-        queryParameters: {'locale': locale},
-        cancelToken: cancelToken,
-      );
-
-      return MobileLegalDocuments.fromJson(response.data ?? const {});
-    } on DioException catch (error) {
-      throw _mapDioException(
-        error,
-        fallbackMessage: 'auth.legal_documents_unavailable',
-      );
-    }
-  }
-
-  Future<MobileUserProfile> acceptCurrentLegalDocuments({
-    required MobileLegalDocuments documents,
-    CancelToken? cancelToken,
-  }) async {
-    final response = await _authorizedRequest<Map<String, dynamic>>(
-      (session) => _dio.post<Map<String, dynamic>>(
-        '/api/legal/accept',
-        data: {
-          'termsOfUseVersion': documents.termsOfUse.version,
-          'privacyPolicyVersion': documents.privacyPolicy.version,
-        },
-        options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
-      ),
-      retryTransientFailures: false,
-    );
-
-    final profile = MobileUserProfile.fromJson(response.data ?? const {});
-    await _replaceStoredUser(profile);
-    return profile;
-  }
-
-  Future<MobileUserProfile> uploadAvatar(
-    String filePath, {
-    CancelToken? cancelToken,
-  }) async {
-    final fileName = filePath.split(Platform.pathSeparator).last;
-    final mediaType = _resolveMediaType(fileName);
-    OptimizedUploadFile? optimizedAvatar;
-    try {
-      optimizedAvatar = await _imageUploadOptimizer.optimizeForAvatar(
-        XFile(filePath, name: fileName, mimeType: mediaType.toString()),
-        cancelToken: cancelToken,
-      );
-      final uploadFile = optimizedAvatar.file;
-      final uploadFileName = uploadFile.name.isNotEmpty
-          ? uploadFile.name
-          : uploadFile.path.split(Platform.pathSeparator).last;
-      final uploadMediaType = await _validateAvatarForUpload(
-        filePath: uploadFile.path,
-        mediaType: _resolveMediaType(uploadFileName),
-      );
-
-      final response = await _authorizedRequest<Map<String, dynamic>>(
-        (session) async => _dio.put<Map<String, dynamic>>(
-          '/api/auth/me/avatar',
-          data: FormData.fromMap({
-            'file': await MultipartFile.fromFile(
-              uploadFile.path,
-              filename: uploadFileName,
-              contentType: uploadMediaType,
-            ),
-          }),
-          cancelToken: cancelToken,
-          options: authenticatedMultipartRequestOptions(session.accessToken),
-        ),
-        retryTransientFailures: false,
-      );
-
-      final profile = MobileUserProfile.fromJson(response.data ?? const {});
-      await _replaceStoredUser(profile);
-      return profile;
-    } finally {
-      await optimizedAvatar?.dispose();
-    }
-  }
-
-  Future<MobileUserProfile> removeAvatar({CancelToken? cancelToken}) async {
-    final response = await _authorizedRequest<Map<String, dynamic>>(
-      (session) => _dio.delete<Map<String, dynamic>>(
-        '/api/auth/me/avatar',
-        options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
-      ),
-      retryTransientFailures: false,
-    );
-
-    final profile = MobileUserProfile.fromJson(response.data ?? const {});
-    await _replaceStoredUser(profile);
-    return profile;
-  }
-
-  Future<List<MobileLinkedAccount>> unlinkLinkedAccount(
-    String provider, {
-    CancelToken? cancelToken,
-  }) async {
-    final response = await _authorizedRequest<List<dynamic>>(
-      (session) => _dio.delete<List<dynamic>>(
-        '/api/auth/me/linked-accounts/${Uri.encodeComponent(provider)}',
-        options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
-      ),
-      retryTransientFailures: false,
-    );
-
-    return (response.data ?? const <dynamic>[])
-        .whereType<Map<String, dynamic>>()
-        .map(MobileLinkedAccount.fromJson)
-        .toList(growable: false);
-  }
 
   Future<Response<T>> _authorizedRequest<T>(
     Future<Response<T>> Function(AuthSession session) request, {
@@ -579,72 +118,193 @@ class ProfileRepository {
 
     return NetworkErrorMapper.fallback(error, fallbackMessage: fallbackMessage);
   }
+}
 
-  Future<MediaType> _validateAvatarForUpload({
-    required String filePath,
-    required MediaType mediaType,
+class ProfileRepository extends _ProfileRepositoryBase
+    with _ProfileAuthRepositoryMixin
+    implements ProfileRepositoryPort {
+  ProfileRepository({
+    required super.dio,
+    required super.sessionStorage,
+    super.authSessionCoordinator,
+    super.imageUploadOptimizer,
+  });
+  @override
+  Future<MobileUserProfile> fetchProfile({
+    RequestCancellation? cancelToken,
   }) async {
-    if (!_isAllowedAvatarMediaType(mediaType)) {
-      throw const AppException('profile.action_failed', statusCode: 400);
-    }
+    final response = await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.get<Map<String, dynamic>>(
+        '/api/auth/me',
+        options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken.toDioCancelToken(),
+      ),
+    );
 
-    int fileSizeBytes;
+    final profile = MobileUserProfile.fromJson(response.data ?? const {});
+    await _replaceStoredUser(profile);
+    return profile;
+  }
+
+  @override
+  Future<MobileUserProfile> updateProfile({
+    required String? displayName,
+    RequestCancellation? cancelToken,
+  }) async {
     try {
-      fileSizeBytes = await File(filePath).length();
-    } on FileSystemException catch (error) {
-      throw AppException(
-        'profile.action_failed',
-        statusCode: 400,
-        cause: error,
+      final response = await _authorizedRequest<Map<String, dynamic>>(
+        (session) => _dio.put<Map<String, dynamic>>(
+          '/api/auth/me/profile',
+          data: {
+            'displayName': displayName?.trim().isEmpty ?? true
+                ? null
+                : displayName!.trim(),
+          },
+          options: authenticatedRequestOptions(session.accessToken),
+          cancelToken: cancelToken.toDioCancelToken(),
+        ),
+        retryTransientFailures: false,
+      );
+
+      final profile = MobileUserProfile.fromJson(response.data ?? const {});
+      await _replaceStoredUser(profile);
+      return profile;
+    } on DioException catch (error) {
+      throw _mapDioException(error, fallbackMessage: 'profile.action_failed');
+    }
+  }
+
+  @override
+  Future<List<MobileLinkedAccount>> fetchLinkedAccounts({
+    RequestCancellation? cancelToken,
+  }) async {
+    final response = await _authorizedRequest<List<dynamic>>(
+      (session) => _dio.get<List<dynamic>>(
+        '/api/auth/me/linked-accounts',
+        options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken.toDioCancelToken(),
+      ),
+    );
+
+    return (response.data ?? const <dynamic>[])
+        .whereType<Map<String, dynamic>>()
+        .map(mapMobileLinkedAccountDto)
+        .toList(growable: false);
+  }
+
+  @override
+  Future<MobileLegalDocuments> fetchCurrentLegalDocuments({
+    required String locale,
+    RequestCancellation? cancelToken,
+  }) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/api/legal/current',
+        queryParameters: {'locale': locale},
+        cancelToken: cancelToken.toDioCancelToken(),
+      );
+
+      return mapMobileLegalDocumentsDto(response.data ?? const {});
+    } on DioException catch (error) {
+      throw _mapDioException(
+        error,
+        fallbackMessage: 'auth.legal_documents_unavailable',
       );
     }
-
-    if (fileSizeBytes <= 0 || fileSizeBytes > _maxAvatarBytes) {
-      throw const AppException('profile.action_failed', statusCode: 400);
-    }
-
-    final detectedMediaType = await _detectAvatarMediaType(filePath);
-    if (detectedMediaType == null ||
-        !_isAllowedAvatarMediaType(detectedMediaType)) {
-      throw const AppException('profile.action_failed', statusCode: 400);
-    }
-
-    return detectedMediaType;
   }
 
-  bool _isAllowedAvatarMediaType(MediaType mediaType) {
-    return mediaType.type == 'image' &&
-        (mediaType.subtype == 'jpeg' ||
-            mediaType.subtype == 'png' ||
-            mediaType.subtype == 'webp');
+  @override
+  Future<MobileUserProfile> acceptCurrentLegalDocuments({
+    required MobileLegalDocuments documents,
+    RequestCancellation? cancelToken,
+  }) async {
+    final response = await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.post<Map<String, dynamic>>(
+        '/api/legal/accept',
+        data: {
+          'termsOfUseVersion': documents.termsOfUse.version,
+          'privacyPolicyVersion': documents.privacyPolicy.version,
+        },
+        options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken.toDioCancelToken(),
+      ),
+      retryTransientFailures: false,
+    );
+
+    final profile = MobileUserProfile.fromJson(response.data ?? const {});
+    await _replaceStoredUser(profile);
+    return profile;
   }
 
-  MediaType _resolveMediaType(String fileName) {
-    final extension = fileName.split('.').last.toLowerCase();
-    return switch (extension) {
-      'jpg' || 'jpeg' => MediaType('image', 'jpeg'),
-      'png' => MediaType('image', 'png'),
-      'webp' => MediaType('image', 'webp'),
-      _ => throw const AppException('profile.action_failed', statusCode: 400),
-    };
-  }
-
-  Future<MediaType?> _detectAvatarMediaType(String path) async {
-    final header = await _avatarHeader(path);
-    final contentType = detectAvatarUploadContentType(header);
-    return contentType == null ? null : MediaType.parse(contentType);
-  }
-
-  Future<List<int>> _avatarHeader(String path) async {
+  @override
+  Future<MobileUserProfile> uploadAvatar(
+    String filePath, {
+    RequestCancellation? cancelToken,
+  }) async {
+    final prepared = await _avatarUploadPreparer.prepare(
+      filePath,
+      cancelToken: cancelToken,
+    );
     try {
-      final chunks = await File(path).openRead(0, 32).toList();
-      return [for (final chunk in chunks) ...chunk];
-    } on FileSystemException catch (error) {
-      throw AppException(
-        'profile.action_failed',
-        statusCode: 400,
-        cause: error,
+      final response = await _authorizedRequest<Map<String, dynamic>>(
+        (session) async => _dio.put<Map<String, dynamic>>(
+          '/api/auth/me/avatar',
+          data: FormData.fromMap({
+            'file': await MultipartFile.fromFile(
+              prepared.filePath,
+              filename: prepared.fileName,
+              contentType: prepared.mediaType,
+            ),
+          }),
+          cancelToken: cancelToken.toDioCancelToken(),
+          options: authenticatedMultipartRequestOptions(session.accessToken),
+        ),
+        retryTransientFailures: false,
       );
+
+      final profile = MobileUserProfile.fromJson(response.data ?? const {});
+      await _replaceStoredUser(profile);
+      return profile;
+    } finally {
+      await prepared.dispose();
     }
+  }
+
+  @override
+  Future<MobileUserProfile> removeAvatar({
+    RequestCancellation? cancelToken,
+  }) async {
+    final response = await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.delete<Map<String, dynamic>>(
+        '/api/auth/me/avatar',
+        options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken.toDioCancelToken(),
+      ),
+      retryTransientFailures: false,
+    );
+
+    final profile = MobileUserProfile.fromJson(response.data ?? const {});
+    await _replaceStoredUser(profile);
+    return profile;
+  }
+
+  @override
+  Future<List<MobileLinkedAccount>> unlinkLinkedAccount(
+    String provider, {
+    RequestCancellation? cancelToken,
+  }) async {
+    final response = await _authorizedRequest<List<dynamic>>(
+      (session) => _dio.delete<List<dynamic>>(
+        '/api/auth/me/linked-accounts/${Uri.encodeComponent(provider)}',
+        options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken.toDioCancelToken(),
+      ),
+      retryTransientFailures: false,
+    );
+
+    return (response.data ?? const <dynamic>[])
+        .whereType<Map<String, dynamic>>()
+        .map(mapMobileLinkedAccountDto)
+        .toList(growable: false);
   }
 }

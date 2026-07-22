@@ -1,21 +1,23 @@
 import 'dart:async';
+import 'package:petmagic_mobile/core/payments/store_purchase.dart';
+import 'package:petmagic_mobile/core/platform/app_runtime_info.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
-import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
+import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_store_purchase_recovery_store.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/features/wallet/data/pending_store_purchase_dto_mapper.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
@@ -48,12 +50,15 @@ void main() {
     expect(buildBody, isNot(contains('purchaseUpdates.listen')));
     expect(source, isNot(contains('Timer.periodic')));
     expect(source, isNot(contains('_walletSyncTimer')));
-    expect(source, isNot(contains('late final WalletRepository _repository')));
+    expect(
+      source,
+      isNot(contains('late final WalletRepositoryPort _repository')),
+    );
     expect(source, isNot(contains('_repositoryInitialized')));
     expect(
       source,
       contains(
-        'WalletRepository get _repository => ref.read(walletRepositoryProvider)',
+        'WalletRepositoryPort get _repository => ref.read(walletRepositoryProvider)',
       ),
     );
 
@@ -75,9 +80,11 @@ void main() {
     'wallet external checkout and verification requests are cancel-aware',
     () {
       final source = readWalletControllerLibrarySource();
-      final repositorySource = File(
+      final repositorySource = [
         'lib/features/wallet/data/wallet_repository.dart',
-      ).readAsStringSync();
+        'lib/features/wallet/data/wallet_store_repository_mixin.part.dart',
+        'lib/features/wallet/data/wallet_actions_repository_mixin.part.dart',
+      ].map((path) => File(path).readAsStringSync()).join('\n');
       final lifecycleBody = _methodBody(
         source,
         '_ensureWalletLifecycleStarted',
@@ -92,10 +99,15 @@ void main() {
         source,
         '_performStripeCheckoutVerification',
       );
-      expect(source, contains('CancelToken? _activeCheckoutCancelToken;'));
       expect(
         source,
-        contains('CancelToken? _activeCheckoutVerificationCancelToken;'),
+        contains('RequestCancellation? _activeCheckoutRequestCancellation;'),
+      );
+      expect(
+        source,
+        contains(
+          'RequestCancellation? _activeCheckoutVerificationRequestCancellation;',
+        ),
       );
       expect(lifecycleBody, contains('_cancelActiveCheckout();'));
       expect(lifecycleBody, contains('_cancelActiveCheckoutVerification();'));
@@ -103,47 +115,39 @@ void main() {
       expect(offlineBody, contains('_cancelActiveCheckoutVerification();'));
       expect(offlineBody, contains('isBuying: false'));
 
-      expect(buyPackBody, contains('_startCheckoutCancelToken()'));
-      expect(buyPackBody, contains('cancelToken: checkoutCancelToken'));
-      expect(buyPackBody, contains('checkoutCancelToken.isCancelled'));
+      expect(buyPackBody, contains('_startCheckoutRequestCancellation()'));
+      expect(buyPackBody, contains('cancelToken: checkoutRequestCancellation'));
+      expect(buyPackBody, contains('checkoutRequestCancellation.isCancelled'));
       expect(buyPackBody, contains('on RequestCancelledException'));
       expect(
         buyPackBody,
-        contains('_clearActiveCheckout(checkoutCancelToken)'),
+        contains('_clearActiveCheckout(checkoutRequestCancellation)'),
       );
 
+      expect(checkoutStatusBody, contains('_host.startCancellation()'));
+      expect(checkoutStatusBody, contains('cancelToken: cancellation'));
+      expect(checkoutStatusBody, contains('!_canContinue(cancellation)'));
       expect(
         checkoutStatusBody,
-        contains('_startCheckoutVerificationCancelToken()'),
-      );
-      expect(
-        checkoutStatusBody,
-        contains('cancelToken: verificationCancelToken'),
-      );
-      expect(
-        checkoutStatusBody,
-        contains('verificationCancelToken.isCancelled'),
-      );
-      expect(
-        checkoutStatusBody,
-        contains('_clearActiveCheckoutVerification(verificationCancelToken)'),
+        contains('_host.clearCancellation(cancellation)'),
       );
 
+      expect(stripeVerificationBody, contains('_host.startCancellation()'));
+      expect(stripeVerificationBody, contains('cancelToken: cancellation'));
+      expect(stripeVerificationBody, contains('!_canContinue(cancellation)'));
       expect(
         stripeVerificationBody,
-        contains('_startCheckoutVerificationCancelToken()'),
+        contains('_host.clearCancellation(cancellation)'),
       );
       expect(
-        stripeVerificationBody,
-        contains('cancelToken: verificationCancelToken'),
+        source,
+        contains(
+          'startCancellation: _startCheckoutVerificationRequestCancellation',
+        ),
       );
       expect(
-        stripeVerificationBody,
-        contains('verificationCancelToken.isCancelled'),
-      );
-      expect(
-        stripeVerificationBody,
-        contains('_clearActiveCheckoutVerification(verificationCancelToken)'),
+        source,
+        contains('clearCancellation: _clearActiveCheckoutVerification'),
       );
 
       expect(
@@ -159,8 +163,11 @@ void main() {
         repositorySource,
         contains("'/api/economy/purchases/\$encodedOrderId/verify-stripe'"),
       );
-      expect(repositorySource, contains('CancelToken? cancelToken,'));
-      expect(repositorySource, contains('cancelToken: cancelToken,'));
+      expect(repositorySource, contains('RequestCancellation? cancelToken,'));
+      expect(
+        repositorySource,
+        contains('cancelToken: cancelToken.toDioCancelToken(),'),
+      );
     },
   );
 
@@ -375,7 +382,7 @@ void main() {
   test(
     'concurrent checkout status verification shares one in-flight polling loop',
     () async {
-      final repository = _DelayedPurchaseStatusWalletRepository();
+      final repository = _DelayedStorePurchaseStatusWalletRepository();
       final container = _walletTestContainer(repository);
       addTearDown(container.dispose);
 
@@ -490,7 +497,7 @@ void main() {
     expect(state.wallet?.balance, 10);
     expect(state.ledgerHasMore, isFalse);
 
-    controller.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    controller.handleAppResumed();
     await repository.syncCompleted.future;
     await Future<void>.delayed(Duration.zero);
 
@@ -514,7 +521,7 @@ void main() {
     final controller = container.read(walletControllerProvider.notifier);
     await controller.load();
 
-    controller.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    controller.handleAppResumed();
     await Future<void>.delayed(Duration.zero);
 
     final state = container.read(walletControllerProvider);
@@ -530,7 +537,7 @@ void main() {
     final controller = container.read(walletControllerProvider.notifier);
     await controller.load();
 
-    controller.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    controller.handleAppResumed();
     await Future<void>.delayed(Duration.zero);
 
     final state = container.read(walletControllerProvider);
@@ -581,7 +588,7 @@ void main() {
       await controller.load();
       controller.setWalletPageVisible(true);
 
-      controller.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      controller.handleAppResumed();
       await Future<void>.delayed(Duration.zero);
 
       final state = container.read(walletControllerProvider);
@@ -608,7 +615,7 @@ void main() {
       expect(state.ledger.last.entryId, 'entry-1');
       expect(state.ledgerHasMore, isFalse);
 
-      controller.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      controller.handleAppResumed();
       await repository.syncCompleted.future;
       await Future<void>.delayed(Duration.zero);
 
@@ -808,13 +815,17 @@ void main() {
       );
 
       expect(verifyBody, contains("'reference_type'"));
-      expect(verifyBody, contains('_stripeReferenceType(normalizedReference)'));
+      expect(verifyBody, contains('stripeCheckoutReferenceType('));
+      expect(verifyBody, contains('normalizedReference'));
       expect(verifyBody, isNot(contains("'reference': normalizedReference")));
       expect(
         verifyBody,
         isNot(contains("'reference': normalizedReference ??")),
       );
-      expect(source, contains("String _stripeReferenceType(String? value)"));
+      expect(
+        source,
+        contains('String stripeCheckoutReferenceType(String? value)'),
+      );
     },
   );
 
@@ -822,26 +833,18 @@ void main() {
     'store purchase verification deduplicates non-secret purchase updates',
     () {
       final source = readWalletControllerLibrarySource();
-      final verifyBody = _methodBody(source, '_verifyStorePurchase');
+      final verifyBody = _methodBody(source, '_verifyPurchase');
 
-      expect(
-        source,
-        contains('Set<String> _storePurchaseVerificationInFlightKeys'),
-      );
-      expect(source, contains('Set<String> _storePurchaseVerifiedKeys'));
-      expect(
-        verifyBody,
-        contains('_storePurchaseVerificationInFlightKeys.add'),
-      );
-      expect(verifyBody, contains('_storePurchaseVerifiedKeys.contains'));
-      expect(verifyBody, contains('_rememberStorePurchaseVerifiedKey'));
-      expect(
-        verifyBody,
-        contains('_storePurchaseVerificationInFlightKeys.remove'),
-      );
-      expect(source, contains('_maxStorePurchaseVerificationKeys = 32'));
-      expect(source, contains('_storePurchaseVerifiedKeys.remove'));
-      expect(source, contains('String? _storePurchaseVerificationKey'));
+      expect(source, contains('Set<String> _verificationInFlightKeys'));
+      expect(source, contains('Set<String> _verifiedKeys'));
+      expect(verifyBody, contains('_acquireVerification'));
+      expect(source, contains('_verificationInFlightKeys.add'));
+      expect(source, contains('_verifiedKeys.contains'));
+      expect(source, contains('_rememberVerifiedKey'));
+      expect(verifyBody, contains('_verificationInFlightKeys.remove'));
+      expect(source, contains('_maxVerificationKeys = 32'));
+      expect(source, contains('_verifiedKeys.remove'));
+      expect(source, contains('String? verificationKey'));
       expect(source, contains('orderId'));
       expect(source, contains('provider'));
       expect(source, contains('purchase.purchaseID'));
@@ -982,13 +985,15 @@ void main() {
       await preferences.setString(
         WalletStorePurchaseRecoveryStore.legacyPendingPurchaseKey,
         jsonEncode(
-          PendingStoreWalletPurchase(
-            orderId: 'legacy-order-store-1',
-            provider: 'google_play',
-            productId: 'com.petmagic.app.tokens.google.pack100',
-            packId: 'pack-100',
-            packCode: 'pack100',
-            createdAtUtc: DateTime.utc(2026, 7, 2, 10),
+          mapPendingStorePurchaseToJson(
+            PendingStoreWalletPurchase(
+              orderId: 'legacy-order-store-1',
+              provider: 'google_play',
+              productId: 'com.petmagic.app.tokens.google.pack100',
+              packId: 'pack-100',
+              packCode: 'pack100',
+              createdAtUtc: DateTime.utc(2026, 7, 2, 10),
+            ),
           ),
         ),
       );
@@ -1229,14 +1234,16 @@ class _DelayedWalletRepository extends _NoopWalletRepository {
   final String checkoutUrl;
   final Completer<void> fetchWalletStarted = Completer<void>();
   final Completer<void> _fetchWalletCompleter = Completer<void>();
-  final Completer<CancelToken> verifyStripeStarted = Completer<CancelToken>();
+  final Completer<RequestCancellation> verifyStripeStarted =
+      Completer<RequestCancellation>();
   final Completer<void> _verifyStripeCompleter = Completer<void>();
-  CancelToken? fetchWalletCancelToken;
+  RequestCancellation? fetchWalletCancelToken;
   int verifyStripeCalls = 0;
   String? lastStripeReferenceId;
 
   @override
-  Stream<List<PurchaseDetails>> get purchaseUpdates => const Stream.empty();
+  Stream<List<StorePurchaseDetails>> get purchaseUpdates =>
+      const Stream.empty();
 
   void completeFetchWallet() {
     if (!_fetchWalletCompleter.isCompleted) {
@@ -1245,7 +1252,9 @@ class _DelayedWalletRepository extends _NoopWalletRepository {
   }
 
   @override
-  Future<WalletStateModel> fetchWallet({CancelToken? cancelToken}) async {
+  Future<WalletStateModel> fetchWallet({
+    RequestCancellation? cancelToken,
+  }) async {
     fetchWalletCancelToken = cancelToken;
     if (!fetchWalletStarted.isCompleted) {
       fetchWalletStarted.complete();
@@ -1259,13 +1268,15 @@ class _DelayedWalletRepository extends _NoopWalletRepository {
   Future<OffsetPagedModel<WalletLedgerItem>> fetchLedger({
     int skip = 0,
     int take = 20,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return const OffsetPagedModel(items: [], skip: 0, take: 20, hasMore: false);
   }
 
   @override
-  Future<RewardsSummaryModel> fetchRewards({CancelToken? cancelToken}) async {
+  Future<RewardsSummaryModel> fetchRewards({
+    RequestCancellation? cancelToken,
+  }) async {
     return const RewardsSummaryModel(
       referralCode: '',
       referralBonusSpark: 0,
@@ -1279,8 +1290,8 @@ class _DelayedWalletRepository extends _NoopWalletRepository {
 
   @override
   Future<WalletCheckoutConfigModel> fetchCheckoutConfig({
-    required Locale locale,
-    CancelToken? cancelToken,
+    required AppLocale locale,
+    RequestCancellation? cancelToken,
   }) async {
     return const WalletCheckoutConfigModel(
       packs: [],
@@ -1293,7 +1304,7 @@ class _DelayedWalletRepository extends _NoopWalletRepository {
   Future<OffsetPagedModel<PurchaseHistoryItem>> fetchPurchases({
     int skip = 0,
     int take = 20,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return const OffsetPagedModel(items: [], skip: 0, take: 20, hasMore: false);
   }
@@ -1302,8 +1313,8 @@ class _DelayedWalletRepository extends _NoopWalletRepository {
   Future<PurchaseCheckoutModel> createPurchase(
     CurrencyPackModel pack,
     WalletPaymentMethodModel paymentMethod,
-    Locale locale, {
-    CancelToken? cancelToken,
+    AppLocale locale, {
+    RequestCancellation? cancelToken,
   }) async {
     return PurchaseCheckoutModel(
       orderId: 'order-1',
@@ -1318,11 +1329,11 @@ class _DelayedWalletRepository extends _NoopWalletRepository {
   Future<PurchaseHistoryItem> verifyStripeCheckoutSession({
     required String orderId,
     String? stripeReferenceId,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     verifyStripeCalls++;
     lastStripeReferenceId = stripeReferenceId;
-    final token = cancelToken ?? CancelToken();
+    final token = cancelToken ?? RequestCancellation();
     if (!verifyStripeStarted.isCompleted) {
       verifyStripeStarted.complete(token);
     }
@@ -1351,7 +1362,8 @@ class _DelayedWalletRepository extends _NoopWalletRepository {
   }
 }
 
-class _DelayedPurchaseStatusWalletRepository extends _DelayedWalletRepository {
+class _DelayedStorePurchaseStatusWalletRepository
+    extends _DelayedWalletRepository {
   final Completer<void> fetchPurchaseStarted = Completer<void>();
   final Completer<void> _fetchPurchaseCompleter = Completer<void>();
   int fetchPurchaseCalls = 0;
@@ -1359,7 +1371,7 @@ class _DelayedPurchaseStatusWalletRepository extends _DelayedWalletRepository {
   @override
   Future<PurchaseHistoryItem> fetchPurchase(
     String orderId, {
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     fetchPurchaseCalls++;
     if (!fetchPurchaseStarted.isCompleted) {
@@ -1394,7 +1406,9 @@ class _ErrorWalletRepository extends _DelayedWalletRepository {
   final Object? createPurchaseError;
 
   @override
-  Future<WalletStateModel> fetchWallet({CancelToken? cancelToken}) async {
+  Future<WalletStateModel> fetchWallet({
+    RequestCancellation? cancelToken,
+  }) async {
     if (fetchWalletError != null) {
       throw fetchWalletError!;
     }
@@ -1405,8 +1419,8 @@ class _ErrorWalletRepository extends _DelayedWalletRepository {
   Future<PurchaseCheckoutModel> createPurchase(
     CurrencyPackModel pack,
     WalletPaymentMethodModel paymentMethod,
-    Locale locale, {
-    CancelToken? cancelToken,
+    AppLocale locale, {
+    RequestCancellation? cancelToken,
   }) async {
     if (createPurchaseError != null) {
       throw createPurchaseError!;
@@ -1430,10 +1444,13 @@ class _LifecycleSyncWalletRepository extends _NoopWalletRepository {
   int get walletFetchCount => _walletFetchCount;
 
   @override
-  Stream<List<PurchaseDetails>> get purchaseUpdates => const Stream.empty();
+  Stream<List<StorePurchaseDetails>> get purchaseUpdates =>
+      const Stream.empty();
 
   @override
-  Future<WalletStateModel> fetchWallet({CancelToken? cancelToken}) async {
+  Future<WalletStateModel> fetchWallet({
+    RequestCancellation? cancelToken,
+  }) async {
     _walletFetchCount++;
     return WalletStateModel(
       userId: 'user-1',
@@ -1448,7 +1465,7 @@ class _LifecycleSyncWalletRepository extends _NoopWalletRepository {
   Future<OffsetPagedModel<WalletLedgerItem>> fetchLedger({
     int skip = 0,
     int take = 20,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final page = _walletFetchCount <= 1
         ? const OffsetPagedModel<WalletLedgerItem>(
@@ -1481,14 +1498,16 @@ class _LifecycleSyncWalletRepository extends _NoopWalletRepository {
   }
 
   @override
-  Future<RewardsSummaryModel> fetchRewards({CancelToken? cancelToken}) async {
+  Future<RewardsSummaryModel> fetchRewards({
+    RequestCancellation? cancelToken,
+  }) async {
     return _emptyRewards();
   }
 
   @override
   Future<WalletCheckoutConfigModel> fetchCheckoutConfig({
-    required Locale locale,
-    CancelToken? cancelToken,
+    required AppLocale locale,
+    RequestCancellation? cancelToken,
   }) async {
     return const WalletCheckoutConfigModel(
       packs: [],
@@ -1501,7 +1520,7 @@ class _LifecycleSyncWalletRepository extends _NoopWalletRepository {
   Future<OffsetPagedModel<PurchaseHistoryItem>> fetchPurchases({
     int skip = 0,
     int take = 20,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return const OffsetPagedModel(items: [], skip: 0, take: 20, hasMore: false);
   }
@@ -1539,10 +1558,13 @@ class _LedgerPreservingSyncWalletRepository extends _NoopWalletRepository {
   ];
 
   @override
-  Stream<List<PurchaseDetails>> get purchaseUpdates => const Stream.empty();
+  Stream<List<StorePurchaseDetails>> get purchaseUpdates =>
+      const Stream.empty();
 
   @override
-  Future<WalletStateModel> fetchWallet({CancelToken? cancelToken}) async {
+  Future<WalletStateModel> fetchWallet({
+    RequestCancellation? cancelToken,
+  }) async {
     _walletFetchCount++;
     return WalletStateModel(
       userId: 'user-1',
@@ -1557,7 +1579,7 @@ class _LedgerPreservingSyncWalletRepository extends _NoopWalletRepository {
   Future<OffsetPagedModel<WalletLedgerItem>> fetchLedger({
     int skip = 0,
     int take = 20,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     final ledger = _walletFetchCount <= 1 ? _initialLedger : _syncedLedger;
     final start = skip.clamp(0, ledger.length);
@@ -1577,7 +1599,9 @@ class _LedgerPreservingSyncWalletRepository extends _NoopWalletRepository {
   }
 
   @override
-  Future<RewardsSummaryModel> fetchRewards({CancelToken? cancelToken}) async {
+  Future<RewardsSummaryModel> fetchRewards({
+    RequestCancellation? cancelToken,
+  }) async {
     return const RewardsSummaryModel(
       referralCode: '',
       referralBonusSpark: 0,
@@ -1591,8 +1615,8 @@ class _LedgerPreservingSyncWalletRepository extends _NoopWalletRepository {
 
   @override
   Future<WalletCheckoutConfigModel> fetchCheckoutConfig({
-    required Locale locale,
-    CancelToken? cancelToken,
+    required AppLocale locale,
+    RequestCancellation? cancelToken,
   }) async {
     return const WalletCheckoutConfigModel(
       packs: [],
@@ -1605,7 +1629,7 @@ class _LedgerPreservingSyncWalletRepository extends _NoopWalletRepository {
   Future<OffsetPagedModel<PurchaseHistoryItem>> fetchPurchases({
     int skip = 0,
     int take = 20,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return const OffsetPagedModel(items: [], skip: 0, take: 20, hasMore: false);
   }
@@ -1618,10 +1642,13 @@ class _MutationLedgerWalletRepository extends _NoopWalletRepository {
   _MutationLedgerPhase _phase = _MutationLedgerPhase.initial;
 
   @override
-  Stream<List<PurchaseDetails>> get purchaseUpdates => const Stream.empty();
+  Stream<List<StorePurchaseDetails>> get purchaseUpdates =>
+      const Stream.empty();
 
   @override
-  Future<WalletStateModel> fetchWallet({CancelToken? cancelToken}) async {
+  Future<WalletStateModel> fetchWallet({
+    RequestCancellation? cancelToken,
+  }) async {
     final balance = _phase == _MutationLedgerPhase.initial ? 10 : 25;
     return WalletStateModel(
       userId: 'user-1',
@@ -1636,7 +1663,7 @@ class _MutationLedgerWalletRepository extends _NoopWalletRepository {
   Future<OffsetPagedModel<WalletLedgerItem>> fetchLedger({
     int skip = 0,
     int take = 20,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return switch (_phase) {
       _MutationLedgerPhase.initial => const OffsetPagedModel(
@@ -1681,14 +1708,16 @@ class _MutationLedgerWalletRepository extends _NoopWalletRepository {
   }
 
   @override
-  Future<RewardsSummaryModel> fetchRewards({CancelToken? cancelToken}) async {
+  Future<RewardsSummaryModel> fetchRewards({
+    RequestCancellation? cancelToken,
+  }) async {
     return _emptyRewards();
   }
 
   @override
   Future<WalletCheckoutConfigModel> fetchCheckoutConfig({
-    required Locale locale,
-    CancelToken? cancelToken,
+    required AppLocale locale,
+    RequestCancellation? cancelToken,
   }) async {
     return const WalletCheckoutConfigModel(
       packs: [],
@@ -1701,7 +1730,7 @@ class _MutationLedgerWalletRepository extends _NoopWalletRepository {
   Future<OffsetPagedModel<PurchaseHistoryItem>> fetchPurchases({
     int skip = 0,
     int take = 20,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return const OffsetPagedModel(items: [], skip: 0, take: 20, hasMore: false);
   }
@@ -1727,10 +1756,11 @@ class _CancelableLedgerLoadMoreWalletRepository extends _NoopWalletRepository {
 
   final Completer<void> loadMoreStarted = Completer<void>();
   final Completer<void> _loadMoreCompleter = Completer<void>();
-  CancelToken? loadMoreCancelToken;
+  RequestCancellation? loadMoreCancelToken;
 
   @override
-  Stream<List<PurchaseDetails>> get purchaseUpdates => const Stream.empty();
+  Stream<List<StorePurchaseDetails>> get purchaseUpdates =>
+      const Stream.empty();
 
   void completeLoadMore() {
     if (!_loadMoreCompleter.isCompleted) {
@@ -1739,7 +1769,9 @@ class _CancelableLedgerLoadMoreWalletRepository extends _NoopWalletRepository {
   }
 
   @override
-  Future<WalletStateModel> fetchWallet({CancelToken? cancelToken}) async {
+  Future<WalletStateModel> fetchWallet({
+    RequestCancellation? cancelToken,
+  }) async {
     return _wallet();
   }
 
@@ -1747,7 +1779,7 @@ class _CancelableLedgerLoadMoreWalletRepository extends _NoopWalletRepository {
   Future<OffsetPagedModel<WalletLedgerItem>> fetchLedger({
     int skip = 0,
     int take = 20,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     if (skip == 0) {
       return OffsetPagedModel(
@@ -1797,14 +1829,16 @@ class _CancelableLedgerLoadMoreWalletRepository extends _NoopWalletRepository {
   }
 
   @override
-  Future<RewardsSummaryModel> fetchRewards({CancelToken? cancelToken}) async {
+  Future<RewardsSummaryModel> fetchRewards({
+    RequestCancellation? cancelToken,
+  }) async {
     return _emptyRewards();
   }
 
   @override
   Future<WalletCheckoutConfigModel> fetchCheckoutConfig({
-    required Locale locale,
-    CancelToken? cancelToken,
+    required AppLocale locale,
+    RequestCancellation? cancelToken,
   }) async {
     return const WalletCheckoutConfigModel(
       packs: [],
@@ -1817,7 +1851,7 @@ class _CancelableLedgerLoadMoreWalletRepository extends _NoopWalletRepository {
   Future<OffsetPagedModel<PurchaseHistoryItem>> fetchPurchases({
     int skip = 0,
     int take = 20,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return const OffsetPagedModel(items: [], skip: 0, take: 20, hasMore: false);
   }
@@ -1830,10 +1864,13 @@ class _OverlappingLedgerLoadMoreWalletRepository extends _NoopWalletRepository {
   int ledgerFetchCalls = 0;
 
   @override
-  Stream<List<PurchaseDetails>> get purchaseUpdates => const Stream.empty();
+  Stream<List<StorePurchaseDetails>> get purchaseUpdates =>
+      const Stream.empty();
 
   @override
-  Future<WalletStateModel> fetchWallet({CancelToken? cancelToken}) async {
+  Future<WalletStateModel> fetchWallet({
+    RequestCancellation? cancelToken,
+  }) async {
     return _wallet();
   }
 
@@ -1841,7 +1878,7 @@ class _OverlappingLedgerLoadMoreWalletRepository extends _NoopWalletRepository {
   Future<OffsetPagedModel<WalletLedgerItem>> fetchLedger({
     int skip = 0,
     int take = 20,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     ledgerFetchCalls++;
     final items = switch (skip) {
@@ -1923,14 +1960,16 @@ class _OverlappingLedgerLoadMoreWalletRepository extends _NoopWalletRepository {
   }
 
   @override
-  Future<RewardsSummaryModel> fetchRewards({CancelToken? cancelToken}) async {
+  Future<RewardsSummaryModel> fetchRewards({
+    RequestCancellation? cancelToken,
+  }) async {
     return _emptyRewards();
   }
 
   @override
   Future<WalletCheckoutConfigModel> fetchCheckoutConfig({
-    required Locale locale,
-    CancelToken? cancelToken,
+    required AppLocale locale,
+    RequestCancellation? cancelToken,
   }) async {
     return const WalletCheckoutConfigModel(
       packs: [],
@@ -1943,7 +1982,7 @@ class _OverlappingLedgerLoadMoreWalletRepository extends _NoopWalletRepository {
   Future<OffsetPagedModel<PurchaseHistoryItem>> fetchPurchases({
     int skip = 0,
     int take = 20,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return const OffsetPagedModel(items: [], skip: 0, take: 20, hasMore: false);
   }
@@ -1957,10 +1996,13 @@ class _DuplicateOnlyLedgerLoadMoreWalletRepository
   int ledgerFetchCalls = 0;
 
   @override
-  Stream<List<PurchaseDetails>> get purchaseUpdates => const Stream.empty();
+  Stream<List<StorePurchaseDetails>> get purchaseUpdates =>
+      const Stream.empty();
 
   @override
-  Future<WalletStateModel> fetchWallet({CancelToken? cancelToken}) async {
+  Future<WalletStateModel> fetchWallet({
+    RequestCancellation? cancelToken,
+  }) async {
     return _wallet();
   }
 
@@ -1968,7 +2010,7 @@ class _DuplicateOnlyLedgerLoadMoreWalletRepository
   Future<OffsetPagedModel<WalletLedgerItem>> fetchLedger({
     int skip = 0,
     int take = 20,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     ledgerFetchCalls++;
     return OffsetPagedModel(
@@ -1990,14 +2032,16 @@ class _DuplicateOnlyLedgerLoadMoreWalletRepository
   }
 
   @override
-  Future<RewardsSummaryModel> fetchRewards({CancelToken? cancelToken}) async {
+  Future<RewardsSummaryModel> fetchRewards({
+    RequestCancellation? cancelToken,
+  }) async {
     return _emptyRewards();
   }
 
   @override
   Future<WalletCheckoutConfigModel> fetchCheckoutConfig({
-    required Locale locale,
-    CancelToken? cancelToken,
+    required AppLocale locale,
+    RequestCancellation? cancelToken,
   }) async {
     return const WalletCheckoutConfigModel(
       packs: [],
@@ -2010,7 +2054,7 @@ class _DuplicateOnlyLedgerLoadMoreWalletRepository
   Future<OffsetPagedModel<PurchaseHistoryItem>> fetchPurchases({
     int skip = 0,
     int take = 20,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return const OffsetPagedModel(items: [], skip: 0, take: 20, hasMore: false);
   }
@@ -2023,7 +2067,8 @@ class _StoreRecoveryWalletRepository extends WalletRepository {
     this.validationError,
   }) : super(dio: Dio(), sessionStorage: AuthSessionStorage());
 
-  final _streamController = StreamController<List<PurchaseDetails>>.broadcast();
+  final _streamController =
+      StreamController<List<StorePurchaseDetails>>.broadcast();
   PendingStoreWalletPurchase? pendingStorePurchase;
   final StoreBillingValidationModel? validationResponse;
   final Object? validationError;
@@ -2033,14 +2078,17 @@ class _StoreRecoveryWalletRepository extends WalletRepository {
   int completePurchaseCalls = 0;
 
   @override
-  Stream<List<PurchaseDetails>> get purchaseUpdates => _streamController.stream;
+  Stream<List<StorePurchaseDetails>> get purchaseUpdates =>
+      _streamController.stream;
 
-  void emitPurchase(PurchaseDetails purchase) {
+  void emitPurchase(StorePurchaseDetails purchase) {
     _streamController.add([purchase]);
   }
 
   @override
-  Future<WalletStateModel> fetchWallet({CancelToken? cancelToken}) async {
+  Future<WalletStateModel> fetchWallet({
+    RequestCancellation? cancelToken,
+  }) async {
     return _wallet();
   }
 
@@ -2048,20 +2096,22 @@ class _StoreRecoveryWalletRepository extends WalletRepository {
   Future<OffsetPagedModel<WalletLedgerItem>> fetchLedger({
     int skip = 0,
     int take = 20,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return const OffsetPagedModel(items: [], skip: 0, take: 20, hasMore: false);
   }
 
   @override
-  Future<RewardsSummaryModel> fetchRewards({CancelToken? cancelToken}) async {
+  Future<RewardsSummaryModel> fetchRewards({
+    RequestCancellation? cancelToken,
+  }) async {
     return _emptyRewards();
   }
 
   @override
   Future<WalletCheckoutConfigModel> fetchCheckoutConfig({
-    required Locale locale,
-    CancelToken? cancelToken,
+    required AppLocale locale,
+    RequestCancellation? cancelToken,
   }) async {
     return const WalletCheckoutConfigModel(
       packs: [
@@ -2100,7 +2150,7 @@ class _StoreRecoveryWalletRepository extends WalletRepository {
   Future<OffsetPagedModel<PurchaseHistoryItem>> fetchPurchases({
     int skip = 0,
     int take = 20,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     return const OffsetPagedModel(items: [], skip: 0, take: 20, hasMore: false);
   }
@@ -2134,7 +2184,7 @@ class _StoreRecoveryWalletRepository extends WalletRepository {
   @override
   Future<StoreBillingValidationModel> validateStorePurchase({
     required String provider,
-    required PurchaseDetails purchase,
+    required StorePurchaseDetails purchase,
   }) async {
     validateStorePurchaseCalls++;
     if (!validationStarted.isCompleted) {
@@ -2158,13 +2208,12 @@ class _StoreRecoveryWalletRepository extends WalletRepository {
   }
 
   @override
-  Future<void> completePurchase(PurchaseDetails purchase) async {
+  Future<void> completePurchase(StorePurchaseDetails purchase) async {
     completePurchaseCalls++;
-    purchase.pendingCompletePurchase = false;
   }
 
   @override
-  Future<void> consumeVerifiedPurchase(PurchaseDetails purchase) {
+  Future<void> consumeVerifiedPurchase(StorePurchaseDetails purchase) {
     return completePurchase(purchase);
   }
 }
@@ -2188,7 +2237,9 @@ class _MutableWalletLifecycleAppLaunchController extends AppLaunchController {
 
 class _PartialWalletRepository extends _LifecycleSyncWalletRepository {
   @override
-  Future<RewardsSummaryModel> fetchRewards({CancelToken? cancelToken}) async {
+  Future<RewardsSummaryModel> fetchRewards({
+    RequestCancellation? cancelToken,
+  }) async {
     throw const AppException('rewards.summary_failed');
   }
 }
@@ -2239,23 +2290,22 @@ WalletStateModel _wallet() {
   );
 }
 
-PurchaseDetails _storePurchase({
+StorePurchaseDetails _storePurchase({
   String productId = 'com.petmagic.app.tokens.google.pack100',
   String source = 'google_play',
 }) {
-  final purchase = PurchaseDetails(
+  return StorePurchaseDetails(
     purchaseID: 'gp-purchase-1',
     productID: productId,
-    verificationData: PurchaseVerificationData(
+    verificationData: StorePurchaseVerificationData(
       localVerificationData: 'local-store-data',
       serverVerificationData: 'gp-token-pack-1',
       source: source,
     ),
     transactionDate: DateTime.utc(2026, 7, 2).millisecondsSinceEpoch.toString(),
-    status: PurchaseStatus.purchased,
+    status: StorePurchaseStatus.purchased,
+    pendingCompletePurchase: true,
   );
-  purchase.pendingCompletePurchase = true;
-  return purchase;
 }
 
 class _FakeSecureStorage extends FlutterSecureStorage {

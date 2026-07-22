@@ -5,8 +5,8 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
     TemplateItem template, {
     TemplateOfTheDayItem? templateOfTheDay,
   }) async {
-    final petId = _routeQueryParameter(context, 'petId');
-    final petPhotoId = _routeQueryParameter(context, 'petPhotoId');
+    final petId = widget.initialPetId;
+    final petPhotoId = widget.initialPetPhotoId;
     if (petId != null && petId.isNotEmpty) {
       await _startTemplateFromPetFlow(
         template,
@@ -21,7 +21,10 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
       if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
         await showAuthRequiredSheet(
           context,
-          redirectPath: _templatesPageLocation(context),
+          redirectPath: _templatesPageLocation(
+            currentPetId: widget.initialPetId,
+            currentPetPhotoId: widget.initialPetPhotoId,
+          ),
         );
         return;
       }
@@ -72,9 +75,9 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
 
         switch (blockerAction) {
           case TemplateBlockedAction.wallet:
-            context.push(WalletPage.routePath);
+            context.appNavigator.push(const WalletDestination());
           case TemplateBlockedAction.premium:
-            context.push(PremiumPage.routePath);
+            context.appNavigator.push(const PremiumDestination());
           case TemplateBlockedAction.chooseAnother:
             break;
         }
@@ -99,7 +102,6 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
         return;
       }
 
-      final router = GoRouter.of(context);
       final text = AppLocalizations.of(context);
       final generation = await generationController.startGeneration(template);
       if (!mounted) {
@@ -113,7 +115,10 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
         if (_isAuthRequiredError(errorMessage)) {
           await showAuthRequiredSheet(
             context,
-            redirectPath: _templatesPageLocation(context),
+            redirectPath: _templatesPageLocation(
+              currentPetId: widget.initialPetId,
+              currentPetPhotoId: widget.initialPetPhotoId,
+            ),
           );
           return;
         }
@@ -153,9 +158,8 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
         );
       }
 
-      router.push(
-        GenerationStatusPage.routeFor(generation.generationId),
-        extra: featured,
+      context.appNavigator.push(
+        GenerationDestination(generation.generationId, payload: featured),
       );
       return;
     }
@@ -174,7 +178,8 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
       await showAuthRequiredSheet(
         context,
         redirectPath: _templatesPageLocation(
-          context,
+          currentPetId: widget.initialPetId,
+          currentPetPhotoId: widget.initialPetPhotoId,
           petId: petId,
           petPhotoId: petPhotoId,
         ),
@@ -207,9 +212,9 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
 
       switch (blockerAction) {
         case TemplateBlockedAction.wallet:
-          context.push(WalletPage.routePath);
+          context.appNavigator.push(const WalletDestination());
         case TemplateBlockedAction.premium:
-          context.push(PremiumPage.routePath);
+          context.appNavigator.push(const PremiumDestination());
         case TemplateBlockedAction.chooseAnother:
           break;
       }
@@ -226,8 +231,15 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
       showChangeAction: showChangeAction,
       pickPhoto: _pickPetGalleryPhoto,
       uploadPhoto: (photo) => ref
-          .read(templateGenerationRepositoryProvider)
-          .uploadPetPhoto(petId: petId, photo: photo),
+          .read(petRepositoryProvider)
+          .uploadPetPhoto(
+            petId: petId,
+            photo: LocalMediaFile(
+              path: photo.path,
+              name: photo.name,
+              mimeType: photo.mimeType,
+            ),
+          ),
       startGeneration: (selectedPhoto) async {
         return ref
             .read(templateGenerationRepositoryProvider)
@@ -244,7 +256,7 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
     }
 
     if (action.changePet) {
-      context.push('/profile/pets');
+      context.appNavigator.push(const PetsDestination());
       return;
     }
 
@@ -272,9 +284,8 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
       );
     }
 
-    context.go(
-      GenerationStatusPage.routeFor(generation.generationId),
-      extra: featured,
+    context.appNavigator.go(
+      GenerationDestination(generation.generationId, payload: featured),
     );
   }
 
@@ -295,7 +306,7 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
           message: text.petsFirstPetToast,
           tone: PetMagicToastTone.info,
         );
-        context.push('/profile/pets');
+        context.appNavigator.push(const PetsDestination());
         return;
       }
 
@@ -332,195 +343,16 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
       );
     }
   }
-
-  Future<XFile?> _pickPetPhoto(PetMagicActionSheetResult sourceAction) async {
-    final source = switch (sourceAction) {
-      PetMagicActionSheetResult.camera => ImageSource.camera,
-      PetMagicActionSheetResult.gallery => ImageSource.gallery,
-      PetMagicActionSheetResult.myPets => null,
-    };
-    if (source == null) {
-      return null;
-    }
-
-    return _runPetPhotoPickerSession(() async {
-      final permissionFeedback = await ref
-          .read(mediaPermissionFeedbackCoordinatorProvider)
-          .request(
-            context,
-            source == ImageSource.camera
-                ? MediaPermissionFlow.cameraPhoto
-                : MediaPermissionFlow.galleryPhoto,
-          );
-      if (!mounted || !permissionFeedback.granted) {
-        if (mounted) {
-          ref
-              .read(mediaPermissionFeedbackCoordinatorProvider)
-              .show(context, permissionFeedback);
-        }
-        return null;
-      }
-
-      return _imagePicker.pickImage(
-        source: source,
-        imageQuality: 92,
-        maxWidth: 1800,
-      );
-    });
-  }
-
-  Future<XFile?> _pickPetGalleryPhoto() async {
-    return _runPetPhotoPickerSession(() async {
-      final permissionFeedback = await ref
-          .read(mediaPermissionFeedbackCoordinatorProvider)
-          .request(context, MediaPermissionFlow.galleryPhoto);
-      if (!mounted || !permissionFeedback.granted) {
-        if (mounted) {
-          ref
-              .read(mediaPermissionFeedbackCoordinatorProvider)
-              .show(context, permissionFeedback);
-        }
-        return null;
-      }
-
-      return _imagePicker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 92,
-        maxWidth: 1800,
-      );
-    });
-  }
-
-  Future<T?> _runPetPhotoPickerSession<T>(Future<T?> Function() action) async {
-    if (_isPetPhotoPickerActive) {
-      return null;
-    }
-
-    _isPetPhotoPickerActive = true;
-    try {
-      return await action();
-    } finally {
-      _isPetPhotoPickerActive = false;
-    }
-  }
 }
 
-Future<PetProfile?> _showPetPickerSheet(
-  BuildContext context,
-  List<PetProfile> pets,
-) {
-  final text = AppLocalizations.of(context);
-  final colors = context.petMagicColors;
-  return showPetMagicModalBottomSheet<PetProfile>(
-    context: context,
-    backgroundColor: Colors.transparent,
-    builder: (sheetContext, bottomInset) => SafeArea(
-      top: false,
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: colors.surfaceStrong,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: colors.border.withValues(alpha: 0.8)),
-          ),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 420),
-            child: Material(
-              type: MaterialType.transparency,
-              child: ListView(
-                shrinkWrap: true,
-                padding: const EdgeInsets.fromLTRB(0, 8, 0, 8),
-                children: [
-                  Center(
-                    child: Container(
-                      width: 42,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: colors.border,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  for (final pet in pets)
-                    ListTile(
-                      leading: PetShortcutAvatar(avatarUrl: pet.avatarUrl),
-                      title: Text(
-                        pet.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: colors.textStrong,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      subtitle: Text(
-                        [
-                          templatePetTypeLabel(pet.type, text),
-                          pet.breed,
-                        ].whereType<String>().join(' • '),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: colors.textSoft),
-                      ),
-                      onTap: () => Navigator.of(sheetContext).pop(pet),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-TemplateItem? _findTemplateById(Iterable<TemplateItem> items, String id) {
-  final normalizedId = id.trim();
-  if (normalizedId.isEmpty) {
-    return null;
-  }
-
-  for (final item in items) {
-    if (item.templateId == normalizedId) {
-      return item;
-    }
-  }
-
-  return null;
-}
-
-String? _routeQueryParameter(BuildContext context, String key) {
-  try {
-    final value = GoRouterState.of(context).uri.queryParameters[key];
-    if (value == null || value.isEmpty) {
-      return null;
-    }
-    return value;
-  } catch (error, stackTrace) {
-    AppLogger.warn(
-      feature: 'Templates.GenerationFlow',
-      operation: 'read_route_query_parameter',
-      message: 'Could not read templates route query parameter',
-      context: {'key': key},
-      error: error,
-      stackTrace: stackTrace,
-    );
-    return null;
-  }
-}
-
-String _templatesPageLocation(
-  BuildContext context, {
+String _templatesPageLocation({
+  required String? currentPetId,
+  required String? currentPetPhotoId,
   String? petId,
   String? petPhotoId,
 }) {
   return TemplatesPage.location(
-    petId:
-        petId ?? _routeQueryParameter(context, TemplatesPage.petIdQueryParam),
-    petPhotoId:
-        petPhotoId ??
-        _routeQueryParameter(context, TemplatesPage.petPhotoIdQueryParam),
+    petId: petId ?? currentPetId,
+    petPhotoId: petPhotoId ?? currentPetPhotoId,
   );
 }

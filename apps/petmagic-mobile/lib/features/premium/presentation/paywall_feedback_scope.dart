@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
-import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
+import 'package:petmagic_mobile/core/auth/auth_session_storage.dart';
 
 const paywallFeedbackLastShownStorageKeyPrefix =
     'feedback_paywall_last_shown_utc_v2';
@@ -22,10 +22,10 @@ String _paywallFeedbackScopeFingerprint(String scopeKey) {
 }
 
 class PaywallFeedbackScopeResolver {
-  PaywallFeedbackScopeResolver({required AuthSessionStorage sessionStorage})
+  PaywallFeedbackScopeResolver({required AuthSessionStore sessionStorage})
     : _sessionStorage = sessionStorage;
 
-  final AuthSessionStorage _sessionStorage;
+  final AuthSessionStore _sessionStorage;
 
   Future<String?> resolve({
     required bool isAuthenticated,

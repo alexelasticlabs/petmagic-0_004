@@ -1,13 +1,13 @@
 import 'package:dio/dio.dart';
+import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/password_change_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/password_reset_controller.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
+import 'package:petmagic_mobile/features/profile/application/profile_controller.dart';
 
 void main() {
   test('registration blocks weak passwords before repository call', () async {
@@ -217,7 +217,7 @@ class _PasswordPolicyRepository extends ProfileRepository {
     required String privacyPolicyVersion,
     required bool marketingEmailsEnabled,
     String? displayName,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     registerCalled = true;
   }
@@ -226,7 +226,7 @@ class _PasswordPolicyRepository extends ProfileRepository {
   Future<AuthSession> login({
     required String email,
     required String password,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     loginCalled = true;
     return AuthSession(
@@ -264,7 +264,7 @@ class _PasswordPolicyRepository extends ProfileRepository {
     required String email,
     required String code,
     required String newPassword,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     confirmPasswordResetCalled = true;
   }
@@ -273,7 +273,7 @@ class _PasswordPolicyRepository extends ProfileRepository {
   Future<void> confirmCurrentPasswordChange({
     required String code,
     required String newPassword,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     confirmCurrentPasswordChangeCalled = true;
   }
@@ -281,14 +281,14 @@ class _PasswordPolicyRepository extends ProfileRepository {
   @override
   Future<void> requestPasswordReset({
     required String email,
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     requestPasswordResetCalled = true;
   }
 
   @override
   Future<void> requestCurrentPasswordChangeCode({
-    CancelToken? cancelToken,
+    RequestCancellation? cancelToken,
   }) async {
     requestCurrentPasswordChangeCodeCalled = true;
   }

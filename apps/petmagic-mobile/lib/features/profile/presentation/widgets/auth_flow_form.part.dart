@@ -140,83 +140,98 @@ class _AuthFieldState extends State<AuthField> {
                 ),
             ],
           ),
-          child: TextField(
-            focusNode: _focusNode,
-            controller: widget.controller,
-            onChanged: widget.onChanged,
-            enabled: widget.enabled,
-            keyboardType: widget.keyboardType,
-            textInputAction: widget.textInputAction,
-            obscureText: widget.obscureText,
-            style: labelStyle?.copyWith(
-              color: widget.enabled ? colors.textStrong : colors.textMuted,
-              fontSize: widget.compact ? 13 : 14,
-              fontWeight: FontWeight.w700,
-            ),
-            decoration: InputDecoration(
-              constraints: BoxConstraints(minHeight: widget.compact ? 50 : 54),
-              hintText: widget.hintText,
-              hintStyle: labelStyle?.copyWith(
-                color: colors.textMuted.withValues(alpha: isDark ? 0.82 : 0.72),
-                fontSize: widget.compact ? 12.5 : 13,
-                fontWeight: FontWeight.w600,
+          child: Semantics(
+            label: widget.hintText,
+            child: TextField(
+              focusNode: _focusNode,
+              controller: widget.controller,
+              onChanged: widget.onChanged,
+              enabled: widget.enabled,
+              keyboardType: widget.keyboardType,
+              textInputAction: widget.textInputAction,
+              obscureText: widget.obscureText,
+              style: labelStyle?.copyWith(
+                color: widget.enabled ? colors.textStrong : colors.textMuted,
+                fontSize: widget.compact ? 13 : 14,
+                fontWeight: FontWeight.w700,
               ),
-              prefixIcon: AnimatedSwitcher(
-                duration: duration,
-                child: Padding(
-                  key: ValueKey(iconColor),
-                  padding: const EdgeInsets.only(left: 14, right: 6),
-                  child: Icon(widget.prefixIcon, color: iconColor, size: 20),
+              decoration: InputDecoration(
+                constraints: BoxConstraints(
+                  minHeight: widget.compact ? 50 : 54,
                 ),
-              ),
-              prefixIconConstraints: BoxConstraints(
-                minWidth: 44,
-                minHeight: widget.compact ? 50 : 54,
-              ),
-              suffixIcon: widget.trailing,
-              suffixIconColor: iconColor,
-              filled: true,
-              fillColor: inputFill,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(18),
-                borderSide: BorderSide.none,
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(18),
-                borderSide: BorderSide(
-                  color: colors.border.withValues(alpha: isDark ? 0.64 : 0.72),
+                hint: ExcludeSemantics(
+                  child: Text(
+                    widget.hintText,
+                    style: labelStyle?.copyWith(
+                      color: colors.textMuted.withValues(
+                        alpha: isDark ? 0.82 : 0.72,
+                      ),
+                      fontSize: widget.compact ? 12.5 : 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(18),
-                borderSide: BorderSide(
-                  color: hasError ? colors.danger : colors.accent,
-                  width: 1.55,
+                prefixIcon: AnimatedSwitcher(
+                  duration: duration,
+                  child: Padding(
+                    key: ValueKey(iconColor),
+                    padding: const EdgeInsets.only(left: 14, right: 6),
+                    child: Icon(widget.prefixIcon, color: iconColor, size: 20),
+                  ),
                 ),
-              ),
-              disabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(18),
-                borderSide: BorderSide(
-                  color: colors.border.withValues(alpha: isDark ? 0.38 : 0.45),
+                prefixIconConstraints: BoxConstraints(
+                  minWidth: 44,
+                  minHeight: widget.compact ? 50 : 54,
                 ),
-              ),
-              errorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(18),
-                borderSide: BorderSide(
-                  color: colors.danger.withValues(alpha: 0.64),
-                  width: 1.2,
+                suffixIcon: widget.trailing,
+                suffixIconColor: iconColor,
+                filled: true,
+                fillColor: inputFill,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  borderSide: BorderSide.none,
                 ),
-              ),
-              focusedErrorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(18),
-                borderSide: BorderSide(
-                  color: colors.danger.withValues(alpha: 0.9),
-                  width: 1.4,
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  borderSide: BorderSide(
+                    color: colors.border.withValues(
+                      alpha: isDark ? 0.64 : 0.72,
+                    ),
+                  ),
                 ),
-              ),
-              contentPadding: EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: widget.compact ? 13 : 15,
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  borderSide: BorderSide(
+                    color: hasError ? colors.danger : colors.accent,
+                    width: 1.55,
+                  ),
+                ),
+                disabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  borderSide: BorderSide(
+                    color: colors.border.withValues(
+                      alpha: isDark ? 0.38 : 0.45,
+                    ),
+                  ),
+                ),
+                errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  borderSide: BorderSide(
+                    color: colors.danger.withValues(alpha: 0.64),
+                    width: 1.2,
+                  ),
+                ),
+                focusedErrorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  borderSide: BorderSide(
+                    color: colors.danger.withValues(alpha: 0.9),
+                    width: 1.4,
+                  ),
+                ),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: widget.compact ? 13 : 15,
+                ),
               ),
             ),
           ),
