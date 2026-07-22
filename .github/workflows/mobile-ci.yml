@@ -7,7 +7,7 @@ on:
       - .github/workflows/mobile-ci.yml
   push:
     branches:
-      - main
+      - master
     paths:
       - apps/petmagic-mobile/**
       - .github/workflows/mobile-ci.yml
@@ -46,11 +46,19 @@ jobs:
       - name: Analyze
         run: flutter analyze --fatal-infos
 
+      - name: Generate staging Firebase packaging placeholders
+        run: dart run tool/configure_firebase_smoke.dart --environment=staging
+
       - name: Verify release signing guard
         shell: bash
         run: |
           set +e
-          output=$(cd android && ./gradlew :app:assembleRelease 2>&1)
+          output=$(flutter build appbundle \
+            --flavor staging \
+            --release \
+            --dart-define=APP_ENVIRONMENT=staging \
+            --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging \
+            --dart-define=API_BASE_URL=https://api.staging.petmagic.app 2>&1)
           status=$?
           set -e
 
@@ -67,7 +75,16 @@ jobs:
           fi
 
       - name: Release packaging smoke
-        run: cd android && ./gradlew :app:bundleRelease -PallowInsecureReleaseSigning=true --warning-mode all
+        env:
+          ORG_GRADLE_PROJECT_allowInsecureReleaseSigning: "true"
+          ORG_GRADLE_PROJECT_allowPlaceholderFirebase: "true"
+        run: >-
+          flutter build appbundle
+          --flavor staging
+          --release
+          --dart-define=APP_ENVIRONMENT=staging
+          --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging
+          --dart-define=API_BASE_URL=https://api.staging.petmagic.app
 
       - name: Test
         run: flutter test

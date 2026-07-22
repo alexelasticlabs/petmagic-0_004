@@ -230,7 +230,7 @@
   "petsHistoryTitle": "Historique des générations",
   "petsNoPhotosTitle": "Aucune photo pour le moment.",
   "petsNoGenerationsTitle": "Aucune génération pour le moment.",
-  "petsStatsPhotos": "{count} photos",
+  "petsStatsPhotos": "{count} photos de l’animal",
   "petsStatsGenerations": "{count} générations",
   "petsGenerateWithPet": "Générer avec l'animal",
   "petsGenerateWithName": "Générer avec {name}",
@@ -1198,7 +1198,7 @@
   "profileNotificationsDeviceUnknown": "Inconnu",
   "profileNotificationsDeviceNotifications": "Notifications",
   "profileNotificationsDeviceCamera": "Caméra",
-  "profileNotificationsDeviceMicrophone": "Microphone",
+  "profileNotificationsDeviceMicrophone": "Accès au microphone",
   "profileNotificationsDevicePhotos": "Photos",
   "profileNotificationsDeviceFiles": "Fichiers",
   "supportChatLoadPreviousMessagesAction": "Charger les messages précédents",
@@ -1255,7 +1255,7 @@
   "generationStatusCompareResultUnavailable": "Le résultat n'est pas disponible.",
   "generationStatusCompareOpenFailed": "Impossible d'ouvrir la comparaison.",
   "gamificationLevel": "Niveau {level}",
-  "gamificationXpProgress": "{current} / {total} XP",
+  "gamificationXpProgress": "{current} / {total} EXP",
   "gamificationEvolutionEgg": "Oeuf",
   "gamificationEvolutionBaby": "Bébé",
   "gamificationEvolutionTeen": "Adolescent",
@@ -1500,7 +1500,7 @@
       }
     }
   },
-  "generationStatusWaitMinutes": "{minutes} min",
+  "generationStatusWaitMinutes": "{minutes} min.",
   "@generationStatusWaitMinutes": {
     "placeholders": {
       "minutes": {

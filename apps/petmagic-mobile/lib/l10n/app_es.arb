@@ -1255,7 +1255,7 @@
   "generationStatusCompareResultUnavailable": "El resultado no está disponible.",
   "generationStatusCompareOpenFailed": "No se pudo abrir la comparación.",
   "gamificationLevel": "Nivel {level}",
-  "gamificationXpProgress": "{current} / {total} XP",
+  "gamificationXpProgress": "{current} / {total} EXP",
   "gamificationEvolutionEgg": "Huevo",
   "gamificationEvolutionBaby": "Bebé",
   "gamificationEvolutionTeen": "Adolescente",
@@ -1500,7 +1500,7 @@
       }
     }
   },
-  "generationStatusWaitMinutes": "{minutes} min",
+  "generationStatusWaitMinutes": "{minutes} min.",
   "@generationStatusWaitMinutes": {
     "placeholders": {
       "minutes": {

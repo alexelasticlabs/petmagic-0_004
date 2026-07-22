@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:app_links/app_links.dart';
 import 'package:dio/dio.dart';
@@ -573,8 +574,7 @@ class _FakeGoogleSignInAdapter implements GoogleSignInAdapter {
   Future<void> signOut() async {}
 }
 
-class _ConfigurationLockedGoogleSignInAdapter
-    implements GoogleSignInAdapter {
+class _ConfigurationLockedGoogleSignInAdapter implements GoogleSignInAdapter {
   final List<String?> initializeCalls = [];
   String? _serverClientId;
   bool _initialized = false;
@@ -589,9 +589,7 @@ class _ConfigurationLockedGoogleSignInAdapter
       _serverClientId = serverClientId;
       initializeCalls.add(serverClientId);
     }
-    throw const GoogleSignInException(
-      code: GoogleSignInExceptionCode.canceled,
-    );
+    throw const GoogleSignInException(code: GoogleSignInExceptionCode.canceled);
   }
 
   @override

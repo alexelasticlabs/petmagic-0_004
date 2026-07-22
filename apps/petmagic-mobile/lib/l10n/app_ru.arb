@@ -1290,7 +1290,7 @@
   "generationStatusCompareResultUnavailable": "Результат недоступен.",
   "generationStatusCompareOpenFailed": "Не удалось открыть сравнение.",
   "gamificationLevel": "Уровень {level}",
-  "gamificationXpProgress": "{current} / {total} XP",
+  "gamificationXpProgress": "{current} / {total} ед. опыта",
   "gamificationEvolutionEgg": "Яйцо",
   "gamificationEvolutionBaby": "Малыш",
   "gamificationEvolutionTeen": "Подросток",

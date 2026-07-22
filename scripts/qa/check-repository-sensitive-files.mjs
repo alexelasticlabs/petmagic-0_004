@@ -30,6 +30,16 @@ const allowedFirebasePlaceholders = new Map([
   ]
 ]);
 
+const requiredIgnoredFirebasePaths = [
+  'apps/petmagic-mobile/android/app/google-services.json',
+  'apps/petmagic-mobile/android/app/src/debug/google-services.json',
+  'apps/petmagic-mobile/android/app/src/profile/google-services.json',
+  'apps/petmagic-mobile/android/app/src/staging/google-services.json',
+  'apps/petmagic-mobile/android/app/src/production/google-services.json',
+  'apps/petmagic-mobile/ios/Runner/GoogleService-Info.plist',
+  'apps/petmagic-mobile/ios/Flutter/FirebaseConfig.xcconfig'
+];
+
 const allowedSecretFixtures = new Map([
   [
     'tests/PetMagic.Modules.Identity.Tests/Economy/EconomyInfrastructureConfigurationTests.cs',
@@ -60,6 +70,8 @@ const highConfidenceSecretPatterns = [
 
 const failures = [];
 
+validateFirebaseIgnoreRules();
+
 for (const path of collectGitCandidateFiles()) {
   validatePath(path);
   validateContent(path);
@@ -74,6 +86,16 @@ if (failures.length > 0) {
 }
 
 console.log('Repository sensitive-file check ok.');
+
+function validateFirebaseIgnoreRules() {
+  for (const path of requiredIgnoredFirebasePaths) {
+    try {
+      execFileSync('git', ['check-ignore', '--quiet', '--', path], { stdio: 'ignore' });
+    } catch {
+      failures.push(`${path}: generated Firebase configuration path must be gitignored.`);
+    }
+  }
+}
 
 function collectGitCandidateFiles() {
   const output = execFileSync('git', ['ls-files', '-co', '--exclude-standard'], {

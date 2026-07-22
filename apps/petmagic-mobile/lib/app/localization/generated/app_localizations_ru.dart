@@ -4182,7 +4182,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String gamificationXpProgress(Object current, Object total) {
-    return '$current / $total XP';
+    return '$current / $total ед. опыта';
   }
 
   @override

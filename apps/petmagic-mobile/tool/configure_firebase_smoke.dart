@@ -10,7 +10,7 @@ void main(List<String> args) {
 
   _copyTemplate(
     sourcePath: 'android/app/google-services.json.example',
-    targetPath: 'android/app/google-services.json',
+    targetPath: 'android/app/src/$environment/google-services.json',
     packageName: packageName,
   );
   _copyTemplate(
@@ -51,7 +51,9 @@ void _copyTemplate({
   if (!source.existsSync()) {
     throw StateError('Missing Firebase smoke template: $sourcePath');
   }
-  File(targetPath).writeAsStringSync(
+  final target = File(targetPath);
+  target.parent.createSync(recursive: true);
+  target.writeAsStringSync(
     source.readAsStringSync().replaceAll('APP_PACKAGE_NAME', packageName),
   );
 }

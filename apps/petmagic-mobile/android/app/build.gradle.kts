@@ -69,6 +69,10 @@ android {
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
+    buildFeatures {
+        resValues = true
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -148,10 +152,14 @@ android {
                     )
                 }
 
-                val firebaseConfig = file("google-services.json")
-                if (!firebaseConfig.exists()) {
+                val firebaseConfig = listOf(
+                    file("src/$environment/google-services.json"),
+                    file("google-services.json"),
+                ).firstOrNull { it.exists() }
+                if (firebaseConfig == null) {
                     throw GradleException(
-                        "Missing android/app/google-services.json. Inject it from the protected environment.",
+                        "Missing Firebase config for $environment. Inject " +
+                            "android/app/src/$environment/google-services.json from the protected environment.",
                     )
                 }
                 val firebaseContents = firebaseConfig.readText()

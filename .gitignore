@@ -34,9 +34,12 @@ node_modules/
 .flutter-plugins-dependencies
 .pub-cache/
 **/android/app/src/debug/google-services.json
-  **/android/app/src/profile/google-services.json
-  apps/petmagic-mobile/android/app/google-services.json
-  apps/petmagic-mobile/ios/Runner/GoogleService-Info.plist
+**/android/app/src/profile/google-services.json
+apps/petmagic-mobile/android/app/google-services.json
+apps/petmagic-mobile/android/app/src/staging/google-services.json
+apps/petmagic-mobile/android/app/src/production/google-services.json
+apps/petmagic-mobile/ios/Runner/GoogleService-Info.plist
+apps/petmagic-mobile/ios/Flutter/FirebaseConfig.xcconfig
 **/ios/Pods/
 **/ios/.symlinks/
 **/ios/SourcePackages/

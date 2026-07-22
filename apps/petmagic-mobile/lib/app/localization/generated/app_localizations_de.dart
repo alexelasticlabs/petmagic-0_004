@@ -4237,7 +4237,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String gamificationXpProgress(Object current, Object total) {
-    return '$current / $total XP';
+    return '$current / $total EP';
   }
 
   @override
@@ -4752,7 +4752,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String generationStatusWaitMinutes(int minutes) {
-    return '$minutes min';
+    return '$minutes Min.';
   }
 
   @override

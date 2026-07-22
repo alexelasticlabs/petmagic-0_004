@@ -461,7 +461,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String petsStatsPhotos(Object count) {
-    return '$count photos';
+    return '$count photos de l’animal';
   }
 
   @override
@@ -3929,7 +3929,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get profileNotificationsDeviceCamera => 'Caméra';
 
   @override
-  String get profileNotificationsDeviceMicrophone => 'Microphone';
+  String get profileNotificationsDeviceMicrophone => 'Accès au microphone';
 
   @override
   String get profileNotificationsDevicePhotos => 'Photos';
@@ -4248,7 +4248,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String gamificationXpProgress(Object current, Object total) {
-    return '$current / $total XP';
+    return '$current / $total EXP';
   }
 
   @override
@@ -4764,7 +4764,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String generationStatusWaitMinutes(int minutes) {
-    return '$minutes min';
+    return '$minutes min.';
   }
 
   @override
