@@ -19,6 +19,8 @@ import 'package:petmagic_mobile/features/support/data/support_chat_dto_mapper.da
 import 'package:petmagic_mobile/features/support/data/support_attachment_upload_preparer.dart';
 import 'package:petmagic_mobile/shared/files/image_upload_optimizer.dart';
 
+part 'support_attachment_repository_mixin.part.dart';
+
 final dioSupportRepositoryProvider = Provider<SupportRepository>((ref) {
   return SupportChatRepository(
     dio: ref.watch(dioProvider),
@@ -28,8 +30,8 @@ final dioSupportRepositoryProvider = Provider<SupportRepository>((ref) {
   );
 });
 
-class SupportChatRepository implements SupportRepository {
-  SupportChatRepository({
+abstract class _SupportChatRepositoryBase implements SupportRepository {
+  _SupportChatRepositoryBase({
     required Dio dio,
     required AuthSessionStore sessionStorage,
     ImageUploadOptimizer? imageUploadOptimizer,
@@ -49,6 +51,53 @@ class SupportChatRepository implements SupportRepository {
 
   static const _maxAttachmentCount = 5;
 
+  Future<Response<T>> _authorizedRequest<T>(
+    Future<Response<T>> Function(AuthSession session) request, {
+    bool retryTransientFailures = true,
+  }) async {
+    return _authSessionCoordinator.authorizedRequest(
+      request: request,
+      mapError: _mapDioException,
+      requestFailedMessage: 'support.request_failed',
+      sessionExpiredMessage: 'auth.session_expired',
+      transientRetryAttempts: retryTransientFailures ? 2 : 1,
+    );
+  }
+
+  AppException _mapDioException(
+    DioException error, {
+    required String fallbackMessage,
+  }) {
+    final payload = NetworkErrorMapper.parseApiPayload(error);
+    final safeMessage = NetworkErrorMapper.safePayloadMessage(payload);
+    if (safeMessage != null) {
+      return NetworkErrorMapper.fromMessage(
+        error,
+        safeMessage,
+        includeCause: false,
+      );
+    }
+
+    if (NetworkErrorMapper.isConnectivityIssue(error)) {
+      return const AppException('support.unavailable', statusCode: 503);
+    }
+
+    return NetworkErrorMapper.fallback(
+      error,
+      fallbackMessage: fallbackMessage,
+      includeCause: false,
+    );
+  }
+}
+
+class SupportChatRepository extends _SupportChatRepositoryBase
+    with _SupportAttachmentRepositoryMixin {
+  SupportChatRepository({
+    required super.dio,
+    required super.sessionStorage,
+    super.imageUploadOptimizer,
+    super.authSessionCoordinator,
+  });
   @override
   Future<SupportChatConversation> openConversation({
     String? initialMessage,
@@ -141,163 +190,6 @@ class SupportChatRepository implements SupportRepository {
     );
 
     return mapSupportChatMessageDto(response.data ?? const {});
-  }
-
-  @override
-  Future<SupportChatMessage> sendAttachment({
-    required String conversationId,
-    required String filePath,
-    required String fileName,
-    required String contentType,
-    required String localeTag,
-    String? body,
-    String? replyToMessageId,
-    UploadProgressCallback? onSendProgress,
-    RequestCancellation? cancelToken,
-  }) async {
-    final encodedConversationId = _supportPathSegment(conversationId);
-    final prepared = await _attachmentUploadPreparer.prepare(
-      filePath: filePath,
-      fileName: fileName,
-      contentType: contentType,
-      cancelToken: cancelToken,
-    );
-    try {
-      final trimmedBody = body?.trim() ?? '';
-      final response = await _authorizedRequest<Map<String, dynamic>>(
-        (session) async => _dio.post<Map<String, dynamic>>(
-          '/api/support/conversation/$encodedConversationId/attachments',
-          data: FormData.fromMap({
-            if (trimmedBody.isNotEmpty) 'body': trimmedBody,
-            'locale': localeTag,
-            if (replyToMessageId?.trim().isNotEmpty == true)
-              'replyToMessageId': replyToMessageId!.trim(),
-            'file': await MultipartFile.fromFile(
-              prepared.filePath,
-              filename: prepared.safeFileName,
-              contentType: MediaType.parse(prepared.contentType),
-            ),
-          }),
-          options: authenticatedMultipartRequestOptions(session.accessToken),
-          onSendProgress: onSendProgress,
-          cancelToken: cancelToken.toDioCancelToken(),
-        ),
-        retryTransientFailures: false,
-      );
-
-      return mapSupportChatMessageDto(response.data ?? const {});
-    } finally {
-      await prepared.dispose();
-    }
-  }
-
-  @override
-  Future<SupportChatMessage> sendAttachments({
-    required String conversationId,
-    required List<SupportChatUploadAttachment> attachments,
-    required String localeTag,
-    String? body,
-    String? replyToMessageId,
-    UploadProgressCallback? onSendProgress,
-    RequestCancellation? cancelToken,
-  }) async {
-    final encodedConversationId = _supportPathSegment(conversationId);
-    if (attachments.isEmpty) {
-      throw const AppException(
-        'support.attachment_invalid_upload',
-        statusCode: 400,
-      );
-    }
-    if (attachments.length > _maxAttachmentCount) {
-      throw const AppException('support.attachment_too_many', statusCode: 400);
-    }
-
-    final preparedAttachments = <PreparedSupportAttachmentUpload>[];
-    try {
-      for (final attachment in attachments) {
-        preparedAttachments.add(
-          await _attachmentUploadPreparer.prepare(
-            filePath: attachment.filePath,
-            fileName: attachment.fileName,
-            contentType: attachment.contentType,
-            cancelToken: cancelToken,
-          ),
-        );
-      }
-
-      final multipartFiles = await Future.wait(
-        preparedAttachments.map(
-          (entry) => MultipartFile.fromFile(
-            entry.filePath,
-            filename: entry.safeFileName,
-            contentType: MediaType.parse(entry.contentType),
-          ),
-        ),
-      );
-      final trimmedBody = body?.trim() ?? '';
-      final response = await _authorizedRequest<Map<String, dynamic>>(
-        (session) async => _dio.post<Map<String, dynamic>>(
-          '/api/support/conversation/$encodedConversationId/messages/attachments',
-          data: FormData.fromMap({
-            if (trimmedBody.isNotEmpty) 'body': trimmedBody,
-            'locale': localeTag,
-            if (replyToMessageId?.trim().isNotEmpty == true)
-              'replyToMessageId': replyToMessageId!.trim(),
-            'files': multipartFiles,
-          }),
-          options: authenticatedMultipartRequestOptions(session.accessToken),
-          onSendProgress: onSendProgress,
-          cancelToken: cancelToken.toDioCancelToken(),
-        ),
-        retryTransientFailures: false,
-      );
-
-      return mapSupportChatMessageDto(response.data ?? const {});
-    } finally {
-      for (final prepared in preparedAttachments) {
-        await prepared.dispose();
-      }
-    }
-  }
-
-  @override
-  Future<SupportChatMessage> retryAttachment({
-    required String conversationId,
-    required String messageId,
-    required String filePath,
-    required String fileName,
-    required String contentType,
-    RequestCancellation? cancelToken,
-  }) async {
-    final encodedConversationId = _supportPathSegment(conversationId);
-    final encodedMessageId = _supportPathSegment(messageId);
-    final prepared = await _attachmentUploadPreparer.prepare(
-      filePath: filePath,
-      fileName: fileName,
-      contentType: contentType,
-      cancelToken: cancelToken,
-    );
-    try {
-      final response = await _authorizedRequest<Map<String, dynamic>>(
-        (session) async => _dio.post<Map<String, dynamic>>(
-          '/api/support/conversation/$encodedConversationId/messages/$encodedMessageId/attachment/retry',
-          data: FormData.fromMap({
-            'file': await MultipartFile.fromFile(
-              prepared.filePath,
-              filename: prepared.safeFileName,
-              contentType: MediaType.parse(prepared.contentType),
-            ),
-          }),
-          options: authenticatedMultipartRequestOptions(session.accessToken),
-          cancelToken: cancelToken.toDioCancelToken(),
-        ),
-        retryTransientFailures: false,
-      );
-
-      return mapSupportChatMessageDto(response.data ?? const {});
-    } finally {
-      await prepared.dispose();
-    }
   }
 
   @override
@@ -421,44 +313,6 @@ class SupportChatRepository implements SupportRepository {
         options: authenticatedRequestOptions(session.accessToken),
       ),
       retryTransientFailures: false,
-    );
-  }
-
-  Future<Response<T>> _authorizedRequest<T>(
-    Future<Response<T>> Function(AuthSession session) request, {
-    bool retryTransientFailures = true,
-  }) async {
-    return _authSessionCoordinator.authorizedRequest(
-      request: request,
-      mapError: _mapDioException,
-      requestFailedMessage: 'support.request_failed',
-      sessionExpiredMessage: 'auth.session_expired',
-      transientRetryAttempts: retryTransientFailures ? 2 : 1,
-    );
-  }
-
-  AppException _mapDioException(
-    DioException error, {
-    required String fallbackMessage,
-  }) {
-    final payload = NetworkErrorMapper.parseApiPayload(error);
-    final safeMessage = NetworkErrorMapper.safePayloadMessage(payload);
-    if (safeMessage != null) {
-      return NetworkErrorMapper.fromMessage(
-        error,
-        safeMessage,
-        includeCause: false,
-      );
-    }
-
-    if (NetworkErrorMapper.isConnectivityIssue(error)) {
-      return const AppException('support.unavailable', statusCode: 503);
-    }
-
-    return NetworkErrorMapper.fallback(
-      error,
-      fallbackMessage: fallbackMessage,
-      includeCause: false,
     );
   }
 }

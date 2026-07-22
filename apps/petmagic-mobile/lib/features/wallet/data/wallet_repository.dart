@@ -25,6 +25,9 @@ import 'package:petmagic_mobile/features/wallet/data/wallet_store_purchase_recov
 import 'package:petmagic_mobile/features/wallet/data/wallet_store_purchase_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+part 'wallet_store_repository_mixin.part.dart';
+part 'wallet_actions_repository_mixin.part.dart';
+
 final dioWalletRepositoryProvider = Provider<WalletRepositoryPort>((ref) {
   return WalletRepository(
     dio: ref.watch(dioProvider),
@@ -36,8 +39,8 @@ final dioWalletRepositoryProvider = Provider<WalletRepositoryPort>((ref) {
   );
 });
 
-class WalletRepository implements WalletRepositoryPort {
-  WalletRepository({
+abstract class _WalletRepositoryBase implements WalletRepositoryPort {
+  _WalletRepositoryBase({
     required Dio dio,
     required AuthSessionStore sessionStorage,
     AuthSessionCoordinator? authSessionCoordinator,
@@ -61,6 +64,65 @@ class WalletRepository implements WalletRepositoryPort {
   final WalletStorePurchaseService _storePurchaseService;
   final WalletStorePurchaseRecoveryStore _storePurchaseRecoveryStore;
 
+  Future<Response<T>> _authorizedRequest<T>(
+    Future<Response<T>> Function(AuthSession session) request, {
+    bool retryTransientFailures = true,
+  }) async {
+    return _authSessionCoordinator.authorizedRequest(
+      request: request,
+      mapError: _mapDioException,
+      requestFailedMessage: 'wallet.request_failed',
+      sessionExpiredMessage: 'auth.session_expired',
+      transientRetryAttempts: retryTransientFailures ? 2 : 1,
+    );
+  }
+
+  String _platformValue() {
+    if (Platform.isIOS) {
+      return 'ios';
+    }
+
+    if (Platform.isAndroid) {
+      return 'android';
+    }
+
+    return 'web';
+  }
+
+  AppException _mapDioException(
+    DioException error, {
+    required String fallbackMessage,
+  }) {
+    if (NetworkErrorMapper.isConnectivityIssue(error)) {
+      return NetworkErrorMapper.fromMessage(
+        error,
+        'wallet.network_unavailable',
+      );
+    }
+
+    if (NetworkErrorMapper.isServerError(error)) {
+      return NetworkErrorMapper.fromMessage(error, 'wallet.server_unavailable');
+    }
+
+    final payload = NetworkErrorMapper.parseApiPayload(error);
+    final safeMessage = NetworkErrorMapper.safePayloadMessage(payload);
+    if (safeMessage != null) {
+      return NetworkErrorMapper.fromMessage(error, safeMessage);
+    }
+
+    return NetworkErrorMapper.fallback(error, fallbackMessage: fallbackMessage);
+  }
+}
+
+class WalletRepository extends _WalletRepositoryBase
+    with _WalletStoreRepositoryMixin, _WalletActionsRepositoryMixin {
+  WalletRepository({
+    required super.dio,
+    required super.sessionStorage,
+    super.authSessionCoordinator,
+    super.inAppPurchase,
+    super.storePurchaseRecoveryStore,
+  });
   @override
   Stream<List<StorePurchaseDetails>> get purchaseUpdates =>
       _storePurchaseService.purchaseUpdates;
@@ -227,294 +289,6 @@ class WalletRepository implements WalletRepositoryPort {
     );
 
     return mapPurchaseCheckoutFromJson(response.data ?? const {});
-  }
-
-  @override
-  Future<
-    ({
-      bool isAvailable,
-      Set<String> productIds,
-      Map<String, String> productPrices,
-    })
-  >
-  fetchStoreAvailability(
-    List<CurrencyPackModel> packs,
-    WalletPaymentMethodModel paymentMethod,
-  ) async {
-    return _storePurchaseService.fetchAvailability(packs, paymentMethod);
-  }
-
-  @override
-  Future<void> startStoreCheckout(
-    CurrencyPackModel pack,
-    WalletPaymentMethodModel paymentMethod,
-  ) async {
-    final session = await _authSessionCoordinator.requireValidSession(
-      mapError: _mapDioException,
-      unauthorizedMessage: 'auth.sign_in_required',
-      sessionExpiredMessage: 'auth.session_expired',
-    );
-    await _storePurchaseService.startCheckout(
-      pack,
-      paymentMethod,
-      applicationUserName: session.user.userId,
-    );
-  }
-
-  @override
-  Future<PurchaseHistoryItem> verifyStorePurchase({
-    required String orderId,
-    required WalletPaymentMethodModel paymentMethod,
-    required StorePurchaseDetails purchase,
-  }) async {
-    final encodedOrderId = _walletPathSegment(orderId);
-    final response = await _authorizedRequest<Map<String, dynamic>>(
-      (session) => _dio.post<Map<String, dynamic>>(
-        '/api/economy/purchases/$encodedOrderId/verify-store',
-        data: {
-          'paymentProvider': paymentMethod.provider,
-          'productId': purchase.productID,
-          'serverVerificationData':
-              purchase.verificationData.serverVerificationData,
-          'localVerificationData':
-              purchase.verificationData.localVerificationData,
-          'purchaseId': purchase.purchaseID,
-          'transactionDate': purchase.transactionDate,
-        },
-        options: authenticatedRequestOptions(session.accessToken),
-      ),
-      retryTransientFailures: false,
-    );
-
-    return mapPurchaseHistoryItemFromJson(response.data ?? const {});
-  }
-
-  @override
-  Future<StoreBillingValidationModel> validateStorePurchase({
-    required String provider,
-    required StorePurchaseDetails purchase,
-  }) async {
-    final normalizedProvider = provider.trim().toLowerCase();
-    final serverVerificationData = purchase
-        .verificationData
-        .serverVerificationData
-        .trim();
-    if (serverVerificationData.isEmpty) {
-      throw const AppException('wallet.payment_unavailable');
-    }
-
-    final response = await _authorizedRequest<Map<String, dynamic>>((session) {
-      if (normalizedProvider == 'google_play') {
-        return _dio.post<Map<String, dynamic>>(
-          '/api/billing/google/validate',
-          data: {
-            'purchaseToken': serverVerificationData,
-            'productId': purchase.productID,
-            'packageName': AppConfig.androidPackageName,
-          },
-          options: authenticatedRequestOptions(session.accessToken),
-        );
-      }
-
-      if (normalizedProvider == 'app_store') {
-        return _dio.post<Map<String, dynamic>>(
-          '/api/billing/apple/validate',
-          data: {'signedTransactionInfo': serverVerificationData},
-          options: authenticatedRequestOptions(session.accessToken),
-        );
-      }
-
-      throw const AppException('wallet.payment_unavailable');
-    }, retryTransientFailures: false);
-
-    return mapStoreBillingValidationFromJson(response.data ?? const {});
-  }
-
-  @override
-  Future<void> savePendingStorePurchase(PendingStoreWalletPurchase purchase) {
-    return _storePurchaseRecoveryStore.savePendingPurchase(purchase);
-  }
-
-  @override
-  Future<PendingStoreWalletPurchase?> readPendingStorePurchase() {
-    return _storePurchaseRecoveryStore.readPendingPurchase();
-  }
-
-  @override
-  Future<void> clearPendingStorePurchase({String? orderId}) {
-    return _storePurchaseRecoveryStore.clearPendingPurchase(orderId: orderId);
-  }
-
-  @override
-  Future<void> restoreStorePurchases() async {
-    final session = await _authSessionCoordinator.requireValidSession(
-      mapError: _mapDioException,
-      unauthorizedMessage: 'auth.sign_in_required',
-      sessionExpiredMessage: 'auth.session_expired',
-    );
-    await _storePurchaseService.restorePurchases(
-      applicationUserName: session.user.userId,
-    );
-  }
-
-  @override
-  Future<void> completePurchase(StorePurchaseDetails purchase) {
-    return _storePurchaseService.completePurchase(purchase);
-  }
-
-  @override
-  Future<void> consumeVerifiedPurchase(StorePurchaseDetails purchase) {
-    return _storePurchaseService.consumeVerifiedPurchase(purchase);
-  }
-
-  @override
-  Future<WalletStateModel> claimAdReward() async {
-    await _authorizedRequest<Map<String, dynamic>>(
-      (session) => _dio.post<Map<String, dynamic>>(
-        '/api/economy/wallet/claim-ad',
-        options: authenticatedRequestOptions(session.accessToken),
-      ),
-      retryTransientFailures: false,
-    );
-
-    return fetchWallet();
-  }
-
-  @override
-  Future<WalletStateModel> applyRedeemCode(String code) async {
-    await _authorizedRequest<Map<String, dynamic>>(
-      (session) => _dio.post<Map<String, dynamic>>(
-        '/api/economy/wallet/redeem',
-        data: {'code': code.trim()},
-        options: authenticatedRequestOptions(session.accessToken),
-      ),
-      retryTransientFailures: false,
-    );
-
-    return fetchWallet();
-  }
-
-  @override
-  Future<RewardsSummaryModel> applyReferralCode(String code) async {
-    await _authorizedRequest<Map<String, dynamic>>(
-      (session) => _dio.post<Map<String, dynamic>>(
-        '/api/economy/referrals/activate',
-        data: {'code': code.trim()},
-        options: authenticatedRequestOptions(session.accessToken),
-      ),
-      retryTransientFailures: false,
-    );
-
-    return fetchRewards();
-  }
-
-  @override
-  Future<PurchaseHistoryItem> verifyStripeCheckoutSession({
-    required String orderId,
-    String? stripeReferenceId,
-    RequestCancellation? cancelToken,
-  }) async {
-    final normalizedReference = stripeReferenceId?.trim();
-    final payload = <String, Object?>{};
-    if (normalizedReference != null && normalizedReference.isNotEmpty) {
-      payload['stripeReferenceId'] = normalizedReference;
-    }
-
-    final encodedOrderId = _walletPathSegment(orderId);
-    final response = await _authorizedRequest<Map<String, dynamic>>(
-      (session) => _dio.post<Map<String, dynamic>>(
-        '/api/economy/purchases/$encodedOrderId/verify-stripe',
-        data: payload,
-        options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken.toDioCancelToken(),
-      ),
-      retryTransientFailures: false,
-    );
-
-    return mapPurchaseHistoryItemFromJson(response.data ?? const {});
-  }
-
-  @override
-  Future<void> registerPushToken({
-    required String token,
-    required String platform,
-    String? locale,
-  }) async {
-    await _authorizedRequest<Map<String, dynamic>>(
-      (session) => _dio.put<Map<String, dynamic>>(
-        '/api/economy/notifications/push-token',
-        data: {
-          'token': token,
-          'platform': platform,
-          'deviceId': null,
-          'appVersion': AppConfig.appVersion,
-          'locale': locale,
-        },
-        options: authenticatedRequestOptions(session.accessToken),
-      ),
-      retryTransientFailures: false,
-    );
-  }
-
-  @override
-  Future<void> unregisterPushToken(String token) async {
-    await _authorizedRequest<Map<String, dynamic>>(
-      (session) => _dio.delete<Map<String, dynamic>>(
-        '/api/economy/notifications/push-token',
-        data: {'token': token},
-        options: authenticatedRequestOptions(session.accessToken),
-      ),
-      retryTransientFailures: false,
-    );
-  }
-
-  Future<Response<T>> _authorizedRequest<T>(
-    Future<Response<T>> Function(AuthSession session) request, {
-    bool retryTransientFailures = true,
-  }) async {
-    return _authSessionCoordinator.authorizedRequest(
-      request: request,
-      mapError: _mapDioException,
-      requestFailedMessage: 'wallet.request_failed',
-      sessionExpiredMessage: 'auth.session_expired',
-      transientRetryAttempts: retryTransientFailures ? 2 : 1,
-    );
-  }
-
-  String _platformValue() {
-    if (Platform.isIOS) {
-      return 'ios';
-    }
-
-    if (Platform.isAndroid) {
-      return 'android';
-    }
-
-    return 'web';
-  }
-
-  AppException _mapDioException(
-    DioException error, {
-    required String fallbackMessage,
-  }) {
-    if (NetworkErrorMapper.isConnectivityIssue(error)) {
-      return NetworkErrorMapper.fromMessage(
-        error,
-        'wallet.network_unavailable',
-      );
-    }
-
-    if (NetworkErrorMapper.isServerError(error)) {
-      return NetworkErrorMapper.fromMessage(error, 'wallet.server_unavailable');
-    }
-
-    final payload = NetworkErrorMapper.parseApiPayload(error);
-    final safeMessage = NetworkErrorMapper.safePayloadMessage(payload);
-    if (safeMessage != null) {
-      return NetworkErrorMapper.fromMessage(error, safeMessage);
-    }
-
-    return NetworkErrorMapper.fallback(error, fallbackMessage: fallbackMessage);
   }
 }
 

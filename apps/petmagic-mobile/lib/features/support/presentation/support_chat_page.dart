@@ -26,6 +26,7 @@ import 'package:petmagic_mobile/shared/profile/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/support/domain/support_chat_models.dart';
 import 'package:petmagic_mobile/features/support/domain/support_attachment_validation.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_controller.dart';
+import 'package:petmagic_mobile/features/support/presentation/support_chat_route_policy.dart';
 import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
 import 'package:petmagic_mobile/shared/files/file_name_sanitizer.dart';
 import 'package:petmagic_mobile/shared/files/media_share_save.dart';
@@ -46,6 +47,7 @@ part 'widgets/support_chat_actions_attachment_flow.part.dart';
 part 'widgets/support_chat_actions_message_flow.part.dart';
 part 'widgets/support_chat_actions_preview.part.dart';
 part 'widgets/support_chat_attachment_picker.part.dart';
+part 'widgets/support_chat_attachment_picker_view.part.dart';
 part 'widgets/support_chat_attachment_picker_asset_tile.part.dart';
 part 'widgets/support_chat_attachment_picker_quick_tiles.part.dart';
 part 'widgets/support_chat_external_media.part.dart';
@@ -53,12 +55,15 @@ part 'widgets/support_chat_composer.part.dart';
 part 'widgets/support_chat_dialogs.part.dart';
 part 'widgets/support_chat_header.part.dart';
 part 'widgets/support_chat_messages.part.dart';
+part 'widgets/support_chat_message_bubbles.part.dart';
 part 'widgets/support_chat_messages_meta.part.dart';
 part 'widgets/support_chat_messages_reply.part.dart';
 part 'widgets/support_chat_message_media_grid.part.dart';
 part 'widgets/support_chat_message_media.part.dart';
+part 'widgets/support_chat_video_attachment_preview.part.dart';
 part 'widgets/support_chat_models.part.dart';
 part 'widgets/support_chat_sections_composer.part.dart';
+part 'widgets/support_chat_resolution_surfaces.part.dart';
 part 'widgets/support_chat_sections_interactions.part.dart';
 part 'widgets/support_chat_sections.part.dart';
 part 'widgets/support_chat_states.part.dart';
@@ -81,11 +86,10 @@ class SupportChatPage extends ConsumerStatefulWidget {
   static const routePath = '/profile/support/chat';
   static const initialMessageQueryParam = 'initialMessage';
   static const relatedGenerationIdQueryParam = 'relatedGenerationId';
-  static const int maxInitialMessageQueryLength = 500;
-  static const int maxRelatedGenerationIdQueryLength = 128;
-  static final RegExp _relatedGenerationIdPattern = RegExp(
-    r'^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$',
-  );
+  static const int maxInitialMessageQueryLength =
+      SupportChatRoutePolicy.maxInitialMessageQueryLength;
+  static const int maxRelatedGenerationIdQueryLength =
+      SupportChatRoutePolicy.maxRelatedGenerationIdQueryLength;
 
   final String? initialMessage;
   final String? relatedGenerationId;
@@ -94,50 +98,21 @@ class SupportChatPage extends ConsumerStatefulWidget {
     String? initialMessage,
     String? relatedGenerationId,
   }) {
-    final queryParameters = <String, String>{};
-    final normalizedInitialMessage = normalizeInitialMessageQuery(
-      initialMessage,
+    return SupportChatRoutePolicy.buildRoute(
+      routePath: routePath,
+      initialMessageQueryParam: initialMessageQueryParam,
+      relatedGenerationIdQueryParam: relatedGenerationIdQueryParam,
+      initialMessage: initialMessage,
+      relatedGenerationId: relatedGenerationId,
     );
-    if (normalizedInitialMessage != null &&
-        normalizedInitialMessage.isNotEmpty) {
-      queryParameters[initialMessageQueryParam] = normalizedInitialMessage;
-    }
-    final normalizedGenerationId = normalizeRelatedGenerationIdQuery(
-      relatedGenerationId,
-    );
-    if (normalizedGenerationId != null && normalizedGenerationId.isNotEmpty) {
-      queryParameters[relatedGenerationIdQueryParam] = normalizedGenerationId;
-    }
-
-    return Uri(
-      path: routePath,
-      queryParameters: queryParameters.isEmpty ? null : queryParameters,
-    ).toString();
   }
 
   static String? normalizeInitialMessageQuery(String? value) {
-    final normalized = value?.trim();
-    if (normalized == null || normalized.isEmpty) {
-      return null;
-    }
-
-    return normalized.length <= maxInitialMessageQueryLength
-        ? normalized
-        : normalized.substring(0, maxInitialMessageQueryLength);
+    return SupportChatRoutePolicy.normalizeInitialMessage(value);
   }
 
   static String? normalizeRelatedGenerationIdQuery(String? value) {
-    final normalized = value?.trim();
-    if (normalized == null || normalized.isEmpty) {
-      return null;
-    }
-
-    if (normalized.length > maxRelatedGenerationIdQueryLength ||
-        !_relatedGenerationIdPattern.hasMatch(normalized)) {
-      return null;
-    }
-
-    return normalized;
+    return SupportChatRoutePolicy.normalizeRelatedGenerationId(value);
   }
 
   @override

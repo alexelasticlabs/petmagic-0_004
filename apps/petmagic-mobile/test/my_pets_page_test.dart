@@ -102,12 +102,15 @@ void main() {
     expect(source, isNot(contains('ShareParams(text: safeOutputUrl)')));
   });
 
-  test('pet form step widgets stay in a dedicated part file', () {
+  test('pet form step widgets stay in a dedicated widget file', () {
     final pageSource = File(
       'lib/features/pets/presentation/my_pets_page.dart',
     ).readAsStringSync();
     final formSource = File(
       'lib/features/pets/presentation/my_pets_form_sheet.part.dart',
+    ).readAsStringSync();
+    final formStepsSource = File(
+      'lib/features/pets/presentation/widgets/pet_form_steps.dart',
     ).readAsStringSync();
     final detailsSource = File(
       'lib/features/pets/presentation/my_pets_detail_page.part.dart',
@@ -141,10 +144,11 @@ void main() {
     expect(pageSource, isNot(contains('Future<void> _pickAndUploadPhoto')));
     expect(pageSource, isNot(contains('Future<void> _deletePhoto')));
     expect(formSource, contains("part of 'my_pets_page.dart';"));
-    expect(formSource, contains('class _PetFormProgress'));
-    expect(formSource, contains('class _PetNameStep'));
-    expect(formSource, contains('class _PetTypeStep'));
-    expect(formSource, contains('class _PetPhotoStep'));
+    expect(formSource, isNot(contains('class PetFormProgress')));
+    expect(formStepsSource, contains('class PetFormProgress'));
+    expect(formStepsSource, contains('class PetNameStep'));
+    expect(formStepsSource, contains('class PetTypeStep'));
+    expect(formStepsSource, contains('class PetPhotoStep'));
     expect(detailsSource, contains("part of 'my_pets_page.dart';"));
     expect(detailsSource, contains('class PetDetailsPage'));
     expect(overviewSource, contains("part of 'my_pets_page.dart';"));
@@ -158,8 +162,11 @@ void main() {
     expect(formSource, contains("feature: 'Pets.Form'"));
     expect(formSource, contains("operation: 'save_pet'"));
     expect(formSource, contains('text.profileActionFailed'));
-    expect(formSource, contains('Theme.of(context).colorScheme.onPrimary'));
-    expect(formSource, isNot(contains('isActive ? Colors.black')));
+    expect(
+      formStepsSource,
+      contains('Theme.of(context).colorScheme.onPrimary'),
+    );
+    expect(formStepsSource, isNot(contains('isActive ? Colors.black')));
     expect(formSource, isNot(contains('} catch (_) {')));
   });
 

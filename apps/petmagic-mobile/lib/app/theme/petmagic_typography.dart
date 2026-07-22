@@ -1,8 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:petmagic_mobile/app/theme/petmagic_theme_colors.dart';
 
 abstract final class PetMagicTypography {
+  static const fontFamily = 'Comfortaa';
+  static String? _debugFontFamilyOverride;
+
+  static String get resolvedFontFamily =>
+      _debugFontFamilyOverride ?? fontFamily;
+
+  @visibleForTesting
+  static void debugUseFontFamily(String? family) {
+    _debugFontFamilyOverride = family;
+  }
+
   static TextTheme build(
     PetMagicColors colors, {
     required Brightness brightness,
@@ -10,10 +20,14 @@ abstract final class PetMagicTypography {
   }) {
     final compactLight = compactDisplay && brightness == Brightness.light;
     final base = Typography.material2021(platform: TargetPlatform.iOS).black
-        .apply(bodyColor: colors.textStrong, displayColor: colors.textStrong);
+        .apply(
+          fontFamily: resolvedFontFamily,
+          bodyColor: colors.textStrong,
+          displayColor: colors.textStrong,
+        );
     final bodyWeight = compactLight ? FontWeight.w600 : FontWeight.w500;
 
-    return GoogleFonts.comfortaaTextTheme(base)
+    return base
         .copyWith(
           displayLarge: _style(colors, 54, FontWeight.w700, 1.06),
           displayMedium: _style(colors, 44, FontWeight.w700, 1.06),
@@ -67,7 +81,8 @@ abstract final class PetMagicTypography {
     FontWeight weight,
     double height, {
     Color? color,
-  }) => GoogleFonts.comfortaa(
+  }) => TextStyle(
+    fontFamily: resolvedFontFamily,
     fontSize: size,
     fontWeight: weight,
     height: height,

@@ -14,6 +14,9 @@ void main() {
       final contentSource = File(
         'lib/features/startup/presentation/guest_welcome_content.part.dart',
       ).readAsStringSync();
+      final featureSectionsSource = File(
+        'lib/features/startup/presentation/guest_welcome_feature_sections.part.dart',
+      ).readAsStringSync();
 
       expect(
         'ListView('.allMatches(source).length,
@@ -35,7 +38,12 @@ void main() {
       expect(source, contains("part 'guest_welcome_content.part.dart';"));
       expect(source, isNot(contains('class _WelcomeHeroCard')));
       expect(contentSource, contains('class _WelcomeHeroCard'));
-      expect(contentSource, contains('class _WelcomeCtaBlock'));
+      expect(
+        source,
+        contains("part 'guest_welcome_feature_sections.part.dart';"),
+      );
+      expect(featureSectionsSource, contains('class _FeatureMiniCard'));
+      expect(featureSectionsSource, contains('class _WelcomeCtaBlock'));
     }
   });
 }

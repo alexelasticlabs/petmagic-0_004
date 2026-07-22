@@ -59,17 +59,16 @@ void main() {
 
   test('release API config rejects dev origins before Dio can use them', () {
     final config = File('lib/core/config/app_config.dart').readAsStringSync();
+    final resolver = File(
+      'lib/core/config/api_base_url_config_resolver.dart',
+    ).readAsStringSync();
 
-    expect(
-      config,
-      contains(
-        'if (!kDebugMode) {\n'
-        '        final releaseBaseUrl = normalizeReleaseBaseUrl(',
-      ),
-    );
+    expect(config, contains('isReleaseBuild: kReleaseMode,'));
+    expect(resolver, contains('if (isReleaseBuild) {'));
+    expect(resolver, contains('normalizeReleaseBaseUrl('));
+    expect(resolver, contains('return [productionBaseUrl];'));
     expect(config, contains('validateReleaseConfiguration'));
     expect(config, contains("'staging' => 'api.staging.petmagic.app'"));
-    expect(config, contains("return const [productionApiBaseUrl];"));
     expect(config, contains("static const productionApiBaseUrl = 'https://"));
     expect(
       config,

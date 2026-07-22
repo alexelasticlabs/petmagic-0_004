@@ -62,7 +62,7 @@ void main() {
 
   test('polling realtime client uses disposable one-shot timers', () {
     final source = File(
-      'lib/core/realtime/realtime_client.dart',
+      'lib/core/realtime/polling_realtime_client.part.dart',
     ).readAsStringSync();
 
     expect(source, contains('void _scheduleNextPoll()'));
@@ -303,7 +303,7 @@ void main() {
 
   test('server-sent events realtime logs safe base URL origin only', () {
     final source = File(
-      'lib/core/realtime/realtime_client.dart',
+      'lib/core/realtime/server_sent_events_realtime_client.part.dart',
     ).readAsStringSync();
 
     expect(

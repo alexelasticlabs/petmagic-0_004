@@ -80,9 +80,11 @@ void main() {
     'wallet external checkout and verification requests are cancel-aware',
     () {
       final source = readWalletControllerLibrarySource();
-      final repositorySource = File(
+      final repositorySource = [
         'lib/features/wallet/data/wallet_repository.dart',
-      ).readAsStringSync();
+        'lib/features/wallet/data/wallet_store_repository_mixin.part.dart',
+        'lib/features/wallet/data/wallet_actions_repository_mixin.part.dart',
+      ].map((path) => File(path).readAsStringSync()).join('\n');
       final lifecycleBody = _methodBody(
         source,
         '_ensureWalletLifecycleStarted',

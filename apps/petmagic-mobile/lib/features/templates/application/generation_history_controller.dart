@@ -17,8 +17,11 @@ import 'package:petmagic_mobile/features/templates/application/template_error_ke
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 
 part 'generation_history_controller_cache.part.dart';
+part 'generation_history_controller_cache_policy.part.dart';
 part 'generation_history_controller_lifecycle.part.dart';
+part 'generation_history_controller_realtime.part.dart';
 part 'generation_history_controller_sync.part.dart';
+part 'generation_history_controller_mutations.part.dart';
 
 final generationHistoryControllerProvider =
     NotifierProvider<GenerationHistoryController, GenerationHistoryState>(
@@ -234,11 +237,17 @@ abstract class _GenerationHistoryControllerBase
 
   void _scheduleOfflineBannerHide();
 
+  void _scheduleNextAutoRefresh();
+
   Future<int?> _fetchUnreadGenerationCountBestEffort(
     RequestCancellation cancelToken,
   );
 
   Future<void> _resumeRealtimeIfNeeded();
+
+  void _pauseRealtime();
+
+  void _cancelActiveRealtimeRefetches(String reason);
 
   Future<void> _mergeExternalGeneration(
     TemplateGenerationResult generation, {
@@ -297,7 +306,9 @@ class GenerationHistoryController extends _GenerationHistoryControllerBase
     with
         _GenerationHistoryControllerCache,
         _GenerationHistoryControllerLifecycle,
-        _GenerationHistoryControllerSync {
+        _GenerationHistoryControllerMutations,
+        _GenerationHistoryControllerSync,
+        _GenerationHistoryControllerRealtime {
   @override
   GenerationHistoryState build() {
     final galleryStore = ref.read(generationGalleryStoreProvider);

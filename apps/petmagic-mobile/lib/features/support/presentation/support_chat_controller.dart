@@ -8,9 +8,11 @@ import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/support/application/support_contract.dart';
+import 'package:petmagic_mobile/features/support/presentation/support_chat_conversation_policy.dart';
 
 part 'support_chat_controller_conversation.part.dart';
 part 'support_chat_controller_messaging.part.dart';
+part 'support_chat_controller_realtime.part.dart';
 
 final supportChatControllerProvider =
     NotifierProvider<SupportChatController, SupportChatState>(
@@ -98,6 +100,7 @@ abstract class _SupportChatControllerBase extends Notifier<SupportChatState>
 
 class SupportChatController extends _SupportChatControllerBase
     with
+        _SupportChatControllerRealtimeMixin,
         _SupportChatControllerConversationMixin,
         _SupportChatControllerMessagingMixin {
   SupportRepository? _activeRepository;

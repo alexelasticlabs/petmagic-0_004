@@ -9,9 +9,12 @@ void main() {
       final authEntry = await File(
         'lib/features/profile/presentation/auth_entry_page.dart',
       ).readAsString();
-      final router = await File(
-        'lib/app/router/app_router.dart',
-      ).readAsString();
+      final router = await Future.wait(
+        [
+          'lib/app/router/app_router.dart',
+          'lib/app/router/app_routes.part.dart',
+        ].map((path) => File(path).readAsString()),
+      ).then((sources) => sources.join('\n'));
       final verificationPage = await File(
         'lib/features/profile/presentation/email_verification_page.dart',
       ).readAsString();

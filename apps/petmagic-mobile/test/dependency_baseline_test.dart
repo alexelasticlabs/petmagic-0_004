@@ -9,7 +9,6 @@ void main() {
     for (final dependency in const {
       'cupertino_icons': '^1.0.9',
       'go_router': '^17.3.0',
-      'google_fonts': '^8.1.0',
       'image_picker': '^1.2.3',
       'share_plus': '^13.2.0',
       'in_app_purchase': '^3.3.0',
@@ -24,6 +23,8 @@ void main() {
             '${dependency.key} should not drift below the version covered by release gates.',
       );
     }
+
+    expect(pubspec, isNot(contains('google_fonts:')));
 
     expect(pubspec, contains('photo_manager:'));
     expect(

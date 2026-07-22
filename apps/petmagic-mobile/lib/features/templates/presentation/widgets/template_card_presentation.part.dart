@@ -303,43 +303,47 @@ class _TemplateActionButton extends StatelessWidget {
             ),
           ],
         ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textStyle?.copyWith(
-                    color: foregroundColor,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: textStyle?.copyWith(
+                      color: foregroundColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      height: 1.05,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 6),
-              Container(
-                width: usePremiumStyle ? 22 : null,
-                height: usePremiumStyle ? 22 : null,
-                decoration: usePremiumStyle
-                    ? BoxDecoration(
-                        color: const Color(0x3DFFF3D2),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xAAFFF0C0)),
-                      )
-                    : null,
-                child: isPremiumLockCta
-                    ? const PremiumCrownIcon(size: 13.5)
-                    : Icon(
-                        Icons.arrow_forward_rounded,
-                        color: foregroundColor,
-                        size: usePremiumStyle ? 13.5 : 16,
-                      ),
-              ),
-            ],
+                const SizedBox(width: 5),
+                Container(
+                  width: usePremiumStyle ? 22 : null,
+                  height: usePremiumStyle ? 22 : null,
+                  decoration: usePremiumStyle
+                      ? BoxDecoration(
+                          color: const Color(0x3DFFF3D2),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: const Color(0xAAFFF0C0)),
+                        )
+                      : null,
+                  child: isPremiumLockCta
+                      ? const PremiumCrownIcon(size: 13.5)
+                      : Icon(
+                          Icons.arrow_forward_rounded,
+                          color: foregroundColor,
+                          size: usePremiumStyle ? 13.5 : 16,
+                        ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

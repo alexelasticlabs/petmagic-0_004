@@ -32,9 +32,9 @@ void main() {
     'premium repository maps connectivity and server failures explicitly',
     () {
       final source = File(
-        'lib/features/premium/data/premium_repository.dart',
+        'lib/features/premium/data/premium_repository_transport.part.dart',
       ).readAsStringSync();
-      final body = _methodBody(source, '_mapDioException');
+      final body = _methodBody(source, 'mapDioException');
 
       expect(body, contains('NetworkErrorMapper.isConnectivityIssue(error)'));
       expect(body, contains("'templates.network_unavailable'"));

@@ -26,7 +26,112 @@ import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 
+import 'widget_test_support.dart';
+
 void main() {
+  configureWidgetTestHarness();
+
+  for (final configuration in const [
+    _ProfileGoldenConfiguration('compact', Size(320, 568)),
+    _ProfileGoldenConfiguration('phone', Size(390, 844)),
+    _ProfileGoldenConfiguration('tablet', Size(834, 1194)),
+  ]) {
+    for (final brightness in Brightness.values) {
+      testWidgets(
+        'profile ${configuration.name} ${brightness.name} visual baseline',
+        (tester) async {
+          tester.view.physicalSize = configuration.size;
+          tester.view.devicePixelRatio = 1;
+          addTearDown(() {
+            tester.view.resetPhysicalSize();
+            tester.view.resetDevicePixelRatio();
+          });
+          final router = GoRouter(
+            initialLocation: ProfilePage.routePath,
+            routes: [
+              GoRoute(
+                path: ProfilePage.routePath,
+                pageBuilder: (context, state) => const NoTransitionPage(
+                  child: RepaintBoundary(
+                    key: Key('profile_golden_surface'),
+                    child: ProfilePage(),
+                  ),
+                ),
+              ),
+            ],
+          );
+          addTearDown(router.dispose);
+
+          await tester.pumpWidget(
+            ProviderScope(
+              overrides: [
+                appLaunchControllerProvider.overrideWith(
+                  _AuthenticatedProfileAppLaunchController.new,
+                ),
+                networkStatusControllerProvider.overrideWith(
+                  () => _TestProfileNetworkStatusController(
+                    initialHasInternet: true,
+                  ),
+                ),
+                profileControllerProvider.overrideWith(
+                  _FakeProfileController.new,
+                ),
+                walletControllerProvider.overrideWith(
+                  _FakeWalletController.new,
+                ),
+                gamificationSummaryProvider.overrideWith(
+                  (ref) async => const GamificationSummaryModel(),
+                ),
+                achievementsProvider.overrideWith(
+                  (ref) async => const <AchievementModel>[],
+                ),
+                premiumSubscriptionSummaryProvider.overrideWith(
+                  (ref) async => const PremiumSubscriptionSummaryView(
+                    isPremium: false,
+                    canManageSubscription: false,
+                    status: 'inactive',
+                    manageSubscriptionAction: '',
+                    provider: PremiumSubscriptionProviderView.unknown,
+                  ),
+                ),
+              ],
+              child: MaterialApp.router(
+                builder: (context, child) => MediaQuery(
+                  data: MediaQuery.of(
+                    context,
+                  ).copyWith(disableAnimations: true),
+                  child: AppNavigationScope(
+                    navigator: GoRouterAppNavigator(router),
+                    child: child!,
+                  ),
+                ),
+                routerConfig: router,
+                theme: AppTheme.light(),
+                darkTheme: AppTheme.dark(),
+                themeMode: brightness == Brightness.dark
+                    ? ThemeMode.dark
+                    : ThemeMode.light,
+                locale: const Locale('en'),
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+              ),
+            ),
+          );
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 500));
+
+          expect(tester.takeException(), isNull);
+          await expectLater(
+            find.byKey(const Key('profile_golden_surface')),
+            matchesGoldenFile(
+              'goldens/profile_${configuration.name}_${brightness.name}.png',
+            ),
+          );
+        },
+      );
+    }
+  }
+
   testWidgets('profile page shows unified auth gate for guests', (
     tester,
   ) async {
@@ -883,7 +988,11 @@ void main() {
     await tester.pump(const Duration(milliseconds: 250));
 
     final legalShortcut = find.byKey(const ValueKey('profile_legal_shortcut'));
-    await tester.ensureVisible(legalShortcut);
+    await tester.scrollUntilVisible(
+      legalShortcut,
+      400,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.pump(const Duration(milliseconds: 200));
     await tester.tap(legalShortcut);
     await tester.pumpAndSettle();
@@ -1389,6 +1498,13 @@ void main() {
       expect(find.text('Achievements route'), findsOneWidget);
     },
   );
+}
+
+class _ProfileGoldenConfiguration {
+  const _ProfileGoldenConfiguration(this.name, this.size);
+
+  final String name;
+  final Size size;
 }
 
 class _FakeProfileController extends ProfileController {

@@ -51,12 +51,14 @@ void main() {
     final profileSettingsSource = File(
       'lib/features/profile/presentation/profile_settings_page.dart',
     ).readAsStringSync();
-    final linkedAccountsSource = File(
+    final linkedAccountsSource = [
       'lib/features/profile/presentation/widgets/profile_linked_accounts_settings_section.dart',
-    ).readAsStringSync();
-    final appRouterSource = File(
+      'lib/features/profile/presentation/widgets/profile_linked_accounts_widgets.part.dart',
+    ].map((path) => File(path).readAsStringSync()).join('\n');
+    final appRouterSource = [
       'lib/app/router/app_router.dart',
-    ).readAsStringSync();
+      'lib/app/router/app_routes.part.dart',
+    ].map((path) => File(path).readAsStringSync()).join('\n');
 
     expect(authEntrySource, contains('EmailVerificationRouteArgs('));
     expect(

@@ -611,9 +611,10 @@ void main() {
       final helpersSource = File(
         'lib/features/wallet/presentation/wallet_page_helpers.part.dart',
       ).readAsStringSync();
-      final transactionsSource = File(
+      final transactionsSource = [
         'lib/features/wallet/presentation/all_transactions_page.dart',
-      ).readAsStringSync();
+        'lib/features/wallet/presentation/widgets/all_transactions_widgets.dart',
+      ].map((path) => File(path).readAsStringSync()).join('\n');
       final overviewSource = File(
         'lib/features/wallet/presentation/widgets/wallet_page_overview_chrome.part.dart',
       ).readAsStringSync();

@@ -1,4 +1,4 @@
-part of 'profile_settings_detail_page.dart';
+part of 'profile_account_info_page.dart';
 
 class _AccountProfileHeroCard extends StatelessWidget {
   const _AccountProfileHeroCard({

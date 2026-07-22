@@ -259,7 +259,8 @@ class AuthWordmark extends StatelessWidget {
         SizedBox(height: compact ? 5 : 8),
         Text(
           'PetMagic',
-          style: GoogleFonts.comfortaa(
+          style: TextStyle(
+            fontFamily: PetMagicTypography.resolvedFontFamily,
             fontSize: compact ? 20 : 24,
             fontWeight: FontWeight.w700,
             letterSpacing: 0,

@@ -314,9 +314,12 @@ void main() {
   test(
     'external auth logs google sdk failures instead of swallowing them',
     () async {
-      final source = await File(
-        'lib/features/profile/data/external_auth_repository.dart',
-      ).readAsString();
+      final source = await Future.wait(
+        [
+          'lib/features/profile/data/external_auth_repository.dart',
+          'lib/features/profile/data/external_auth_google_flow.part.dart',
+        ].map((path) => File(path).readAsString()),
+      ).then((sources) => sources.join('\n'));
 
       expect(source, contains('AppLogger.warn('));
       expect(

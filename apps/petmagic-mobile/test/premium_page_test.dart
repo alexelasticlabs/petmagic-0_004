@@ -77,9 +77,10 @@ void main() {
     final contentSource = File(
       'lib/features/premium/presentation/premium_page_content.part.dart',
     ).readAsStringSync();
-    final sectionsSource = File(
+    final sectionsSource = [
       'lib/features/premium/presentation/premium_page_sections.part.dart',
-    ).readAsStringSync();
+      'lib/features/premium/presentation/premium_page_benefits.part.dart',
+    ].map((path) => File(path).readAsStringSync()).join('\n');
 
     expect(pageSource, contains("part 'premium_page_sections.part.dart';"));
     expect(contentSource, isNot(contains('class _Header')));

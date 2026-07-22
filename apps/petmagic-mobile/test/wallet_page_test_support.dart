@@ -220,6 +220,9 @@ Future<void> pumpRewardsPage(
   required WalletRepository repository,
   bool authenticated = true,
   NetworkStatusController? networkStatusController,
+  WalletController? walletController,
+  Brightness brightness = Brightness.dark,
+  bool disableAnimations = false,
 }) async {
   addTearDown(() => PetMagicNotificationCenter.instance.clearQueue());
 
@@ -232,13 +235,25 @@ Future<void> pumpRewardsPage(
               : UnauthenticatedWalletAppLaunchController.new,
         ),
         walletRepositoryProvider.overrideWithValue(repository),
+        if (walletController != null)
+          walletControllerProvider.overrideWith(() => walletController),
         if (networkStatusController != null)
           networkStatusControllerProvider.overrideWith(
             () => networkStatusController,
           ),
       ],
       child: MaterialApp.router(
-        theme: AppTheme.dark(),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(disableAnimations: disableAnimations),
+          child: child!,
+        ),
+        theme: AppTheme.light(),
+        darkTheme: AppTheme.dark(),
+        themeMode: brightness == Brightness.dark
+            ? ThemeMode.dark
+            : ThemeMode.light,
         locale: const Locale('ru'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: const [
@@ -254,7 +269,10 @@ Future<void> pumpRewardsPage(
           routes: [
             GoRoute(
               path: '/',
-              builder: (context, state) => const Material(child: RewardsPage()),
+              builder: (context, state) => const Material(
+                key: Key('rewards_test_surface'),
+                child: RewardsPage(),
+              ),
             ),
           ],
         ),
@@ -265,6 +283,21 @@ Future<void> pumpRewardsPage(
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 200));
   await tester.pump(const Duration(milliseconds: 300));
+}
+
+class StaticRewardsWalletController extends WalletController {
+  @override
+  WalletState build() => const WalletState(
+    wallet: walletStateFixture,
+    ledger: ledgerItemsFixture,
+    hasCompletedFullLoad: true,
+    packs: packsFixture,
+    paymentMethods: paymentMethodsFixture,
+    purchases: purchasesFixture,
+  );
+
+  @override
+  Future<void> load({bool refresh = false}) async {}
 }
 
 class AutoRefreshProbeWalletController extends WalletController {

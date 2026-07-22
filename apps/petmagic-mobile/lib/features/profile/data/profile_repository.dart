@@ -22,6 +22,8 @@ import 'package:petmagic_mobile/features/profile/data/profile_avatar_upload_prep
 import 'package:petmagic_mobile/features/profile/application/profile_repository.dart';
 import 'package:petmagic_mobile/shared/files/image_upload_optimizer.dart';
 
+part 'profile_auth_repository_mixin.part.dart';
+
 final dioProfileRepositoryProvider = Provider<ProfileRepositoryPort>((ref) {
   return ProfileRepository(
     dio: ref.watch(dioProvider),
@@ -31,8 +33,8 @@ final dioProfileRepositoryProvider = Provider<ProfileRepositoryPort>((ref) {
   );
 });
 
-class ProfileRepository implements ProfileRepositoryPort {
-  ProfileRepository({
+abstract class _ProfileRepositoryBase implements ProfileRepositoryPort {
+  _ProfileRepositoryBase({
     required Dio dio,
     required AuthSessionStore sessionStorage,
     AuthSessionCoordinator? authSessionCoordinator,
@@ -52,251 +54,81 @@ class ProfileRepository implements ProfileRepositoryPort {
   final ProfileAvatarUploadPreparer _avatarUploadPreparer;
   final AuthSessionCoordinator _authSessionCoordinator;
 
-  @override
-  Future<AuthSession?> readSession() => _sessionStorage.read();
-
-  @override
-  Future<void> register({
-    required String email,
-    required String password,
-    required bool termsOfUseAccepted,
-    required bool privacyPolicyAccepted,
-    required String termsOfUseVersion,
-    required String privacyPolicyVersion,
-    required bool marketingEmailsEnabled,
-    String? displayName,
-    RequestCancellation? cancelToken,
+  Future<Response<T>> _authorizedRequest<T>(
+    Future<Response<T>> Function(AuthSession session) request, {
+    bool retryTransientFailures = true,
   }) async {
-    try {
-      await _dio.post<Map<String, dynamic>>(
-        '/api/auth/register',
-        data: {
-          'email': email.trim(),
-          'password': password,
-          'termsOfUseAccepted': termsOfUseAccepted,
-          'privacyPolicyAccepted': privacyPolicyAccepted,
-          'termsOfUseVersion': termsOfUseVersion,
-          'privacyPolicyVersion': privacyPolicyVersion,
-          'marketingEmailsEnabled': marketingEmailsEnabled,
-          'displayName': displayName?.trim().isEmpty ?? true
-              ? null
-              : displayName!.trim(),
-        },
-        options: anonymousRequestOptions(),
-        cancelToken: cancelToken.toDioCancelToken(),
-      );
-
-      return;
-    } on DioException catch (error) {
-      throw _mapDioException(
-        error,
-        fallbackMessage: 'auth.registration_failed',
-      );
-    }
+    return _authSessionCoordinator.authorizedRequest(
+      request: request,
+      mapError: _mapDioException,
+      requestFailedMessage: 'auth.request_failed',
+      sessionExpiredMessage: 'auth.session_expired',
+      transientRetryAttempts: retryTransientFailures ? 2 : 1,
+    );
   }
 
-  @override
-  Future<AuthSession> login({
-    required String email,
-    required String password,
-    RequestCancellation? cancelToken,
-  }) async {
-    try {
-      final response = await _dio.post<Map<String, dynamic>>(
-        '/api/auth/login',
-        data: {'email': email.trim(), 'password': password},
-        cancelToken: cancelToken.toDioCancelToken(),
-      );
-
-      final session = AuthSession.fromJson(response.data ?? const {});
-      await _sessionStorage.save(session);
-      return session;
-    } on DioException catch (error) {
-      throw _mapDioException(error, fallbackMessage: 'auth.login_failed');
-    }
-  }
-
-  @override
-  Future<void> requestPasswordReset({
-    required String email,
-    RequestCancellation? cancelToken,
-  }) async {
-    try {
-      await _dio.post<void>(
-        '/api/auth/password-reset/request',
-        data: {'email': email.trim()},
-        cancelToken: cancelToken.toDioCancelToken(),
-      );
-    } on DioException catch (error) {
-      throw _mapDioException(
-        error,
-        fallbackMessage: 'auth.password_reset_request_failed',
-      );
-    }
-  }
-
-  @override
-  Future<void> confirmPasswordReset({
-    required String email,
-    required String code,
-    required String newPassword,
-    RequestCancellation? cancelToken,
-  }) async {
-    try {
-      await _dio.post<void>(
-        '/api/auth/password-reset/confirm',
-        data: {
-          'email': email.trim(),
-          'code': code.trim(),
-          'newPassword': newPassword,
-        },
-        cancelToken: cancelToken.toDioCancelToken(),
-      );
-    } on DioException catch (error) {
-      throw _mapDioException(
-        error,
-        fallbackMessage: 'auth.password_reset_failed',
-      );
-    }
-  }
-
-  @override
-  Future<void> requestCurrentPasswordChangeCode({
-    RequestCancellation? cancelToken,
-  }) async {
-    try {
-      await _authorizedRequest<void>(
-        (session) => _dio.post<void>(
-          '/api/auth/me/password-change/request',
-          options: authenticatedRequestOptions(session.accessToken),
-          cancelToken: cancelToken.toDioCancelToken(),
-        ),
-        retryTransientFailures: false,
-      );
-    } on DioException catch (error) {
-      throw _mapDioException(
-        error,
-        fallbackMessage: 'auth.password_reset_request_failed',
-      );
-    }
-  }
-
-  @override
-  Future<void> confirmCurrentPasswordChange({
-    required String code,
-    required String newPassword,
-    RequestCancellation? cancelToken,
-  }) async {
-    try {
-      await _authorizedRequest<void>(
-        (session) => _dio.post<void>(
-          '/api/auth/me/password-change/confirm',
-          data: {
-            'code': code.trim(),
-            'newPassword': newPassword,
-            'refreshToken': session.refreshToken,
-          },
-          options: authenticatedRequestOptions(session.accessToken),
-          cancelToken: cancelToken.toDioCancelToken(),
-        ),
-        retryTransientFailures: false,
-      );
-    } on DioException catch (error) {
-      throw _mapDioException(
-        error,
-        fallbackMessage: 'auth.password_reset_failed',
-      );
-    }
-  }
-
-  @override
-  Future<void> resendEmailVerificationCode({
-    required String email,
-    RequestCancellation? cancelToken,
-  }) async {
-    try {
-      await _dio.post<void>(
-        '/api/auth/resend-email-verification-code',
-        data: {'email': email.trim()},
-        cancelToken: cancelToken.toDioCancelToken(),
-      );
-    } on DioException catch (error) {
-      throw _mapDioException(
-        error,
-        fallbackMessage: 'auth.email_verification_resend_failed',
-      );
-    }
-  }
-
-  @override
-  Future<AuthSession> verifyEmailCode({
-    required String email,
-    required String code,
-    RequestCancellation? cancelToken,
-  }) async {
-    try {
-      final response = await _dio.post<Map<String, dynamic>>(
-        '/api/auth/verify-email-code',
-        data: {'email': email.trim(), 'code': code.trim()},
-        cancelToken: cancelToken.toDioCancelToken(),
-      );
-      final session = AuthSession.fromJson(response.data ?? const {});
-      await _sessionStorage.save(session);
-      return session;
-    } on DioException catch (error) {
-      throw _mapDioException(
-        error,
-        fallbackMessage: 'auth.email_verification_failed',
-      );
-    }
-  }
-
-  @override
-  Future<void> logout() async {
+  Future<void> _replaceStoredUser(MobileUserProfile profile) async {
     final session = await _sessionStorage.read();
-    await _sessionStorage.clear();
-
     if (session == null) {
       return;
     }
 
-    try {
-      await _dio.post<void>(
-        '/api/auth/logout',
-        data: {'refreshToken': session.refreshToken},
-        options: authenticatedRequestOptions(session.accessToken),
-      );
-    } catch (error, stackTrace) {
-      AppLogger.warn(
-        feature: 'Profile.Auth',
-        operation: 'remote_logout',
-        message: 'Remote logout failed after local session clear',
-        context: {'stage': 'remote_logout'},
-        error: error,
-        stackTrace: stackTrace,
-      );
-      // Keep logout local-first.
-    }
+    await _sessionStorage.save(
+      AuthSession(
+        accessToken: session.accessToken,
+        refreshToken: session.refreshToken,
+        expiresAtUtc: session.expiresAtUtc,
+        user: profile,
+      ),
+    );
   }
 
-  @override
-  Future<void> deleteCurrentAccount({RequestCancellation? cancelToken}) async {
-    try {
-      await _authorizedRequest<void>(
-        (session) => _dio.delete<void>(
-          '/api/auth/me',
-          options: authenticatedRequestOptions(session.accessToken),
-          cancelToken: cancelToken.toDioCancelToken(),
-        ),
-        retryTransientFailures: false,
-      );
-
-      await _sessionStorage.clear();
-    } on DioException catch (error) {
-      throw _mapDioException(error, fallbackMessage: 'profile.action_failed');
+  AppException _mapDioException(
+    DioException error, {
+    required String fallbackMessage,
+  }) {
+    if (CancelToken.isCancel(error)) {
+      return const RequestCancelledException();
     }
-  }
 
+    if (NetworkErrorMapper.isConnectivityIssue(error)) {
+      return NetworkErrorMapper.fromMessage(
+        error,
+        'templates.network_unavailable',
+        includeCause: false,
+      );
+    }
+
+    final payload = NetworkErrorMapper.parseApiPayload(error);
+    final statusCode = error.response?.statusCode;
+    final title = payload.title?.trim();
+    final isUserNotFound = title == 'users.not_found';
+    if (isUserNotFound && statusCode == 404) {
+      return NetworkErrorMapper.fromMessage(
+        error,
+        'auth.session_expired',
+        statusCode: statusCode,
+      );
+    }
+
+    final safeMessage = NetworkErrorMapper.safePayloadMessage(payload);
+    if (safeMessage != null) {
+      return NetworkErrorMapper.fromMessage(error, safeMessage);
+    }
+
+    return NetworkErrorMapper.fallback(error, fallbackMessage: fallbackMessage);
+  }
+}
+
+class ProfileRepository extends _ProfileRepositoryBase
+    with _ProfileAuthRepositoryMixin
+    implements ProfileRepositoryPort {
+  ProfileRepository({
+    required super.dio,
+    required super.sessionStorage,
+    super.authSessionCoordinator,
+    super.imageUploadOptimizer,
+  });
   @override
   Future<MobileUserProfile> fetchProfile({
     RequestCancellation? cancelToken,
@@ -474,70 +306,5 @@ class ProfileRepository implements ProfileRepositoryPort {
         .whereType<Map<String, dynamic>>()
         .map(mapMobileLinkedAccountDto)
         .toList(growable: false);
-  }
-
-  Future<Response<T>> _authorizedRequest<T>(
-    Future<Response<T>> Function(AuthSession session) request, {
-    bool retryTransientFailures = true,
-  }) async {
-    return _authSessionCoordinator.authorizedRequest(
-      request: request,
-      mapError: _mapDioException,
-      requestFailedMessage: 'auth.request_failed',
-      sessionExpiredMessage: 'auth.session_expired',
-      transientRetryAttempts: retryTransientFailures ? 2 : 1,
-    );
-  }
-
-  Future<void> _replaceStoredUser(MobileUserProfile profile) async {
-    final session = await _sessionStorage.read();
-    if (session == null) {
-      return;
-    }
-
-    await _sessionStorage.save(
-      AuthSession(
-        accessToken: session.accessToken,
-        refreshToken: session.refreshToken,
-        expiresAtUtc: session.expiresAtUtc,
-        user: profile,
-      ),
-    );
-  }
-
-  AppException _mapDioException(
-    DioException error, {
-    required String fallbackMessage,
-  }) {
-    if (CancelToken.isCancel(error)) {
-      return const RequestCancelledException();
-    }
-
-    if (NetworkErrorMapper.isConnectivityIssue(error)) {
-      return NetworkErrorMapper.fromMessage(
-        error,
-        'templates.network_unavailable',
-        includeCause: false,
-      );
-    }
-
-    final payload = NetworkErrorMapper.parseApiPayload(error);
-    final statusCode = error.response?.statusCode;
-    final title = payload.title?.trim();
-    final isUserNotFound = title == 'users.not_found';
-    if (isUserNotFound && statusCode == 404) {
-      return NetworkErrorMapper.fromMessage(
-        error,
-        'auth.session_expired',
-        statusCode: statusCode,
-      );
-    }
-
-    final safeMessage = NetworkErrorMapper.safePayloadMessage(payload);
-    if (safeMessage != null) {
-      return NetworkErrorMapper.fromMessage(error, safeMessage);
-    }
-
-    return NetworkErrorMapper.fallback(error, fallbackMessage: fallbackMessage);
   }
 }

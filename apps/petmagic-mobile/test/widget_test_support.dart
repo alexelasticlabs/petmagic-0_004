@@ -1,22 +1,24 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/app.dart';
+import 'package:petmagic_mobile/app/theme/petmagic_typography.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
 import 'package:petmagic_mobile/features/profile/domain/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
+import 'package:petmagic_mobile/features/support/application/support_realtime_gateway.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/templates_query.dart';
@@ -33,43 +35,65 @@ import 'package:shared_preferences_platform_interface/in_memory_shared_preferenc
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
+import 'support_chat_test_support.dart';
+
 void configureWidgetTestHarness() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() async {
     VisibilityDetectorController.instance.updateInterval = Duration.zero;
-    await _loadMaterialIconsForGoldenTests();
+    await _loadDeterministicTestFonts();
   });
   setUp(() {
-    SharedPreferencesAsyncPlatform.instance =
-        InMemorySharedPreferencesAsync.empty();
+    resetInMemoryAsyncPreferences();
   });
   tearDown(() {
     PetMagicNotificationCenter.instance.clearQueue();
   });
 }
 
-Future<void> _loadMaterialIconsForGoldenTests() async {
-  var flutterRoot = Platform.environment['FLUTTER_ROOT'];
-  if (flutterRoot == null || flutterRoot.trim().isEmpty) {
-    var directory = File(Platform.resolvedExecutable).parent;
-    for (var index = 0; index < 4; index++) {
-      directory = directory.parent;
-    }
-    flutterRoot = directory.path;
-  }
+const _goldenComfortaaFamily = 'PetMagicGoldenComfortaa';
 
-  final font = File(
-    '$flutterRoot${Platform.pathSeparator}bin${Platform.pathSeparator}cache'
-    '${Platform.pathSeparator}artifacts${Platform.pathSeparator}material_fonts'
-    '${Platform.pathSeparator}MaterialIcons-Regular.otf',
+Future<void> _loadDeterministicTestFonts() async {
+  final fontManifest = await rootBundle.loadStructuredData<Iterable<Object?>>(
+    'FontManifest.json',
+    (source) async => (jsonDecode(source) as List<Object?>),
   );
-  if (!font.existsSync()) {
-    return;
+
+  final comfortaaLoader = FontLoader(_goldenComfortaaFamily)
+    ..addFont(rootBundle.load('assets/fonts/Comfortaa-Regular.ttf'));
+  await comfortaaLoader.load();
+  PetMagicTypography.debugUseFontFamily(_goldenComfortaaFamily);
+
+  for (final entry in fontManifest) {
+    if (entry is! Map<String, Object?>) {
+      continue;
+    }
+    final family = entry['family'];
+    final fonts = entry['fonts'];
+    if (family is! String || fonts is! List<Object?>) {
+      continue;
+    }
+    if (family == PetMagicTypography.fontFamily) {
+      continue;
+    }
+
+    final loader = FontLoader(family);
+    for (final font in fonts) {
+      if (font is! Map<String, Object?>) {
+        continue;
+      }
+      final asset = font['asset'];
+      if (asset is String) {
+        loader.addFont(rootBundle.load(asset));
+      }
+    }
+    await loader.load();
   }
-  final bytes = await font.readAsBytes();
-  final loader = FontLoader('MaterialIcons')
-    ..addFont(Future.value(ByteData.sublistView(bytes)));
-  await loader.load();
+}
+
+void resetInMemoryAsyncPreferences() {
+  SharedPreferencesAsyncPlatform.instance =
+      InMemorySharedPreferencesAsync.empty();
 }
 
 GoRouter testRouter(Widget home) {
@@ -84,7 +108,10 @@ Future<void> pumpTestApp(
   TemplatesRepository? repository,
   ProfileRepository? profileRepository,
   ExternalAuthRepository? externalAuthRepository,
+  SupportChatRepository? supportChatRepository,
+  SupportChatRealtimeClient? supportChatRealtimeClient,
   AppLaunchController Function()? appLaunchController,
+  NetworkStatusController Function()? networkStatusController,
   Size surfaceSize = const Size(1080, 1920),
   double textScaleFactor = 1.0,
 }) async {
@@ -123,7 +150,10 @@ Future<void> pumpTestApp(
           (ref) => RouterTemplateGenerationRepository(),
         ),
         supportChatRepositoryProvider.overrideWith(
-          (ref) => ref.watch(dioSupportRepositoryProvider),
+          (ref) => supportChatRepository ?? FakeSupportChatRepository(),
+        ),
+        supportChatRealtimeClientProvider.overrideWithValue(
+          supportChatRealtimeClient ?? const FakeSupportChatRealtimeClient(),
         ),
         walletRepositoryProvider.overrideWith(
           (ref) => ref.watch(dioWalletRepositoryProvider),
@@ -137,6 +167,8 @@ Future<void> pumpTestApp(
         ),
         if (appLaunchController != null)
           appLaunchControllerProvider.overrideWith(appLaunchController),
+        if (networkStatusController != null)
+          networkStatusControllerProvider.overrideWith(networkStatusController),
         realtimeClientProvider.overrideWith(
           (ref) => const NoopRealtimeClient(),
         ),
@@ -246,6 +278,11 @@ class AuthenticatedWidgetAppLaunchController extends AppLaunchController {
       guestSessionReady: true,
     );
   }
+}
+
+class OnlineWidgetNetworkStatusController extends NetworkStatusController {
+  @override
+  NetworkStatusState build() => const NetworkStatusState(hasInternet: true);
 }
 
 class IdleWidgetWalletController extends WalletController {

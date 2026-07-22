@@ -7,7 +7,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:petmagic_mobile/app/app.dart';
 import 'package:petmagic_mobile/app/composition/mobile_provider_overrides.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
@@ -27,7 +26,6 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   AppConfig.validateReleaseConfiguration();
-  GoogleFonts.config.allowRuntimeFetching = false;
   _installGlobalErrorHandlers();
   configureDecodedImageCacheBudget();
 

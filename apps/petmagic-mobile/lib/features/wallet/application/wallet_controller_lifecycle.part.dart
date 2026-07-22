@@ -111,6 +111,7 @@ mixin _WalletControllerLifecycle on _WalletControllerBase {
     }
   }
 
+  @override
   RequestCancellation _startLedgerLoadMoreRequestCancellation() {
     _cancelActiveLedgerLoadMore();
     final cancelToken = RequestCancellation();
@@ -126,6 +127,7 @@ mixin _WalletControllerLifecycle on _WalletControllerBase {
     _activeLedgerLoadMoreRequestCancellation = null;
   }
 
+  @override
   void _clearActiveLedgerLoadMore(RequestCancellation cancelToken) {
     if (identical(_activeLedgerLoadMoreRequestCancellation, cancelToken)) {
       _activeLedgerLoadMoreRequestCancellation = null;
@@ -177,6 +179,7 @@ mixin _WalletControllerLifecycle on _WalletControllerBase {
     }
   }
 
+  @override
   void _updateStateIfMounted(WalletState Function(WalletState current) update) {
     if (!ref.mounted) {
       return;

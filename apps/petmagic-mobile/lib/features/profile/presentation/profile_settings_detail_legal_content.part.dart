@@ -39,7 +39,7 @@ class _ProfileSettingsLegalDetailContent extends ConsumerWidget {
         child: ListView(
           padding: EdgeInsets.fromLTRB(20, 18, 20, bottomInset),
           children: [
-            _DetailHeader(title: title, subtitle: subtitle),
+            ProfileSettingsDetailHeader(title: title, subtitle: subtitle),
             const SizedBox(height: 22),
             if (state.errorMessage != null) ...[
               ProfileGlassCard(

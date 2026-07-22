@@ -11,7 +11,7 @@ void main() {
 
   test('realtime clients send request and correlation headers', () async {
     final sseSource = await File(
-      'lib/core/realtime/realtime_client.dart',
+      'lib/core/realtime/server_sent_events_realtime_client.part.dart',
     ).readAsString();
     final supportSource = await File(
       'lib/features/support/data/support_chat_realtime_client.dart',

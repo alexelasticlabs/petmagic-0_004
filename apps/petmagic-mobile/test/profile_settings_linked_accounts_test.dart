@@ -70,6 +70,8 @@ void main() {
       linkedAccounts: const <MobileLinkedAccount>[],
     );
 
+    await tester.ensureVisible(find.text('Change password'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Change password'));
     await tester.pumpAndSettle();
 

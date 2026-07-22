@@ -458,28 +458,26 @@ void main() {
     expect(requests[1].queryParameters['take'], 1);
   });
 
-  test(
-    'uses async file APIs for attachment upload validation and multipart',
-    () {
-      final repositorySource = File(
-        'lib/features/support/data/support_chat_repository.dart',
-      ).readAsStringSync();
-      final preparerSource = File(
-        'lib/features/support/data/support_attachment_upload_preparer.dart',
-      ).readAsStringSync();
-      final source = '$repositorySource\n$preparerSource';
+  test('uses async file APIs for attachment upload validation and multipart', () {
+    final repositorySource = [
+      'lib/features/support/data/support_chat_repository.dart',
+      'lib/features/support/data/support_attachment_repository_mixin.part.dart',
+    ].map((path) => File(path).readAsStringSync()).join('\n');
+    final preparerSource = File(
+      'lib/features/support/data/support_attachment_upload_preparer.dart',
+    ).readAsStringSync();
+    final source = '$repositorySource\n$preparerSource';
 
-      expect(source, isNot(contains('lengthSync(')));
-      expect(source, isNot(contains('MultipartFile.fromFileSync')));
-      expect(source, contains('await File(filePath).length()'));
-      expect(source, contains('await MultipartFile.fromFile('));
-      expect(source, contains('authenticatedMultipartRequestOptions'));
-      expect(
-        source,
-        contains("query['beforeMessageId'] = beforeMessageId!.trim();"),
-      );
-    },
-  );
+    expect(source, isNot(contains('lengthSync(')));
+    expect(source, isNot(contains('MultipartFile.fromFileSync')));
+    expect(source, contains('await File(filePath).length()'));
+    expect(source, contains('await MultipartFile.fromFile('));
+    expect(source, contains('authenticatedMultipartRequestOptions'));
+    expect(
+      source,
+      contains("query['beforeMessageId'] = beforeMessageId!.trim();"),
+    );
+  });
 
   test('sanitizes attachment content type before logging upload failures', () {
     final source = File(

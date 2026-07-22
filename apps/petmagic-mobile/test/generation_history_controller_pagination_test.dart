@@ -312,9 +312,10 @@ void main() {
     final lifecycleSource = File(
       'lib/features/templates/application/generation_history_controller_lifecycle.part.dart',
     ).readAsStringSync();
-    final syncSource = File(
+    final syncSource = [
       'lib/features/templates/application/generation_history_controller_sync.part.dart',
-    ).readAsStringSync();
+      'lib/features/templates/application/generation_history_controller_mutations.part.dart',
+    ].map((path) => File(path).readAsStringSync()).join('\n');
 
     expect(
       contractSource,

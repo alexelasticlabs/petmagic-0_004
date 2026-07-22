@@ -147,7 +147,10 @@ class GalleryHarness {
   final NetworkStatusController? networkStatusController;
   final FakeGalleryTemplateGenerationRepository? repository;
 
-  Widget app() {
+  Widget app({
+    Brightness brightness = Brightness.dark,
+    bool disableAnimations = false,
+  }) {
     return ProviderScope(
       overrides: [
         appLaunchControllerProvider.overrideWith(
@@ -181,8 +184,18 @@ class GalleryHarness {
       child: AppNavigationScope(
         navigator: GoRouterAppNavigator(router),
         child: MaterialApp.router(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(disableAnimations: disableAnimations),
+            child: child!,
+          ),
           routerConfig: router,
-          theme: AppTheme.dark(),
+          theme: AppTheme.light(),
+          darkTheme: AppTheme.dark(),
+          themeMode: brightness == Brightness.dark
+              ? ThemeMode.dark
+              : ThemeMode.light,
           locale: const Locale('ru'),
           localizationsDelegates: const [
             AppLocalizations.delegate,

@@ -69,10 +69,7 @@ void main() {
     );
     expect(gatewaySource, isNot(contains('evictFromCache(imageUrl);')));
     expect(gatewaySource, contains('NetworkImage(imageUrl)'));
-    expect(
-      evictBody,
-      contains('_mediaGateway.evictAvatarCache(safeImageUrl)'),
-    );
+    expect(evictBody, contains('_mediaGateway.evictAvatarCache(safeImageUrl)'));
     expect(evictBody, isNot(contains('NetworkImage(imageUrl)')));
     expect(evictBody, contains("'avatar_cache_evict_failed'"));
     expect(evictBody, isNot(contains('avatar_url')));

@@ -10,6 +10,8 @@ import 'package:petmagic_mobile/core/performance/media_cache_tracking.dart';
 import 'package:petmagic_mobile/core/performance/template_media_cache_budget.dart';
 import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 
+part 'template_media_cache_maintenance.part.dart';
+
 typedef _RememberedFilesByUrl = LinkedHashMap<String, _RememberedCacheFile>;
 typedef _InvalidationCountsByUrl = LinkedHashMap<String, int>;
 typedef _FetchGenerationsByUrl = LinkedHashMap<String, int>;
@@ -92,42 +94,11 @@ class TemplateMediaCache {
     return 'v$mediaVersion|$normalized';
   }
 
-  static Future<File?> getCachedPreviewFile(
-    String url, {
-    int? mediaVersion,
-  }) async {
-    final cacheKey = cacheKeyForMedia(url, mediaVersion: mediaVersion);
-    if (_blockedPreviewCacheUrls.contains(cacheKey)) {
-      return null;
-    }
-
-    final rememberedFile = await _getRememberedFile(
-      _previewFilesByUrl,
-      cacheKey,
-      maxEntries: _maxPreviewFileReferences,
-    );
-    if (rememberedFile != null) {
-      return rememberedFile;
-    }
-
-    final cachedFile = await previewVideoCache.getFileFromCache(cacheKey);
-    final file = cachedFile?.file;
-    if (cachedFile == null ||
-        !cachedFile.validTill.isAfter(DateTime.now()) ||
-        file == null ||
-        !await file.exists()) {
-      return null;
-    }
-
-    _rememberFile(
-      _previewFilesByUrl,
-      cacheKey,
-      file,
-      validTill: cachedFile.validTill,
-      maxEntries: _maxPreviewFileReferences,
-    );
-    return file;
-  }
+  static Future<File?> getCachedPreviewFile(String url, {int? mediaVersion}) =>
+      _TemplateMediaCacheMaintenance.getCachedPreviewFile(
+        url,
+        mediaVersion: mediaVersion,
+      );
 
   static Future<File?> getCachedThumbnailFile(
     String url, {
@@ -138,11 +109,12 @@ class TemplateMediaCache {
       return null;
     }
 
-    final rememberedFile = await _getRememberedFile(
-      _thumbnailFilesByUrl,
-      cacheKey,
-      maxEntries: _maxThumbnailFileReferences,
-    );
+    final rememberedFile =
+        await _TemplateMediaCacheMaintenance._getRememberedFile(
+          _thumbnailFilesByUrl,
+          cacheKey,
+          maxEntries: _maxThumbnailFileReferences,
+        );
     if (rememberedFile != null) {
       return rememberedFile;
     }
@@ -156,7 +128,7 @@ class TemplateMediaCache {
       return null;
     }
 
-    _rememberFile(
+    _TemplateMediaCacheMaintenance._rememberFile(
       _thumbnailFilesByUrl,
       cacheKey,
       file,
@@ -219,7 +191,7 @@ class TemplateMediaCache {
     }
 
     if (_blockedThumbnailCacheUrls.contains(cacheKey)) {
-      await _removeCacheManagerFile(
+      await _TemplateMediaCacheMaintenance._removeCacheManagerFile(
         thumbnailCache,
         cacheKey,
         stage: 'thumbnail_blocked_cache_remove',
@@ -227,19 +199,19 @@ class TemplateMediaCache {
     }
 
     final file = await thumbnailCache.getSingleFile(url, key: cacheKey);
-    if (!_isCurrentFetch(
+    if (!_TemplateMediaCacheMaintenance._isCurrentFetch(
       cacheKey,
       generation: generation,
       urlInvalidation: urlInvalidation,
       invalidationsByUrl: _thumbnailInvalidationByUrl,
     )) {
-      if (_canInvalidateCompletedFetch(
+      if (_TemplateMediaCacheMaintenance._canInvalidateCompletedFetch(
         cacheKey,
         generation: generation,
         latestFetchGenerationsByUrl: _latestThumbnailFetchGenerationByUrl,
       )) {
-        _blockThumbnailCacheUrl(cacheKey);
-        await _removeCacheManagerFile(
+        _TemplateMediaCacheMaintenance._blockThumbnailCacheUrl(cacheKey);
+        await _TemplateMediaCacheMaintenance._removeCacheManagerFile(
           thumbnailCache,
           cacheKey,
           stage: 'thumbnail_invalidated_fetch_remove',
@@ -248,7 +220,7 @@ class TemplateMediaCache {
       throw StateError('template_thumbnail_cache_invalidated');
     }
 
-    _rememberFile(
+    _TemplateMediaCacheMaintenance._rememberFile(
       _thumbnailFilesByUrl,
       cacheKey,
       file,
@@ -256,14 +228,14 @@ class TemplateMediaCache {
         thumbnailCache,
         cacheKey,
         fallbackValidTill: DateTime.now().add(AppConfig.mediaCacheStalePeriod),
-        onFailure: _logCacheFailure,
+        onFailure: _TemplateMediaCacheMaintenance._logCacheFailure,
       ),
       maxEntries: _maxThumbnailFileReferences,
     );
     _blockedThumbnailCacheUrls.remove(cacheKey);
     TemplateMediaCacheBudget.scheduleThumbnail(
       file.parent,
-      onFailure: _logCacheFailure,
+      onFailure: _TemplateMediaCacheMaintenance._logCacheFailure,
     );
     return file;
   }
@@ -295,7 +267,7 @@ class TemplateMediaCache {
             .then((file) {
               TemplateMediaCacheBudget.schedulePreview(
                 file.parent,
-                onFailure: _logCacheFailure,
+                onFailure: _TemplateMediaCacheMaintenance._logCacheFailure,
               );
               return file;
             })
@@ -329,7 +301,7 @@ class TemplateMediaCache {
     }
 
     if (_blockedPreviewCacheUrls.contains(cacheKey)) {
-      await _removeCacheManagerFile(
+      await _TemplateMediaCacheMaintenance._removeCacheManagerFile(
         previewVideoCache,
         cacheKey,
         stage: 'preview_blocked_cache_remove',
@@ -337,19 +309,19 @@ class TemplateMediaCache {
     }
 
     final file = await previewVideoCache.getSingleFile(url, key: cacheKey);
-    if (!_isCurrentFetch(
+    if (!_TemplateMediaCacheMaintenance._isCurrentFetch(
       cacheKey,
       generation: generation,
       urlInvalidation: urlInvalidation,
       invalidationsByUrl: _previewInvalidationByUrl,
     )) {
-      if (_canInvalidateCompletedFetch(
+      if (_TemplateMediaCacheMaintenance._canInvalidateCompletedFetch(
         cacheKey,
         generation: generation,
         latestFetchGenerationsByUrl: _latestPreviewFetchGenerationByUrl,
       )) {
-        _blockPreviewCacheUrl(cacheKey);
-        await _removeCacheManagerFile(
+        _TemplateMediaCacheMaintenance._blockPreviewCacheUrl(cacheKey);
+        await _TemplateMediaCacheMaintenance._removeCacheManagerFile(
           previewVideoCache,
           cacheKey,
           stage: 'preview_invalidated_fetch_remove',
@@ -358,7 +330,7 @@ class TemplateMediaCache {
       throw StateError('template_preview_cache_invalidated');
     }
 
-    _rememberFile(
+    _TemplateMediaCacheMaintenance._rememberFile(
       _previewFilesByUrl,
       cacheKey,
       file,
@@ -366,7 +338,7 @@ class TemplateMediaCache {
         previewVideoCache,
         cacheKey,
         fallbackValidTill: DateTime.now().add(AppConfig.mediaCacheStalePeriod),
-        onFailure: _logCacheFailure,
+        onFailure: _TemplateMediaCacheMaintenance._logCacheFailure,
       ),
       maxEntries: _maxPreviewFileReferences,
     );
@@ -374,217 +346,35 @@ class TemplateMediaCache {
     return file;
   }
 
-  static Future<void> removeThumbnailFile(
-    String url, {
-    int? mediaVersion,
-  }) async {
-    final cacheKey = cacheKeyForMedia(url, mediaVersion: mediaVersion);
-    _invalidateThumbnailCacheUrl(cacheKey);
-    _thumbnailFetchesByUrl.remove(cacheKey);
-    await thumbnailCache.removeFile(cacheKey);
-  }
+  static Future<void> removeThumbnailFile(String url, {int? mediaVersion}) =>
+      _TemplateMediaCacheMaintenance.removeThumbnailFile(
+        url,
+        mediaVersion: mediaVersion,
+      );
 
-  static Future<void> removePreviewFile(String url, {int? mediaVersion}) {
-    final cacheKey = cacheKeyForMedia(url, mediaVersion: mediaVersion);
-    _invalidatePreviewCacheUrl(cacheKey);
-    _previewFetchesByUrl.remove(cacheKey);
-    return previewVideoCache.removeFile(cacheKey);
-  }
+  static Future<void> removePreviewFile(String url, {int? mediaVersion}) =>
+      _TemplateMediaCacheMaintenance.removePreviewFile(
+        url,
+        mediaVersion: mediaVersion,
+      );
 
   @visibleForTesting
   static Future<int> trimThumbnailCacheDirectoryForTesting(
     Directory thumbnailCacheDirectory, {
     required int maxBytes,
-  }) {
-    return TemplateMediaCacheBudget.trimDirectory(
-      thumbnailCacheDirectory,
-      maxBytes: maxBytes,
-      statStage: 'thumbnail_budget_stat_file',
-      deleteStage: 'thumbnail_budget_delete_file',
-      onFailure: _logCacheFailure,
-    );
-  }
+  }) => _TemplateMediaCacheMaintenance.trimThumbnailCacheDirectoryForTesting(
+    thumbnailCacheDirectory,
+    maxBytes: maxBytes,
+  );
 
   @visibleForTesting
   static Future<int> trimPreviewCacheDirectoryForTesting(
     Directory previewCacheDirectory, {
     required int maxBytes,
-  }) {
-    return TemplateMediaCacheBudget.trimDirectory(
-      previewCacheDirectory,
-      maxBytes: maxBytes,
-      statStage: 'preview_budget_stat_file',
-      deleteStage: 'preview_budget_delete_file',
-      onFailure: _logCacheFailure,
-    );
-  }
+  }) => _TemplateMediaCacheMaintenance.trimPreviewCacheDirectoryForTesting(
+    previewCacheDirectory,
+    maxBytes: maxBytes,
+  );
 
-  static Future<void> clearAll() async {
-    _cacheGeneration++;
-    _thumbnailFilesByUrl.clear();
-    _previewFilesByUrl.clear();
-    _thumbnailFetchesByUrl.clear();
-    _previewFetchesByUrl.clear();
-    _thumbnailInvalidationByUrl.clear();
-    _previewInvalidationByUrl.clear();
-    _latestThumbnailFetchGenerationByUrl.clear();
-    _latestPreviewFetchGenerationByUrl.clear();
-    _blockedThumbnailCacheUrls.clear();
-    _blockedPreviewCacheUrls.clear();
-
-    try {
-      await thumbnailCache.emptyCache();
-    } catch (error, stackTrace) {
-      _logCacheFailure('clear_thumbnail_cache', error, stackTrace);
-      // Keep best-effort semantics for logout cleanup.
-    }
-
-    try {
-      await previewVideoCache.emptyCache();
-    } catch (error, stackTrace) {
-      _logCacheFailure('clear_preview_cache', error, stackTrace);
-      // Keep best-effort semantics for logout cleanup.
-    }
-  }
-
-  static Future<File?> _getRememberedFile(
-    _RememberedFilesByUrl filesByUrl,
-    String url, {
-    required int maxEntries,
-  }) async {
-    final rememberedFile = filesByUrl.remove(url);
-    if (rememberedFile == null) {
-      return null;
-    }
-
-    if (!rememberedFile.validTill.isAfter(DateTime.now())) {
-      return null;
-    }
-
-    try {
-      if (!await rememberedFile.file.exists()) {
-        return null;
-      }
-    } on FileSystemException {
-      return null;
-    }
-
-    _rememberFile(
-      filesByUrl,
-      url,
-      rememberedFile.file,
-      validTill: rememberedFile.validTill,
-      maxEntries: maxEntries,
-    );
-    return rememberedFile.file;
-  }
-
-  static void _rememberFile(
-    _RememberedFilesByUrl filesByUrl,
-    String url,
-    File file, {
-    required DateTime validTill,
-    required int maxEntries,
-  }) {
-    filesByUrl.remove(url);
-    filesByUrl[url] = _RememberedCacheFile(file, validTill);
-    while (filesByUrl.length > maxEntries) {
-      filesByUrl.remove(filesByUrl.keys.first);
-    }
-  }
-
-  static void _invalidateThumbnailCacheUrl(String url) {
-    final currentInvalidation = _thumbnailInvalidationByUrl.remove(url) ?? 0;
-    _thumbnailInvalidationByUrl[url] = currentInvalidation + 1;
-    _blockThumbnailCacheUrl(url);
-    MediaCacheTracking.trimInvalidations(
-      _thumbnailInvalidationByUrl,
-      _blockedThumbnailCacheUrls,
-      maxEntries: _maxBlockedThumbnailCacheUrls,
-    );
-  }
-
-  static void _invalidatePreviewCacheUrl(String url) {
-    final currentInvalidation = _previewInvalidationByUrl.remove(url) ?? 0;
-    _previewInvalidationByUrl[url] = currentInvalidation + 1;
-    _blockPreviewCacheUrl(url);
-    MediaCacheTracking.trimInvalidations(
-      _previewInvalidationByUrl,
-      _blockedPreviewCacheUrls,
-      maxEntries: _maxBlockedPreviewCacheUrls,
-    );
-  }
-
-  static void _blockThumbnailCacheUrl(String url) {
-    _thumbnailFilesByUrl.remove(url);
-    _blockedThumbnailCacheUrls.remove(url);
-    _blockedThumbnailCacheUrls.add(url);
-    MediaCacheTracking.trimBlockedUrls(
-      _blockedThumbnailCacheUrls,
-      maxEntries: _maxBlockedThumbnailCacheUrls,
-    );
-  }
-
-  static void _blockPreviewCacheUrl(String url) {
-    _previewFilesByUrl.remove(url);
-    _blockedPreviewCacheUrls.remove(url);
-    _blockedPreviewCacheUrls.add(url);
-    MediaCacheTracking.trimBlockedUrls(
-      _blockedPreviewCacheUrls,
-      maxEntries: _maxBlockedPreviewCacheUrls,
-    );
-  }
-
-  static bool _isCurrentFetch(
-    String url, {
-    required int generation,
-    required int urlInvalidation,
-    required _InvalidationCountsByUrl invalidationsByUrl,
-  }) {
-    return generation == _cacheGeneration &&
-        urlInvalidation == (invalidationsByUrl[url] ?? 0);
-  }
-
-  static bool _canInvalidateCompletedFetch(
-    String url, {
-    required int generation,
-    required _FetchGenerationsByUrl latestFetchGenerationsByUrl,
-  }) {
-    final latestGeneration = latestFetchGenerationsByUrl[url];
-    return latestGeneration == null || latestGeneration == generation;
-  }
-
-  static Future<void> _removeCacheManagerFile(
-    CacheManager cacheManager,
-    String url, {
-    required String stage,
-  }) async {
-    try {
-      await cacheManager.removeFile(url);
-    } catch (error, stackTrace) {
-      _logCacheFailure(stage, error, stackTrace);
-    }
-  }
-
-  static void _logCacheFailure(
-    String stage,
-    Object error,
-    StackTrace stackTrace,
-  ) {
-    AppLogger.error(
-      feature: 'Performance.MediaCache',
-      operation: stage,
-      message: 'Template media cache operation failed',
-      error: error,
-      stackTrace: stackTrace,
-      context: {'stage': stage},
-    );
-  }
-}
-
-class _RememberedCacheFile {
-  const _RememberedCacheFile(this.file, this.validTill);
-
-  final File file;
-  final DateTime validTill;
+  static Future<void> clearAll() => _TemplateMediaCacheMaintenance.clearAll();
 }

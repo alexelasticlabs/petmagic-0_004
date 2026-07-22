@@ -57,9 +57,13 @@ void main() {
     final generationSource = await File(
       'lib/features/templates/presentation/widgets/template_flow_sheets_generation.part.dart',
     ).readAsString();
-    final chromeSource = await File(
-      'lib/features/templates/presentation/widgets/template_flow_sheets_chrome.part.dart',
+    final completedPremiumGateSource = await File(
+      'lib/features/templates/presentation/widgets/generation_completed_premium_gate.dart',
     ).readAsString();
+    final chromeSource = [
+      'lib/features/templates/presentation/widgets/template_flow_sheets_chrome.part.dart',
+      'lib/features/templates/presentation/widgets/template_flow_sheets_placeholders.part.dart',
+    ].map((path) => File(path).readAsStringSync()).join('\n');
     final blockedSource = await File(
       'lib/features/templates/presentation/widgets/template_flow_sheets_blocked.part.dart',
     ).readAsString();
@@ -104,8 +108,14 @@ void main() {
       generationSource,
       contains('class _TemplateGenerationProgressContent'),
     );
-    expect(generationSource, contains('templateFlowCompletedPremiumHeadline'));
-    expect(generationSource, contains('templateFlowCompletedPremiumMessage'));
+    expect(
+      completedPremiumGateSource,
+      contains('templateFlowCompletedPremiumHeadline'),
+    );
+    expect(
+      completedPremiumGateSource,
+      contains('templateFlowCompletedPremiumMessage'),
+    );
     expect(cardSource, contains("part 'template_card_badges.part.dart';"));
     expect(
       cardSource,
@@ -248,12 +258,14 @@ void main() {
   });
 
   test('templates domain secondary flows use shared localizations', () async {
-    final gallerySource = await File(
+    final gallerySource = [
       'lib/features/templates/presentation/generations_gallery_page_filters_and_chrome.dart',
-    ).readAsString();
-    final resultInputSource = await File(
+      'lib/features/templates/presentation/generations_gallery_page_premium_chrome.part.dart',
+    ].map((path) => File(path).readAsStringSync()).join('\n');
+    final resultInputSource = [
       'lib/features/templates/presentation/generation_result_input_page.dart',
-    ).readAsString();
+      'lib/features/templates/presentation/generation_result_input_widgets.part.dart',
+    ].map((path) => File(path).readAsStringSync()).join('\n');
     final petLaunchSource = await File(
       'lib/features/templates/presentation/widgets/pet_generation_launch_sheet.dart',
     ).readAsString();
@@ -263,8 +275,11 @@ void main() {
     final petLaunchMediaSource = await File(
       'lib/features/templates/presentation/widgets/pet_generation_launch_sheet_media.part.dart',
     ).readAsString();
+    final petLaunchViewSource = await File(
+      'lib/features/templates/presentation/widgets/pet_generation_launch_sheet_view.part.dart',
+    ).readAsString();
     final fullPetLaunchSource =
-        '$petLaunchSource\n$petLaunchContentSource\n$petLaunchMediaSource';
+        '$petLaunchSource\n$petLaunchContentSource\n$petLaunchMediaSource\n$petLaunchViewSource';
     final templateOfDayMainSource = await File(
       'lib/features/templates/presentation/widgets/template_of_the_day_card.dart',
     ).readAsString();
@@ -276,15 +291,17 @@ void main() {
     ).readAsString();
     final templateOfDaySource =
         '$templateOfDayMainSource\n$templateOfDayChromeSource\n$templateOfDayMediaSource';
-    final statusSource = await File(
+    final statusSource = [
       'lib/features/templates/presentation/generation_status_page.dart',
-    ).readAsString();
+      'lib/features/templates/presentation/generation_status_page_view.part.dart',
+    ].map((path) => File(path).readAsStringSync()).join('\n');
     final activeStatusCardSource = await File(
       'lib/features/templates/presentation/generation_status_page_active_card.part.dart',
     ).readAsString();
-    final galleryCardsSource = await File(
+    final galleryCardsSource = [
       'lib/features/templates/presentation/generations_gallery_page_cards.dart',
-    ).readAsString();
+      'lib/features/templates/presentation/generations_gallery_page_failed_card.part.dart',
+    ].map((path) => File(path).readAsStringSync()).join('\n');
     final randomTemplateSheetSource = await File(
       'lib/features/templates/presentation/widgets/random_template_sheet.dart',
     ).readAsString();

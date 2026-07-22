@@ -15,6 +15,7 @@ import 'package:petmagic_mobile/features/startup/presentation/widgets/startup_ch
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 
 part 'guest_welcome_content.part.dart';
+part 'guest_welcome_feature_sections.part.dart';
 
 class GuestWelcomePage extends ConsumerStatefulWidget {
   const GuestWelcomePage({super.key});

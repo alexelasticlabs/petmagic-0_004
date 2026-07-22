@@ -32,6 +32,7 @@ import 'generation_gallery_remote_file_materializer.dart';
 import 'generation_gallery_storage_codec.dart';
 
 part 'generation_gallery_store_entries.part.dart';
+part 'generation_gallery_store_scopes.part.dart';
 part 'generation_gallery_store_storage.part.dart';
 
 typedef GenerationGalleryRootDirectoryResolver = Future<Directory> Function();

@@ -31,7 +31,7 @@ class _ProfileSettingsStaticDetailContent extends StatelessWidget {
         child: ListView(
           padding: EdgeInsets.fromLTRB(20, 18, 20, bottomInset),
           children: [
-            _DetailHeader(title: title, subtitle: subtitle),
+            ProfileSettingsDetailHeader(title: title, subtitle: subtitle),
             const SizedBox(height: 22),
             ProfileSectionLabel(label: text.profileDetailsCurrentStatusSection),
             ProfileGlassCard(

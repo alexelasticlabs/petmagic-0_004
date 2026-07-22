@@ -25,9 +25,10 @@ void main() {
     final contentSource = await File(
       'lib/features/premium/presentation/subscription_management_content.part.dart',
     ).readAsString();
-    final sectionsSource = await File(
+    final sectionsSource = [
       'lib/features/premium/presentation/subscription_management_sections.part.dart',
-    ).readAsString();
+      'lib/features/premium/presentation/subscription_management_billing_sections.part.dart',
+    ].map((path) => File(path).readAsStringSync()).join('\n');
     final progressSource = await File(
       'lib/features/premium/presentation/subscription_management_progress.part.dart',
     ).readAsString();
@@ -208,9 +209,12 @@ void main() {
     final pageSource = await File(
       'lib/features/premium/presentation/subscription_management_page.dart',
     ).readAsString();
-    final controllerSource = await File(
-      'lib/features/premium/application/premium_controller.dart',
-    ).readAsString();
+    final controllerSource = await Future.wait(
+      [
+        'lib/features/premium/application/premium_controller.dart',
+        'lib/features/premium/application/premium_controller_models.part.dart',
+      ].map((path) => File(path).readAsString()),
+    ).then((sources) => sources.join('\n'));
     final repositorySource = await File(
       'lib/features/premium/data/premium_repository.dart',
     ).readAsString();

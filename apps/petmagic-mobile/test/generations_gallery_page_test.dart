@@ -8,9 +8,64 @@ import 'package:petmagic_mobile/features/templates/application/generation_histor
 import 'package:petmagic_mobile/shared/files/media_share_save.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'generations_gallery_page_test_support.dart';
+import 'widget_test_support.dart';
 
 void main() {
+  configureWidgetTestHarness();
   configureGenerationsGalleryPageTestHarness();
+
+  for (final configuration in const [
+    _GalleryGoldenConfiguration('compact', Size(320, 568)),
+    _GalleryGoldenConfiguration('phone', Size(390, 844)),
+    _GalleryGoldenConfiguration('tablet', Size(834, 1194)),
+  ]) {
+    for (final brightness in Brightness.values) {
+      testWidgets(
+        'creations ${configuration.name} ${brightness.name} visual baseline',
+        (tester) async {
+          const pathProviderChannel = MethodChannel(
+            'plugins.flutter.io/path_provider',
+          );
+          tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            pathProviderChannel,
+            (call) async => Directory.systemTemp.path,
+          );
+          addTearDown(() {
+            tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+              pathProviderChannel,
+              null,
+            );
+          });
+          tester.view.physicalSize = configuration.size;
+          tester.view.devicePixelRatio = 1;
+          addTearDown(() {
+            tester.view.resetPhysicalSize();
+            tester.view.resetDevicePixelRatio();
+          });
+          final harness = GalleryHarness(
+            networkStatusController: TestGalleryNetworkStatusController(
+              initialHasInternet: true,
+            ),
+          );
+          addTearDown(harness.router.dispose);
+
+          await tester.pumpWidget(
+            harness.app(brightness: brightness, disableAnimations: true),
+          );
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 500));
+
+          expect(tester.takeException(), isNull);
+          await expectLater(
+            find.byType(Scaffold).first,
+            matchesGoldenFile(
+              'goldens/creations_${configuration.name}_${brightness.name}.png',
+            ),
+          );
+        },
+      );
+    }
+  }
 
   testWidgets('renders sections and expands ready grid', (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 900));
@@ -249,13 +304,20 @@ void main() {
 
     final loadingHarness = GalleryHarness(
       initialState: const GenerationHistoryState(isLoading: true),
+      networkStatusController: TestGalleryNetworkStatusController(
+        initialHasInternet: true,
+      ),
     );
     addTearDown(loadingHarness.router.dispose);
 
-    await tester.pumpWidget(loadingHarness.app());
+    await tester.pumpWidget(loadingHarness.app(disableAnimations: true));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    await expectLater(
+      find.byType(Scaffold).first,
+      matchesGoldenFile('goldens/shared_loading.png'),
+    );
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
@@ -265,16 +327,24 @@ void main() {
       initialState: const GenerationHistoryState(
         errorMessage: 'Network is unavailable',
       ),
+      networkStatusController: TestGalleryNetworkStatusController(
+        initialHasInternet: true,
+      ),
     );
     addTearDown(errorHarness.router.dispose);
 
-    await tester.pumpWidget(errorHarness.app());
+    await tester.pumpWidget(errorHarness.app(disableAnimations: true));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     var text = galleryText(tester);
     expect(find.text(text.templatesRequestFailedError), findsOneWidget);
     expect(find.text('Network is unavailable'), findsNothing);
     expect(find.text(text.retryAction), findsOneWidget);
+    await tester.pump(const Duration(seconds: 1));
+    await expectLater(
+      find.byType(Scaffold).first,
+      matchesGoldenFile('goldens/shared_error.png'),
+    );
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
@@ -283,10 +353,13 @@ void main() {
       initialState: const GenerationHistoryState(
         errorMessage: 'templates.connection_timeout',
       ),
+      networkStatusController: TestGalleryNetworkStatusController(
+        initialHasInternet: true,
+      ),
     );
     addTearDown(keyedErrorHarness.router.dispose);
 
-    await tester.pumpWidget(keyedErrorHarness.app());
+    await tester.pumpWidget(keyedErrorHarness.app(disableAnimations: true));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     text = galleryText(tester);
@@ -296,18 +369,40 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
 
-    final emptyHarness = GalleryHarness(items: const []);
+    final emptyHarness = GalleryHarness(
+      items: const [],
+      networkStatusController: TestGalleryNetworkStatusController(
+        initialHasInternet: true,
+      ),
+    );
     addTearDown(emptyHarness.router.dispose);
 
-    await tester.pumpWidget(emptyHarness.app());
+    await tester.pumpWidget(emptyHarness.app(disableAnimations: true));
     await tester.pumpAndSettle();
     expect(find.text(text.generationStatusEmptyTitle), findsOneWidget);
     expect(find.text(text.generationStatusEmptyMessage), findsOneWidget);
+    await expectLater(
+      find.byType(Scaffold).first,
+      matchesGoldenFile('goldens/shared_empty.png'),
+    );
   });
 
   testWidgets('gallery renders offline and recovered data banners', (
     tester,
   ) async {
+    const pathProviderChannel = MethodChannel(
+      'plugins.flutter.io/path_provider',
+    );
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      pathProviderChannel,
+      (call) async => Directory.systemTemp.path,
+    );
+    addTearDown(() {
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        pathProviderChannel,
+        null,
+      );
+    });
     await tester.binding.setSurfaceSize(const Size(390, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -327,16 +422,23 @@ void main() {
         showOfflineBanner: true,
         lastSyncedAtUtc: now,
       ),
+      networkStatusController: TestGalleryNetworkStatusController(
+        initialHasInternet: false,
+      ),
     );
     addTearDown(offlineHarness.router.dispose);
 
-    await tester.pumpWidget(offlineHarness.app());
+    await tester.pumpWidget(offlineHarness.app(disableAnimations: true));
     await tester.pumpAndSettle();
     var text = galleryText(tester);
     expect(find.text(text.generationStatusOfflineBannerTitle), findsOneWidget);
     expect(find.text(text.generationStatusOnlineBannerTitle), findsNothing);
     expect(find.text(text.retryAction), findsOneWidget);
     expect(find.text('Offline Ready'), findsOneWidget);
+    await expectLater(
+      find.byType(Scaffold).first,
+      matchesGoldenFile('goldens/shared_offline.png'),
+    );
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
@@ -348,10 +450,13 @@ void main() {
         isConnectionRecovered: true,
         lastSyncedAtUtc: now,
       ),
+      networkStatusController: TestGalleryNetworkStatusController(
+        initialHasInternet: true,
+      ),
     );
     addTearDown(recoveredHarness.router.dispose);
 
-    await tester.pumpWidget(recoveredHarness.app());
+    await tester.pumpWidget(recoveredHarness.app(disableAnimations: true));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     text = galleryText(tester);
@@ -388,13 +493,30 @@ void main() {
   testWidgets('active filter renders progress and ETA without mixed items', (
     tester,
   ) async {
+    const pathProviderChannel = MethodChannel(
+      'plugins.flutter.io/path_provider',
+    );
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      pathProviderChannel,
+      (call) async => Directory.systemTemp.path,
+    );
+    addTearDown(() {
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        pathProviderChannel,
+        null,
+      );
+    });
     await tester.binding.setSurfaceSize(const Size(390, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    final harness = GalleryHarness();
+    final harness = GalleryHarness(
+      networkStatusController: TestGalleryNetworkStatusController(
+        initialHasInternet: true,
+      ),
+    );
     addTearDown(harness.router.dispose);
 
-    await tester.pumpWidget(harness.app());
+    await tester.pumpWidget(harness.app(disableAnimations: true));
     await tester.pumpAndSettle();
     final text = galleryText(tester);
 
@@ -415,6 +537,10 @@ void main() {
     expect(find.text(text.generationStatusActiveInfoHint), findsOneWidget);
     expect(find.text('Cancel generation'), findsNothing);
     expect(find.text(text.generationStatusEtaNotifyHint), findsOneWidget);
+    await expectLater(
+      find.byType(Scaffold).first,
+      matchesGoldenFile('goldens/shared_pending.png'),
+    );
   });
 
   testWidgets('failed filter renders reason and recovery actions', (
@@ -624,9 +750,7 @@ void main() {
   });
 
   test('gallery gold CTA foreground is derived from its button tone', () {
-    final chromeSource = File(
-      'lib/features/templates/presentation/generations_gallery_page_filters_and_chrome.dart',
-    ).readAsStringSync();
+    final chromeSource = _readGalleryChromeSource();
 
     expect(chromeSource, contains('final backgroundColor = colors.gold;'));
     expect(
@@ -641,9 +765,7 @@ void main() {
   });
 
   test('gallery premium upsell uses theme tokens for chrome copy', () {
-    final chromeSource = File(
-      'lib/features/templates/presentation/generations_gallery_page_filters_and_chrome.dart',
-    ).readAsStringSync();
+    final chromeSource = _readGalleryChromeSource();
 
     expect(chromeSource, contains('final accent = colors.gold;'));
     expect(
@@ -1128,4 +1250,18 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+}
+
+class _GalleryGoldenConfiguration {
+  const _GalleryGoldenConfiguration(this.name, this.size);
+
+  final String name;
+  final Size size;
+}
+
+String _readGalleryChromeSource() {
+  return [
+    'lib/features/templates/presentation/generations_gallery_page_filters_and_chrome.dart',
+    'lib/features/templates/presentation/generations_gallery_page_premium_chrome.part.dart',
+  ].map((path) => File(path).readAsStringSync()).join('\n');
 }

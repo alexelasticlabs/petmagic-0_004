@@ -208,9 +208,10 @@ void main() {
       final dialogSource = File(
         'lib/features/support/presentation/widgets/support_chat_dialogs.part.dart',
       ).readAsStringSync();
-      final mediaSource = File(
+      final mediaSource = [
         'lib/features/support/presentation/widgets/support_chat_message_media.part.dart',
-      ).readAsStringSync();
+        'lib/features/support/presentation/widgets/support_chat_video_attachment_preview.part.dart',
+      ].map((path) => File(path).readAsStringSync()).join('\n');
 
       for (final source in [dialogSource, mediaSource]) {
         expect(source, contains('int _initializeRequestVersion = 0;'));

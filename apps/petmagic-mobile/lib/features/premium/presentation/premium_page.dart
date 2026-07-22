@@ -35,6 +35,7 @@ import 'package:url_launcher/url_launcher.dart';
 part 'premium_page_background.part.dart';
 part 'premium_page_plans.part.dart';
 part 'premium_page_sections.part.dart';
+part 'premium_page_benefits.part.dart';
 part 'premium_page_cta.part.dart';
 part 'premium_page_footer.part.dart';
 part 'premium_page_content.part.dart';

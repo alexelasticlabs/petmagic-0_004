@@ -18,6 +18,8 @@ import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
 import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 
+part 'push_notification_route_policy.part.dart';
+
 class PushNotificationsBootstrap extends ConsumerStatefulWidget {
   const PushNotificationsBootstrap({
     required this.navigator,
@@ -354,68 +356,15 @@ class _PushNotificationsBootstrapState
     unawaited(controller.verifyCheckoutStatus());
   }
 
-  bool _isGenerationRoute(String route) {
-    return route.startsWith('${GenerationStatusPage.routePrefix}/');
-  }
+  bool _isSupportedRoute(String route) =>
+      _PushNotificationRoutePolicy._isSupportedRoute(route);
 
-  bool _isSupportedRoute(String route) {
-    return _isGenerationRoute(route) ||
-        _isSupportRoute(route) ||
-        _isWalletRoute(route) ||
-        _isSubscriptionManagementRoute(route) ||
-        _isProfileRoute(route);
-  }
+  bool _isAuthOnlyRoute(String route) =>
+      _PushNotificationRoutePolicy._isAuthOnlyRoute(route);
 
-  bool _isAuthOnlyRoute(String route) {
-    return _isSupportRoute(route) ||
-        _isWalletRoute(route) ||
-        _isSubscriptionManagementRoute(route) ||
-        _isProfileRoute(route);
-  }
+  AppDestination _authRedirectRoute(String route) =>
+      _PushNotificationRoutePolicy._authRedirectRoute(route);
 
-  AppDestination _authRedirectRoute(String route) {
-    final redirectPath = normalizeAuthRedirectPath(route);
-    if (redirectPath == null) {
-      return const AuthDestination();
-    }
-
-    return AuthDestination(redirectPath: redirectPath);
-  }
-
-  AppDestination? _destinationForRoute(String route) {
-    if (_isGenerationRoute(route)) {
-      return GenerationDestination(
-        route.substring('${GenerationStatusPage.routePrefix}/'.length),
-      );
-    }
-    return switch (route) {
-      '/templates' => const TemplatesDestination(),
-      '/creations' => const CreationsDestination(),
-      '/rewards' => const RewardsDestination(),
-      '/profile' => const ProfileDestination(),
-      '/profile/support' => const SupportDestination(),
-      '/profile/support/chat' => const SupportChatDestination(),
-      '/profile/wallet' => const WalletDestination(),
-      '/profile/premium' => const PremiumDestination(),
-      '/profile/subscription/manage' =>
-        const SubscriptionManagementDestination(),
-      _ => null,
-    };
-  }
-
-  bool _isSupportRoute(String route) {
-    return route == SupportChatPage.routePath || route == '/profile/support';
-  }
-
-  bool _isWalletRoute(String route) {
-    return route == WalletPage.routePath;
-  }
-
-  bool _isSubscriptionManagementRoute(String route) {
-    return route == SubscriptionManagementPage.routePath;
-  }
-
-  bool _isProfileRoute(String route) {
-    return route == '/profile';
-  }
+  AppDestination? _destinationForRoute(String route) =>
+      _PushNotificationRoutePolicy._destinationForRoute(route);
 }

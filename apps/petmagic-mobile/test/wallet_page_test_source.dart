@@ -5,7 +5,10 @@ const _walletPageLibraryPaths = [
   'lib/features/wallet/presentation/wallet_page_checkout.part.dart',
   'lib/features/wallet/presentation/wallet_page_helpers.part.dart',
   'lib/features/wallet/presentation/widgets/wallet_page_activity_widgets.dart',
+  'lib/features/wallet/presentation/widgets/wallet_page_history_widgets.dart',
   'lib/features/wallet/presentation/widgets/wallet_page_overview_chrome.part.dart',
+  'lib/features/wallet/presentation/widgets/wallet_page_premium_upsell.part.dart',
+  'lib/features/wallet/presentation/widgets/wallet_page_view.part.dart',
 ];
 
 String readWalletPageLibrarySource() {

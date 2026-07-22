@@ -24,6 +24,8 @@ import 'package:petmagic_mobile/core/auth/auth_session.dart';
 import 'package:petmagic_mobile/shared/payments/store_product_availability_cache.dart';
 import 'package:petmagic_mobile/shared/payments/store_purchase_adapter.dart';
 
+part 'premium_repository_transport.part.dart';
+
 final dioPremiumRepositoryProvider = Provider<PremiumRepositoryPort>((ref) {
   return PremiumRepository(
     dio: ref.watch(dioProvider),
@@ -288,31 +290,10 @@ class PremiumRepository implements PremiumRepositoryPort {
 
   Future<StoreProductAvailabilitySnapshot> _loadStoreAvailabilitySnapshot(
     Set<String> requestedProductIds,
-  ) async {
-    final isAvailable = await _inAppPurchase.isAvailable();
-    if (!isAvailable) {
-      return const StoreProductAvailabilitySnapshot(isAvailable: false);
-    }
-
-    final response = await _inAppPurchase.queryProductDetails(
-      requestedProductIds,
-    );
-    if (response.error != null) {
-      throw const AppException('premium.store_unavailable');
-    }
-
-    return StoreProductAvailabilitySnapshot(
-      isAvailable: true,
-      productIds: response.productDetails.map((product) => product.id).toSet(),
-      productPrices: {
-        for (final product in response.productDetails)
-          product.id: product.price,
-      },
-      productDetailsById: {
-        for (final product in response.productDetails) product.id: product,
-      },
-    );
-  }
+  ) => _PremiumRepositoryTransport.loadStoreAvailabilitySnapshot(
+    _inAppPurchase,
+    requestedProductIds,
+  );
 
   @override
   Future<PremiumStoreVerificationModel> verifyStorePurchase({
@@ -364,17 +345,7 @@ class PremiumRepository implements PremiumRepositoryPort {
     );
   }
 
-  String _platformValue() {
-    if (Platform.isIOS) {
-      return 'ios';
-    }
-
-    if (Platform.isAndroid) {
-      return 'android';
-    }
-
-    return 'web';
-  }
+  String _platformValue() => _PremiumRepositoryTransport.platformValue();
 
   @override
   Future<void> restoreStorePurchases() async {
@@ -398,42 +369,17 @@ class PremiumRepository implements PremiumRepositoryPort {
   Future<Response<T>> _authorizedRequest<T>(
     Future<Response<T>> Function(AuthSession session) request, {
     bool retryTransientFailures = true,
-  }) async {
-    return _authSessionCoordinator.authorizedRequest(
-      request: request,
-      mapError: _mapDioException,
-      requestFailedMessage: 'premium.request_failed',
-      sessionExpiredMessage: 'auth.session_expired',
-      transientRetryAttempts: retryTransientFailures ? 2 : 1,
-    );
-  }
+  }) => _PremiumRepositoryTransport.authorizedRequest(
+    _authSessionCoordinator,
+    request,
+    retryTransientFailures: retryTransientFailures,
+  );
 
   AppException _mapDioException(
     DioException error, {
     required String fallbackMessage,
-  }) {
-    if (NetworkErrorMapper.isConnectivityIssue(error)) {
-      return NetworkErrorMapper.fromMessage(
-        error,
-        'templates.network_unavailable',
-        includeCause: false,
-      );
-    }
-
-    if (NetworkErrorMapper.isServerError(error)) {
-      return NetworkErrorMapper.fromMessage(
-        error,
-        'premium.store_unavailable',
-        includeCause: false,
-      );
-    }
-
-    final payload = NetworkErrorMapper.parseApiPayload(error);
-    final safeMessage = NetworkErrorMapper.safePayloadMessage(payload);
-    if (safeMessage != null) {
-      return NetworkErrorMapper.fromMessage(error, safeMessage);
-    }
-
-    return NetworkErrorMapper.fallback(error, fallbackMessage: fallbackMessage);
-  }
+  }) => _PremiumRepositoryTransport.mapDioException(
+    error,
+    fallbackMessage: fallbackMessage,
+  );
 }

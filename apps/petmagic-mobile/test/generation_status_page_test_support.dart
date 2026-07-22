@@ -33,8 +33,12 @@ String readGenerationStatusLibrarySource() {
   const files = [
     'lib/features/templates/presentation/generation_status_page.dart',
     'lib/features/templates/presentation/generation_status_page_lifecycle.part.dart',
+    'lib/features/templates/presentation/generation_status_page_recovery.part.dart',
+    'lib/features/templates/presentation/generation_status_page_view.part.dart',
     'lib/features/templates/presentation/generation_status_page_media_actions.part.dart',
+    'lib/features/templates/presentation/generation_status_page_actions_sheet.part.dart',
     'lib/features/templates/presentation/generation_status_page_result_actions.part.dart',
+    'lib/features/templates/presentation/generation_status_page_result_action_copy.part.dart',
     'lib/features/templates/presentation/generation_status_page_feedback_actions.part.dart',
   ];
 

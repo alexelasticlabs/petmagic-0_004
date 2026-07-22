@@ -22,6 +22,8 @@ part 'wallet_controller_checkout.part.dart';
 part 'wallet_controller_errors.part.dart';
 part 'wallet_controller_lifecycle.part.dart';
 part 'wallet_controller_loading.part.dart';
+part 'wallet_controller_pagination.part.dart';
+part 'wallet_controller_coordinator_callbacks.part.dart';
 
 final walletControllerProvider =
     NotifierProvider<WalletController, WalletState>(WalletController.new);
@@ -228,6 +230,17 @@ abstract class _WalletControllerBase extends Notifier<WalletState> {
 
   Future<void> _syncWalletSnapshot({bool forceRefresh = false});
 
+  RequestCancellation _startLedgerLoadMoreRequestCancellation();
+
+  void _clearActiveLedgerLoadMore(RequestCancellation cancelToken);
+
+  void _updateStateIfMounted(WalletState Function(WalletState current) update);
+
+  List<WalletLedgerItem> _mergeRefreshedLedgerPage({
+    required List<WalletLedgerItem> existingLedger,
+    required List<WalletLedgerItem> refreshedFirstPage,
+  });
+
   void _ensureCheckoutCoordinators();
 
   void setWalletPageVisible(bool visible);
@@ -264,6 +277,8 @@ class WalletController extends _WalletControllerBase
     with
         _WalletControllerLifecycle,
         _WalletControllerLoading,
+        _WalletControllerPagination,
+        _WalletControllerCoordinatorCallbacks,
         _WalletControllerCheckout {
   @override
   WalletState build() {
@@ -323,76 +338,6 @@ class WalletController extends _WalletControllerBase
         onStateChange: _applyStorePurchaseStateChange,
       ),
     );
-  }
-
-  Future<void> _handleCheckoutVerificationSucceeded(
-    PurchaseHistoryItem purchase,
-  ) async {
-    await load(refresh: true);
-    _updateStateIfMounted(
-      (state) => state.copyWith(
-        checkoutVerificationState: WalletCheckoutVerificationState.succeeded,
-        checkoutGrantedSpark: purchase.sparkToGrant,
-        highlightedPurchaseOrderId: purchase.orderId,
-        clearPendingCheckout: true,
-        clearPendingStoreProvider: true,
-        clearCheckoutError: true,
-      ),
-    );
-  }
-
-  void _applyStorePurchaseStateChange(WalletStorePurchaseStateChange change) {
-    _updateStateIfMounted((state) {
-      return switch (change.phase) {
-        WalletStorePurchasePhase.purchasePending => state.copyWith(
-          isBuying: true,
-          clearError: true,
-        ),
-        WalletStorePurchasePhase.recoveredPending => state.copyWith(
-          pendingCheckoutOrderId: change.pendingPurchase?.orderId,
-          pendingStoreProvider: change.pendingPurchase?.provider,
-          checkoutVerificationState: WalletCheckoutVerificationState.pending,
-          clearCheckoutError: true,
-        ),
-        WalletStorePurchasePhase.pendingWithoutOrder => state.copyWith(
-          pendingCheckoutOrderId: change.pendingPurchase?.orderId,
-          pendingStoreProvider: change.pendingPurchase?.provider,
-          isBuying: false,
-          checkoutVerificationState: WalletCheckoutVerificationState.pending,
-          clearCheckoutError: true,
-        ),
-        WalletStorePurchasePhase.checking => state.copyWith(
-          checkoutVerificationState: WalletCheckoutVerificationState.checking,
-          clearCheckoutError: true,
-        ),
-        WalletStorePurchasePhase.succeeded => state.copyWith(
-          isBuying: false,
-          checkoutVerificationState: WalletCheckoutVerificationState.succeeded,
-          checkoutGrantedSpark: change.grantedSpark,
-          highlightedPurchaseOrderId: change.orderId,
-          clearPendingCheckout: true,
-          clearPendingStoreProvider: true,
-          clearCheckoutError: true,
-        ),
-        WalletStorePurchasePhase.pending => state.copyWith(
-          isBuying: false,
-          checkoutVerificationState: WalletCheckoutVerificationState.pending,
-          checkoutErrorMessage: change.errorMessage,
-          errorMessage: change.errorMessage,
-          clearCheckoutError: change.errorMessage == null,
-        ),
-        WalletStorePurchasePhase.error => state.copyWith(
-          isBuying: false,
-          checkoutVerificationState: WalletCheckoutVerificationState.error,
-          checkoutErrorMessage: change.errorMessage,
-          errorMessage: change.errorMessage,
-        ),
-        WalletStorePurchasePhase.cancelled => state.copyWith(
-          isBuying: false,
-          errorMessage: change.errorMessage,
-        ),
-      };
-    });
   }
 }
 

@@ -36,6 +36,7 @@ part 'rewards_page_referral_share.part.dart';
 part 'rewards_page_friend_code_card.part.dart';
 part 'rewards_page_premium_upsell.part.dart';
 part 'rewards_page_shared_widgets.dart';
+part 'rewards_page_action_widgets.part.dart';
 part 'rewards_page_shell_widgets.dart';
 part 'rewards_page_support.part.dart';
 

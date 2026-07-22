@@ -22,7 +22,8 @@ mixin _SupportChatControllerMessagingMixin
       return false;
     }
 
-    if (conversation != null && _isConversationReadOnlyForUser(conversation)) {
+    if (conversation != null &&
+        isSupportConversationReadOnlyForUser(conversation)) {
       return false;
     }
 
@@ -136,7 +137,8 @@ mixin _SupportChatControllerMessagingMixin
     }
 
     var conversation = state.conversation;
-    if (conversation != null && _isConversationReadOnlyForUser(conversation)) {
+    if (conversation != null &&
+        isSupportConversationReadOnlyForUser(conversation)) {
       return false;
     }
 
@@ -247,7 +249,8 @@ mixin _SupportChatControllerMessagingMixin
       return false;
     }
 
-    if (conversation != null && _isConversationReadOnlyForUser(conversation)) {
+    if (conversation != null &&
+        isSupportConversationReadOnlyForUser(conversation)) {
       return false;
     }
 

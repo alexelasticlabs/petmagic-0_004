@@ -139,9 +139,10 @@ void main() {
   );
 
   test('push and deep links use the typed application navigator', () {
-    final navigator = File(
+    final navigator = [
       'lib/core/navigation/app_navigator.dart',
-    ).readAsStringSync();
+      'lib/core/navigation/app_destinations.part.dart',
+    ].map((path) => File(path).readAsStringSync()).join('\n');
     final bootstrap = File(
       'lib/app/notifications/push_notifications_bootstrap.dart',
     ).readAsStringSync();
@@ -423,74 +424,11 @@ int _ownershipLimitFor(String path) {
 
 // Existing ownership debt is explicit and frozen: no new oversized file can
 // enter the codebase, while each split removes one entry from this list.
-const _legacyOversizedProductionFiles = <String>{
-  'lib/features/pets/presentation/my_pets_form_sheet.part.dart',
-  'lib/features/premium/application/premium_controller_checkout.part.dart',
-  'lib/features/premium/presentation/subscription_management_sections.part.dart',
-  'lib/features/profile/presentation/profile_settings_detail_page.dart',
-  'lib/features/profile/presentation/widgets/profile_notifications_settings_section.dart',
-  'lib/features/rewards/presentation/rewards_page_shared_widgets.dart',
-  'lib/features/support/presentation/support_chat_controller_conversation.part.dart',
-  'lib/features/support/presentation/support_ticket_form_page.dart',
-  'lib/features/support/presentation/widgets/support_chat_attachment_picker.part.dart',
-  'lib/features/support/presentation/widgets/support_chat_messages.part.dart',
-  'lib/features/support/presentation/widgets/support_chat_message_media.part.dart',
-  'lib/features/support/presentation/widgets/support_chat_sections_composer.part.dart',
-  'lib/features/templates/application/generation_history_controller_sync.part.dart',
-  'lib/features/templates/presentation/generations_gallery_page_cards.dart',
-  'lib/features/templates/presentation/generation_result_input_page.dart',
-  'lib/features/templates/presentation/generation_status_page.dart',
-  'lib/features/templates/presentation/generation_status_page_lifecycle.part.dart',
-  'lib/features/templates/presentation/generation_status_page_media_actions.part.dart',
-  'lib/features/templates/presentation/widgets/pet_generation_launch_sheet.dart',
-  'lib/features/templates/presentation/widgets/template_flow_sheets_generation.part.dart',
-  'lib/features/wallet/presentation/all_transactions_page.dart',
-  'lib/features/wallet/presentation/wallet_page.dart',
-  'lib/features/wallet/presentation/widgets/wallet_page_overview_chrome.part.dart',
-};
+const _legacyOversizedProductionFiles = <String>{};
 
 // Existing files between their target layer limit and the absolute 600-line
 // ceiling. This set is exact: every extraction must remove its stale entry.
-const _legacyLayerLimitProductionFiles = <String>{
-  'lib/app/notifications/notification_coordinator.dart',
-  'lib/app/notifications/push_notifications_bootstrap.dart',
-  'lib/app/notifications/push_token_registrar.dart',
-  'lib/app/router/app_router.dart',
-  'lib/core/navigation/app_navigator.dart',
-  'lib/core/performance/template_media_cache.dart',
-  'lib/core/realtime/realtime_client.dart',
-  'lib/features/premium/application/premium_controller.dart',
-  'lib/features/premium/data/premium_repository.dart',
-  'lib/features/premium/presentation/premium_page_sections.part.dart',
-  'lib/features/profile/presentation/password_change_page.dart',
-  'lib/features/profile/data/profile_repository.dart',
-  'lib/features/profile/data/external_auth_repository.dart',
-  'lib/features/profile/presentation/profile_avatar_cropper_page.dart',
-  'lib/features/profile/presentation/profile_page.dart',
-  'lib/features/profile/presentation/widgets/profile_linked_accounts_settings_section.dart',
-  'lib/features/startup/presentation/guest_welcome_content.part.dart',
-  'lib/features/support/presentation/support_home_page.dart',
-  'lib/features/support/data/support_chat_repository.dart',
-  'lib/features/templates/application/generation_history_controller_cache.part.dart',
-  'lib/features/templates/application/generation_history_controller_lifecycle.part.dart',
-  'lib/features/templates/data/generation_gallery_store_entries.part.dart',
-  'lib/features/templates/data/template_generation_dtos.dart',
-  'lib/features/templates/data/templates_remote_data_source.dart',
-  'lib/features/templates/data/templates_repository.dart',
-  'lib/features/templates/domain/template_generation_models.dart',
-  'lib/features/templates/presentation/generation_status_page_result_actions.part.dart',
-  'lib/features/templates/presentation/generations_gallery_page_filters_and_chrome.dart',
-  'lib/features/templates/presentation/template_feed_playback_manager.dart',
-  'lib/features/templates/presentation/templates_page.dart',
-  'lib/features/templates/presentation/templates_page_feed.part.dart',
-  'lib/features/templates/presentation/templates_page_generation_flow.part.dart',
-  'lib/features/templates/presentation/widgets/template_flow_sheets_chrome.part.dart',
-  'lib/features/wallet/application/wallet_controller_loading.part.dart',
-  'lib/features/wallet/data/wallet_repository.dart',
-  'lib/features/wallet/presentation/widgets/wallet_page_activity_widgets.dart',
-  'lib/shared/settings/app_settings_bottom_sheets.dart',
-  'lib/shared/widgets/petmagic_action_sheet.dart',
-};
+const _legacyLayerLimitProductionFiles = <String>{};
 
 const _legacyApplicationPlatformDependencyFiles = <String>{};
 

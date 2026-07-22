@@ -10,9 +10,10 @@ void main() {
     final passwordChangeSource = File(
       'lib/features/profile/presentation/password_change_page.dart',
     ).readAsStringSync();
-    final profilePageSource = File(
+    final profilePageSource = [
       'lib/features/profile/presentation/profile_page.dart',
-    ).readAsStringSync();
+      'lib/features/profile/presentation/profile_page_view.part.dart',
+    ].map((path) => File(path).readAsStringSync()).join('\n');
 
     expect(
       passwordResetSource,

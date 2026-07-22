@@ -4,9 +4,10 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('support recent media picker exits loading state on PhotoManager errors', () {
-    final source = File(
+    final source = [
       'lib/features/support/presentation/widgets/support_chat_attachment_picker.part.dart',
-    ).readAsStringSync();
+      'lib/features/support/presentation/widgets/support_chat_attachment_picker_view.part.dart',
+    ].map((path) => File(path).readAsStringSync()).join('\n');
     final pageSource = File(
       'lib/features/support/presentation/support_chat_page.dart',
     ).readAsStringSync();

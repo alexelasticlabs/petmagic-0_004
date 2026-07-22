@@ -120,7 +120,7 @@ jobs:
         run: flutter pub get
       - name: Generate staging Firebase smoke configuration
         run: dart run tool/configure_firebase_smoke.dart --environment=staging
-      - name: Run deterministic feed stress test on Android
+      - name: Run deterministic mobile core flows on Android
         uses: reactivecircus/android-emulator-runner@e89f39f1abbbd05b1113a29cf4db69e7540cae5a # v2.37.0
         with:
           api-level: 35
@@ -131,6 +131,7 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot-save
           script: |
             cd apps/petmagic-mobile
+            flutter test integration_test/core_user_journey_test.dart -d emulator-5554 --flavor staging --dart-define=APP_ENVIRONMENT=staging --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging --dart-define=API_BASE_URL=https://api.staging.petmagic.app
             flutter test integration_test/templates_feed_stress_test.dart -d emulator-5554 --flavor staging --dart-define=APP_ENVIRONMENT=staging --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging --dart-define=API_BASE_URL=https://api.staging.petmagic.app
             flutter test integration_test/gallery_cross_flow_test.dart -d emulator-5554 --flavor staging --dart-define=APP_ENVIRONMENT=staging --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging --dart-define=API_BASE_URL=https://api.staging.petmagic.app
             flutter test integration_test/watermark_result_flow_test.dart -d emulator-5554 --flavor staging --dart-define=APP_ENVIRONMENT=staging --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging --dart-define=API_BASE_URL=https://api.staging.petmagic.app
@@ -167,7 +168,25 @@ jobs:
           test -n "$DEVICE_ID"
           xcrun simctl boot "$DEVICE_ID" || true
           xcrun simctl bootstatus "$DEVICE_ID" -b
+          flutter test integration_test/core_user_journey_test.dart \
+            -d "$DEVICE_ID" \
+            --flavor staging \
+            --dart-define=APP_ENVIRONMENT=staging \
+            --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging \
+            --dart-define=API_BASE_URL=https://api.staging.petmagic.app
+          flutter test integration_test/templates_feed_stress_test.dart \
+            -d "$DEVICE_ID" \
+            --flavor staging \
+            --dart-define=APP_ENVIRONMENT=staging \
+            --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging \
+            --dart-define=API_BASE_URL=https://api.staging.petmagic.app
           flutter test integration_test/gallery_cross_flow_test.dart \
+            -d "$DEVICE_ID" \
+            --flavor staging \
+            --dart-define=APP_ENVIRONMENT=staging \
+            --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging \
+            --dart-define=API_BASE_URL=https://api.staging.petmagic.app
+          flutter test integration_test/watermark_result_flow_test.dart \
             -d "$DEVICE_ID" \
             --flavor staging \
             --dart-define=APP_ENVIRONMENT=staging \

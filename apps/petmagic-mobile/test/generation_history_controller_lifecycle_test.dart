@@ -7,8 +7,11 @@ void main() {
     final source = [
       'lib/features/templates/application/generation_history_controller.dart',
       'lib/features/templates/application/generation_history_controller_cache.part.dart',
+      'lib/features/templates/application/generation_history_controller_cache_policy.part.dart',
       'lib/features/templates/application/generation_history_controller_lifecycle.part.dart',
+      'lib/features/templates/application/generation_history_controller_realtime.part.dart',
       'lib/features/templates/application/generation_history_controller_sync.part.dart',
+      'lib/features/templates/application/generation_history_controller_mutations.part.dart',
     ].map((path) => File(path).readAsStringSync()).join('\n');
 
     final buildBody = _methodBody(source, 'build');

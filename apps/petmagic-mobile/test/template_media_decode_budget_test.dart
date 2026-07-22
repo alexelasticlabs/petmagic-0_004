@@ -199,9 +199,10 @@ void main() {
     final gallerySource = await File(
       'lib/features/templates/presentation/generations_gallery_page.dart',
     ).readAsString();
-    final cardsSource = await File(
+    final cardsSource = [
       'lib/features/templates/presentation/generations_gallery_page_cards.dart',
-    ).readAsString();
+      'lib/features/templates/presentation/generations_gallery_page_failed_card.part.dart',
+    ].map((path) => File(path).readAsStringSync()).join('\n');
     final actionsSource = await File(
       'lib/features/templates/presentation/generations_gallery_page_media_actions.dart',
     ).readAsString();
@@ -339,35 +340,33 @@ void main() {
     expect(source, isNot(contains('memCacheWidth: 1440')));
   });
 
-  test(
-    'generation result input media decodes with bounded cache sizes',
-    () async {
-      final source = await File(
-        'lib/features/templates/presentation/generation_result_input_page.dart',
-      ).readAsString();
+  test('generation result input media decodes with bounded cache sizes', () async {
+    final source = [
+      'lib/features/templates/presentation/generation_result_input_page.dart',
+      'lib/features/templates/presentation/generation_result_input_widgets.part.dart',
+    ].map((path) => File(path).readAsStringSync()).join('\n');
 
-      expect(source, contains('const int _parentPreviewCacheWidth = 900;'));
-      expect(
-        source,
-        contains('const int _compatibleTemplateThumbnailCacheWidth = 240;'),
-      );
-      expect(source, contains('memCacheWidth: _parentPreviewCacheWidth'));
-      expect(source, contains('maxWidthDiskCache: _parentPreviewCacheWidth'));
-      expect(
-        source,
-        contains('memCacheWidth: _compatibleTemplateThumbnailCacheWidth'),
-      );
-      expect(
-        source,
-        contains(
-          'maxWidthDiskCache:\n                              _compatibleTemplateThumbnailCacheWidth',
-        ),
-      );
-      expect(source, contains('filterQuality: FilterQuality.medium'));
-      expect(source, isNot(contains('memCacheWidth: 900')));
-      expect(source, isNot(contains('memCacheWidth: 240')));
-    },
-  );
+    expect(source, contains('const int _parentPreviewCacheWidth = 900;'));
+    expect(
+      source,
+      contains('const int _compatibleTemplateThumbnailCacheWidth = 240;'),
+    );
+    expect(source, contains('memCacheWidth: _parentPreviewCacheWidth'));
+    expect(source, contains('maxWidthDiskCache: _parentPreviewCacheWidth'));
+    expect(
+      source,
+      contains('memCacheWidth: _compatibleTemplateThumbnailCacheWidth'),
+    );
+    expect(
+      source,
+      contains(
+        'maxWidthDiskCache:\n                              _compatibleTemplateThumbnailCacheWidth',
+      ),
+    );
+    expect(source, contains('filterQuality: FilterQuality.medium'));
+    expect(source, isNot(contains('memCacheWidth: 900')));
+    expect(source, isNot(contains('memCacheWidth: 240')));
+  });
 
   test('template blocked balance sheet keeps a lazy scroll surface', () async {
     final source = readTemplateFlowSheetsLibrarySource();

@@ -117,9 +117,11 @@ void main() {
   test(
     'wallet repository isolates store plugin operations without changing semantics',
     () {
-      final repositorySource = File(
+      final repositorySource = [
         'lib/features/wallet/data/wallet_repository.dart',
-      ).readAsStringSync();
+        'lib/features/wallet/data/wallet_store_repository_mixin.part.dart',
+        'lib/features/wallet/data/wallet_actions_repository_mixin.part.dart',
+      ].map((path) => File(path).readAsStringSync()).join('\n');
       final storeServiceSource = File(
         'lib/features/wallet/data/wallet_store_purchase_service.dart',
       ).readAsStringSync();

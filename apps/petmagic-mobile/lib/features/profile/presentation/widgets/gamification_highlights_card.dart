@@ -76,7 +76,11 @@ class GamificationHighlightsCard extends StatelessWidget {
                       ),
                     ),
                     alignment: Alignment.center,
-                    child: const Text('🏆', style: TextStyle(fontSize: 20)),
+                    child: const Icon(
+                      Icons.emoji_events_rounded,
+                      size: 22,
+                      color: Color(0xFF4A2B00),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -113,37 +117,54 @@ class GamificationHighlightsCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _MiniStat(
-                  emoji: '🔥',
-                  label: text.gamificationStreakTitle,
-                  value: text.gamificationDayStreak(streak?.currentStreak ?? 0),
-                  color: const Color(0xFFFF6D00),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _MiniStat(
-                  key: const ValueKey('profile_gamification_achievements_stat'),
-                  emoji: '🏅',
-                  label: text.gamificationAchievementsTitle,
-                  value: achievementsValue,
-                  color: const Color(0xFFFFD700),
-                  onTap: onOpenHub,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _MiniStat(
-                  emoji: '🎯',
-                  label: text.gamificationWeekFocusTitle,
-                  value: weeklyGoalsValue,
-                  color: const Color(0xFF53C3A6),
-                ),
-              ),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              const gap = 10.0;
+              final columnCount = constraints.maxWidth < 300 ? 2 : 3;
+              final itemWidth =
+                  (constraints.maxWidth - (columnCount - 1) * gap) /
+                  columnCount;
+
+              return Wrap(
+                spacing: gap,
+                runSpacing: gap,
+                children: [
+                  SizedBox(
+                    width: itemWidth,
+                    child: _MiniStat(
+                      icon: Icons.local_fire_department_rounded,
+                      label: text.gamificationStreakTitle,
+                      value: text.gamificationDayStreak(
+                        streak?.currentStreak ?? 0,
+                      ),
+                      color: const Color(0xFFFF6D00),
+                    ),
+                  ),
+                  SizedBox(
+                    width: itemWidth,
+                    child: _MiniStat(
+                      key: const ValueKey(
+                        'profile_gamification_achievements_stat',
+                      ),
+                      icon: Icons.workspace_premium_rounded,
+                      label: text.gamificationAchievementsTitle,
+                      value: achievementsValue,
+                      color: const Color(0xFFFFD700),
+                      onTap: onOpenHub,
+                    ),
+                  ),
+                  SizedBox(
+                    width: itemWidth,
+                    child: _MiniStat(
+                      icon: Icons.track_changes_rounded,
+                      label: text.gamificationWeekFocusTitle,
+                      value: weeklyGoalsValue,
+                      color: const Color(0xFF53C3A6),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
           if (topPet != null) ...[
             const SizedBox(height: 10),
@@ -204,14 +225,14 @@ class GamificationHighlightsCard extends StatelessWidget {
 class _MiniStat extends StatelessWidget {
   const _MiniStat({
     super.key,
-    required this.emoji,
+    required this.icon,
     required this.label,
     required this.value,
     required this.color,
     this.onTap,
   });
 
-  final String emoji;
+  final IconData icon;
   final String label;
   final String value;
   final Color color;
@@ -230,7 +251,7 @@ class _MiniStat extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 18)),
+          Icon(icon, size: 20, color: color),
           const SizedBox(height: 4),
           Text(
             value,
@@ -240,7 +261,15 @@ class _MiniStat extends StatelessWidget {
               color: color,
             ),
           ),
-          Text(label, style: TextStyle(fontSize: 11, color: colors.textSoft)),
+          Text(
+            label,
+            maxLines: 2,
+            style: TextStyle(
+              fontSize: 10.5,
+              height: 1.15,
+              color: colors.textSoft,
+            ),
+          ),
         ],
       ),
     );

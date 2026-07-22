@@ -59,9 +59,7 @@ void main() {
     final composerSource = await File(
       'lib/features/support/presentation/widgets/support_chat_composer.part.dart',
     ).readAsString().then((source) => source.replaceAll('\r\n', '\n'));
-    final messagesSource = await File(
-      'lib/features/support/presentation/widgets/support_chat_messages.part.dart',
-    ).readAsString();
+    final messagesSource = await _supportMessagesSource();
     final replySource = await File(
       'lib/features/support/presentation/widgets/support_chat_messages_reply.part.dart',
     ).readAsString();
@@ -120,9 +118,7 @@ void main() {
   });
 
   test('support image previews avoid uncached Image.network widgets', () async {
-    final messagesSource = await File(
-      'lib/features/support/presentation/widgets/support_chat_messages.part.dart',
-    ).readAsString();
+    final messagesSource = await _supportMessagesSource();
     final replySource = await File(
       'lib/features/support/presentation/widgets/support_chat_messages_reply.part.dart',
     ).readAsString();
@@ -147,9 +143,7 @@ void main() {
 
   test('support remote media previews require trusted attachment origins', () async {
     final mediaSource = await _supportMessageMediaSource();
-    final messagesSource = await File(
-      'lib/features/support/presentation/widgets/support_chat_messages.part.dart',
-    ).readAsString();
+    final messagesSource = await _supportMessagesSource();
     final replySource = await File(
       'lib/features/support/presentation/widgets/support_chat_messages_reply.part.dart',
     ).readAsString();
@@ -316,9 +310,10 @@ void main() {
     final interactionsSource = await File(
       'lib/features/support/presentation/widgets/support_chat_sections_interactions.part.dart',
     ).readAsString();
-    final composerSource = await File(
+    final composerSource = [
       'lib/features/support/presentation/widgets/support_chat_sections_composer.part.dart',
-    ).readAsString();
+      'lib/features/support/presentation/widgets/support_chat_resolution_surfaces.part.dart',
+    ].map((path) => File(path).readAsStringSync()).join('\n');
 
     expect(
       pageSource,
@@ -349,5 +344,18 @@ Future<String> _supportMessageMediaSource() async {
   final gridSource = await File(
     'lib/features/support/presentation/widgets/support_chat_message_media_grid.part.dart',
   ).readAsString();
-  return '$previewSource\n$gridSource';
+  final videoPreviewSource = await File(
+    'lib/features/support/presentation/widgets/support_chat_video_attachment_preview.part.dart',
+  ).readAsString();
+  return '$previewSource\n$gridSource\n$videoPreviewSource';
+}
+
+Future<String> _supportMessagesSource() async {
+  final messageSource = await File(
+    'lib/features/support/presentation/widgets/support_chat_messages.part.dart',
+  ).readAsString();
+  final bubbleSource = await File(
+    'lib/features/support/presentation/widgets/support_chat_message_bubbles.part.dart',
+  ).readAsString();
+  return '$messageSource\n$bubbleSource';
 }

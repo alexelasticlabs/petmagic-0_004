@@ -10,6 +10,8 @@ import 'package:petmagic_mobile/features/support/application/support_contract.da
 import 'package:petmagic_mobile/features/templates/application/template_generation_contract.dart';
 import 'package:petmagic_mobile/features/wallet/application/wallet_contract.dart';
 
+part 'push_token_registrar_policy.part.dart';
+
 final class PushTokenRegistrar {
   PushTokenRegistrar({
     required GenerationRepository templateRepository,
@@ -47,19 +49,23 @@ final class PushTokenRegistrar {
     bool Function()? canContinue,
   }) async {
     final normalizedToken = token.trim();
-    if (normalizedToken.isEmpty || !_canContinue(canContinue)) {
+    if (normalizedToken.isEmpty ||
+        !_PushTokenIdentityPolicy._canContinue(canContinue)) {
       return false;
     }
 
-    final normalizedPlatform = _normalizePlatform(platform);
-    final normalizedLocale = _normalizeLocale(locale);
+    final normalizedPlatform = _PushTokenIdentityPolicy._normalizePlatform(
+      platform,
+    );
+    final normalizedLocale = _PushTokenIdentityPolicy._normalizeLocale(locale);
 
     final accountScope = await _readAccountScope();
-    if (accountScope == null || !_canContinue(canContinue)) {
+    if (accountScope == null ||
+        !_PushTokenIdentityPolicy._canContinue(canContinue)) {
       return false;
     }
 
-    final registrationKey = _registrationKey(
+    final registrationKey = _PushTokenIdentityPolicy._registrationKey(
       token: normalizedToken,
       accountScope: accountScope,
       platform: normalizedPlatform,
@@ -105,12 +111,12 @@ final class PushTokenRegistrar {
   }
 
   static void invalidateToken(String token) {
-    _invalidateTokenInMemory(token);
+    _PushTokenRegistrationMemoryState._invalidateTokenInMemory(token);
   }
 
   Future<void> invalidatePersistedToken(String token) async {
     _registrationStateGeneration++;
-    _invalidateTokenInMemory(token);
+    _PushTokenRegistrationMemoryState._invalidateTokenInMemory(token);
     await _registrationCache.clear();
   }
 
@@ -133,11 +139,12 @@ final class PushTokenRegistrar {
     void Function(String stage, Object error, StackTrace stackTrace)? onFailure,
   }) async {
     final normalizedToken = token.trim();
-    if (normalizedToken.isEmpty || !_canContinue(canContinue)) {
+    if (normalizedToken.isEmpty ||
+        !_PushTokenIdentityPolicy._canContinue(canContinue)) {
       return false;
     }
 
-    final unregisterKey = _unregistrationKey(
+    final unregisterKey = _PushTokenIdentityPolicy._unregistrationKey(
       token: normalizedToken,
       clearRegistrationState: clearRegistrationState,
     );
@@ -168,12 +175,14 @@ final class PushTokenRegistrar {
   }
 
   Future<String?> _readLastCompletedRegistrationToken() async {
-    final inMemory = _nonEmpty(_lastCompletedRegistrationToken);
+    final inMemory = _PushTokenIdentityPolicy._nonEmpty(
+      _lastCompletedRegistrationToken,
+    );
     if (inMemory != null) {
       return inMemory;
     }
 
-    final persisted = _nonEmpty(
+    final persisted = _PushTokenIdentityPolicy._nonEmpty(
       await _registrationCache.readLastCompletedRegistrationToken(),
     );
     if (persisted != null) {
@@ -183,36 +192,9 @@ final class PushTokenRegistrar {
     return persisted;
   }
 
-  static void _invalidateTokenInMemory(String token) {
-    final normalizedToken = token.trim();
-    if (normalizedToken.isEmpty) {
-      return;
-    }
-
-    if (_lastCompletedRegistrationToken == normalizedToken) {
-      final currentKey = _lastCompletedRegistrationKey;
-      _lastCompletedRegistrationKey = null;
-      _lastCompletedRegistrationToken = null;
-      _inFlightRegistrations.removeWhere((key, _) => key == currentKey);
-    }
-    _inFlightUnregistrations.removeWhere(
-      (key, _) =>
-          key ==
-              _unregistrationKey(
-                token: normalizedToken,
-                clearRegistrationState: true,
-              ) ||
-          key ==
-              _unregistrationKey(
-                token: normalizedToken,
-                clearRegistrationState: false,
-              ),
-    );
-  }
-
   Future<String?> _readAccountScope() async {
     final session = await _sessionStorage.read();
-    return _nonEmpty(session?.user.userId);
+    return _PushTokenIdentityPolicy._nonEmpty(session?.user.userId);
   }
 
   Future<String?> _readLastCompletedRegistrationKey() async {
@@ -223,7 +205,7 @@ final class PushTokenRegistrar {
 
     final persisted = await _registrationCache
         .readLastCompletedRegistrationKey();
-    final normalized = _nonEmpty(persisted);
+    final normalized = _PushTokenIdentityPolicy._nonEmpty(persisted);
     if (normalized != null) {
       _lastCompletedRegistrationKey = normalized;
     }
@@ -241,12 +223,13 @@ final class PushTokenRegistrar {
     String? appVersion,
     String? deviceId,
   }) async {
-    if (!_canContinue(canContinue)) {
+    if (!_PushTokenIdentityPolicy._canContinue(canContinue)) {
       return false;
     }
 
-    final resolvedAppVersion = _nonEmpty(appVersion) ?? AppConfig.appVersion;
-    final resolvedDeviceId = _nonEmpty(deviceId);
+    final resolvedAppVersion =
+        _PushTokenIdentityPolicy._nonEmpty(appVersion) ?? AppConfig.appVersion;
+    final resolvedDeviceId = _PushTokenIdentityPolicy._nonEmpty(deviceId);
 
     try {
       await Future.wait<void>([
@@ -275,7 +258,7 @@ final class PushTokenRegistrar {
       Error.throwWithStackTrace(error, stackTrace);
     }
 
-    if (!_canContinue(canContinue) ||
+    if (!_PushTokenIdentityPolicy._canContinue(canContinue) ||
         registrationStateGeneration != _registrationStateGeneration) {
       await _rollbackPartialRegistration(token);
       return false;
@@ -305,7 +288,7 @@ final class PushTokenRegistrar {
       try {
         await _registrationCache.clear();
       } catch (clearError, clearStackTrace) {
-        _logNonBlockingFailure(
+        _PushTokenFailureLogger._logNonBlockingFailure(
           operation: 'clear_registration_cache_after_persist_failure',
           stage: 'cache',
           error: clearError,
@@ -324,7 +307,7 @@ final class PushTokenRegistrar {
     required void Function(String stage, Object error, StackTrace stackTrace)?
     onFailure,
   }) async {
-    if (!_canContinue(canContinue)) {
+    if (!_PushTokenIdentityPolicy._canContinue(canContinue)) {
       return false;
     }
 
@@ -360,7 +343,7 @@ final class PushTokenRegistrar {
     if (clearRegistrationState) {
       await invalidatePersistedToken(token);
     } else {
-      _invalidateTokenInMemory(token);
+      _PushTokenRegistrationMemoryState._invalidateTokenInMemory(token);
     }
 
     return true;
@@ -372,7 +355,7 @@ final class PushTokenRegistrar {
         Object error,
         StackTrace stackTrace,
       ) {
-        _logNonBlockingFailure(
+        _PushTokenFailureLogger._logNonBlockingFailure(
           operation: 'rollback_partial_push_token_registration',
           stage: 'template',
           error: error,
@@ -383,7 +366,7 @@ final class PushTokenRegistrar {
         Object error,
         StackTrace stackTrace,
       ) {
-        _logNonBlockingFailure(
+        _PushTokenFailureLogger._logNonBlockingFailure(
           operation: 'rollback_partial_push_token_registration',
           stage: 'support',
           error: error,
@@ -394,7 +377,7 @@ final class PushTokenRegistrar {
         Object error,
         StackTrace stackTrace,
       ) {
-        _logNonBlockingFailure(
+        _PushTokenFailureLogger._logNonBlockingFailure(
           operation: 'rollback_partial_push_token_registration',
           stage: 'wallet',
           error: error,
@@ -402,104 +385,5 @@ final class PushTokenRegistrar {
         );
       }),
     ]);
-  }
-
-  static void _logNonBlockingFailure({
-    required String operation,
-    required String stage,
-    required Object error,
-    required StackTrace stackTrace,
-  }) {
-    AppLogger.warn(
-      feature: 'notifications',
-      operation: operation,
-      message: 'Non-blocking push token cleanup failed.',
-      context: {'stage': stage},
-      error: error,
-      stackTrace: stackTrace,
-    );
-  }
-
-  static bool _canContinue(bool Function()? canContinue) {
-    return canContinue == null || canContinue();
-  }
-
-  static String _registrationKey({
-    required String token,
-    required String accountScope,
-    required String platform,
-    required String locale,
-    String? appVersion,
-    String? deviceId,
-  }) {
-    final payload = jsonEncode([
-      token,
-      accountScope,
-      platform.trim(),
-      locale.trim(),
-      _nonEmpty(appVersion) ?? AppConfig.appVersion,
-      _nonEmpty(deviceId) ?? '',
-    ]);
-    return '$pushTokenRegistrationFingerprintPrefix${sha256.convert(utf8.encode(payload))}';
-  }
-
-  static String _unregistrationKey({
-    required String token,
-    required bool clearRegistrationState,
-  }) {
-    final payload = jsonEncode([token, clearRegistrationState]);
-    return '$pushTokenRegistrationFingerprintPrefix${sha256.convert(utf8.encode(payload))}';
-  }
-
-  static String _normalizePlatform(String platform) {
-    return platform.trim().toLowerCase();
-  }
-
-  static String _normalizeLocale(String locale) {
-    final normalized = locale.trim().replaceAll('_', '-');
-    if (normalized.isEmpty) {
-      return normalized;
-    }
-
-    final parts = normalized
-        .split('-')
-        .where((part) => part.trim().isNotEmpty)
-        .toList(growable: false);
-    if (parts.isEmpty) {
-      return '';
-    }
-
-    final canonical = <String>[parts.first.toLowerCase()];
-    for (final rawPart in parts.skip(1)) {
-      final part = rawPart.trim();
-      if (part.length == 4) {
-        canonical.add(
-          '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}',
-        );
-        continue;
-      }
-
-      if (_localeRegionSegmentPattern.hasMatch(part)) {
-        canonical.add(part.toUpperCase());
-        continue;
-      }
-
-      canonical.add(part.toLowerCase());
-    }
-
-    return canonical.join('-');
-  }
-
-  static final RegExp _localeRegionSegmentPattern = RegExp(
-    r'^[A-Za-z]{2}$|^[0-9]{3}$',
-  );
-
-  static String? _nonEmpty(String? value) {
-    final normalized = value?.trim();
-    if (normalized == null || normalized.isEmpty) {
-      return null;
-    }
-
-    return normalized;
   }
 }

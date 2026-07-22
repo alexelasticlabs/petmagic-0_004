@@ -1,10 +1,12 @@
 import 'dart:async';
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
@@ -23,12 +25,10 @@ import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
 import 'templates_page_lifecycle_test_support.dart';
+import 'widget_test_support.dart';
 
 void main() {
-  setUpAll(() {
-    GoogleFonts.config.allowRuntimeFetching = false;
-  });
-
+  configureWidgetTestHarness();
   setUp(() {
     VisibilityDetectorController.instance.updateInterval = Duration.zero;
   });
@@ -39,6 +39,91 @@ void main() {
     );
     await PetMagicNotificationCenter.instance.clearQueue();
   });
+
+  for (final configuration in const [
+    _TemplatesGoldenConfiguration('compact', Size(320, 568)),
+    _TemplatesGoldenConfiguration('phone', Size(390, 844)),
+    _TemplatesGoldenConfiguration('tablet', Size(834, 1194)),
+  ]) {
+    for (final brightness in Brightness.values) {
+      testWidgets(
+        'discover ${configuration.name} ${brightness.name} visual baseline',
+        (tester) async {
+          const pathProviderChannel = MethodChannel(
+            'plugins.flutter.io/path_provider',
+          );
+          tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            pathProviderChannel,
+            (call) async => Directory.systemTemp.path,
+          );
+          addTearDown(() {
+            tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+              pathProviderChannel,
+              null,
+            );
+          });
+          tester.view.physicalSize = configuration.size;
+          tester.view.devicePixelRatio = 1;
+          addTearDown(() {
+            tester.view.resetPhysicalSize();
+            tester.view.resetDevicePixelRatio();
+          });
+
+          await tester.pumpWidget(
+            ProviderScope(
+              overrides: [
+                appLaunchControllerProvider.overrideWith(
+                  AuthenticatedAppLaunchController.new,
+                ),
+                networkStatusControllerProvider.overrideWith(
+                  () => TestTemplatesNetworkStatusController(
+                    initialHasInternet: true,
+                  ),
+                ),
+                walletControllerProvider.overrideWith(IdleWalletController.new),
+                templatesControllerProvider.overrideWith(
+                  FakeTemplatesController.new,
+                ),
+                realtimeClientProvider.overrideWith(
+                  (ref) => const NoopRealtimeClient(),
+                ),
+              ],
+              child: MaterialApp(
+                builder: (context, child) => MediaQuery(
+                  data: MediaQuery.of(
+                    context,
+                  ).copyWith(disableAnimations: true),
+                  child: child!,
+                ),
+                theme: AppTheme.light(),
+                darkTheme: AppTheme.dark(),
+                themeMode: brightness == Brightness.dark
+                    ? ThemeMode.dark
+                    : ThemeMode.light,
+                locale: const Locale('en'),
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                home: const RepaintBoundary(
+                  key: Key('discover_golden_surface'),
+                  child: Scaffold(body: TemplatesPage()),
+                ),
+              ),
+            ),
+          );
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 500));
+
+          expect(tester.takeException(), isNull);
+          await expectLater(
+            find.byKey(const Key('discover_golden_surface')),
+            matchesGoldenFile(
+              'goldens/discover_${configuration.name}_${brightness.name}.png',
+            ),
+          );
+        },
+      );
+    }
+  }
 
   testWidgets('templates page does not reload when tab is hidden and shown', (
     tester,
@@ -462,6 +547,21 @@ void main() {
   testWidgets('wallet.isPremium=false keeps premium template locked', (
     tester,
   ) async {
+    const pathProviderChannel = MethodChannel(
+      'plugins.flutter.io/path_provider',
+    );
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      pathProviderChannel,
+      (call) async => Directory.systemTemp.path,
+    );
+    addTearDown(() {
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        pathProviderChannel,
+        null,
+      );
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     final controller = FakeTemplatesController(
       items: [
         templateFixture(
@@ -485,6 +585,10 @@ void main() {
             AuthenticatedAppLaunchController.new,
           ),
           walletControllerProvider.overrideWith(() => walletController),
+          networkStatusControllerProvider.overrideWith(
+            () =>
+                TestTemplatesNetworkStatusController(initialHasInternet: true),
+          ),
           templatesControllerProvider.overrideWith(() => controller),
           realtimeClientProvider.overrideWith(
             (ref) => const NoopRealtimeClient(),
@@ -515,6 +619,11 @@ void main() {
       isFalse,
     );
     expect(find.text(text.templateUnlockPremiumAction), findsOneWidget);
+    await tester.pump(const Duration(seconds: 1));
+    await expectLater(
+      find.byType(Scaffold).first,
+      matchesGoldenFile('goldens/shared_locked.png'),
+    );
   });
 
   testWidgets('wallet.isPremium=true unlocks premium template cards', (
@@ -1161,6 +1270,13 @@ void main() {
       expect(find.text(text.templateOfTheDayFeedBadge), findsOneWidget);
     },
   );
+}
+
+class _TemplatesGoldenConfiguration {
+  const _TemplatesGoldenConfiguration(this.name, this.size);
+
+  final String name;
+  final Size size;
 }
 
 String _searchFieldText(WidgetTester tester) {

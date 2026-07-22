@@ -33,6 +33,7 @@ node_modules/
 .flutter-plugins
 .flutter-plugins-dependencies
 .pub-cache/
+apps/petmagic-mobile/test/failures/
 **/android/app/src/debug/google-services.json
 **/android/app/src/profile/google-services.json
 apps/petmagic-mobile/android/app/google-services.json

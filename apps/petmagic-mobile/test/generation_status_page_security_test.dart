@@ -24,9 +24,10 @@ import 'package:petmagic_mobile/shared/notifications/petmagic_notification_cente
 import 'generation_status_page_test_support.dart';
 
 void main() {
-  final generationStatusPageSource = File(
+  final generationStatusPageSource = [
     'lib/features/templates/presentation/generation_status_page.dart',
-  ).readAsStringSync();
+    'lib/features/templates/presentation/generation_status_page_view.part.dart',
+  ].map((path) => File(path).readAsStringSync()).join('\n');
   final generationStatusLibrarySource = readGenerationStatusLibrarySource();
   final generationStatusSectionsLibrarySource =
       readGenerationStatusSectionsLibrarySource();
@@ -194,7 +195,7 @@ void main() {
     'generation status back button preserves existing navigation stack first',
     () {
       final source = generationStatusLibrarySource;
-      final buildBody = methodBody(source, 'Widget build');
+      final buildBody = methodBody(source, 'Widget _buildPage');
       final backBody = methodBody(source, 'void _handleBackNavigation');
 
       expect(buildBody, contains('onBack: _handleBackNavigation'));
@@ -369,6 +370,10 @@ void main() {
       await tester.tapAt(const Offset(8, 8));
       await tester.pumpAndSettle();
 
+      await tester.scrollUntilVisible(
+        find.text(text.generationStatusContinueInAppAction),
+        240,
+      );
       await tester.tap(find.text(text.generationStatusContinueInAppAction));
       await tester.pumpAndSettle();
       expect(find.text('creations-route'), findsOneWidget);
@@ -421,6 +426,10 @@ void main() {
       tester.element(find.byType(GenerationStatusPage)),
     );
 
+    await tester.scrollUntilVisible(
+      find.text(text.generationStatusCancelQueuedAction),
+      240,
+    );
     expect(find.text(text.generationStatusCancelQueuedAction), findsOneWidget);
     expect(
       find.text(
@@ -499,6 +508,10 @@ void main() {
       tester.element(find.byType(GenerationStatusPage)),
     );
 
+    await tester.scrollUntilVisible(
+      find.text(text.generationStatusCancelQueuedAction),
+      240,
+    );
     await tester.tap(
       find
           .widgetWithText(
@@ -930,7 +943,7 @@ void main() {
 
   test('generation status failed retry and sheet keep pet context helper', () {
     final source = generationStatusLibrarySource;
-    final buildBody = methodBody(source, 'Widget build');
+    final buildBody = methodBody(source, 'Widget _buildPage');
     final sheetBody = methodBody(source, 'Future<void> _openActionsSheet');
     final retryBody = methodBody(source, 'void _retrySoon');
 

@@ -13,6 +13,8 @@ import 'package:petmagic_mobile/features/templates/data/templates_remote_data_so
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 
+part 'templates_catalog_repository_mixin.part.dart';
+
 final defaultTemplatesRepositoryProvider = Provider<TemplatesRepository>((ref) {
   return DefaultTemplatesRepository(
     remoteDataSource: ref.watch(templatesRemoteDataSourceProvider),
@@ -22,8 +24,8 @@ final defaultTemplatesRepositoryProvider = Provider<TemplatesRepository>((ref) {
 
 typedef TemplateMediaCleanup = Future<void> Function(String url);
 
-class DefaultTemplatesRepository implements TemplatesRepository {
-  DefaultTemplatesRepository({
+abstract class _TemplatesRepositoryBase implements TemplatesRepository {
+  _TemplatesRepositoryBase({
     required TemplatesRemoteDataSource remoteDataSource,
     required TemplatesCacheDataSource cacheDataSource,
     TemplateMediaCleanup? mediaCleanup,
@@ -46,6 +48,132 @@ class DefaultTemplatesRepository implements TemplatesRepository {
   static const int _templateDetailCacheLimit = 64;
   static const Duration _templateDetailCacheTtl = Duration(minutes: 10);
 
+  void _rememberTemplateDetail(
+    String templateId,
+    TemplateItem template,
+    DateTime nowUtc,
+  ) {
+    final normalizedId = templateId.trim();
+    final cacheKey = normalizedId.isEmpty ? templateId : normalizedId;
+    _templateDetailsById.remove(cacheKey);
+    _templateDetailsById[cacheKey] = _CachedTemplateDetail(
+      template,
+      nowUtc.add(_templateDetailCacheTtl),
+    );
+
+    while (_templateDetailsById.length > _templateDetailCacheLimit) {
+      _templateDetailsById.remove(_templateDetailsById.keys.first);
+    }
+  }
+
+  void _forgetTemplateDetails(Iterable<String> templateIds) {
+    var changedAnyTemplate = false;
+    for (final templateId in templateIds) {
+      final normalizedId = templateId.trim();
+      final cacheKey = normalizedId.isEmpty ? templateId : normalizedId;
+      changedAnyTemplate = true;
+      _templateDetailsById.remove(cacheKey);
+      _templateDetailFetchesById.remove(cacheKey);
+    }
+
+    if (changedAnyTemplate) {
+      _templateDetailCacheGeneration++;
+    }
+  }
+
+  void _clearTemplateDetails({bool forceGeneration = false}) {
+    final hadCachedDetails =
+        _templateDetailsById.isNotEmpty ||
+        _templateDetailFetchesById.isNotEmpty;
+    _templateDetailsById.clear();
+    _templateDetailFetchesById.clear();
+    if (forceGeneration || hadCachedDetails) {
+      _templateDetailCacheGeneration++;
+    }
+  }
+
+  Future<void> _cleanupDeletedMediaUrls(List<String> urls) async {
+    for (final url in urls.toSet()) {
+      try {
+        await _mediaCleanup(url);
+      } catch (error, stackTrace) {
+        AppLogger.warn(
+          feature: 'Templates.Repository',
+          operation: 'cleanup_deleted_media_url',
+          message: 'Deleted template media cleanup failed',
+          context: {'media_kind': _mediaKindLabel(url)},
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }
+    }
+  }
+
+  static Future<void> _removeTemplateMediaFromCache(String url) async {
+    try {
+      await TemplateMediaCache.removeThumbnailFile(url);
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Templates.Repository',
+        operation: 'remove_thumbnail_from_cache',
+        message: 'Template thumbnail cache cleanup failed',
+        context: {'media_kind': _mediaKindLabel(url)},
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    try {
+      await TemplateMediaCache.removePreviewFile(url);
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Templates.Repository',
+        operation: 'remove_preview_from_cache',
+        message: 'Template preview cache cleanup failed',
+        context: {'media_kind': _mediaKindLabel(url)},
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  static Iterable<String> _templateMediaUrls(TemplateItemDto item) sync* {
+    final thumbnailUrl = persistentSafeGenerationMediaUrl(item.thumbnailUrl);
+    if (thumbnailUrl != null && thumbnailUrl.isNotEmpty) {
+      yield thumbnailUrl;
+    }
+
+    final previewUrl = persistentSafeGenerationMediaUrl(item.previewAsset?.url);
+    if (previewUrl != null && previewUrl.isNotEmpty) {
+      yield previewUrl;
+    }
+  }
+
+  static String _mediaKindLabel(String url) {
+    final normalized = url.trim().toLowerCase();
+    if (normalized.endsWith('.mp4') || normalized.endsWith('.mov')) {
+      return 'video';
+    }
+
+    if (normalized.endsWith('.jpg') ||
+        normalized.endsWith('.jpeg') ||
+        normalized.endsWith('.png') ||
+        normalized.endsWith('.webp') ||
+        normalized.endsWith('.gif')) {
+      return 'image';
+    }
+
+    return 'unknown';
+  }
+}
+
+class DefaultTemplatesRepository extends _TemplatesRepositoryBase
+    with _TemplatesCatalogRepositoryMixin {
+  DefaultTemplatesRepository({
+    required super.remoteDataSource,
+    required super.cacheDataSource,
+    super.mediaCleanup,
+  });
   @override
   Future<TemplatesFeedPage?> readCachedFirstPage(TemplatesQuery query) async {
     final dto = await _cacheDataSource.readFirstPage(query.copyWith(page: 1));
@@ -180,263 +308,6 @@ class DefaultTemplatesRepository implements TemplatesRepository {
   @override
   Future<int> readLocalCatalogVersion() =>
       _cacheDataSource.readCatalogVersion();
-
-  @override
-  Future<List<String>> fetchCategories() async {
-    try {
-      return await _remoteDataSource.fetchCategories();
-    } on RequestCancelledException {
-      rethrow;
-    } on AppException {
-      final localCategories = await _cacheDataSource.readCategories();
-      if (localCategories.isNotEmpty) {
-        return localCategories;
-      }
-      rethrow;
-    }
-  }
-
-  @override
-  Future<int> fetchCatalogVersion() async {
-    final dto = await _remoteDataSource.fetchCatalogVersion();
-    return dto.version;
-  }
-
-  @override
-  Future<TemplatesCatalogChanges> fetchCatalogChanges(int sinceVersion) async {
-    final dto = await _remoteDataSource.fetchCatalogChanges(sinceVersion);
-    return dto.toDomain();
-  }
-
-  @override
-  Future<int> syncCatalog({int? knownRemoteVersion}) async {
-    final localVersion = await _cacheDataSource.readCatalogVersion();
-    final hasLocalCatalogItems =
-        (await _cacheDataSource.readCatalogItems()).isNotEmpty;
-    final remoteVersion = knownRemoteVersion ?? await fetchCatalogVersion();
-
-    // Self-heal scenarios when metadata version exists but the local catalog
-    // payload is missing/corrupted (for example after interrupted writes or
-    // stale cache drift).
-    if (!hasLocalCatalogItems) {
-      return _performFullResync(knownRemoteVersion: remoteVersion);
-    }
-
-    if (remoteVersion <= localVersion) {
-      return localVersion;
-    }
-
-    final changesDto = await _remoteDataSource.fetchCatalogChanges(
-      localVersion,
-    );
-    if (changesDto.needsFullResync) {
-      return _performFullResync(knownRemoteVersion: remoteVersion);
-    }
-
-    final staleMediaUrls = await _cacheDataSource.applyCatalogChanges(
-      changesDto,
-    );
-    _forgetTemplateDetails([
-      ...changesDto.deletedIds,
-      ...changesDto.upserts.map((item) => item.templateId),
-    ]);
-    await _cleanupDeletedMediaUrls(staleMediaUrls);
-    return _cacheDataSource.readCatalogVersion();
-  }
-
-  Future<int> _performFullResync({int? knownRemoteVersion}) async {
-    final targetVersion = knownRemoteVersion ?? await fetchCatalogVersion();
-    final previousItems = await _cacheDataSource.readCatalogItems();
-    final allItems = <TemplateItemDto>[];
-    var page = 1;
-    var pagesFetched = 0;
-
-    while (true) {
-      if (pagesFetched >= _fullResyncMaxPages) {
-        throw _buildCatalogSyncFailure(
-          reason: 'page_limit_exceeded',
-          requestedPage: page,
-          targetVersion: targetVersion,
-        );
-      }
-
-      final response = await _remoteDataSource.fetchCatalogPage(
-        page: page,
-        pageSize: _fullResyncPageSize,
-      );
-      pagesFetched++;
-      if (response.page != page) {
-        throw _buildCatalogSyncFailure(
-          reason: 'page_mismatch',
-          requestedPage: page,
-          receivedPage: response.page,
-          targetVersion: targetVersion,
-        );
-      }
-
-      allItems.addAll(response.items);
-      if (!response.hasMore || response.items.isEmpty) {
-        break;
-      }
-
-      page++;
-    }
-
-    final incomingMediaUrls = allItems.expand(_templateMediaUrls).toSet();
-    final staleMediaUrls = previousItems
-        .expand(_templateMediaUrls)
-        .where((url) => !incomingMediaUrls.contains(url))
-        .toSet()
-        .toList(growable: false);
-
-    await _cacheDataSource.replaceCatalog(allItems, version: targetVersion);
-    _clearTemplateDetails(forceGeneration: true);
-    await _cleanupDeletedMediaUrls(staleMediaUrls);
-    return targetVersion;
-  }
-
-  AppException _buildCatalogSyncFailure({
-    required String reason,
-    required int requestedPage,
-    required int targetVersion,
-    int? receivedPage,
-  }) {
-    final error = AppException(_catalogSyncFailedCode);
-    AppLogger.warn(
-      feature: 'Templates.Repository',
-      operation: 'full_catalog_resync',
-      message:
-          'Template catalog full resync aborted due to invalid paging contract.',
-      error: error,
-      context: {
-        'reason': reason,
-        'requestedPage': requestedPage,
-        'receivedPage': receivedPage,
-        'targetVersion': targetVersion,
-        'pageSize': _fullResyncPageSize,
-        'maxPages': _fullResyncMaxPages,
-      },
-    );
-    return error;
-  }
-
-  void _rememberTemplateDetail(
-    String templateId,
-    TemplateItem template,
-    DateTime nowUtc,
-  ) {
-    final normalizedId = templateId.trim();
-    final cacheKey = normalizedId.isEmpty ? templateId : normalizedId;
-    _templateDetailsById.remove(cacheKey);
-    _templateDetailsById[cacheKey] = _CachedTemplateDetail(
-      template,
-      nowUtc.add(_templateDetailCacheTtl),
-    );
-
-    while (_templateDetailsById.length > _templateDetailCacheLimit) {
-      _templateDetailsById.remove(_templateDetailsById.keys.first);
-    }
-  }
-
-  void _forgetTemplateDetails(Iterable<String> templateIds) {
-    var changedAnyTemplate = false;
-    for (final templateId in templateIds) {
-      final normalizedId = templateId.trim();
-      final cacheKey = normalizedId.isEmpty ? templateId : normalizedId;
-      changedAnyTemplate = true;
-      _templateDetailsById.remove(cacheKey);
-      _templateDetailFetchesById.remove(cacheKey);
-    }
-
-    if (changedAnyTemplate) {
-      _templateDetailCacheGeneration++;
-    }
-  }
-
-  void _clearTemplateDetails({bool forceGeneration = false}) {
-    final hadCachedDetails =
-        _templateDetailsById.isNotEmpty ||
-        _templateDetailFetchesById.isNotEmpty;
-    _templateDetailsById.clear();
-    _templateDetailFetchesById.clear();
-    if (forceGeneration || hadCachedDetails) {
-      _templateDetailCacheGeneration++;
-    }
-  }
-
-  Future<void> _cleanupDeletedMediaUrls(List<String> urls) async {
-    for (final url in urls.toSet()) {
-      try {
-        await _mediaCleanup(url);
-      } catch (error, stackTrace) {
-        AppLogger.warn(
-          feature: 'Templates.Repository',
-          operation: 'cleanup_deleted_media_url',
-          message: 'Deleted template media cleanup failed',
-          context: {'media_kind': _mediaKindLabel(url)},
-          error: error,
-          stackTrace: stackTrace,
-        );
-      }
-    }
-  }
-
-  static Future<void> _removeTemplateMediaFromCache(String url) async {
-    try {
-      await TemplateMediaCache.removeThumbnailFile(url);
-    } catch (error, stackTrace) {
-      AppLogger.warn(
-        feature: 'Templates.Repository',
-        operation: 'remove_thumbnail_from_cache',
-        message: 'Template thumbnail cache cleanup failed',
-        context: {'media_kind': _mediaKindLabel(url)},
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }
-
-    try {
-      await TemplateMediaCache.removePreviewFile(url);
-    } catch (error, stackTrace) {
-      AppLogger.warn(
-        feature: 'Templates.Repository',
-        operation: 'remove_preview_from_cache',
-        message: 'Template preview cache cleanup failed',
-        context: {'media_kind': _mediaKindLabel(url)},
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }
-  }
-
-  static Iterable<String> _templateMediaUrls(TemplateItemDto item) sync* {
-    final thumbnailUrl = persistentSafeGenerationMediaUrl(item.thumbnailUrl);
-    if (thumbnailUrl != null && thumbnailUrl.isNotEmpty) {
-      yield thumbnailUrl;
-    }
-
-    final previewUrl = persistentSafeGenerationMediaUrl(item.previewAsset?.url);
-    if (previewUrl != null && previewUrl.isNotEmpty) {
-      yield previewUrl;
-    }
-  }
-
-  static String _mediaKindLabel(String url) {
-    final normalized = url.trim().toLowerCase();
-    if (normalized.endsWith('.mp4') || normalized.endsWith('.mov')) {
-      return 'video';
-    }
-
-    if (normalized.endsWith('.jpg') ||
-        normalized.endsWith('.jpeg') ||
-        normalized.endsWith('.png') ||
-        normalized.endsWith('.webp') ||
-        normalized.endsWith('.gif')) {
-      return 'image';
-    }
-
-    return 'unknown';
-  }
 }
 
 class _CachedTemplateDetail {
