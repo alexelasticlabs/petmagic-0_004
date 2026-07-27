@@ -23,6 +23,7 @@ const supportRealtimeCooldownMs = 30_000;
 const supportRealtimeIdMaxLength = 128;
 const supportRealtimeTimestampMaxLength = 64;
 const supportRealtimeSenderTypeMaxLength = 32;
+const supportRealtimeDisabled = process.env.NEXT_PUBLIC_E2E_DISABLE_SUPPORT_REALTIME === "1";
 
 let supportRealtimeBlockedUntil = 0;
 let supportRealtimeAccessToken: string | undefined;
@@ -53,7 +54,7 @@ export function useSupportRealtime(
   );
 
   useEffect(() => {
-    if (!accessToken) {
+    if (!accessToken || supportRealtimeDisabled) {
       return;
     }
 

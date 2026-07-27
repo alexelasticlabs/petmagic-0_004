@@ -8,6 +8,8 @@ describe("support realtime connection policy", () => {
   it("shares one SignalR connection across admin-shell and support workspace subscribers", () => {
     const source = readFileSync(supportRealtimePath, "utf8");
 
+    expect(source).toContain('process.env.NEXT_PUBLIC_E2E_DISABLE_SUPPORT_REALTIME === "1"');
+    expect(source).toContain("if (!accessToken || supportRealtimeDisabled) {");
     expect(source).toContain("let supportRealtimeConnection: HubConnection | null = null;");
     expect(source).toContain(
       'export type SupportRealtimeStatus = "idle" | "connecting" | "connected" | "unavailable";'

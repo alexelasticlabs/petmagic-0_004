@@ -30,6 +30,7 @@ await withE2eBuildIsolation(
       PLAYWRIGHT_PORT: String(port),
       PLAYWRIGHT_EXTERNAL_SERVER: "1",
       NEXT_PUBLIC_API_BASE_URL: "https://api.petmagic.test",
+      NEXT_PUBLIC_E2E_DISABLE_SUPPORT_REALTIME: "1",
       ADMIN_MEDIA_ORIGINS: "https://cdn.petmagic.app",
     };
 

@@ -44,6 +44,7 @@ export default defineConfig({
           NEXT_E2E_DIST_DIR: e2eBuildDirectory,
           NEXT_DIST_DIR: e2eBuildDirectory,
           NEXT_PUBLIC_API_BASE_URL: "https://api.petmagic.test",
+          NEXT_PUBLIC_E2E_DISABLE_SUPPORT_REALTIME: "1",
           ADMIN_MEDIA_ORIGINS: "https://cdn.petmagic.app",
         },
       },

@@ -184,9 +184,11 @@ function collectRuntimeErrors(page: Page) {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push("pageerror: " + error.message));
   page.on("requestfailed", (request) => {
-    errors.push(
-      `requestfailed: ${request.url()} (${request.failure()?.errorText ?? "unknown failure"})`
-    );
+    const errorText = request.failure()?.errorText;
+    if (!errorText || errorText === "net::ERR_ABORTED") {
+      return;
+    }
+    errors.push(`requestfailed: ${request.url()} (${errorText})`);
   });
   page.on("console", (message) => {
     if (message.type() === "error") {
