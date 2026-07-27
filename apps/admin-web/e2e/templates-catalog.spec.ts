@@ -500,9 +500,17 @@ test("unified templates catalog supports publishing filters and responsive cards
   await installStrictCatalogMocks(page, apiState);
 
   page.on("pageerror", (error) => runtimeErrors.push(`pageerror: ${error.message}`));
+  page.on("requestfailed", (request) => {
+    const errorText = request.failure()?.errorText;
+    if (!errorText || errorText === "net::ERR_ABORTED") {
+      return;
+    }
+    runtimeErrors.push(`requestfailed: ${request.url()} (${errorText})`);
+  });
   page.on("console", (message) => {
     if (message.type() === "error") {
-      runtimeErrors.push(`console: ${message.text()}`);
+      const sourceUrl = message.location().url;
+      runtimeErrors.push(`console: ${message.text()}${sourceUrl ? ` (${sourceUrl})` : ""}`);
     }
   });
 
