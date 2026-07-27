@@ -77,6 +77,8 @@ if (api) {
     expectedExpose: '5000',
     requiredCopy: 'scripts/docker/run-dotnet-app.sh'
   });
+  requireBuildFilterPath(api, 'global.json');
+  requireBuildFilterPath(api, 'shared/**');
   requireDomain(api, apiDomain);
   requirePersistentDisk(api, `${prefix}-api-data`, '/var/petmagic');
   requireEnvValue(api, 'PORT', '5000');
@@ -148,6 +150,8 @@ if (worker) {
     expectedAppDll: 'PetMagic.Host.GenerationWorker.dll',
     requiredCopy: 'scripts/docker/run-dotnet-app.sh'
   });
+  requireBuildFilterPath(worker, 'global.json');
+  requireBuildFilterPath(worker, 'shared/**');
   if (Array.isArray(worker.domains) && worker.domains.length > 0) {
     fail(`${prefix}-generation-worker must not define public domains.`);
   }
@@ -235,6 +239,10 @@ function requireDatabase(name, plan) {
   if (database.plan !== plan) {
     fail(`${name} must use plan ${plan}, found ${database.plan ?? '<missing>'}.`);
   }
+
+  if (!Array.isArray(database.ipAllowList) || database.ipAllowList.length !== 0) {
+    fail(`${name} must define an empty ipAllowList to block public database access.`);
+  }
 }
 
 function requireEnvGroup(name) {
@@ -291,6 +299,12 @@ function requireService(name, expected) {
 function requireDomain(service, domain) {
   if (!Array.isArray(service.domains) || !service.domains.includes(domain)) {
     fail(`${service.name} must define domain ${domain}.`);
+  }
+}
+
+function requireBuildFilterPath(service, expectedPath) {
+  if (!Array.isArray(service.buildFilter?.paths) || !service.buildFilter.paths.includes(expectedPath)) {
+    fail(`${service.name} buildFilter must include ${expectedPath}.`);
   }
 }
 

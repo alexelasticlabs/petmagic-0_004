@@ -1,13 +1,14 @@
 # PetMagic Admin Style Guide
 
-Этот файл фиксирует текущий стиль админ-панели и порядок добавления новых разделов. Цель - сохранять единый темный операционный интерфейс без возврата к старым глобальным стилям.
+Этот файл фиксирует текущий стиль админ-панели и порядок добавления новых разделов. Цель - сохранять единый операционный интерфейс в dark/light themes без возврата к старым глобальным стилям.
 
 ## Visual Language
 
-- Основной фон: почти черный `#090d16` с мягким зеленым акцентом `#22c55e`.
-- Surface-карточки: темные панели с border `#1a2738`, легким gradient и без декоративных внешних карточек внутри карточек.
-- Typography: `Inter` для интерфейса, `Manrope` для заголовков и крупных чисел; обе гарнитуры должны уверенно работать с русским и английским языком.
-- Радиусы: компактные, обычно `0.85rem` для controls и `1.05rem` для cards.
+- Основное действие и focus: blue tokens `--primary-bg` / `--accent` (`#1a73e8` / `#8ab4f8` в dark theme, `#2563eb` в light theme).
+- Success и подтвержденное состояние: green token `--success` (`#81c995` в dark theme, `#16a34a` в light theme). Green не заменяет primary action.
+- Surface-слои берутся из `--surface-0` ... `--surface-4`; не добавляйте локальные hex-цвета и декоративные внешние карточки внутри карточек.
+- Typography: `Inter` через `--font-body`, `Manrope` через `--font-heading`, идентификаторы и числовые ключи через `--font-mono`. Runtime stacks содержат системные fallback fonts для offline/container среды.
+- Радиусы: компактные runtime tokens `--radius-xs: 4px`, `--radius-sm: 8px`, `--radius: 10px`, `--radius-lg: 14px`.
 - Сетки: стабильные `grid-template-columns: minmax(0, 1fr)` и явные responsive breakpoints.
 - Текст в компактных панелях должен быть коротким, сканируемым и не hero-size.
 
@@ -23,13 +24,22 @@
 
 - `AdminShell` - общий locale-aware layout, auth redirect, sidebar/topbar wrapper.
 - `AdminSidebar` - навигация и logout.
-- `AdminTopbar` - title, description, locale switch, user badge.
+- `AdminTopbar` - title, description, global command search, notifications, theme, locale switch, user badge.
+- `AdminCommandPalette` - RBAC-aware быстрый переход по доступным разделам через `Ctrl/Cmd+K`.
 - `AdminCard` - базовая панель с title/description/action.
 - `AdminStatCard` - метрика с accent color and icon.
 - `AdminStatusBadge` - status pill через CSS custom property `--status-color`.
+- `AdminQueueLayout` - flat queue/workspace/inspector composition без nested cards.
+- `AdminInspector` и `AdminDetailsDrawer` - единый desktop/mobile details flow с focus trap, `Escape` и focus restore.
+- `AdminEntityLink` - единое отображение связанных сущностей и технического secondary label.
+- `AdminActionMenu` - keyboard-accessible меню контекстных действий.
+- `AdminSelectionTray` - bulk-selection summary и actions без скрытия eligibility ограничений.
+- `AdminPagination` - компактная pagination с `aria-current` и localized labels.
+- `AdminUrlState` - canonical URL contract для filters, sort, page, selected entity и active tab.
 - `adminTableStyles` - shared table wrapper, table, mono and numeric classes.
 - `TemplatesCatalogView` - overview-экран шаблонов с фильтрами, Cards/List toggle и right rail.
-- `TemplatesCategoriesView` - read-only сводка категорий на основе существующих шаблонов.
+- `TemplatesCategoriesView` - Admin CRUD и Moderator read-only сводка категорий.
+- `UsersBulkEmailDialog` - двухэтапная постановка email-рассылки в backend queue с явной проверкой аудитории.
 - `TemplatesManager` - editor flow для создания и редактирования image/video templates.
 - `Button` - базовый reusable button через `.ui-button`; feature modules могут добавлять scoped modifier class.
 - `Toast` - глобальный floating feedback.
@@ -48,6 +58,19 @@
 10. Добавьте loading, empty, error и success feedback states.
 11. Проверьте `npm run lint` и `npm run build`.
 
+## Navigation Information Architecture
+
+Sidebar использует шесть стабильных рабочих областей без изменения route keys, RBAC или deep links:
+
+1. `Command Center` - dashboard и оперативная сводка.
+2. `Customers & Access` - пользователи и роли.
+3. `Operations Desk` - генерации, feedback, support, moderation и audit.
+4. `Content Studio` - templates и вложенные catalog routes.
+5. `Revenue & Risk` - economy, платежные и risk workflows.
+6. `Growth & Rewards` - promo codes и gamification.
+
+Названия областей локализуются централизованно в `src/lib/admin-navigation-areas.ts`; route entries продолжают приходить из `getAdminNavItems`, поэтому RBAC-фильтрация и существующие URL остаются источником истины.
+
 ## Templates Route Family
 
 - Главный grouped-раздел в sidebar: `Шаблоны`.
@@ -59,7 +82,7 @@
   - `src/app/[locale]/templates/video/editor/page.tsx`
   - `src/app/[locale]/templates/image/editor/page.tsx`
 - Старые routes `src/app/[locale]/video-templates/page.tsx` и `src/app/[locale]/image-templates/page.tsx` остаются только compatibility redirects.
-- `Categories` сейчас read-only: данные агрегируются из `AdminTemplateListItem.category`. Для CRUD категорий нужен отдельный backend endpoint и отдельная архитектурная волна.
+- `Categories` используют отдельный admin backend contract: Admin может создавать, переименовывать, архивировать, восстанавливать и удалять пустые категории; Moderator работает в read-only режиме.
 - В overview-страницах обязательно сохраняйте переключатель `Cards/List`, фильтры, loading/empty/error states и editor action через `.../editor?templateId=<id>`.
 
 Route page skeleton:
@@ -86,6 +109,13 @@ export default async function FeaturePage({ params }: Props) {
 - Для repeated metrics используйте `AdminStatCard`.
 - Формы держите в feature CSS Module: `.formGrid`, `.split`, `.actions`, scoped button modifiers.
 - Error/empty/loading states должны занимать предсказуемую высоту и не ломать grid.
+
+## Sensitive Actions
+
+- Массовые и необратимые действия не выполняются одним кликом: сначала сбор параметров, затем отдельный review/confirmation step.
+- UI должен показывать реальную аудиторию, ограничения полей и backend queue/audit semantics без обещания мгновенной отправки.
+- Выбор получателей учитывает backend eligibility; недоступные строки остаются видимыми, но selection control отключается с пояснением.
+- Не изображайте статический период, badge или label как dropdown, если backend не поддерживает смену значения.
 
 ## CSS Rules
 

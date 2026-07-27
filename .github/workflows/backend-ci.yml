@@ -14,7 +14,7 @@ on:
       - scripts/k6/**
       - scripts/db/**
       - scripts/load/**
-      - docs/LOAD_TESTING.md
+      - docs/load-testing.md
       - deploy/monitoring/**
       - PetMagic.slnx
       - Directory.Build.props
@@ -28,7 +28,7 @@ on:
       - scripts/k6/**
       - scripts/db/**
       - scripts/load/**
-      - docs/LOAD_TESTING.md
+      - docs/load-testing.md
       - deploy/monitoring/**
       - PetMagic.slnx
       - Directory.Build.props

@@ -244,11 +244,23 @@ Compatibility rules:
 - FAL submit metadata persists validated `status_url`, `response_url` and `cancel_url`. Provider URLs must match the configured queue origin and exact `{model}/requests/{requestId}/{status|response|cancel}` path, must not contain credentials/query/fragment, and redirects are not followed. Legacy rows may derive a cancel URL only from an already validated matching FAL status URL.
 - Generation dashboard metrics include `cancellingJobs`; generation list filtering accepts `cancelling` and returns `Cancelling` rows with `canCancel=false` while the provider request is pending.
 - Admin generation rows may include `canRetry=true` only for failed/cancelled jobs whose original charge has not been refunded, plus admin test jobs. `POST /api/admin/templates/generations/{generationId}/retry` is `AdminOnly`, requeues the same generation with a fresh attempt budget, does not create a new billing command, does not charge or refund credits, and must return ProblemDetails with `templates.generation_retry_not_allowed` for active, completed, refunded, or otherwise unsafe jobs.
-- `POST /api/admin/templates/generations/{generationId}/retry-refund` is refund-only. It re-arms the idempotent refund retry path for failed/cancelled charged generations without creating or retrying generation work.
+- Admin generation metrics include `pendingRefunds` and `exhaustedRefunds`. List rows expose `chargedAtUtc`, `refundState`, refund attempt counters/timestamps/error code and `canRetryRefund`; the optional `refundState` filter accepts `not_applicable`, `pending`, `exhausted`, or `refunded`.
+- `POST /api/admin/templates/generations/{generationId}/retry-refund` is refund-only. It re-arms the idempotent refund retry path for failed/cancelled charged generations without creating or retrying generation work. New admin clients send optional `{ "reason": "..." }` plus `Idempotency-Key`; receipts are scoped by actor and key, same-payload replay is safe, and reuse for a different generation/reason returns HTTP 409 `templates.generation_refund_retry_idempotency_conflict`. Legacy empty-body/no-key requests remain accepted for compatibility.
 - Historical generations that were completed before durable Gamification delivery may return `gamificationLegacyReviewRequired=true`. `POST /api/admin/templates/generations/{generationId}/resolve-legacy-gamification` is `AdminOnly`, requires an auditable reason, and accepts only `mark_delivered` (suppress replay) or `replay` (queue the idempotent delivery). It never performs an implicit replay.
 - Admin endpoints must keep `ModeratorOrAdmin` or stricter authorization policies according to route intent.
 - `POST /api/admin/gamification/users/{userId}/streak/reset` is `AdminOnly`, requires `{ "reason": "..." }` (1–500 characters), and records the actor, previous streak state, target user and reason in the admin audit log. The legacy `DELETE /api/admin/gamification/users/{userId}/streak` route remains only for compatibility and requires the same reason in `X-Admin-Audit-Reason`; requests without a reason are rejected.
-- `GET /api/admin/templates/categories/diagnostics` is `AdminOnly` and reports active templates whose string category no longer maps to a non-archived canonical category.
+- `GET /api/admin/templates/categories/diagnostics` is `AdminOnly` and reports active templates whose string category no longer maps to a non-archived canonical category. Every issue includes `issueKind`: `empty_category`, `archived_category`, or `missing_category`; rows are ordered by normalized category, title, then template id.
+
+## Admin System Status
+
+Endpoint: `GET /api/admin/system/status`
+
+Compatibility rules:
+
+- The endpoint is `AdminOnly`, uses the `admin` rate limit, and returns `Cache-Control: no-store`, `Pragma: no-cache`, and `X-Content-Type-Options: nosniff`.
+- The response keeps `overallStatus`, `generatedAtUtc`, `staleAfterSeconds`, and ordered `checks`; status values are `healthy`, `degraded`, or `unhealthy`.
+- Public check keys are `api`, `subscriptionCatalog`, `storeAccountBinding`, and `generationScheduler`. The endpoint must remain bounded and must not expose health-check descriptions, exception text, raw provider responses, connection details, secrets, or remote media probes.
+- A completed degraded/unhealthy check returns HTTP 200 so the admin workspace can render partial system state; authentication, authorization, and rate-limit failures retain their normal HTTP statuses.
 
 ## Template Generation History
 
@@ -361,6 +373,27 @@ Compatibility rules:
 - Dashboard metrics must use database-side aggregation and must not materialize all users or all user-role rows just to compute counters.
 - Admin user endpoints must require `ModeratorOrAdmin`; wallet, role, premium, active-status, delete, and bulk-email mutations must require `AdminOnly`.
 
+## Admin Audit Explorer
+
+Endpoint family:
+
+- `GET /api/admin/audit-events`
+- `GET /api/admin/audit-events/{eventId}`
+
+Consumers:
+
+- Next.js Admin-only audit workspace.
+
+Compatibility rules:
+
+- Both endpoints require `AdminOnly`, use the `admin` rate-limit policy, and return `Cache-Control: no-store`, `Pragma: no-cache`, and `X-Content-Type-Options: nosniff`.
+- The list accepts optional `search`, `category`, `actorUserId`, `subjectUserId`, `fromUtc`, and `toUtc` filters plus offset pagination with `skip` and `take`. `take` is backend-bounded to `1..100` and defaults to `25`.
+- Accepted categories are `identity`, `economy`, `content`, `support`, `gamification`, and `system`. Invalid categories, search longer than 120 characters, reversed dates, and ranges longer than 90 days return HTTP 400 ProblemDetails.
+- One-sided date filters remain bounded: `fromUtc` implies an upper bound no later than 90 days after it, and `toUtc` implies a lower bound no earlier than 90 days before it.
+- List order is deterministic by `occurredAtUtc` descending and audit event id descending. The response keeps `items`, `skip`, `take`, `totalCount`, `hasMore`, and a filtered `summary` with `totalEvents`, `uniqueActors`, `accessEvents`, and `systemEvents`.
+- List items may expose sanitized actor/subject labels, action, category, target identifiers, correlation id, and occurrence time. They must not expose `oldValue`, `newValue`, `details`, `ipAddress`, or `userAgent`; those fields are available only from the selected event detail endpoint.
+- Event detail returns HTTP 404 ProblemDetails with `audit.event_not_found` for a missing id. Persisted text is sanitized again before it leaves the backend.
+
 ## Admin User Pets
 
 Endpoint family: `/api/admin/users/{userId}/pets`
@@ -434,9 +467,11 @@ Query parameters:
 - `priority`: optional `Low`, `Normal`, or `High`.
 - `search`: optional trimmed text, backend-bounded by the admin client.
 - `sort`: optional `default`, `priority`, `waiting`, `updated`, or `created`.
-- `queue`: optional `all` or `waiting_for_support`. `waiting_for_support`
+- `queue`: optional `all`, `waiting_for_support`, or `unread`. `waiting_for_support`
   returns open tickets that need operator action (`New` or `InProgress`), not
-  tickets whose status is `WaitingForUser`.
+  tickets whose status is `WaitingForUser`. `unread` returns conversations with
+  at least one unread non-admin message (`ReadAtUtc` is null) and is the canonical
+  target for the Dashboard unread-support signal.
 - `page`: optional one-based page number.
 - `pageSize`: optional page size. Missing or non-positive values normalize to `50`; positive values are backend-bounded to `1..100`.
 

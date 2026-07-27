@@ -15,8 +15,8 @@
   },
   "dependencies": {
     "next": "16.2.11",
-    "react": "19.2.7",
-    "react-dom": "19.2.7"
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.46.0",
@@ -29,7 +29,7 @@
     "cross-env": "10.1.0",
     "eslint": "9.39.4",
     "eslint-config-next": "16.2.11",
-    "react-server-dom-webpack": "19.2.7",
+    "react-server-dom-webpack": "19.2.8",
     "tailwindcss": "4.2.1",
     "typescript": "5.9.3",
     "vinext": "0.0.50",
@@ -39,13 +39,13 @@
   "overrides": {
     "@babel/core": "7.29.7",
     "js-yaml": "4.3.0",
-    "postcss": "8.5.16",
+    "postcss": "8.5.18",
     "fast-uri": "3.1.4",
     "minimatch@3.1.5": {
       "brace-expansion": "1.1.16"
     },
     "minimatch@10.2.5": {
-      "brace-expansion": "5.0.7"
+      "brace-expansion": "5.0.8"
     },
     "sharp": "0.35.3"
   },

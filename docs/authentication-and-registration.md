@@ -133,9 +133,9 @@ Both clients rely on the backend token pair response from login, refresh, and ex
 
 ## Related files
 
-1. [Auth endpoints](../../src/Modules/Identity/PetMagic.Modules.Identity.Api/Endpoints/AuthEndpoints.cs)
-2. [Auth validation rules](../../src/Modules/Identity/PetMagic.Modules.Identity.Application/Validation/AuthValidators.cs)
-3. [Identity service auth flows](../../src/Modules/Identity/PetMagic.Modules.Identity.Infrastructure/IdentityService.AuthFlows.cs)
-4. [Mobile profile repository](../../apps/petmagic-mobile/lib/features/profile/data/profile_repository.dart)
-5. [Mobile auth session storage](../../apps/petmagic-mobile/lib/features/profile/data/auth_session_storage.dart)
-6. [Admin web auth client](../../apps/admin-web/src/lib/api-client.core.ts)
+1. [Auth endpoints](../src/Modules/Identity/PetMagic.Modules.Identity.Api/Endpoints/AuthEndpoints.cs)
+2. [Auth validation rules](../src/Modules/Identity/PetMagic.Modules.Identity.Application/Validation/AuthValidators.cs)
+3. [Identity service auth flows](../src/Modules/Identity/PetMagic.Modules.Identity.Infrastructure/IdentityService.AuthFlows.cs)
+4. [Mobile profile repository](../apps/petmagic-mobile/lib/features/profile/data/profile_repository.dart)
+5. [Mobile auth session storage](../apps/petmagic-mobile/lib/features/profile/data/auth_session_storage.dart)
+6. [Admin web auth client](../apps/admin-web/src/lib/api-client.core.ts)

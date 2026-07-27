@@ -55,6 +55,7 @@ const expectedScriptFiles = [
   'scripts/qa/template-feed-metrics-summary.py',
   'scripts/qa/template-feed-video-log-summary.py',
   'scripts/qa/test-markdown-local-links.mjs',
+  'scripts/qa/test-render-blueprint-contracts.mjs',
   'scripts/qa/test-script-safety-inventory.mjs',
   'scripts/qa/test-template-feed-admin-qa-report-draft.mjs',
   'scripts/qa/test-template-feed-load-probe.mjs',
@@ -331,12 +332,48 @@ assert(
 );
 
 const adminDockerfile = read('apps/admin-web/Dockerfile');
+assert.equal(
+  (adminDockerfile.match(/npm ci .*--prefer-offline.*--fetch-retries=5.*--fetch-retry-mintimeout=20000.*--fetch-retry-maxtimeout=120000/g) ?? [])
+    .length,
+  1,
+  'admin web Dockerfile must install the integrity-locked dependency graph exactly once',
+);
+assert.equal(
+  (adminDockerfile.match(/--mount=type=cache,id=npm-admin-web,sharing=locked,target=\/root\/.npm/g) ?? [])
+    .length,
+  1,
+  'admin web Dockerfile must retain a resilient npm package cache for its single install stage',
+);
+assert(
+  adminDockerfile.includes('FROM deps AS production-deps')
+    && adminDockerfile.includes('RUN npm prune --omit=dev --engine-strict'),
+  'admin web Dockerfile must derive production dependencies from the verified install and prune dev dependencies locally',
+);
 const adminRuntimeStage = adminDockerfile.slice(adminDockerfile.lastIndexOf('FROM '));
 assert(
   adminRuntimeStage.includes('USER node')
     && adminRuntimeStage.indexOf('USER node') < adminRuntimeStage.indexOf('CMD ['),
   'admin web runtime image must execute as the non-root node user',
 );
+
+for (const [dockerfilePath, dockerfile] of [
+  ['Dockerfile.api', read('Dockerfile.api')],
+  ['Dockerfile.generation-worker', read('Dockerfile.generation-worker')],
+]) {
+  assert(
+    dockerfile.includes('COPY ["global.json", "./"]'),
+    `${dockerfilePath} must copy global.json before dotnet restore so container builds honor the repository SDK policy`,
+  );
+  assert(
+    dockerfile.includes(
+      'apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o APT::Update::Error-Mode=any update',
+    )
+      && dockerfile.includes(
+        'apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y',
+      ),
+    `${dockerfilePath} must retry package downloads and reject partial apt indexes`,
+  );
+}
 
 assert.deepEqual(
   collectWorkflowSecretReferences(),
@@ -478,6 +515,12 @@ assert(
   renderDockerBuildSmoke.includes('It does not pass secrets as Docker build args.'),
   'Render Docker build smoke must document that secrets are not passed as build args',
 );
+assert(
+  renderDockerBuildSmoke.includes("getOptionValue('--environment')")
+    && renderDockerBuildSmoke.includes("'https://api.petmagic.app'")
+    && renderDockerBuildSmoke.includes("'https://api.staging.petmagic.app'"),
+  'Render Docker build smoke must select admin build-time API URLs by deployment environment',
+);
 
 const renderPostdeploySmoke = read('scripts/qa/run-render-postdeploy-smoke.mjs');
 assert(
@@ -510,6 +553,12 @@ assert(
 assert(
   renderPredeployGate.includes('--with-docker-build'),
   'Render predeploy gate must keep Docker build smoke opt-in documented',
+);
+assert(
+  renderPredeployGate.includes("'--environment',")
+    && renderPredeployGate.includes('environment,')
+    && renderPredeployGate.includes("'--platform',"),
+  'Render predeploy gate must pass the selected environment to the Docker build smoke',
 );
 
 const economyStagingGate = read('scripts/qa/run-economy-staging-infra-gate.mjs');

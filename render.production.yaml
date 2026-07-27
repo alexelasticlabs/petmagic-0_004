@@ -6,6 +6,7 @@ databases:
   - name: petmagic-production-db
     region: frankfurt
     plan: basic-1gb
+    ipAllowList: []
     databaseName: petmagic_db
     user: petmagic_user
     postgresMajorVersion: "16"
@@ -65,8 +66,10 @@ services:
       sizeGB: 10
     buildFilter:
       paths:
+        - global.json
         - Directory.Build.props
         - Directory.Packages.props
+        - shared/**
         - Dockerfile.api
         - render.production.yaml
         - scripts/docker/**
@@ -217,8 +220,10 @@ services:
     numInstances: 4
     buildFilter:
       paths:
+        - global.json
         - Directory.Build.props
         - Directory.Packages.props
+        - shared/**
         - Dockerfile.generation-worker
         - render.production.yaml
         - scripts/docker/**

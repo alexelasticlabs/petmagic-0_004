@@ -19,7 +19,9 @@ deploy.
 | PostgreSQL | Render managed Postgres | `petmagic-staging-db` in `render.yaml` | No after setup |
 | Media storage | Cloudflare R2 | Runtime env vars | Public/custom R2 URL |
 
-The Render staging topology is declared in `render.yaml`.
+The Render staging topology is declared in `render.yaml`. Production uses the
+separate `render.production.yaml` Blueprint and production-only secret storage;
+never promote staging by copying local `.env` files.
 
 ## What you need to buy or create
 

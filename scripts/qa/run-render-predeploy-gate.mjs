@@ -57,6 +57,11 @@ const steps = [
     required: true
   },
   {
+    name: 'render_blueprint_contract_tests',
+    command: ['node', ['scripts/qa/test-render-blueprint-contracts.mjs']],
+    required: true
+  },
+  {
     name: 'environment_release_configuration',
     command: environment === 'production'
       ? ['node', ['scripts/qa/check-production-release-config.mjs', '--blueprint', blueprint]]
@@ -97,7 +102,16 @@ const steps = [
   },
   {
     name: 'render_docker_build_smoke',
-    command: ['node', ['scripts/qa/run-render-docker-build-smoke.mjs', '--platform', dockerPlatform]],
+    command: [
+      'node',
+      [
+        'scripts/qa/run-render-docker-build-smoke.mjs',
+        '--environment',
+        environment,
+        '--platform',
+        dockerPlatform
+      ]
+    ],
     required: withDockerBuild,
     skippedReason: 'Skipped by default. Pass --with-docker-build before first deploy or after Dockerfile changes.'
   }

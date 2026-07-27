@@ -6,7 +6,7 @@ on:
       - apps/admin-web/**
       - src/**
       - docker-compose.yml
-      - docs/API_CONTRACTS.md
+      - docs/api-contracts.md
       - .github/workflows/admin-web-ci.yml
   push:
     branches:
@@ -15,7 +15,7 @@ on:
       - apps/admin-web/**
       - src/**
       - docker-compose.yml
-      - docs/API_CONTRACTS.md
+      - docs/api-contracts.md
       - .github/workflows/admin-web-ci.yml
 
 permissions:

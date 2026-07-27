@@ -23,14 +23,14 @@
 
 ## Что использовать
 
-1. Шаблон переменных окружения: [.env.example](../../.env.example)
+1. Шаблон переменных окружения: [.env.example](../.env.example)
 2. Локальный файл переменных: `.env` рядом с `.env.example` в корне репозитория
-3. Основная Docker-конфигурация: [docker-compose.yml](../../docker-compose.yml)
-4. Mobile README: [apps/petmagic-mobile/README.md](../../apps/petmagic-mobile/README.md)
+3. Основная Docker-конфигурация: [docker-compose.yml](../docker-compose.yml)
+4. Mobile README: [apps/petmagic-mobile/README.md](../apps/petmagic-mobile/README.md)
 
 ## Шаг 1. Создай локальный `.env`
 
-В корне проекта рядом с [.env.example](../../.env.example) создай файл `.env`.
+В корне проекта рядом с [.env.example](../.env.example) создай файл `.env`.
 
 Для Windows PowerShell из корня проекта:
 
@@ -183,7 +183,7 @@ https://api.petmagic.app/signin-google
 com.petmagic.app
 ```
 
-Его можно увидеть в [apps/petmagic-mobile/android/app/build.gradle.kts](../../apps/petmagic-mobile/android/app/build.gradle.kts).
+Его можно увидеть в [apps/petmagic-mobile/android/app/build.gradle.kts](../apps/petmagic-mobile/android/app/build.gradle.kts).
 
 В Google Cloud Console для Android-клиента нужно указать:
 
@@ -207,7 +207,7 @@ keytool -list -v -alias androiddebugkey -keystore "$env:USERPROFILE\.android\deb
 com.petmagic.app
 ```
 
-Его можно увидеть в [apps/petmagic-mobile/ios/Runner.xcodeproj/project.pbxproj](../../apps/petmagic-mobile/ios/Runner.xcodeproj/project.pbxproj).
+Его можно увидеть в [apps/petmagic-mobile/ios/Runner.xcodeproj/project.pbxproj](../apps/petmagic-mobile/ios/Runner.xcodeproj/project.pbxproj).
 
 ### 3.7 Что в итоге идет в `.env`
 
@@ -224,8 +224,8 @@ GOOGLE_CLIENT_SECRET=web_client_secret
 
 Ничего переносить не нужно, fallback callback уже есть в проекте:
 
-- Android deep link: [apps/petmagic-mobile/android/app/src/main/AndroidManifest.xml](../../apps/petmagic-mobile/android/app/src/main/AndroidManifest.xml)
-- iOS URL scheme: [apps/petmagic-mobile/ios/Runner/Info.plist](../../apps/petmagic-mobile/ios/Runner/Info.plist)
+- Android deep link: [apps/petmagic-mobile/android/app/src/main/AndroidManifest.xml](../apps/petmagic-mobile/android/app/src/main/AndroidManifest.xml)
+- iOS URL scheme: [apps/petmagic-mobile/ios/Runner/Info.plist](../apps/petmagic-mobile/ios/Runner/Info.plist)
 
 Используется callback URI:
 

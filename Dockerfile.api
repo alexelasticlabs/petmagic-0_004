@@ -1,12 +1,14 @@
 # syntax=docker/dockerfile:1.7
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS builder
 ARG TARGETARCH
+ARG NUGET_CACHE_BUST=default
 WORKDIR /src
+COPY ["global.json", "./"]
 COPY ["Directory.Build.props", "./"]
 COPY ["Directory.Packages.props", "./"]
 COPY ["shared/", "shared/"]
 COPY ["src/", "src/"]
-RUN --mount=type=cache,id=nuget-api,sharing=locked,target=/root/.nuget/packages \
+RUN --mount=type=cache,id=nuget-api-${NUGET_CACHE_BUST},sharing=locked,target=/root/.nuget/packages \
     case "$TARGETARCH" in \
       amd64) RID=linux-x64 ;; \
       arm64) RID=linux-arm64 ;; \
@@ -16,7 +18,7 @@ RUN --mount=type=cache,id=nuget-api,sharing=locked,target=/root/.nuget/packages 
       -r "$RID" \
       -p:PublishReadyToRun=true \
       --verbosity normal
-RUN --mount=type=cache,id=nuget-api,sharing=locked,target=/root/.nuget/packages \
+RUN --mount=type=cache,id=nuget-api-${NUGET_CACHE_BUST},sharing=locked,target=/root/.nuget/packages \
     case "$TARGETARCH" in \
       amd64) RID=linux-x64 ;; \
       arm64) RID=linux-arm64 ;; \
@@ -32,8 +34,8 @@ RUN --mount=type=cache,id=nuget-api,sharing=locked,target=/root/.nuget/packages 
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 ARG DEBIAN_FRONTEND=noninteractive
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends libgssapi-krb5-2 curl ffmpeg \
+RUN apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o APT::Update::Error-Mode=any update \
+    && apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y --no-install-recommends libgssapi-krb5-2 curl ffmpeg \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -m -r appuser
 WORKDIR /app

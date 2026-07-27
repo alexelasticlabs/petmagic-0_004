@@ -19,9 +19,18 @@ const dryRun = args.has('--dry-run');
 const noCache = args.has('--no-cache');
 const pull = args.has('--pull');
 const platform = getOptionValue('--platform');
-const runId = getOptionValue('--run-id') ?? `render-docker-build-smoke-${formatTimestamp(new Date())}`;
+const environment = (getOptionValue('--environment') ?? 'staging').toLowerCase();
+if (!['staging', 'production'].includes(environment)) {
+  fail('--environment must be staging or production.');
+}
+const apiBaseUrl = environment === 'production'
+  ? 'https://api.petmagic.app'
+  : 'https://api.staging.petmagic.app';
+const runId = getOptionValue('--run-id')
+  ?? `render-docker-build-smoke-${environment}-${formatTimestamp(new Date())}-${process.pid}`;
 const artifactDir = getOptionValue('--artifact-dir') ?? join('artifacts', 'render-docker-build-smoke', runId);
 const requestedServices = parseServiceSelection(getOptionValue('--service') ?? 'api,worker,admin');
+const cleanBuildArgs = noCache ? [['NUGET_CACHE_BUST', runId]] : [];
 
 const services = [
   {
@@ -29,14 +38,14 @@ const services = [
     tag: 'petmagic-render-smoke-api:local',
     dockerfile: 'Dockerfile.api',
     context: '.',
-    buildArgs: []
+    buildArgs: cleanBuildArgs
   },
   {
     name: 'worker',
     tag: 'petmagic-render-smoke-generation-worker:local',
     dockerfile: 'Dockerfile.generation-worker',
     context: '.',
-    buildArgs: []
+    buildArgs: cleanBuildArgs
   },
   {
     name: 'admin',
@@ -44,8 +53,8 @@ const services = [
     dockerfile: 'apps/admin-web/Dockerfile',
     context: 'apps/admin-web',
     buildArgs: [
-      ['NEXT_PUBLIC_API_BASE_URL', 'https://api.staging.petmagic.app'],
-      ['INTERNAL_API_BASE_URL', 'https://api.staging.petmagic.app'],
+      ['NEXT_PUBLIC_API_BASE_URL', apiBaseUrl],
+      ['INTERNAL_API_BASE_URL', apiBaseUrl],
       ['ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION', 'false'],
       ['NEXT_PUBLIC_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION', 'false']
     ]
@@ -65,6 +74,8 @@ const evidence = {
   noCache,
   pull,
   platform: platform ?? null,
+  environment,
+  apiBaseUrl,
   services: []
 };
 
@@ -141,8 +152,7 @@ function runDockerBuild(service) {
       ...process.env,
       DOCKER_BUILDKIT: process.env.DOCKER_BUILDKIT || '1'
     },
-    encoding: 'utf8',
-    maxBuffer: 20 * 1024 * 1024
+    stdio: 'inherit'
   });
 
   serviceEvidence.completedAtUtc = new Date().toISOString();
@@ -193,6 +203,8 @@ function renderSummary() {
     `Completed: ${evidence.completedAtUtc ?? 'n/a'}`,
     `Dry run: ${dryRun}`,
     `Platform: ${platform ?? 'docker default'}`,
+    `Environment: ${environment}`,
+    `Admin API base URL: ${apiBaseUrl}`,
     '',
     '| Service | Result | Tag |',
     '| --- | --- | --- |',
@@ -257,9 +269,11 @@ Render Docker build smoke.
 Usage:
   node scripts/qa/run-render-docker-build-smoke.mjs
   node scripts/qa/run-render-docker-build-smoke.mjs --service api,worker --platform linux/amd64
+  node scripts/qa/run-render-docker-build-smoke.mjs --environment production --platform linux/amd64
 
 Options:
   --service <list>      Comma-separated services: api, worker, admin. Defaults to all.
+  --environment <value> staging or production. Defaults to staging.
   --platform <value>    Optional Docker platform, for example linux/amd64.
   --no-cache            Pass --no-cache to docker build.
   --pull                Pass --pull to docker build.
@@ -268,7 +282,7 @@ Options:
   --artifact-dir <dir>  Evidence output directory.
   --help, -h            Print this help.
 
-The smoke builds the same Dockerfiles and contexts declared in render.yaml.
+The smoke builds the same Dockerfiles and contexts declared in the selected environment's Render Blueprint.
 It does not pass secrets as Docker build args.
 `.trim());
 }

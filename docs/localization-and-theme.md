@@ -155,7 +155,7 @@ Frontend rules:
 - unknown codes must fall back to a localized generic message.
 
 Contract changes that affect visible error behavior must update backend tests,
-mobile/admin error mapping tests, and `docs/API_CONTRACTS.md` when the API shape
+mobile/admin error mapping tests, and `docs/api-contracts.md` when the API shape
 changes.
 
 ## Theme Sources

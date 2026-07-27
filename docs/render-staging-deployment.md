@@ -18,6 +18,11 @@ https://github.com/alexelasticlabs/petmagic-0_004.git
 Do not split the repository. `render.yaml` maps the monorepo into three Render
 services:
 
+This runbook is staging-only. Production uses `render.production.yaml` plus a
+separate production secret store and is governed by `release-readiness.md`.
+Neither deployment reads `.env.staging.local`; that file exists only on an
+operator machine for smoke and QA scripts.
+
 | Render service | Repo source | Runtime role |
 | --- | --- | --- |
 | `petmagic-staging-api` | `Dockerfile.api`, context `.` | Public backend API |

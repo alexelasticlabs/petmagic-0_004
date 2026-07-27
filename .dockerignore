@@ -42,7 +42,10 @@ tests/
 # Build artifacts
 bin/
 obj/
+**/bin/
+**/obj/
 .next/
+**/.next/
 artifacts/
 apps/admin-web/.next/
 apps/petmagic-mobile/.dart_tool/
@@ -52,6 +55,7 @@ apps/petmagic-mobile/android/app/build/
 
 # Node
 node_modules/
+**/node_modules/
 
 # Docker
 Dockerfile*

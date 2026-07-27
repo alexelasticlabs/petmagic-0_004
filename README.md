@@ -52,7 +52,8 @@ The backend API does not run template generation work in Docker Compose. It enqu
 
 ```bash
 cp .env.example .env
-# Fill JWT_SIGNING_KEY before starting Compose.
+# Fill JWT_SIGNING_KEY before starting Compose. The copied template already
+# targets the local backend and local admin URLs.
 docker compose up --build
 ```
 
@@ -106,16 +107,18 @@ Expected local endpoints:
 `BACKEND_HOST_PORT` defaults to `5001` in Compose. If your local `.env` overrides it to `5000`, use `http://localhost:5000`.
 
 If you change `BACKEND_HOST_PORT`, update frontend and mobile API base URLs accordingly.
-If you intentionally point Docker `admin-web` at a local HTTP backend, set
-`ADMIN_WEB_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION=true` only in your local
-uncommitted `.env`. Keep it `false` for staging, production, and production-like
-validation.
+The local template sets `ADMIN_WEB_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION=true`
+because the Dockerized Next build intentionally targets the local HTTP backend.
+Keep it `false` for staging, production, and production-like validation.
 
 For an isolated local-smoke proof without touching the default local ports, use a
-separate Compose project and `.env.local-smoke.example`:
+separate Compose project and an ignored `.env.local-smoke` created from the
+template:
 
 ```powershell
-docker compose -p petmagic_goal_probe --env-file .env.local-smoke.example up -d --build --wait --wait-timeout 240
+Copy-Item .env.local-smoke.example .env.local-smoke
+# Fill local-only values if the following QA probes require them.
+docker compose -p petmagic_goal_probe --env-file .env.local-smoke up -d --build --wait --wait-timeout 240
 curl http://localhost:5601/health
 curl "http://localhost:5601/api/templates/feed?limit=3"
 curl http://localhost:3600/ru
@@ -127,6 +130,21 @@ local development evidence only, not staging or production rollout evidence.
 ## Configuration
 
 Use `.env.example` as a template only. Real credentials must stay in local `.env`, CI/CD secrets, platform environment variables, or a managed secret store. `.env` is ignored by Git.
+
+### Configuration source of truth
+
+| Purpose | Canonical source | Local mutable file | Do not use it for |
+| --- | --- | --- | --- |
+| Default local Docker Compose | `.env.example` and `docker-compose.yml` | `.env` | staging or production deployment |
+| Isolated local smoke | `.env.local-smoke.example` | `.env.local-smoke` | staging evidence or production secrets |
+| Staging deploy | `render.yaml` and Render secret storage | `.env.staging.local` only for QA runner inputs | direct deployment configuration |
+| Production deploy | `render.production.yaml` and production secret storage | none required | staging or local configuration |
+| Standalone admin-web | `apps/admin-web/.env.<environment>.example` | `apps/admin-web/.env.local` for development | root Compose configuration |
+
+The staging runner template intentionally contains both QA inputs and Compose
+parity values. Its comments mark those sections; it never overrides Render.
+Validate template syntax with `--env-file *.example`, but run a local scenario
+with the corresponding ignored file after copying and filling it.
 
 Important variables:
 
@@ -237,13 +255,13 @@ k6 run -e BASE_URL=http://localhost:<BACKEND_HOST_PORT> \
   scripts/k6/template-generation-load-test.js
 ```
 
-See [docs/LOAD_TESTING.md](docs/LOAD_TESTING.md) for profiles, environment variables, and baseline capture notes.
+See [docs/load-testing.md](docs/load-testing.md) for profiles, environment variables, and baseline capture notes.
 
 ## Observability
 
 OpenTelemetry metrics and Prometheus alert rules cover API latency/error SLIs, Stripe webhook failures, template generation queue health, lifecycle stages, retry exhaustion, and AI provider errors.
 
-See [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md) and `deploy/monitoring/prometheus/petmagic-alerts.yml`.
+See [docs/observability.md](docs/observability.md) and `deploy/monitoring/prometheus/petmagic-alerts.yml`.
 
 ## Security
 
@@ -252,28 +270,35 @@ See [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md) and `deploy/monitoring/promet
 - If a credential is committed, rotate or revoke it, remove it from history, and rerun the secret scan.
 - Production problem responses hide exception details and include correlation identifiers.
 
-See [docs/SECURITY.md](docs/SECURITY.md) for the security policy and dependency audit notes.
+See [docs/security.md](docs/security.md) for the security policy and dependency audit notes.
 
 ## Release Readiness
 
 Current repo-wide production-readiness status is tracked in
-[docs/RELEASE_READINESS.md](docs/RELEASE_READINESS.md). Treat local green builds and
+[docs/release-readiness.md](docs/release-readiness.md). Treat local green builds and
 tests as pre-release evidence only; production release still requires real
 provider-backed staging proof and signed store artifacts.
 
 ## Documentation Map
 
-- [API contracts](docs/API_CONTRACTS.md) - backend, mobile, and admin contract notes.
-- [Authentication and registration](docs/md/AUTHENTICATION_AND_REGISTRATION.md) - auth flows and account setup behavior.
-- [Payments sandbox checklist](docs/payments-sandbox-checklist.md) and [economy billing](docs/economy-generation-billing.md) - Stripe/store purchase validation and billing behavior.
-- [Notifications contract](docs/notifications-contract.md) - push payload contracts shared by backend and clients.
-- [Generation media lifecycle audit](docs/generation-media-lifecycle-audit.md), [template content hygiene](docs/template-content-hygiene.md), and [scheduler rollout](docs/generation-scheduler-rollout.md) - generation/media operations.
-- [Admin web follow-ups](docs/admin-web-production-followups.md) and [admin style guide](docs/md/ADMIN_STYLE_GUIDE.md) - admin panel production and UI conventions.
-- [Staging FAL rollout checklist](docs/staging-fal-rollout-checklist.md) - provider-backed rollout evidence.
-- [Observability logging](docs/observability/logging.md) and [generation release gate](docs/observability/generation-release-gate.md) - production monitoring checks.
-- [Mobile release size audit](docs/md/mobile_release_size_audit.md) and [mobile background crash playbook](docs/md/MOBILE_BACKGROUND_CRASH_PLAYBOOK.md) - mobile release operations.
-- [Template feed TZ1-8 staging QA](docs/templates-feed-tz1-8-staging-qa.md), [watermark monetization manual QA](docs/watermark-monetization-manual-qa.md), and [templates preview content profile](docs/md/TEMPLATES_PREVIEW_CONTENT_PROFILE.md) - manual/staging QA protocols.
-- [AI agent rules](docs/ai-agent-rules.md), [auth email setup](docs/md/AUTH_EMAIL_SETUP.md), and [logging standard](docs/md/LOGGING_STANDARD.md) - engineering conventions.
+### Canonical references
+
+- [Release readiness](docs/release-readiness.md) — current production gate and remaining evidence.
+- [API contracts](docs/api-contracts.md), [security](docs/security.md), [authentication](docs/authentication-and-registration.md), [payments](docs/payments-sandbox-checklist.md), and [notifications](docs/notifications-contract.md) — cross-stack contracts and security rules.
+- [Staging deployment](docs/render-staging-deployment.md), [production blueprint](render.production.yaml), and [staging secrets checklist](docs/render-staging-secrets-checklist.md) — deployment source and operator procedure.
+- [Observability](docs/observability.md), [logging](docs/observability/logging.md), and [generation release gate](docs/observability/generation-release-gate.md) — production monitoring and gates.
+
+### Runbooks and validation evidence
+
+- [Economy billing](docs/economy-generation-billing.md), [generation lifecycle](docs/generation-media-lifecycle-audit.md), [content hygiene](docs/template-content-hygiene.md), and [scheduler rollout](docs/generation-scheduler-rollout.md).
+- [Admin style guide](docs/admin-style-guide.md), [mobile release size audit](docs/mobile-release-size-audit.md), and [mobile background crash playbook](docs/mobile-background-crash-playbook.md).
+- [Staging FAL rollout](docs/staging-fal-rollout-checklist.md), [template-feed QA](docs/templates-feed-tz1-8-staging-qa.md), [watermark QA](docs/watermark-monetization-manual-qa.md), and [template preview profile](docs/templates-preview-content-profile.md).
+
+### Supplementary guides
+
+- [Hosting first-time guide](docs/hosting-first-time-guide.md) — first staging deployment walkthrough; use the deployment runbook above for current operations.
+- [Auth email setup](docs/auth-email-setup.md). Repository agent workflow
+  rules are kept only in `AGENTS.md`.
 
 ## Useful Commands
 

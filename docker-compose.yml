@@ -3,6 +3,7 @@ name: petmagic-0_004
 services:
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: petmagic_user
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}"
@@ -21,6 +22,7 @@ services:
 
   mailpit:
     image: axllent/mailpit:v1.19
+    restart: unless-stopped
     ports:
       - "${DOCKER_BIND_ADDRESS:-127.0.0.1}:${MAILPIT_SMTP_HOST_PORT:-1025}:1025"
       - "${DOCKER_BIND_ADDRESS:-127.0.0.1}:${MAILPIT_WEB_HOST_PORT:-8025}:8025"
@@ -283,6 +285,7 @@ services:
         INTERNAL_API_BASE_URL: "${INTERNAL_API_BASE_URL:?INTERNAL_API_BASE_URL is required for admin web build}"
         ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION: "${ADMIN_WEB_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION:-false}"
         NEXT_PUBLIC_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION: "${ADMIN_WEB_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION:-false}"
+    restart: unless-stopped
     environment:
       NEXT_PUBLIC_API_BASE_URL: "${NEXT_PUBLIC_API_BASE_URL:?NEXT_PUBLIC_API_BASE_URL is required for admin web runtime}"
       INTERNAL_API_BASE_URL: "${INTERNAL_API_BASE_URL:?INTERNAL_API_BASE_URL is required for admin web runtime}"

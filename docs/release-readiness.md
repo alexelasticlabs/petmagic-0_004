@@ -78,11 +78,13 @@ do not append command transcripts to this file.
 
 ## Canonical References
 
-- `docs/API_CONTRACTS.md`
-- `docs/SECURITY.md`
+- `docs/api-contracts.md`
+- `docs/security.md`
 - `docs/payments-sandbox-checklist.md`
 - `docs/notifications-contract.md`
 - `docs/economy-generation-billing.md`
-- `docs/OBSERVABILITY.md`
+- `docs/observability.md`
 - `docs/render-staging-deployment.md`
 - `docs/render-staging-secrets-checklist.md`
+- `render.yaml` (staging Blueprint)
+- `render.production.yaml` (production Blueprint)
