@@ -12,57 +12,8 @@ class ProfileScreenBackground extends StatelessWidget {
     return Material(
       type: MaterialType.transparency,
       child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [colors.backgroundTop, colors.backgroundBottom],
-          ),
-        ),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Positioned(
-              top: -100,
-              left: -20,
-              child: IgnorePointer(
-                child: Container(
-                  width: 220,
-                  height: 220,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        colors.accent.withValues(alpha: 0.16),
-                        colors.accent.withValues(alpha: 0),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              top: 180,
-              right: -70,
-              child: IgnorePointer(
-                child: Container(
-                  width: 220,
-                  height: 220,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        colors.blue.withValues(alpha: 0.08),
-                        colors.blue.withValues(alpha: 0),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            child,
-          ],
-        ),
+        decoration: BoxDecoration(color: colors.background),
+        child: child,
       ),
     );
   }

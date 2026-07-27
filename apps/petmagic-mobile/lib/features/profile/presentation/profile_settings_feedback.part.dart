@@ -176,66 +176,186 @@ class _SettingsFeedbackSheetState extends State<_SettingsFeedbackSheet> {
         ),
         child: SafeArea(
           top: false,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  copy.sheetTitle,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: colors.textStrong,
-                    fontWeight: FontWeight.w800,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(context).height * 0.82,
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    copy.sheetTitle,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: colors.textStrong,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final option in copy.options)
-                      ChoiceChip(
-                        selected: _selected == option,
-                        label: Text(option.$3),
-                        onSelected: (_) => setState(() => _selected = option),
+                  const SizedBox(height: 6),
+                  Text(
+                    copy.subtitle,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: colors.textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _SettingsFeedbackOptions(
+                    options: copy.options,
+                    selected: _selected,
+                    onSelected: (option) => setState(() => _selected = option),
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _messageController,
+                    minLines: 3,
+                    maxLines: 5,
+                    maxLength: 2000,
+                    decoration: InputDecoration(
+                      labelText: copy.messageLabel,
+                      hintText: copy.messageHint,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    height: 56,
+                    child: FilledButton.icon(
+                      onPressed: _selected == null
+                          ? null
+                          : () {
+                              final trimmedMessage = _messageController.text
+                                  .trim();
+                              final selected = _selected;
+                              if (selected == null) {
+                                return;
+                              }
+                              Navigator.of(context).pop(
+                                _SettingsFeedbackDraft(
+                                  type: selected.$1,
+                                  category: selected.$2,
+                                  message: trimmedMessage.isEmpty
+                                      ? null
+                                      : trimmedMessage,
+                                ),
+                              );
+                            },
+                      icon: const Icon(Icons.send_rounded),
+                      label: Text(copy.submit),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SettingsFeedbackOptions extends StatelessWidget {
+  const _SettingsFeedbackOptions({
+    required this.options,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final List<(String, String, String)> options;
+  final (String, String, String)? selected;
+  final ValueChanged<(String, String, String)> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columnCount = constraints.maxWidth >= 360 ? 2 : 1;
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columnCount,
+            mainAxisExtent: 56,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+          ),
+          itemCount: options.length,
+          itemBuilder: (context, index) {
+            final option = options[index];
+            return _SettingsFeedbackOptionButton(
+              option: option,
+              selected: selected == option,
+              onPressed: () => onSelected(option),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _SettingsFeedbackOptionButton extends StatelessWidget {
+  const _SettingsFeedbackOptionButton({
+    required this.option,
+    required this.selected,
+    required this.onPressed,
+  });
+
+  final (String, String, String) option;
+  final bool selected;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final icon = switch (option.$2) {
+      'suggestion' => Icons.lightbulb_outline_rounded,
+      'bug' => Icons.bug_report_outlined,
+      'payment' => Icons.receipt_long_outlined,
+      _ => Icons.chat_bubble_outline_rounded,
+    };
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: option.$3,
+      child: Material(
+        color: selected ? colors.accentSoft : Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(14),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: selected ? colors.accent : colors.border,
+                width: selected ? 1.4 : 1,
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                children: [
+                  Icon(
+                    selected ? Icons.check_circle_rounded : icon,
+                    color: selected ? colors.accent : colors.textMuted,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      option.$3,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: colors.textStrong,
+                        fontWeight: FontWeight.w700,
                       ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: _messageController,
-                  minLines: 3,
-                  maxLines: 5,
-                  maxLength: 2000,
-                  decoration: InputDecoration(
-                    labelText: copy.messageLabel,
-                    hintText: copy.messageHint,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 14),
-                FilledButton(
-                  onPressed: _selected == null
-                      ? null
-                      : () {
-                          final trimmedMessage = _messageController.text.trim();
-                          final selected = _selected;
-                          if (selected == null) {
-                            return;
-                          }
-                          Navigator.of(context).pop(
-                            _SettingsFeedbackDraft(
-                              type: selected.$1,
-                              category: selected.$2,
-                              message: trimmedMessage.isEmpty
-                                  ? null
-                                  : trimmedMessage,
-                            ),
-                          );
-                        },
-                  child: Text(copy.submit),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

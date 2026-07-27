@@ -1804,6 +1804,64 @@ class AppLocalizationsEn extends AppLocalizations {
       'Switch between system, light and dark appearance.';
 
   @override
+  String get profileSettingsStorageTitle => 'Storage management';
+
+  @override
+  String get profileSettingsStorageSubtitle =>
+      'Review and clear temporary files stored on this device.';
+
+  @override
+  String get profileStorageUsageSection => 'Storage usage';
+
+  @override
+  String get profileStorageDownloadedTitle => 'Downloaded creations';
+
+  @override
+  String profileStorageDownloadedSubtitle(Object size) {
+    return '$size stored on this device';
+  }
+
+  @override
+  String get profileStorageCleanupSection => 'Clear storage';
+
+  @override
+  String get profileStorageMediaCacheTitle => 'Temporary media cache';
+
+  @override
+  String get profileStorageMediaCacheSubtitle =>
+      'Images and previews will download again when needed.';
+
+  @override
+  String get profileStorageDownloadedClearSubtitle =>
+      'Removes downloaded copies; your creations stay in your account.';
+
+  @override
+  String get profileStorageClearAction => 'Clear';
+
+  @override
+  String get profileStorageClearMediaConfirmTitle =>
+      'Clear temporary media cache?';
+
+  @override
+  String get profileStorageClearMediaConfirmBody =>
+      'Cached images and previews will be removed from this device.';
+
+  @override
+  String get profileStorageClearDownloadsConfirmTitle =>
+      'Clear downloaded creations?';
+
+  @override
+  String get profileStorageClearDownloadsConfirmBody =>
+      'Only local copies will be removed. Your creations and pending changes remain in your account.';
+
+  @override
+  String get profileStorageClearSuccess => 'Local storage cleared.';
+
+  @override
+  String get profileStorageSafetyNote =>
+      'Account data, settings and server-side creations are not removed.';
+
+  @override
   String get profileSettingsHelpCenterTitle => 'Help center';
 
   @override

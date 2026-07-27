@@ -32,7 +32,7 @@ class PaywallFeedbackScopeResolver {
     String? profileUserId,
   }) async {
     if (!isAuthenticated) {
-      return 'guest';
+      return null;
     }
 
     final normalizedProfileUserId = normalizePaywallFeedbackScope(

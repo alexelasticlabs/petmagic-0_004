@@ -83,7 +83,6 @@ const _referencedImageAssets = [
   'assets/rewards/premium-crown.png',
   'assets/rewards/premium-upsell-dog.png',
   'assets/rewards/profile-premium-dog.png',
-  'assets/rewards/wallet-hero-logo.png',
   'assets/rewards/wallet-pack-chest.png',
   'assets/rewards/wallet-pack-coffee.png',
   'assets/rewards/wallet-pack-suitcase.png',

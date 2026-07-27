@@ -4,15 +4,15 @@ import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart'
 
 void main() {
   test(
-    'paywall feedback scope resolver uses guest scope for signed-out flow',
+    'paywall feedback scope resolver skips the signed-out flow',
     () async {
-      final resolver = PaywallFeedbackScopeResolver(
-        sessionStorage: _FakeAuthSessionStorage(),
-      );
+      final storage = _FakeAuthSessionStorage();
+      final resolver = PaywallFeedbackScopeResolver(sessionStorage: storage);
 
       final scope = await resolver.resolve(isAuthenticated: false);
 
-      expect(scope, 'guest');
+      expect(scope, isNull);
+      expect(storage.readCalls, 0);
     },
   );
 

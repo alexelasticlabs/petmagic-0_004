@@ -14,6 +14,7 @@ class _ProfileSettingsPageContent extends StatelessWidget {
     required this.onOpenNotifications,
     required this.onOpenLanguageSheet,
     required this.onOpenThemeSheet,
+    required this.onOpenStorageManagement,
     required this.onOpenHelpCenter,
     required this.onOpenSupport,
     required this.onOpenFeedback,
@@ -34,6 +35,7 @@ class _ProfileSettingsPageContent extends StatelessWidget {
   final VoidCallback onOpenNotifications;
   final Future<void> Function() onOpenLanguageSheet;
   final Future<void> Function() onOpenThemeSheet;
+  final VoidCallback onOpenStorageManagement;
   final VoidCallback onOpenHelpCenter;
   final VoidCallback onOpenSupport;
   final Future<void> Function() onOpenFeedback;
@@ -152,8 +154,14 @@ class _ProfileSettingsPageContent extends StatelessWidget {
                       text,
                       themeMode,
                     ),
-                    showDivider: false,
                     onTap: onOpenThemeSheet,
+                  ),
+                  ProfileSettingsRow(
+                    icon: Icons.storage_outlined,
+                    title: text.profileSettingsStorageTitle,
+                    subtitle: text.profileSettingsStorageSubtitle,
+                    showDivider: false,
+                    onTap: onOpenStorageManagement,
                   ),
                 ],
               ),

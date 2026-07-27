@@ -82,6 +82,8 @@ void main() {
     );
     expect(gradle, contains('isMinifyEnabled = true'));
     expect(gradle, contains('isShrinkResources = true'));
+    expect(gradle, contains('file("src/\$environment/google-services.json")'));
+    expect(gradle, contains('if (flavorFirebaseConfig.exists())'));
     expect(
       gradle,
       contains('getDefaultProguardFile("proguard-android-optimize.txt"),'),

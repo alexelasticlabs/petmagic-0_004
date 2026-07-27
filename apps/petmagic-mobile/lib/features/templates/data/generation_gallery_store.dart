@@ -254,6 +254,11 @@ class GenerationGalleryStore implements GenerationGalleryCache {
   }
 
   @override
+  Future<void> clearCurrentAccountDownloads() {
+    return _galleryClearCurrentAccountDownloads(this);
+  }
+
+  @override
   Future<void> purgeCurrentAccountScope() {
     return _galleryPurgeCurrentAccountScope(this);
   }

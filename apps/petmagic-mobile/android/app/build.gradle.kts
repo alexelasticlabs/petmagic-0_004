@@ -153,10 +153,16 @@ android {
                     )
                 }
 
-                val firebaseConfig = file("google-services.json")
+                val flavorFirebaseConfig = file("src/$environment/google-services.json")
+                val firebaseConfig = if (flavorFirebaseConfig.exists()) {
+                    flavorFirebaseConfig
+                } else {
+                    file("google-services.json")
+                }
                 if (!firebaseConfig.exists()) {
                     throw GradleException(
-                        "Missing android/app/google-services.json. Inject it from the protected environment.",
+                        "Missing Firebase config for $environment. Inject src/$environment/google-services.json " +
+                            "or android/app/google-services.json from the protected environment.",
                     )
                 }
                 val firebaseContents = firebaseConfig.readText()

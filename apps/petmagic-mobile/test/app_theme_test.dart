@@ -80,7 +80,7 @@ void main() {
       ),
     );
 
-    expect(colors.backgroundTop, const Color(0xFFF9FAFC));
+    expect(colors.backgroundTop, const Color(0xFFFAFBFC));
     expect(colors.textStrong, const Color(0xFF0F1D35));
   });
 
@@ -101,7 +101,7 @@ void main() {
       ),
     );
 
-    expect(colors.backgroundTop, const Color(0xFF000306));
+    expect(colors.backgroundTop, const Color(0xFF080D13));
     expect(colors.textStrong, const Color(0xFFF8FBFF));
   });
 }

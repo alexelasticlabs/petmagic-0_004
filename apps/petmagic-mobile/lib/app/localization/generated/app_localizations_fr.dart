@@ -1823,6 +1823,64 @@ class AppLocalizationsFr extends AppLocalizations {
       'Basculez entre le système, l’apparence claire et sombre.';
 
   @override
+  String get profileSettingsStorageTitle => 'Gestion du stockage';
+
+  @override
+  String get profileSettingsStorageSubtitle =>
+      'Consultez et effacez les fichiers temporaires de cet appareil.';
+
+  @override
+  String get profileStorageUsageSection => 'Utilisation du stockage';
+
+  @override
+  String get profileStorageDownloadedTitle => 'Créations téléchargées';
+
+  @override
+  String profileStorageDownloadedSubtitle(Object size) {
+    return '$size stockés sur cet appareil';
+  }
+
+  @override
+  String get profileStorageCleanupSection => 'Nettoyer le stockage';
+
+  @override
+  String get profileStorageMediaCacheTitle => 'Cache multimédia temporaire';
+
+  @override
+  String get profileStorageMediaCacheSubtitle =>
+      'Les images et aperçus seront téléchargés à nouveau si nécessaire.';
+
+  @override
+  String get profileStorageDownloadedClearSubtitle =>
+      'Supprime les copies locales ; vos créations restent dans votre compte.';
+
+  @override
+  String get profileStorageClearAction => 'Effacer';
+
+  @override
+  String get profileStorageClearMediaConfirmTitle =>
+      'Effacer le cache multimédia temporaire ?';
+
+  @override
+  String get profileStorageClearMediaConfirmBody =>
+      'Les images et aperçus mis en cache seront supprimés de cet appareil.';
+
+  @override
+  String get profileStorageClearDownloadsConfirmTitle =>
+      'Effacer les créations téléchargées ?';
+
+  @override
+  String get profileStorageClearDownloadsConfirmBody =>
+      'Seules les copies locales seront supprimées. Les créations et modifications en attente restent dans votre compte.';
+
+  @override
+  String get profileStorageClearSuccess => 'Stockage local effacé.';
+
+  @override
+  String get profileStorageSafetyNote =>
+      'Les données du compte, les réglages et les créations sur le serveur ne sont pas supprimés.';
+
+  @override
   String get profileSettingsHelpCenterTitle => 'Centre d\'aide';
 
   @override

@@ -33,11 +33,10 @@ void main() {
     );
     expect(profileSource, isNot(contains('const accent = Color(0xFFFFC107)')));
     expect(profileSource, isNot(contains('color: Color(0xFFFFD666)')));
-    expect(profileSource, contains('final cardAccent = colors.accent;'));
-    expect(profileSource, contains('? colors.accentSoft'));
+    expect(profileSource, contains('child: ProfileGlassCard('));
     expect(
       profileSource,
-      contains('final chipText = isLight ? colors.on(chipBg) : colors.accent;'),
+      contains('color: colors.accent.withValues(alpha: 0.12)'),
     );
     expect(
       profileSource,
@@ -46,7 +45,8 @@ void main() {
     expect(profileSource, isNot(contains('const Color(0xFF0A7A4D)')));
 
     final walletSource = sources['wallet_page']!;
-    expect(walletSource, contains('final cardAccent = colors.accent;'));
+    expect(walletSource, contains('return ProfileGlassCard('));
+    expect(walletSource, contains('PawSparkIcon(size: compact ? 36 : 40'));
     expect(walletSource, contains('final accent = colors.gold;'));
     expect(
       walletSource,

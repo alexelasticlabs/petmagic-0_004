@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
+import 'package:petmagic_mobile/core/platform/app_runtime_info.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_dto.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_remote_error_policy.dart';
 import 'package:petmagic_mobile/features/templates/domain/templates_query.dart';
@@ -10,7 +11,10 @@ import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 final templatesRemoteDataSourceProvider = Provider<TemplatesRemoteDataSource>((
   ref,
 ) {
-  final dataSource = TemplatesRemoteDataSource(ref.watch(dioProvider));
+  final dataSource = TemplatesRemoteDataSource(
+    ref.watch(dioProvider),
+    runtimeInfo: ref.watch(appRuntimeInfoProvider),
+  );
   ref.onDispose(() {
     dataSource.cancelPendingFeedRequest();
     dataSource.cancelPendingRandomTemplateRequest();
@@ -20,9 +24,11 @@ final templatesRemoteDataSourceProvider = Provider<TemplatesRemoteDataSource>((
 });
 
 class TemplatesRemoteDataSource {
-  TemplatesRemoteDataSource(this._dio);
+  TemplatesRemoteDataSource(this._dio, {AppRuntimeInfo? runtimeInfo})
+    : _runtimeInfo = runtimeInfo ?? const DefaultAppRuntimeInfo();
 
   final Dio _dio;
+  final AppRuntimeInfo _runtimeInfo;
   CancelToken? _feedCancelToken;
   CancelToken? _randomCancelToken;
   CancelToken? _categoriesCancelToken;
@@ -260,6 +266,7 @@ class TemplatesRemoteDataSource {
           'eventType': eventType,
           if (source != null && source.trim().isNotEmpty)
             'source': source.trim(),
+          'deviceClass': _analyticsDeviceClass,
           if (generationId != null && generationId.trim().isNotEmpty)
             'generationId': generationId.trim(),
           if (metadata != null && metadata.isNotEmpty) 'metadata': metadata,
@@ -277,6 +284,12 @@ class TemplatesRemoteDataSource {
       );
     }
   }
+
+  String get _analyticsDeviceClass => switch (_runtimeInfo.platform) {
+    AppRuntimePlatform.android => 'android',
+    AppRuntimePlatform.ios => 'ios',
+    AppRuntimePlatform.other => 'web',
+  };
 
   Future<TemplatesCatalogVersionDto> fetchCatalogVersion() async {
     try {

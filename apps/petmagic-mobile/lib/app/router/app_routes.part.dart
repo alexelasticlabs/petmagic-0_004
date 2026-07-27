@@ -76,6 +76,17 @@ List<RouteBase> _buildAppRoutes(Ref ref) {
         child: const LegalAcceptanceGatePage(),
       ),
     ),
+    GoRoute(
+      path: CreateHubPage.routePath,
+      pageBuilder: (context, state) => NoTransitionPage(
+        child: Scaffold(
+          body: CreateHubPage(
+            initialSource:
+                state.uri.queryParameters[CreateHubPage.sourceQueryParameter],
+          ),
+        ),
+      ),
+    ),
     StatefulShellRoute.indexedStack(
       parentNavigatorKey: _rootNavigatorKey,
       builder: (context, state, navigationShell) => PetMagicShell(
@@ -92,21 +103,6 @@ List<RouteBase> _buildAppRoutes(Ref ref) {
                 child: TemplatesPage(
                   initialPetId: state.uri.queryParameters['petId'],
                   initialPetPhotoId: state.uri.queryParameters['petPhotoId'],
-                ),
-              ),
-            ),
-          ],
-        ),
-        StatefulShellBranch(
-          navigatorKey: _createNavigatorKey,
-          routes: [
-            GoRoute(
-              path: CreateHubPage.routePath,
-              pageBuilder: (context, state) => NoTransitionPage(
-                child: CreateHubPage(
-                  initialSource: state
-                      .uri
-                      .queryParameters[CreateHubPage.sourceQueryParameter],
                 ),
               ),
             ),
@@ -274,6 +270,14 @@ List<RouteBase> _buildAppRoutes(Ref ref) {
       path: ProfileSettingsPage.routePath,
       pageBuilder: (context, state) =>
           _buildFadeSlidePage(state: state, child: const ProfileSettingsPage()),
+    ),
+    GoRoute(
+      parentNavigatorKey: _rootNavigatorKey,
+      path: StorageManagementPage.routePath,
+      pageBuilder: (context, state) => _buildFadeSlidePage(
+        state: state,
+        child: const StorageManagementPage(),
+      ),
     ),
     GoRoute(
       parentNavigatorKey: _rootNavigatorKey,

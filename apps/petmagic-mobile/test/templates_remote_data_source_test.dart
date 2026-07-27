@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/platform/app_runtime_info.dart';
 import 'package:petmagic_mobile/features/templates/domain/templates_query.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_remote_data_source.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
@@ -608,6 +609,7 @@ void main() {
     expect(capturedOptions?.data, {
       'eventType': 'viewed',
       'source': 'manual',
+      'deviceClass': 'web',
       'generationId': 'generation-1',
       'metadata': {
         'templateId': 'template-day-1',
@@ -647,7 +649,45 @@ void main() {
       expect(capturedOptions?.data, {
         'eventType': 'viewed',
         'source': 'manual',
+        'deviceClass': 'web',
       });
+    },
+  );
+
+  test(
+    'recordAnalyticsEvent maps runtime platforms without sending locale country',
+    () async {
+      const expectedDeviceClasses = <AppRuntimePlatform, String>{
+        AppRuntimePlatform.android: 'android',
+        AppRuntimePlatform.ios: 'ios',
+        AppRuntimePlatform.other: 'web',
+      };
+
+      for (final entry in expectedDeviceClasses.entries) {
+        RequestOptions? capturedOptions;
+        final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+          ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+            capturedOptions = options;
+            return ResponseBody.fromString('', 204);
+          });
+        final dataSource = TemplatesRemoteDataSource(
+          dio,
+          runtimeInfo: DefaultAppRuntimeInfo(
+            locale: const AppLocale(languageTag: 'ru-BY', countryCode: 'BY'),
+            platform: entry.key,
+          ),
+        );
+
+        await dataSource.recordAnalyticsEvent(
+          templateId: 'template-device-${entry.value}',
+          eventType: 'viewed',
+        );
+
+        expect(capturedOptions?.data, {
+          'eventType': 'viewed',
+          'deviceClass': entry.value,
+        });
+      }
     },
   );
 

@@ -1,11 +1,9 @@
 import 'dart:async';
 
-import 'package:flutter/painting.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/core/performance/app_media_cache_manager.dart';
 import 'package:petmagic_mobile/app/notifications/push_token_registrar.dart';
-import 'package:petmagic_mobile/core/performance/template_media_cache.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/core/session/session_epoch.dart';
 import 'package:petmagic_mobile/features/gamification/application/gamification_providers.dart';
@@ -107,14 +105,7 @@ final sessionScopeResetProvider = Provider<void>((ref) {
 });
 
 Future<void> _clearSessionMediaCaches() async {
-  await Future.wait<void>([
-    _runBestEffortCleanup('template_media_cache', TemplateMediaCache.clearAll),
-    _runBestEffortCleanup('default_image_cache', () async {
-      await DefaultCacheManager().emptyCache();
-      imageCache.clear();
-      imageCache.clearLiveImages();
-    }),
-  ]);
+  await _runBestEffortCleanup('media_caches', AppMediaCacheManager.clearAll);
 }
 
 Future<void> _runBestEffortCleanup(

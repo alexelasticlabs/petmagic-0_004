@@ -107,7 +107,6 @@ void main() {
     );
     for (final label in [
       text.navDiscover,
-      text.navCreate,
       text.navCreations,
       text.navRewards,
       text.navProfile,

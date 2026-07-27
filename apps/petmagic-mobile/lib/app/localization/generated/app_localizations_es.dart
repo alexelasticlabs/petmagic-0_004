@@ -1821,6 +1821,64 @@ class AppLocalizationsEs extends AppLocalizations {
       'Cambie entre sistema, apariencia clara y oscura.';
 
   @override
+  String get profileSettingsStorageTitle => 'Gestión de almacenamiento';
+
+  @override
+  String get profileSettingsStorageSubtitle =>
+      'Revisa y elimina archivos temporales guardados en este dispositivo.';
+
+  @override
+  String get profileStorageUsageSection => 'Uso de almacenamiento';
+
+  @override
+  String get profileStorageDownloadedTitle => 'Creaciones descargadas';
+
+  @override
+  String profileStorageDownloadedSubtitle(Object size) {
+    return '$size almacenados en este dispositivo';
+  }
+
+  @override
+  String get profileStorageCleanupSection => 'Limpiar almacenamiento';
+
+  @override
+  String get profileStorageMediaCacheTitle => 'Caché multimedia temporal';
+
+  @override
+  String get profileStorageMediaCacheSubtitle =>
+      'Las imágenes y vistas previas se descargarán de nuevo cuando sea necesario.';
+
+  @override
+  String get profileStorageDownloadedClearSubtitle =>
+      'Elimina copias locales; tus creaciones permanecen en tu cuenta.';
+
+  @override
+  String get profileStorageClearAction => 'Limpiar';
+
+  @override
+  String get profileStorageClearMediaConfirmTitle =>
+      '¿Limpiar la caché multimedia temporal?';
+
+  @override
+  String get profileStorageClearMediaConfirmBody =>
+      'Las imágenes y vistas previas almacenadas en caché se eliminarán de este dispositivo.';
+
+  @override
+  String get profileStorageClearDownloadsConfirmTitle =>
+      '¿Limpiar las creaciones descargadas?';
+
+  @override
+  String get profileStorageClearDownloadsConfirmBody =>
+      'Solo se eliminarán las copias locales. Las creaciones y los cambios pendientes seguirán en tu cuenta.';
+
+  @override
+  String get profileStorageClearSuccess => 'Almacenamiento local limpiado.';
+
+  @override
+  String get profileStorageSafetyNote =>
+      'Los datos de la cuenta, la configuración y las creaciones del servidor no se eliminan.';
+
+  @override
   String get profileSettingsHelpCenterTitle => 'Centro de ayuda';
 
   @override

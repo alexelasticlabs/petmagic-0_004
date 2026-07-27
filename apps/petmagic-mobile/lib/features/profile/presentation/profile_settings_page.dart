@@ -114,6 +114,8 @@ class ProfileSettingsPage extends ConsumerWidget {
         selectedThemeMode: preferences.themeMode,
         onSelect: preferencesController.updateThemeMode,
       ),
+      onOpenStorageManagement: () =>
+          navigator.push(const StorageManagementDestination()),
       onOpenHelpCenter: () => navigator.push(
         ProfileSettingsDetailDestination(
           ProfileSettingsDetailKind.helpCenter.slug,

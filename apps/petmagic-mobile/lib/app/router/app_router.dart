@@ -16,6 +16,7 @@ import 'package:petmagic_mobile/features/profile/presentation/password_reset_pag
 import 'package:petmagic_mobile/features/profile/presentation/profile_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_page.dart';
+import 'package:petmagic_mobile/features/profile/presentation/storage_management_page.dart';
 import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart';
 import 'package:petmagic_mobile/features/startup/presentation/guest_welcome_page.dart';
 import 'package:petmagic_mobile/features/startup/presentation/startup_loading_page.dart';
@@ -45,9 +46,6 @@ final _rootNavigatorKey = GlobalKey<NavigatorState>(
 );
 final _templatesNavigatorKey = GlobalKey<NavigatorState>(
   debugLabel: 'templatesNavigator',
-);
-final _createNavigatorKey = GlobalKey<NavigatorState>(
-  debugLabel: 'createNavigator',
 );
 final _creationsNavigatorKey = GlobalKey<NavigatorState>(
   debugLabel: 'creationsNavigator',

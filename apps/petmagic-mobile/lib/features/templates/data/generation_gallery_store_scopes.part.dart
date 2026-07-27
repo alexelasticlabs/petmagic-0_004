@@ -91,6 +91,36 @@ Future<void> _galleryPurgeCurrentAccountScope(
   await _galleryPurgeScope(store, accountScope);
 }
 
+/// Drops only files downloaded for the active account while retaining gallery
+/// metadata and pending deletion tombstones for the next server synchronization.
+Future<void> _galleryClearCurrentAccountDownloads(
+  GenerationGalleryStore store,
+) async {
+  final accountScope = await store.readCurrentAccountScope();
+  if (accountScope == null) {
+    return;
+  }
+
+  await _galleryCancelActiveDownloads(store);
+  final entries = await _galleryReadEntriesForScope(store, accountScope);
+  await store._fileStorage.deleteScopeDirectory(accountScope);
+  final clearedAtUtc = _galleryNowUtc(store);
+  await _galleryWriteEntriesForScope(store, accountScope, [
+    for (final entry in entries)
+      entry.copyWith(
+        previewLocalPath: null,
+        outputLocalPath: null,
+        isDownloadComplete: false,
+        lastSyncedAtUtc: clearedAtUtc,
+        version: entry.version + 1,
+        materializationFailureCount: 0,
+        materializationBackoffUntilUtc: null,
+        materializationFailureCode: null,
+        localBytes: 0,
+      ),
+  ]);
+}
+
 Future<void> _galleryPurgeAllScopes(GenerationGalleryStore store) async {
   await _galleryCancelActiveDownloads(store);
   try {

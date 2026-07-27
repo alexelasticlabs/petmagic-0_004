@@ -3312,6 +3312,102 @@ abstract class AppLocalizations {
   /// **'Switch between system, light and dark appearance.'**
   String get profileSettingsThemeSubtitle;
 
+  /// No description provided for @profileSettingsStorageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage management'**
+  String get profileSettingsStorageTitle;
+
+  /// No description provided for @profileSettingsStorageSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Review and clear temporary files stored on this device.'**
+  String get profileSettingsStorageSubtitle;
+
+  /// No description provided for @profileStorageUsageSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage usage'**
+  String get profileStorageUsageSection;
+
+  /// No description provided for @profileStorageDownloadedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloaded creations'**
+  String get profileStorageDownloadedTitle;
+
+  /// No description provided for @profileStorageDownloadedSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{size} stored on this device'**
+  String profileStorageDownloadedSubtitle(Object size);
+
+  /// No description provided for @profileStorageCleanupSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear storage'**
+  String get profileStorageCleanupSection;
+
+  /// No description provided for @profileStorageMediaCacheTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Temporary media cache'**
+  String get profileStorageMediaCacheTitle;
+
+  /// No description provided for @profileStorageMediaCacheSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Images and previews will download again when needed.'**
+  String get profileStorageMediaCacheSubtitle;
+
+  /// No description provided for @profileStorageDownloadedClearSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Removes downloaded copies; your creations stay in your account.'**
+  String get profileStorageDownloadedClearSubtitle;
+
+  /// No description provided for @profileStorageClearAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get profileStorageClearAction;
+
+  /// No description provided for @profileStorageClearMediaConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear temporary media cache?'**
+  String get profileStorageClearMediaConfirmTitle;
+
+  /// No description provided for @profileStorageClearMediaConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Cached images and previews will be removed from this device.'**
+  String get profileStorageClearMediaConfirmBody;
+
+  /// No description provided for @profileStorageClearDownloadsConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear downloaded creations?'**
+  String get profileStorageClearDownloadsConfirmTitle;
+
+  /// No description provided for @profileStorageClearDownloadsConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Only local copies will be removed. Your creations and pending changes remain in your account.'**
+  String get profileStorageClearDownloadsConfirmBody;
+
+  /// No description provided for @profileStorageClearSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Local storage cleared.'**
+  String get profileStorageClearSuccess;
+
+  /// No description provided for @profileStorageSafetyNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Account data, settings and server-side creations are not removed.'**
+  String get profileStorageSafetyNote;
+
   /// No description provided for @profileSettingsHelpCenterTitle.
   ///
   /// In en, this message translates to:

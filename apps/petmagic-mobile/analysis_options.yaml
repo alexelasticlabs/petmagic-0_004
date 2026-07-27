@@ -12,6 +12,7 @@ analyzer:
     - ios/Flutter/flutter_export_environment.sh
     - ios/Runner.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/**
     - ios/Runner.xcworkspace/xcshareddata/swiftpm/**
+    - third_party/**
     - "**/*.g.dart"
     - "**/*.freezed.dart"
     - "**/*.mocks.dart"

@@ -105,12 +105,12 @@ abstract final class PetMagicPalettes {
   static const onAccentLight = Color(0xFFF8FBFF);
 
   static const light = PetMagicColors(
-    backgroundTop: Color(0xFFF9FAFC),
-    backgroundBottom: Color(0xFFE7EDF5),
+    backgroundTop: Color(0xFFFAFBFC),
+    backgroundBottom: Color(0xFFF4F6F8),
     surface: Color(0xFFFFFFFF),
-    surfaceGlass: Color(0xFFF0F4FA),
-    surfaceStrong: Color(0xFFDCE5F0),
-    border: Color(0xFFA8B9CC),
+    surfaceGlass: Color(0xFFFFFFFF),
+    surfaceStrong: Color(0xFFEAF0F6),
+    border: Color(0xFFD8E1EA),
     textStrong: Color(0xFF0F1D35),
     textSoft: Color(0xFF22354D),
     textMuted: Color(0xFF3F5268),
@@ -124,12 +124,12 @@ abstract final class PetMagicPalettes {
   );
 
   static const dark = PetMagicColors(
-    backgroundTop: Color(0xFF000306),
-    backgroundBottom: Color(0xFF04070D),
-    surface: Color(0xFF0A121B),
-    surfaceGlass: Color(0xCC101925),
-    surfaceStrong: Color(0xFF141E2A),
-    border: Color(0xFF1E2A38),
+    backgroundTop: Color(0xFF080D13),
+    backgroundBottom: Color(0xFF0B1016),
+    surface: Color(0xFF101720),
+    surfaceGlass: Color(0xFF141D27),
+    surfaceStrong: Color(0xFF1B2632),
+    border: Color(0xFF2A3746),
     textStrong: Color(0xFFF8FBFF),
     textSoft: Color(0xFFD0DAE6),
     textMuted: Color(0xFF7F8EA0),
@@ -139,7 +139,7 @@ abstract final class PetMagicPalettes {
     purple: Color(0xFFB56BFF),
     blue: Color(0xFF38BDF8),
     danger: Color(0xFFFB7185),
-    shadow: Color(0xCC00040A),
+    shadow: Color(0xCC000000),
   );
 
   static PetMagicColors forBrightness(Brightness brightness) =>

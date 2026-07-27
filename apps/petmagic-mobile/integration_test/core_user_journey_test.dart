@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
-import 'package:petmagic_mobile/features/create/presentation/create_hub_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_page.dart';
 import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart';
@@ -63,11 +62,6 @@ void main() {
         'journey@petmagic.test',
       );
 
-      await _openDestination(
-        tester,
-        semanticsLabel: text.navCreate,
-        page: find.byType(CreateHubPage),
-      );
       await _openDestination(
         tester,
         semanticsLabel: text.navCreations,

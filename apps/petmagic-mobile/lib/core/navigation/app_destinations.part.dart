@@ -155,6 +155,13 @@ final class ProfileSettingsDestination extends AppDestination {
   String get location => '/profile/settings';
 }
 
+final class StorageManagementDestination extends AppDestination {
+  const StorageManagementDestination();
+
+  @override
+  String get location => '/profile/settings/storage';
+}
+
 final class ProfileAccountDestination extends AppDestination {
   const ProfileAccountDestination();
 

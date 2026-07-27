@@ -16,6 +16,7 @@ import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/all_transactions_page.dart';
 import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
+import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 
 import 'widget_test_support.dart';
@@ -51,7 +52,7 @@ void main() {
   });
 
   testWidgets(
-    'wallet hero cards keep mascot art visible and premium headline readable',
+    'wallet hero cards keep PawSpark branding and premium headline readable',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(320, 900));
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -71,12 +72,8 @@ void main() {
 
       expect(
         find.byWidgetPredicate((widget) {
-          final child = widget is Opacity ? widget.child : null;
-          final image = child is Image ? child.image : null;
-          return widget is Opacity &&
-              widget.opacity >= 0.7 &&
-              image is AssetImage &&
-              image.assetName == 'assets/rewards/wallet-hero-logo.png';
+          return widget is PawSparkIcon &&
+              (widget.size == 36 || widget.size == 40);
         }),
         findsOneWidget,
       );

@@ -1813,6 +1813,65 @@ class AppLocalizationsPl extends AppLocalizations {
       'Przełączaj pomiędzy systemem, jasnym i ciemnym wyglądem.';
 
   @override
+  String get profileSettingsStorageTitle => 'Zarządzanie pamięcią';
+
+  @override
+  String get profileSettingsStorageSubtitle =>
+      'Sprawdzaj i usuwaj pliki tymczasowe zapisane na tym urządzeniu.';
+
+  @override
+  String get profileStorageUsageSection => 'Użycie pamięci';
+
+  @override
+  String get profileStorageDownloadedTitle => 'Pobrane kreacje';
+
+  @override
+  String profileStorageDownloadedSubtitle(Object size) {
+    return '$size zapisane na tym urządzeniu';
+  }
+
+  @override
+  String get profileStorageCleanupSection => 'Czyszczenie pamięci';
+
+  @override
+  String get profileStorageMediaCacheTitle => 'Tymczasowa pamięć multimediów';
+
+  @override
+  String get profileStorageMediaCacheSubtitle =>
+      'Obrazy i podglądy zostaną pobrane ponownie, gdy będą potrzebne.';
+
+  @override
+  String get profileStorageDownloadedClearSubtitle =>
+      'Usuwa lokalne kopie; twoje kreacje pozostaną na koncie.';
+
+  @override
+  String get profileStorageClearAction => 'Wyczyść';
+
+  @override
+  String get profileStorageClearMediaConfirmTitle =>
+      'Wyczyścić tymczasową pamięć multimediów?';
+
+  @override
+  String get profileStorageClearMediaConfirmBody =>
+      'Obrazy i podglądy z pamięci podręcznej zostaną usunięte z tego urządzenia.';
+
+  @override
+  String get profileStorageClearDownloadsConfirmTitle =>
+      'Wyczyścić pobrane kreacje?';
+
+  @override
+  String get profileStorageClearDownloadsConfirmBody =>
+      'Zostaną usunięte tylko lokalne kopie. Kreacje i oczekujące zmiany pozostaną na koncie.';
+
+  @override
+  String get profileStorageClearSuccess =>
+      'Pamięć lokalna została wyczyszczona.';
+
+  @override
+  String get profileStorageSafetyNote =>
+      'Dane konta, ustawienia i kreacje na serwerze nie zostaną usunięte.';
+
+  @override
   String get profileSettingsHelpCenterTitle => 'Centrum pomocy';
 
   @override

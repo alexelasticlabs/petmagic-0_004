@@ -94,7 +94,12 @@ void main() {
   });
 
   test('iOS release path injects Firebase config instead of tracking it', () {
-    expect(File('ios/Runner/GoogleService-Info.plist').existsSync(), isFalse);
+    final trackedFirebaseConfig = Process.runSync('git', [
+      'ls-files',
+      '--error-unmatch',
+      'ios/Runner/GoogleService-Info.plist',
+    ]);
+    expect(trackedFirebaseConfig.exitCode, isNot(0));
     expect(
       File('ios/Runner/GoogleService-Info.plist.example').existsSync(),
       isTrue,

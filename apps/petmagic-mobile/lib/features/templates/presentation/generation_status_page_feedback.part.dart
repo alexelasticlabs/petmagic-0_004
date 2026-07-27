@@ -211,59 +211,64 @@ class _ProblemFeedbackSheetState extends State<_ProblemFeedbackSheet> {
         ),
         child: SafeArea(
           top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  widget.title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: colors.textStrong,
-                    fontWeight: FontWeight.w800,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(context).height * 0.82,
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    widget.title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: colors.textStrong,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final reason in widget.reasons)
-                      ChoiceChip(
-                        selected: _selectedReason == reason.$1,
-                        label: Text(reason.$2),
-                        onSelected: (_) =>
-                            setState(() => _selectedReason = reason.$1),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: _commentController,
-                  minLines: 2,
-                  maxLines: 4,
-                  maxLength: 2000,
-                  decoration: InputDecoration(
-                    labelText: text.commentLabel,
-                    hintText: text.commentHint,
+                  const SizedBox(height: 16),
+                  _FeedbackReasonGrid(
+                    reasons: widget.reasons,
+                    selectedReasons: _selectedReason == null
+                        ? const <String>{}
+                        : {_selectedReason!},
+                    onChanged: (reason, selected) => setState(
+                      () => _selectedReason = selected ? reason : null,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 14),
-                FilledButton(
-                  onPressed: _selectedReason == null
-                      ? null
-                      : () => Navigator.of(context).pop(
-                          _FeedbackResult(
-                            [_selectedReason!],
-                            _commentController.text.trim().isEmpty
-                                ? null
-                                : _commentController.text.trim(),
-                          ),
-                        ),
-                  child: Text(text.submit),
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _commentController,
+                    minLines: 2,
+                    maxLines: 4,
+                    maxLength: 2000,
+                    decoration: InputDecoration(
+                      labelText: text.commentLabel,
+                      hintText: text.commentHint,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    height: 56,
+                    child: FilledButton.icon(
+                      onPressed: _selectedReason == null
+                          ? null
+                          : () => Navigator.of(context).pop(
+                              _FeedbackResult(
+                                [_selectedReason!],
+                                _commentController.text.trim().isEmpty
+                                    ? null
+                                    : _commentController.text.trim(),
+                              ),
+                            ),
+                      icon: const Icon(Icons.send_rounded),
+                      label: Text(text.submit),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -361,64 +366,66 @@ class _NegativeFeedbackSheetState extends State<_NegativeFeedbackSheet> {
         ),
         child: SafeArea(
           top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  text.generationStatusFeedbackImproveTitle,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: colors.textStrong,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final reason in reasons)
-                      FilterChip(
-                        selected: _selectedReasons.contains(reason.$1),
-                        label: Text(reason.$2),
-                        onSelected: (selected) {
-                          setState(() {
-                            if (selected) {
-                              _selectedReasons.add(reason.$1);
-                            } else {
-                              _selectedReasons.remove(reason.$1);
-                            }
-                          });
-                        },
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: _commentController,
-                  minLines: 2,
-                  maxLines: 4,
-                  maxLength: 2000,
-                  decoration: InputDecoration(
-                    labelText: text.generationStatusFeedbackCommentLabel,
-                    hintText: text.generationStatusFeedbackCommentHint,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                FilledButton(
-                  onPressed: () => Navigator.of(context).pop(
-                    _FeedbackResult(
-                      _selectedReasons.toList(growable: false),
-                      _commentController.text.trim().isEmpty
-                          ? null
-                          : _commentController.text.trim(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(context).height * 0.82,
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    text.generationStatusFeedbackImproveTitle,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: colors.textStrong,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
-                  child: Text(text.generationStatusFeedbackSubmitAction),
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  _FeedbackReasonGrid(
+                    reasons: reasons,
+                    selectedReasons: _selectedReasons,
+                    onChanged: (reason, selected) {
+                      setState(() {
+                        if (selected) {
+                          _selectedReasons.add(reason);
+                        } else {
+                          _selectedReasons.remove(reason);
+                        }
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _commentController,
+                    minLines: 2,
+                    maxLines: 4,
+                    maxLength: 2000,
+                    decoration: InputDecoration(
+                      labelText: text.generationStatusFeedbackCommentLabel,
+                      hintText: text.generationStatusFeedbackCommentHint,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    height: 56,
+                    child: FilledButton.icon(
+                      onPressed: () => Navigator.of(context).pop(
+                        _FeedbackResult(
+                          _selectedReasons.toList(growable: false),
+                          _commentController.text.trim().isEmpty
+                              ? null
+                              : _commentController.text.trim(),
+                        ),
+                      ),
+                      icon: const Icon(Icons.send_rounded),
+                      label: Text(text.generationStatusFeedbackSubmitAction),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

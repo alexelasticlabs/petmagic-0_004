@@ -16,6 +16,7 @@ import 'package:petmagic_mobile/features/profile/presentation/password_change_pa
 import 'package:petmagic_mobile/features/profile/application/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_page.dart';
+import 'package:petmagic_mobile/features/profile/presentation/storage_management_page.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -88,6 +89,20 @@ void main() {
     expect(find.text(text.profileSettingsThemeDark), findsOneWidget);
   });
 
+  testWidgets('storage row opens local storage management', (tester) async {
+    await _pumpSettingsPage(tester);
+
+    final text = AppLocalizations.of(
+      tester.element(find.byType(ProfileSettingsPage)),
+    );
+
+    await tester.tap(find.text(text.profileSettingsStorageTitle));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(StorageManagementPage), findsOneWidget);
+    expect(find.text(text.profileStorageMediaCacheTitle), findsOneWidget);
+  });
+
   testWidgets('delete confirmation sheet triggers account deletion action', (
     tester,
   ) async {
@@ -144,16 +159,20 @@ void main() {
     final text = AppLocalizations.of(
       tester.element(find.byType(ProfileSettingsPage)),
     );
-    final feedbackRow = find.text(text.profileSettingsFeedbackTitle).first;
-    await tester.scrollUntilVisible(
-      feedbackRow,
-      320,
-      scrollable: find.byType(Scrollable),
-    );
-    await tester.ensureVisible(feedbackRow);
+    final feedbackRow = find.text(text.profileSettingsFeedbackTitle);
+    for (
+      var attempt = 0;
+      attempt < 4 && feedbackRow.evaluate().isEmpty;
+      attempt++
+    ) {
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, -320));
+      await tester.pumpAndSettle();
+    }
+    expect(feedbackRow, findsWidgets);
+    await tester.ensureVisible(feedbackRow.first);
     await tester.pumpAndSettle();
 
-    await tester.tap(feedbackRow);
+    await tester.tap(feedbackRow.first);
     await tester.pumpAndSettle();
 
     expect(find.text(text.profileSettingsFeedbackOptionBug), findsOneWidget);
@@ -172,12 +191,13 @@ void main() {
 
     await tester.tap(find.text(text.profileSettingsFeedbackOptionBug));
     await tester.enterText(find.byType(TextFormField), 'Краш при отправке');
-    await tester.tap(
-      find.widgetWithText(
-        FilledButton,
-        text.profileSettingsFeedbackSubmitAction,
-      ),
+    final submitButton = find.widgetWithText(
+      FilledButton,
+      text.profileSettingsFeedbackSubmitAction,
     );
+    await tester.ensureVisible(submitButton);
+    await tester.pumpAndSettle();
+    await tester.tap(submitButton);
     await tester.pumpAndSettle();
     await tester.pump(const Duration(seconds: 3));
     await tester.pumpAndSettle();
@@ -289,6 +309,11 @@ Future<void> _pumpSettingsPage(
         path: PasswordChangePage.routePath,
         builder: (context, state) =>
             const Scaffold(body: Text('password-change-screen')),
+      ),
+      GoRoute(
+        path: StorageManagementPage.routePath,
+        builder: (context, state) =>
+            const Scaffold(body: StorageManagementPage()),
       ),
     ],
   );

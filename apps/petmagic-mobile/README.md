@@ -2,6 +2,14 @@
 
 Flutter iOS/Android client for PetMagic. The app starts with a production-oriented Templates feed: anonymous catalog browsing, light/dark themes, localization, API layer, caching, skeleton/loading/empty/error states, and a floating bottom navigation shell.
 
+## Vendored plugins
+
+`third_party/flutter_plugins` intentionally contains the source roots of
+`app_links`, `sign_in_with_apple`, and `photo_manager`: `pubspec.yaml` uses
+them as pinned `path` dependencies for reproducible mobile builds. They are not
+generated artifacts and must not be removed during cleanup. Upstream demo apps
+are intentionally excluded because PetMagic does not build or test them.
+
 ## Requirements
 
 - Flutter 3.41+
@@ -192,7 +200,7 @@ For Apple sign-in to work end-to-end:
 
 Password reset emails are sent by the backend SMTP worker, so reset flow depends on valid backend email settings rather than any direct SMTP integration in Flutter.
 
-See the full setup guide in [../../docs/md/AUTH_EMAIL_SETUP.md](../../docs/md/AUTH_EMAIL_SETUP.md).
+See the full setup guide in [../../docs/auth-email-setup.md](../../docs/auth-email-setup.md).
 
 ## Checks
 

@@ -107,7 +107,6 @@ class _WalletHighlightCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
-    final isLight = Theme.of(context).brightness == Brightness.light;
     final walletValue = wallet;
     final nextWeeklyGrantAtUtc = walletValue?.nextWeeklyGrantAtUtc;
     final weeklyReady =
@@ -123,11 +122,10 @@ class _WalletHighlightCard extends StatelessWidget {
         : weeklyReady
         ? text.profileWalletPreviewWeeklyReady
         : text.profileWalletPreviewAdCount(walletValue.adRewardsRemainingToday);
-    final cardAccent = colors.accent;
     final rewardColor = walletValue == null
         ? colors.textMuted
         : weeklyReady
-        ? colors.gold
+        ? colors.accent
         : colors.accent;
 
     return Material(
@@ -136,11 +134,7 @@ class _WalletHighlightCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         onTap: onTap,
         child: Ink(
-          child: PetMagicAccentCard(
-            accentColor: cardAccent,
-            borderOpacity: isLight ? 0.2 : 0.28,
-            glowOpacity: isLight ? 0.1 : 0.15,
-            glowAlignment: const Alignment(-0.94, -0.16),
+          child: ProfileGlassCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -150,17 +144,15 @@ class _WalletHighlightCard extends StatelessWidget {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: Colors.black.withValues(
-                          alpha: isLight ? 0.04 : 0.16,
-                        ),
-                        borderRadius: BorderRadius.circular(16),
+                        color: colors.accent.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: cardAccent.withValues(alpha: 0.24),
+                          color: colors.accent.withValues(alpha: 0.24),
                         ),
                       ),
                       child: Icon(
                         Icons.account_balance_wallet_rounded,
-                        color: colors.textStrong,
+                        color: colors.accent,
                         size: 22,
                       ),
                     ),
@@ -190,9 +182,9 @@ class _WalletHighlightCard extends StatelessWidget {
                       ),
                     ),
                     Icon(
-                      Icons.arrow_forward_rounded,
+                      Icons.chevron_right_rounded,
                       color: colors.textSoft,
-                      size: 18,
+                      size: 22,
                     ),
                   ],
                 ),
@@ -216,72 +208,19 @@ class _WalletHighlightCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    ProfileStatusPill(
-                      label: rewardLabel,
-                      leading: wallet == null
-                          ? Icons.sync_rounded
-                          : weeklyReady
-                          ? Icons.card_giftcard_rounded
-                          : Icons.play_circle_outline_rounded,
-                      backgroundColor: rewardColor.withValues(alpha: 0.14),
-                      foregroundColor: rewardColor,
-                    ),
-                    _ProfileActionChip(label: text.profileWalletPreviewAction),
-                  ],
+                ProfileStatusPill(
+                  label: rewardLabel,
+                  leading: wallet == null
+                      ? Icons.sync_rounded
+                      : weeklyReady
+                      ? Icons.card_giftcard_rounded
+                      : Icons.play_circle_outline_rounded,
+                  backgroundColor: rewardColor.withValues(alpha: 0.1),
+                  foregroundColor: rewardColor,
                 ),
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ProfileActionChip extends StatelessWidget {
-  const _ProfileActionChip({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-    final isLight = Theme.of(context).brightness == Brightness.light;
-    final chipBg = isLight
-        ? colors.accentSoft
-        : colors.accent.withValues(alpha: 0.12);
-    final chipBorder = isLight
-        ? colors.accent.withValues(alpha: 0.42)
-        : colors.accent.withValues(alpha: 0.24);
-    final chipText = isLight ? colors.on(chipBg) : colors.accent;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: chipBg,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: chipBorder),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                color: chipText,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(width: 5),
-            Icon(Icons.arrow_forward_rounded, color: chipText, size: 14),
-          ],
         ),
       ),
     );

@@ -44,6 +44,7 @@ abstract interface class GenerationGalleryCache {
     bool background = false,
   });
   Future<void> cancelActiveDownloads();
+  Future<void> clearCurrentAccountDownloads();
   Future<void> purgeCurrentAccountScope();
   Future<void> purgeAllScopes();
   Future<void> cleanupCurrentAccountArtifacts();
@@ -56,6 +57,9 @@ final class _NoopGenerationGalleryCache implements GenerationGalleryCache {
 
   @override
   Future<void> cancelActiveDownloads() async {}
+
+  @override
+  Future<void> clearCurrentAccountDownloads() async {}
 
   @override
   Future<void> cleanupCurrentAccountArtifacts() async {}

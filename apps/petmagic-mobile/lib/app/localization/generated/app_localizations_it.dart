@@ -1821,6 +1821,64 @@ class AppLocalizationsIt extends AppLocalizations {
       'Passa dal sistema all\'aspetto chiaro e scuro.';
 
   @override
+  String get profileSettingsStorageTitle => 'Gestione memoria';
+
+  @override
+  String get profileSettingsStorageSubtitle =>
+      'Controlla e cancella i file temporanei su questo dispositivo.';
+
+  @override
+  String get profileStorageUsageSection => 'Utilizzo memoria';
+
+  @override
+  String get profileStorageDownloadedTitle => 'Creazioni scaricate';
+
+  @override
+  String profileStorageDownloadedSubtitle(Object size) {
+    return '$size memorizzati su questo dispositivo';
+  }
+
+  @override
+  String get profileStorageCleanupSection => 'Pulisci memoria';
+
+  @override
+  String get profileStorageMediaCacheTitle => 'Cache multimediale temporanea';
+
+  @override
+  String get profileStorageMediaCacheSubtitle =>
+      'Immagini e anteprime verranno scaricate di nuovo quando necessario.';
+
+  @override
+  String get profileStorageDownloadedClearSubtitle =>
+      'Rimuove le copie locali; le tue creazioni restano nell\'account.';
+
+  @override
+  String get profileStorageClearAction => 'Cancella';
+
+  @override
+  String get profileStorageClearMediaConfirmTitle =>
+      'Cancellare la cache multimediale temporanea?';
+
+  @override
+  String get profileStorageClearMediaConfirmBody =>
+      'Immagini e anteprime in cache saranno rimosse da questo dispositivo.';
+
+  @override
+  String get profileStorageClearDownloadsConfirmTitle =>
+      'Cancellare le creazioni scaricate?';
+
+  @override
+  String get profileStorageClearDownloadsConfirmBody =>
+      'Saranno rimosse solo le copie locali. Le creazioni e le modifiche in attesa restano nell\'account.';
+
+  @override
+  String get profileStorageClearSuccess => 'Memoria locale cancellata.';
+
+  @override
+  String get profileStorageSafetyNote =>
+      'Dati dell\'account, impostazioni e creazioni sul server non vengono rimossi.';
+
+  @override
   String get profileSettingsHelpCenterTitle => 'Centro assistenza';
 
   @override

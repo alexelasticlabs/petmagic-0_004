@@ -100,12 +100,10 @@ class _PetMagicShellState extends ConsumerState<PetMagicShell> {
                     case 0:
                       context.go('/templates');
                     case 1:
-                      context.go('/create');
-                    case 2:
                       context.go(GenerationsGalleryPage.routePath);
-                    case 3:
+                    case 2:
                       context.go(RewardsPage.routePath);
-                    case 4:
+                    case 3:
                       context.go('/profile');
                   }
                 },
@@ -118,16 +116,13 @@ class _PetMagicShellState extends ConsumerState<PetMagicShell> {
 
   int _resolveCurrentIndexFromLocation(String location) {
     if (location.startsWith('/profile')) {
-      return 4;
+      return 3;
     }
     if (location.startsWith(RewardsPage.routePath)) {
-      return 3;
+      return 2;
     }
     if (location == GenerationsGalleryPage.routePath ||
         location.startsWith(GenerationStatusPage.routePrefix)) {
-      return 2;
-    }
-    if (location.startsWith('/create')) {
       return 1;
     }
     return 0;

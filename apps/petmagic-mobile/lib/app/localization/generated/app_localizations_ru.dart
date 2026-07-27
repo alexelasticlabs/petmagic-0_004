@@ -1800,6 +1800,64 @@ class AppLocalizationsRu extends AppLocalizations {
       'Переключайтесь между системной, светлой и темной темой.';
 
   @override
+  String get profileSettingsStorageTitle => 'Управление памятью';
+
+  @override
+  String get profileSettingsStorageSubtitle =>
+      'Просматривайте и очищайте временные файлы на устройстве.';
+
+  @override
+  String get profileStorageUsageSection => 'Использование памяти';
+
+  @override
+  String get profileStorageDownloadedTitle => 'Скачанные работы';
+
+  @override
+  String profileStorageDownloadedSubtitle(Object size) {
+    return 'Занято на устройстве: $size';
+  }
+
+  @override
+  String get profileStorageCleanupSection => 'Очистка памяти';
+
+  @override
+  String get profileStorageMediaCacheTitle => 'Временный медиакэш';
+
+  @override
+  String get profileStorageMediaCacheSubtitle =>
+      'Изображения и превью будут загружены заново при необходимости.';
+
+  @override
+  String get profileStorageDownloadedClearSubtitle =>
+      'Удаляет локальные копии; работы останутся в аккаунте.';
+
+  @override
+  String get profileStorageClearAction => 'Очистить';
+
+  @override
+  String get profileStorageClearMediaConfirmTitle =>
+      'Очистить временный медиакэш?';
+
+  @override
+  String get profileStorageClearMediaConfirmBody =>
+      'Кэшированные изображения и превью будут удалены с устройства.';
+
+  @override
+  String get profileStorageClearDownloadsConfirmTitle =>
+      'Очистить скачанные работы?';
+
+  @override
+  String get profileStorageClearDownloadsConfirmBody =>
+      'Будут удалены только локальные копии. Работы и ожидающие изменения останутся в аккаунте.';
+
+  @override
+  String get profileStorageClearSuccess => 'Локальная память очищена.';
+
+  @override
+  String get profileStorageSafetyNote =>
+      'Данные аккаунта, настройки и работы на сервере не удаляются.';
+
+  @override
   String get profileSettingsHelpCenterTitle => 'Центр помощи';
 
   @override

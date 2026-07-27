@@ -38,6 +38,7 @@ import 'package:video_player/video_player.dart';
 part 'generation_status_page_common_sections.dart';
 part 'generation_status_page_compare_viewer.part.dart';
 part 'generation_status_page_feedback.part.dart';
+part 'generation_status_page_feedback_reason_grid.part.dart';
 part 'generation_status_page_feedback_actions.part.dart';
 part 'generation_status_page_fullscreen_viewer.part.dart';
 part 'generation_status_page_active_card.part.dart';

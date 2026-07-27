@@ -98,6 +98,61 @@ void main() {
   );
 
   test(
+    'clearCurrentAccountDownloads removes files while preserving deletion state',
+    () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'petmagic-generation-gallery-store-test-',
+      );
+      addTearDown(() async {
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+
+      final preferences = SharedPreferencesAsync();
+      final store = _store(tempDir, preferences: preferences);
+      final generation = _completedGeneration(generationId: 'generation-clear');
+      final generationDirectory = _generationDirectory(
+        tempDir,
+        generation.userId,
+        generation.generationId,
+      );
+      await generationDirectory.create(recursive: true);
+      final localFile = File(
+        '${generationDirectory.path}${Platform.pathSeparator}result.jpg',
+      );
+      await localFile.writeAsBytes(_tinyJpegOne);
+      final record = await store.upsertReadyItem(generation);
+      await preferences.setString(
+        _entriesKeyForScope(generation.userId),
+        jsonEncode([
+          record
+              .copyWith(
+                outputLocalPath: localFile.path,
+                isDownloadComplete: true,
+                isDeletedLocally: true,
+                pendingServerDelete: true,
+                localBytes: _tinyJpegOne.length,
+              )
+              .toJson(),
+        ]),
+      );
+
+      await store.clearCurrentAccountDownloads();
+
+      expect(await generationDirectory.exists(), isFalse);
+      final cleared = await store.readLocalRecord(generation.generationId);
+      expect(cleared, isNotNull);
+      expect(cleared!.outputLocalPath, isNull);
+      expect(cleared.previewLocalPath, isNull);
+      expect(cleared.localBytes, 0);
+      expect(cleared.isDownloadComplete, isFalse);
+      expect(cleared.isDeletedLocally, isTrue);
+      expect(cleared.pendingServerDelete, isTrue);
+    },
+  );
+
+  test(
     'markDeletedLocally treats generation ids as safe path segments',
     () async {
       final tempDir = await Directory.systemTemp.createTemp(
