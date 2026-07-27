@@ -183,9 +183,15 @@ async function loginAsAdmin(page: Page) {
 function collectRuntimeErrors(page: Page) {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push("pageerror: " + error.message));
+  page.on("requestfailed", (request) => {
+    errors.push(
+      `requestfailed: ${request.url()} (${request.failure()?.errorText ?? "unknown failure"})`
+    );
+  });
   page.on("console", (message) => {
     if (message.type() === "error") {
-      errors.push("console: " + message.text());
+      const sourceUrl = message.location().url;
+      errors.push("console: " + message.text() + (sourceUrl ? ` (${sourceUrl})` : ""));
     }
   });
   return errors;
