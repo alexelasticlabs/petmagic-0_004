@@ -65,6 +65,20 @@ jobs:
           echo "$output"
           test "$status" -ne 0
           echo "$output" | grep -q "Release signing is not configured"
+
+  android-staging-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/petmagic-mobile
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: '3.44.5'
+          cache: true
+      - name: Resolve dependencies
+        run: flutter pub get
       - name: Build Android staging release smoke
         env:
           ORG_GRADLE_PROJECT_allowInsecureReleaseSigning: "true"
@@ -85,6 +99,7 @@ jobs:
           --artifact build/app/outputs/bundle/stagingRelease/app-staging-release.aab
           --baseline-bytes 95104021
           --max-growth-percent 5
+
   android-production-build:
     runs-on: ubuntu-latest
     defaults:
@@ -115,6 +130,14 @@ jobs:
 
   android-device-ui-smoke:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario:
+          - core_user_journey_test
+          - templates_feed_stress_test
+          - gallery_cross_flow_test
+          - watermark_result_flow_test
     defaults:
       run:
         working-directory: apps/petmagic-mobile
@@ -133,7 +156,14 @@ jobs:
         run: flutter pub get
       - name: Generate staging Firebase smoke configuration
         run: dart run tool/configure_firebase_smoke.dart --environment=staging
-      - name: Run deterministic mobile core flows on Android
+      - name: Prebuild Android integration scenario
+        run: >-
+          flutter build apk --debug --flavor staging
+          --target integration_test/${{ matrix.scenario }}.dart
+          --dart-define=APP_ENVIRONMENT=staging
+          --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging
+          --dart-define=API_BASE_URL=https://api.staging.petmagic.app
+      - name: Run deterministic mobile scenario on Android
         uses: reactivecircus/android-emulator-runner@e89f39f1abbbd05b1113a29cf4db69e7540cae5a # v2.37.0
         with:
           api-level: 35
@@ -143,10 +173,7 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot-save
           script: |
-            cd apps/petmagic-mobile && flutter test integration_test/core_user_journey_test.dart -d emulator-5554 --flavor staging --dart-define=APP_ENVIRONMENT=staging --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging --dart-define=API_BASE_URL=https://api.staging.petmagic.app
-            cd apps/petmagic-mobile && flutter test integration_test/templates_feed_stress_test.dart -d emulator-5554 --flavor staging --dart-define=APP_ENVIRONMENT=staging --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging --dart-define=API_BASE_URL=https://api.staging.petmagic.app
-            cd apps/petmagic-mobile && flutter test integration_test/gallery_cross_flow_test.dart -d emulator-5554 --flavor staging --dart-define=APP_ENVIRONMENT=staging --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging --dart-define=API_BASE_URL=https://api.staging.petmagic.app
-            cd apps/petmagic-mobile && flutter test integration_test/watermark_result_flow_test.dart -d emulator-5554 --flavor staging --dart-define=APP_ENVIRONMENT=staging --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging --dart-define=API_BASE_URL=https://api.staging.petmagic.app
+            cd apps/petmagic-mobile && flutter test integration_test/${{ matrix.scenario }}.dart -d emulator-5554 --flavor staging --dart-define=APP_ENVIRONMENT=staging --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging --dart-define=API_BASE_URL=https://api.staging.petmagic.app
 
   ios-build:
     runs-on: macos-latest
@@ -185,6 +212,14 @@ jobs:
 
   ios-device-ui-smoke:
     runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario:
+          - core_user_journey_test
+          - templates_feed_stress_test
+          - gallery_cross_flow_test
+          - watermark_result_flow_test
     defaults:
       run:
         working-directory: apps/petmagic-mobile
@@ -204,25 +239,7 @@ jobs:
           test -n "$DEVICE_ID"
           xcrun simctl boot "$DEVICE_ID" || true
           xcrun simctl bootstatus "$DEVICE_ID" -b
-          flutter test integration_test/core_user_journey_test.dart \
-            -d "$DEVICE_ID" \
-            --flavor staging \
-            --dart-define=APP_ENVIRONMENT=staging \
-            --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging \
-            --dart-define=API_BASE_URL=https://api.staging.petmagic.app
-          flutter test integration_test/templates_feed_stress_test.dart \
-            -d "$DEVICE_ID" \
-            --flavor staging \
-            --dart-define=APP_ENVIRONMENT=staging \
-            --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging \
-            --dart-define=API_BASE_URL=https://api.staging.petmagic.app
-          flutter test integration_test/gallery_cross_flow_test.dart \
-            -d "$DEVICE_ID" \
-            --flavor staging \
-            --dart-define=APP_ENVIRONMENT=staging \
-            --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging \
-            --dart-define=API_BASE_URL=https://api.staging.petmagic.app
-          flutter test integration_test/watermark_result_flow_test.dart \
+          flutter test integration_test/${{ matrix.scenario }}.dart \
             -d "$DEVICE_ID" \
             --flavor staging \
             --dart-define=APP_ENVIRONMENT=staging \

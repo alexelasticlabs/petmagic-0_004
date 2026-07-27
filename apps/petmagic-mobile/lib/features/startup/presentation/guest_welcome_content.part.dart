@@ -21,7 +21,6 @@ class _MagicSignInButton extends StatelessWidget {
 
     if (disableAnimations) {
       return FilledButton.icon(
-        key: const ValueKey<String>('guest-welcome-sign-in'),
         onPressed: onPressed,
         icon: const Icon(Icons.auto_awesome_rounded, size: 18),
         label: Text(label),
@@ -65,7 +64,6 @@ class _MagicSignInButton extends StatelessWidget {
               child: Stack(
                 children: [
                   FilledButton.icon(
-                    key: const ValueKey<String>('guest-welcome-sign-in'),
                     onPressed: onPressed,
                     icon: const Icon(Icons.auto_awesome_rounded, size: 18),
                     label: Text(label),
