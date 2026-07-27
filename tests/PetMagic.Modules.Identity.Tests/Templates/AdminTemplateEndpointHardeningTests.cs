@@ -229,8 +229,11 @@ public sealed class AdminTemplateEndpointHardeningTests
 
         Assert.Contains("var periodCounts = await dbContext.TemplateGenerationJobs", method, StringComparison.Ordinal);
         Assert.Contains(".GroupBy(_ => 1)", method, StringComparison.Ordinal);
+        Assert.Contains(".Where(job => job.UserId != TemplateGenerationService.AdminTestUserId)", method, StringComparison.Ordinal);
         Assert.Contains("GenerationsToday = group.Count(job => job.CreatedAtUtc >= todayStart)", method, StringComparison.Ordinal);
         Assert.Contains("FailedGenerationsThisMonth = group.Count(job => job.Status == TemplateGenerationStatus.Failed)", method, StringComparison.Ordinal);
+        Assert.Contains("TemplateGenerationJobStatusSets.Processing.Sum", method, StringComparison.Ordinal);
+        Assert.Contains("TemplateGenerationStatus.Retrying", method, StringComparison.Ordinal);
         Assert.DoesNotContain("var jobs = await", method, StringComparison.Ordinal);
         Assert.DoesNotContain("jobs.Count(", method, StringComparison.Ordinal);
     }
@@ -268,6 +271,42 @@ public sealed class AdminTemplateEndpointHardeningTests
         Assert.Contains("CanAdminCancelGeneration(row)", adminDashboardSource, StringComparison.Ordinal);
         Assert.Contains("ResolveCancellationUri", adminDashboardSource, StringComparison.Ordinal);
         Assert.Contains("bool CanCancel = false", contractsSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AdminGenerationDetail_ShouldResolveAcceptedLocationWithSafeContract()
+    {
+        var endpointSource = ReadAllEndpointPartialFiles("AdminTemplateEndpoints");
+        var serviceSource = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Infrastructure",
+            "TemplatesService.AdminDashboard.cs"));
+        var contractsSource = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Application",
+            "Contracts",
+            "TemplatesContracts.Admin.cs"));
+
+        Assert.Contains(
+            "group.MapGet(\"/generations/{generationId:guid}\", GetGenerationAsync)",
+            endpointSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "$\"/api/admin/templates/generations/{result.Value.Generation.GenerationId}\"",
+            endpointSource,
+            StringComparison.Ordinal);
+        Assert.Contains("GetAdminGenerationAsync(generationId, cancellationToken)", endpointSource, StringComparison.Ordinal);
+        Assert.Contains("job.Id == query.GenerationId.Value", serviceSource, StringComparison.Ordinal);
+        Assert.Contains("AdminGenerationDetailResponse", contractsSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProviderStatusUrl", contractsSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProviderCancelUrl", contractsSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProviderResponse", contractsSource, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -433,7 +472,7 @@ public sealed class AdminTemplateEndpointHardeningTests
     public void TemplateVisibilityPolicyDirectCheckAllowlist_ShouldStayDocumented()
     {
         var root = FindRepositoryRoot();
-        var docs = File.ReadAllText(Path.Combine(root, "docs", "API_CONTRACTS.md"));
+        var docs = File.ReadAllText(Path.Combine(root, "docs", "api-contracts.md"));
         var allowlistedFiles = new[]
         {
             Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "TemplateCategoryAdminService.cs"),
@@ -528,7 +567,7 @@ public sealed class AdminTemplateEndpointHardeningTests
             "src",
             "lib",
             "api-client.templates.ts"));
-        var docs = File.ReadAllText(Path.Combine(root, "docs", "API_CONTRACTS.md"));
+        var docs = File.ReadAllText(Path.Combine(root, "docs", "api-contracts.md"));
 
         Assert.DoesNotContain("/bulk", endpointSource, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("/bulk", categoryEndpointSource, StringComparison.OrdinalIgnoreCase);

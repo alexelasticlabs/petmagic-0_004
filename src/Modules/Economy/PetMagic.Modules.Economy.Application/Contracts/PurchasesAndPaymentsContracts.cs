@@ -50,6 +50,43 @@ public sealed record PurchaseHistoryItemResponse(
     int TokenAmount = 0,
     string RefundStatus = "none");
 
+public sealed record AdminPurchaseCapabilitiesResponse(
+    bool CanRefund,
+    bool CanRetryRefund,
+    bool RequiresManualReview);
+
+public sealed record AdminPurchaseTimelineItemResponse(
+    string EventType,
+    string Status,
+    DateTime OccurredAtUtc);
+
+public sealed record AdminPurchaseIncidentLinkResponse(
+    Guid IncidentId,
+    string Type,
+    string Severity,
+    string Status,
+    DateTime FirstDetectedAtUtc,
+    DateTime? ResolvedAtUtc);
+
+public sealed record AdminPurchaseDetailResponse(
+    Guid OrderId,
+    Guid UserId,
+    Guid PackId,
+    string PackCode,
+    string PackDisplayName,
+    string PaymentProvider,
+    string Status,
+    decimal PriceAmount,
+    string CurrencyCode,
+    int SparkToGrant,
+    DateTime CreatedAtUtc,
+    DateTime? ConfirmedAtUtc,
+    string RefundStatus,
+    string SettlementState,
+    AdminPurchaseCapabilitiesResponse Capabilities,
+    IReadOnlyList<AdminPurchaseTimelineItemResponse> Timeline,
+    IReadOnlyList<AdminPurchaseIncidentLinkResponse> Incidents);
+
 public sealed record PaymentMethodResponse(
     Guid PaymentMethodId,
     string PaymentProvider,

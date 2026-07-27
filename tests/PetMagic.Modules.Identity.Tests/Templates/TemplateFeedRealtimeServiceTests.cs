@@ -215,34 +215,54 @@ public sealed class TemplateFeedRealtimeServiceTests
         await using var provider = CreateProvider(databaseName, databaseRoot);
 
         var realtime = provider.GetRequiredService<ITemplateFeedRealtimeService>();
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        var subscription = realtime.Subscribe(timeout.Token);
+        using var subscriptionCancellation = new CancellationTokenSource();
+        var subscription = realtime.Subscribe(subscriptionCancellation.Token);
 
-        await using (var scope = provider.CreateAsyncScope())
+        try
         {
-            var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
-            var createdAtUtc = DateTime.UtcNow.AddSeconds(1);
-            for (var i = 0; i < 150; i++)
+            await using (var scope = provider.CreateAsyncScope())
             {
-                dbContext.TemplateRealtimeEvents.Add(new TemplateRealtimeEventRecord
+                var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+                var createdAtUtc = DateTime.UtcNow.AddSeconds(1);
+                for (var i = 0; i < 150; i++)
                 {
-                    Id = Guid.NewGuid(),
-                    Topic = TemplateFeedRealtimeTopics.GenerationStatusChanged,
-                    Data = $$"""{"index":{{i}}}""",
-                    CreatedAtUtc = createdAtUtc
-                });
+                    dbContext.TemplateRealtimeEvents.Add(new TemplateRealtimeEventRecord
+                    {
+                        Id = Guid.NewGuid(),
+                        Topic = TemplateFeedRealtimeTopics.GenerationStatusChanged,
+                        Data = $$"""{"index":{{i}}}""",
+                        CreatedAtUtc = createdAtUtc
+                    });
+                }
+
+                await dbContext.SaveChangesAsync(CancellationToken.None);
             }
 
-            await dbContext.SaveChangesAsync(timeout.Token);
-        }
+            using var deliveryTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            var received = new List<TemplateFeedRealtimeEvent>();
+            while (received.Count < 150)
+            {
+                received.Add(await ReadNextAsync(subscription, deliveryTimeout.Token));
+            }
 
-        var received = new List<TemplateFeedRealtimeEvent>();
-        while (received.Count < 150)
+            Assert.All(received, realtimeEvent =>
+                Assert.Equal(TemplateFeedRealtimeTopics.GenerationStatusChanged, realtimeEvent.Topic));
+
+            var receivedIndexes = received
+                .Select(realtimeEvent =>
+                {
+                    using var payload = JsonDocument.Parse(realtimeEvent.Data);
+                    return payload.RootElement.GetProperty("index").GetInt32();
+                })
+                .Order()
+                .ToArray();
+
+            Assert.Equal(Enumerable.Range(0, 150), receivedIndexes);
+        }
+        finally
         {
-            received.Add(await ReadNextAsync(subscription, timeout.Token));
+            subscriptionCancellation.Cancel();
         }
-
-        Assert.Equal(150, received.Count(x => x.Topic == TemplateFeedRealtimeTopics.GenerationStatusChanged));
     }
 
     [Fact]

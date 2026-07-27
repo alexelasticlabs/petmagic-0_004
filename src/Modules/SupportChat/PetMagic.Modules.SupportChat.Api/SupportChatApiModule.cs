@@ -1,6 +1,7 @@
 using FluentValidation;
 
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
 
 using PetMagic.Modules.SupportChat.Api.Endpoints;
@@ -16,6 +17,7 @@ public static class SupportChatApiModule
     public static IServiceCollection AddSupportChatApiModule(this IServiceCollection services)
     {
         services.AddSignalR();
+        services.AddSingleton<IUserIdProvider, SupportChatUserIdProvider>();
         services.AddScoped<ISupportChatRealtimeNotifier, SignalRSupportChatRealtimeNotifier>();
         services.AddScoped<IValidator<OpenSupportConversationCommand>, OpenSupportConversationCommandValidator>();
         services.AddScoped<IValidator<SendSupportMessageCommand>, SendSupportMessageCommandValidator>();

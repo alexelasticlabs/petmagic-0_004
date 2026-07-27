@@ -507,6 +507,169 @@ public sealed partial class TemplatesApiIntegrationTests
     }
 
     [Fact]
+    public async Task UpdateImageEndpoint_ShouldPersistQaOnlyFlag_WhenEnabledByUpdate()
+    {
+        await using var application = await TestApplication.CreateAsync();
+
+        var created = await PostAsJsonAsync<AdminTemplateResponse>(
+            application.Client,
+            "/api/admin/templates/image",
+            new CreateImageTemplateCommand(
+                "QA Image Contract",
+                "Image template used to verify the QA-only update contract.",
+                "QA Contract",
+                ["qa", "contract"],
+                false,
+                20,
+                TemplatePromoBadgeMode.New.ToString(),
+                null,
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                TemplateStatus.Draft.ToString()));
+
+        Assert.False(created.IsQaOnly);
+
+        var updated = await PutAsJsonAsync<AdminTemplateResponse>(
+            application.Client,
+            $"/api/admin/templates/image/{created.TemplateId}",
+            new AdminTemplateEndpoints.UpdateImageTemplateRequest(
+                created.Title,
+                created.ShortDescription,
+                created.Category,
+                created.Tags,
+                created.IsPremium,
+                created.TokenCost,
+                created.PromoBadgeMode,
+                null,
+                created.ImageModel!,
+                created.ImagePrompt!,
+                Status: TemplateStatus.Draft.ToString(),
+                IsQaOnly: true));
+
+        Assert.True(updated.IsQaOnly);
+
+        var persisted = await GetFromJsonAsync<AdminTemplateResponse>(
+            application.Client,
+            $"/api/admin/templates/{created.TemplateId}");
+        Assert.True(persisted.IsQaOnly);
+
+        var legacyCompatibleUpdate = await PutAsJsonAsync<AdminTemplateResponse>(
+            application.Client,
+            $"/api/admin/templates/image/{created.TemplateId}",
+            new
+            {
+                title = "QA Image Contract Legacy Update",
+                shortDescription = updated.ShortDescription,
+                category = updated.Category,
+                tags = updated.Tags,
+                isPremium = updated.IsPremium,
+                tokenCost = updated.TokenCost,
+                promoBadgeMode = updated.PromoBadgeMode,
+                previewAsset = (TemplateAssetCommand?)null,
+                imageModel = updated.ImageModel,
+                imagePrompt = updated.ImagePrompt,
+                status = TemplateStatus.Draft.ToString()
+            });
+
+        Assert.Equal("QA Image Contract Legacy Update", legacyCompatibleUpdate.Title);
+        Assert.True(legacyCompatibleUpdate.IsQaOnly);
+
+        var persistedAfterLegacyUpdate = await GetFromJsonAsync<AdminTemplateResponse>(
+            application.Client,
+            $"/api/admin/templates/{created.TemplateId}");
+        Assert.True(persistedAfterLegacyUpdate.IsQaOnly);
+    }
+
+    [Fact]
+    public async Task UpdateVideoEndpoint_ShouldPersistQaOnlyFlag_WhenEnabledByUpdate()
+    {
+        await using var application = await TestApplication.CreateAsync();
+
+        var created = await PostAsJsonAsync<AdminTemplateResponse>(
+            application.Client,
+            "/api/admin/templates/video",
+            new CreateVideoTemplateCommand(
+                "QA Video Contract",
+                "Video template used to verify the QA-only update contract.",
+                "QA Contract",
+                ["qa", "contract"],
+                false,
+                40,
+                TemplatePromoBadgeMode.New.ToString(),
+                string.Empty,
+                null,
+                null,
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                "fal-ai/kling-video/v3/pro/motion-control",
+                "Animate the pet gently.",
+                false,
+                TemplateStatus.Draft.ToString()));
+
+        Assert.False(created.IsQaOnly);
+
+        var updated = await PutAsJsonAsync<AdminTemplateResponse>(
+            application.Client,
+            $"/api/admin/templates/video/{created.TemplateId}",
+            new AdminTemplateEndpoints.UpdateVideoTemplateRequest(
+                created.Title,
+                created.ShortDescription,
+                created.Category,
+                created.Tags,
+                created.IsPremium,
+                created.TokenCost,
+                created.PromoBadgeMode,
+                created.MusicDescription ?? string.Empty,
+                null,
+                null,
+                created.PreprocessingModel!,
+                created.PreprocessingPrompt!,
+                created.KlingModel!,
+                created.KlingPrompt!,
+                created.KeepOriginalSound ?? false,
+                Status: TemplateStatus.Draft.ToString(),
+                IsQaOnly: true));
+
+        Assert.True(updated.IsQaOnly);
+
+        var persisted = await GetFromJsonAsync<AdminTemplateResponse>(
+            application.Client,
+            $"/api/admin/templates/{created.TemplateId}");
+        Assert.True(persisted.IsQaOnly);
+
+        var legacyCompatibleUpdate = await PutAsJsonAsync<AdminTemplateResponse>(
+            application.Client,
+            $"/api/admin/templates/video/{created.TemplateId}",
+            new
+            {
+                title = "QA Video Contract Legacy Update",
+                shortDescription = updated.ShortDescription,
+                category = updated.Category,
+                tags = updated.Tags,
+                isPremium = updated.IsPremium,
+                tokenCost = updated.TokenCost,
+                promoBadgeMode = updated.PromoBadgeMode,
+                musicDescription = updated.MusicDescription ?? string.Empty,
+                previewAsset = (TemplateAssetCommand?)null,
+                referenceMotionAsset = (TemplateAssetCommand?)null,
+                preprocessingModel = updated.PreprocessingModel,
+                preprocessingPrompt = updated.PreprocessingPrompt,
+                klingModel = updated.KlingModel,
+                klingPrompt = updated.KlingPrompt,
+                keepOriginalSound = updated.KeepOriginalSound ?? false,
+                status = TemplateStatus.Draft.ToString()
+            });
+
+        Assert.Equal("QA Video Contract Legacy Update", legacyCompatibleUpdate.Title);
+        Assert.True(legacyCompatibleUpdate.IsQaOnly);
+
+        var persistedAfterLegacyUpdate = await GetFromJsonAsync<AdminTemplateResponse>(
+            application.Client,
+            $"/api/admin/templates/{created.TemplateId}");
+        Assert.True(persistedAfterLegacyUpdate.IsQaOnly);
+    }
+
+    [Fact]
     public async Task PublicTemplatesFeed_ShouldExcludeQaOnlyTemplatesByDefaultAndAllowAdminQaMode()
     {
         await using var application = await TestApplication.CreateAsync();
@@ -1065,6 +1228,8 @@ public sealed partial class TemplatesApiIntegrationTests
     [InlineData("/api/admin/templates/?status=Deleted", "templates.invalid_status")]
     [InlineData("/api/admin/templates/?status=1", "templates.invalid_status")]
     [InlineData("/api/admin/templates/?access=vip", "templates.invalid_access")]
+    [InlineData("/api/admin/templates/?visibility=internal", "templates.invalid_visibility")]
+    [InlineData("/api/admin/templates/?readiness=broken", "templates.invalid_readiness")]
     [InlineData("/api/admin/templates/?sort=random", "templates.invalid_sort")]
     public async Task AdminTemplatesCatalog_ShouldReturnProblem_WhenFilterIsInvalid(string path, string expectedCode)
     {
@@ -1125,6 +1290,132 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.False(secondPage.HasMore);
         Assert.Equal(1, secondPage.TotalCount);
         Assert.Empty(secondPage.Items);
+    }
+
+    [Fact]
+    public async Task AdminTemplatesAnalytics_ShouldBindRepeatedTemplateIdsAndRestrictResponse()
+    {
+        await using var application = await TestApplication.CreateAsync();
+
+        var first = await CreateActiveImageTemplateAsync(
+            application.Client,
+            "Analytics Batch First",
+            "Analytics batch first",
+            ["analytics", "batch", "first"]);
+        var second = await CreateActiveImageTemplateAsync(
+            application.Client,
+            "Analytics Batch Second",
+            "Analytics batch second",
+            ["analytics", "batch", "second"]);
+        var excluded = await CreateActiveImageTemplateAsync(
+            application.Client,
+            "Analytics Batch Excluded",
+            "Analytics batch excluded",
+            ["analytics", "batch", "excluded"]);
+
+        var overview = await GetFromJsonAsync<AdminTemplatesAnalyticsOverviewResponse>(
+            application.Client,
+            $"/api/admin/templates/analytics?templateIds={first.TemplateId:D}&templateIds={second.TemplateId:D}");
+
+        Assert.Equal(2, overview.Summary.TotalTemplates);
+        Assert.Equal(2, overview.TotalCount);
+        Assert.Equal(2, overview.Templates.Count);
+        Assert.Contains(overview.Templates, item => item.TemplateId == first.TemplateId);
+        Assert.Contains(overview.Templates, item => item.TemplateId == second.TemplateId);
+        Assert.DoesNotContain(overview.Templates, item => item.TemplateId == excluded.TemplateId);
+        Assert.DoesNotContain("Analytics batch excluded", overview.AvailableCategories);
+    }
+
+    [Fact]
+    public async Task AdminTemplatesCatalog_ShouldFilterVisibilityAndReadinessAndReturnSummary()
+    {
+        await using var application = await TestApplication.CreateAsync();
+        const string category = "Catalog Operations";
+
+        var publicReady = await CreateActiveImageTemplateAsync(
+            application.Client,
+            "Catalog Public Ready",
+            category,
+            ["catalog", "public", "ready"]);
+        var qaPreview = await UploadMediaAsync(
+            application.Client,
+            "catalog-qa-ready.jpg",
+            "image/jpeg",
+            TemplateAssetKind.Preview,
+            "catalog-qa-ready-content"u8.ToArray());
+        var qaReady = await PostAsJsonAsync<AdminTemplateResponse>(
+            application.Client,
+            "/api/admin/templates/image",
+            new CreateImageTemplateCommand(
+                "Catalog QA Ready",
+                "QA-only catalog summary fixture.",
+                category,
+                ["catalog", "qa", "ready"],
+                true,
+                30,
+                TemplatePromoBadgeMode.New.ToString(),
+                new TemplateAssetCommand(
+                    qaPreview.Url,
+                    qaPreview.FileName,
+                    qaPreview.ContentType,
+                    qaPreview.FileSizeBytes,
+                    qaPreview.DurationSeconds),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                TemplateStatus.Draft.ToString(),
+                IsQaOnly: true));
+        var publicMissingPreview = await PostAsJsonAsync<AdminTemplateResponse>(
+            application.Client,
+            "/api/admin/templates/image",
+            new CreateImageTemplateCommand(
+                "Catalog Public Missing Preview",
+                "Public draft without a preview fixture.",
+                category,
+                ["catalog", "public", "missing-preview"],
+                false,
+                20,
+                TemplatePromoBadgeMode.New.ToString(),
+                null,
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                TemplateStatus.Draft.ToString()));
+        var encodedCategory = Uri.EscapeDataString(category);
+
+        var all = await GetFromJsonAsync<AdminTemplateCatalogPageResponse>(
+            application.Client,
+            $"/api/admin/templates/?type=Image&category={encodedCategory}&sort=title&skip=0&take=10");
+
+        Assert.Equal(3, all.TotalCount);
+        Assert.Equal(3, all.Summary.TotalTemplates);
+        Assert.Equal(3, all.Summary.ImageTemplates);
+        Assert.Equal(0, all.Summary.VideoTemplates);
+        Assert.Equal(1, all.Summary.ActiveTemplates);
+        Assert.Equal(2, all.Summary.DraftTemplates);
+        Assert.Equal(0, all.Summary.ArchivedTemplates);
+        Assert.Equal(1, all.Summary.PremiumTemplates);
+        Assert.Equal(1, all.Summary.QaOnlyTemplates);
+        Assert.Equal(1, all.Summary.MissingPreviewTemplates);
+
+        var qaOnlyReady = await GetFromJsonAsync<AdminTemplateCatalogPageResponse>(
+            application.Client,
+            $"/api/admin/templates/?category={encodedCategory}&visibility=qa_only&readiness=ready");
+
+        Assert.Equal(1, qaOnlyReady.TotalCount);
+        Assert.Equal(qaReady.TemplateId, Assert.Single(qaOnlyReady.Items).TemplateId);
+        Assert.Equal(1, qaOnlyReady.Summary.TotalTemplates);
+        Assert.Equal(1, qaOnlyReady.Summary.QaOnlyTemplates);
+        Assert.Equal(0, qaOnlyReady.Summary.MissingPreviewTemplates);
+
+        var publicMissing = await GetFromJsonAsync<AdminTemplateCatalogPageResponse>(
+            application.Client,
+            $"/api/admin/templates/?category={encodedCategory}&visibility=public&readiness=missing_preview");
+
+        Assert.Equal(1, publicMissing.TotalCount);
+        Assert.Equal(publicMissingPreview.TemplateId, Assert.Single(publicMissing.Items).TemplateId);
+        Assert.Equal(1, publicMissing.Summary.TotalTemplates);
+        Assert.Equal(0, publicMissing.Summary.QaOnlyTemplates);
+        Assert.Equal(1, publicMissing.Summary.MissingPreviewTemplates);
+        Assert.DoesNotContain(publicReady.TemplateId, publicMissing.Items.Select(item => item.TemplateId));
     }
 
     [Fact]

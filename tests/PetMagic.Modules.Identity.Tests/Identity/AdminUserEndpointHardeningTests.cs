@@ -1,3 +1,5 @@
+using PetMagic.Modules.Identity.Application.Contracts;
+
 namespace PetMagic.Modules.Identity.Tests.Identity;
 
 public sealed class AdminUserEndpointHardeningTests
@@ -15,7 +17,7 @@ public sealed class AdminUserEndpointHardeningTests
             "AdminUserEndpoints.cs"));
 
         Assert.Equal(
-            10,
+            16,
             CountOccurrences(source, "IdentityClientProblems.ToProblem(result.Error"));
         Assert.Contains("Task<Results<Ok<AdminUserDashboardMetricsResponse>, ProblemHttpResult>> GetDashboardMetricsAsync(", source, StringComparison.Ordinal);
         Assert.Contains("IdentityClientProblems.ToProblem(", source, StringComparison.Ordinal);
@@ -59,6 +61,9 @@ public sealed class AdminUserEndpointHardeningTests
         Assert.Contains("group.MapGet(\"/dashboard/metrics\", GetDashboardMetricsAsync);", source, StringComparison.Ordinal);
         Assert.Contains("group.MapGet(\"/{userId:guid}\", GetUserAsync);", source, StringComparison.Ordinal);
         Assert.Contains("group.MapGet(\"/{userId:guid}/analytics\", GetUserAnalyticsAsync);", source, StringComparison.Ordinal);
+        Assert.Contains("group.MapGet(\"/{userId:guid}/sessions\", GetUserSessionsAsync);", source, StringComparison.Ordinal);
+        Assert.Contains("group.MapPost(\"/{userId:guid}/sessions/{sessionId:guid}/revoke\", RevokeUserSessionAsync)", source, StringComparison.Ordinal);
+        Assert.Contains("group.MapPost(\"/{userId:guid}/sessions/revoke-all\", RevokeAllUserSessionsAsync)", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -74,6 +79,9 @@ public sealed class AdminUserEndpointHardeningTests
             "IdentityClientProblems.cs"));
 
         Assert.Contains("\"users.cannot_remove_last_admin\" => StatusCodes.Status409Conflict", source, StringComparison.Ordinal);
+        Assert.Contains("\"users.bulk_email_idempotency_conflict\" => StatusCodes.Status409Conflict", source, StringComparison.Ordinal);
+        Assert.Contains("\"users.session_not_found\" => StatusCodes.Status404NotFound", source, StringComparison.Ordinal);
+        Assert.Contains("\"users.session_idempotency_conflict\" => StatusCodes.Status409Conflict", source, StringComparison.Ordinal);
         Assert.Contains("\"users.not_found\" => StatusCodes.Status404NotFound", source, StringComparison.Ordinal);
         Assert.Contains("\"users.role_not_allowed\" => StatusCodes.Status403Forbidden", source, StringComparison.Ordinal);
         Assert.Contains("\"legal.catalog_unavailable\" => StatusCodes.Status503ServiceUnavailable", source, StringComparison.Ordinal);
@@ -101,7 +109,26 @@ public sealed class AdminUserEndpointHardeningTests
         Assert.Contains("var normalizedSearchLower = normalizedSearch.ToLowerInvariant();", source, StringComparison.Ordinal);
         Assert.Contains("((user.Email ?? string.Empty).ToLower().Contains(normalizedSearchLower))", source, StringComparison.Ordinal);
         Assert.Contains("((user.DisplayName ?? string.Empty).ToLower().Contains(normalizedSearchLower))", source, StringComparison.Ordinal);
+        Assert.Contains("EscapePostgresLikePattern(normalizedSearch)", source, StringComparison.Ordinal);
+        Assert.Contains("EF.Functions.ILike(user.Email, searchPattern, \"\\\\\")", source, StringComparison.Ordinal);
+        Assert.Contains("EF.Functions.ILike(user.DisplayName, searchPattern, \"\\\\\")", source, StringComparison.Ordinal);
+        Assert.Contains(".Replace(\"%\", \"\\\\%\", StringComparison.Ordinal)", source, StringComparison.Ordinal);
+        Assert.Contains(".Replace(\"_\", \"\\\\_\", StringComparison.Ordinal)", source, StringComparison.Ordinal);
         Assert.DoesNotContain("normalizedSearch.ToLower()", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AdminUserSearch_ShouldEscapePostgresLikeMetacharacters()
+    {
+        var escapePattern = typeof(PetMagic.Modules.Identity.Infrastructure.IdentityService).GetMethod(
+            "EscapePostgresLikePattern",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+
+        Assert.NotNull(escapePattern);
+
+        var escaped = escapePattern!.Invoke(null, [@"pet%_\magic"]);
+
+        Assert.Equal(@"pet\%\_\\magic", Assert.IsType<string>(escaped));
     }
 
     [Fact]
@@ -137,9 +164,78 @@ public sealed class AdminUserEndpointHardeningTests
         Assert.Contains("private const int MaxAdminUserMutationRequestBodyBytes = 8 * 1024;", source, StringComparison.Ordinal);
         Assert.Contains("private const int MaxAdminBulkEmailRequestBodyBytes = 64 * 1024;", source, StringComparison.Ordinal);
         Assert.Equal(
-            5,
+            8,
             CountOccurrences(source, ".WithMetadata(new RequestSizeLimitAttribute(MaxAdminUserMutationRequestBodyBytes));"));
         Assert.Contains(".WithMetadata(new RequestSizeLimitAttribute(MaxAdminBulkEmailRequestBodyBytes));", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AdminWalletEndpoint_ShouldForwardOptionalIdempotencyKeyToTheValidatedCommand()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Identity",
+            "PetMagic.Modules.Identity.Api",
+            "Endpoints",
+            "AdminUserEndpoints.cs"));
+
+        Assert.Contains("HttpContext httpContext", source, StringComparison.Ordinal);
+        Assert.Contains("httpContext.Request.Headers[\"Idempotency-Key\"]", source, StringComparison.Ordinal);
+        Assert.Contains("NormalizeOptionalHeaderValue", source, StringComparison.Ordinal);
+        Assert.Contains("private static string? NormalizeOptionalHeaderValue", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AdminBulkEmailEndpoint_ShouldForwardOptionalIdempotencyKeyToTheValidatedCommand()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Identity",
+            "PetMagic.Modules.Identity.Api",
+            "Endpoints",
+            "AdminUserEndpoints.cs"));
+
+        Assert.Contains("private static async Task<Results<Accepted<AdminEmailBroadcastQueueResponse>, ValidationProblem, ProblemHttpResult>> SendBulkEmailAsync(", source, StringComparison.Ordinal);
+        Assert.Contains("NormalizeOptionalHeaderValue(httpContext.Request.Headers[\"Idempotency-Key\"])", source, StringComparison.Ordinal);
+        Assert.Contains("/api/admin/users/email-broadcasts/{result.Value.BroadcastId:D}", source, StringComparison.Ordinal);
+        Assert.Contains("group.MapGet(\"/email-broadcasts\", ListEmailBroadcastsAsync);", source, StringComparison.Ordinal);
+        Assert.Contains("group.MapGet(\"/email-broadcasts/{broadcastId:guid}\", GetEmailBroadcastAsync);", source, StringComparison.Ordinal);
+        Assert.Contains("group.MapPost(\"/email-broadcasts/{broadcastId:guid}/retry-failed\", RetryFailedEmailBroadcastAsync)", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AdminEmailBroadcastContracts_ShouldNotExposeRecipientOrDeliverySecrets()
+    {
+        var contractTypes = new[]
+        {
+            typeof(AdminEmailBroadcastQueueResponse),
+            typeof(AdminEmailBroadcastListItemResponse),
+            typeof(AdminEmailBroadcastDetailResponse),
+            typeof(AdminEmailBroadcastRetryResponse)
+        };
+
+        var forbiddenPropertyNames = new[]
+        {
+            "RecipientEmail",
+            "Body",
+            "HtmlBody",
+            "TextBody",
+            "FailureMessage",
+            "ProviderPayload",
+            "LockId",
+            "LockExpiresAtUtc",
+            "RequestHash"
+        };
+
+        foreach (var contractType in contractTypes)
+        {
+            var propertyNames = contractType.GetProperties().Select(property => property.Name).ToArray();
+            Assert.DoesNotContain(propertyNames, propertyName => forbiddenPropertyNames.Contains(propertyName, StringComparer.Ordinal));
+        }
     }
 
     [Fact]
@@ -157,6 +253,25 @@ public sealed class AdminUserEndpointHardeningTests
         Assert.DoesNotContain("MapPut(\"/{userId:guid}/premium\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("SetPremiumStatusRequest", source, StringComparison.Ordinal);
         Assert.DoesNotContain("SetPremiumStatusAsync(", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AdminUserSessionContracts_ShouldNeverExposeTokenMaterial()
+    {
+        var exposedPropertyNames = new[]
+        {
+            typeof(AdminUserSessionListItemResponse),
+            typeof(AdminUserSessionsResponse),
+            typeof(AdminUserSessionRevokeResponse)
+        }
+            .SelectMany(type => type.GetProperties())
+            .Select(property => property.Name)
+            .ToArray();
+
+        Assert.DoesNotContain("TokenHash", exposedPropertyNames);
+        Assert.DoesNotContain("RefreshToken", exposedPropertyNames);
+        Assert.DoesNotContain("AccessToken", exposedPropertyNames);
+        Assert.DoesNotContain("SecurityStamp", exposedPropertyNames);
     }
 
     private static string FindRepositoryRoot()

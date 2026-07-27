@@ -34,6 +34,18 @@ public static partial class SupportChatEndpoints
             return unauthorized!;
         }
 
+        string? idempotencyKey = null;
+        if (isAdmin)
+        {
+            var idempotencyValidationErrors = ValidateOptionalSupportMessageIdempotencyKey(
+                httpContext.Request,
+                out idempotencyKey);
+            if (idempotencyValidationErrors.Count > 0)
+            {
+                return TypedResults.ValidationProblem(idempotencyValidationErrors);
+            }
+        }
+
         var form = await httpContext.Request.ReadFormAsync(cancellationToken);
         var files = form.Files.Where(file => file.Length > 0).ToList();
         if (files.Count == 0)
@@ -126,7 +138,8 @@ public static partial class SupportChatEndpoints
                     StorageKey: attachment.StorageKey))
                 .ToList(),
             ReplyToMessageId: replyToMessageId,
-            Locale: isAdmin ? null : ResolvePreferredLocale(locale, httpContext));
+            Locale: isAdmin ? null : ResolvePreferredLocale(locale, httpContext),
+            IdempotencyKey: idempotencyKey);
 
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
@@ -142,7 +155,34 @@ public static partial class SupportChatEndpoints
             return ToProblem(sendResult.Error);
         }
 
+        if (sendResult.Value.IsIdempotencyReplay)
+        {
+            await CleanupStoredAttachmentsAsync(storedAttachments, attachmentStorage);
+        }
+
         return TypedResults.Ok(SignAttachmentUrls(sendResult.Value, attachmentReadUrlSigner));
+    }
+
+    private static Dictionary<string, string[]> ValidateOptionalSupportMessageIdempotencyKey(
+        HttpRequest request,
+        out string? idempotencyKey)
+    {
+        idempotencyKey = null;
+        var values = request.Headers[SupportMessageIdempotency.HeaderName];
+        if (values.Count == 0)
+        {
+            return [];
+        }
+
+        if (values.Count != 1 || !SupportMessageIdempotency.TryNormalize(values[0], out idempotencyKey))
+        {
+            return new Dictionary<string, string[]>
+            {
+                [SupportMessageIdempotency.HeaderName] = ["support.idempotency_key_invalid"]
+            };
+        }
+
+        return [];
     }
 
     private static Dictionary<string, string[]> ValidateAttachmentFiles(

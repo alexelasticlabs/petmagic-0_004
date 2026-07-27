@@ -26,6 +26,9 @@ public sealed class SupportChatRealtimePrivacyTests
         Assert.DoesNotContain("lastMessagePreview", userPayload, StringComparison.Ordinal);
         Assert.DoesNotContain("initiatorUserId", userPayload, StringComparison.Ordinal);
         Assert.DoesNotContain("adminUnreadCount", userPayload, StringComparison.Ordinal);
+        Assert.Contains("GetActiveUserIdsInRolesAsync", source, StringComparison.Ordinal);
+        Assert.Contains("hubContext.Clients.Users(operatorUserIds)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("hubContext.Clients.Group(SupportChatHub.AdminInboxGroup)", source, StringComparison.Ordinal);
         Assert.Contains(".SendAsync(SupportChatHub.ConversationUpdatedEvent, adminPayload, cancellationToken)", source, StringComparison.Ordinal);
         Assert.Contains(".SendAsync(SupportChatHub.ConversationUpdatedEvent, userPayload, cancellationToken)", source, StringComparison.Ordinal);
     }

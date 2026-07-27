@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -136,6 +137,115 @@ public sealed class EmailDispatchProcessorTests
 
         Assert.False(await processor.ProcessNextAsync(CancellationToken.None));
         Assert.Equal(0, sender.SendCount);
+    }
+
+    [Fact]
+    public async Task ProcessAndCleanupBroadcastDispatch_ShouldPreserveAggregateProgress()
+    {
+        await using var dbContext = CreateDbContext();
+        var broadcastId = Guid.NewGuid();
+        var now = DateTime.UtcNow.AddMinutes(-1);
+        dbContext.AdminEmailBroadcasts.Add(new AdminEmailBroadcast
+        {
+            Id = broadcastId,
+            Audience = "premium",
+            Subject = "Broadcast",
+            RequestHash = new string('A', 64),
+            Status = AdminEmailBroadcastStatus.Queued,
+            RecipientCount = 1,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        });
+        dbContext.EmailDispatchJobs.Add(new EmailDispatchJob
+        {
+            Id = Guid.NewGuid(),
+            BroadcastId = broadcastId,
+            UserId = Guid.NewGuid(),
+            RecipientEmail = "pet@example.com",
+            Subject = "Broadcast",
+            HtmlBody = "<p>Body</p>",
+            TextBody = "Body",
+            Kind = EmailDispatchKind.Broadcast,
+            Status = EmailDispatchStatus.Queued,
+            QueuedAtUtc = now,
+            UpdatedAtUtc = now
+        });
+        await dbContext.SaveChangesAsync();
+        var processor = new EmailDispatchProcessor(
+            dbContext,
+            new SuccessfulEmailSender(),
+            new EmailOptions
+            {
+                MaxDispatchAttempts = 3,
+                CompletedDispatchRetentionDays = 0
+            },
+            NullLogger<EmailDispatchProcessor>.Instance);
+
+        Assert.True(await processor.ProcessNextAsync(CancellationToken.None));
+
+        var completed = await dbContext.AdminEmailBroadcasts.AsNoTracking().SingleAsync();
+        Assert.Equal(AdminEmailBroadcastStatus.Completed, completed.Status);
+        Assert.Equal(1, completed.SentCount);
+        Assert.Equal(0, completed.FailedCount);
+        Assert.NotNull(completed.CompletedAtUtc);
+
+        Assert.True(await processor.CleanupNextExpiredDispatchAsync(CancellationToken.None));
+        Assert.Empty(await dbContext.EmailDispatchJobs.ToListAsync());
+        var afterCleanup = await dbContext.AdminEmailBroadcasts.AsNoTracking().SingleAsync();
+        Assert.Equal(AdminEmailBroadcastStatus.Completed, afterCleanup.Status);
+        Assert.Equal(1, afterCleanup.SentCount);
+        Assert.Equal(0, afterCleanup.FailedCount);
+    }
+
+    [Fact]
+    public async Task ProcessBroadcastDispatch_ShouldUpdateAggregateAtomicallyOnRelationalProvider()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<IdentityDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var dbContext = new IdentityDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+        var broadcastId = Guid.NewGuid();
+        var now = DateTime.UtcNow.AddMinutes(-1);
+        dbContext.AdminEmailBroadcasts.Add(new AdminEmailBroadcast
+        {
+            Id = broadcastId,
+            Audience = "premium",
+            Subject = "Relational broadcast",
+            RequestHash = new string('B', 64),
+            Status = AdminEmailBroadcastStatus.Queued,
+            RecipientCount = 1,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        });
+        dbContext.EmailDispatchJobs.Add(new EmailDispatchJob
+        {
+            Id = Guid.NewGuid(),
+            BroadcastId = broadcastId,
+            RecipientEmail = "pet@example.com",
+            Subject = "Relational broadcast",
+            HtmlBody = "<p>Body</p>",
+            TextBody = "Body",
+            Kind = EmailDispatchKind.Broadcast,
+            Status = EmailDispatchStatus.Queued,
+            QueuedAtUtc = now,
+            UpdatedAtUtc = now
+        });
+        await dbContext.SaveChangesAsync();
+        var processor = new EmailDispatchProcessor(
+            dbContext,
+            new SuccessfulEmailSender(),
+            new EmailOptions { MaxDispatchAttempts = 3 },
+            NullLogger<EmailDispatchProcessor>.Instance);
+
+        Assert.True(await processor.ProcessNextAsync(CancellationToken.None));
+
+        var completed = await dbContext.AdminEmailBroadcasts.AsNoTracking().SingleAsync();
+        Assert.Equal(AdminEmailBroadcastStatus.Completed, completed.Status);
+        Assert.Equal(1, completed.SentCount);
+        Assert.NotNull(completed.CompletedAtUtc);
     }
 
     [Fact]

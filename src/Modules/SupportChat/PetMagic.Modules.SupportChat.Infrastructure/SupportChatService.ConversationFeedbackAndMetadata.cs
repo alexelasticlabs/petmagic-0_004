@@ -12,6 +12,12 @@ public sealed partial class SupportChatService
         SubmitSupportConversationFeedbackCommand command,
         CancellationToken cancellationToken)
     {
+        await using var transaction = await BeginSupportAdminActionTransactionAsync(cancellationToken);
+        if (transaction is not null)
+        {
+            await LockConversationRowForAdminActionAsync(command.ConversationId, cancellationToken);
+        }
+
         var conversation = await supportChatDbContext.SupportConversations
             .FirstOrDefaultAsync(x => x.Id == command.ConversationId, cancellationToken);
         if (conversation is null)
@@ -34,6 +40,11 @@ public sealed partial class SupportChatService
             return Result.Failure<SupportConversationDetailResponse>(SupportChatErrors.InvalidFeedbackRating);
         }
 
+        if (conversation.FeedbackSubmittedAtUtc is not null || conversation.FeedbackRating is not null)
+        {
+            return Result.Failure<SupportConversationDetailResponse>(SupportChatErrors.FeedbackNotAllowed);
+        }
+
         var now = DateTime.UtcNow;
         conversation.FeedbackRating = command.Rating;
         conversation.FeedbackComment = string.IsNullOrWhiteSpace(command.Comment)
@@ -43,6 +54,11 @@ public sealed partial class SupportChatService
         conversation.UpdatedAtUtc = now;
 
         await supportChatDbContext.SaveChangesAsync(cancellationToken);
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
+
         await NotifyConversationUpdatedAsync(conversation, cancellationToken);
         return Result.Success(await BuildConversationDetailAsync(conversation.Id, cancellationToken));
     }

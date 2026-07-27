@@ -58,10 +58,20 @@ public sealed class SupportClaimPostgresConcurrencyTests
 
             var results = await Task.WhenAll(
                 firstService.AssignConversationAsync(
-                    new AssignSupportConversationCommand(conversationId, firstAdminId, firstAdminId),
+                    new AssignSupportConversationCommand(
+                        conversationId,
+                        firstAdminId,
+                        firstAdminId,
+                        "Concurrent claim by first operator.",
+                        ExpectedVersion: 1),
                     CancellationToken.None),
                 secondService.AssignConversationAsync(
-                    new AssignSupportConversationCommand(conversationId, secondAdminId, secondAdminId),
+                    new AssignSupportConversationCommand(
+                        conversationId,
+                        secondAdminId,
+                        secondAdminId,
+                        "Concurrent claim by second operator.",
+                        ExpectedVersion: 1),
                     CancellationToken.None));
 
             Assert.Single(results, result => result.IsSuccess);
@@ -73,6 +83,77 @@ public sealed class SupportClaimPostgresConcurrencyTests
                 .AsNoTracking()
                 .SingleAsync(x => x.Id == conversationId);
             Assert.True(persisted.AssignedAdminId == firstAdminId || persisted.AssignedAdminId == secondAdminId);
+        }
+        finally
+        {
+            await using var cleanupContext = new SupportChatDbContext(options);
+            await cleanupContext.SupportConversations
+                .Where(x => x.Id == conversationId)
+                .ExecuteDeleteAsync();
+        }
+    }
+
+    [Fact]
+    public async Task ConcurrentFeedback_ShouldAllowExactlyOneSubmissionOnPostgres()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("PETMAGIC_POSTGRES_INTEGRATION_CONNECTION_STRING");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            return;
+        }
+
+        var options = new DbContextOptionsBuilder<SupportChatDbContext>()
+            .UseNpgsql(connectionString)
+            .Options;
+        var conversationId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        await using (var seedContext = new SupportChatDbContext(options))
+        {
+            seedContext.SupportConversations.Add(new SupportConversation
+            {
+                Id = conversationId,
+                InitiatorUserId = userId,
+                Status = SupportConversationStatus.Closed,
+                Priority = SupportConversationPriority.Normal,
+                Source = SupportConversationSource.MobileChat,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
+                WaitingSinceUtc = now,
+                ClosedAtUtc = now,
+                ClosedByUserId = userId,
+            });
+            await seedContext.SaveChangesAsync();
+        }
+
+        try
+        {
+            await using var firstContext = new SupportChatDbContext(options);
+            await using var secondContext = new SupportChatDbContext(options);
+            var users = new SupportOperatorsLookup(userId);
+            var firstService = CreateService(firstContext, users);
+            var secondService = CreateService(secondContext, users);
+
+            var results = await Task.WhenAll(
+                firstService.SubmitConversationFeedbackAsync(
+                    new SubmitSupportConversationFeedbackCommand(conversationId, userId, 5, "First"),
+                    CancellationToken.None),
+                secondService.SubmitConversationFeedbackAsync(
+                    new SubmitSupportConversationFeedbackCommand(conversationId, userId, 1, "Second"),
+                    CancellationToken.None));
+
+            Assert.Single(results, result => result.IsSuccess);
+            var rejected = Assert.Single(results, result => result.IsFailure);
+            Assert.Equal(SupportChatErrors.FeedbackNotAllowed.Code, rejected.Error.Code);
+
+            await using var verificationContext = new SupportChatDbContext(options);
+            var persisted = await verificationContext.SupportConversations
+                .AsNoTracking()
+                .SingleAsync(x => x.Id == conversationId);
+            Assert.True(persisted.FeedbackRating is 1 or 5);
+            Assert.True(persisted.FeedbackComment is "First" or "Second");
+            Assert.NotNull(persisted.FeedbackSubmittedAtUtc);
         }
         finally
         {
@@ -112,6 +193,16 @@ public sealed class SupportClaimPostgresConcurrencyTests
         private readonly IReadOnlyDictionary<Guid, IdentityUserLookup> users = operatorIds.ToDictionary(
             id => id,
             id => new IdentityUserLookup(id, $"{id:N}@petmagic.test", "Support Operator", [SystemRoles.Admin]));
+
+        public Task<IReadOnlyList<Guid>> GetActiveUserIdsInRolesAsync(
+            IReadOnlyCollection<string> roles,
+            CancellationToken cancellationToken)
+        {
+            IReadOnlyList<Guid> result = roles.Contains(SystemRoles.Admin, StringComparer.Ordinal)
+                ? [.. users.Keys]
+                : [];
+            return Task.FromResult(result);
+        }
 
         public Task<IReadOnlyDictionary<Guid, IdentityUserLookup>> GetUsersByIdsAsync(
             IReadOnlyCollection<Guid> userIds,

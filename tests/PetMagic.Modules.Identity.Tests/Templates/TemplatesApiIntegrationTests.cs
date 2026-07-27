@@ -20,10 +20,12 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Host.Api.Security;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
+using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Templates.Api;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
@@ -200,7 +202,9 @@ public sealed partial class TemplatesApiIntegrationTests
             bool failGeneratedMediaImport = false,
             int? freeImageMaxEstimatedWaitSeconds = null,
             bool startGenerationWorker = true,
-            bool qaFixturesEnabled = false)
+            bool qaFixturesEnabled = false,
+            IAdminAuditLog? adminAuditLog = null,
+            IIdentityUserLookupService? identityUserLookupService = null)
         {
             var databaseRoot = new InMemoryDatabaseRoot();
             var databaseName = $"templates-api-tests-{Guid.NewGuid():N}";
@@ -212,6 +216,7 @@ public sealed partial class TemplatesApiIntegrationTests
             });
 
             builder.WebHost.UseTestServer();
+            builder.Services.AddDataProtection().UseEphemeralDataProtectionProvider();
             builder.Configuration["AllowedHosts"] = "*";
 
             builder.Services.AddAuthentication(TestAuthHandler.SchemeName)
@@ -232,7 +237,6 @@ public sealed partial class TemplatesApiIntegrationTests
             });
 
             builder.Services.AddProblemDetails();
-            builder.Services.AddDataProtection();
             builder.Services.AddMemoryCache();
             builder.Services.AddRateLimiter(options =>
             {
@@ -332,6 +336,15 @@ public sealed partial class TemplatesApiIntegrationTests
                 .AddHttpClient(TemplateLocalizationTranslator.HttpClientName)
                 .ConfigurePrimaryHttpMessageHandler(() => new UnavailableTranslationHandler());
             builder.Services.AddScoped<ITemplateMediaLifecycleService, TemplateMediaLifecycleService>();
+            if (adminAuditLog is not null)
+            {
+                builder.Services.AddSingleton<IAdminAuditLog>(adminAuditLog);
+            }
+            if (identityUserLookupService is not null)
+            {
+                builder.Services.AddSingleton(identityUserLookupService);
+            }
+
             builder.Services.AddScoped<ITemplatesService, TemplatesService>();
             builder.Services.AddScoped<TemplateGenerationService>();
             builder.Services.AddScoped<ITemplateGenerationService>(serviceProvider =>
@@ -597,6 +610,54 @@ public sealed partial class TemplatesApiIntegrationTests
             }
 
             throw new NotSupportedException(targetMethod?.Name ?? "Unknown economy method");
+        }
+    }
+
+    private sealed class RecordingAdminAuditLog : IAdminAuditLog
+    {
+        public List<AdminAuditEntry> Entries { get; } = [];
+
+        public Task WriteAsync(AdminAuditEntry entry, CancellationToken cancellationToken)
+        {
+            Entries.Add(entry);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FixedIdentityUserLookupService(IReadOnlyDictionary<Guid, string> activeRoles)
+        : IIdentityUserLookupService
+    {
+        public Task<IReadOnlyList<Guid>> GetActiveUserIdsInRolesAsync(
+            IReadOnlyCollection<string> roles,
+            CancellationToken cancellationToken)
+        {
+            var roleSet = roles.ToHashSet(StringComparer.Ordinal);
+            IReadOnlyList<Guid> result = activeRoles
+                .Where(item => roleSet.Contains(item.Value))
+                .Select(item => item.Key)
+                .ToArray();
+            return Task.FromResult(result);
+        }
+
+        public Task<IReadOnlyDictionary<Guid, IdentityUserLookup>> GetUsersByIdsAsync(
+            IReadOnlyCollection<Guid> userIds,
+            CancellationToken cancellationToken)
+        {
+            var requestedIds = userIds.ToHashSet();
+            IReadOnlyDictionary<Guid, IdentityUserLookup> result = activeRoles
+                .Where(item => requestedIds.Contains(item.Key))
+                .ToDictionary(
+                    item => item.Key,
+                    item => new IdentityUserLookup(item.Key, string.Empty, null, [item.Value]));
+            return Task.FromResult(result);
+        }
+
+        public Task<IdentityUserLookup?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken)
+        {
+            IdentityUserLookup? result = activeRoles.TryGetValue(userId, out var role)
+                ? new IdentityUserLookup(userId, string.Empty, null, [role])
+                : null;
+            return Task.FromResult(result);
         }
     }
 

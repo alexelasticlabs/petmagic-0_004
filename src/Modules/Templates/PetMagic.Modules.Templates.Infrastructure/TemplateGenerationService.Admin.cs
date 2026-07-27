@@ -1,3 +1,6 @@
+using System.Security.Cryptography;
+using System.Text;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
@@ -16,6 +19,10 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 internal sealed partial class TemplateGenerationService
 {
     private const string NpgsqlProviderName = "Npgsql.EntityFrameworkCore.PostgreSQL";
+    private const string AdminGenerationRefundRetryIdempotencyScope = "admin_generation_refund_retry";
+    private const string AdminGenerationRefundRetryAction = "admin.templates.generation.refund_retry";
+    private const int AdminGenerationRefundRetryReasonMaxLength = 500;
+    private const int AdminGenerationRefundRetryIdempotencyKeyMaxLength = 256;
 
     public async Task<Result<TemplateGenerationResponse>> GetAdminAsync(Guid generationId, CancellationToken cancellationToken)
     {
@@ -146,16 +153,93 @@ internal sealed partial class TemplateGenerationService
         return Result.Success(response);
     }
 
-    public async Task<Result<TemplateGenerationResponse>> RetryAdminGenerationRefundAsync(
+    public Task<Result<TemplateGenerationResponse>> RetryAdminGenerationRefundAsync(
         Guid adminUserId,
         Guid generationId,
         CancellationToken cancellationToken)
     {
+        return RetryAdminGenerationRefundAsync(
+            adminUserId,
+            generationId,
+            reason: null,
+            idempotencyKey: null,
+            cancellationToken);
+    }
+
+    public async Task<Result<TemplateGenerationResponse>> RetryAdminGenerationRefundAsync(
+        Guid adminUserId,
+        Guid generationId,
+        string? reason,
+        string? idempotencyKey,
+        CancellationToken cancellationToken)
+    {
+        var normalizedReason = NormalizeAdminGenerationRefundRetryOptionalText(reason);
+        if (normalizedReason is { Length: > AdminGenerationRefundRetryReasonMaxLength })
+        {
+            return Result.Failure<TemplateGenerationResponse>(TemplatesErrors.GenerationRefundRetryReasonInvalid);
+        }
+
+        var normalizedIdempotencyKey = NormalizeAdminGenerationRefundRetryOptionalText(idempotencyKey);
+        if ((idempotencyKey is not null && normalizedIdempotencyKey is null)
+            || normalizedIdempotencyKey is { Length: > AdminGenerationRefundRetryIdempotencyKeyMaxLength })
+        {
+            return Result.Failure<TemplateGenerationResponse>(TemplatesErrors.GenerationRefundRetryIdempotencyKeyInvalid);
+        }
+
+        var requestHash = normalizedIdempotencyKey is null
+            ? null
+            : CreateAdminGenerationRefundRetryRequestHash(generationId, normalizedReason);
+        if (normalizedIdempotencyKey is not null)
+        {
+            var existingReceipt = await FindAdminGenerationRefundRetryReceiptAsync(
+                adminUserId,
+                normalizedIdempotencyKey,
+                cancellationToken);
+            if (existingReceipt is not null)
+            {
+                return await ResolveAdminGenerationRefundRetryReplayAsync(
+                    existingReceipt,
+                    requestHash!,
+                    cancellationToken);
+            }
+        }
+
+        await using var transaction = await BeginGenerationAdminActionTransactionAsync(cancellationToken);
+        if (transaction is not null)
+        {
+            await LockGenerationRowForAdminActionAsync(generationId, cancellationToken);
+        }
+
+        if (normalizedIdempotencyKey is not null)
+        {
+            var existingReceipt = await FindAdminGenerationRefundRetryReceiptAsync(
+                adminUserId,
+                normalizedIdempotencyKey,
+                cancellationToken);
+            if (existingReceipt is not null)
+            {
+                if (transaction is not null)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                }
+
+                return await ResolveAdminGenerationRefundRetryReplayAsync(
+                    existingReceipt,
+                    requestHash!,
+                    cancellationToken);
+            }
+        }
+
         var job = await dbContext.TemplateGenerationJobs
             .Include(x => x.Template)
             .FirstOrDefaultAsync(x => x.Id == generationId, cancellationToken);
         if (job is null)
         {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+
             return Result.Failure<TemplateGenerationResponse>(TemplatesErrors.GenerationJobNotFound);
         }
 
@@ -163,27 +247,214 @@ internal sealed partial class TemplateGenerationService
             || job.ChargedAtUtc is null
             || job.RefundedAtUtc is not null)
         {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+
             return Result.Failure<TemplateGenerationResponse>(TemplatesErrors.GenerationRefundNotPending);
+        }
+
+        if (job.RefundAttemptCount < options.MaxRefundAttempts)
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+
+            return Result.Failure<TemplateGenerationResponse>(TemplatesErrors.GenerationRefundRetryNotExhausted);
         }
 
         // No money moves here: the refund itself stays inside the idempotent worker retry pipeline
         // (generation_refund ledger unique index guarantees at-most-once crediting). This action only
         // re-arms the retry budget so the worker picks the job up again within its poll interval.
+        var previousRefundAttemptCount = job.RefundAttemptCount;
+        var previousRefundLastAttemptedAtUtc = job.RefundLastAttemptedAtUtc;
+        var previousRefundLastErrorCode = job.RefundLastErrorCode;
+        var now = DateTime.UtcNow;
+        var correlationId = NormalizeAdminGenerationRefundRetryCorrelationId(CorrelationContext.ResolveOrCreate());
+        AdminGenerationRefundRetryReceipt? receipt = null;
+        if (normalizedIdempotencyKey is not null)
+        {
+            receipt = new AdminGenerationRefundRetryReceipt
+            {
+                Id = CreateAdminGenerationRefundRetryReceiptId(adminUserId, normalizedIdempotencyKey),
+                ActorUserId = adminUserId,
+                GenerationId = generationId,
+                IdempotencyKey = normalizedIdempotencyKey,
+                RequestHash = requestHash!,
+                Reason = normalizedReason,
+                PreviousRefundAttemptCount = previousRefundAttemptCount,
+                PreviousRefundLastAttemptedAtUtc = previousRefundLastAttemptedAtUtc,
+                PreviousRefundLastErrorCode = previousRefundLastErrorCode,
+                CorrelationId = correlationId,
+                CreatedAtUtc = now
+            };
+            dbContext.AdminGenerationRefundRetryReceipts.Add(receipt);
+        }
+
+        var auditEventId = receipt?.Id ?? Guid.NewGuid();
+        var auditEntry = CreateAdminGenerationRefundRetryAuditEntry(
+            adminUserId,
+            job,
+            normalizedReason,
+            previousRefundAttemptCount,
+            previousRefundLastAttemptedAtUtc,
+            previousRefundLastErrorCode,
+            correlationId,
+            auditEventId,
+            now);
+        var pendingAudit = TemplateAdminAuditOutbox.Enqueue(
+            dbContext,
+            auditEntry,
+            httpContextAccessor?.HttpContext);
+
         job.RefundAttemptCount = 0;
         job.RefundLastAttemptedAtUtc = null;
         job.RefundLastErrorCode = null;
-        job.UpdatedAtUtc = DateTime.UtcNow;
-        await dbContext.SaveChangesAsync(cancellationToken);
+        job.UpdatedAtUtc = now;
+
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+        }
+        catch (DbUpdateException) when (normalizedIdempotencyKey is not null)
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+
+            dbContext.ChangeTracker.Clear();
+            var persistedReceipt = await FindAdminGenerationRefundRetryReceiptAsync(
+                adminUserId,
+                normalizedIdempotencyKey,
+                cancellationToken);
+            if (persistedReceipt is not null)
+            {
+                return await ResolveAdminGenerationRefundRetryReplayAsync(
+                    persistedReceipt,
+                    requestHash!,
+                    cancellationToken);
+            }
+
+            throw;
+        }
+
+        await TemplateAdminAuditOutbox.TryDeliverAsync(
+            dbContext,
+            adminAuditLog,
+            logger,
+            pendingAudit,
+            cancellationToken);
 
         logger?.LogWarning(
-            "ADMIN ACTION: generation refund retry re-armed. AdminUserIdHash={AdminUserIdHash} GenerationIdHash={GenerationIdHash} UserIdHash={UserIdHash} TokenCost={TokenCost} CorrelationIdHash={CorrelationIdHash}",
+            "ADMIN ACTION: generation refund retry re-armed. AdminUserIdHash={AdminUserIdHash} GenerationIdHash={GenerationIdHash} UserIdHash={UserIdHash} TokenCost={TokenCost} PreviousRefundAttemptCount={PreviousRefundAttemptCount} Idempotent={Idempotent} CorrelationIdHash={CorrelationIdHash}",
             TemplateLogSanitizer.SafeId(adminUserId),
             TemplateLogSanitizer.SafeId(job.Id),
             TemplateLogSanitizer.SafeId(job.UserId),
             job.TokenCost,
-            SafeLogValues.StableHash(CorrelationContext.ResolveOrCreate()));
+            previousRefundAttemptCount,
+            receipt is not null,
+            SafeLogValues.StableHash(correlationId));
 
         return Result.Success(await MapResponseWithQueueMetricsAsync(job, cancellationToken));
+    }
+
+    private Task<AdminGenerationRefundRetryReceipt?> FindAdminGenerationRefundRetryReceiptAsync(
+        Guid adminUserId,
+        string idempotencyKey,
+        CancellationToken cancellationToken)
+    {
+        return dbContext.AdminGenerationRefundRetryReceipts
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                receipt => receipt.ActorUserId == adminUserId
+                    && receipt.IdempotencyKey == idempotencyKey,
+                cancellationToken);
+    }
+
+    private async Task<Result<TemplateGenerationResponse>> ResolveAdminGenerationRefundRetryReplayAsync(
+        AdminGenerationRefundRetryReceipt receipt,
+        string requestHash,
+        CancellationToken cancellationToken)
+    {
+        if (!string.Equals(receipt.RequestHash, requestHash, StringComparison.Ordinal))
+        {
+            return Result.Failure<TemplateGenerationResponse>(TemplatesErrors.GenerationRefundRetryIdempotencyConflict);
+        }
+
+        var job = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .Include(x => x.Template)
+            .SingleOrDefaultAsync(x => x.Id == receipt.GenerationId, cancellationToken);
+        if (job is null)
+        {
+            return Result.Failure<TemplateGenerationResponse>(TemplatesErrors.GenerationJobNotFound);
+        }
+
+        await TemplateAdminAuditOutbox.TryDeliverExistingAsync(
+            dbContext,
+            adminAuditLog,
+            logger,
+            receipt.Id,
+            cancellationToken);
+
+        return Result.Success(await MapResponseWithQueueMetricsAsync(job, cancellationToken));
+    }
+
+    private static AdminAuditEntry CreateAdminGenerationRefundRetryAuditEntry(
+        Guid adminUserId,
+        TemplateGenerationJob job,
+        string? reason,
+        int previousRefundAttemptCount,
+        DateTime? previousRefundLastAttemptedAtUtc,
+        string? previousRefundLastErrorCode,
+        string correlationId,
+        Guid eventId,
+        DateTime occurredAtUtc)
+    {
+        return new AdminAuditEntry(
+            AdminGenerationRefundRetryAction,
+            "TemplateGenerationJob",
+            job.Id.ToString("D"),
+            $"refundAttemptCount={previousRefundAttemptCount};refundLastAttemptedAtUtc={previousRefundLastAttemptedAtUtc:O};refundLastErrorCode={previousRefundLastErrorCode ?? "null"}",
+            "refundAttemptCount=0;refundLastAttemptedAtUtc=null;refundLastErrorCode=null",
+            $"reason={reason ?? "not_provided"};tokenCost={job.TokenCost};retryBudgetReset=true",
+            job.UserId,
+            eventId,
+            adminUserId,
+            correlationId)
+        {
+            OccurredAtUtc = occurredAtUtc
+        };
+    }
+
+    private static string? NormalizeAdminGenerationRefundRetryOptionalText(string? value)
+    {
+        var trimmed = value?.Trim();
+        return string.IsNullOrEmpty(trimmed) ? null : trimmed;
+    }
+
+    private static string NormalizeAdminGenerationRefundRetryCorrelationId(string value)
+    {
+        return value.Length <= 128 ? value : value[..128];
+    }
+
+    private static Guid CreateAdminGenerationRefundRetryReceiptId(Guid adminUserId, string idempotencyKey)
+    {
+        var rawKey = $"{AdminGenerationRefundRetryIdempotencyScope}:{adminUserId:D}:{idempotencyKey}";
+        return new Guid(SHA256.HashData(Encoding.UTF8.GetBytes(rawKey)).AsSpan(0, 16));
+    }
+
+    private static string CreateAdminGenerationRefundRetryRequestHash(Guid generationId, string? reason)
+    {
+        var canonicalRequest = $"{generationId:D}|{reason?.Length ?? 0}:{reason}";
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonicalRequest)));
     }
 
     private async Task<IDbContextTransaction?> BeginGenerationAdminActionTransactionAsync(CancellationToken cancellationToken)

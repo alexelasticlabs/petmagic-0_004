@@ -279,7 +279,7 @@ public sealed class EconomyDbContext(DbContextOptions<EconomyDbContext> options)
             entity.Property(x => x.ExternalSubscriptionId).HasMaxLength(160);
             entity.Property(x => x.ExternalTransactionId).HasMaxLength(160);
             entity.Property(x => x.CreatedAtUtc).IsRequired();
-            entity.Property(x => x.UpdatedAtUtc).IsRequired();
+            entity.Property(x => x.UpdatedAtUtc).IsRequired().IsConcurrencyToken();
             entity.HasIndex(x => new { x.UserId, x.UpdatedAtUtc });
             entity.HasIndex(x => new { x.UserId, x.Status, x.CurrentPeriodEndUtc });
             entity.HasIndex(x => x.UpdatedAtUtc);
@@ -318,7 +318,7 @@ public sealed class EconomyDbContext(DbContextOptions<EconomyDbContext> options)
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Provider).HasMaxLength(32).IsRequired();
             entity.Property(x => x.EventType).HasMaxLength(64).IsRequired();
-            entity.Property(x => x.Status).HasMaxLength(32).IsRequired();
+            entity.Property(x => x.Status).HasMaxLength(32).IsRequired().IsConcurrencyToken();
             entity.Property(x => x.ExternalEventId).HasMaxLength(160);
             entity.Property(x => x.ExternalSubscriptionId).HasMaxLength(160);
             entity.Property(x => x.PayloadJson).HasMaxLength(32000);

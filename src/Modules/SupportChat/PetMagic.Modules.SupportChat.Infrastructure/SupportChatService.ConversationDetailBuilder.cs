@@ -31,6 +31,7 @@ public sealed partial class SupportChatService
                 x.Id,
                 x.InitiatorUserId,
                 x.AssignedAdminId,
+                x.Version,
                 x.Status,
                 x.Priority,
                 x.Source,
@@ -45,6 +46,9 @@ public sealed partial class SupportChatService
                 x.LastMessagePreview,
                 x.LastMessageSenderType,
                 x.WaitingSinceUtc,
+                x.FirstResponseAtUtc,
+                x.ResolutionSlaPausedAtUtc,
+                x.ResolutionSlaPausedSeconds,
                 x.ResolvedAtUtc,
                 x.ReopenUntilUtc,
                 x.ClosedAtUtc,
@@ -180,12 +184,22 @@ public sealed partial class SupportChatService
             ResolveAvailableActions(normalizedStatus, conversation.AssignedAdminId.HasValue),
             hasOlderMessages,
             oldestLoadedMessageCreatedAtUtc,
-            messages);
+            messages,
+            conversation.Version,
+            BuildSla(
+                conversation.Priority,
+                conversation.CreatedAtUtc,
+                conversation.FirstResponseAtUtc,
+                conversation.ResolvedAtUtc,
+                conversation.ResolutionSlaPausedAtUtc,
+                conversation.ResolutionSlaPausedSeconds,
+                now));
     }
 
     private async Task<SupportMessageResponse> BuildMessageResponseAsync(
         ConversationMessage message,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool isIdempotencyReplay = false)
     {
         var sender = await identityUserLookupService.GetUserByIdAsync(message.SenderUserId, cancellationToken);
         var messageAttachments = BuildAttachmentResponses(message);
@@ -209,6 +223,7 @@ public sealed partial class SupportChatService
             message.ReadAtUtc,
             message.DeliveredAtUtc,
             message.IsInternalNote,
-            message.CreatedAtUtc);
+            message.CreatedAtUtc,
+            isIdempotencyReplay);
     }
 }

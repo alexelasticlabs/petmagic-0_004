@@ -22,6 +22,7 @@ public static class EconomyInfrastructureServiceCollectionExtensions
         bool isProduction = false)
     {
         services.AddMemoryCache();
+        services.AddHttpContextAccessor();
 
         var section = configuration.GetSection(EconomyOptions.SectionName);
         var economyOptions = new EconomyOptions
@@ -156,6 +157,7 @@ public static class EconomyInfrastructureServiceCollectionExtensions
             options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"));
         });
 
+        services.AddScoped<EconomyAdminAuditOutbox>();
         services.AddScoped<EconomyAdminConfigurationService>();
         services.AddScoped<EconomyAdminRedeemCodeService>();
         services.AddScoped<IEconomyService, EconomyService>();
@@ -182,7 +184,7 @@ public static class EconomyInfrastructureServiceCollectionExtensions
             serviceProvider.GetRequiredService<FcmEconomyPushNotificationSender>());
         services.AddScoped<IEconomyPushNotificationSender, EconomyPushNotificationOutbox>();
         services.AddScoped<EconomyPushOutboxProcessor>();
-        if (economyOptions.PushOutboxDispatcherEnabled && economyOptions.IsFirebasePushConfigured)
+        if (economyOptions.PushOutboxDispatcherEnabled)
         {
             services.AddHostedService<EconomyPushOutboxWorker>();
         }

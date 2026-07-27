@@ -21,6 +21,8 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
 
     public DbSet<EmailDispatchJob> EmailDispatchJobs => Set<EmailDispatchJob>();
 
+    public DbSet<AdminEmailBroadcast> AdminEmailBroadcasts => Set<AdminEmailBroadcast>();
+
     public DbSet<ExternalAuthTicket> ExternalAuthTickets => Set<ExternalAuthTicket>();
 
     protected override void OnModelCreating(ModelBuilder builder)
@@ -151,6 +153,36 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.HasIndex(x => new { x.Status, x.UpdatedAtUtc });
             entity.HasIndex(x => x.NextAttemptAtUtc);
             entity.HasIndex(x => x.UserId);
+            entity.HasIndex(x => new { x.BroadcastId, x.Status });
+            entity.HasOne(x => x.Broadcast)
+                .WithMany(x => x.DispatchJobs)
+                .HasForeignKey(x => x.BroadcastId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<AdminEmailBroadcast>(entity =>
+        {
+            entity.ToTable(
+                "admin_email_broadcasts",
+                tableBuilder =>
+                {
+                    tableBuilder.HasCheckConstraint(
+                        "CK_admin_email_broadcasts_counts_nonnegative",
+                        "\"RecipientCount\" >= 0 AND \"SentCount\" >= 0 AND \"FailedCount\" >= 0");
+                    tableBuilder.HasCheckConstraint(
+                        "CK_admin_email_broadcasts_counts_within_total",
+                        "\"SentCount\" + \"FailedCount\" <= \"RecipientCount\"");
+                    tableBuilder.HasCheckConstraint(
+                        "CK_admin_email_broadcasts_status",
+                        "\"Status\" >= 0 AND \"Status\" <= 5");
+                });
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Audience).HasMaxLength(32).IsRequired();
+            entity.Property(x => x.Subject).HasMaxLength(200);
+            entity.Property(x => x.RequestHash).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.Status).HasConversion<int>().IsRequired();
+            entity.HasIndex(x => new { x.CreatedAtUtc, x.Id }).IsDescending();
+            entity.HasIndex(x => new { x.Status, x.CreatedAtUtc }).IsDescending(false, true);
         });
 
         builder.Entity<ExternalAuthTicket>(entity =>

@@ -54,6 +54,13 @@ public interface ITemplateGenerationService
     Task<Result<TemplateGenerationResponse>> RetryAdminGenerationAsync(Guid adminUserId, Guid generationId, CancellationToken cancellationToken);
 
     Task<Result<TemplateGenerationResponse>> RetryAdminGenerationRefundAsync(Guid adminUserId, Guid generationId, CancellationToken cancellationToken);
+
+    Task<Result<TemplateGenerationResponse>> RetryAdminGenerationRefundAsync(
+        Guid adminUserId,
+        Guid generationId,
+        string? reason,
+        string? idempotencyKey,
+        CancellationToken cancellationToken);
 }
 
 public interface ITemplateGenerationGamificationReconciliationService

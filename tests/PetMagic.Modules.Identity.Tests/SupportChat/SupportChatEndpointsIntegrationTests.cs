@@ -175,6 +175,8 @@ public sealed partial class SupportChatEndpointsIntegrationTests
             "/api/support/conversation/open",
             new OpenConversationRequest("Queue action case", SupportConversationPriority.Normal));
 
+        Assert.Empty(created.AvailableActions);
+
         var tickets = await GetFromJsonAsync<SupportConversationInboxPageResponse>(
             adminClient,
             "/api/admin/support/tickets?status=New&source=MobileChat&page=1&pageSize=10");
@@ -196,6 +198,7 @@ public sealed partial class SupportChatEndpointsIntegrationTests
 
         Assert.Equal("InProgress", assigned.Status);
         Assert.Equal(AdminId, assigned.AssignedAdminId);
+        Assert.Equal(new[] { "close", "unassign" }, assigned.AvailableActions);
         Assert.Contains(
             assigned.Messages,
             message => message.SenderType == "System" && message.Body == "Ticket assigned to operator");
@@ -217,7 +220,7 @@ public sealed partial class SupportChatEndpointsIntegrationTests
 
         Assert.Equal("Closed", closed.Status);
         Assert.True(closed.IsReadOnly);
-        Assert.Contains(closed.AvailableActions, action => action == "reopen");
+        Assert.Equal(new[] { "reopen" }, closed.AvailableActions);
 
         using var blockedReply = await adminClient.PostAsJsonAsync(
             $"/api/admin/support/tickets/{created.ConversationId}/messages",
@@ -229,7 +232,16 @@ public sealed partial class SupportChatEndpointsIntegrationTests
             $"/api/admin/support/tickets/{created.ConversationId}/reopen");
 
         Assert.Equal("InProgress", reopened.Status);
+        Assert.Equal(new[] { "close", "unassign" }, reopened.AvailableActions);
         Assert.Contains(reopened.Messages, message => message.SenderType == "System" && message.Body == "Ticket reopened by operator");
+
+        var unassigned = await PostEmptyAsync<SupportConversationDetailResponse>(
+            adminClient,
+            $"/api/admin/support/tickets/{created.ConversationId}/unassign");
+
+        Assert.Equal("InProgress", unassigned.Status);
+        Assert.Null(unassigned.AssignedAdminId);
+        Assert.Empty(unassigned.AvailableActions);
 
         var context = await GetFromJsonAsync<SupportTicketContextResponse>(
             adminClient,
@@ -259,14 +271,26 @@ public sealed partial class SupportChatEndpointsIntegrationTests
             repeatedClaim.Messages,
             message => message.SenderType == "System" && message.Body == "Ticket assigned to operator");
 
-        using var stealResponse = await moderatorClient.PostAsync(claimPath, content: null);
+        using var stealResponse = await moderatorClient.PostAsJsonAsync(
+            claimPath,
+            new
+            {
+                reason = "Moderator attempts to take an owned ticket.",
+                expectedVersion = repeatedClaim.Version,
+            });
         Assert.Equal(HttpStatusCode.Conflict, stealResponse.StatusCode);
         Assert.Contains(
             "support.conversation_already_assigned",
             await stealResponse.Content.ReadAsStringAsync(),
             StringComparison.Ordinal);
 
-        using var foreignUnassignResponse = await moderatorClient.PostAsync(unassignPath, content: null);
+        using var foreignUnassignResponse = await moderatorClient.PostAsJsonAsync(
+            unassignPath,
+            new
+            {
+                reason = "Moderator attempts to release another operator's ticket.",
+                expectedVersion = repeatedClaim.Version,
+            });
         Assert.Equal(HttpStatusCode.Conflict, foreignUnassignResponse.StatusCode);
         Assert.Contains(
             "support.conversation_not_owned",
@@ -313,7 +337,10 @@ public sealed partial class SupportChatEndpointsIntegrationTests
         var assigned = await PutAsJsonAsync<SupportConversationDetailResponse>(
             adminClient,
             $"/api/admin/support/tickets/{created.ConversationId}/assignment",
-            new AssignSupportConversationRequest(AdminId));
+            new AssignSupportConversationRequest(
+                AdminId,
+                "Confirm current assignment.",
+                created.Version));
 
         Assert.Equal(AdminId, assigned.AssignedAdminId);
 
@@ -358,6 +385,75 @@ public sealed partial class SupportChatEndpointsIntegrationTests
     }
 
     [Fact]
+    public async Task AdminMessageEndpoint_ShouldReplaySameIdempotencyKeyWithoutDuplicateReply()
+    {
+        await using var application = await SupportChatTestApplication.CreateAsync();
+
+        var userClient = application.CreateClient(UserId, "User");
+        var adminClient = application.CreateClient(AdminId, "Admin");
+        var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
+            userClient,
+            "/api/support/conversation/open",
+            new OpenConversationRequest("Need idempotent reply", SupportConversationPriority.Normal));
+        _ = await PostEmptyAsync<SupportConversationDetailResponse>(
+            adminClient,
+            $"/api/admin/support/tickets/{created.ConversationId}/assign-to-me");
+
+        const string idempotencyKey = "admin-support-message-endpoint-retry";
+        var path = $"/api/admin/support/tickets/{created.ConversationId}/messages";
+
+        using var firstRequest = new HttpRequestMessage(HttpMethod.Post, path)
+        {
+            Content = JsonContent.Create(new SendSupportMessageRequest("We are investigating"))
+        };
+        firstRequest.Headers.TryAddWithoutValidation(SupportMessageIdempotency.HeaderName, idempotencyKey);
+        using var firstResponse = await adminClient.SendAsync(firstRequest);
+        await AssertSuccessAsync(firstResponse);
+        var firstMessage = (await firstResponse.Content.ReadFromJsonAsync<SupportMessageResponse>(JsonOptions))!;
+
+        using var replayRequest = new HttpRequestMessage(HttpMethod.Post, path)
+        {
+            Content = JsonContent.Create(new SendSupportMessageRequest("We are investigating"))
+        };
+        replayRequest.Headers.TryAddWithoutValidation(SupportMessageIdempotency.HeaderName, idempotencyKey);
+        using var replayResponse = await adminClient.SendAsync(replayRequest);
+        await AssertSuccessAsync(replayResponse);
+        var replayMessage = (await replayResponse.Content.ReadFromJsonAsync<SupportMessageResponse>(JsonOptions))!;
+
+        Assert.False(firstMessage.IsIdempotencyReplay);
+        Assert.True(replayMessage.IsIdempotencyReplay);
+        Assert.Equal(firstMessage.MessageId, replayMessage.MessageId);
+
+        var detail = await GetFromJsonAsync<SupportConversationDetailResponse>(
+            adminClient,
+            $"/api/admin/support/tickets/{created.ConversationId}");
+        Assert.Single(detail.Messages, message => message.SenderType == "SupportAgent" && message.Body == "We are investigating");
+        Assert.Single(detail.Messages, message => message.SenderType == "System" && message.Body == "Support replied");
+    }
+
+    [Theory]
+    [InlineData("assign-to-me")]
+    [InlineData("unassign")]
+    public async Task LegacyAssignmentEndpoints_ShouldRejectMissingSafetyContext(string action)
+    {
+        await using var application = await SupportChatTestApplication.CreateAsync();
+        var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
+            application.CreateClient(UserId, "User"),
+            "/api/support/conversation/open",
+            new OpenConversationRequest("Validate assignment safety", SupportConversationPriority.Normal));
+
+        using var response = await application.CreateClient(AdminId, "Admin").PostAsync(
+            $"/api/admin/support/tickets/{created.ConversationId}/{action}",
+            content: null);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>(JsonOptions);
+        Assert.NotNull(problem);
+        Assert.Contains(nameof(AssignSupportConversationCommand.Reason), problem.Errors.Keys);
+        Assert.Contains(nameof(AssignSupportConversationCommand.ExpectedVersion), problem.Errors.Keys);
+    }
+
+    [Fact]
     public async Task AdminAssignmentEndpoint_ShouldAssignNewConversationAndMoveToInProgress()
     {
         await using var application = await SupportChatTestApplication.CreateAsync();
@@ -370,7 +466,10 @@ public sealed partial class SupportChatEndpointsIntegrationTests
         var assigned = await PutAsJsonAsync<SupportConversationDetailResponse>(
             application.CreateClient(AdminId, "Admin"),
             $"/api/admin/support/tickets/{created.ConversationId}/assignment",
-            new AssignSupportConversationRequest(AdminId));
+            new AssignSupportConversationRequest(
+                AdminId,
+                "Assign support operator.",
+                created.Version));
 
         Assert.Equal("InProgress", assigned.Status);
         Assert.Equal(AdminId, assigned.AssignedAdminId);
@@ -394,7 +493,10 @@ public sealed partial class SupportChatEndpointsIntegrationTests
 
         using var response = await application.CreateClient(AdminId, "Admin").PutAsJsonAsync(
             $"/api/admin/support/tickets/{created.ConversationId}/assignment",
-            new AssignSupportConversationRequest(Guid.Empty));
+            new AssignSupportConversationRequest(
+                Guid.Empty,
+                "Validate empty support operator.",
+                created.Version));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
@@ -415,7 +517,10 @@ public sealed partial class SupportChatEndpointsIntegrationTests
 
         using var response = await application.CreateClient(AdminId, "Admin").PutAsJsonAsync(
             $"/api/admin/support/tickets/{created.ConversationId}/assignment",
-            new AssignSupportConversationRequest(OtherUserId));
+            new AssignSupportConversationRequest(
+                OtherUserId,
+                "Validate support operator role.",
+                created.Version));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
@@ -615,9 +720,30 @@ public sealed partial class SupportChatEndpointsIntegrationTests
 
     private static async Task<TResponse> PostEmptyAsync<TResponse>(HttpClient client, string url)
     {
-        using var response = await client.PostAsync(url, content: null);
-        await AssertSuccessAsync(response);
-        return (await response.Content.ReadFromJsonAsync<TResponse>(JsonOptions))!;
+        HttpResponseMessage response;
+        if (url.EndsWith("/assign-to-me", StringComparison.Ordinal)
+            || url.EndsWith("/unassign", StringComparison.Ordinal))
+        {
+            var ticketUrl = url[..url.LastIndexOf('/')];
+            var current = await GetFromJsonAsync<SupportConversationDetailResponse>(client, ticketUrl);
+            response = await client.PostAsJsonAsync(
+                url,
+                new
+                {
+                    reason = "Test support assignment transition.",
+                    expectedVersion = current.Version,
+                });
+        }
+        else
+        {
+            response = await client.PostAsync(url, content: null);
+        }
+
+        using (response)
+        {
+            await AssertSuccessAsync(response);
+            return (await response.Content.ReadFromJsonAsync<TResponse>(JsonOptions))!;
+        }
     }
 
     private static async Task<TResponse> PutAsJsonAsync<TResponse>(HttpClient client, string url, object payload)
@@ -693,6 +819,10 @@ public sealed partial class SupportChatEndpointsIntegrationTests
                 ApplicationName = typeof(SupportChatEndpointsIntegrationTests).Assembly.FullName,
             });
 
+            // The default Windows EventLog provider can throw for the unprivileged test host,
+            // masking the HTTP response that an integration test is meant to assert.
+            builder.Logging.ClearProviders();
+
             builder.WebHost.UseTestServer();
             builder.Configuration["AllowedHosts"] = "*";
             builder.Configuration["Jwt:Issuer"] = TestJwtIssuer;
@@ -719,6 +849,11 @@ public sealed partial class SupportChatEndpointsIntegrationTests
                 {
                     policy.RequireAuthenticatedUser();
                     policy.RequireRole("Admin", "Moderator");
+                });
+                options.AddPolicy("AdminOnly", policy =>
+                {
+                    policy.RequireAuthenticatedUser();
+                    policy.RequireRole("Admin");
                 });
             });
 
@@ -907,6 +1042,38 @@ public sealed partial class SupportChatEndpointsIntegrationTests
 
         private sealed class TestIdentityUserLookupService(IdentityDbContext identityDbContext) : IIdentityUserLookupService
         {
+            public async Task<IReadOnlyList<Guid>> GetActiveUserIdsInRolesAsync(
+                IReadOnlyCollection<string> roles,
+                CancellationToken cancellationToken)
+            {
+                if (roles.Count == 0)
+                {
+                    return [];
+                }
+
+                var activeRoleUserIds = identityDbContext.UserRoles
+                    .AsNoTracking()
+                    .Join(
+                        identityDbContext.Roles.AsNoTracking(),
+                        userRole => userRole.RoleId,
+                        role => role.Id,
+                        (userRole, role) => new
+                        {
+                            userRole.UserId,
+                            RoleName = role.Name
+                        })
+                    .Where(x => x.RoleName != null && roles.Contains(x.RoleName));
+
+                return await activeRoleUserIds
+                    .Join(
+                        identityDbContext.Users.AsNoTracking().Where(user => user.IsActive),
+                        roleUser => roleUser.UserId,
+                        user => user.Id,
+                        (roleUser, _) => roleUser.UserId)
+                    .Distinct()
+                    .ToListAsync(cancellationToken);
+            }
+
             public async Task<IReadOnlyDictionary<Guid, IdentityUserLookup>> GetUsersByIdsAsync(
                 IReadOnlyCollection<Guid> userIds,
                 CancellationToken cancellationToken)
@@ -1088,7 +1255,10 @@ public sealed partial class SupportChatEndpointsIntegrationTests
 
     private sealed record UpdateSupportConversationStatusRequest(string Status);
 
-    private sealed record AssignSupportConversationRequest(Guid? AssignedAdminId);
+    private sealed record AssignSupportConversationRequest(
+        Guid? AssignedAdminId,
+        string Reason,
+        long ExpectedVersion);
 
     private sealed record UpsertSupportReplyTemplateRequest(string Title, string Body, bool IsEnabled, int SortOrder);
 

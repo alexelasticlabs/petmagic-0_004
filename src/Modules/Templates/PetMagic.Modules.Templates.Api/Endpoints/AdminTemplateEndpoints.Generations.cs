@@ -80,6 +80,8 @@ public static partial class AdminTemplateEndpoints
 
     private static async Task<Results<Ok<AdminModerationQueueItemResponse>, ProblemHttpResult>> DecideModerationItemAsync(
 
+        HttpContext context,
+
         Guid eventId,
 
         [FromBody] AdminModerationDecisionRequest? request,
@@ -90,9 +92,25 @@ public static partial class AdminTemplateEndpoints
 
     {
 
+        var (actorUserId, subjectError) = TryGetAdminUserId(context);
+
+        if (subjectError is not null)
+
+        {
+
+            return ToAdminTemplateProblem(subjectError);
+
+        }
+
         var result = await service.DecideAdminModerationItemAsync(
 
-            new AdminModerationDecisionCommand(eventId, request?.Action ?? string.Empty, request?.Reason ?? string.Empty),
+            new AdminModerationDecisionCommand(
+                eventId,
+                request?.Action ?? string.Empty,
+                request?.Reason ?? string.Empty,
+                actorUserId,
+                ResolveModerationActorRole(context),
+                request?.ExpectedVersion),
 
             cancellationToken);
 
@@ -122,6 +140,8 @@ public static partial class AdminTemplateEndpoints
 
         [FromQuery] string? search,
 
+        [FromQuery] string? refundState,
+
         [FromQuery] int? skip,
 
         [FromQuery] int? take,
@@ -130,7 +150,8 @@ public static partial class AdminTemplateEndpoints
 
     {
 
-        var filterProblem = ValidateGenerationFilters(status);
+        var filterProblem = ValidateGenerationFilters(status)
+            ?? ValidateGenerationRefundStateFilter(refundState);
 
         if (filterProblem is not null)
 
@@ -144,7 +165,7 @@ public static partial class AdminTemplateEndpoints
         var service = context.RequestServices.GetRequiredService<ITemplatesService>();
         var result = await service.ListAdminGenerationsAsync(
 
-            new AdminTemplateGenerationsQuery(status, provider, user, search, skip, take),
+            new AdminTemplateGenerationsQuery(status, provider, user, search, skip, take, refundState),
 
             cancellationToken);
 
@@ -160,6 +181,17 @@ public static partial class AdminTemplateEndpoints
 
         return TypedResults.Ok(result.Value);
 
+    }
+
+    private static async Task<Results<Ok<AdminGenerationDetailResponse>, ProblemHttpResult>> GetGenerationAsync(
+        Guid generationId,
+        [FromServices] ITemplatesService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.GetAdminGenerationAsync(generationId, cancellationToken);
+        return result.IsFailure
+            ? ToAdminTemplateProblem(result.Error)
+            : TypedResults.Ok(result.Value);
     }
 
 
@@ -283,6 +315,7 @@ public static partial class AdminTemplateEndpoints
     private static async Task<Results<Ok<TemplateGenerationResponse>, ProblemHttpResult>> RetryGenerationRefundAsync(
         HttpContext context,
         Guid generationId,
+        [FromBody] AdminGenerationRefundRetryRequest? request,
         [FromServices] ITemplateGenerationService generationService,
         CancellationToken cancellationToken)
     {
@@ -295,6 +328,8 @@ public static partial class AdminTemplateEndpoints
         var result = await generationService.RetryAdminGenerationRefundAsync(
             adminUserId,
             generationId,
+            request?.Reason,
+            context.Request.Headers["Idempotency-Key"].FirstOrDefault(),
             cancellationToken);
         if (result.IsFailure)
         {
@@ -302,6 +337,14 @@ public static partial class AdminTemplateEndpoints
         }
 
         return TypedResults.Ok(result.Value);
+    }
+
+    private static ProblemHttpResult? ValidateGenerationRefundStateFilter(string? refundState)
+    {
+        return IsNeutralFilter(refundState)
+            || IsOneOf(refundState, "not_applicable", "pending", "exhausted", "refunded")
+                ? null
+                : InvalidCatalogFilterProblem("templates.invalid_refund_state");
     }
 
     private static async Task<Results<Ok<TemplateGenerationResponse>, ProblemHttpResult>> RetryGenerationAsync(
@@ -574,17 +617,29 @@ public static partial class AdminTemplateEndpoints
 
         Guid templateId,
 
+        HttpContext context,
+
         [FromQuery] string? type,
 
         [FromQuery] string? search,
 
         [FromQuery] int? take,
 
-        [FromServices] ITemplatesService service,
-
         CancellationToken cancellationToken)
 
     {
+
+        var filterProblem = ValidateAnalyticsFeedbackFilters(type);
+
+        if (filterProblem is not null)
+
+        {
+
+            return filterProblem;
+
+        }
+
+        var service = context.RequestServices.GetRequiredService<ITemplatesService>();
 
         var result = await service.GetAdminFeedbackAsync(
 
@@ -735,4 +790,6 @@ public static partial class AdminTemplateEndpoints
     public sealed record AdminGamificationLegacyDeliveryResolutionRequest(
         string Action,
         string Reason);
+
+    public sealed record AdminGenerationRefundRetryRequest(string? Reason);
 }

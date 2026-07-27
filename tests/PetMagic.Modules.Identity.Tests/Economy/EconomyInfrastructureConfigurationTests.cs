@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 using PetMagic.Modules.Economy.Infrastructure;
@@ -189,6 +190,28 @@ public sealed class EconomyInfrastructureConfigurationTests
         Assert.Contains("services.AddHttpClient(FcmEconomyPushNotificationSender.HttpClientName, ConfigureExternalHttpClient)", source, StringComparison.Ordinal);
         Assert.Contains(".ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler", source, StringComparison.Ordinal);
         Assert.Contains("AllowAutoRedirect = false", source, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public void AddEconomyInfrastructure_ShouldGateOutboxWorkerOnlyByDispatcherSetting(
+        bool dispatcherEnabled,
+        bool expectedWorkerRegistration)
+    {
+        var services = CreateServices();
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["Economy:PushOutboxDispatcherEnabled"] = dispatcherEnabled.ToString(),
+            ["Economy:FirebasePushEnabled"] = "false"
+        });
+
+        services.AddEconomyInfrastructure(configuration);
+
+        var workerRegistered = services.Any(descriptor =>
+            descriptor.ServiceType == typeof(IHostedService)
+            && descriptor.ImplementationType == typeof(EconomyPushOutboxWorker));
+        Assert.Equal(expectedWorkerRegistration, workerRegistered);
     }
 
     private static string StripeTestSecretKey => "sk_" + "test_should_not_start";

@@ -20,6 +20,8 @@ public sealed class ConversationMessage
 
     public string? ReplyToPreview { get; set; }
 
+    public string? ClientIdempotencyKey { get; set; }
+
     public string? AttachmentUrl { get; set; }
 
     public string? AttachmentFileName { get; set; }

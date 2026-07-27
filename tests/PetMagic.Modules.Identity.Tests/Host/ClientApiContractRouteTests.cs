@@ -134,6 +134,7 @@ public sealed class ClientApiContractRouteTests
         { "GET", "/api/admin/users/dashboard/metrics", "admin users metrics" },
         { "GET", "/api/admin/users/{userId:guid}", "admin user detail" },
         { "GET", "/api/admin/users/{userId:guid}/analytics", "admin user analytics" },
+        { "GET", "/api/admin/users/{userId:guid}/support/tickets", "admin user support tickets" },
         { "POST", "/api/admin/users/{userId:guid}/wallet", "admin wallet adjustment" },
         { "PUT", "/api/admin/users/{userId:guid}/role", "admin role assign" },
         { "DELETE", "/api/admin/users/{userId:guid}/role", "admin role revoke" },
@@ -150,6 +151,12 @@ public sealed class ClientApiContractRouteTests
         { "POST", "/api/admin/economy/purchases/{orderId:guid}/refund", "admin economy refund" },
         { "GET", "/api/admin/economy/subscriptions", "admin economy subscriptions" },
         { "GET", "/api/admin/economy/subscription-events", "admin economy subscription events" },
+        { "GET", "/api/admin/economy/incidents", "admin economy incidents" },
+        { "GET", "/api/admin/economy/incidents/{incidentId:guid}", "admin economy incident detail" },
+        { "POST", "/api/admin/economy/reconciliation/run", "admin economy reconciliation run" },
+        { "POST", "/api/admin/economy/incidents/{incidentId:guid}/resolve", "admin economy incident resolve" },
+        { "POST", "/api/admin/economy/incidents/{incidentId:guid}/reopen", "admin economy incident reopen" },
+        { "POST", "/api/admin/economy/incidents/{incidentId:guid}/actions", "admin economy incident action" },
         { "GET", "/api/admin/economy/packs", "admin economy packs" },
         { "PUT", "/api/admin/economy/packs/{packId:guid}", "admin economy pack update" },
         { "GET", "/api/admin/economy/subscription-plans", "admin economy subscription plans" },
@@ -221,6 +228,7 @@ public sealed class ClientApiContractRouteTests
         { "GET", "/api/admin/support/tickets/{conversationId:guid}", "admin support ticket detail" },
         { "POST", "/api/admin/support/tickets/{conversationId:guid}/messages", "admin support message" },
         { "POST", "/api/admin/support/tickets/{conversationId:guid}/attachments", "admin support attachment" },
+        { "POST", "/api/admin/support/tickets/{conversationId:guid}/messages/{messageId:guid}/attachment/retry", "admin support attachment retry" },
         { "POST", "/api/admin/support/tickets/{conversationId:guid}/messages/attachments", "admin support attachments" },
         { "POST", "/api/admin/support/tickets/{conversationId:guid}/read", "admin support read" },
         { "POST", "/api/admin/support/tickets/{conversationId:guid}/assign-to-me", "admin support assign to me" },
@@ -410,6 +418,7 @@ public sealed class ClientApiContractRouteTests
                 throw new NotSupportedException("ISupportAttachmentStorage should not be resolved during route contract tests."));
             builder.Services.AddScoped<ISupportReplyTemplateCatalogService>(_ =>
                 throw new NotSupportedException("ISupportReplyTemplateCatalogService should not be resolved during route contract tests."));
+            builder.Services.AddScoped<IIdentityUserLookupService, ClientApiContractIdentityUserLookupService>();
 
             builder.Services
                 .AddIdentityApiModule()
@@ -521,6 +530,25 @@ public sealed class ClientApiContractRouteTests
             await app.StopAsync();
             await app.DisposeAsync();
         }
+    }
+
+    private sealed class ClientApiContractIdentityUserLookupService : IIdentityUserLookupService
+    {
+        public Task<IReadOnlyList<Guid>> GetActiveUserIdsInRolesAsync(
+            IReadOnlyCollection<string> roles,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<Guid>>([]);
+
+        public Task<IReadOnlyDictionary<Guid, IdentityUserLookup>> GetUsersByIdsAsync(
+            IReadOnlyCollection<Guid> userIds,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyDictionary<Guid, IdentityUserLookup>>(
+                new Dictionary<Guid, IdentityUserLookup>());
+
+        public Task<IdentityUserLookup?> GetUserByIdAsync(
+            Guid userId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IdentityUserLookup?>(null);
     }
 
     private sealed class TestAuthHandler(

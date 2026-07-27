@@ -36,16 +36,47 @@ public sealed class AdminEconomyEndpointHardeningTests
     }
 
     [Fact]
+    public void AdminPurchaseInspectorEndpoint_ShouldBeAdminOnlySafeReadContract()
+    {
+        var routes = ReadEndpointSource("AdminEconomyEndpoints.cs");
+        var handlers = ReadEndpointSource("AdminEconomyEndpoints.OverviewAndSubscriptions.cs");
+        var contracts = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src", "Modules", "Economy", "PetMagic.Modules.Economy.Application", "Contracts",
+            "PurchasesAndPaymentsContracts.cs"));
+
+        Assert.Contains("group.MapGet(\"/purchases/{orderId:guid}\", GetPurchaseAsync);", routes, StringComparison.Ordinal);
+        Assert.Contains("Task<Results<Ok<AdminPurchaseDetailResponse>, ProblemHttpResult>> GetPurchaseAsync(", handlers, StringComparison.Ordinal);
+        Assert.Contains("GetAdminPurchaseAsync(orderId, cancellationToken)", handlers, StringComparison.Ordinal);
+        Assert.Contains("AdminPurchaseCapabilitiesResponse", contracts, StringComparison.Ordinal);
+        Assert.Contains("IReadOnlyList<AdminPurchaseTimelineItemResponse> Timeline", contracts, StringComparison.Ordinal);
+        Assert.DoesNotContain("ExternalPaymentId,\n    DateTime CreatedAtUtc,\n    DateTime? ConfirmedAtUtc,\n    string RefundStatus,\n    string SettlementState", contracts, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void AdminEconomyOverviewReadEndpoints_ShouldGuardServiceFailures()
     {
         var source = ReadEndpointSource("AdminEconomyEndpoints.OverviewAndSubscriptions.cs");
 
         Assert.Contains("Task<Results<Ok<AdminEconomyDashboardMetricsResponse>, ProblemHttpResult>> GetDashboardMetricsAsync(", source, StringComparison.Ordinal);
+        Assert.Contains("[FromQuery] int? periodDays", source, StringComparison.Ordinal);
+        Assert.Contains("var invalidPeriodProblem = ValidateDashboardPeriodDays(periodDays);", source, StringComparison.Ordinal);
+        Assert.Contains("GetAdminDashboardMetricsAsync(periodDays.Value, cancellationToken)", source, StringComparison.Ordinal);
         Assert.Contains("Task<Results<Ok<IReadOnlyList<AdminCurrencyPackResponse>>, ProblemHttpResult>> ListPacksAsync(", source, StringComparison.Ordinal);
         Assert.Contains("Task<Results<Ok<IReadOnlyList<AdminSubscriptionPlanResponse>>, ProblemHttpResult>> ListSubscriptionPlansAsync(", source, StringComparison.Ordinal);
         Assert.DoesNotContain("GetAdminDashboardMetricsAsync(cancellationToken);\r\n        return TypedResults.Ok(result.Value);", source, StringComparison.Ordinal);
         Assert.DoesNotContain("ListAdminCurrencyPacksAsync(cancellationToken);\r\n        return TypedResults.Ok(result.Value);", source, StringComparison.Ordinal);
         Assert.DoesNotContain("ListAdminSubscriptionPlansAsync(cancellationToken);\r\n        return TypedResults.Ok(result.Value);", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AdminEconomyDashboardMetrics_ShouldAllowOnlyDocumentedPeriods()
+    {
+        var source = ReadEndpointSource("AdminEconomyEndpoints.Filters.cs");
+
+        Assert.Contains("ValidateDashboardPeriodDays(int? periodDays)", source, StringComparison.Ordinal);
+        Assert.Contains("periodDays is null or 7 or 30 or 90", source, StringComparison.Ordinal);
+        Assert.Contains("economy.dashboard_period_invalid", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -80,6 +111,7 @@ public sealed class AdminEconomyEndpointHardeningTests
         Assert.Contains("\"economy.redeem_code_exists\" => StatusCodes.Status409Conflict", source, StringComparison.Ordinal);
         Assert.Contains("\"economy.incident_action_invalid\" => StatusCodes.Status409Conflict", source, StringComparison.Ordinal);
         Assert.Contains("\"economy.payment_gateway_failed\" => StatusCodes.Status502BadGateway", source, StringComparison.Ordinal);
+        Assert.Contains("\"economy.admin_premium_revoke_finalization_failed\" => StatusCodes.Status503ServiceUnavailable", source, StringComparison.Ordinal);
         Assert.Contains("extensions: BuildAdminEconomyProblemExtensions(error.Code)", source, StringComparison.Ordinal);
         Assert.Contains("return new Dictionary<string, object?> { [\"code\"] = errorCode };", source, StringComparison.Ordinal);
         Assert.DoesNotContain("GetAdminEconomyProblemDetail", source, StringComparison.Ordinal);

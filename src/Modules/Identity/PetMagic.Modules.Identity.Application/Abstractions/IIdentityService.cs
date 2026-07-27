@@ -43,6 +43,8 @@ public interface IIdentityService
 
     Task<Result> LogoutAsync(LogoutCommand command, CancellationToken cancellationToken);
 
+    Task<Result> LogoutByRefreshTokenAsync(RefreshTokenCommand command, CancellationToken cancellationToken);
+
     Task<Result> DeleteCurrentUserAsync(DeleteCurrentUserCommand command, CancellationToken cancellationToken);
 
     Task<Result<UserProfileResponse>> GetCurrentUserAsync(Guid userId, CancellationToken cancellationToken);
@@ -71,11 +73,37 @@ public interface IIdentityService
 
     Task<Result<AdminUserAnalyticsResponse>> GetAdminUserAnalyticsAsync(Guid userId, CancellationToken cancellationToken);
 
+    Task<Result<AdminUserSessionsResponse>> GetAdminUserSessionsAsync(Guid userId, CancellationToken cancellationToken);
+
+    Task<Result<AdminUserSessionRevokeResponse>> RevokeAdminUserSessionAsync(
+        AdminRevokeUserSessionCommand command,
+        CancellationToken cancellationToken);
+
+    Task<Result<AdminUserSessionRevokeResponse>> RevokeAllAdminUserSessionsAsync(
+        AdminRevokeAllUserSessionsCommand command,
+        CancellationToken cancellationToken);
+
     Task<Result<AdminUserWalletOperationResponse>> AdjustAdminUserWalletAsync(AdminAdjustUserWalletCommand command, CancellationToken cancellationToken);
 
     Task<Result> DeleteAdminUserAsync(DeleteAdminUserCommand command, CancellationToken cancellationToken);
 
-    Task<Result> SendBulkEmailAsync(SendBulkEmailCommand command, CancellationToken cancellationToken);
+    Task<Result<AdminEmailBroadcastQueueResponse>> SendBulkEmailAsync(
+        SendBulkEmailCommand command,
+        CancellationToken cancellationToken);
+
+    Task<Result<AdminEmailBroadcastsPageResponse>> ListAdminEmailBroadcastsAsync(
+        int skip,
+        int take,
+        string? status,
+        CancellationToken cancellationToken);
+
+    Task<Result<AdminEmailBroadcastDetailResponse>> GetAdminEmailBroadcastAsync(
+        Guid broadcastId,
+        CancellationToken cancellationToken);
+
+    Task<Result<AdminEmailBroadcastRetryResponse>> RetryFailedAdminEmailBroadcastAsync(
+        Guid broadcastId,
+        CancellationToken cancellationToken);
 
     Task<Result> AssignRoleAsync(AssignRoleCommand command, CancellationToken cancellationToken);
 

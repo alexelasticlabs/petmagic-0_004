@@ -271,7 +271,7 @@ public sealed partial class EconomyService
 
         if (string.IsNullOrWhiteSpace(command.ExternalReferenceId))
         {
-            return Result.Failure<AdminEconomyIncidentActionResponse>(EconomyErrors.PaymentGatewayFailed);
+            return Result.Failure<AdminEconomyIncidentActionResponse>(EconomyErrors.EconomyIncidentExternalReferenceRequired);
         }
 
         var order = await dbContext.PurchaseOrders

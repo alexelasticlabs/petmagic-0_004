@@ -849,5 +849,258 @@ public sealed partial class TemplatesServiceTests
         Assert.Equal(string.Empty, row.PreviewAsset!.ContentType);
     }
 
+    [Fact]
+    public async Task GetAdminTemplatesAnalyticsAsync_ShouldExcludeDeletedTemplatesAndPageRows()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        async Task<Guid> CreateTemplateAsync(string title, string category)
+        {
+            var created = await service.CreateImageAsync(
+                new CreateImageTemplateCommand(
+                    title,
+                    $"Analytics template {title}",
+                    category,
+                    ["analytics"],
+                    false,
+                    30,
+                    TemplatePromoBadgeMode.Auto.ToString(),
+                    CreatePreviewAsset(),
+                    "openai/gpt-image-2/edit",
+                    "Keep the same pet.",
+                    TemplateStatus.Active.ToString()),
+                CancellationToken.None);
+
+            Assert.True(created.IsSuccess);
+            return created.Value.TemplateId;
+        }
+
+        var visibleOlderId = await CreateTemplateAsync("Analytics older", "Visible older");
+        var visibleNewerId = await CreateTemplateAsync("Analytics newer", "Visible newer");
+        var deletedId = await CreateTemplateAsync("Analytics deleted", "Deleted");
+        var now = new DateTime(2026, 7, 26, 12, 0, 0, DateTimeKind.Utc);
+
+        var templates = await dbContext.TemplateItems
+            .Where(x => x.Id == visibleOlderId || x.Id == visibleNewerId || x.Id == deletedId)
+            .ToDictionaryAsync(x => x.Id);
+        templates[visibleOlderId].UpdatedAtUtc = now.AddMinutes(-1);
+        templates[visibleNewerId].UpdatedAtUtc = now;
+        templates[deletedId].UpdatedAtUtc = now.AddMinutes(1);
+        templates[deletedId].DeletedAtUtc = now;
+        dbContext.TemplateAnalyticsEvents.AddRange(
+            new TemplateAnalyticsEvent
+            {
+                Id = Guid.NewGuid(),
+                TemplateId = visibleOlderId,
+                EventType = TemplateAnalyticsEventTypes.View,
+                Source = "home",
+                DeviceClass = "web",
+                CountryCode = "US",
+                CreatedAtUtc = now
+            },
+            new TemplateAnalyticsEvent
+            {
+                Id = Guid.NewGuid(),
+                TemplateId = visibleNewerId,
+                EventType = TemplateAnalyticsEventTypes.View,
+                Source = "search",
+                DeviceClass = "ios",
+                CountryCode = "US",
+                CreatedAtUtc = now
+            },
+            new TemplateAnalyticsEvent
+            {
+                Id = Guid.NewGuid(),
+                TemplateId = deletedId,
+                EventType = TemplateAnalyticsEventTypes.View,
+                Source = "direct",
+                DeviceClass = "android",
+                CountryCode = "US",
+                CreatedAtUtc = now
+            });
+        await dbContext.SaveChangesAsync();
+
+        var firstPage = await service.GetAdminTemplatesAnalyticsAsync(
+            new AdminTemplatesAnalyticsQuery(null, null, null, null, null, "updated", 1, -10),
+            CancellationToken.None);
+
+        Assert.True(firstPage.IsSuccess);
+        Assert.Equal(2, firstPage.Value.Summary.TotalTemplates);
+        Assert.Equal(2, firstPage.Value.Summary.TotalViews);
+        Assert.Equal(0, firstPage.Value.Skip);
+        Assert.Equal(1, firstPage.Value.Take);
+        Assert.Equal(2, firstPage.Value.TotalCount);
+        Assert.True(firstPage.Value.HasMore);
+        Assert.Equal(visibleNewerId, Assert.Single(firstPage.Value.Templates).TemplateId);
+        Assert.DoesNotContain(firstPage.Value.TopTemplates, x => x.TemplateId == deletedId);
+        Assert.DoesNotContain("Deleted", firstPage.Value.AvailableCategories);
+
+        var secondPage = await service.GetAdminTemplatesAnalyticsAsync(
+            new AdminTemplatesAnalyticsQuery(null, null, null, null, null, "updated", 1, 1),
+            CancellationToken.None);
+
+        Assert.True(secondPage.IsSuccess);
+        Assert.Equal(1, secondPage.Value.Skip);
+        Assert.Equal(1, secondPage.Value.Take);
+        Assert.Equal(2, secondPage.Value.TotalCount);
+        Assert.False(secondPage.Value.HasMore);
+        Assert.Equal(visibleOlderId, Assert.Single(secondPage.Value.Templates).TemplateId);
+    }
+
+    [Fact]
+    public async Task GetAdminTemplatesAnalyticsAsync_ShouldRestrictAggregatesToRequestedTemplateIds()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        async Task<Guid> CreateTemplateAsync(string title, string category)
+        {
+            var created = await service.CreateImageAsync(
+                new CreateImageTemplateCommand(
+                    title,
+                    $"Analytics template {title}",
+                    category,
+                    ["analytics"],
+                    false,
+                    30,
+                    TemplatePromoBadgeMode.Auto.ToString(),
+                    CreatePreviewAsset(),
+                    "openai/gpt-image-2/edit",
+                    "Keep the same pet.",
+                    TemplateStatus.Active.ToString()),
+                CancellationToken.None);
+
+            Assert.True(created.IsSuccess);
+            return created.Value.TemplateId;
+        }
+
+        var requestedId = await CreateTemplateAsync("Requested analytics", "Requested category");
+        var excludedId = await CreateTemplateAsync("Excluded analytics", "Excluded category");
+        var now = new DateTime(2026, 7, 26, 13, 0, 0, DateTimeKind.Utc);
+
+        dbContext.TemplateAnalyticsEvents.AddRange(
+            new TemplateAnalyticsEvent
+            {
+                Id = Guid.NewGuid(),
+                TemplateId = requestedId,
+                EventType = TemplateAnalyticsEventTypes.View,
+                Source = "home",
+                DeviceClass = "web",
+                CountryCode = "US",
+                CreatedAtUtc = now
+            },
+            new TemplateAnalyticsEvent
+            {
+                Id = Guid.NewGuid(),
+                TemplateId = excludedId,
+                EventType = TemplateAnalyticsEventTypes.View,
+                Source = "search",
+                DeviceClass = "ios",
+                CountryCode = "CA",
+                CreatedAtUtc = now
+            });
+        await dbContext.SaveChangesAsync();
+
+        var filtered = await service.GetAdminTemplatesAnalyticsAsync(
+            new AdminTemplatesAnalyticsQuery(
+                null,
+                null,
+                null,
+                null,
+                null,
+                "views",
+                10,
+                TemplateIds: [requestedId, requestedId]),
+            CancellationToken.None);
+
+        Assert.True(filtered.IsSuccess);
+        Assert.Equal(1, filtered.Value.Summary.TotalTemplates);
+        Assert.Equal(1, filtered.Value.Summary.TotalViews);
+        Assert.Equal(1, filtered.Value.TotalCount);
+        Assert.Equal(requestedId, Assert.Single(filtered.Value.Templates).TemplateId);
+        Assert.Equal(requestedId, Assert.Single(filtered.Value.TopTemplates).TemplateId);
+        Assert.Contains("Requested category", filtered.Value.AvailableCategories);
+        Assert.DoesNotContain("Excluded category", filtered.Value.AvailableCategories);
+
+        var unfiltered = await service.GetAdminTemplatesAnalyticsAsync(
+            new AdminTemplatesAnalyticsQuery(null, null, null, null, null, "views", 10),
+            CancellationToken.None);
+
+        Assert.True(unfiltered.IsSuccess);
+        Assert.Equal(2, unfiltered.Value.Summary.TotalTemplates);
+        Assert.Equal(2, unfiltered.Value.Summary.TotalViews);
+    }
+
+    [Fact]
+    public async Task GetAdminTemplatesAnalyticsAsync_ShouldZeroFillBoundedTrendDays()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var created = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Bounded trend template",
+                "Template with a sparse weekly trend",
+                "Analytics",
+                ["analytics"],
+                false,
+                30,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset(),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                TemplateStatus.Active.ToString()),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+
+        var todayUtc = DateTime.UtcNow.Date;
+        dbContext.TemplateAnalyticsEvents.AddRange(
+            new TemplateAnalyticsEvent
+            {
+                Id = Guid.NewGuid(),
+                TemplateId = created.Value.TemplateId,
+                EventType = TemplateAnalyticsEventTypes.View,
+                Source = "home",
+                DeviceClass = "web",
+                CountryCode = "US",
+                CreatedAtUtc = todayUtc.AddDays(-6)
+            },
+            new TemplateAnalyticsEvent
+            {
+                Id = Guid.NewGuid(),
+                TemplateId = created.Value.TemplateId,
+                EventType = TemplateAnalyticsEventTypes.View,
+                Source = "search",
+                DeviceClass = "web",
+                CountryCode = "US",
+                CreatedAtUtc = todayUtc.AddDays(-2)
+            });
+        await dbContext.SaveChangesAsync();
+
+        var overview = await service.GetAdminTemplatesAnalyticsAsync(
+            new AdminTemplatesAnalyticsQuery(7, null, null, null, null, "views", 10),
+            CancellationToken.None);
+
+        Assert.True(overview.IsSuccess);
+        Assert.Equal(7, overview.Value.TrendPoints.Count);
+        Assert.Equal(todayUtc.AddDays(-6), overview.Value.TrendPoints[0].DateUtc);
+        Assert.Equal(todayUtc, overview.Value.TrendPoints[^1].DateUtc);
+        Assert.Equal(1, overview.Value.TrendPoints[0].TotalViews);
+        Assert.Equal(1, overview.Value.TrendPoints[4].TotalViews);
+        Assert.All(
+            overview.Value.TrendPoints
+                .Where(point => point.DateUtc != todayUtc.AddDays(-6) && point.DateUtc != todayUtc.AddDays(-2)),
+            point =>
+            {
+                Assert.Equal(0, point.TotalViews);
+                Assert.Equal(0, point.TotalGenerationStarts);
+                Assert.Equal(0, point.CompletedGenerations);
+                Assert.Equal(0, point.FailedGenerations);
+                Assert.Equal(0, point.TotalTokenCost);
+                Assert.Equal(0m, point.TotalProviderCostUsd);
+            });
+    }
+
 
 }

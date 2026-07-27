@@ -5,6 +5,8 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.StaticFiles;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.FileProviders;
@@ -20,6 +22,7 @@ using PetMagic.Host.Api.Observability;
 using PetMagic.Host.Api.Startup;
 using PetMagic.Modules.Economy.Api;
 using PetMagic.Modules.Economy.Infrastructure;
+using PetMagic.Modules.Economy.Infrastructure.Data;
 using PetMagic.Host.Api.Security;
 using PetMagic.Modules.Identity.Api;
 using PetMagic.Modules.Identity.Infrastructure;
@@ -334,6 +337,8 @@ try
         .AddCheck<TemplateSchedulerConfigHealthCheck>("templates_scheduler_config")
         .AddCheck<GamificationLegacyDeliveryHealthCheck>("gamification_legacy_delivery")
         .AddCheck<PushOutboxHealthCheck>("push_outbox");
+    builder.Services.AddScoped<IAdminSystemStatusService, AdminSystemStatusService>();
+    builder.Services.AddScoped<IAdminOperationsStatusService, AdminOperationsStatusService>();
 
     builder.Services
         .AddOpenTelemetry()
@@ -524,6 +529,7 @@ try
             await context.Response.WriteAsJsonAsync(result);
         }
     }).AllowAnonymous();
+    app.MapAdminSystemStatusEndpoints();
 
     app.MapEconomyApiModule();
     app.MapIdentityApiModule();
@@ -537,6 +543,17 @@ try
         {
             await PostgreSqlIndexIntegrityValidator.RepairPendingMigrationIndexesAsync(
                 app.Configuration.GetConnectionString("DefaultConnection"));
+            var isEmptyPostgreSqlSchema = await PostgreSqlStartupSchemaState.IsEmptyAsync(
+                app.Configuration.GetConnectionString("DefaultConnection"));
+            if (isEmptyPostgreSqlSchema)
+            {
+                Log.Information("Initializing EF migration history for an empty PostgreSQL schema.");
+                using var historyScope = app.Services.CreateScope();
+                var economyDbContext = historyScope.ServiceProvider.GetRequiredService<EconomyDbContext>();
+                var historyRepository = economyDbContext.GetService<IHistoryRepository>();
+                await historyRepository.CreateIfNotExistsAsync();
+            }
+
             await app.Services.EnsureEconomySeedDataAsync();
             await app.Services.EnsureIdentitySeedDataAsync();
             await app.Services.EnsureSupportChatSeedDataAsync();

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
+using PetMagic.Modules.Templates.Infrastructure.Entities;
 
 namespace PetMagic.Modules.Templates.Infrastructure;
 
@@ -21,6 +22,7 @@ internal sealed partial class TemplatesService
 
         var periodCounts = await dbContext.TemplateGenerationJobs
             .AsNoTracking()
+            .Where(job => job.UserId != TemplateGenerationService.AdminTestUserId)
             .Where(job => job.CreatedAtUtc >= monthStart)
             .GroupBy(_ => 1)
             .Select(group => new
@@ -35,6 +37,7 @@ internal sealed partial class TemplatesService
             .FirstOrDefaultAsync(cancellationToken);
         var statusCounts = await dbContext.TemplateGenerationJobs
             .AsNoTracking()
+            .Where(job => job.UserId != TemplateGenerationService.AdminTestUserId)
             .GroupBy(job => job.Status)
             .Select(group => new
             {
@@ -43,6 +46,20 @@ internal sealed partial class TemplatesService
             })
             .ToListAsync(cancellationToken);
         var statusCountByStatus = statusCounts.ToDictionary(row => row.Status, row => row.Count);
+        var refundCounts = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .Where(job => job.UserId != TemplateGenerationService.AdminTestUserId)
+            .Where(job => (job.Status == TemplateGenerationStatus.Failed
+                    || job.Status == TemplateGenerationStatus.Cancelled)
+                && job.ChargedAtUtc != null
+                && job.RefundedAtUtc == null)
+            .GroupBy(_ => 1)
+            .Select(group => new
+            {
+                Pending = group.Count(job => job.RefundAttemptCount < options.MaxRefundAttempts),
+                Exhausted = group.Count(job => job.RefundAttemptCount >= options.MaxRefundAttempts)
+            })
+            .FirstOrDefaultAsync(cancellationToken);
 
         return Result.Success(new AdminTemplateGenerationDashboardMetricsResponse(
             TotalJobs: statusCounts.Sum(row => row.Count),
@@ -52,13 +69,16 @@ internal sealed partial class TemplatesService
             FailedGenerationsToday: periodCounts?.FailedGenerationsToday ?? 0,
             FailedGenerationsThisWeek: periodCounts?.FailedGenerationsThisWeek ?? 0,
             FailedGenerationsThisMonth: periodCounts?.FailedGenerationsThisMonth ?? 0,
-            PendingJobs: statusCountByStatus.GetValueOrDefault(TemplateGenerationStatus.Queued),
-            RunningJobs: statusCountByStatus.GetValueOrDefault(TemplateGenerationStatus.Processing),
+            PendingJobs: statusCountByStatus.GetValueOrDefault(TemplateGenerationStatus.Queued)
+                + statusCountByStatus.GetValueOrDefault(TemplateGenerationStatus.Retrying),
+            RunningJobs: TemplateGenerationJobStatusSets.Processing.Sum(status => statusCountByStatus.GetValueOrDefault(status)),
             CompletedJobs: statusCountByStatus.GetValueOrDefault(TemplateGenerationStatus.Completed),
             FailedJobs: statusCountByStatus.GetValueOrDefault(TemplateGenerationStatus.Failed),
             CancelledJobs: statusCountByStatus.GetValueOrDefault(TemplateGenerationStatus.Cancelled),
             CancellingJobs: statusCountByStatus.GetValueOrDefault(TemplateGenerationStatus.CancellationRequested),
             RetryingJobs: statusCountByStatus.GetValueOrDefault(TemplateGenerationStatus.Retrying),
+            PendingRefunds: refundCounts?.Pending ?? 0,
+            ExhaustedRefunds: refundCounts?.Exhausted ?? 0,
             GeneratedAtUtc: now));
     }
 
@@ -72,10 +92,16 @@ internal sealed partial class TemplatesService
         var provider = NormalizeQueryValue(query.Provider);
         var user = NormalizeQueryValue(query.User);
         var search = NormalizeQueryValue(query.Search);
+        var refundState = NormalizeQueryValue(query.RefundState);
 
         var generations = dbContext.TemplateGenerationJobs
             .AsNoTracking()
             .AsQueryable();
+
+        if (query.GenerationId.HasValue)
+        {
+            generations = generations.Where(job => job.Id == query.GenerationId.Value);
+        }
 
         if (status.HasValue)
         {
@@ -106,6 +132,8 @@ internal sealed partial class TemplatesService
             generations = generations.Where(job => job.Id.ToString().ToLower().Contains(search));
         }
 
+        generations = ApplyAdminGenerationRefundStateFilter(generations, refundState, options.MaxRefundAttempts);
+
         var totalCount = await generations.CountAsync(cancellationToken);
         var rows = await generations
             .OrderByDescending(job => job.CreatedAtUtc)
@@ -135,6 +163,9 @@ internal sealed partial class TemplatesService
                 job.CompletedAtUtc,
                 job.ChargedAtUtc,
                 job.RefundedAtUtc,
+                job.RefundAttemptCount,
+                job.RefundLastAttemptedAtUtc,
+                job.RefundLastErrorCode,
                 job.IsWatermarkRequired,
                 job.IsWatermarkRemoved,
                 job.WatermarkedResultUrl,
@@ -196,7 +227,14 @@ internal sealed partial class TemplatesService
                     row.UpdatedAtUtc,
                     row.StartedAtUtc,
                     row.CompletedAtUtc,
+                    row.ChargedAtUtc,
                     row.RefundedAtUtc,
+                    MapAdminGenerationRefundState(row, options.MaxRefundAttempts),
+                    row.RefundAttemptCount,
+                    options.MaxRefundAttempts,
+                    row.RefundLastAttemptedAtUtc,
+                    row.RefundLastErrorCode,
+                    CanAdminRetryGenerationRefund(row, options.MaxRefundAttempts),
                     row.IsWatermarkRequired,
                     row.IsWatermarkRemoved,
                     watermarkedMediaUrl,
@@ -235,6 +273,32 @@ internal sealed partial class TemplatesService
             take,
             skip + items.Count < totalCount,
             DateTime.UtcNow));
+    }
+
+    public async Task<Result<AdminGenerationDetailResponse>> GetAdminGenerationAsync(
+        Guid generationId,
+        CancellationToken cancellationToken)
+    {
+        var result = await ListAdminGenerationsAsync(
+            new AdminTemplateGenerationsQuery(
+                Status: null,
+                Provider: null,
+                User: null,
+                Search: null,
+                Skip: 0,
+                Take: 1,
+                RefundState: null,
+                GenerationId: generationId),
+            cancellationToken);
+        if (result.IsFailure)
+        {
+            return Result.Failure<AdminGenerationDetailResponse>(result.Error);
+        }
+
+        var generation = result.Value.Items.SingleOrDefault();
+        return generation is null
+            ? Result.Failure<AdminGenerationDetailResponse>(TemplatesErrors.GenerationJobNotFound)
+            : Result.Success(new AdminGenerationDetailResponse(generation, result.Value.GeneratedAtUtc));
     }
 
     private async Task<IReadOnlyDictionary<Guid, AdminGenerationWatermarkUnlockRow>> LoadLatestAdminWatermarkUnlocksAsync(
@@ -347,7 +411,8 @@ internal sealed partial class TemplatesService
             {
                 if (row.PetPhotoId.HasValue && petPhotoPreviews.TryGetValue(row.PetPhotoId.Value, out var previewUrl))
                 {
-                    previewsByGenerationId[row.GenerationId] = previewUrl;
+                    previewsByGenerationId[row.GenerationId] =
+                        await CreateAdminGenerationReadUrlAsync(previewUrl, cancellationToken);
                 }
             }
         }
@@ -485,6 +550,58 @@ internal sealed partial class TemplatesService
         };
     }
 
+    private static IQueryable<TemplateGenerationJob> ApplyAdminGenerationRefundStateFilter(
+        IQueryable<TemplateGenerationJob> generations,
+        string refundState,
+        int refundAttemptLimit)
+    {
+        return refundState switch
+        {
+            "pending" => generations.Where(job =>
+                (job.Status == TemplateGenerationStatus.Failed || job.Status == TemplateGenerationStatus.Cancelled)
+                && job.ChargedAtUtc != null
+                && job.RefundedAtUtc == null
+                && job.RefundAttemptCount < refundAttemptLimit),
+            "exhausted" => generations.Where(job =>
+                (job.Status == TemplateGenerationStatus.Failed || job.Status == TemplateGenerationStatus.Cancelled)
+                && job.ChargedAtUtc != null
+                && job.RefundedAtUtc == null
+                && job.RefundAttemptCount >= refundAttemptLimit),
+            "refunded" => generations.Where(job => job.RefundedAtUtc != null),
+            "not_applicable" => generations.Where(job =>
+                job.RefundedAtUtc == null
+                && (job.ChargedAtUtc == null
+                    || (job.Status != TemplateGenerationStatus.Failed
+                        && job.Status != TemplateGenerationStatus.Cancelled))),
+            "" or "all" => generations,
+            _ => generations.Where(_ => false)
+        };
+    }
+
+    private static string MapAdminGenerationRefundState(AdminGenerationPageRow row, int refundAttemptLimit)
+    {
+        if (row.RefundedAtUtc is not null)
+        {
+            return "refunded";
+        }
+
+        if (row.Status is not (TemplateGenerationStatus.Failed or TemplateGenerationStatus.Cancelled)
+            || row.ChargedAtUtc is null)
+        {
+            return "not_applicable";
+        }
+
+        return row.RefundAttemptCount >= refundAttemptLimit ? "exhausted" : "pending";
+    }
+
+    private static bool CanAdminRetryGenerationRefund(AdminGenerationPageRow row, int refundAttemptLimit)
+    {
+        return string.Equals(
+            MapAdminGenerationRefundState(row, refundAttemptLimit),
+            "exhausted",
+            StringComparison.Ordinal);
+    }
+
     private static string MapAdminGenerationStatus(TemplateGenerationStatus status)
     {
         return status switch
@@ -575,6 +692,9 @@ internal sealed partial class TemplatesService
         DateTime? CompletedAtUtc,
         DateTime? ChargedAtUtc,
         DateTime? RefundedAtUtc,
+        int RefundAttemptCount,
+        DateTime? RefundLastAttemptedAtUtc,
+        string? RefundLastErrorCode,
         bool IsWatermarkRequired,
         bool IsWatermarkRemoved,
         string? WatermarkedMediaPath,

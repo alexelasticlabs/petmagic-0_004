@@ -74,7 +74,7 @@ public sealed class GenerationObservabilityReleaseGateTests
     public void GenerationReleaseGateDocsSmokeAndAlerts_ShouldContainRequiredMetricsAndAlerts()
     {
         var runbook = File.ReadAllText(RepositoryPath("docs", "observability", "generation-release-gate.md"));
-        var observability = File.ReadAllText(RepositoryPath("docs", "OBSERVABILITY.md"));
+        var observability = File.ReadAllText(RepositoryPath("docs", "observability.md"));
         var smoke = File.ReadAllText(RepositoryPath("scripts", "qa", "run-staging-generation-scheduler-smoke.mjs"));
         var alerts = File.ReadAllText(RepositoryPath("deploy", "monitoring", "prometheus", "petmagic-alerts.yml"));
 

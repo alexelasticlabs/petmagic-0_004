@@ -86,6 +86,7 @@ internal sealed class TemplatePushOutboxProcessor(
                 SELECT "Id" FROM templates_push_outbox
                 WHERE (("Status" = {0} AND "NextAttemptAtUtc" <= {2} AND "AttemptCount" < {3})
                        OR ("Status" = {1} AND ("LockExpiresAtUtc" IS NULL OR "LockExpiresAtUtc" <= {2})))
+                    AND "Kind" <> {6}
                 ORDER BY "NextAttemptAtUtc", "CreatedAtUtc"
                 FOR UPDATE SKIP LOCKED LIMIT 1)
             RETURNING "Id" AS "Value";
@@ -95,7 +96,8 @@ internal sealed class TemplatePushOutboxProcessor(
             now,
             PushOutboxPolicy.MaxAttempts,
             Guid.NewGuid(),
-            now.Add(PushOutboxPolicy.LeaseDuration)).ToListAsync(cancellationToken);
+            now.Add(PushOutboxPolicy.LeaseDuration),
+            TemplateAdminAuditOutbox.Kind).ToListAsync(cancellationToken);
 
         var id = ids.FirstOrDefault();
         return id == Guid.Empty
@@ -107,6 +109,7 @@ internal sealed class TemplatePushOutboxProcessor(
     {
         var now = DateTime.UtcNow;
         var message = await dbContext.PushOutboxMessages
+            .Where(x => x.Kind != TemplateAdminAuditOutbox.Kind)
             .Where(x => (x.Status == PushOutboxStatus.Queued
                         && x.NextAttemptAtUtc <= now
                         && x.AttemptCount < PushOutboxPolicy.MaxAttempts)
@@ -161,7 +164,9 @@ internal sealed class TemplatePushOutboxProcessor(
     {
         var cutoff = DateTime.UtcNow.Subtract(PushOutboxPolicy.SentRetention);
         var message = await dbContext.PushOutboxMessages
-            .Where(x => x.Status == PushOutboxStatus.Sent && x.SentAtUtc <= cutoff)
+            .Where(x => x.Kind != TemplateAdminAuditOutbox.Kind
+                && x.Status == PushOutboxStatus.Sent
+                && x.SentAtUtc <= cutoff)
             .OrderBy(x => x.SentAtUtc)
             .FirstOrDefaultAsync(cancellationToken);
         if (message is null)

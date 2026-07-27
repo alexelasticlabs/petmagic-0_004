@@ -235,6 +235,15 @@ public sealed partial class EconomyService
         var isPremium = IsActivePremiumSubscription(subscription);
         var manageAction = GetManageSubscriptionAction(subscription?.Provider);
         await ReconcilePremiumEntitlementAsync(userId, "subscription_summary", cancellationToken);
+        var hasPendingAdminRevocation = await dbContext.SubscriptionEventLogs
+            .AsNoTracking()
+            .AnyAsync(
+                x => x.UserId == userId
+                    && x.EventType == AdminPremiumRevokeEventType
+                    && x.ExternalEventId != null
+                    && x.ExternalEventId.StartsWith(AdminPremiumRevokeOperationPrefix)
+                    && x.Status != AdminPremiumRevokeCompleted,
+                cancellationToken);
 
         string? cardBrand = null;
         string? cardLast4 = null;
@@ -268,7 +277,8 @@ public sealed partial class EconomyService
             subscription?.LastTokenGrantAtUtc,
             cardBrand,
             cardLast4,
-            options.Value.WeeklyPremiumSpark));
+            options.Value.WeeklyPremiumSpark,
+            hasPendingAdminRevocation));
     }
 
     public async Task<Result<StripeDiagnosticsResponse>> GetStripeDiagnosticsAsync(Guid userId, CancellationToken cancellationToken)

@@ -313,6 +313,7 @@ public sealed partial class EconomyServiceTests
 
         Assert.True(first.IsSuccess);
         Assert.True(second.IsSuccess);
+        Assert.Equal(60, first.Value.Delta);
         Assert.Equal(60, first.Value.NewBalance);
         Assert.Equal(60, second.Value.NewBalance);
         Assert.Equal(0, second.Value.Delta);
@@ -326,6 +327,48 @@ public sealed partial class EconomyServiceTests
         var ledgerEntry = Assert.Single(ledgerEntries);
         Assert.Equal(60, ledgerEntry.Delta);
         Assert.Equal(idempotencyKey, ledgerEntry.Reason);
+    }
+
+    [Fact]
+    public async Task CreditAsync_ShouldHonorPreviousGenerationRefundIdempotencyKey()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var generationId = Guid.NewGuid();
+        var feedbackId = Guid.NewGuid();
+        var legacyKey = $"feedback_refund:{feedbackId:N}";
+        var currentKey = $"generation_refund:{generationId:N}";
+        var service = CreateService(dbContext);
+
+        var historicalCredit = await service.CreditAsync(
+            new CreditBalanceCommand(
+                userId,
+                60,
+                WalletLedgerSource.GenerationRefund,
+                "historical admin refund",
+                legacyKey),
+            CancellationToken.None);
+        var recoveredCurrentCredit = await service.CreditAsync(
+            new CreditBalanceCommand(
+                userId,
+                60,
+                WalletLedgerSource.GenerationRefund,
+                "current admin refund",
+                currentKey,
+                PreviousIdempotencyKeys: [legacyKey]),
+            CancellationToken.None);
+
+        Assert.True(historicalCredit.IsSuccess);
+        Assert.True(recoveredCurrentCredit.IsSuccess);
+        Assert.Equal(60, historicalCredit.Value.Delta);
+        Assert.Equal(0, recoveredCurrentCredit.Value.Delta);
+        Assert.Equal(60, recoveredCurrentCredit.Value.NewBalance);
+
+        var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
+        var ledgerEntry = await dbContext.WalletLedgerEntries.SingleAsync(x => x.UserId == userId);
+        Assert.Equal(60, wallet.Balance);
+        Assert.Equal(legacyKey, ledgerEntry.Reason);
     }
 
     [Fact]
@@ -426,6 +469,119 @@ public sealed partial class EconomyServiceTests
         Assert.Equal("admin-credit-ticket-1", ledgerEntry.Reason);
         Assert.Equal("internal", ledgerEntry.SourceProvider);
         Assert.StartsWith("wallet:", ledgerEntry.SourceTransactionId, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CreditAsync_ShouldPreserveHumanLedgerReasonWhenIdempotencyKeyIsProvided()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var service = CreateService(dbContext);
+        var command = new CreditBalanceCommand(
+            userId,
+            75,
+            WalletLedgerSource.AdminGrant,
+            "support:manual-credit",
+            "wallet-adjustment:credit-1",
+            LedgerReason: "Customer support compensation",
+            IdempotencyScope: "admin_user_wallet");
+
+        var first = await service.CreditAsync(command, CancellationToken.None);
+        var duplicate = await service.CreditAsync(command, CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(duplicate.IsSuccess);
+        Assert.Equal(75, first.Value.NewBalance);
+        Assert.Equal(0, duplicate.Value.Delta);
+
+        var ledgerEntry = await dbContext.WalletLedgerEntries.SingleAsync(x => x.UserId == userId);
+        Assert.Equal("Customer support compensation", ledgerEntry.Reason);
+        Assert.Equal("internal", ledgerEntry.SourceProvider);
+        Assert.StartsWith("wallet:", ledgerEntry.SourceTransactionId, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SpendAsync_ShouldBeIdempotentForGenericIdempotencyKey()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        dbContext.Wallets.Add(new Wallet
+        {
+            UserId = userId,
+            Balance = 100,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext);
+        var command = new SpendBalanceCommand(
+            userId,
+            25,
+            "Customer support correction",
+            WalletLedgerSource.AdminDebit,
+            "wallet-adjustment:debit-1",
+            IdempotencyScope: "admin_user_wallet");
+
+        var first = await service.SpendAsync(command, CancellationToken.None);
+        var duplicate = await service.SpendAsync(command, CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(duplicate.IsSuccess);
+        Assert.Equal(75, first.Value.NewBalance);
+        Assert.Equal(75, duplicate.Value.NewBalance);
+        Assert.Equal(0, duplicate.Value.Delta);
+
+        var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
+        var ledgerEntry = await dbContext.WalletLedgerEntries.SingleAsync(x => x.UserId == userId);
+        Assert.Equal(75, wallet.Balance);
+        Assert.Equal(-25, ledgerEntry.Delta);
+        Assert.Equal("Customer support correction", ledgerEntry.Reason);
+        Assert.Equal("internal", ledgerEntry.SourceProvider);
+        Assert.StartsWith("wallet:", ledgerEntry.SourceTransactionId, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task WalletAdjustmentScope_ShouldNotApplyDifferentOperationsWithTheSameIdempotencyKey()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var service = CreateService(dbContext);
+        const string idempotencyKey = "wallet-adjustment:single-operation";
+
+        var credit = await service.CreditAsync(
+            new CreditBalanceCommand(
+                userId,
+                80,
+                WalletLedgerSource.AdminGrant,
+                "Customer support compensation",
+                idempotencyKey,
+                LedgerReason: "Customer support compensation",
+                IdempotencyScope: "admin_user_wallet"),
+            CancellationToken.None);
+        var conflictingDebit = await service.SpendAsync(
+            new SpendBalanceCommand(
+                userId,
+                30,
+                "Customer support correction",
+                WalletLedgerSource.AdminDebit,
+                idempotencyKey,
+                IdempotencyScope: "admin_user_wallet"),
+            CancellationToken.None);
+
+        Assert.True(credit.IsSuccess);
+        Assert.True(conflictingDebit.IsSuccess);
+        Assert.Equal(80, credit.Value.NewBalance);
+        Assert.Equal(80, conflictingDebit.Value.NewBalance);
+        Assert.Equal(0, conflictingDebit.Value.Delta);
+
+        var ledgerEntries = await dbContext.WalletLedgerEntries
+            .Where(x => x.UserId == userId)
+            .ToListAsync();
+        Assert.Single(ledgerEntries);
+        Assert.Equal(WalletLedgerSource.AdminGrant, ledgerEntries[0].Source);
     }
 
     [Fact]

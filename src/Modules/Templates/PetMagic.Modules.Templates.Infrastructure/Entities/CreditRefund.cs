@@ -18,7 +18,16 @@ public sealed class CreditRefund
 
     public DateTime CreatedAtUtc { get; set; }
 
+    // Existing rows predate the durable refund intent and are settled refunds.
+    public string SettlementStatus { get; set; } = CreditRefundSettlementStatus.Completed;
+
     public TemplateGenerationFeedback? Feedback { get; set; }
 
     public TemplateGenerationJob? Generation { get; set; }
+}
+
+internal static class CreditRefundSettlementStatus
+{
+    public const string Pending = "Pending";
+    public const string Completed = "Completed";
 }

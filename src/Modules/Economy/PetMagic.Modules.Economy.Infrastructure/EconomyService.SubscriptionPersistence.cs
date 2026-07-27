@@ -17,6 +17,12 @@ public sealed partial class EconomyService
             .Where(x => x.UserId == userId)
             .ToListAsync(cancellationToken);
 
+        return SelectLatestUserSubscription(subscriptions);
+    }
+
+    private static UserSubscription? SelectLatestUserSubscription(
+        IEnumerable<UserSubscription> subscriptions)
+    {
         return subscriptions
             .OrderByDescending(IsActivePremiumSubscription)
             .ThenByDescending(x => x.CurrentPeriodEndUtc ?? DateTime.MinValue)

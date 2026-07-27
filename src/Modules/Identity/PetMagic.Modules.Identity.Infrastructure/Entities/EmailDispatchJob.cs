@@ -6,6 +6,8 @@ public sealed class EmailDispatchJob
 {
     public Guid Id { get; set; }
 
+    public Guid? BroadcastId { get; set; }
+
     public Guid? UserId { get; set; }
 
     public string RecipientEmail { get; set; } = string.Empty;
@@ -39,4 +41,6 @@ public sealed class EmailDispatchJob
     public string? FailureCode { get; set; }
 
     public string? FailureMessage { get; set; }
+
+    public AdminEmailBroadcast? Broadcast { get; set; }
 }

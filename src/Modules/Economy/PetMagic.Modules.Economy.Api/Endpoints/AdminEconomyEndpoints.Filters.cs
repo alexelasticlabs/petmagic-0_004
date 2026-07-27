@@ -7,6 +7,18 @@ namespace PetMagic.Modules.Economy.Api.Endpoints;
 
 public static partial class AdminEconomyEndpoints
 {
+    private static ProblemHttpResult? ValidateDashboardPeriodDays(int? periodDays)
+    {
+        if (periodDays is null or 7 or 30 or 90)
+        {
+            return null;
+        }
+
+        return ToAdminEconomyFilterProblem(
+            "economy.dashboard_period_invalid",
+            "Dashboard period filter is invalid.");
+    }
+
     private static ProblemHttpResult? ValidatePurchaseFilters(string? status, string? provider)
     {
         if (!IsAllowedOptionalFilter(status, PurchaseStatusFilters))

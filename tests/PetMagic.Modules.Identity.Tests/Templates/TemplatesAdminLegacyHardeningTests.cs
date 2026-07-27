@@ -92,6 +92,58 @@ public sealed class TemplatesAdminLegacyHardeningTests
     }
 
     [Fact]
+    public void ModerationDecision_ShouldKeepBackendValidationLeaseConcurrencyAuditAndConflictMapping()
+    {
+        var root = FindRepositoryRoot();
+        var serviceSource = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Infrastructure",
+            "TemplatesService.AdminModeration.cs"));
+        var leaseSource = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Infrastructure",
+            "TemplatesService.AdminModerationLeases.cs"));
+        var errorsSource = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Infrastructure",
+            "TemplatesErrors.cs"));
+        var problemSource = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Api",
+            "Endpoints",
+            "AdminTemplateEndpoints.ClientProblems.cs"));
+
+        Assert.Contains("AdminModerationDecisionReasonMinLength = 3", serviceSource, StringComparison.Ordinal);
+        Assert.Contains("AdminModerationDecisionReasonMaxLength = 500", serviceSource, StringComparison.Ordinal);
+        Assert.Contains("ResolveExistingModerationDecision", serviceSource, StringComparison.Ordinal);
+        Assert.Contains("TemplatesErrors.ModerationDecisionConflict", serviceSource, StringComparison.Ordinal);
+        Assert.Contains("command.ExpectedVersion.HasValue", leaseSource, StringComparison.Ordinal);
+        Assert.Contains("analyticsEvent.ModerationVersion != command.ExpectedVersion.Value", leaseSource, StringComparison.Ordinal);
+        Assert.Contains("DbUpdateConcurrencyException", leaseSource, StringComparison.Ordinal);
+        Assert.Contains("TemplatesErrors.ModerationLeaseConflict", leaseSource, StringComparison.Ordinal);
+        Assert.Contains("EnqueueModerationAudit", leaseSource, StringComparison.Ordinal);
+        Assert.Contains("TemplateAdminAuditOutbox.TryDeliverAsync", leaseSource, StringComparison.Ordinal);
+        Assert.Contains("templates.moderation_decision_reason_invalid", errorsSource, StringComparison.Ordinal);
+        Assert.Contains("templates.moderation_decision_conflict", errorsSource, StringComparison.Ordinal);
+        Assert.Contains("templates.moderation_lease_conflict", errorsSource, StringComparison.Ordinal);
+        Assert.Contains("templates.moderation_decision_conflict", problemSource, StringComparison.Ordinal);
+        Assert.Contains("templates.moderation_lease_conflict", problemSource, StringComparison.Ordinal);
+        Assert.Contains("StatusCodes.Status409Conflict", problemSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TemplateOfTheDayMappers_ShouldNormalizeLegacyNullFields()
     {
         var templatesServiceType = typeof(TemplateItem).Assembly.GetType(

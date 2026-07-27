@@ -1,8 +1,14 @@
+using System.Text.Json;
+
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
+using PetMagic.BuildingBlocks.Notifications;
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Economy.Application.Contracts;
 using PetMagic.Modules.Economy.Domain.Enums;
 using PetMagic.Modules.Economy.Infrastructure;
+using PetMagic.Modules.Economy.Infrastructure.Data;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
 
 namespace PetMagic.Modules.Identity.Tests.Economy;
@@ -45,6 +51,197 @@ public sealed partial class EconomyServiceTests
         Assert.Equal(100, wallet.Balance);
         Assert.Equal("redeem_code", ledger.Source);
         Assert.Equal(ledger.Id, redemption.WalletLedgerEntryId);
+    }
+
+    [Fact]
+    public async Task RedeemCodeMutations_ShouldWriteRedactedAuditTrail()
+    {
+        await using var dbContext = CreateDbContext();
+        const string plainTextCode = "Q7X9";
+        var auditLog = new RecordingAdminAuditLog();
+        var service = CreateService(dbContext, adminAuditLog: auditLog);
+
+        var create = await service.CreateRedeemCodeAsync(
+            new CreateRedeemCodeCommand(
+                plainTextCode,
+                $"Campaign for {plainTextCode}",
+                RedeemCodeRewardKind.Spark,
+                25,
+                100,
+                1,
+                true,
+                null,
+                DateTime.UtcNow.AddDays(7),
+                CampaignName: plainTextCode,
+                CampaignChannel: plainTextCode,
+                MinimumSuccessfulPurchases: 1,
+                CreatedBy: plainTextCode),
+            CancellationToken.None);
+
+        Assert.True(create.IsSuccess);
+        var persisted = await dbContext.RedeemCodes
+            .AsNoTracking()
+            .SingleAsync(x => x.Id == create.Value.RedeemCodeId);
+
+        var update = await service.UpdateRedeemCodeAsync(
+            new UpdateRedeemCodeCommand(
+                create.Value.RedeemCodeId,
+                $"Updated campaign for {plainTextCode}",
+                RedeemCodeRewardKind.Spark,
+                30,
+                120,
+                2,
+                false,
+                DateTime.UtcNow.AddHours(1),
+                DateTime.UtcNow.AddDays(14),
+                CampaignName: plainTextCode,
+                CampaignChannel: plainTextCode,
+                MinimumSuccessfulPurchases: 2,
+                CreatedBy: plainTextCode),
+            CancellationToken.None);
+
+        Assert.True(update.IsSuccess);
+        Assert.Collection(
+            auditLog.Entries,
+            entry =>
+            {
+                Assert.Equal("admin.economy.redeem_code.created", entry.Action);
+                Assert.Equal("redeem_code", entry.TargetType);
+                Assert.Equal(create.Value.RedeemCodeId.ToString("D"), entry.TargetId);
+                Assert.Null(entry.OldValue);
+                Assert.NotNull(entry.NewValue);
+            },
+            entry =>
+            {
+                Assert.Equal("admin.economy.redeem_code.updated", entry.Action);
+                Assert.Equal("redeem_code", entry.TargetType);
+                Assert.Equal(create.Value.RedeemCodeId.ToString("D"), entry.TargetId);
+                Assert.NotEqual(entry.OldValue, entry.NewValue);
+            });
+
+        var auditPayload = string.Join(
+            '\n',
+            auditLog.Entries.SelectMany(entry => new[]
+            {
+                entry.OldValue,
+                entry.NewValue,
+                entry.Details,
+            }));
+        Assert.DoesNotContain(plainTextCode, auditPayload, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(persisted.CodeHash, auditPayload, StringComparison.OrdinalIgnoreCase);
+
+        using var createSnapshot = JsonDocument.Parse(auditLog.Entries[0].NewValue!);
+        Assert.False(createSnapshot.RootElement.TryGetProperty("CodePrefix", out _));
+        Assert.True(createSnapshot.RootElement.GetProperty("DescriptionConfigured").GetBoolean());
+        Assert.True(createSnapshot.RootElement.GetProperty("CampaignNameConfigured").GetBoolean());
+        Assert.True(createSnapshot.RootElement.GetProperty("CampaignChannelConfigured").GetBoolean());
+        Assert.True(createSnapshot.RootElement.GetProperty("CreatedByConfigured").GetBoolean());
+
+        var outboxMessages = await dbContext.PushOutboxMessages
+            .AsNoTracking()
+            .OrderBy(message => message.CreatedAtUtc)
+            .ToListAsync();
+        Assert.Equal(2, outboxMessages.Count);
+        Assert.All(outboxMessages, message =>
+        {
+            Assert.Equal(EconomyAdminAuditOutbox.Kind, message.Kind);
+            Assert.Equal(PushOutboxStatus.Sent, message.Status);
+            Assert.DoesNotContain(plainTextCode, message.PayloadJson, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(persisted.CodeHash, message.PayloadJson, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("codePrefix", message.PayloadJson, StringComparison.OrdinalIgnoreCase);
+        });
+        Assert.All(auditLog.Entries, entry =>
+        {
+            Assert.NotNull(entry.EventId);
+            Assert.NotEqual(Guid.Empty, entry.EventId!.Value);
+            Assert.NotNull(entry.OccurredAtUtc);
+        });
+    }
+
+    [Fact]
+    public async Task CreateRedeemCodeAsync_ShouldSucceedAndKeepAuditQueued_WhenImmediateAuditDeliveryFails()
+    {
+        await using var dbContext = CreateDbContext();
+        const string plainTextCode = "ZXCV-ATOMIC-2026";
+        var service = CreateService(dbContext, adminAuditLog: new ThrowingAdminAuditLog());
+
+        var result = await service.CreateRedeemCodeAsync(
+            new CreateRedeemCodeCommand(
+                plainTextCode,
+                "Atomic audit campaign",
+                RedeemCodeRewardKind.Spark,
+                50,
+                100,
+                1,
+                true,
+                null,
+                DateTime.UtcNow.AddDays(7)),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var persistedCode = await dbContext.RedeemCodes
+            .AsNoTracking()
+            .SingleAsync(code => code.Id == result.Value.RedeemCodeId);
+        var queuedAudit = await dbContext.PushOutboxMessages
+            .AsNoTracking()
+            .SingleAsync();
+
+        Assert.Equal(EconomyAdminAuditOutbox.Kind, queuedAudit.Kind);
+        Assert.Equal(PushOutboxStatus.Queued, queuedAudit.Status);
+        Assert.Equal(0, queuedAudit.AttemptCount);
+        Assert.Null(queuedAudit.SentAtUtc);
+        Assert.DoesNotContain(plainTextCode, queuedAudit.PayloadJson, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(persistedCode.CodeHash, queuedAudit.PayloadJson, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(persistedCode.CodePrefix, queuedAudit.PayloadJson, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("codePrefix", queuedAudit.PayloadJson, StringComparison.OrdinalIgnoreCase);
+
+        var capturedEntry = JsonSerializer.Deserialize<AdminAuditEntry>(
+            queuedAudit.PayloadJson,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        Assert.NotNull(capturedEntry);
+        Assert.NotNull(capturedEntry.EventId);
+        Assert.NotEqual(Guid.Empty, capturedEntry.EventId!.Value);
+        Assert.NotNull(capturedEntry.OccurredAtUtc);
+    }
+
+    [Fact]
+    public async Task CreateRedeemCodeAsync_ShouldRollbackMutation_WhenDurableAuditCannotBeQueued()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<EconomyDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var dbContext = new EconomyDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TRIGGER reject_economy_admin_audit_outbox
+            BEFORE INSERT ON economy_push_outbox
+            BEGIN
+                SELECT RAISE(ABORT, 'audit outbox unavailable');
+            END;
+            """);
+        var auditLog = new RecordingAdminAuditLog();
+        var service = CreateService(dbContext, adminAuditLog: auditLog);
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => service.CreateRedeemCodeAsync(
+            new CreateRedeemCodeCommand(
+                "ATOMIC-ROLLBACK",
+                "Atomic rollback campaign",
+                RedeemCodeRewardKind.Spark,
+                50,
+                100,
+                1,
+                true,
+                null,
+                DateTime.UtcNow.AddDays(7)),
+            CancellationToken.None));
+
+        dbContext.ChangeTracker.Clear();
+        Assert.Empty(await dbContext.RedeemCodes.ToListAsync());
+        Assert.Empty(await dbContext.PushOutboxMessages.ToListAsync());
+        Assert.Empty(auditLog.Entries);
     }
 
     [Fact]
@@ -530,5 +727,11 @@ public sealed partial class EconomyServiceTests
 
         Assert.True(result.IsFailure);
         Assert.Equal(EconomyErrors.RedeemCodeRewardUnsupported.Code, result.Error.Code);
+    }
+
+    private sealed class ThrowingAdminAuditLog : IAdminAuditLog
+    {
+        public Task WriteAsync(AdminAuditEntry entry, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("Simulated central audit outage.");
     }
 }

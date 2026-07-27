@@ -2,6 +2,7 @@ using System.Data;
 using System.Security.Cryptography;
 using System.Text;
 
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Caching.Memory;
@@ -33,13 +34,28 @@ public sealed partial class EconomyService(
     ILogger<EconomyService>? logger = null,
     IAdminAuditLog? adminAuditLog = null,
     IStoreWebhookSecurityValidator? storeWebhookSecurityValidator = null,
-    IGenerationBillingReconciliationService? generationBillingReconciliation = null) : IEconomyService, IEconomyAdminService
+    IGenerationBillingReconciliationService? generationBillingReconciliation = null,
+    IHttpContextAccessor? httpContextAccessor = null,
+    ILoggerFactory? loggerFactory = null) : IEconomyService, IEconomyAdminService
 {
     private readonly EconomyAdminConfigurationService _adminConfigurationService =
-        new(dbContext, options);
+        new(
+            dbContext,
+            options,
+            new EconomyAdminAuditOutbox(
+                dbContext,
+                adminAuditLog,
+                httpContextAccessor,
+                loggerFactory?.CreateLogger<EconomyAdminAuditOutbox>()));
 
     private readonly EconomyAdminRedeemCodeService _adminRedeemCodeService =
-        new(dbContext);
+        new(
+            dbContext,
+            new EconomyAdminAuditOutbox(
+                dbContext,
+                adminAuditLog,
+                httpContextAccessor,
+                loggerFactory?.CreateLogger<EconomyAdminAuditOutbox>()));
 
     private readonly IEconomyPushTokenService _pushTokenService =
         pushTokenService ?? new EconomyPushTokenService(dbContext);
@@ -222,13 +238,22 @@ public sealed partial class EconomyService(
         var source = string.IsNullOrWhiteSpace(command.Source)
             ? WalletLedgerSource.GenerationSpend
             : command.Source;
+        var idempotencyScope = string.IsNullOrWhiteSpace(command.IdempotencyScope)
+            ? source
+            : command.IdempotencyScope;
+        var sourceTransactionId = BuildInternalWalletIdempotencyTransactionId(
+            command.UserId,
+            idempotencyScope,
+            command.IdempotencyKey);
         var walletMutation = await ApplyWalletMutationAsync(
             wallet,
             -command.Amount,
             source,
             command.Reason,
             now,
-            cancellationToken);
+            cancellationToken,
+            sourceTransactionId is null ? null : InternalWalletMutationProvider,
+            sourceTransactionId);
         if (walletMutation.IsFailure)
         {
             return Result.Failure<WalletOperationResponse>(walletMutation.Error);
@@ -256,8 +281,8 @@ public sealed partial class EconomyService(
                 command.UserId,
                 source,
                 command.Reason,
-                sourceProvider: null,
-                sourceTransactionId: null,
+                sourceTransactionId is null ? null : InternalWalletMutationProvider,
+                sourceTransactionId,
                 clearChangeTracker: true,
                 cancellationToken);
             if (existing is not null)
@@ -296,10 +321,22 @@ public sealed partial class EconomyService(
         var normalizedReason = NormalizeCreditReason(command);
         var wallet = await GetOrCreateWalletAsync(command.UserId, cancellationToken);
         var now = DateTime.UtcNow;
+        var idempotencyScope = string.IsNullOrWhiteSpace(command.IdempotencyScope)
+            ? command.Source
+            : command.IdempotencyScope;
         var sourceTransactionId = BuildInternalWalletIdempotencyTransactionId(
             command.UserId,
-            command.Source,
+            idempotencyScope,
             command.IdempotencyKey);
+        var previousMutation = await TryResolvePreviousCreditIdempotencyKeysAsync(
+            command,
+            idempotencyScope,
+            cancellationToken);
+        if (previousMutation is not null)
+        {
+            return Result.Success(previousMutation.Response);
+        }
+
         var walletMutation = await ApplyWalletMutationAsync(
             wallet,
             command.Amount,
@@ -566,9 +603,59 @@ public sealed partial class EconomyService(
 
     private static string NormalizeCreditReason(CreditBalanceCommand command)
     {
+        if (!string.IsNullOrWhiteSpace(command.LedgerReason))
+        {
+            return command.LedgerReason.Trim();
+        }
+
         return string.IsNullOrWhiteSpace(command.IdempotencyKey)
             ? command.Reason
             : command.IdempotencyKey.Trim();
+    }
+
+    private async Task<WalletMutationResult?> TryResolvePreviousCreditIdempotencyKeysAsync(
+        CreditBalanceCommand command,
+        string idempotencyScope,
+        CancellationToken cancellationToken)
+    {
+        if (command.PreviousIdempotencyKeys is null || command.PreviousIdempotencyKeys.Count == 0)
+        {
+            return null;
+        }
+
+        var checkedKeys = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var previousKey in command.PreviousIdempotencyKeys)
+        {
+            var normalizedPreviousKey = NormalizeWalletMutationReason(previousKey);
+            if (normalizedPreviousKey is null
+                || !checkedKeys.Add(normalizedPreviousKey)
+                || string.Equals(normalizedPreviousKey, command.IdempotencyKey?.Trim(), StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            // The compatibility keys represent historical internal credits whose
+            // ledger reason was the idempotency key itself. Check both the internal
+            // transaction id and that legacy ledger reason before issuing a new credit.
+            var previousTransactionId = BuildInternalWalletIdempotencyTransactionId(
+                command.UserId,
+                idempotencyScope,
+                normalizedPreviousKey);
+            var existing = await TryResolveExistingWalletMutationAsync(
+                command.UserId,
+                command.Source,
+                normalizedPreviousKey,
+                previousTransactionId is null ? null : InternalWalletMutationProvider,
+                previousTransactionId,
+                clearChangeTracker: false,
+                cancellationToken);
+            if (existing is not null)
+            {
+                return existing;
+            }
+        }
+
+        return null;
     }
 
     private static string? BuildInternalWalletIdempotencyTransactionId(Guid userId, string source, string? idempotencyKey)

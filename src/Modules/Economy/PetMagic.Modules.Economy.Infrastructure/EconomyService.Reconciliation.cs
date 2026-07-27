@@ -1,6 +1,7 @@
 using System.Text.Json;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 using Npgsql;
 
@@ -57,6 +58,7 @@ public sealed partial class EconomyService
         await ReconcilePurchaseOrdersAsync(stalePendingBeforeUtc, stats, cancellationToken);
         await ReconcileLedgerConsistencyAsync(stats, cancellationToken);
         await ReconcileGenerationBillingAsync(stalePendingBeforeUtc, lookbackAfterUtc, stats, cancellationToken);
+        await ReconcilePendingAdminPremiumRevocationsAsync(stats, cancellationToken);
         await ReconcileSubscriptionsAsync(startedAtUtc, lookbackAfterUtc, stats, cancellationToken);
         await ReconcileWebhookEventsAsync(lookbackAfterUtc, stats, cancellationToken);
 
@@ -69,6 +71,66 @@ public sealed partial class EconomyService
             stats.IncidentsResolved,
             stats.AutoFixesApplied,
             stats.ManualReviewRequired));
+    }
+
+    private async Task ReconcilePendingAdminPremiumRevocationsAsync(
+        ReconciliationStats stats,
+        CancellationToken cancellationToken)
+    {
+        const int batchSize = 100;
+        var operationIds = await dbContext.SubscriptionEventLogs
+            .AsNoTracking()
+            .Where(x => x.Provider == "stripe"
+                && x.EventType == AdminPremiumRevokeEventType
+                && x.ExternalEventId != null
+                && x.ExternalEventId.StartsWith(AdminPremiumRevokeOperationPrefix)
+                && (x.Status == AdminPremiumRevokePending
+                    || x.Status == AdminPremiumRevokeGatewayFailed
+                    || x.Status == AdminPremiumRevokeEconomyApplied))
+            .OrderBy(x => x.CreatedAtUtc)
+            .Select(x => x.Id)
+            .Take(batchSize)
+            .ToListAsync(cancellationToken);
+
+        foreach (var operationId in operationIds)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            stats.ChecksRun++;
+            dbContext.ChangeTracker.Clear();
+
+            var operation = await dbContext.SubscriptionEventLogs
+                .FirstOrDefaultAsync(x => x.Id == operationId, cancellationToken);
+            if (operation?.UserSubscriptionId is not { } subscriptionId
+                || !IsAdminPremiumRevokeOperation(operation, subscriptionId))
+            {
+                continue;
+            }
+
+            var subscription = await dbContext.UserSubscriptions
+                .FirstOrDefaultAsync(x => x.Id == subscriptionId, cancellationToken);
+            if (subscription is null || subscription.UserId != operation.UserId)
+            {
+                logger?.LogWarning(
+                    "Skipping orphaned admin Premium revoke recovery. OperationIdHash={OperationIdHash}",
+                    SafeLogValues.StableHash(operationId.ToString("D")));
+                continue;
+            }
+
+            var recovery = await ResumeAdminPremiumRevokeAsync(
+                subscription,
+                operation,
+                cancellationToken);
+            if (recovery.IsSuccess)
+            {
+                stats.AutoFixesApplied++;
+                continue;
+            }
+
+            logger?.LogWarning(
+                "Admin Premium revoke recovery remains pending. OperationIdHash={OperationIdHash} ErrorCode={ErrorCode}",
+                SafeLogValues.StableHash(operationId.ToString("D")),
+                recovery.Error.Code);
+        }
     }
 
     private async Task<(bool Acquired, IAsyncDisposable? Lease)> TryAcquireEconomyReconciliationLockAsync(

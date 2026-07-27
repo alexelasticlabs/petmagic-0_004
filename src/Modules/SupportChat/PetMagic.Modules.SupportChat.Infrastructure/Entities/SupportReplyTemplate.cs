@@ -10,9 +10,17 @@ public sealed class SupportReplyTemplate
 
     public bool IsEnabled { get; set; }
 
+    public int Version { get; set; } = 1;
+
+    public DateTime? DisabledAtUtc { get; set; }
+
+    public Guid LastModifiedByUserId { get; set; }
+
     public int SortOrder { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }
 
     public DateTime UpdatedAtUtc { get; set; }
+
+    public List<SupportReplyTemplateRevision> Revisions { get; set; } = [];
 }

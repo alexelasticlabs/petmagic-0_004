@@ -91,6 +91,30 @@ public static partial class SupportChatEndpoints
         return TypedResults.Ok(result.Value);
     }
 
+    private static async Task<Results<Ok<SupportConversationInboxPageResponse>, ProblemHttpResult>> ListAdminUserTicketsAsync(
+        [FromRoute] Guid userId,
+        [FromQuery] int? page,
+        [FromQuery] int? pageSize,
+        [FromServices] ISupportChatService service,
+        CancellationToken cancellationToken)
+    {
+        var requestedPage = page is null or <= 0 ? 1 : page.Value;
+        var requestedPageSize = NormalizeAdminInboxPageSize(pageSize);
+        var result = await service.ListAdminInboxAsync(
+            new ListAdminSupportInboxQuery(
+                Status: null,
+                Page: requestedPage,
+                PageSize: requestedPageSize,
+                InitiatorUserId: userId),
+            cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToProblem(result.Error);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
     private static async Task<Results<Ok<AdminSupportInboxMetricsResponse>, ProblemHttpResult>> GetAdminInboxMetricsAsync(
         [FromServices] ISupportChatService service,
         CancellationToken cancellationToken)

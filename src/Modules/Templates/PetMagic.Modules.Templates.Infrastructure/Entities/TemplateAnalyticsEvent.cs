@@ -28,6 +28,14 @@ public sealed class TemplateAnalyticsEvent
 
     public DateTime? ModeratedAtUtc { get; set; }
 
+    public Guid? ModerationLeaseOwnerUserId { get; set; }
+
+    public DateTime? ModerationLeaseClaimedAtUtc { get; set; }
+
+    public DateTime? ModerationLeaseExpiresAtUtc { get; set; }
+
+    public long ModerationVersion { get; set; }
+
     public DateTime CreatedAtUtc { get; set; }
 
     public TemplateItem Template { get; set; } = null!;

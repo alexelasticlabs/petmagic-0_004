@@ -92,7 +92,13 @@ public static partial class SupportChatEndpoints
             return unauthorized!;
         }
 
-        var command = new AssignSupportConversationCommand(conversationId, userId, request.AssignedAdminId);
+        var command = new AssignSupportConversationCommand(
+            conversationId,
+            userId,
+            request.AssignedAdminId,
+            request.Reason,
+            request.ExpectedVersion,
+            CanAssignOthers: httpContext.User.IsInRole("Admin"));
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {

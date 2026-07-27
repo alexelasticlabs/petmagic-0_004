@@ -11,6 +11,7 @@ public sealed class SupportChatHub : Hub
     public const string RoutePattern = "/hubs/support-chat";
     public const string AdminInboxGroup = "support:admins";
     public const string ConversationUpdatedEvent = "conversation-updated";
+    public static IReadOnlyList<string> OperatorRoles { get; } = ["Admin", "Moderator"];
 
     public override async Task OnConnectedAsync()
     {
@@ -20,7 +21,8 @@ public sealed class SupportChatHub : Hub
             await Groups.AddToGroupAsync(Context.ConnectionId, UserGroup(userId.Value));
         }
 
-        if (Context.User?.IsInRole("Admin") == true || Context.User?.IsInRole("Moderator") == true)
+        var principal = Context.User;
+        if (principal is not null && OperatorRoles.Any(principal.IsInRole))
         {
             await Groups.AddToGroupAsync(Context.ConnectionId, AdminInboxGroup);
         }

@@ -1,5 +1,9 @@
-using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
+
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
@@ -15,6 +19,12 @@ internal sealed partial class TemplatesService
     private const int TemplateOfTheDayMaxExcludeRecentDays = 365;
     private const string TemplateOfTheDayDefaultBadge = "Template of the Day";
     private const string TemplateOfTheDayDefaultAllowedTypes = "both";
+    private const string TemplateOfTheDayManualRangeConstraint = "EX_templates_otd_active_manual_date_range";
+    private const string TemplateOfTheDayAutoRangeConstraint = "EX_templates_otd_active_auto_date_range";
+
+    private sealed record TemplateOfTheDayAutoPickResult(
+        TemplateOfTheDay? Assignment,
+        bool Created);
 
     public async Task<Result<PublicTemplateOfTheDayResponse>> GetPublicTemplateOfTheDayAsync(
         DateOnly? date,
@@ -24,7 +34,7 @@ internal sealed partial class TemplatesService
         var targetDate = ResolveTemplateOfTheDayBusinessDate(date);
         var assignment = await ResolveTemplateOfTheDayAsync(
             targetDate,
-            createAutoFallback: true,
+            createAutoFallback: !date.HasValue,
             createdByAdminId: null,
             cancellationToken);
 
@@ -95,6 +105,7 @@ internal sealed partial class TemplatesService
         CancellationToken cancellationToken)
     {
         var settings = await GetTemplateOfTheDaySettingsEntityAsync(cancellationToken);
+        var previousAuditSnapshot = BuildTemplateOfTheDaySettingsAuditSnapshot(settings);
         settings.AutoModeEnabled = command.AutoModeEnabled;
         settings.AllowedTypes = NormalizeTemplateOfTheDayAllowedTypes(command.AllowedTypes);
         settings.ExcludeRecentDays = NormalizeTemplateOfTheDayExcludeRecentDays(command.ExcludeRecentDays);
@@ -102,6 +113,13 @@ internal sealed partial class TemplatesService
         settings.UpdatedByAdminId = command.UpdatedByAdminId;
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        await WriteTemplateOfTheDaySettingsAuditAsync(
+            "admin.template_of_the_day.settings_updated",
+            settings.Id,
+            previousAuditSnapshot,
+            BuildTemplateOfTheDaySettingsAuditSnapshot(settings),
+            command.UpdatedByAdminId,
+            cancellationToken);
         await PublishTemplateOfTheDayInvalidatedAsync("settings_updated", cancellationToken);
         return Result.Success(MapAdminTemplateOfTheDaySettings(settings));
     }
@@ -148,7 +166,23 @@ internal sealed partial class TemplatesService
         };
 
         dbContext.TemplateOfTheDay.Add(assignment);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (IsTemplateOfTheDayDateConflict(exception))
+        {
+            dbContext.ChangeTracker.Clear();
+            return Result.Failure<AdminTemplateOfTheDayResponse>(TemplatesErrors.TemplateOfTheDayDateOccupied);
+        }
+
+        await WriteTemplateOfTheDayAuditAsync(
+            "admin.template_of_the_day.created",
+            assignment.Id,
+            null,
+            BuildTemplateOfTheDayAuditSnapshot(assignment),
+            command.CreatedByAdminId,
+            cancellationToken);
         await PublishTemplateOfTheDayInvalidatedAsync("created", cancellationToken);
         return Result.Success(MapAdminTemplateOfTheDay(assignment));
     }
@@ -167,6 +201,7 @@ internal sealed partial class TemplatesService
             return Result.Failure<AdminTemplateOfTheDayResponse>(TemplatesErrors.NotFound);
         }
 
+        var previousAuditSnapshot = BuildTemplateOfTheDayAuditSnapshot(assignment);
         var dateRangeValidation = ValidateTemplateOfTheDayDateRange(command.StartDate, command.EndDate);
         if (dateRangeValidation.IsFailure)
         {
@@ -179,7 +214,7 @@ internal sealed partial class TemplatesService
             return Result.Failure<AdminTemplateOfTheDayResponse>(TemplatesErrors.TemplateOfTheDayTemplateUnavailable);
         }
 
-        if (command.IsManual && command.IsActive
+        if (assignment.IsManual && command.IsActive
             && await HasManualTemplateOfTheDayOverlapAsync(command.StartDate, command.EndDate, command.Id, cancellationToken))
         {
             return Result.Failure<AdminTemplateOfTheDayResponse>(TemplatesErrors.TemplateOfTheDayDateOccupied);
@@ -190,19 +225,37 @@ internal sealed partial class TemplatesService
         assignment.StartDate = command.StartDate;
         assignment.EndDate = command.EndDate;
         assignment.IsActive = command.IsActive;
-        assignment.IsManual = command.IsManual;
         assignment.Priority = command.Priority;
         assignment.TitleOverride = NormalizeOptionalTemplateOfTheDayText(command.TitleOverride, 120);
         assignment.SubtitleOverride = NormalizeOptionalTemplateOfTheDayText(command.SubtitleOverride, 240);
         assignment.BadgeTextOverride = NormalizeOptionalTemplateOfTheDayText(command.BadgeTextOverride, 64);
         assignment.UpdatedAtUtc = DateTime.UtcNow;
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (IsTemplateOfTheDayDateConflict(exception))
+        {
+            dbContext.ChangeTracker.Clear();
+            return Result.Failure<AdminTemplateOfTheDayResponse>(TemplatesErrors.TemplateOfTheDayDateOccupied);
+        }
+
+        await WriteTemplateOfTheDayAuditAsync(
+            "admin.template_of_the_day.updated",
+            assignment.Id,
+            previousAuditSnapshot,
+            BuildTemplateOfTheDayAuditSnapshot(assignment),
+            command.UpdatedByAdminId,
+            cancellationToken);
         await PublishTemplateOfTheDayInvalidatedAsync("updated", cancellationToken);
         return Result.Success(MapAdminTemplateOfTheDay(assignment));
     }
 
-    public async Task<Result> DeleteTemplateOfTheDayAsync(Guid id, CancellationToken cancellationToken)
+    public async Task<Result> DeleteTemplateOfTheDayAsync(
+        Guid id,
+        CancellationToken cancellationToken,
+        Guid? deletedByAdminId = null)
     {
         var assignment = await dbContext.TemplateOfTheDay
             .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
@@ -212,8 +265,16 @@ internal sealed partial class TemplatesService
             return Result.Failure(TemplatesErrors.NotFound);
         }
 
+        var previousAuditSnapshot = BuildTemplateOfTheDayAuditSnapshot(assignment);
         dbContext.TemplateOfTheDay.Remove(assignment);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await WriteTemplateOfTheDayAuditAsync(
+            "admin.template_of_the_day.deleted",
+            assignment.Id,
+            previousAuditSnapshot,
+            "deleted",
+            deletedByAdminId,
+            cancellationToken);
         await PublishTemplateOfTheDayInvalidatedAsync("deleted", cancellationToken);
         return Result.Success();
     }
@@ -230,20 +291,31 @@ internal sealed partial class TemplatesService
 
         var allowedTypes = command.AllowedTypes ?? settings.AllowedTypes;
         var excludeRecentDays = command.ExcludeRecentDays ?? settings.ExcludeRecentDays;
-        var assignment = await CreateAutoTemplateOfTheDayAsync(
+        var autoPick = await CreateAutoTemplateOfTheDayAsync(
             command.Date,
             command.CreatedByAdminId,
             ResolveTemplateOfTheDayAllowedType(allowedTypes),
             NormalizeTemplateOfTheDayExcludeRecentDays(excludeRecentDays),
             cancellationToken);
 
-        if (assignment is null)
+        if (autoPick.Assignment is null)
         {
             return Result.Failure<AdminTemplateOfTheDayResponse>(TemplatesErrors.TemplateOfTheDayTemplateUnavailable);
         }
 
+        if (autoPick.Created && command.CreatedByAdminId.HasValue)
+        {
+            await WriteTemplateOfTheDayAuditAsync(
+                "admin.template_of_the_day.auto_picked",
+                autoPick.Assignment.Id,
+                null,
+                BuildTemplateOfTheDayAuditSnapshot(autoPick.Assignment),
+                command.CreatedByAdminId,
+                cancellationToken);
+        }
+
         await PublishTemplateOfTheDayInvalidatedAsync("auto_picked", cancellationToken);
-        return Result.Success(MapAdminTemplateOfTheDay(assignment));
+        return Result.Success(MapAdminTemplateOfTheDay(autoPick.Assignment));
     }
 
     private async Task<TemplateOfTheDay?> ResolveTemplateOfTheDayAsync(
@@ -282,12 +354,13 @@ internal sealed partial class TemplatesService
             return null;
         }
 
-        return await CreateAutoTemplateOfTheDayAsync(
+        var autoPick = await CreateAutoTemplateOfTheDayAsync(
             date,
             createdByAdminId,
             ResolveTemplateOfTheDayAllowedType(settings.AllowedTypes),
             settings.ExcludeRecentDays,
             cancellationToken);
+        return autoPick.Assignment;
     }
 
     private IQueryable<TemplateOfTheDay> QueryAvailableTemplateOfTheDayAssignments(DateOnly date)
@@ -305,7 +378,7 @@ internal sealed partial class TemplatesService
                 && (asset.Url ?? string.Empty).Trim() != string.Empty));
     }
 
-    private async Task<TemplateOfTheDay?> CreateAutoTemplateOfTheDayAsync(
+    private async Task<TemplateOfTheDayAutoPickResult> CreateAutoTemplateOfTheDayAsync(
         DateOnly date,
         Guid? createdByAdminId,
         TemplateType? allowedType,
@@ -320,7 +393,7 @@ internal sealed partial class TemplatesService
 
         if (manual is not null)
         {
-            return manual;
+            return new TemplateOfTheDayAutoPickResult(manual, Created: false);
         }
 
         var existing = await QueryAvailableTemplateOfTheDayAssignments(date)
@@ -330,7 +403,7 @@ internal sealed partial class TemplatesService
 
         if (existing is not null)
         {
-            return existing;
+            return new TemplateOfTheDayAutoPickResult(existing, Created: false);
         }
 
         var baseCandidates = _visibilityPolicy.ApplyPublic(
@@ -368,7 +441,7 @@ internal sealed partial class TemplatesService
 
         if (candidates.Length == 0)
         {
-            return null;
+            return new TemplateOfTheDayAutoPickResult(null, Created: false);
         }
 
         var selected = candidates[new Random(HashCode.Combine(date.DayNumber, candidates.Length)).Next(candidates.Length)];
@@ -389,8 +462,22 @@ internal sealed partial class TemplatesService
         };
 
         dbContext.TemplateOfTheDay.Add(assignment);
-        await dbContext.SaveChangesAsync(cancellationToken);
-        return assignment;
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (IsTemplateOfTheDayDateConflict(exception))
+        {
+            dbContext.ChangeTracker.Clear();
+            var resolved = await ResolveTemplateOfTheDayAsync(
+                date,
+                createAutoFallback: false,
+                createdByAdminId: null,
+                cancellationToken);
+            return new TemplateOfTheDayAutoPickResult(resolved, Created: false);
+        }
+
+        return new TemplateOfTheDayAutoPickResult(assignment, Created: true);
     }
 
     private async Task<TemplateItem?> FindAvailableTemplateOfTheDayTemplateAsync(
@@ -429,6 +516,88 @@ internal sealed partial class TemplatesService
         return endDate.HasValue && endDate.Value < startDate
             ? Result.Failure(TemplatesErrors.InvalidTemplateOfTheDayDateRange)
             : Result.Success();
+    }
+
+    private async Task WriteTemplateOfTheDayAuditAsync(
+        string action,
+        Guid assignmentId,
+        string? oldValue,
+        string? newValue,
+        Guid? actorUserId,
+        CancellationToken cancellationToken)
+    {
+        if (adminAuditLog is null)
+        {
+            return;
+        }
+
+        await adminAuditLog.WriteAsync(
+            new AdminAuditEntry(
+                action,
+                "template_of_the_day",
+                assignmentId.ToString("D"),
+                oldValue,
+                newValue,
+                ActorUserId: actorUserId),
+            cancellationToken);
+    }
+
+    private async Task WriteTemplateOfTheDaySettingsAuditAsync(
+        string action,
+        Guid settingsId,
+        string? oldValue,
+        string? newValue,
+        Guid? actorUserId,
+        CancellationToken cancellationToken)
+    {
+        if (adminAuditLog is null)
+        {
+            return;
+        }
+
+        await adminAuditLog.WriteAsync(
+            new AdminAuditEntry(
+                action,
+                "template_of_the_day_settings",
+                settingsId.ToString("D"),
+                oldValue,
+                newValue,
+                ActorUserId: actorUserId),
+            cancellationToken);
+    }
+
+    private static string BuildTemplateOfTheDayAuditSnapshot(TemplateOfTheDay assignment)
+    {
+        return string.Join(
+            ';',
+            $"templateId={assignment.TemplateId:D}",
+            $"startDate={assignment.StartDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}",
+            $"endDate={assignment.EndDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty}",
+            $"isActive={assignment.IsActive.ToString().ToLowerInvariant()}",
+            $"isManual={assignment.IsManual.ToString().ToLowerInvariant()}",
+            $"priority={assignment.Priority}",
+            $"titleOverride={assignment.TitleOverride ?? string.Empty}",
+            $"subtitleOverride={assignment.SubtitleOverride ?? string.Empty}",
+            $"badgeTextOverride={assignment.BadgeTextOverride ?? string.Empty}");
+    }
+
+    private static string BuildTemplateOfTheDaySettingsAuditSnapshot(TemplateOfTheDaySettings settings)
+    {
+        return string.Join(
+            ';',
+            $"autoModeEnabled={settings.AutoModeEnabled.ToString().ToLowerInvariant()}",
+            $"allowedTypes={settings.AllowedTypes}",
+            $"excludeRecentDays={settings.ExcludeRecentDays}");
+    }
+
+    private static bool IsTemplateOfTheDayDateConflict(DbUpdateException exception)
+    {
+        return exception.InnerException is PostgresException
+            {
+                SqlState: PostgresErrorCodes.ExclusionViolation
+            } postgresException
+            && (string.Equals(postgresException.ConstraintName, TemplateOfTheDayManualRangeConstraint, StringComparison.Ordinal)
+                || string.Equals(postgresException.ConstraintName, TemplateOfTheDayAutoRangeConstraint, StringComparison.Ordinal));
     }
 
     private static TemplateType? ResolveTemplateOfTheDayAllowedType(string? rawAllowedTypes)
@@ -552,7 +721,7 @@ internal sealed partial class TemplatesService
             assignment.CreatedByAdminId);
     }
 
-    private static AdminTemplateOfTheDaySettingsResponse MapAdminTemplateOfTheDaySettings(
+    private AdminTemplateOfTheDaySettingsResponse MapAdminTemplateOfTheDaySettings(
         TemplateOfTheDaySettings settings)
     {
         return new AdminTemplateOfTheDaySettingsResponse(
@@ -560,7 +729,8 @@ internal sealed partial class TemplatesService
             settings.AllowedTypes,
             settings.ExcludeRecentDays,
             settings.UpdatedAtUtc,
-            settings.UpdatedByAdminId);
+            settings.UpdatedByAdminId,
+            ResolveTemplateOfTheDayBusinessDate(null));
     }
 
     private static PublicTemplateOfTheDayItemResponse MapPublicTemplateOfTheDay(

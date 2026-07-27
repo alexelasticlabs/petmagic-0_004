@@ -5,6 +5,7 @@
     <ProjectReference Include="..\PetMagic.Modules.Templates.Domain\PetMagic.Modules.Templates.Domain.csproj" />
     <ProjectReference Include="..\..\Economy\PetMagic.Modules.Economy.Application\PetMagic.Modules.Economy.Application.csproj" />
     <ProjectReference Include="..\..\Gamification\PetMagic.Modules.Gamification.Application\PetMagic.Modules.Gamification.Application.csproj" />
+    <ProjectReference Include="..\..\Identity\PetMagic.Modules.Identity.Application\PetMagic.Modules.Identity.Application.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\PetMagic.BuildingBlocks\PetMagic.BuildingBlocks.csproj" />
   </ItemGroup>
 

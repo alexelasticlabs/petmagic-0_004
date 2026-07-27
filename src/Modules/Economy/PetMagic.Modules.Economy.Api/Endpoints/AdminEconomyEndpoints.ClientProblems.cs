@@ -33,6 +33,7 @@ public static partial class AdminEconomyEndpoints
             "economy.payment_provider_config_exists" => StatusCodes.Status409Conflict,
             "economy.redeem_code_exists" => StatusCodes.Status409Conflict,
             "economy.payment_gateway_failed" => StatusCodes.Status502BadGateway,
+            "economy.admin_premium_revoke_finalization_failed" => StatusCodes.Status503ServiceUnavailable,
             "economy.payment_provider_unavailable"
                 or "economy.payment_provider_config_invalid"
                 or "economy.payment_provider_config_not_found"

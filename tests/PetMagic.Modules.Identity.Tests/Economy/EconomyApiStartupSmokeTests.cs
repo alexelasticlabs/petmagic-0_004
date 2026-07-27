@@ -3,6 +3,8 @@ using System.Security.Claims;
 using System.Text.Encodings.Web;
 using System.Threading.RateLimiting;
 
+using FluentValidation;
+
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -17,6 +19,8 @@ using Microsoft.Extensions.Options;
 
 using PetMagic.Modules.Economy.Api;
 using PetMagic.Modules.Economy.Application.Abstractions;
+using PetMagic.Modules.Economy.Application.Contracts;
+using PetMagic.Modules.Economy.Application.Validation;
 
 namespace PetMagic.Modules.Identity.Tests.Economy;
 
@@ -28,6 +32,17 @@ public sealed class EconomyApiStartupSmokeTests
         await using var app = await EconomyApiStartupTestApplication.CreateAsync();
 
         Assert.NotNull(app);
+    }
+
+    [Fact]
+    public async Task EconomyApiModule_ShouldRegisterAdminPremiumRevokeValidator()
+    {
+        await using var app = await EconomyApiStartupTestApplication.CreateAsync();
+        using var scope = app.CreateScope();
+
+        Assert.IsType<AdminRevokePremiumSubscriptionCommandValidator>(
+            scope.ServiceProvider
+                .GetRequiredService<IValidator<AdminRevokePremiumSubscriptionCommand>>());
     }
 
     [Theory]
@@ -383,6 +398,11 @@ public sealed class EconomyApiStartupSmokeTests
             var client = app.GetTestClient();
             client.BaseAddress = new Uri("http://localhost");
             return client.GetAsync(path);
+        }
+
+        public IServiceScope CreateScope()
+        {
+            return app.Services.CreateScope();
         }
 
         public async ValueTask DisposeAsync()

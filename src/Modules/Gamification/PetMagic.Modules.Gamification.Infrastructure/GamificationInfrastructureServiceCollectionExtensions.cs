@@ -25,6 +25,8 @@ public static class GamificationInfrastructureServiceCollectionExtensions
         if (includeAdminServices)
         {
             services.AddScoped<IGamificationAdminService, GamificationAdminService>();
+            services.AddScoped<GamificationAdminAuditOutboxProcessor>();
+            services.AddHostedService<GamificationAdminAuditOutboxWorker>();
         }
 
         return services;

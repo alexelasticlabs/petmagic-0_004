@@ -23,7 +23,8 @@ public sealed record ListAdminSupportInboxQuery(
     int PageSize = 50,
     string? Sort = null,
     IReadOnlyList<string>? Statuses = null,
-    string? Queue = null);
+    string? Queue = null,
+    Guid? InitiatorUserId = null);
 
 public sealed record SupportConversationInboxPageResponse(
     IReadOnlyList<SupportConversationSummaryResponse> Items,
@@ -37,7 +38,16 @@ public sealed record AdminSupportInboxMetricsResponse(
     int OpenConversations,
     int ClosedConversations,
     int UnassignedConversations,
-    int UnreadForAdminConversations);
+    int UnreadForAdminConversations,
+    IReadOnlyList<AdminSupportOperatorWorkloadResponse>? OperatorWorkloads = null);
+
+public sealed record AdminSupportOperatorWorkloadResponse(
+    Guid OperatorUserId,
+    string DisplayName,
+    int OpenConversations,
+    int HighPriorityConversations,
+    int UrgentConversations,
+    int WaitingForUserConversations);
 
 public sealed record SupportConversationMessagesQuery(
     int Take = 60,
@@ -50,7 +60,8 @@ public sealed record SendSupportMessageCommand(
     string Body,
     bool IsAdmin,
     Guid? ReplyToMessageId = null,
-    string? Locale = null);
+    string? Locale = null,
+    string? IdempotencyKey = null);
 
 public sealed record SupportMessageAttachmentInput(
     string FileUrl,
@@ -72,7 +83,8 @@ public sealed record SendSupportAttachmentsCommand(
     bool IsAdmin,
     IReadOnlyList<SupportMessageAttachmentInput> Attachments,
     Guid? ReplyToMessageId = null,
-    string? Locale = null);
+    string? Locale = null,
+    string? IdempotencyKey = null);
 
 public sealed record CreateSupportAttachmentMessageCommand(
     Guid ConversationId,
@@ -82,7 +94,27 @@ public sealed record CreateSupportAttachmentMessageCommand(
     string AttachmentFileName,
     string AttachmentContentType,
     Guid? ReplyToMessageId = null,
-    string? Locale = null);
+    string? Locale = null,
+    string? IdempotencyKey = null);
+
+public static class SupportMessageIdempotency
+{
+    public const string HeaderName = "Idempotency-Key";
+
+    public const int MaxKeyLength = 128;
+
+    public static bool TryNormalize(string? value, out string? normalizedValue)
+    {
+        normalizedValue = value?.Trim();
+        if (string.IsNullOrEmpty(normalizedValue))
+        {
+            normalizedValue = null;
+            return value is null;
+        }
+
+        return normalizedValue.Length <= MaxKeyLength;
+    }
+}
 
 public sealed record UpdateSupportAttachmentMessageCommand(
     Guid ConversationId,
@@ -144,7 +176,17 @@ public sealed record UpdateSupportConversationStatusCommand(
 public sealed record AssignSupportConversationCommand(
     Guid ConversationId,
     Guid AdminUserId,
-    Guid? AssignedAdminId);
+    Guid? AssignedAdminId,
+    string? Reason = null,
+    long? ExpectedVersion = null,
+    bool CanAssignOthers = false);
+
+public static class SupportConversationMetadataLimits
+{
+    public const int MaxTagCount = 12;
+
+    public const int MaxTagLength = 40;
+}
 
 public sealed record UpdateSupportConversationMetadataCommand(
     Guid ConversationId,
@@ -158,11 +200,15 @@ public sealed record UpsertSupportReplyTemplateCommand(
     string Title,
     string Body,
     bool IsEnabled,
-    int SortOrder);
+    int SortOrder,
+    int? ExpectedVersion = null,
+    string? Reason = null);
 
 public sealed record DeleteSupportReplyTemplateCommand(
     Guid TemplateId,
-    Guid AdminUserId);
+    Guid AdminUserId,
+    int? ExpectedVersion = null,
+    string? Reason = null);
 
 public sealed record SupportConversationSummaryResponse(
     Guid ConversationId,
@@ -194,7 +240,9 @@ public sealed record SupportConversationSummaryResponse(
     Guid? ReopenedByUserId,
     int? FeedbackRating,
     bool IsReadOnly,
-    bool CanReopen);
+    bool CanReopen,
+    long Version = 1,
+    SupportConversationSlaResponse? Sla = null);
 
 public sealed record SupportMessageAttachmentResponse(
     string FileUrl,
@@ -232,7 +280,8 @@ public sealed record SupportMessageResponse(
     DateTime? ReadAtUtc,
     DateTime? DeliveredAtUtc,
     bool IsInternalNote,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAtUtc,
+    bool IsIdempotencyReplay = false);
 
 public sealed record SupportConversationDetailResponse(
     Guid ConversationId,
@@ -272,7 +321,19 @@ public sealed record SupportConversationDetailResponse(
     IReadOnlyList<string> AvailableActions,
     bool HasOlderMessages,
     DateTime? OldestLoadedMessageCreatedAtUtc,
-    IReadOnlyList<SupportMessageResponse> Messages);
+    IReadOnlyList<SupportMessageResponse> Messages,
+    long Version = 1,
+    SupportConversationSlaResponse? Sla = null);
+
+public sealed record SupportConversationSlaResponse(
+    DateTime FirstResponseDueAtUtc,
+    DateTime ResolutionDueAtUtc,
+    DateTime? FirstResponseAtUtc,
+    string FirstResponseStatus,
+    string ResolutionStatus,
+    bool IsResolutionPaused,
+    int FirstResponseRemainingMinutes,
+    int ResolutionRemainingMinutes);
 
 public sealed record SupportTicketContextResponse(
     int TokenBalance,
@@ -293,4 +354,18 @@ public sealed record SupportReplyTemplateResponse(
     bool IsEnabled,
     int SortOrder,
     DateTime CreatedAtUtc,
-    DateTime UpdatedAtUtc);
+    DateTime UpdatedAtUtc,
+    int Version = 1,
+    DateTime? DisabledAtUtc = null);
+
+public sealed record SupportReplyTemplateVersionResponse(
+    Guid TemplateId,
+    int Version,
+    string Title,
+    string Body,
+    bool IsEnabled,
+    int SortOrder,
+    Guid ActorUserId,
+    string? Reason,
+    DateTime CapturedAtUtc,
+    bool IsCurrent);

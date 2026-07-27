@@ -1,6 +1,7 @@
 using System.Threading.Channels;
 using System.Net;
 using System.Text;
+
 using Microsoft.Data.Sqlite;
 
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +11,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 using PetMagic.BuildingBlocks.Observability;
+using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
@@ -29,7 +31,8 @@ public sealed partial class TemplatesServiceTests
         ITemplateFeedRealtimeService? realtimeService = null,
         IAdminAuditLog? adminAuditLog = null,
         TemplatesOptions? templatesOptions = null,
-        ILogger<TemplatesService>? logger = null)
+        ILogger<TemplatesService>? logger = null,
+        IIdentityUserLookupService? identityUserLookupService = null)
     {
         var options = templatesOptions ?? CreateTemplatesServiceOptions();
 
@@ -44,7 +47,8 @@ public sealed partial class TemplatesServiceTests
             lifecycleService,
             realtimeService ?? new RecordingTemplateFeedRealtimeService(),
             adminAuditLog,
-            logger: logger);
+            logger: logger,
+            identityUserLookupService: identityUserLookupService);
     }
 
     private static TemplatesOptions CreateTemplatesServiceOptions(
@@ -382,6 +386,50 @@ public sealed partial class TemplatesServiceTests
         {
             Entries.Add(entry);
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed record ModerationLookupUser(
+        Guid UserId,
+        bool IsActive,
+        IReadOnlyList<string> Roles);
+
+    private sealed class ModerationIdentityUserLookupService(params ModerationLookupUser[] users)
+        : IIdentityUserLookupService
+    {
+        public Task<IReadOnlyList<Guid>> GetActiveUserIdsInRolesAsync(
+            IReadOnlyCollection<string> roles,
+            CancellationToken cancellationToken)
+        {
+            var roleSet = roles.ToHashSet(StringComparer.Ordinal);
+            IReadOnlyList<Guid> result = users
+                .Where(user => user.IsActive && user.Roles.Any(roleSet.Contains))
+                .Select(user => user.UserId)
+                .Distinct()
+                .ToArray();
+            return Task.FromResult(result);
+        }
+
+        public Task<IReadOnlyDictionary<Guid, IdentityUserLookup>> GetUsersByIdsAsync(
+            IReadOnlyCollection<Guid> userIds,
+            CancellationToken cancellationToken)
+        {
+            var requestedIds = userIds.ToHashSet();
+            IReadOnlyDictionary<Guid, IdentityUserLookup> result = users
+                .Where(user => requestedIds.Contains(user.UserId))
+                .ToDictionary(
+                    user => user.UserId,
+                    user => new IdentityUserLookup(user.UserId, string.Empty, null, user.Roles));
+            return Task.FromResult(result);
+        }
+
+        public Task<IdentityUserLookup?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken)
+        {
+            var user = users.FirstOrDefault(candidate => candidate.UserId == userId);
+            IdentityUserLookup? result = user is null
+                ? null
+                : new IdentityUserLookup(user.UserId, string.Empty, null, user.Roles);
+            return Task.FromResult(result);
         }
     }
 

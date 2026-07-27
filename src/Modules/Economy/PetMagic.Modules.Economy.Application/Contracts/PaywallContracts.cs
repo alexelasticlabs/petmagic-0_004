@@ -36,7 +36,8 @@ public sealed record SubscriptionSummaryResponse(
     DateTime? LastTokenGrantAtUtc,
     string? CardBrand,
     string? CardLast4,
-    int WeeklyGrantAmount);
+    int WeeklyGrantAmount,
+    bool HasPendingAdminRevocation = false);
 
 public sealed record PaywallPlanResponse(
     string PlanId,

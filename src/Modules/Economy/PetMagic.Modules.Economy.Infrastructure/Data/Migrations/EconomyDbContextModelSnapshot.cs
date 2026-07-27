@@ -850,6 +850,7 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
+                        .IsConcurrencyToken()
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
@@ -1018,6 +1019,7 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
                         .HasColumnType("character varying(32)");
 
                     b.Property<DateTime>("UpdatedAtUtc")
+                        .IsConcurrencyToken()
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("UserId")

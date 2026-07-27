@@ -114,6 +114,10 @@ public sealed class AdminRevokePremiumSubscriptionCommandValidator : AbstractVal
             .MaximumLength(24)
             .Must(value => string.Equals(value.Trim(), "stripe", StringComparison.OrdinalIgnoreCase))
             .WithMessage("economy.payment_provider_stripe_required");
+        RuleFor(x => x.Reason)
+            .Must(value => !string.IsNullOrWhiteSpace(value))
+            .WithMessage("economy.admin_premium_revoke_reason_required")
+            .MaximumLength(500);
     }
 }
 
@@ -164,6 +168,12 @@ public sealed class AdminEconomyIncidentActionCommandValidator : AbstractValidat
             x => string.Equals(x.Action, "manual_wallet_correction", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(x.Action, "manual_revoke", StringComparison.OrdinalIgnoreCase),
             () => RuleFor(x => x.Amount).NotNull().NotEqual(0));
+
+        When(
+            x => string.Equals(x.Action, "manual_refund_mark", StringComparison.OrdinalIgnoreCase),
+            () => RuleFor(x => x.ExternalReferenceId)
+                .NotEmpty()
+                .WithMessage("economy.incident_external_reference_required"));
     }
 }
 

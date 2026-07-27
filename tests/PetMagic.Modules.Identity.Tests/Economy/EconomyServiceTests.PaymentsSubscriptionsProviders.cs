@@ -5,6 +5,7 @@ using System.Text.Json;
 
 using Microsoft.EntityFrameworkCore;
 
+using PetMagic.BuildingBlocks.Notifications;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Contracts;
 using PetMagic.Modules.Economy.Domain.Enums;
@@ -2523,10 +2524,13 @@ public sealed partial class EconomyServiceTests
         await dbContext.SaveChangesAsync();
 
         var identityService = new FakeIdentityService();
-        var service = CreateService(dbContext, identityService: identityService);
+        var service = CreateService(
+            dbContext,
+            identityService: identityService,
+            adminAuditLog: new RecordingAdminAuditLog());
 
         var result = await service.AdminRevokePremiumSubscriptionAsync(
-            new AdminRevokePremiumSubscriptionCommand(userId, "stripe"),
+            new AdminRevokePremiumSubscriptionCommand(userId, "stripe", "Verified administrative cancellation."),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess, result.IsFailure ? $"{result.Error.Code}:{result.Error.Message}" : "unexpected failure state");
@@ -2543,7 +2547,8 @@ public sealed partial class EconomyServiceTests
 
         var eventLog = await dbContext.SubscriptionEventLogs.SingleAsync(x => x.UserId == userId);
         Assert.Equal("AdminImmediateCancelRequested", eventLog.EventType);
-        Assert.Equal("Expired", eventLog.Status);
+        Assert.Equal("Completed", eventLog.Status);
+        Assert.NotNull(eventLog.ProcessedAtUtc);
     }
 
     [Fact]
@@ -3049,6 +3054,82 @@ public sealed partial class EconomyServiceTests
         Assert.Equal(EconomyErrors.PaymentProviderConfigurationAlreadyExists.Code, result.Error.Code);
     }
 
+    [Theory]
+    [InlineData("23505", "IX_economy_payment_provider_configs_Provider_Platform_Region", true)]
+    [InlineData("23505", "IX_economy_payment_provider_configs_Platform_IsEnabled", false)]
+    [InlineData("23514", "IX_economy_payment_provider_configs_Provider_Platform_Region", false)]
+    public void PaymentProviderConfigurationRouteUniqueViolation_ShouldOnlyMatchRouteIndex(
+        string sqlState,
+        string constraintName,
+        bool expected)
+    {
+        var actual = EconomyAdminConfigurationService.IsPaymentProviderConfigurationRouteUniqueViolation(
+            sqlState,
+            constraintName);
+
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public async Task UpdatePaymentProviderConfigurationAsync_ShouldRejectDuplicateNormalizedRoute()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var source = await dbContext.PaymentProviderConfigurations.AsNoTracking().SingleAsync();
+
+        var create = await service.CreatePaymentProviderConfigurationAsync(
+            new CreatePaymentProviderConfigurationCommand(
+                source.Provider,
+                source.Platform,
+                "US",
+                source.IsEnabled,
+                source.IsRecommended,
+                source.IsSelectedByDefault,
+                source.RequiresExternalWarning,
+                source.RequiresStoreDisclosure,
+                source.AllowedFromAppVersion,
+                source.ExternalCheckoutAllowed,
+                source.BonusTokensPercent,
+                source.DisplayLabel,
+                source.DisplaySubtitle,
+                source.WarningTitle,
+                source.WarningMessage,
+                source.Mode,
+                source.Notes),
+            CancellationToken.None);
+
+        Assert.True(create.IsSuccess);
+
+        var update = await service.UpdatePaymentProviderConfigurationAsync(
+            new UpdatePaymentProviderConfigurationCommand(
+                source.Id,
+                " us ",
+                source.IsEnabled,
+                source.IsRecommended,
+                source.IsSelectedByDefault,
+                source.RequiresExternalWarning,
+                source.RequiresStoreDisclosure,
+                source.AllowedFromAppVersion,
+                source.ExternalCheckoutAllowed,
+                source.BonusTokensPercent,
+                source.DisplayLabel,
+                source.DisplaySubtitle,
+                source.WarningTitle,
+                source.WarningMessage,
+                source.Mode,
+                source.Notes),
+            CancellationToken.None);
+
+        Assert.True(update.IsFailure);
+        Assert.Equal(EconomyErrors.PaymentProviderConfigurationAlreadyExists.Code, update.Error.Code);
+        Assert.Equal(
+            "*",
+            await dbContext.PaymentProviderConfigurations
+                .Where(x => x.Id == source.Id)
+                .Select(x => x.Region)
+                .SingleAsync());
+    }
+
     [Fact]
     public async Task ClonePaymentProviderConfigurationAsync_ShouldCopySourceWithNewRegion()
     {
@@ -3102,6 +3183,219 @@ public sealed partial class EconomyServiceTests
 
         Assert.True(delete.IsSuccess);
         Assert.False(await dbContext.PaymentProviderConfigurations.AnyAsync(x => x.Id == create.Value.ConfigurationId));
+    }
+
+    [Fact]
+    public async Task CurrencyPackAndSubscriptionPlanMutations_ShouldWriteAuditTrail()
+    {
+        await using var dbContext = CreateDbContext();
+        var packId = Guid.NewGuid();
+        const string planId = "premium-audit-monthly";
+        dbContext.CurrencyPacks.Add(new CurrencyPack
+        {
+            Id = packId,
+            Code = "audit-pack",
+            DisplayName = "Audit pack before",
+            CurrencyCode = "USD",
+            PriceAmount = 4.99m,
+            GrantedSpark = 100,
+            BonusSpark = 10,
+            IsActive = true,
+            SortOrder = 5,
+        });
+        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = planId,
+            Name = "Audit plan before",
+            BillingPeriod = "monthly",
+            PriceAmount = 9.99m,
+            CurrencyCode = "USD",
+            MonthlyTokenLimit = 500,
+            IsRecommended = false,
+            IsActive = true,
+            AppleProductId = "apple-old-product-id",
+            GoogleProductId = null,
+            StripePriceId = "stripe-old-price-id",
+            DisplayOrder = 2,
+            CreatedAtUtc = DateTime.UtcNow.AddDays(-1),
+            UpdatedAtUtc = DateTime.UtcNow.AddDays(-1),
+        });
+        await dbContext.SaveChangesAsync();
+
+        var auditLog = new RecordingAdminAuditLog();
+        var service = CreateService(dbContext, adminAuditLog: auditLog);
+
+        var packUpdate = await service.UpdateCurrencyPackAsync(
+            new UpdateCurrencyPackCommand(packId, "Audit pack after", 5.49m, 120, 20, false, 7),
+            CancellationToken.None);
+        var planUpdate = await service.UpdateSubscriptionPlanAsync(
+            new UpdateSubscriptionPlanCommand(
+                planId,
+                "Audit plan after",
+                11.99m,
+                "eur",
+                700,
+                true,
+                false,
+                null,
+                "google-new-product-id",
+                null,
+                3),
+            CancellationToken.None);
+
+        Assert.True(packUpdate.IsSuccess);
+        Assert.True(planUpdate.IsSuccess);
+        Assert.Collection(
+            auditLog.Entries,
+            entry =>
+            {
+                Assert.Equal("admin.economy.currency_pack.updated", entry.Action);
+                Assert.Equal("currency_pack", entry.TargetType);
+                Assert.Equal(packId.ToString("D"), entry.TargetId);
+                Assert.NotEqual(entry.OldValue, entry.NewValue);
+
+                using var oldSnapshot = JsonDocument.Parse(entry.OldValue!);
+                using var newSnapshot = JsonDocument.Parse(entry.NewValue!);
+                Assert.Equal("Audit pack before", oldSnapshot.RootElement.GetProperty("DisplayName").GetString());
+                Assert.Equal("Audit pack after", newSnapshot.RootElement.GetProperty("DisplayName").GetString());
+                Assert.Equal(120, newSnapshot.RootElement.GetProperty("GrantedSpark").GetInt32());
+            },
+            entry =>
+            {
+                Assert.Equal("admin.economy.subscription_plan.updated", entry.Action);
+                Assert.Equal("subscription_plan", entry.TargetType);
+                Assert.Equal(planId, entry.TargetId);
+                Assert.NotEqual(entry.OldValue, entry.NewValue);
+
+                var snapshots = $"{entry.OldValue}\n{entry.NewValue}";
+                Assert.DoesNotContain("apple-old-product-id", snapshots, StringComparison.Ordinal);
+                Assert.DoesNotContain("stripe-old-price-id", snapshots, StringComparison.Ordinal);
+                Assert.DoesNotContain("google-new-product-id", snapshots, StringComparison.Ordinal);
+
+                using var oldSnapshot = JsonDocument.Parse(entry.OldValue!);
+                using var newSnapshot = JsonDocument.Parse(entry.NewValue!);
+                Assert.True(oldSnapshot.RootElement.GetProperty("AppleProductIdConfigured").GetBoolean());
+                Assert.False(oldSnapshot.RootElement.GetProperty("GoogleProductIdConfigured").GetBoolean());
+                Assert.True(oldSnapshot.RootElement.GetProperty("StripePriceIdConfigured").GetBoolean());
+                Assert.False(newSnapshot.RootElement.GetProperty("AppleProductIdConfigured").GetBoolean());
+                Assert.True(newSnapshot.RootElement.GetProperty("GoogleProductIdConfigured").GetBoolean());
+                Assert.False(newSnapshot.RootElement.GetProperty("StripePriceIdConfigured").GetBoolean());
+            });
+
+        var outboxMessages = await dbContext.PushOutboxMessages
+            .AsNoTracking()
+            .OrderBy(message => message.CreatedAtUtc)
+            .ToListAsync();
+        Assert.Equal(2, outboxMessages.Count);
+        Assert.All(outboxMessages, message =>
+        {
+            Assert.Equal(EconomyAdminAuditOutbox.Kind, message.Kind);
+            Assert.Equal(PushOutboxStatus.Sent, message.Status);
+            Assert.Contains("eventId", message.PayloadJson, StringComparison.Ordinal);
+            Assert.Contains("occurredAtUtc", message.PayloadJson, StringComparison.Ordinal);
+            Assert.DoesNotContain("apple-old-product-id", message.PayloadJson, StringComparison.Ordinal);
+            Assert.DoesNotContain("stripe-old-price-id", message.PayloadJson, StringComparison.Ordinal);
+            Assert.DoesNotContain("google-new-product-id", message.PayloadJson, StringComparison.Ordinal);
+        });
+    }
+
+    [Fact]
+    public async Task PaymentProviderConfigurationMutations_ShouldWriteAuditTrail()
+    {
+        await using var dbContext = CreateDbContext();
+        var auditLog = new RecordingAdminAuditLog();
+        var service = CreateService(dbContext, adminAuditLog: auditLog);
+        var source = await dbContext.PaymentProviderConfigurations.AsNoTracking().SingleAsync();
+
+        var create = await service.CreatePaymentProviderConfigurationAsync(
+            new CreatePaymentProviderConfigurationCommand(
+                source.Provider,
+                source.Platform,
+                "US",
+                source.IsEnabled,
+                source.IsRecommended,
+                source.IsSelectedByDefault,
+                source.RequiresExternalWarning,
+                source.RequiresStoreDisclosure,
+                source.AllowedFromAppVersion,
+                source.ExternalCheckoutAllowed,
+                source.BonusTokensPercent,
+                source.DisplayLabel,
+                source.DisplaySubtitle,
+                source.WarningTitle,
+                source.WarningMessage,
+                source.Mode,
+                source.Notes),
+            CancellationToken.None);
+
+        Assert.True(create.IsSuccess);
+
+        var clone = await service.ClonePaymentProviderConfigurationAsync(
+            new ClonePaymentProviderConfigurationCommand(source.Id, "EU"),
+            CancellationToken.None);
+
+        Assert.True(clone.IsSuccess);
+
+        var update = await service.UpdatePaymentProviderConfigurationAsync(
+            new UpdatePaymentProviderConfigurationCommand(
+                create.Value.ConfigurationId,
+                "CA",
+                create.Value.IsEnabled,
+                create.Value.IsRecommended,
+                create.Value.IsSelectedByDefault,
+                create.Value.RequiresExternalWarning,
+                create.Value.RequiresStoreDisclosure,
+                create.Value.AllowedFromAppVersion,
+                create.Value.ExternalCheckoutAllowed,
+                create.Value.BonusTokensPercent,
+                create.Value.DisplayLabel,
+                create.Value.DisplaySubtitle,
+                create.Value.WarningTitle,
+                create.Value.WarningMessage,
+                create.Value.Mode,
+                create.Value.Notes),
+            CancellationToken.None);
+
+        Assert.True(update.IsSuccess);
+
+        var delete = await service.DeletePaymentProviderConfigurationAsync(
+            new DeletePaymentProviderConfigurationCommand(clone.Value.ConfigurationId),
+            CancellationToken.None);
+
+        Assert.True(delete.IsSuccess);
+
+        Assert.Collection(
+            auditLog.Entries,
+            entry =>
+            {
+                Assert.Equal("admin.economy.payment_provider_configuration.created", entry.Action);
+                Assert.Equal("payment_provider_configuration", entry.TargetType);
+                Assert.Equal(create.Value.ConfigurationId.ToString("D"), entry.TargetId);
+                Assert.Null(entry.OldValue);
+                Assert.Contains("region=US", entry.NewValue ?? string.Empty);
+            },
+            entry =>
+            {
+                Assert.Equal("admin.economy.payment_provider_configuration.cloned", entry.Action);
+                Assert.Equal(clone.Value.ConfigurationId.ToString("D"), entry.TargetId);
+                Assert.Contains("region=*", entry.OldValue ?? string.Empty);
+                Assert.Contains("region=EU", entry.NewValue ?? string.Empty);
+                Assert.Contains(source.Id.ToString("D"), entry.Details ?? string.Empty);
+            },
+            entry =>
+            {
+                Assert.Equal("admin.economy.payment_provider_configuration.updated", entry.Action);
+                Assert.Equal(create.Value.ConfigurationId.ToString("D"), entry.TargetId);
+                Assert.Contains("region=US", entry.OldValue ?? string.Empty);
+                Assert.Contains("region=CA", entry.NewValue ?? string.Empty);
+            },
+            entry =>
+            {
+                Assert.Equal("admin.economy.payment_provider_configuration.deleted", entry.Action);
+                Assert.Equal(clone.Value.ConfigurationId.ToString("D"), entry.TargetId);
+                Assert.Contains("region=EU", entry.OldValue ?? string.Empty);
+                Assert.Null(entry.NewValue);
+            });
     }
 
     [Fact]

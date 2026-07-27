@@ -9,6 +9,7 @@ internal static class SupportChatErrors
     public static readonly Error AttachmentMimeMismatch = new("support.attachment_mime_mismatch", "Support attachment MIME type does not match file content.");
     public static readonly Error AttachmentFileTooLarge = new("support.attachment_file_too_large", "Support attachment exceeds the maximum allowed size.");
     public static readonly Error AttachmentBatchLimitExceeded = new("support.attachment_batch_limit_exceeded", "Support message allows up to 5 attachments.");
+    public static readonly Error InvalidIdempotencyKey = new("support.idempotency_key_invalid", "Support message idempotency key is invalid.");
     public static readonly Error AttachmentStorageFailed = new("support.attachment_storage_failed", "Support attachment could not be stored.");
     public static readonly Error AttachmentRetryNotAllowed = new("support.attachment_retry_not_allowed", "Support attachment retry is not allowed for this message state.");
     public static readonly Error ConversationReadOnly = new("support.conversation_read_only", "Support conversation is read-only.");
@@ -17,6 +18,10 @@ internal static class SupportChatErrors
     public static readonly Error InvalidFeedbackRating = new("support.feedback_rating_invalid", "Support feedback rating must be between 1 and 5.");
     public static readonly Error InvalidPushToken = new("support.push_token_invalid", "Support push token is invalid.");
     public static readonly Error InvalidAssignedAdmin = new("support.assigned_admin_invalid", "Assigned support operator is invalid.");
+    public static readonly Error AssignmentForbidden = new("support.assignment_forbidden", "The current operator cannot assign this support conversation to the requested operator.");
+    public static readonly Error AssignmentReasonRequired = new("support.assignment_reason_required", "A reason is required for support assignment changes.");
+    public static readonly Error AssignmentExpectedVersionRequired = new("support.assignment_expected_version_required", "ExpectedVersion is required for support assignment changes.");
+    public static readonly Error AssignmentConflict = new("support.assignment_conflict", "The support conversation assignment changed. Refresh and retry the action.");
     public static readonly Error RelatedResourceNotFound = new("support.related_resource_not_found", "Related support resource was not found.");
     public static readonly Error ConversationAlreadyAssigned = new("support.conversation_already_assigned", "Support conversation is already assigned to another operator.");
     public static readonly Error ConversationNotOwned = new("support.conversation_not_owned", "Support conversation must be assigned to the current operator.");

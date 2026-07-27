@@ -300,6 +300,68 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
                     b.ToTable("users", (string)null);
                 });
 
+            modelBuilder.Entity("PetMagic.Modules.Identity.Infrastructure.Entities.AdminEmailBroadcast", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Audience")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("FailedCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RecipientCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("SentCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Subject")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAtUtc", "Id")
+                        .IsDescending();
+
+                    b.HasIndex("Status", "CreatedAtUtc")
+                        .IsDescending(false, true);
+
+                    b.ToTable("admin_email_broadcasts", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_admin_email_broadcasts_counts_nonnegative", "\"RecipientCount\" >= 0 AND \"SentCount\" >= 0 AND \"FailedCount\" >= 0");
+
+                            t.HasCheckConstraint("CK_admin_email_broadcasts_counts_within_total", "\"SentCount\" + \"FailedCount\" <= \"RecipientCount\"");
+
+                            t.HasCheckConstraint("CK_admin_email_broadcasts_status", "\"Status\" >= 0 AND \"Status\" <= 5");
+                        });
+                });
+
             modelBuilder.Entity("PetMagic.Modules.Identity.Infrastructure.Entities.AuditEvent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -416,6 +478,9 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
                     b.Property<int>("AttemptCount")
                         .HasColumnType("integer");
 
+                    b.Property<Guid?>("BroadcastId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("FailureCode")
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
@@ -481,6 +546,8 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
 
                     b.HasIndex("UserId");
 
+                    b.HasIndex("BroadcastId", "Status");
+
                     b.HasIndex("Status", "QueuedAtUtc");
 
                     b.HasIndex("Status", "UpdatedAtUtc");
@@ -490,6 +557,16 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
                     b.HasIndex("Status", "NextAttemptAtUtc", "QueuedAtUtc");
 
                     b.ToTable("email_dispatch_jobs", (string)null);
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.Identity.Infrastructure.Entities.EmailDispatchJob", b =>
+                {
+                    b.HasOne("PetMagic.Modules.Identity.Infrastructure.Entities.AdminEmailBroadcast", "Broadcast")
+                        .WithMany("DispatchJobs")
+                        .HasForeignKey("BroadcastId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Broadcast");
                 });
 
             modelBuilder.Entity("PetMagic.Modules.Identity.Infrastructure.Entities.ExternalAuthProvider", b =>
@@ -716,6 +793,11 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.Identity.Infrastructure.Entities.AdminEmailBroadcast", b =>
+                {
+                    b.Navigation("DispatchJobs");
                 });
 #pragma warning restore 612, 618
         }

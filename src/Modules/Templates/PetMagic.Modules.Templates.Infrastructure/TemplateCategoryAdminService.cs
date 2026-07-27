@@ -63,14 +63,32 @@ internal sealed class TemplateCategoryAdminService(
 
     public async Task<Result<AdminTemplateCategoryDiagnosticsResponse>> GetAdminCategoryDiagnosticsAsync(CancellationToken cancellationToken)
     {
-        var activeCategoryKeys = await dbContext.TemplateCategories
+        var categorySnapshots = await dbContext.TemplateCategories
             .AsNoTracking()
-            .Where(category => !category.IsArchived)
-            .Select(category => category.NormalizedName)
+            .Select(category => new
+            {
+                category.Name,
+                category.NormalizedName,
+                category.IsArchived
+            })
             .ToArrayAsync(cancellationToken);
-        var activeCategoryKeySet = activeCategoryKeys
-            .Where(key => !string.IsNullOrWhiteSpace(key))
-            .ToHashSet(StringComparer.Ordinal);
+        var categoryStatesByKey = categorySnapshots
+            .Select(category => new
+            {
+                Key = NormalizeCategoryKey(
+                    string.IsNullOrWhiteSpace(category.NormalizedName)
+                        ? category.Name ?? string.Empty
+                        : category.NormalizedName),
+                category.IsArchived
+            })
+            .Where(category => !string.IsNullOrWhiteSpace(category.Key))
+            .GroupBy(category => category.Key, StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => new TemplateCategoryDiagnosticState(
+                    HasActiveCategory: group.Any(category => !category.IsArchived),
+                    HasArchivedCategory: group.Any(category => category.IsArchived)),
+                StringComparer.Ordinal);
 
         var templates = await dbContext.TemplateItems
             .AsNoTracking()
@@ -92,13 +110,18 @@ internal sealed class TemplateCategoryAdminService(
             .Select(template => new
             {
                 Template = template,
-                NormalizedCategory = NormalizeCategoryKey(template.Category ?? string.Empty)
+                NormalizedCategory = NormalizeCategoryKey(template.Category ?? string.Empty),
+                IssueKind = ResolveCategoryIssueKind(
+                    NormalizeCategoryKey(template.Category ?? string.Empty),
+                    categoryStatesByKey)
             })
-            .Where(template => !activeCategoryKeySet.Contains(template.NormalizedCategory))
+            .Where(template => template.IssueKind is not null)
             .OrderBy(template => template.NormalizedCategory, StringComparer.Ordinal)
             .ThenBy(template => template.Template.Title, StringComparer.Ordinal)
+            .ThenBy(template => template.Template.Id)
             .Select(template => new AdminTemplateCategoryDiagnosticItemResponse(
                 template.Template.Id,
+                template.IssueKind!,
                 template.Template.Title ?? string.Empty,
                 template.Template.Category ?? string.Empty,
                 template.NormalizedCategory,
@@ -119,6 +142,30 @@ internal sealed class TemplateCategoryAdminService(
             percent,
             items,
             DateTime.UtcNow));
+    }
+
+    private static string? ResolveCategoryIssueKind(
+        string normalizedCategory,
+        IReadOnlyDictionary<string, TemplateCategoryDiagnosticState> categoryStatesByKey)
+    {
+        if (string.IsNullOrWhiteSpace(normalizedCategory))
+        {
+            return AdminTemplateCategoryDiagnosticIssueKinds.EmptyCategory;
+        }
+
+        if (!categoryStatesByKey.TryGetValue(normalizedCategory, out var categoryState))
+        {
+            return AdminTemplateCategoryDiagnosticIssueKinds.MissingCategory;
+        }
+
+        if (categoryState.HasActiveCategory)
+        {
+            return null;
+        }
+
+        return categoryState.HasArchivedCategory
+            ? AdminTemplateCategoryDiagnosticIssueKinds.ArchivedCategory
+            : AdminTemplateCategoryDiagnosticIssueKinds.MissingCategory;
     }
 
     public async Task<Result<AdminTemplateCategoryListItemResponse>> CreateCategoryAsync(CreateTemplateCategoryCommand command, CancellationToken cancellationToken)
@@ -395,4 +442,8 @@ internal sealed class TemplateCategoryAdminService(
         TemplateStatus Status,
         bool IsPremium,
         string? Tags);
+
+    private sealed record TemplateCategoryDiagnosticState(
+        bool HasActiveCategory,
+        bool HasArchivedCategory);
 }

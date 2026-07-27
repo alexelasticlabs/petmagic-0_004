@@ -10,6 +10,43 @@ public sealed class IdentityUserLookupService(IdentityDbContext dbContext, IMemo
 {
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
 
+    public async Task<IReadOnlyList<Guid>> GetActiveUserIdsInRolesAsync(
+        IReadOnlyCollection<string> roles,
+        CancellationToken cancellationToken)
+    {
+        var normalizedRoles = roles
+            .Where(static role => !string.IsNullOrWhiteSpace(role))
+            .Select(static role => role.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        if (normalizedRoles.Length == 0)
+        {
+            return [];
+        }
+
+        var activeRoleUserIds = dbContext.UserRoles
+            .AsNoTracking()
+            .Join(
+                dbContext.Roles.AsNoTracking(),
+                userRole => userRole.RoleId,
+                role => role.Id,
+                (userRole, role) => new
+                {
+                    userRole.UserId,
+                    RoleName = role.Name
+                })
+            .Where(x => x.RoleName != null && normalizedRoles.Contains(x.RoleName));
+
+        return await activeRoleUserIds
+            .Join(
+                dbContext.Users.AsNoTracking().Where(user => user.IsActive),
+                roleUser => roleUser.UserId,
+                user => user.Id,
+                (roleUser, _) => roleUser.UserId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyDictionary<Guid, IdentityUserLookup>> GetUsersByIdsAsync(
         IReadOnlyCollection<Guid> userIds,
         CancellationToken cancellationToken)

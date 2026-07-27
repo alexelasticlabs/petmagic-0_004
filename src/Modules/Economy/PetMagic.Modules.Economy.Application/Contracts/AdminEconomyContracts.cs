@@ -196,7 +196,9 @@ public sealed record AdminEconomyDashboardMetricsResponse(
     int ActiveSubscriptions,
     int RenewalStops,
     string CurrencyCode,
-    IReadOnlyList<AdminEconomyDashboardRevenuePointResponse> RevenueSeries);
+    IReadOnlyList<AdminEconomyDashboardRevenuePointResponse> RevenueSeries,
+    int PeriodDays,
+    DateTime AsOfUtc);
 
 public sealed record AdminSubscriptionEventResponse(
     Guid EventId,

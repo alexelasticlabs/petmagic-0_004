@@ -28,6 +28,7 @@ public sealed partial class SupportChatService
 
     private static void MarkClosed(SupportConversation conversation, DateTime now, Guid? closedByUserId)
     {
+        UpdateResolutionSlaPause(conversation, SupportConversationStatus.Closed, now);
         conversation.Status = SupportConversationStatus.Closed;
         conversation.ResolvedAtUtc ??= now;
         conversation.ReopenUntilUtc = null;
@@ -44,6 +45,7 @@ public sealed partial class SupportChatService
         Guid? reopenedByUserId = null)
     {
         var wasClosed = ToCanonicalStatus(conversation.Status, conversation.AssignedAdminId) == SupportConversationStatus.Closed;
+        UpdateResolutionSlaPause(conversation, status, now);
         conversation.Status = status;
         conversation.ResolvedAtUtc = null;
         conversation.ReopenUntilUtc = null;
@@ -57,6 +59,29 @@ public sealed partial class SupportChatService
 
         conversation.WaitingSinceUtc = ResolveWaitingSince(status, conversation.LastMessageAtUtc, conversation.CreatedAtUtc);
         conversation.UpdatedAtUtc = now;
+    }
+
+    private static void UpdateResolutionSlaPause(
+        SupportConversation conversation,
+        SupportConversationStatus nextStatus,
+        DateTime now)
+    {
+        var currentStatus = ToCanonicalStatus(conversation.Status, conversation.AssignedAdminId);
+        if (currentStatus == SupportConversationStatus.WaitingForUser
+            && nextStatus != SupportConversationStatus.WaitingForUser
+            && conversation.ResolutionSlaPausedAtUtc.HasValue)
+        {
+            var pauseSeconds = Math.Max(
+                0,
+                (long)Math.Floor((now - conversation.ResolutionSlaPausedAtUtc.Value).TotalSeconds));
+            conversation.ResolutionSlaPausedSeconds += pauseSeconds;
+            conversation.ResolutionSlaPausedAtUtc = null;
+        }
+        else if (currentStatus != SupportConversationStatus.WaitingForUser
+                 && nextStatus == SupportConversationStatus.WaitingForUser)
+        {
+            conversation.ResolutionSlaPausedAtUtc = now;
+        }
     }
 
     private Task AppendStatusChangedEventAsync(
@@ -93,13 +118,16 @@ public sealed partial class SupportChatService
         SupportConversationStatus status,
         bool hasAssignment)
     {
+        if (!hasAssignment)
+        {
+            return [];
+        }
+
         return status switch
         {
             SupportConversationStatus.New => ["close"],
-            SupportConversationStatus.InProgress => hasAssignment
-                ? ["mark-waiting-for-user", "close", "unassign"]
-                : ["mark-waiting-for-user", "close"],
-            SupportConversationStatus.WaitingForUser => ["mark-in-progress", "close"],
+            SupportConversationStatus.InProgress => ["close", "unassign"],
+            SupportConversationStatus.WaitingForUser => ["close"],
             SupportConversationStatus.Closed => ["reopen"],
             _ => []
         };

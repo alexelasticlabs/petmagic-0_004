@@ -121,6 +121,10 @@ namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
 
+                    b.Property<string>("ClientIdempotencyKey")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
                     b.Property<Guid>("ConversationId")
                         .HasColumnType("uuid");
 
@@ -164,6 +168,10 @@ namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
 
                     b.HasIndex("ConversationId", "IsFromAdmin", "ReadAtUtc");
 
+                    b.HasIndex("ConversationId", "SenderUserId", "ClientIdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("UX_support_messages_conversation_sender_idempotency");
+
                     b.ToTable("support_messages", (string)null);
                 });
 
@@ -197,6 +205,9 @@ namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
                         .HasColumnType("integer");
 
                     b.Property<DateTime?>("FeedbackSubmittedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("FirstResponseAtUtc")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("InitiatorUserId")
@@ -233,6 +244,12 @@ namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
                     b.Property<Guid?>("ReopenedByUserId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("ResolutionSlaPausedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("ResolutionSlaPausedSeconds")
+                        .HasColumnType("bigint");
+
                     b.Property<DateTime?>("ResolvedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -248,6 +265,12 @@ namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L);
 
                     b.Property<DateTime?>("WaitingSinceUtc")
                         .HasColumnType("timestamp with time zone");
@@ -410,8 +433,14 @@ namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("DisabledAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
+
+                    b.Property<Guid>("LastModifiedByUserId")
+                        .HasColumnType("uuid");
 
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer");
@@ -424,11 +453,63 @@ namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
                     b.HasKey("Id");
 
                     b.HasIndex("SortOrder", "IsEnabled");
 
                     b.ToTable("support_reply_templates", (string)null);
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.SupportChat.Infrastructure.Entities.SupportReplyTemplateRevision", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<DateTime>("CapturedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TemplateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TemplateId", "Version")
+                        .IsUnique();
+
+                    b.ToTable("support_reply_template_revisions", (string)null);
                 });
 
             modelBuilder.Entity("PetMagic.Modules.SupportChat.Infrastructure.Entities.ConversationMessage", b =>
@@ -460,6 +541,17 @@ namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
                     b.Navigation("Message");
                 });
 
+            modelBuilder.Entity("PetMagic.Modules.SupportChat.Infrastructure.Entities.SupportReplyTemplateRevision", b =>
+                {
+                    b.HasOne("PetMagic.Modules.SupportChat.Infrastructure.Entities.SupportReplyTemplate", "Template")
+                        .WithMany("Revisions")
+                        .HasForeignKey("TemplateId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Template");
+                });
+
             modelBuilder.Entity("PetMagic.Modules.SupportChat.Infrastructure.Entities.ConversationMessage", b =>
                 {
                     b.Navigation("Attachments");
@@ -468,6 +560,11 @@ namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
             modelBuilder.Entity("PetMagic.Modules.SupportChat.Infrastructure.Entities.SupportConversation", b =>
                 {
                     b.Navigation("Messages");
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.SupportChat.Infrastructure.Entities.SupportReplyTemplate", b =>
+                {
+                    b.Navigation("Revisions");
                 });
 #pragma warning restore 612, 618
         }

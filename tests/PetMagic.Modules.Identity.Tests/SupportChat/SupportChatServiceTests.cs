@@ -173,6 +173,177 @@ public sealed class SupportChatServiceTests
     }
 
     [Fact]
+    public async Task SendMessageAsync_ByAdmin_ShouldReturnExistingMessageForSameIdempotencyKey()
+    {
+        var store = CreateStore();
+        var userId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        const string idempotencyKey = "admin-support-reply:retry-safe";
+        await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
+        await SeedUserAsync(store, adminId, "admin@petmagic.test", "Support Admin", SystemRoles.Admin);
+
+        Guid conversationId;
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            conversationId = (await openScope.CreateService().OpenConversationAsync(
+                new OpenSupportConversationCommand(userId, "Need help", SupportConversationPriority.Normal),
+                CancellationToken.None)).Value.ConversationId;
+        }
+
+        await AssignConversationForTestAsync(store, conversationId, adminId);
+
+        SupportMessageResponse firstMessage;
+        await using (var firstScope = await store.CreateScopeAsync())
+        {
+            var firstResult = await firstScope.CreateService().SendMessageAsync(
+                new SendSupportMessageCommand(
+                    conversationId,
+                    adminId,
+                    "We are investigating",
+                    IsAdmin: true,
+                    IdempotencyKey: $"  {idempotencyKey}  "),
+                CancellationToken.None);
+
+            Assert.True(firstResult.IsSuccess);
+            Assert.False(firstResult.Value.IsIdempotencyReplay);
+            firstMessage = firstResult.Value;
+        }
+
+        await using (var replayScope = await store.CreateScopeAsync())
+        {
+            var replayResult = await replayScope.CreateService().SendMessageAsync(
+                new SendSupportMessageCommand(
+                    conversationId,
+                    adminId,
+                    "We are investigating",
+                    IsAdmin: true,
+                    IdempotencyKey: idempotencyKey),
+                CancellationToken.None);
+
+            Assert.True(replayResult.IsSuccess);
+            Assert.True(replayResult.Value.IsIdempotencyReplay);
+            Assert.Equal(firstMessage.MessageId, replayResult.Value.MessageId);
+        }
+
+        await using var verificationScope = await store.CreateScopeAsync();
+        var persistedMessages = await verificationScope.SupportDbContext.ConversationMessages
+            .Where(message => message.ConversationId == conversationId)
+            .ToListAsync();
+        var persistedReply = Assert.Single(persistedMessages, message => message.SenderType == SupportMessageSenderType.SupportAgent);
+        Assert.Equal(idempotencyKey, persistedReply.ClientIdempotencyKey);
+        Assert.Single(persistedMessages, message => message.SenderType == SupportMessageSenderType.System && message.Body == "Support replied");
+    }
+
+    [Fact]
+    public async Task SendMessageAsync_ByAdmin_ShouldRejectInvalidIdempotencyKeyBeforePersistingReply()
+    {
+        var store = CreateStore();
+        var userId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
+        await SeedUserAsync(store, adminId, "admin@petmagic.test", "Support Admin", SystemRoles.Admin);
+
+        Guid conversationId;
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            conversationId = (await openScope.CreateService().OpenConversationAsync(
+                new OpenSupportConversationCommand(userId, "Need help", SupportConversationPriority.Normal),
+                CancellationToken.None)).Value.ConversationId;
+        }
+
+        await AssignConversationForTestAsync(store, conversationId, adminId);
+
+        await using (var sendScope = await store.CreateScopeAsync())
+        {
+            var sendResult = await sendScope.CreateService().SendMessageAsync(
+                new SendSupportMessageCommand(
+                    conversationId,
+                    adminId,
+                    "We are investigating",
+                    IsAdmin: true,
+                    IdempotencyKey: "   "),
+                CancellationToken.None);
+
+            Assert.True(sendResult.IsFailure);
+            Assert.Equal("support.idempotency_key_invalid", sendResult.Error.Code);
+        }
+
+        await using var verificationScope = await store.CreateScopeAsync();
+        Assert.DoesNotContain(
+            await verificationScope.SupportDbContext.ConversationMessages
+                .Where(message => message.ConversationId == conversationId)
+                .ToListAsync(),
+            message => message.SenderType == SupportMessageSenderType.SupportAgent);
+    }
+
+    [Fact]
+    public async Task CreateAttachmentMessageAsync_ByAdmin_ShouldReturnExistingMessageForSameIdempotencyKey()
+    {
+        var store = CreateStore();
+        var userId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        const string idempotencyKey = "admin-support-attachment:retry-safe";
+        await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
+        await SeedUserAsync(store, adminId, "admin@petmagic.test", "Support Admin", SystemRoles.Admin);
+
+        Guid conversationId;
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            conversationId = (await openScope.CreateService().OpenConversationAsync(
+                new OpenSupportConversationCommand(userId, "Need attachment review", SupportConversationPriority.Normal),
+                CancellationToken.None)).Value.ConversationId;
+        }
+
+        await AssignConversationForTestAsync(store, conversationId, adminId);
+
+        SupportMessageResponse firstMessage;
+        await using (var firstScope = await store.CreateScopeAsync())
+        {
+            var firstResult = await firstScope.CreateService().CreateAttachmentMessageAsync(
+                new CreateSupportAttachmentMessageCommand(
+                    conversationId,
+                    adminId,
+                    "Screenshot attached",
+                    IsAdmin: true,
+                    AttachmentFileName: "issue.png",
+                    AttachmentContentType: "image/png",
+                    IdempotencyKey: idempotencyKey),
+                CancellationToken.None);
+
+            Assert.True(firstResult.IsSuccess);
+            Assert.False(firstResult.Value.IsIdempotencyReplay);
+            firstMessage = firstResult.Value;
+        }
+
+        await using (var replayScope = await store.CreateScopeAsync())
+        {
+            var replayResult = await replayScope.CreateService().CreateAttachmentMessageAsync(
+                new CreateSupportAttachmentMessageCommand(
+                    conversationId,
+                    adminId,
+                    "Screenshot attached",
+                    IsAdmin: true,
+                    AttachmentFileName: "issue.png",
+                    AttachmentContentType: "image/png",
+                    IdempotencyKey: idempotencyKey),
+                CancellationToken.None);
+
+            Assert.True(replayResult.IsSuccess);
+            Assert.True(replayResult.Value.IsIdempotencyReplay);
+            Assert.Equal(firstMessage.MessageId, replayResult.Value.MessageId);
+            Assert.Equal("Uploading", replayResult.Value.AttachmentUploadStatus);
+        }
+
+        await using var verificationScope = await store.CreateScopeAsync();
+        var persistedMessages = await verificationScope.SupportDbContext.ConversationMessages
+            .Where(message => message.ConversationId == conversationId)
+            .ToListAsync();
+        var persistedReply = Assert.Single(persistedMessages, message => message.SenderType == SupportMessageSenderType.SupportAgent);
+        Assert.Equal(idempotencyKey, persistedReply.ClientIdempotencyKey);
+        Assert.Single(persistedMessages, message => message.SenderType == SupportMessageSenderType.System && message.Body == "Support replied");
+    }
+
+    [Fact]
     public async Task AssignConversationAsync_ForNewConversation_ShouldMoveToInProgress()
     {
         var store = CreateStore();
@@ -193,13 +364,19 @@ public sealed class SupportChatServiceTests
 
         await using var assignScope = await store.CreateScopeAsync();
         var assignResult = await assignScope.CreateService().AssignConversationAsync(
-            new AssignSupportConversationCommand(conversationId, adminId, adminId),
+            new AssignSupportConversationCommand(
+                conversationId,
+                adminId,
+                adminId,
+                "Assign support operator.",
+                ExpectedVersion: 1),
             CancellationToken.None);
 
         Assert.True(assignResult.IsSuccess);
         Assert.Equal("InProgress", assignResult.Value.Status);
         Assert.Equal(adminId, assignResult.Value.AssignedAdminId);
         Assert.Equal("Support Admin", assignResult.Value.AssignedAdminDisplayName);
+        Assert.Equal(new[] { "close", "unassign" }, assignResult.Value.AvailableActions);
         Assert.Contains(
             assignResult.Value.Messages,
             message => message.SenderType == "System" && message.Body == "Ticket assigned to operator");
@@ -231,7 +408,12 @@ public sealed class SupportChatServiceTests
 
         await using var assignScope = await store.CreateScopeAsync();
         var assignResult = await assignScope.CreateService().AssignConversationAsync(
-            new AssignSupportConversationCommand(conversationId, adminId, regularUserId),
+            new AssignSupportConversationCommand(
+                conversationId,
+                adminId,
+                regularUserId,
+                "Validate support operator role.",
+                ExpectedVersion: 1),
             CancellationToken.None);
 
         Assert.True(assignResult.IsFailure);
@@ -274,6 +456,41 @@ public sealed class SupportChatServiceTests
         Assert.Equal("support.conversation_not_owned", reply.Error.Code);
         Assert.Equal("support.conversation_not_owned", status.Error.Code);
         Assert.Equal("support.conversation_not_owned", metadata.Error.Code);
+    }
+
+    [Fact]
+    public async Task UpdateConversationMetadataAsync_ShouldAcceptPublishedTagLimits()
+    {
+        var store = CreateStore();
+        var userId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
+        await SeedUserAsync(store, adminId, "admin@petmagic.test", "Support Admin", SystemRoles.Admin);
+
+        Guid conversationId;
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            conversationId = (await openScope.CreateService().OpenConversationAsync(
+                new OpenSupportConversationCommand(userId, "Metadata limits", SupportConversationPriority.Normal),
+                CancellationToken.None)).Value.ConversationId;
+        }
+
+        await AssignConversationForTestAsync(store, conversationId, adminId);
+        var tags = Enumerable.Range(0, SupportConversationMetadataLimits.MaxTagCount)
+            .Select(index => $"{index:D2}-{new string('x', SupportConversationMetadataLimits.MaxTagLength - 3)}")
+            .ToArray();
+
+        await using var metadataScope = await store.CreateScopeAsync();
+        var updateResult = await metadataScope.CreateService().UpdateConversationMetadataAsync(
+            new UpdateSupportConversationMetadataCommand(
+                conversationId,
+                adminId,
+                SupportConversationPriority.High,
+                tags),
+            CancellationToken.None);
+
+        Assert.True(updateResult.IsSuccess);
+        Assert.Equal(tags, updateResult.Value.Tags);
     }
 
     [Fact]
@@ -959,7 +1176,12 @@ public sealed class SupportChatServiceTests
         await using (var claimScope = await store.CreateScopeAsync())
         {
             var claimResult = await claimScope.CreateService().AssignConversationAsync(
-                new AssignSupportConversationCommand(conversationId, adminAId, adminAId),
+                new AssignSupportConversationCommand(
+                    conversationId,
+                    adminAId,
+                    adminAId,
+                    "First operator claims the ticket.",
+                    ExpectedVersion: 1),
                 CancellationToken.None);
 
             Assert.True(claimResult.IsSuccess);
@@ -967,7 +1189,12 @@ public sealed class SupportChatServiceTests
 
         await using var assignScope = await store.CreateScopeAsync();
         var assignResult = await assignScope.CreateService().AssignConversationAsync(
-            new AssignSupportConversationCommand(conversationId, adminBId, adminBId),
+            new AssignSupportConversationCommand(
+                conversationId,
+                adminBId,
+                adminBId,
+                "Second operator attempts to claim.",
+                ExpectedVersion: 2),
             CancellationToken.None);
 
         Assert.True(assignResult.IsFailure);
@@ -994,7 +1221,12 @@ public sealed class SupportChatServiceTests
         await using (var assignmentScope = await store.CreateScopeAsync())
         {
             var result = await assignmentScope.CreateService().AssignConversationAsync(
-                new AssignSupportConversationCommand(conversationId, adminId, adminId),
+                new AssignSupportConversationCommand(
+                    conversationId,
+                    adminId,
+                    adminId,
+                    "Assign operator before audit delivery.",
+                    ExpectedVersion: 1),
                 CancellationToken.None);
 
             Assert.True(result.IsSuccess);
@@ -1200,7 +1432,12 @@ public sealed class SupportChatServiceTests
         {
             var service = stateScope.CreateService();
             var assignResult = await service.AssignConversationAsync(
-                new AssignSupportConversationCommand(assignedConversationId, adminId, adminId),
+                new AssignSupportConversationCommand(
+                    assignedConversationId,
+                    adminId,
+                    adminId,
+                    "Assign waiting support ticket.",
+                    ExpectedVersion: 1),
                 CancellationToken.None);
             await AssignConversationForTestAsync(store, waitingConversationId, adminId);
             var replyResult = await service.SendMessageAsync(
@@ -1222,6 +1459,50 @@ public sealed class SupportChatServiceTests
         Assert.Contains(result.Value.Items, item => item.ConversationId == newConversationId && item.Status == "New");
         Assert.Contains(result.Value.Items, item => item.ConversationId == assignedConversationId && item.Status == "InProgress");
         Assert.DoesNotContain(result.Value.Items, item => item.ConversationId == waitingConversationId);
+    }
+
+    [Fact]
+    public async Task ListAdminInboxAsync_UnreadQueue_ShouldOnlyReturnConversationsUnreadForAdmin()
+    {
+        var store = CreateStore();
+
+        var unreadUserId = Guid.NewGuid();
+        var readUserId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        await SeedUserAsync(store, unreadUserId, "unread@petmagic.test", "Unread User");
+        await SeedUserAsync(store, readUserId, "read@petmagic.test", "Read User");
+        await SeedUserAsync(store, adminId, "admin@petmagic.test", "Support Admin", SystemRoles.Admin);
+
+        Guid unreadConversationId;
+        Guid readConversationId;
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            var service = openScope.CreateService();
+            unreadConversationId = (await service.OpenConversationAsync(
+                new OpenSupportConversationCommand(unreadUserId, "Unread case", SupportConversationPriority.Normal),
+                CancellationToken.None)).Value.ConversationId;
+            readConversationId = (await service.OpenConversationAsync(
+                new OpenSupportConversationCommand(readUserId, "Read case", SupportConversationPriority.Normal),
+                CancellationToken.None)).Value.ConversationId;
+        }
+
+        await using (var markReadScope = await store.CreateScopeAsync())
+        {
+            var markRead = await markReadScope.CreateService().MarkConversationReadAsync(
+                new MarkSupportConversationReadCommand(readConversationId, adminId, true),
+                CancellationToken.None);
+            Assert.True(markRead.IsSuccess);
+        }
+
+        await using var verificationScope = await store.CreateScopeAsync();
+        var result = await verificationScope.CreateService().ListAdminInboxAsync(
+            new ListAdminSupportInboxQuery(null, PageSize: 10, Queue: "unread"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, result.Value.TotalCount);
+        Assert.Contains(result.Value.Items, item => item.ConversationId == unreadConversationId);
+        Assert.DoesNotContain(result.Value.Items, item => item.ConversationId == readConversationId);
     }
 
     [Fact]
@@ -1685,6 +1966,56 @@ public sealed class SupportChatServiceTests
     }
 
     [Fact]
+    public async Task SubmitConversationFeedbackAsync_WhenAlreadySubmitted_ShouldRejectAndPreserveInitialFeedback()
+    {
+        var store = CreateStore();
+
+        var userId = Guid.NewGuid();
+        await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
+
+        Guid conversationId;
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            var openResult = await openScope.CreateService().OpenConversationAsync(
+                new OpenSupportConversationCommand(userId, "Need help", SupportConversationPriority.Normal),
+                CancellationToken.None);
+            conversationId = openResult.Value.ConversationId;
+
+            var resolveResult = await openScope.CreateService().ResolveConversationAsync(
+                new ResolveSupportConversationCommand(conversationId, userId, IsAdmin: false),
+                CancellationToken.None);
+
+            Assert.True(resolveResult.IsSuccess);
+        }
+
+        DateTime? submittedAtUtc;
+        await using (var initialFeedbackScope = await store.CreateScopeAsync())
+        {
+            var initialResult = await initialFeedbackScope.CreateService().SubmitConversationFeedbackAsync(
+                new SubmitSupportConversationFeedbackCommand(conversationId, userId, 5, "Thanks"),
+                CancellationToken.None);
+
+            Assert.True(initialResult.IsSuccess);
+            submittedAtUtc = initialResult.Value.FeedbackSubmittedAtUtc;
+            Assert.NotNull(submittedAtUtc);
+        }
+
+        await using var duplicateFeedbackScope = await store.CreateScopeAsync();
+        var duplicateResult = await duplicateFeedbackScope.CreateService().SubmitConversationFeedbackAsync(
+            new SubmitSupportConversationFeedbackCommand(conversationId, userId, 1, "Changed"),
+            CancellationToken.None);
+
+        Assert.True(duplicateResult.IsFailure);
+        Assert.Equal(SupportChatErrors.FeedbackNotAllowed.Code, duplicateResult.Error.Code);
+
+        var persisted = await duplicateFeedbackScope.SupportDbContext.SupportConversations
+            .SingleAsync(x => x.Id == conversationId);
+        Assert.Equal(5, persisted.FeedbackRating);
+        Assert.Equal("Thanks", persisted.FeedbackComment);
+        Assert.Equal(submittedAtUtc, persisted.FeedbackSubmittedAtUtc);
+    }
+
+    [Fact]
     public async Task UpdateConversationStatusAsync_FromClosedToWaitingForUser_ShouldFail()
     {
         var store = CreateStore();
@@ -1725,6 +2056,54 @@ public sealed class SupportChatServiceTests
 
         var conversation = await invalidScope.SupportDbContext.SupportConversations.SingleAsync();
         Assert.Equal(SupportConversationStatus.Closed, conversation.Status);
+    }
+
+    [Fact]
+    public async Task UpdateConversationStatusAsync_WhenAlreadyClosed_ShouldNotAppendDuplicateSystemEvents()
+    {
+        var store = CreateStore();
+        var userId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
+        await SeedUserAsync(store, adminId, "admin@petmagic.test", "Support Admin", SystemRoles.Admin);
+
+        Guid conversationId;
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            conversationId = (await openScope.CreateService().OpenConversationAsync(
+                new OpenSupportConversationCommand(userId, "Idempotent close", SupportConversationPriority.Normal),
+                CancellationToken.None)).Value.ConversationId;
+        }
+
+        await AssignConversationForTestAsync(store, conversationId, adminId);
+
+        await using (var closeScope = await store.CreateScopeAsync())
+        {
+            var closeResult = await closeScope.CreateService().UpdateConversationStatusAsync(
+                new UpdateSupportConversationStatusCommand(
+                    conversationId,
+                    adminId,
+                    SupportConversationStatus.Closed),
+                CancellationToken.None);
+
+            Assert.True(closeResult.IsSuccess);
+        }
+
+        await using var retryScope = await store.CreateScopeAsync();
+        var beforeRetrySystemEventCount = retryScope.SupportDbContext.ConversationMessages.Count(
+            message => message.ConversationId == conversationId && message.SenderType == SupportMessageSenderType.System);
+        var retryResult = await retryScope.CreateService().UpdateConversationStatusAsync(
+            new UpdateSupportConversationStatusCommand(
+                conversationId,
+                adminId,
+                SupportConversationStatus.Closed),
+            CancellationToken.None);
+        var afterRetrySystemEventCount = retryScope.SupportDbContext.ConversationMessages.Count(
+            message => message.ConversationId == conversationId && message.SenderType == SupportMessageSenderType.System);
+
+        Assert.True(retryResult.IsSuccess);
+        Assert.Equal("Closed", retryResult.Value.Status);
+        Assert.Equal(beforeRetrySystemEventCount, afterRetrySystemEventCount);
     }
 
     [Fact]

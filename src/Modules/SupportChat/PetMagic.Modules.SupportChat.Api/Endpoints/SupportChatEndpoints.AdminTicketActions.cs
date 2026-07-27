@@ -15,9 +15,11 @@ namespace PetMagic.Modules.SupportChat.Api.Endpoints;
 
 public static partial class SupportChatEndpoints
 {
-    private static async Task<Results<Ok<SupportConversationDetailResponse>, ProblemHttpResult>> AssignConversationToMeAsync(
+    private static async Task<Results<Ok<SupportConversationDetailResponse>, ValidationProblem, ProblemHttpResult>> AssignConversationToMeAsync(
         HttpContext httpContext,
         [FromRoute] Guid conversationId,
+        [FromBody] LegacySupportAssignmentRequest? request,
+        [FromServices] IValidator<AssignSupportConversationCommand> validator,
         [FromServices] ISupportAttachmentReadUrlSigner attachmentReadUrlSigner,
         [FromServices] ISupportChatService service,
         CancellationToken cancellationToken)
@@ -27,9 +29,19 @@ public static partial class SupportChatEndpoints
             return unauthorized!;
         }
 
-        var result = await service.AssignConversationAsync(
-            new AssignSupportConversationCommand(conversationId, userId, userId),
-            cancellationToken);
+        var command = new AssignSupportConversationCommand(
+            conversationId,
+            userId,
+            userId,
+            request?.Reason,
+            request?.ExpectedVersion);
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
+        }
+
+        var result = await service.AssignConversationAsync(command, cancellationToken);
         if (result.IsFailure)
         {
             return ToProblem(result.Error);
@@ -38,9 +50,11 @@ public static partial class SupportChatEndpoints
         return TypedResults.Ok(SignAttachmentUrls(result.Value, attachmentReadUrlSigner));
     }
 
-    private static async Task<Results<Ok<SupportConversationDetailResponse>, ProblemHttpResult>> UnassignConversationAsync(
+    private static async Task<Results<Ok<SupportConversationDetailResponse>, ValidationProblem, ProblemHttpResult>> UnassignConversationAsync(
         HttpContext httpContext,
         [FromRoute] Guid conversationId,
+        [FromBody] LegacySupportAssignmentRequest? request,
+        [FromServices] IValidator<AssignSupportConversationCommand> validator,
         [FromServices] ISupportAttachmentReadUrlSigner attachmentReadUrlSigner,
         [FromServices] ISupportChatService service,
         CancellationToken cancellationToken)
@@ -50,9 +64,19 @@ public static partial class SupportChatEndpoints
             return unauthorized!;
         }
 
-        var result = await service.AssignConversationAsync(
-            new AssignSupportConversationCommand(conversationId, userId, null),
-            cancellationToken);
+        var command = new AssignSupportConversationCommand(
+            conversationId,
+            userId,
+            AssignedAdminId: null,
+            request?.Reason,
+            request?.ExpectedVersion);
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
+        }
+
+        var result = await service.AssignConversationAsync(command, cancellationToken);
         if (result.IsFailure)
         {
             return ToProblem(result.Error);
@@ -150,16 +174,28 @@ public static partial class SupportChatEndpoints
     }
 
     private static async Task<Results<Ok<IReadOnlyList<SupportReplyTemplateResponse>>, ProblemHttpResult>> ListReplyTemplatesAsync(
+        [FromQuery] bool? includeDisabled,
         [FromServices] ISupportReplyTemplateCatalogService service,
         CancellationToken cancellationToken)
     {
-        var result = await service.ListAdminTemplatesAsync(cancellationToken);
+        var result = await service.ListAdminTemplatesAsync(includeDisabled == true, cancellationToken);
         if (result.IsFailure)
         {
             return ToProblem(result.Error);
         }
 
         return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<IReadOnlyList<SupportReplyTemplateVersionResponse>>, ProblemHttpResult>> ListReplyTemplateVersionsAsync(
+        [FromRoute] Guid templateId,
+        [FromServices] ISupportReplyTemplateCatalogService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.ListAdminTemplateVersionsAsync(templateId, cancellationToken);
+        return result.IsFailure
+            ? ToProblem(result.Error)
+            : TypedResults.Ok(result.Value);
     }
 
     private static async Task<Results<Ok<SupportReplyTemplateResponse>, ValidationProblem, ProblemHttpResult>> CreateReplyTemplateAsync(
@@ -174,7 +210,7 @@ public static partial class SupportChatEndpoints
             return unauthorized!;
         }
 
-        var command = new UpsertSupportReplyTemplateCommand(null, userId, request.Title, request.Body, request.IsEnabled, request.SortOrder);
+        var command = new UpsertSupportReplyTemplateCommand(null, userId, request.Title, request.Body, request.IsEnabled, request.SortOrder, request.ExpectedVersion, request.Reason);
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
@@ -203,7 +239,7 @@ public static partial class SupportChatEndpoints
             return unauthorized!;
         }
 
-        var command = new UpsertSupportReplyTemplateCommand(templateId, userId, request.Title, request.Body, request.IsEnabled, request.SortOrder);
+        var command = new UpsertSupportReplyTemplateCommand(templateId, userId, request.Title, request.Body, request.IsEnabled, request.SortOrder, request.ExpectedVersion, request.Reason);
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
@@ -222,6 +258,8 @@ public static partial class SupportChatEndpoints
     private static async Task<Results<NoContent, ValidationProblem, ProblemHttpResult>> DeleteReplyTemplateAsync(
         HttpContext httpContext,
         [FromRoute] Guid templateId,
+        [FromQuery] int? expectedVersion,
+        [FromQuery] string? reason,
         [FromServices] IValidator<DeleteSupportReplyTemplateCommand> validator,
         [FromServices] ISupportReplyTemplateCatalogService service,
         CancellationToken cancellationToken)
@@ -231,7 +269,7 @@ public static partial class SupportChatEndpoints
             return unauthorized!;
         }
 
-        var command = new DeleteSupportReplyTemplateCommand(templateId, userId);
+        var command = new DeleteSupportReplyTemplateCommand(templateId, userId, expectedVersion, reason);
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
@@ -254,6 +292,7 @@ public static partial class SupportChatEndpoints
             "support.conversation_not_found" => StatusCodes.Status404NotFound,
             "support.message_not_found" => StatusCodes.Status404NotFound,
             "support.template_not_found" => StatusCodes.Status404NotFound,
+            "support.template_version_conflict" => StatusCodes.Status409Conflict,
             "support.related_resource_not_found" => StatusCodes.Status404NotFound,
             "support.forbidden" => StatusCodes.Status403Forbidden,
             "support.status_transition_invalid" => StatusCodes.Status400BadRequest,
@@ -276,6 +315,10 @@ public static partial class SupportChatEndpoints
             "support.feedback_rating_invalid" => StatusCodes.Status400BadRequest,
             "support.push_token_invalid" => StatusCodes.Status400BadRequest,
             "support.assigned_admin_invalid" => StatusCodes.Status400BadRequest,
+            "support.assignment_forbidden" => StatusCodes.Status403Forbidden,
+            "support.assignment_reason_required" => StatusCodes.Status400BadRequest,
+            "support.assignment_expected_version_required" => StatusCodes.Status400BadRequest,
+            "support.assignment_conflict" => StatusCodes.Status409Conflict,
             "support.conversation_already_assigned" => StatusCodes.Status409Conflict,
             "support.conversation_not_owned" => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest,
@@ -349,7 +392,14 @@ public static partial class SupportChatEndpoints
 
     public sealed record UpdateSupportConversationStatusRequest(string Status);
 
-    public sealed record AssignSupportConversationRequest(Guid? AssignedAdminId);
+    public sealed record AssignSupportConversationRequest(
+        Guid? AssignedAdminId,
+        string? Reason = null,
+        long? ExpectedVersion = null);
+
+    public sealed record LegacySupportAssignmentRequest(
+        string? Reason = null,
+        long? ExpectedVersion = null);
 
     public sealed record UpdateSupportConversationMetadataRequest(string Priority, IReadOnlyList<string>? Tags = null);
 
@@ -359,5 +409,11 @@ public static partial class SupportChatEndpoints
 
     public sealed record UnregisterPushTokenRequest(string Token);
 
-    public sealed record UpsertSupportReplyTemplateRequest(string Title, string Body, bool IsEnabled = true, int SortOrder = 0);
+    public sealed record UpsertSupportReplyTemplateRequest(
+        string Title,
+        string Body,
+        bool IsEnabled = true,
+        int SortOrder = 0,
+        int? ExpectedVersion = null,
+        string? Reason = null);
 }

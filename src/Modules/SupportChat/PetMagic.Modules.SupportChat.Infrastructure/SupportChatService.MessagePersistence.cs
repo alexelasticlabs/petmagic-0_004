@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+
 using PetMagic.Modules.SupportChat.Application.Contracts;
 using PetMagic.Modules.SupportChat.Domain.Enums;
 using PetMagic.Modules.SupportChat.Infrastructure.Entities;
@@ -22,7 +24,8 @@ public sealed partial class SupportChatService
         string? attachmentUploadErrorCode,
         IReadOnlyList<SupportMessageAttachmentInput> attachments,
         DateTime? markAsReadAtUtc,
-        bool updateAssignmentAndStatus)
+        bool updateAssignmentAndStatus,
+        string? clientIdempotencyKey = null)
     {
         var now = DateTime.UtcNow;
         var retentionDays = Math.Max(1, attachmentStorageOptions.RetentionDays);
@@ -36,6 +39,7 @@ public sealed partial class SupportChatService
             Body = trimmedBody,
             ReplyToMessageId = replyToMessageId,
             ReplyToPreview = replyToPreview,
+            ClientIdempotencyKey = clientIdempotencyKey,
             IsFromAdmin = isAdmin,
             SenderType = senderType,
             AttachmentUrl = attachmentUrl,
@@ -78,6 +82,7 @@ public sealed partial class SupportChatService
         if (isAdmin && updateAssignmentAndStatus)
         {
             conversation.AssignedAdminId ??= senderUserId;
+            conversation.FirstResponseAtUtc ??= now;
             MarkActive(conversation, SupportConversationStatus.WaitingForUser, now);
         }
         else if (!isAdmin && updateAssignmentAndStatus)
@@ -105,6 +110,27 @@ public sealed partial class SupportChatService
             conversation.CreatedAtUtc);
         supportChatDbContext.ConversationMessages.Add(message);
         return Task.FromResult(message);
+    }
+
+    private async Task<ConversationMessage?> FindExistingIdempotentAdminMessageAsync(
+        Guid conversationId,
+        Guid senderUserId,
+        string? clientIdempotencyKey,
+        CancellationToken cancellationToken)
+    {
+        if (clientIdempotencyKey is null)
+        {
+            return null;
+        }
+
+        return await supportChatDbContext.ConversationMessages
+            .AsNoTracking()
+            .Include(message => message.Attachments)
+            .FirstOrDefaultAsync(
+                message => message.ConversationId == conversationId
+                    && message.SenderUserId == senderUserId
+                    && message.ClientIdempotencyKey == clientIdempotencyKey,
+                cancellationToken);
     }
 
     private Task AppendSystemEventAsync(SupportConversation conversation, string body)

@@ -8,6 +8,10 @@ public sealed record IdentityUserLookup(
 
 public interface IIdentityUserLookupService
 {
+    Task<IReadOnlyList<Guid>> GetActiveUserIdsInRolesAsync(
+        IReadOnlyCollection<string> roles,
+        CancellationToken cancellationToken);
+
     Task<IReadOnlyDictionary<Guid, IdentityUserLookup>> GetUsersByIdsAsync(
         IReadOnlyCollection<Guid> userIds,
         CancellationToken cancellationToken);

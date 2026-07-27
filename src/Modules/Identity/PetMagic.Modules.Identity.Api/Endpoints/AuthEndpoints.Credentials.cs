@@ -317,24 +317,38 @@ public static partial class AuthEndpoints
     private static async Task<Results<NoContent, ValidationProblem, ProblemHttpResult>> LogoutAsync(
         HttpContext context,
         RefreshTokenCommand? request,
-        IValidator<LogoutCommand> validator,
+        IValidator<RefreshTokenCommand> validator,
         IIdentityService service,
         CancellationToken cancellationToken)
     {
-        if (!TryGetUserId(context, out var userId, out var invalidSubjectProblem))
+        var resolvedRefreshToken = ResolveLogoutRefreshToken(
+            context,
+            request?.RefreshToken,
+            out var isCookieBacked);
+
+        if (isCookieBacked && !HasLogoutIntentHeader(context))
         {
-            return invalidSubjectProblem!;
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                extensions: new Dictionary<string, object?>
+                {
+                    ["code"] = "auth.logout_intent_required"
+                });
         }
 
-        var resolvedRefreshToken = ResolveRefreshToken(context, request?.RefreshToken);
-        var logoutCommand = new LogoutCommand(userId, resolvedRefreshToken ?? string.Empty);
+        if (string.IsNullOrWhiteSpace(resolvedRefreshToken))
+        {
+            return TypedResults.NoContent();
+        }
+
+        var logoutCommand = new RefreshTokenCommand(resolvedRefreshToken);
         var validation = await validator.ValidateAsync(logoutCommand, cancellationToken);
         if (!validation.IsValid)
         {
             return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
         }
 
-        var result = await service.LogoutAsync(logoutCommand, cancellationToken);
+        var result = await service.LogoutByRefreshTokenAsync(logoutCommand, cancellationToken);
         if (result.IsFailure)
         {
             return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status401Unauthorized);

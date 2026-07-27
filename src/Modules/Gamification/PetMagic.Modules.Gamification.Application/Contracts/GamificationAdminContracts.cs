@@ -23,7 +23,8 @@ public sealed record AdminGamificationAchievementDefinitionResponse(
     int RewardSpark,
     bool IsSecret,
     int SortOrder,
-    int UnlockedUsersCount);
+    int UnlockedUsersCount,
+    int Version = 1);
 
 public sealed record AdminGamificationChallengeSummaryResponse(
     Guid Id,
@@ -36,14 +37,27 @@ public sealed record AdminGamificationChallengeSummaryResponse(
     int RewardSpark,
     int SortOrder,
     int ParticipantCount,
-    int CompletedCount);
+    int CompletedCount,
+    int DefinitionVersion = 1);
+
+public sealed record AdminUserGamificationHistoryItemResponse(
+    string EventId,
+    string Kind,
+    string Label,
+    string Status,
+    int RewardSpark,
+    DateTime OccurredAtUtc,
+    int DefinitionVersion);
 
 public sealed record AdminUserGamificationOverviewResponse(
     Guid UserId,
     StreakResponse? Streak,
     IReadOnlyList<PetProgressResponse> Pets,
     IReadOnlyList<AchievementResponse> Achievements,
-    IReadOnlyList<ChallengeResponse> CurrentChallenges);
+    IReadOnlyList<ChallengeResponse> CurrentChallenges)
+{
+    public IReadOnlyList<AdminUserGamificationHistoryItemResponse> History { get; init; } = [];
+}
 
 public sealed record AdminResetUserStreakCommand(
     Guid AdminUserId,

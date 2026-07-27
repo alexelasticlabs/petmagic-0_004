@@ -39,6 +39,22 @@ public sealed class AdditionalValidatorsTests
     }
 
     [Fact]
+    public void SendBulkEmailValidator_Should_Fail_When_IdempotencyKey_Is_Too_Long()
+    {
+        var validator = new SendBulkEmailCommandValidator();
+        var command = new SendBulkEmailCommand(
+            EmailAudiences.Premium,
+            "Service update",
+            "Scheduled maintenance details",
+            null,
+            new string('k', 257));
+
+        var result = validator.Validate(command);
+
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
     public void LogoutCommandValidator_Should_Fail_When_RefreshToken_Is_Empty()
     {
         var validator = new LogoutCommandValidator();

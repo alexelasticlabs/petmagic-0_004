@@ -4,14 +4,23 @@ public sealed record ClaimWeeklyGrantCommand(Guid UserId, bool IsPremium);
 
 public sealed record ClaimAdRewardCommand(Guid UserId);
 
-public sealed record SpendBalanceCommand(Guid UserId, int Amount, string Reason, string? Source = null);
+public sealed record SpendBalanceCommand(
+    Guid UserId,
+    int Amount,
+    string Reason,
+    string? Source = null,
+    string? IdempotencyKey = null,
+    string? IdempotencyScope = null);
 
 public sealed record CreditBalanceCommand(
     Guid UserId,
     int Amount,
     string Source,
     string Reason,
-    string? IdempotencyKey = null);
+    string? IdempotencyKey = null,
+    string? LedgerReason = null,
+    string? IdempotencyScope = null,
+    IReadOnlyCollection<string>? PreviousIdempotencyKeys = null);
 
 public sealed record CreatePackPurchaseCommand(
     Guid UserId,
@@ -37,7 +46,10 @@ public sealed record CreatePremiumBillingPortalCommand(Guid UserId, string Payme
 
 public sealed record CancelPremiumSubscriptionCommand(Guid UserId, string PaymentProvider);
 
-public sealed record AdminRevokePremiumSubscriptionCommand(Guid UserId, string PaymentProvider);
+public sealed record AdminRevokePremiumSubscriptionCommand(
+    Guid UserId,
+    string PaymentProvider,
+    string? Reason = null);
 
 public sealed record AdminRefundPurchaseCommand(Guid OrderId, string? Reason = null);
 

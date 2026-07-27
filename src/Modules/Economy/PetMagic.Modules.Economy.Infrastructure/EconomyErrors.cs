@@ -14,6 +14,8 @@ public static class EconomyErrors
 
     public static readonly Error InvalidWalletReason = new("economy.invalid_wallet_reason", "Wallet operation reason is invalid.");
 
+    public static readonly Error DashboardPeriodInvalid = new("economy.dashboard_period_invalid", "Dashboard period must be 7, 30, or 90 days.");
+
     public static readonly Error InvalidSubject = new("economy.invalid_subject", "Invalid access token subject.");
 
     public static readonly Error CurrencyPackNotFound = new("economy.pack_not_found", "Currency pack was not found.");
@@ -45,6 +47,12 @@ public static class EconomyErrors
     public static readonly Error PaymentProviderDisclosureInvalid = new("economy.payment_provider_disclosure_invalid", "Payment provider disclosures must not reference deprecated Stripe checkout or native PaymentSheet copy.");
 
     public static readonly Error PremiumBillingUnavailable = new("economy.premium_billing_unavailable", "Premium billing is not available right now.");
+
+    public static readonly Error PremiumSubscriptionNotCancellable = new("economy.premium_subscription_not_cancellable", "Premium subscription cannot be cancelled in its current state.");
+
+    public static readonly Error AdminPremiumRevokeReasonRequired = new("economy.admin_premium_revoke_reason_required", "An audit reason is required to revoke Premium.");
+
+    public static readonly Error AdminPremiumRevokeFinalizationFailed = new("economy.admin_premium_revoke_finalization_failed", "Premium revocation was not fully finalized. Retry the operation.");
 
     public static readonly Error StoreVerificationUnavailable = new("economy.store_verification_unavailable", "Store subscription verification is not configured.");
 
@@ -94,6 +102,8 @@ public static class EconomyErrors
     public static readonly Error EconomyIncidentActionInvalid = new("economy.incident_action_invalid", "Economy incident action is not supported.");
 
     public static readonly Error EconomyIncidentActionReasonRequired = new("economy.incident_action_reason_required", "Economy incident action reason is required.");
+
+    public static readonly Error EconomyIncidentExternalReferenceRequired = new("economy.incident_external_reference_required", "Economy incident action external reference is required.");
 
     public static readonly Error ReconciliationAlreadyRunning = new("economy.reconciliation_already_running", "Economy reconciliation is already running.");
 

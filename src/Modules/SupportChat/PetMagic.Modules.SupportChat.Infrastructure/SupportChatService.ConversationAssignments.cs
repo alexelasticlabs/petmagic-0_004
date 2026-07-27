@@ -39,12 +39,22 @@ public sealed partial class SupportChatService
         var currentStatus = ToCanonicalStatus(conversation.Status, conversation.AssignedAdminId);
         var nextStatus = ToCanonicalStatus(command.Status);
 
+        if (currentStatus == nextStatus)
+        {
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+
+            return Result.Success(await BuildConversationDetailAsync(conversation.Id, cancellationToken));
+        }
+
         if (currentStatus == SupportConversationStatus.New && nextStatus == SupportConversationStatus.InProgress)
         {
             return Result.Failure<SupportConversationDetailResponse>(InvalidStatusTransition);
         }
 
-        if (currentStatus != nextStatus && !IsAllowedStatusTransition(currentStatus, nextStatus))
+        if (!IsAllowedStatusTransition(currentStatus, nextStatus))
         {
             return Result.Failure<SupportConversationDetailResponse>(InvalidStatusTransition);
         }
@@ -118,21 +128,54 @@ public sealed partial class SupportChatService
             return Result.Failure<SupportConversationDetailResponse>(ConversationNotFound);
         }
 
-        if (command.AssignedAdminId.HasValue && command.AssignedAdminId.Value != command.AdminUserId)
+        var isAssignmentChange = conversation.AssignedAdminId != command.AssignedAdminId;
+        if (isAssignmentChange
+            && command.ExpectedVersion.HasValue
+            && conversation.Version != command.ExpectedVersion.Value)
         {
-            return Result.Failure<SupportConversationDetailResponse>(SupportChatErrors.InvalidAssignedAdmin);
+            return Result.Failure<SupportConversationDetailResponse>(SupportChatErrors.AssignmentConflict);
+        }
+
+        if (command.AssignedAdminId.HasValue)
+        {
+            var activeSupportOperatorIds = await identityUserLookupService.GetActiveUserIdsInRolesAsync(
+                [SystemRoles.Admin, SystemRoles.Moderator],
+                cancellationToken);
+            if (!activeSupportOperatorIds.Contains(command.AssignedAdminId.Value))
+            {
+                return Result.Failure<SupportConversationDetailResponse>(SupportChatErrors.InvalidAssignedAdmin);
+            }
+        }
+
+        if (isAssignmentChange && string.IsNullOrWhiteSpace(command.Reason))
+        {
+            return Result.Failure<SupportConversationDetailResponse>(SupportChatErrors.AssignmentReasonRequired);
+        }
+
+        if (isAssignmentChange && !command.ExpectedVersion.HasValue)
+        {
+            return Result.Failure<SupportConversationDetailResponse>(SupportChatErrors.AssignmentExpectedVersionRequired);
+        }
+
+        if (command.AssignedAdminId.HasValue
+            && command.AssignedAdminId.Value != command.AdminUserId
+            && !command.CanAssignOthers)
+        {
+            return Result.Failure<SupportConversationDetailResponse>(SupportChatErrors.AssignmentForbidden);
         }
 
         if (command.AssignedAdminId.HasValue
             && conversation.AssignedAdminId.HasValue
-            && conversation.AssignedAdminId.Value != command.AdminUserId)
+            && conversation.AssignedAdminId.Value != command.AdminUserId
+            && !command.CanAssignOthers)
         {
             return Result.Failure<SupportConversationDetailResponse>(SupportChatErrors.ConversationAlreadyAssigned);
         }
 
         if (!command.AssignedAdminId.HasValue
             && conversation.AssignedAdminId.HasValue
-            && conversation.AssignedAdminId.Value != command.AdminUserId)
+            && conversation.AssignedAdminId.Value != command.AdminUserId
+            && !command.CanAssignOthers)
         {
             return Result.Failure<SupportConversationDetailResponse>(SupportChatErrors.ConversationNotOwned);
         }
@@ -153,19 +196,6 @@ public sealed partial class SupportChatService
         if (currentStatus == SupportConversationStatus.Closed)
         {
             return Result.Failure<SupportConversationDetailResponse>(InvalidStatusTransition);
-        }
-
-        if (command.AssignedAdminId.HasValue)
-        {
-            var assignedAdmin = await identityUserLookupService.GetUserByIdAsync(
-                command.AssignedAdminId.Value,
-                cancellationToken);
-            var hasSupportRole = assignedAdmin?.Roles.Contains(SystemRoles.Admin, StringComparer.Ordinal) == true
-                || assignedAdmin?.Roles.Contains(SystemRoles.Moderator, StringComparer.Ordinal) == true;
-            if (!hasSupportRole)
-            {
-                return Result.Failure<SupportConversationDetailResponse>(SupportChatErrors.InvalidAssignedAdmin);
-            }
         }
 
         var previousAssignedAdminId = conversation.AssignedAdminId;
@@ -192,6 +222,7 @@ public sealed partial class SupportChatService
             conversation.Id.ToString("D"),
             OldValue: previousAssignedAdminId?.ToString("D"),
             NewValue: command.AssignedAdminId?.ToString("D"),
+            Details: string.IsNullOrWhiteSpace(command.Reason) ? null : command.Reason.Trim(),
             SubjectUserId: conversation.InitiatorUserId,
             EventId: Guid.NewGuid(),
             ActorUserId: command.AdminUserId,

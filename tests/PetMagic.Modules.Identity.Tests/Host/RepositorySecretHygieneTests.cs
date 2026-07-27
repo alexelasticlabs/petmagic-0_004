@@ -289,9 +289,7 @@ public sealed class RepositorySecretHygieneTests
 
         foreach (var activeMobileConfig in activeMobileConfigs)
         {
-            Assert.False(
-                File.Exists(activeMobileConfig),
-                $"{Path.GetRelativePath(repositoryRoot, activeMobileConfig)} must be injected from a protected environment.");
+            AssertFileIsNotTracked(repositoryRoot, activeMobileConfig);
         }
 
         var requiredMobileExamples = new[]
@@ -569,6 +567,32 @@ public sealed class RepositorySecretHygieneTests
         throw new InvalidOperationException("Could not locate repository root.");
     }
 
+    private static void AssertFileIsNotTracked(string repositoryRoot, string file)
+    {
+        var relativePath = Path.GetRelativePath(repositoryRoot, file).Replace('\\', '/');
+        var startInfo = new ProcessStartInfo("git")
+        {
+            WorkingDirectory = repositoryRoot,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+        startInfo.ArgumentList.Add("ls-files");
+        startInfo.ArgumentList.Add("--");
+        startInfo.ArgumentList.Add(relativePath);
+
+        using var process = Process.Start(startInfo);
+        Assert.NotNull(process);
+        var trackedFiles = process.StandardOutput.ReadToEnd();
+        var standardError = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+
+        Assert.True(process.ExitCode == 0, standardError);
+        Assert.True(
+            string.IsNullOrWhiteSpace(trackedFiles),
+            $"{relativePath} must remain local and ignored instead of being tracked by Git.");
+    }
+
     private static IEnumerable<string> EnumerateClientSourceAndConfigFiles(string repositoryRoot)
     {
         var adminRoot = Path.Combine(repositoryRoot, "apps", "admin-web");
@@ -752,6 +776,7 @@ public sealed class RepositorySecretHygieneTests
             ".git",
             ".gradle",
             ".next",
+            ".next-e2e",
             ".turbo",
             "artifacts",
             "bin",
@@ -759,6 +784,7 @@ public sealed class RepositorySecretHygieneTests
             "coverage",
             "node_modules",
             "obj",
+            "test-results",
         };
 
         return segments.Any(segment => ignoredDirectories.Contains(segment));

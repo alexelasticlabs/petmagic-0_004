@@ -65,6 +65,7 @@ public static partial class AdminTemplateEndpoints
             request.RecommendedAfterImageGeneration,
             request.SupportsGenerateSimilar,
             request.DefaultVariationStrength,
+            IsQaOnly: request.IsQaOnly,
             ThumbnailAsset: request.ThumbnailAsset,
             AnimatedPreviewAsset: request.AnimatedPreviewAsset,
             FeedLoopLowAsset: request.FeedLoopLowAsset,
@@ -138,6 +139,7 @@ public static partial class AdminTemplateEndpoints
             request.RecommendedAfterImageGeneration,
             request.SupportsGenerateSimilar,
             request.DefaultVariationStrength,
+            IsQaOnly: request.IsQaOnly,
             ThumbnailAsset: request.ThumbnailAsset,
             AnimatedPreviewAsset: request.AnimatedPreviewAsset,
             FeedLoopLowAsset: request.FeedLoopLowAsset,
@@ -221,7 +223,8 @@ public static partial class AdminTemplateEndpoints
         TemplateAssetCommand? FeedLoopLowAsset = null,
         TemplateAssetCommand? FeedLoopMediumAsset = null,
         TemplateAssetCommand? DetailPreviewAsset = null,
-        bool KeepPreviewAsset = false);
+        bool KeepPreviewAsset = false,
+        bool? IsQaOnly = null);
 
     public sealed record UpdateVideoTemplateRequest(
         string Title,
@@ -252,9 +255,13 @@ public static partial class AdminTemplateEndpoints
         TemplateAssetCommand? FeedLoopMediumAsset = null,
         TemplateAssetCommand? DetailPreviewAsset = null,
         bool KeepPreviewAsset = false,
-        bool KeepReferenceMotionAsset = false);
+        bool KeepReferenceMotionAsset = false,
+        bool? IsQaOnly = null);
 
     public sealed record ChangeTemplateStatusRequest(string Status);
 
-    public sealed record AdminModerationDecisionRequest(string Action, string Reason);
+    public sealed record AdminModerationDecisionRequest(
+        string Action,
+        string Reason,
+        long? ExpectedVersion = null);
 }

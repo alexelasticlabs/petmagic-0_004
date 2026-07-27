@@ -82,9 +82,15 @@ public interface IEconomyService
         Guid? userId,
         CancellationToken cancellationToken);
 
+    Task<Result<AdminPurchaseDetailResponse>> GetAdminPurchaseAsync(
+        Guid orderId,
+        CancellationToken cancellationToken);
+
     Task<Result<PurchaseHistoryItemResponse>> RefundAdminPurchaseAsync(AdminRefundPurchaseCommand command, CancellationToken cancellationToken);
 
     Task<Result<AdminEconomyDashboardMetricsResponse>> GetAdminDashboardMetricsAsync(CancellationToken cancellationToken);
+
+    Task<Result<AdminEconomyDashboardMetricsResponse>> GetAdminDashboardMetricsAsync(int periodDays, CancellationToken cancellationToken);
 
     Task<Result<OffsetPagedResponse<AdminUserSubscriptionResponse>>> GetAdminSubscriptionsAsync(int skip, int take, string? status, string? provider, string? search, CancellationToken cancellationToken);
 

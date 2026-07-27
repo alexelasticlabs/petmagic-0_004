@@ -286,7 +286,7 @@ public sealed class ExternalLoginCompletionStoreTests
         connection.Open();
         var services = new ServiceCollection();
         services.AddSingleton(connection);
-        services.AddDataProtection();
+        services.AddDataProtection().UseEphemeralDataProtectionProvider();
         services.AddDbContext<IdentityDbContext>(options =>
             options.UseSqlite(connection));
         var serviceProvider = services.BuildServiceProvider();
@@ -301,7 +301,7 @@ public sealed class ExternalLoginCompletionStoreTests
             Path.GetTempPath(),
             $"petmagic-external-auth-ticket-tests-{Guid.NewGuid():N}.db");
         var services = new ServiceCollection();
-        services.AddDataProtection();
+        services.AddDataProtection().UseEphemeralDataProtectionProvider();
         services.AddDbContext<IdentityDbContext>(options =>
             options.UseSqlite($"Data Source={databasePath};Default Timeout=30;Pooling=False"));
         var serviceProvider = services.BuildServiceProvider();

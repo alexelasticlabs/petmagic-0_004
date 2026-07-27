@@ -1,3 +1,6 @@
+using System.Net;
+using System.Security.Claims;
+
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
@@ -69,6 +72,46 @@ public sealed class IdentityAdminAuditLogTests
         Assert.Equal(eventId, persisted.Id);
         Assert.Equal(actorUserId, persisted.ActorUserId);
         Assert.Equal("support-assignment-test", persisted.CorrelationId);
+    }
+
+    [Fact]
+    public async Task WriteAsync_ShouldPreserveCapturedRequestContextDuringDelayedDelivery()
+    {
+        await using var dbContext = CreateDbContext();
+        var workerContext = new DefaultHttpContext
+        {
+            User = new ClaimsPrincipal(new ClaimsIdentity(
+                [new Claim(ClaimTypes.Role, "Worker")],
+                authenticationType: "test"))
+        };
+        workerContext.Connection.RemoteIpAddress = IPAddress.Loopback;
+        workerContext.Request.Headers.UserAgent = "BackgroundWorker/1.0";
+        var auditLog = new IdentityAdminAuditLog(
+            dbContext,
+            new HttpContextAccessor { HttpContext = workerContext });
+        var occurredAtUtc = new DateTime(2026, 7, 25, 1, 2, 3, DateTimeKind.Utc);
+
+        await auditLog.WriteAsync(
+            new AdminAuditEntry(
+                "admin.gamification.streak.reset",
+                "DailyStreak",
+                Guid.NewGuid().ToString("D"),
+                EventId: Guid.NewGuid(),
+                ActorUserId: Guid.NewGuid())
+            {
+                ActorRole = "Admin",
+                IpAddress = "203.0.113.12",
+                UserAgent = "PetMagicAdmin/1.0",
+                OccurredAtUtc = occurredAtUtc
+            },
+            CancellationToken.None);
+
+        var persisted = await dbContext.AuditEvents.SingleAsync();
+        Assert.Equal("Admin", persisted.ActorRole);
+        Assert.Equal("203.0.113.12", persisted.IpAddress);
+        Assert.Equal("PetMagicAdmin/1.0", persisted.UserAgent);
+        Assert.Equal(occurredAtUtc, persisted.OccurredAtUtc);
+        Assert.True(persisted.CreatedAtUtc >= occurredAtUtc);
     }
 
     private static IdentityDbContext CreateDbContext()

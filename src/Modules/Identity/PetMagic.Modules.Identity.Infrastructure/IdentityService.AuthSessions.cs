@@ -118,4 +118,29 @@ public sealed partial class IdentityService
 
         return Result.Success();
     }
+
+    public async Task<Result> LogoutByRefreshTokenAsync(
+        RefreshTokenCommand command,
+        CancellationToken cancellationToken)
+    {
+        var hash = HashToken(command.RefreshToken);
+        var session = await dbContext.RefreshTokenSessions
+            .Where(x => x.TokenHash == hash)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (session is null || session.RevokedAtUtc is not null)
+        {
+            return Result.Success();
+        }
+
+        session.RevokedAtUtc = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await WriteAuditAsync(
+            session.UserId,
+            "auth.logout.succeeded",
+            "User logged out and refresh token revoked.",
+            cancellationToken);
+
+        return Result.Success();
+    }
 }

@@ -94,6 +94,8 @@ public sealed class TemplatesApiStartupSmokeTests
             ("POST", "/api/admin/templates/media/upload"),
             ("GET", "/api/admin/templates/generations"),
             ("GET", "/api/admin/templates/generations/metrics"),
+            ("GET", "/api/admin/templates/generations/{generationId:guid}"),
+            ("POST", "/api/admin/templates/moderation/{eventId:guid}/handoff"),
             ("GET", "/api/admin/templates/monetization/watermark"),
             ("PUT", "/api/admin/templates/monetization/watermark"),
             ("POST", "/api/admin/templates/generations/{generationId:guid}/grant-clean-download"),
@@ -133,7 +135,10 @@ public sealed class TemplatesApiStartupSmokeTests
 
     [Theory]
     [InlineData("GET", "/api/admin/templates/categories/")]
+    [InlineData("GET", "/api/admin/templates/analytics")]
     [InlineData("GET", "/api/admin/templates/moderation")]
+    [InlineData("POST", "/api/admin/templates/moderation/{eventId:guid}/claim")]
+    [InlineData("POST", "/api/admin/templates/moderation/{eventId:guid}/release")]
     [InlineData("POST", "/api/admin/templates/moderation/{eventId:guid}/decision")]
     public async Task TemplatesModeratorReadAndModerationEndpoints_ShouldKeepModeratorPolicy(
         string method,
@@ -251,6 +256,46 @@ public sealed class TemplatesApiStartupSmokeTests
         await using var app = await TemplatesApiStartupTestApplication.CreateAsync();
 
         using var response = await app.Client.GetAsync(path);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("/api/admin/templates/analytics?templateType=gif")]
+    [InlineData("/api/admin/templates/analytics?status=visible")]
+    [InlineData("/api/admin/templates/analytics?access=paid")]
+    [InlineData("/api/admin/templates/analytics?sort=random")]
+    public async Task TemplatesAdminAnalyticsEndpoint_ShouldRejectInvalidFiltersBeforeServiceResolution(string path)
+    {
+        await using var app = await TemplatesApiStartupTestApplication.CreateAsync();
+
+        using var response = await app.Client.GetAsync(path);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task TemplatesAdminAnalyticsEndpoint_ShouldRejectMoreThanOneHundredTemplateIdsBeforeServiceResolution()
+    {
+        await using var app = await TemplatesApiStartupTestApplication.CreateAsync();
+        var query = string.Join(
+            "&",
+            Enumerable.Range(0, 101).Select(_ => $"templateIds={Guid.NewGuid():D}"));
+
+        using var response = await app.Client.GetAsync($"/api/admin/templates/analytics?{query}");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("templates.too_many_template_ids", body);
+    }
+
+    [Fact]
+    public async Task TemplatesAdminTemplateFeedbackEndpoint_ShouldRejectInvalidTypeBeforeServiceResolution()
+    {
+        await using var app = await TemplatesApiStartupTestApplication.CreateAsync();
+
+        using var response = await app.Client.GetAsync(
+            "/api/admin/templates/11111111-1111-1111-1111-111111111111/statistics/feedback?type=view");
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }

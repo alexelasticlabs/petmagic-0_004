@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Security;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Abstractions;
@@ -207,12 +208,12 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
 
         ValidateQueueConfiguration(options);
         ValidateProductionProviderConfiguration(options, services, environment, configuredStorageProvider, configuredAiProvider);
+        var resolvedSchedulerComponent = ResolveSchedulerComponent(schedulerComponent, options);
 
         services.AddSingleton(options);
         services.AddSingleton(mediaReadUrlSigningOptions);
         services.AddSingleton<ITemplateMediaReadUrlSigner, TemplateMediaReadUrlSigner>();
-        services.AddSingleton(new TemplateSchedulerConfigComponent(
-            ResolveSchedulerComponent(schedulerComponent, options)));
+        services.AddSingleton(new TemplateSchedulerConfigComponent(resolvedSchedulerComponent));
         services.AddSingleton<TemplateSchedulerConfigRuntimeState>();
         services.AddHostedService<TemplateSchedulerConfigStartupService>();
         services.AddSingleton<TemplateWatermarkSettingsStore>();
@@ -258,6 +259,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             serviceProvider.GetRequiredService<FcmTemplateGenerationPushNotificationSender>());
         services.AddScoped<ITemplateGenerationPushNotificationSender, TemplateGenerationPushNotificationOutbox>();
         services.AddScoped<TemplatePushOutboxProcessor>();
+        services.AddScoped<TemplateAdminAuditOutboxProcessor>();
         services.AddScoped<ITemplateMediaLifecycleService, TemplateMediaLifecycleService>();
         services.AddScoped<ITemplateVisibilityPolicy, TemplateVisibilityPolicy>();
         services.AddScoped<ITemplatesService, TemplatesService>();
@@ -282,11 +284,20 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
 
         if (options.FirebasePush.IsConfigured
             && string.Equals(
-                ResolveSchedulerComponent(schedulerComponent, options),
+                resolvedSchedulerComponent,
                 TemplateSchedulerConfigFingerprint.GenerationWorkerComponent,
                 StringComparison.Ordinal))
         {
             services.AddHostedService<TemplatePushOutboxWorker>();
+        }
+
+        if (string.Equals(
+                resolvedSchedulerComponent,
+                TemplateSchedulerConfigFingerprint.ApiComponent,
+                StringComparison.Ordinal)
+            && services.Any(descriptor => descriptor.ServiceType == typeof(IAdminAuditLog)))
+        {
+            services.AddHostedService<TemplateAdminAuditOutboxWorker>();
         }
 
         if (options.MediaCleanupWorkerEnabled)

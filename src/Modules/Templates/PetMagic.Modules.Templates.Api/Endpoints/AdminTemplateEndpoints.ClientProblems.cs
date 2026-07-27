@@ -41,7 +41,14 @@ public static partial class AdminTemplateEndpoints
                 or "templates.generation_cancel_retry_exhausted"
                 or "templates.generation_retry_not_allowed"
                 or "templates.generation_refund_not_pending"
+                or "templates.generation_refund_retry_not_exhausted"
+                or "templates.generation_refund_retry_idempotency_conflict"
                 or "templates.gamification_legacy_review_not_required"
+                or "templates.moderation_decision_conflict"
+                or "templates.moderation_lease_conflict"
+                or "templates.moderation_lease_required"
+                or "templates.moderation_lease_not_owned"
+                or "templates.moderation_item_not_pending"
                 or "templates.template_of_the_day_date_occupied"
                 or "templates.template_of_the_day_auto_mode_disabled" => StatusCodes.Status409Conflict,
             "ACTIVE_GENERATION_LIMIT_REACHED" => StatusCodes.Status429TooManyRequests,

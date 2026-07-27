@@ -1,6 +1,7 @@
 using System.Text.Json;
 
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -30,7 +31,8 @@ internal sealed partial class TemplateGenerationService(
     ITemplateVisibilityPolicy? visibilityPolicy = null,
     IDataProtectionProvider? dataProtectionProvider = null,
     IAdminAuditLog? adminAuditLog = null,
-    FalQueueClient? falQueueClient = null) : ITemplateGenerationService, ITemplateGenerationGamificationReconciliationService
+    FalQueueClient? falQueueClient = null,
+    IHttpContextAccessor? httpContextAccessor = null) : ITemplateGenerationService, ITemplateGenerationGamificationReconciliationService
 {
     private readonly ITemplateVisibilityPolicy _visibilityPolicy =
         visibilityPolicy ?? new TemplateVisibilityPolicy();

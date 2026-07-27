@@ -32,12 +32,22 @@ public static class AdminUserEndpoints
         group.MapGet("/dashboard/metrics", GetDashboardMetricsAsync);
         group.MapGet("/{userId:guid}", GetUserAsync);
         group.MapGet("/{userId:guid}/analytics", GetUserAnalyticsAsync);
+        group.MapGet("/{userId:guid}/sessions", GetUserSessionsAsync);
+        group.MapPost("/{userId:guid}/sessions/{sessionId:guid}/revoke", RevokeUserSessionAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminUserMutationRequestBodyBytes));
+        group.MapPost("/{userId:guid}/sessions/revoke-all", RevokeAllUserSessionsAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminUserMutationRequestBodyBytes));
         group.MapPost("/{userId:guid}/wallet", AdjustWalletAsync)
             .RequireAuthorization("AdminOnly")
             .WithMetadata(new RequestSizeLimitAttribute(MaxAdminUserMutationRequestBodyBytes));
         group.MapPost("/emails", SendBulkEmailAsync)
             .RequireAuthorization("AdminOnly")
             .WithMetadata(new RequestSizeLimitAttribute(MaxAdminBulkEmailRequestBodyBytes));
+        group.MapGet("/email-broadcasts", ListEmailBroadcastsAsync);
+        group.MapGet("/email-broadcasts/{broadcastId:guid}", GetEmailBroadcastAsync);
+        group.MapPost("/email-broadcasts/{broadcastId:guid}/retry-failed", RetryFailedEmailBroadcastAsync)
+            .RequireAuthorization("AdminOnly")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminUserMutationRequestBodyBytes));
         group.MapPut("/{userId:guid}/role", AssignRoleAsync)
             .RequireAuthorization("AdminOnly")
             .WithMetadata(new RequestSizeLimitAttribute(MaxAdminUserMutationRequestBodyBytes));
@@ -114,11 +124,17 @@ public static class AdminUserEndpoints
     private static async Task<Results<Ok<AdminUserWalletOperationResponse>, ValidationProblem, ProblemHttpResult>> AdjustWalletAsync(
         [FromRoute] Guid userId,
         [FromBody] AdjustWalletRequest request,
+        HttpContext httpContext,
         [FromServices] IValidator<AdminAdjustUserWalletCommand> validator,
         [FromServices] IIdentityService service,
         CancellationToken cancellationToken)
     {
-        var command = new AdminAdjustUserWalletCommand(userId, request.Operation, request.Amount, request.Reason);
+        var command = new AdminAdjustUserWalletCommand(
+            userId,
+            request.Operation,
+            request.Amount,
+            request.Reason,
+            NormalizeOptionalHeaderValue(httpContext.Request.Headers["Idempotency-Key"]));
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
@@ -132,6 +148,11 @@ public static class AdminUserEndpoints
         }
 
         return TypedResults.Ok(result.Value);
+    }
+
+    private static string? NormalizeOptionalHeaderValue(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 
     private static async Task<Results<Ok<AdminUserDetailResponse>, ProblemHttpResult>> GetUserAsync(
@@ -157,6 +178,88 @@ public static class AdminUserEndpoints
         if (result.IsFailure)
         {
             return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status404NotFound);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<AdminUserSessionsResponse>, ProblemHttpResult>> GetUserSessionsAsync(
+        [FromRoute] Guid userId,
+        [FromServices] IIdentityService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.GetAdminUserSessionsAsync(userId, cancellationToken);
+        if (result.IsFailure)
+        {
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<AdminUserSessionRevokeResponse>, ValidationProblem, ProblemHttpResult>> RevokeUserSessionAsync(
+        [FromRoute] Guid userId,
+        [FromRoute] Guid sessionId,
+        [FromBody] RevokeUserSessionsRequest request,
+        HttpContext httpContext,
+        [FromServices] IValidator<AdminRevokeUserSessionCommand> validator,
+        [FromServices] IIdentityService service,
+        CancellationToken cancellationToken)
+    {
+        if (!AuthEndpoints.TryGetUserId(httpContext, out var actorUserId, out var invalidSubjectProblem))
+        {
+            return invalidSubjectProblem!;
+        }
+
+        var command = new AdminRevokeUserSessionCommand(
+            actorUserId,
+            userId,
+            sessionId,
+            request.Reason,
+            NormalizeOptionalHeaderValue(httpContext.Request.Headers["Idempotency-Key"]));
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
+        }
+
+        var result = await service.RevokeAdminUserSessionAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<AdminUserSessionRevokeResponse>, ValidationProblem, ProblemHttpResult>> RevokeAllUserSessionsAsync(
+        [FromRoute] Guid userId,
+        [FromBody] RevokeUserSessionsRequest request,
+        HttpContext httpContext,
+        [FromServices] IValidator<AdminRevokeAllUserSessionsCommand> validator,
+        [FromServices] IIdentityService service,
+        CancellationToken cancellationToken)
+    {
+        if (!AuthEndpoints.TryGetUserId(httpContext, out var actorUserId, out var invalidSubjectProblem))
+        {
+            return invalidSubjectProblem!;
+        }
+
+        var command = new AdminRevokeAllUserSessionsCommand(
+            actorUserId,
+            userId,
+            request.Reason,
+            NormalizeOptionalHeaderValue(httpContext.Request.Headers["Idempotency-Key"]));
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToValidationCodeDictionary());
+        }
+
+        var result = await service.RevokeAllAdminUserSessionsAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.Ok(result.Value);
@@ -265,13 +368,19 @@ public static class AdminUserEndpoints
         return TypedResults.NoContent();
     }
 
-    private static async Task<Results<Accepted, ValidationProblem, ProblemHttpResult>> SendBulkEmailAsync(
+    private static async Task<Results<Accepted<AdminEmailBroadcastQueueResponse>, ValidationProblem, ProblemHttpResult>> SendBulkEmailAsync(
         [FromBody] SendBulkEmailRequest request,
+        HttpContext httpContext,
         [FromServices] IValidator<SendBulkEmailCommand> validator,
         [FromServices] IIdentityService service,
         CancellationToken cancellationToken)
     {
-        var command = new SendBulkEmailCommand(request.Audience, request.Subject, request.Body, request.UserIds);
+        var command = new SendBulkEmailCommand(
+            request.Audience,
+            request.Subject,
+            request.Body,
+            request.UserIds,
+            NormalizeOptionalHeaderValue(httpContext.Request.Headers["Idempotency-Key"]));
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
@@ -284,7 +393,60 @@ public static class AdminUserEndpoints
             return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
-        return TypedResults.Accepted((string?)null);
+        return TypedResults.Accepted(
+            $"/api/admin/users/email-broadcasts/{result.Value.BroadcastId:D}",
+            result.Value);
+    }
+
+    private static async Task<Results<Ok<AdminEmailBroadcastsPageResponse>, ProblemHttpResult>> ListEmailBroadcastsAsync(
+        [FromQuery] int skip,
+        [FromQuery] int take,
+        [FromQuery] string? status,
+        HttpContext httpContext,
+        [FromServices] IIdentityService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.ListAdminEmailBroadcastsAsync(skip, take, status, cancellationToken);
+        if (result.IsFailure)
+        {
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
+        }
+
+        httpContext.Response.Headers["X-Pagination-Skip"] = result.Value.Skip.ToString(CultureInfo.InvariantCulture);
+        httpContext.Response.Headers["X-Pagination-Take"] = result.Value.Take.ToString(CultureInfo.InvariantCulture);
+        httpContext.Response.Headers["X-Pagination-Has-More"] = result.Value.HasMore ? "true" : "false";
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<AdminEmailBroadcastDetailResponse>, ProblemHttpResult>> GetEmailBroadcastAsync(
+        [FromRoute] Guid broadcastId,
+        [FromServices] IIdentityService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.GetAdminEmailBroadcastAsync(broadcastId, cancellationToken);
+        if (result.IsFailure)
+        {
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status404NotFound);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Accepted<AdminEmailBroadcastRetryResponse>, ProblemHttpResult>> RetryFailedEmailBroadcastAsync(
+        [FromRoute] Guid broadcastId,
+        [FromServices] IIdentityService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.RetryFailedAdminEmailBroadcastAsync(broadcastId, cancellationToken);
+        if (result.IsFailure)
+        {
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status404NotFound);
+        }
+
+        return TypedResults.Accepted(
+            $"/api/admin/users/email-broadcasts/{result.Value.BroadcastId:D}",
+            result.Value);
     }
 
     private static string NormalizeSystemRole(string? role)
@@ -315,4 +477,6 @@ public static class AdminUserEndpoints
     public sealed record SendBulkEmailRequest(string Audience, string Subject, string Body, IReadOnlyList<Guid>? UserIds);
 
     public sealed record AdjustWalletRequest(string Operation, int Amount, string Reason);
+
+    public sealed record RevokeUserSessionsRequest(string Reason);
 }

@@ -48,6 +48,7 @@ public static class IdentityApiModule
         app.MapAuthEndpoints();
         app.MapLegalEndpoints();
         app.MapAdminUserEndpoints();
+        app.MapAdminAuditEndpoints();
         return app;
     }
 }

@@ -144,7 +144,10 @@ internal sealed partial class TemplatesService
         template.Category = categoryResult.Value.Name;
         template.Tags = SerializeTags(command.Tags);
         template.IsPremium = command.IsPremium;
-        template.IsQaOnly = command.IsQaOnly;
+        if (command.IsQaOnly.HasValue)
+        {
+            template.IsQaOnly = command.IsQaOnly.Value;
+        }
         template.TokenCost = command.TokenCost;
         template.SupportsGenerationResultInput = command.SupportsGenerationResultInput;
         template.RequiredInputMediaType = ParseInputMediaType(command.RequiredInputMediaType);
@@ -428,7 +431,10 @@ internal sealed partial class TemplatesService
         template.Category = categoryResult.Value.Name;
         template.Tags = SerializeTags(command.Tags);
         template.IsPremium = command.IsPremium;
-        template.IsQaOnly = command.IsQaOnly;
+        if (command.IsQaOnly.HasValue)
+        {
+            template.IsQaOnly = command.IsQaOnly.Value;
+        }
         template.TokenCost = command.TokenCost;
         template.SupportsGenerationResultInput = command.SupportsGenerationResultInput;
         template.RequiredInputMediaType = ParseInputMediaType(command.RequiredInputMediaType);

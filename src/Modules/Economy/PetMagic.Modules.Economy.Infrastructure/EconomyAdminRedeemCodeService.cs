@@ -1,7 +1,9 @@
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 using Microsoft.EntityFrameworkCore;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Contracts;
 using PetMagic.Modules.Economy.Domain.Enums;
@@ -10,9 +12,13 @@ using PetMagic.Modules.Economy.Infrastructure.Entities;
 
 namespace PetMagic.Modules.Economy.Infrastructure;
 
-internal sealed partial class EconomyAdminRedeemCodeService(EconomyDbContext dbContext)
+internal sealed partial class EconomyAdminRedeemCodeService(
+    EconomyDbContext dbContext,
+    EconomyAdminAuditOutbox? auditOutbox = null)
 {
     private const int AdminRedeemCodeRedemptionsPreviewLimit = 5;
+
+    private readonly EconomyAdminAuditOutbox _auditOutbox = auditOutbox ?? new EconomyAdminAuditOutbox(dbContext);
 
     public async Task<Result<OffsetPagedResponse<AdminRedeemCodeResponse>>> ListAdminRedeemCodesAsync(
         AdminRedeemCodeListQuery query,
@@ -330,7 +336,17 @@ internal sealed partial class EconomyAdminRedeemCodeService(EconomyDbContext dbC
         };
 
         dbContext.RedeemCodes.Add(code);
+        var pendingAudit = _auditOutbox.Enqueue(new AdminAuditEntry(
+            "admin.economy.redeem_code.created",
+            "redeem_code",
+            code.Id.ToString("D"),
+            null,
+            DescribeRedeemCode(code),
+            "Redeem code created."));
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await _auditOutbox.TryDeliverAsync(pendingAudit, cancellationToken);
+
         return Result.Success(ToAdminRedeemCodeResponse(code, []));
     }
 
@@ -374,6 +390,7 @@ internal sealed partial class EconomyAdminRedeemCodeService(EconomyDbContext dbC
             return Result.Failure<AdminRedeemCodeResponse>(EconomyErrors.RedeemCodeRewardUnsupported);
         }
 
+        var oldValue = DescribeRedeemCode(code);
         code.Description = command.Description.Trim();
         code.CampaignName = NullIfWhiteSpace(command.CampaignName);
         code.CampaignChannel = NullIfWhiteSpace(command.CampaignChannel);
@@ -388,7 +405,17 @@ internal sealed partial class EconomyAdminRedeemCodeService(EconomyDbContext dbC
         code.ExpiresAtUtc = command.ExpiresAtUtc;
         code.UpdatedAtUtc = DateTime.UtcNow;
 
+        var pendingAudit = _auditOutbox.Enqueue(new AdminAuditEntry(
+            "admin.economy.redeem_code.updated",
+            "redeem_code",
+            code.Id.ToString("D"),
+            oldValue,
+            DescribeRedeemCode(code),
+            "Redeem code updated."));
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await _auditOutbox.TryDeliverAsync(pendingAudit, cancellationToken);
+
         var redemptions = await dbContext.RedeemCodeRedemptions
             .AsNoTracking()
             .Where(x => x.RedeemCodeId == code.Id)
@@ -648,6 +675,26 @@ internal sealed partial class EconomyAdminRedeemCodeService(EconomyDbContext dbC
         }
 
         return Math.Min(take, max);
+    }
+
+    private static string DescribeRedeemCode(RedeemCode code)
+    {
+        return JsonSerializer.Serialize(new
+        {
+            DescriptionConfigured = !string.IsNullOrWhiteSpace(code.Description),
+            CampaignNameConfigured = !string.IsNullOrWhiteSpace(code.CampaignName),
+            CampaignChannelConfigured = !string.IsNullOrWhiteSpace(code.CampaignChannel),
+            code.MinimumSuccessfulPurchases,
+            CreatedByConfigured = !string.IsNullOrWhiteSpace(code.CreatedBy),
+            code.RewardKind,
+            code.RewardValue,
+            code.MaxRedemptions,
+            code.MaxRedemptionsPerUser,
+            code.RedeemedCount,
+            code.IsActive,
+            code.StartsAtUtc,
+            code.ExpiresAtUtc,
+        });
     }
 
     private static string NormalizeRedeemCode(string rawCode)

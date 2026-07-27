@@ -13,6 +13,7 @@ using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain;
 using PetMagic.Modules.Templates.Infrastructure;
 using PetMagic.Modules.Templates.Infrastructure.Data;
+using PetMagic.Modules.Templates.Infrastructure.Entities;
 
 namespace PetMagic.Modules.Identity.Tests.Templates;
 
@@ -100,6 +101,75 @@ public sealed partial class TemplatesServiceTests
         Assert.Equal(-1, metadata.RootElement.GetProperty("rating").GetInt32());
         Assert.Equal(generation.Id, metadata.RootElement.GetProperty("generationId").GetGuid());
         Assert.Equal("ios", metadata.RootElement.GetProperty("platform").GetString());
+    }
+
+    [Fact]
+    public async Task SubmitFeedbackAsync_ShouldPreserveFeedbackMetadataWhileBoundingAnalyticsFields()
+    {
+        await using var dbContext = CreateDbContext();
+        var templateService = CreateService(dbContext);
+        var userId = Guid.NewGuid();
+        var generation = await CreateCompletedImageGenerationAsync(dbContext, templateService, userId);
+        var feedbackService = CreateFeedbackService(dbContext);
+        var sourceScreen = new string('s', 80);
+        var locale = new string('l', 16);
+
+        var submitted = await feedbackService.SubmitAsync(
+            new SubmitFeedbackCommand(
+                userId,
+                "GenerationResult",
+                "quality",
+                -1,
+                "Bad quality",
+                generation.Id,
+                null,
+                null,
+                sourceScreen,
+                "1.2.3",
+                "ios",
+                "iPhone",
+                locale),
+            CancellationToken.None);
+
+        Assert.True(submitted.IsSuccess);
+
+        var persistedFeedback = await dbContext.TemplateGenerationFeedback
+            .SingleAsync(x => x.Id == submitted.Value.FeedbackId);
+        var analytics = await dbContext.TemplateAnalyticsEvents.SingleAsync();
+
+        Assert.Equal(sourceScreen, persistedFeedback.SourceScreen);
+        Assert.Equal(locale, persistedFeedback.Locale);
+        Assert.Equal(sourceScreen[..64], analytics.Source);
+        Assert.Equal(locale[..8], analytics.CountryCode);
+    }
+
+    [Fact]
+    public async Task SubmitFeedbackAsync_ShouldRejectUnknownTemplateTarget()
+    {
+        await using var dbContext = CreateDbContext();
+        var feedbackService = CreateFeedbackService(dbContext);
+
+        var submitted = await feedbackService.SubmitAsync(
+            new SubmitFeedbackCommand(
+                Guid.NewGuid(),
+                "General",
+                "general",
+                null,
+                null,
+                null,
+                Guid.NewGuid(),
+                null,
+                "settings",
+                "1.2.3",
+                "ios",
+                "iPhone",
+                "en"),
+            CancellationToken.None);
+
+        Assert.True(submitted.IsFailure);
+        Assert.Equal(TemplatesErrors.FeedbackNotFound.Code, submitted.Error.Code);
+        Assert.Empty(await dbContext.TemplateGenerationFeedback.ToListAsync());
+        Assert.Empty(await dbContext.TemplateAnalyticsEvents.ToListAsync());
     }
 
     [Fact]
@@ -359,6 +429,8 @@ public sealed partial class TemplatesServiceTests
         Assert.Equal(userId, credit.UserId);
         Assert.Equal(7, credit.Amount);
         Assert.Equal(WalletLedgerSource.GenerationRefund, credit.Source);
+        Assert.Equal($"generation_refund:{generation.Id:N}", credit.IdempotencyKey);
+        Assert.Equal([$"feedback_refund:{submitted.Value.FeedbackId:N}"], credit.PreviousIdempotencyKeys);
 
         var persistedRefund = await dbContext.CreditRefunds.SingleAsync();
         Assert.Equal(submitted.Value.FeedbackId, persistedRefund.FeedbackId);
@@ -386,7 +458,57 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
-    public async Task RefundCreditsAsync_ShouldUseDefaultReason_WhenReasonIsBlank()
+    public async Task RefundCreditsAsync_WhenIntentPersistenceFailsOnce_ShouldRetryBeforeCrediting()
+    {
+        var persistenceFailure = new OneShotConcurrencyInterceptor();
+        await using var dbContext = CreateDbContext(persistenceFailure);
+        var templateService = CreateService(dbContext);
+        var userId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        var generation = await CreateCompletedImageGenerationAsync(dbContext, templateService, userId);
+        generation.ChargedAtUtc = DateTime.UtcNow.AddMinutes(-5);
+        generation.TokenCost = 20;
+        await dbContext.SaveChangesAsync();
+        var auditLog = new RecordingAdminAuditLog();
+        var feedbackService = CreateFeedbackService(dbContext, out var economyProxy, auditLog);
+        var submitted = await feedbackService.SubmitAsync(
+            new SubmitFeedbackCommand(
+                userId,
+                "BugReport",
+                "quality",
+                -1,
+                "Bad quality",
+                generation.Id,
+                null,
+                null,
+                "result",
+                "1.2.3",
+                "ios",
+                "iPhone",
+                "en-US"),
+            CancellationToken.None);
+        Assert.True(submitted.IsSuccess);
+
+        persistenceFailure.Enabled = true;
+        var refunded = await feedbackService.RefundCreditsAsync(
+            new RefundFeedbackCreditsCommand(submitted.Value.FeedbackId, adminId, 7, "admin approved"),
+            CancellationToken.None);
+
+        Assert.True(refunded.IsSuccess);
+        Assert.Equal(1, persistenceFailure.ThrowCount);
+        Assert.Single(economyProxy.CreditCommands);
+        var persistedRefund = await dbContext.CreditRefunds.SingleAsync();
+        Assert.Equal(submitted.Value.FeedbackId, persistedRefund.FeedbackId);
+        Assert.Equal(generation.Id, persistedRefund.GenerationId);
+        var persistedFeedback = await dbContext.TemplateGenerationFeedback.SingleAsync();
+        Assert.Equal("Resolved", persistedFeedback.Status);
+        var persistedGeneration = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == generation.Id);
+        Assert.NotNull(persistedGeneration.RefundedAtUtc);
+        Assert.Single(auditLog.Entries);
+    }
+
+    [Fact]
+    public async Task RefundCreditsAsync_ShouldUseFallbackReasonWhenReasonIsBlank()
     {
         await using var dbContext = CreateDbContext();
         var templateService = CreateService(dbContext);
@@ -425,6 +547,247 @@ public sealed partial class TemplatesServiceTests
         Assert.Equal(expectedReason, refunded.Value.Reason);
         Assert.Equal(expectedReason, Assert.Single(economyProxy.CreditCommands).Reason);
         Assert.Equal(expectedReason, (await dbContext.CreditRefunds.SingleAsync()).Reason);
+    }
+
+    [Fact]
+    public async Task RefundCreditsAsync_ShouldCompleteMarkerWhenGenerationCreditWasAlreadyIssued()
+    {
+        await using var dbContext = CreateDbContext();
+        var templateService = CreateService(dbContext);
+        var userId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        var generation = await CreateCompletedImageGenerationAsync(dbContext, templateService, userId);
+        generation.ChargedAtUtc = DateTime.UtcNow.AddMinutes(-5);
+        generation.TokenCost = 20;
+        await dbContext.SaveChangesAsync();
+        var feedbackService = CreateFeedbackService(dbContext, out var economyProxy);
+        economyProxy.ReturnIdempotentCreditReplay = true;
+        var submitted = await feedbackService.SubmitAsync(
+            new SubmitFeedbackCommand(
+                userId,
+                "GenerationFailure",
+                "provider_failed",
+                -1,
+                "Generation failed",
+                generation.Id,
+                null,
+                null,
+                "result",
+                "1.2.3",
+                "ios",
+                "iPhone",
+                "en-US"),
+            CancellationToken.None);
+        Assert.True(submitted.IsSuccess);
+
+        var refund = await feedbackService.RefundCreditsAsync(
+            new RefundFeedbackCreditsCommand(submitted.Value.FeedbackId, adminId, null, "worker already refunded"),
+            CancellationToken.None);
+
+        Assert.True(refund.IsSuccess);
+        Assert.Single(economyProxy.CreditCommands);
+        var persistedRefund = await dbContext.CreditRefunds.SingleAsync();
+        Assert.Equal("Completed", persistedRefund.SettlementStatus);
+
+        var persistedGeneration = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .SingleAsync(x => x.Id == generation.Id);
+        var persistedFeedback = await dbContext.TemplateGenerationFeedback
+            .AsNoTracking()
+            .SingleAsync(x => x.Id == submitted.Value.FeedbackId);
+        Assert.NotNull(persistedGeneration.RefundedAtUtc);
+        Assert.Equal("Resolved", persistedFeedback.Status);
+    }
+
+    [Fact]
+    public async Task RefundCreditsAsync_ShouldResumePersistedIntentAfterCreditWasCommittedBeforeMarker()
+    {
+        await using var dbContext = CreateDbContext();
+        var templateService = CreateService(dbContext);
+        var userId = Guid.NewGuid();
+        var originalAdminId = Guid.NewGuid();
+        var retryingAdminId = Guid.NewGuid();
+        var generation = await CreateCompletedImageGenerationAsync(dbContext, templateService, userId);
+        generation.ChargedAtUtc = DateTime.UtcNow.AddMinutes(-5);
+        generation.TokenCost = 20;
+        await dbContext.SaveChangesAsync();
+        var feedbackService = CreateFeedbackService(dbContext, out var economyProxy);
+        var submitted = await feedbackService.SubmitAsync(
+            new SubmitFeedbackCommand(
+                userId,
+                "GenerationFailure",
+                "provider_failed",
+                -1,
+                "Generation failed",
+                generation.Id,
+                null,
+                null,
+                "result",
+                "1.2.3",
+                "ios",
+                "iPhone",
+                "en-US"),
+            CancellationToken.None);
+        Assert.True(submitted.IsSuccess);
+
+        dbContext.CreditRefunds.Add(new CreditRefund
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            FeedbackId = submitted.Value.FeedbackId,
+            GenerationId = generation.Id,
+            Amount = 7,
+            Reason = "original refund reason",
+            AdminId = originalAdminId,
+            CreatedAtUtc = DateTime.UtcNow.AddSeconds(-10),
+            SettlementStatus = "Pending"
+        });
+        await dbContext.SaveChangesAsync();
+        economyProxy.ReturnIdempotentCreditReplay = true;
+
+        var pendingDetails = await feedbackService.GetAdminAsync(submitted.Value.FeedbackId, CancellationToken.None);
+        Assert.True(pendingDetails.IsSuccess);
+        Assert.True(pendingDetails.Value.CanRefund);
+        Assert.Null(pendingDetails.Value.Refund);
+
+        var resumed = await feedbackService.RefundCreditsAsync(
+            new RefundFeedbackCreditsCommand(submitted.Value.FeedbackId, retryingAdminId, 20, "different retry reason"),
+            CancellationToken.None);
+
+        Assert.True(resumed.IsSuccess);
+        Assert.Equal(7, resumed.Value.Amount);
+        Assert.Equal(originalAdminId, resumed.Value.AdminId);
+        var credit = Assert.Single(economyProxy.CreditCommands);
+        Assert.Equal(7, credit.Amount);
+        Assert.Equal("original refund reason", credit.Reason);
+        var persistedRefund = await dbContext.CreditRefunds.SingleAsync();
+        Assert.Equal("Completed", persistedRefund.SettlementStatus);
+        var persistedGeneration = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == generation.Id);
+        Assert.NotNull(persistedGeneration.RefundedAtUtc);
+    }
+
+    [Fact]
+    public async Task RefundCreditsAsync_ShouldRejectAutoRefundedGeneration_AndKeepDetailsConsistent()
+    {
+        await using var dbContext = CreateDbContext();
+        var templateService = CreateService(dbContext);
+        var userId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        var generation = await CreateCompletedImageGenerationAsync(dbContext, templateService, userId);
+        generation.ChargedAtUtc = DateTime.UtcNow.AddMinutes(-5);
+        generation.RefundedAtUtc = DateTime.UtcNow.AddMinutes(-1);
+        generation.TokenCost = 20;
+        await dbContext.SaveChangesAsync();
+        var feedbackService = CreateFeedbackService(dbContext, out var economyProxy);
+        var submitted = await feedbackService.SubmitAsync(
+            new SubmitFeedbackCommand(
+                userId,
+                "GenerationFailure",
+                "provider_failed",
+                -1,
+                "Generation failed",
+                generation.Id,
+                null,
+                null,
+                "result",
+                "1.2.3",
+                "ios",
+                "iPhone",
+                "en-US"),
+            CancellationToken.None);
+        Assert.True(submitted.IsSuccess);
+
+        var details = await feedbackService.GetAdminAsync(submitted.Value.FeedbackId, CancellationToken.None);
+        var refund = await feedbackService.RefundCreditsAsync(
+            new RefundFeedbackCreditsCommand(submitted.Value.FeedbackId, adminId, null, "retry"),
+            CancellationToken.None);
+
+        Assert.True(details.IsSuccess);
+        Assert.False(details.Value.CanRefund);
+        Assert.Null(details.Value.Refund);
+        Assert.Equal(TemplatesErrors.FeedbackRefundAlreadyIssued.Code, details.Value.RefundUnavailableReason);
+        Assert.True(refund.IsFailure);
+        Assert.Equal(TemplatesErrors.FeedbackRefundAlreadyIssued.Code, refund.Error.Code);
+        Assert.Empty(economyProxy.CreditCommands);
+        Assert.Empty(await dbContext.CreditRefunds.ToListAsync());
+    }
+
+    [Fact]
+    public async Task RefundCreditsAsync_ShouldRejectRefundAlreadyIssuedForAnotherFeedbackOnGeneration()
+    {
+        await using var dbContext = CreateDbContext();
+        var templateService = CreateService(dbContext);
+        var userId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        var generation = await CreateCompletedImageGenerationAsync(dbContext, templateService, userId);
+        generation.ChargedAtUtc = DateTime.UtcNow.AddMinutes(-5);
+        generation.TokenCost = 20;
+        await dbContext.SaveChangesAsync();
+        var feedbackService = CreateFeedbackService(dbContext, out var economyProxy);
+        var firstFeedback = await feedbackService.SubmitAsync(
+            new SubmitFeedbackCommand(
+                userId,
+                "GenerationResult",
+                "quality",
+                -1,
+                "Poor result",
+                generation.Id,
+                null,
+                null,
+                "result",
+                "1.2.3",
+                "ios",
+                "iPhone",
+                "en-US"),
+            CancellationToken.None);
+        var secondFeedback = await feedbackService.SubmitAsync(
+            new SubmitFeedbackCommand(
+                userId,
+                "GenerationFailure",
+                "provider_failed",
+                -1,
+                "Generation failed",
+                generation.Id,
+                null,
+                null,
+                "result",
+                "1.2.3",
+                "ios",
+                "iPhone",
+                "en-US"),
+            CancellationToken.None);
+        Assert.True(firstFeedback.IsSuccess);
+        Assert.True(secondFeedback.IsSuccess);
+
+        var issuedAtUtc = DateTime.UtcNow.AddMinutes(-1);
+        dbContext.CreditRefunds.Add(new CreditRefund
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            FeedbackId = firstFeedback.Value.FeedbackId,
+            GenerationId = generation.Id,
+            Amount = 20,
+            Reason = "generation_refund:already-issued",
+            AdminId = adminId,
+            CreatedAtUtc = issuedAtUtc
+        });
+        await dbContext.SaveChangesAsync();
+
+        var details = await feedbackService.GetAdminAsync(secondFeedback.Value.FeedbackId, CancellationToken.None);
+        var refund = await feedbackService.RefundCreditsAsync(
+            new RefundFeedbackCreditsCommand(secondFeedback.Value.FeedbackId, adminId, null, "duplicate"),
+            CancellationToken.None);
+
+        Assert.True(details.IsSuccess);
+        Assert.False(details.Value.CanRefund);
+        Assert.Equal(TemplatesErrors.FeedbackRefundAlreadyIssued.Code, details.Value.RefundUnavailableReason);
+        Assert.NotNull(details.Value.Refund);
+        Assert.Equal(firstFeedback.Value.FeedbackId, details.Value.Refund!.FeedbackId);
+        Assert.Equal(generation.Id, details.Value.Refund.GenerationId);
+        Assert.True(refund.IsFailure);
+        Assert.Equal(TemplatesErrors.FeedbackRefundAlreadyIssued.Code, refund.Error.Code);
+        Assert.Empty(economyProxy.CreditCommands);
+        Assert.Single(await dbContext.CreditRefunds.ToListAsync());
     }
 
     [Fact]
@@ -584,6 +947,49 @@ public sealed partial class TemplatesServiceTests
         Assert.Equal(userId, audit.SubjectUserId);
     }
 
+    [Fact]
+    public async Task UpdateAdminAsync_WhenPayloadMatchesPersistedValues_ShouldNotWriteDuplicateAudit()
+    {
+        await using var dbContext = CreateDbContext();
+        var templateService = CreateService(dbContext);
+        var userId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        var generation = await CreateCompletedImageGenerationAsync(dbContext, templateService, userId);
+        var auditLog = new RecordingAdminAuditLog();
+        var feedbackService = CreateFeedbackService(dbContext, out _, auditLog);
+        var submitted = await feedbackService.SubmitAsync(
+            new SubmitFeedbackCommand(
+                userId,
+                "BugReport",
+                "quality",
+                -1,
+                "Bad quality",
+                generation.Id,
+                null,
+                null,
+                "result",
+                "1.2.3",
+                "ios",
+                "iPhone",
+                "en-US"),
+            CancellationToken.None);
+
+        Assert.True(submitted.IsSuccess);
+
+        var firstUpdate = await feedbackService.UpdateAdminAsync(
+            new UpdateFeedbackAdminCommand(submitted.Value.FeedbackId, adminId, "Resolved", "High", "Handled"),
+            CancellationToken.None);
+        Assert.True(firstUpdate.IsSuccess);
+        var reviewedAtUtc = firstUpdate.Value.ReviewedAtUtc;
+        var duplicateUpdate = await feedbackService.UpdateAdminAsync(
+            new UpdateFeedbackAdminCommand(submitted.Value.FeedbackId, adminId, "Resolved", "High", "Handled"),
+            CancellationToken.None);
+
+        Assert.True(duplicateUpdate.IsSuccess);
+        Assert.Equal(reviewedAtUtc, duplicateUpdate.Value.ReviewedAtUtc);
+        Assert.Single(auditLog.Entries);
+    }
+
     private static FeedbackService CreateFeedbackService(TemplatesDbContext dbContext)
     {
         return CreateFeedbackService(dbContext, out _);
@@ -630,6 +1036,8 @@ public sealed partial class TemplatesServiceTests
     {
         public List<CreditBalanceCommand> CreditCommands { get; } = [];
 
+        public bool ReturnIdempotentCreditReplay { get; set; }
+
         public static IEconomyService Create(out RecordingEconomyServiceProxy proxy)
         {
             var service = Create<IEconomyService, RecordingEconomyServiceProxy>();
@@ -645,7 +1053,7 @@ public sealed partial class TemplatesServiceTests
                 CreditCommands.Add(command);
                 return Task.FromResult(Result.Success(new WalletOperationResponse(
                     command.UserId,
-                    command.Amount,
+                    ReturnIdempotentCreditReplay ? 0 : command.Amount,
                     command.Amount,
                     command.Source,
                     DateTime.UtcNow,

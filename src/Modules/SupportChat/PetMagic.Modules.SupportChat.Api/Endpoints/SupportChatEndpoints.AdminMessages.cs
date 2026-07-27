@@ -25,12 +25,21 @@ public static partial class SupportChatEndpoints
             return unauthorized!;
         }
 
+        var idempotencyValidationErrors = ValidateOptionalSupportMessageIdempotencyKey(
+            httpContext.Request,
+            out var idempotencyKey);
+        if (idempotencyValidationErrors.Count > 0)
+        {
+            return TypedResults.ValidationProblem(idempotencyValidationErrors);
+        }
+
         var command = new SendSupportMessageCommand(
             conversationId,
             userId,
             request.Body,
             IsAdmin: true,
-            ReplyToMessageId: request.ReplyToMessageId);
+            ReplyToMessageId: request.ReplyToMessageId,
+            IdempotencyKey: idempotencyKey);
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {

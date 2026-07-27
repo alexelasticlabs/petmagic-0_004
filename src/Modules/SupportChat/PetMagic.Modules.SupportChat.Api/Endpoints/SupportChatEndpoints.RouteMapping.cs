@@ -124,12 +124,24 @@ public static partial class SupportChatEndpoints
         adminGroup.MapPost("/tickets/{conversationId:guid}/read", MarkAdminReadAsync)
             .WithMetadata(new RequestSizeLimitAttribute(MaxSupportJsonRequestBodyBytes));
         adminGroup.MapGet("/templates", ListReplyTemplatesAsync);
+        adminGroup.MapGet("/templates/{templateId:guid}/versions", ListReplyTemplateVersionsAsync);
         adminGroup.MapPost("/templates", CreateReplyTemplateAsync)
-            .WithMetadata(new RequestSizeLimitAttribute(MaxSupportJsonRequestBodyBytes));
+            .WithMetadata(new RequestSizeLimitAttribute(MaxSupportJsonRequestBodyBytes))
+            .RequireAuthorization("AdminOnly");
         adminGroup.MapPut("/templates/{templateId:guid}", UpdateReplyTemplateAsync)
-            .WithMetadata(new RequestSizeLimitAttribute(MaxSupportJsonRequestBodyBytes));
+            .WithMetadata(new RequestSizeLimitAttribute(MaxSupportJsonRequestBodyBytes))
+            .RequireAuthorization("AdminOnly");
         adminGroup.MapDelete("/templates/{templateId:guid}", DeleteReplyTemplateAsync)
-            .WithMetadata(new RequestSizeLimitAttribute(MaxSupportJsonRequestBodyBytes));
+            .WithMetadata(new RequestSizeLimitAttribute(MaxSupportJsonRequestBodyBytes))
+            .RequireAuthorization("AdminOnly");
+
+        var adminUserSupportGroup = endpoints.MapGroup("/api/admin/users/{userId:guid}/support")
+            .WithTags("Admin Users")
+            .RequireRateLimiting("admin")
+            .AddEndpointFilter(ApplyPrivateSupportResponseHeadersAsync)
+            .RequireAuthorization("AdminOnly");
+
+        adminUserSupportGroup.MapGet("/tickets", ListAdminUserTicketsAsync);
 
         return adminGroup;
     }

@@ -583,6 +583,7 @@ public sealed partial class EconomyServiceTests
         public Task<Result<IReadOnlyList<LinkedAccountResponse>>> UnlinkExternalLoginAsync(Guid userId, string provider, CancellationToken cancellationToken) => NotSupported<IReadOnlyList<LinkedAccountResponse>>();
         public Task<Result<TokenPairResponse>> RefreshAsync(RefreshTokenCommand command, CancellationToken cancellationToken) => NotSupported<TokenPairResponse>();
         public Task<Result> LogoutAsync(LogoutCommand command, CancellationToken cancellationToken) => NotSupported();
+        public Task<Result> LogoutByRefreshTokenAsync(RefreshTokenCommand command, CancellationToken cancellationToken) => NotSupported();
         public Task<Result> DeleteCurrentUserAsync(DeleteCurrentUserCommand command, CancellationToken cancellationToken) => NotSupported();
 
         public Task<Result<UserProfileResponse>> GetCurrentUserAsync(Guid userId, CancellationToken cancellationToken)
@@ -616,8 +617,14 @@ public sealed partial class EconomyServiceTests
         public Task<Result<AdminUserDashboardMetricsResponse>> GetAdminUserDashboardMetricsAsync(CancellationToken cancellationToken) => NotSupported<AdminUserDashboardMetricsResponse>();
         public Task<Result<AdminUserDetailResponse>> GetAdminUserAsync(Guid userId, CancellationToken cancellationToken) => NotSupported<AdminUserDetailResponse>();
         public Task<Result<AdminUserAnalyticsResponse>> GetAdminUserAnalyticsAsync(Guid userId, CancellationToken cancellationToken) => NotSupported<AdminUserAnalyticsResponse>();
+        public Task<Result<AdminUserSessionsResponse>> GetAdminUserSessionsAsync(Guid userId, CancellationToken cancellationToken) => NotSupported<AdminUserSessionsResponse>();
+        public Task<Result<AdminUserSessionRevokeResponse>> RevokeAdminUserSessionAsync(AdminRevokeUserSessionCommand command, CancellationToken cancellationToken) => NotSupported<AdminUserSessionRevokeResponse>();
+        public Task<Result<AdminUserSessionRevokeResponse>> RevokeAllAdminUserSessionsAsync(AdminRevokeAllUserSessionsCommand command, CancellationToken cancellationToken) => NotSupported<AdminUserSessionRevokeResponse>();
         public Task<Result<AdminUserWalletOperationResponse>> AdjustAdminUserWalletAsync(AdminAdjustUserWalletCommand command, CancellationToken cancellationToken) => NotSupported<AdminUserWalletOperationResponse>();
-        public Task<Result> SendBulkEmailAsync(SendBulkEmailCommand command, CancellationToken cancellationToken) => NotSupported();
+        public Task<Result<AdminEmailBroadcastQueueResponse>> SendBulkEmailAsync(SendBulkEmailCommand command, CancellationToken cancellationToken) => NotSupported<AdminEmailBroadcastQueueResponse>();
+        public Task<Result<AdminEmailBroadcastsPageResponse>> ListAdminEmailBroadcastsAsync(int skip, int take, string? status, CancellationToken cancellationToken) => NotSupported<AdminEmailBroadcastsPageResponse>();
+        public Task<Result<AdminEmailBroadcastDetailResponse>> GetAdminEmailBroadcastAsync(Guid broadcastId, CancellationToken cancellationToken) => NotSupported<AdminEmailBroadcastDetailResponse>();
+        public Task<Result<AdminEmailBroadcastRetryResponse>> RetryFailedAdminEmailBroadcastAsync(Guid broadcastId, CancellationToken cancellationToken) => NotSupported<AdminEmailBroadcastRetryResponse>();
         public Task<Result> AssignRoleAsync(AssignRoleCommand command, CancellationToken cancellationToken) => NotSupported();
         public Task<Result> RevokeRoleAsync(RevokeRoleCommand command, CancellationToken cancellationToken) => NotSupported();
 

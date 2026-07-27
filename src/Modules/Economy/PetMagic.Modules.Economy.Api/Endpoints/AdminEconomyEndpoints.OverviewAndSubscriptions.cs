@@ -30,10 +30,19 @@ public static partial class AdminEconomyEndpoints
     }
 
     private static async Task<Results<Ok<AdminEconomyDashboardMetricsResponse>, ProblemHttpResult>> GetDashboardMetricsAsync(
+        [FromQuery] int? periodDays,
         [FromServices] IEconomyAdminService service,
         CancellationToken cancellationToken)
     {
-        var result = await service.GetAdminDashboardMetricsAsync(cancellationToken);
+        var invalidPeriodProblem = ValidateDashboardPeriodDays(periodDays);
+        if (invalidPeriodProblem is not null)
+        {
+            return invalidPeriodProblem;
+        }
+
+        var result = periodDays.HasValue
+            ? await service.GetAdminDashboardMetricsAsync(periodDays.Value, cancellationToken)
+            : await service.GetAdminDashboardMetricsAsync(cancellationToken);
         if (result.IsFailure)
         {
             return ToAdminEconomyProblem(result.Error, StatusCodes.Status400BadRequest);
@@ -63,6 +72,20 @@ public static partial class AdminEconomyEndpoints
         if (result.IsFailure)
         {
             return ToAdminEconomyProblem(result.Error, StatusCodes.Status400BadRequest);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<AdminPurchaseDetailResponse>, ProblemHttpResult>> GetPurchaseAsync(
+        [FromRoute] Guid orderId,
+        [FromServices] IEconomyAdminService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.GetAdminPurchaseAsync(orderId, cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToAdminEconomyProblem(result.Error, StatusCodes.Status404NotFound);
         }
 
         return TypedResults.Ok(result.Value);
@@ -115,7 +138,8 @@ public static partial class AdminEconomyEndpoints
     {
         var command = new AdminRevokePremiumSubscriptionCommand(
             userId,
-            string.IsNullOrWhiteSpace(request?.PaymentProvider) ? "stripe" : request.PaymentProvider);
+            string.IsNullOrWhiteSpace(request?.PaymentProvider) ? "stripe" : request.PaymentProvider,
+            request?.Reason);
 
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
@@ -420,7 +444,7 @@ public static partial class AdminEconomyEndpoints
         string? StripePriceId,
         int DisplayOrder);
 
-    public sealed record AdminRevokePremiumRequest(string? PaymentProvider);
+    public sealed record AdminRevokePremiumRequest(string? PaymentProvider, string? Reason = null);
 
     public sealed record AdminRefundPurchaseRequest(string? Reason);
 

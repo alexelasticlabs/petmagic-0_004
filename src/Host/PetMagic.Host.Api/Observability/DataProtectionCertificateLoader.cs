@@ -24,7 +24,7 @@ public static class DataProtectionCertificateLoader
                 var existingCertificate = X509CertificateLoader.LoadPkcs12FromFile(
                     certificatePath,
                     certificatePassword,
-                    X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
+                    X509KeyStorageFlags.Exportable | X509KeyStorageFlags.EphemeralKeySet);
                 logger?.LogInformation(
                     "Development Data Protection certificate loaded. CertificateFileName={CertificateFileName} CertificatePathHash={CertificatePathHash} ApplicationName={ApplicationName}",
                     Path.GetFileName(certificatePath),
@@ -76,6 +76,6 @@ public static class DataProtectionCertificateLoader
         return X509CertificateLoader.LoadPkcs12FromFile(
             certificatePath,
             certificatePassword,
-            X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
+            X509KeyStorageFlags.Exportable | X509KeyStorageFlags.EphemeralKeySet);
     }
 }

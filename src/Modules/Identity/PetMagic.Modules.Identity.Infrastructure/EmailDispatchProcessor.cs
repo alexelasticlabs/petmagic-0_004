@@ -137,8 +137,10 @@ internal sealed class EmailDispatchProcessor(
             return null;
         }
 
-        return await dbContext.EmailDispatchJobs
+        var job = await dbContext.EmailDispatchJobs
             .SingleAsync(x => x.Id == claimedId, cancellationToken);
+        await MarkBroadcastProcessingAsync(job.BroadcastId, cancellationToken);
+        return job;
     }
 
     private async Task<EmailDispatchJob?> ClaimNextTrackedAsync(CancellationToken cancellationToken)
@@ -166,6 +168,17 @@ internal sealed class EmailDispatchProcessor(
         job.FailureMessage = null;
         job.LockId = Guid.NewGuid();
         job.LockExpiresAtUtc = now.AddSeconds(Math.Max(30, options.ProcessingLeaseSeconds));
+        if (job.BroadcastId.HasValue)
+        {
+            var broadcast = await dbContext.AdminEmailBroadcasts
+                .SingleAsync(x => x.Id == job.BroadcastId.Value, cancellationToken);
+            if (broadcast.Status == AdminEmailBroadcastStatus.Queued)
+            {
+                broadcast.Status = AdminEmailBroadcastStatus.Processing;
+                broadcast.UpdatedAtUtc = now;
+            }
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
         return job;
     }
@@ -219,6 +232,14 @@ internal sealed class EmailDispatchProcessor(
         EmailDispatchJob job,
         CancellationToken cancellationToken)
     {
+        var terminalStatus = job.Status is EmailDispatchStatus.Sent or EmailDispatchStatus.Failed;
+        if (terminalStatus && job.BroadcastId.HasValue)
+        {
+            return dbContext.Database.IsRelational()
+                ? await TrySaveRelationalBroadcastLeaseResultAsync(job, cancellationToken)
+                : await TrySaveTrackedBroadcastLeaseResultAsync(job, cancellationToken);
+        }
+
         try
         {
             await dbContext.SaveChangesAsync(cancellationToken);
@@ -232,5 +253,152 @@ internal sealed class EmailDispatchProcessor(
                 SafeLogValues.StableHash(job.Id.ToString("D")));
             return false;
         }
+    }
+
+    private async Task<bool> TrySaveRelationalBroadcastLeaseResultAsync(
+        EmailDispatchJob job,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await UpdateBroadcastTerminalProgressAsync(
+                job.BroadcastId!.Value,
+                job.Status,
+                job.UpdatedAtUtc,
+                cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return true;
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            dbContext.ChangeTracker.Clear();
+            logger.LogInformation(
+                "Email dispatch completion ignored because the processing lease was reclaimed. EmailJobIdHash={EmailJobIdHash}",
+                SafeLogValues.StableHash(job.Id.ToString("D")));
+            return false;
+        }
+    }
+
+    private async Task<bool> TrySaveTrackedBroadcastLeaseResultAsync(
+        EmailDispatchJob job,
+        CancellationToken cancellationToken)
+    {
+        var broadcast = await dbContext.AdminEmailBroadcasts
+            .SingleAsync(x => x.Id == job.BroadcastId!.Value, cancellationToken);
+        ApplyTrackedBroadcastTerminalProgress(broadcast, job.Status, job.UpdatedAtUtc);
+
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            dbContext.ChangeTracker.Clear();
+            logger.LogInformation(
+                "Email dispatch completion ignored because the processing lease was reclaimed. EmailJobIdHash={EmailJobIdHash}",
+                SafeLogValues.StableHash(job.Id.ToString("D")));
+            return false;
+        }
+    }
+
+    private async Task UpdateBroadcastTerminalProgressAsync(
+        Guid broadcastId,
+        EmailDispatchStatus terminalStatus,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        if (terminalStatus == EmailDispatchStatus.Sent)
+        {
+            await dbContext.AdminEmailBroadcasts
+                .Where(x => x.Id == broadcastId)
+                .ExecuteUpdateAsync(
+                    setters => setters
+                        .SetProperty(x => x.SentCount, x => x.SentCount + 1)
+                        .SetProperty(
+                            x => x.Status,
+                            x => x.SentCount + x.FailedCount + 1 >= x.RecipientCount
+                                ? x.FailedCount > 0
+                                    ? AdminEmailBroadcastStatus.PartiallyFailed
+                                    : AdminEmailBroadcastStatus.Completed
+                                : AdminEmailBroadcastStatus.Processing)
+                        .SetProperty(x => x.UpdatedAtUtc, now)
+                        .SetProperty(
+                            x => x.CompletedAtUtc,
+                            x => x.SentCount + x.FailedCount + 1 >= x.RecipientCount
+                                ? now
+                                : x.CompletedAtUtc),
+                    cancellationToken);
+            return;
+        }
+
+        await dbContext.AdminEmailBroadcasts
+            .Where(x => x.Id == broadcastId)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(x => x.FailedCount, x => x.FailedCount + 1)
+                    .SetProperty(
+                        x => x.Status,
+                        x => x.SentCount + x.FailedCount + 1 >= x.RecipientCount
+                            ? x.SentCount > 0
+                                ? AdminEmailBroadcastStatus.PartiallyFailed
+                                : AdminEmailBroadcastStatus.Failed
+                            : AdminEmailBroadcastStatus.Processing)
+                    .SetProperty(x => x.UpdatedAtUtc, now)
+                    .SetProperty(
+                        x => x.CompletedAtUtc,
+                        x => x.SentCount + x.FailedCount + 1 >= x.RecipientCount
+                            ? now
+                            : x.CompletedAtUtc),
+                cancellationToken);
+    }
+
+    private async Task MarkBroadcastProcessingAsync(Guid? broadcastId, CancellationToken cancellationToken)
+    {
+        if (!broadcastId.HasValue)
+        {
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+        await dbContext.AdminEmailBroadcasts
+            .Where(x => x.Id == broadcastId.Value && x.Status == AdminEmailBroadcastStatus.Queued)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(x => x.Status, AdminEmailBroadcastStatus.Processing)
+                    .SetProperty(x => x.UpdatedAtUtc, now),
+                cancellationToken);
+    }
+
+    private static void ApplyTrackedBroadcastTerminalProgress(
+        AdminEmailBroadcast broadcast,
+        EmailDispatchStatus terminalStatus,
+        DateTime now)
+    {
+        if (terminalStatus == EmailDispatchStatus.Sent)
+        {
+            broadcast.SentCount++;
+        }
+        else
+        {
+            broadcast.FailedCount++;
+        }
+
+        broadcast.UpdatedAtUtc = now;
+        if (broadcast.SentCount + broadcast.FailedCount < broadcast.RecipientCount)
+        {
+            broadcast.Status = AdminEmailBroadcastStatus.Processing;
+            return;
+        }
+
+        broadcast.CompletedAtUtc = now;
+        broadcast.Status = broadcast.FailedCount == 0
+            ? AdminEmailBroadcastStatus.Completed
+            : broadcast.SentCount == 0
+                ? AdminEmailBroadcastStatus.Failed
+                : AdminEmailBroadcastStatus.PartiallyFailed;
     }
 }

@@ -470,6 +470,38 @@ public sealed class IdentityServiceEmailFlowTests
     }
 
     [Fact]
+    public async Task LogoutByRefreshTokenAsync_ShouldRevokeRefreshTokenWithoutAuthenticatedUser()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = await CreateServiceAsync(dbContext);
+
+        var registerResult = await service.RegisterAsync(
+            new RegisterUserCommand("logout.cookie@petmagic.app", "StrongPassword123", "Cookie Logout", true, true, CurrentLegalVersion, CurrentLegalVersion, false),
+            CancellationToken.None);
+        Assert.True(registerResult.IsSuccess);
+
+        var user = await dbContext.Users.SingleAsync();
+        user.EmailConfirmed = true;
+        await dbContext.SaveChangesAsync();
+
+        var loginResult = await service.LoginAsync(
+            new LoginCommand(user.Email!, "StrongPassword123"),
+            CancellationToken.None);
+        Assert.True(loginResult.IsSuccess);
+
+        var logoutResult = await service.LogoutByRefreshTokenAsync(
+            new RefreshTokenCommand(loginResult.Value.RefreshToken),
+            CancellationToken.None);
+        Assert.True(logoutResult.IsSuccess);
+
+        var refreshResult = await service.RefreshAsync(
+            new RefreshTokenCommand(loginResult.Value.RefreshToken),
+            CancellationToken.None);
+        Assert.True(refreshResult.IsFailure);
+        Assert.Equal("auth.invalid_refresh", refreshResult.Error.Code);
+    }
+
+    [Fact]
     public async Task RefreshAsync_ShouldRollbackRotationWhenSuccessAuditCannotBePersisted()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
@@ -736,10 +768,28 @@ public sealed class IdentityServiceEmailFlowTests
         await dbContext.SaveChangesAsync();
 
         var result = await service.SendBulkEmailAsync(
-            new SendBulkEmailCommand(EmailAudiences.Premium, "Premium update", "Hello premium users", null),
+            new SendBulkEmailCommand(
+                EmailAudiences.Premium,
+                "Premium update",
+                "Hello premium users",
+                null,
+                "bulk-email:premium-update-1"),
+            CancellationToken.None);
+
+        var replay = await service.SendBulkEmailAsync(
+            new SendBulkEmailCommand(
+                EmailAudiences.Premium,
+                "Premium update",
+                "Hello premium users",
+                null,
+                "bulk-email:premium-update-1"),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
+        Assert.True(replay.IsSuccess);
+        Assert.Equal(result.Value.BroadcastId, replay.Value.BroadcastId);
+        Assert.Equal(1, result.Value.RecipientCount);
+        Assert.Equal(AdminEmailBroadcastStatuses.Queued, result.Value.Status);
 
         var jobs = await dbContext.EmailDispatchJobs
             .Where(x => x.Kind == EmailDispatchKind.Broadcast)
@@ -747,6 +797,177 @@ public sealed class IdentityServiceEmailFlowTests
 
         var queuedJob = Assert.Single(jobs);
         Assert.Equal("premium@petmagic.app", queuedJob.RecipientEmail);
+        Assert.Equal(result.Value.BroadcastId, queuedJob.BroadcastId);
+        var broadcast = await dbContext.AdminEmailBroadcasts.SingleAsync();
+        Assert.Equal(result.Value.BroadcastId, broadcast.Id);
+        Assert.Equal(1, broadcast.RecipientCount);
+        Assert.Equal(AdminEmailBroadcastStatus.Queued, broadcast.Status);
+        Assert.Single(await dbContext.AuditEvents
+            .Where(x => x.Action == "admin.bulk_email.queued")
+            .ToListAsync());
+    }
+
+    [Fact]
+    public async Task SendBulkEmailAsync_ShouldRejectReusedIdempotencyKeyForDifferentPayload()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = await CreateServiceAsync(dbContext);
+
+        dbContext.Users.Add(new AppUser
+        {
+            Id = Guid.NewGuid(),
+            Email = "premium@petmagic.app",
+            UserName = "premium@petmagic.app",
+            EmailConfirmed = true,
+            IsActive = true,
+            IsPremium = true,
+            CreatedAtUtc = DateTime.UtcNow
+        });
+        await dbContext.SaveChangesAsync();
+
+        var first = await service.SendBulkEmailAsync(
+            new SendBulkEmailCommand(
+                EmailAudiences.Premium,
+                "Premium update",
+                "Original body",
+                null,
+                "bulk-email:conflict-1"),
+            CancellationToken.None);
+        var conflictingReplay = await service.SendBulkEmailAsync(
+            new SendBulkEmailCommand(
+                EmailAudiences.Premium,
+                "Premium update",
+                "Changed body",
+                null,
+                "bulk-email:conflict-1"),
+            CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(conflictingReplay.IsFailure);
+        Assert.Equal(IdentityErrors.BulkEmailIdempotencyConflict, conflictingReplay.Error);
+        Assert.Single(await dbContext.EmailDispatchJobs
+            .Where(x => x.Kind == EmailDispatchKind.Broadcast)
+            .ToListAsync());
+    }
+
+    [Fact]
+    public async Task SendBulkEmailAsync_ShouldRollbackBroadcastJobsAndAuditTogether()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<IdentityModuleDbContext>()
+            .UseSqlite(connection)
+            .AddInterceptors(new FailBulkEmailAuditInterceptor())
+            .Options;
+        await using var dbContext = new IdentityModuleDbContext(options);
+        var service = await CreateServiceAsync(dbContext);
+        dbContext.Users.Add(new AppUser
+        {
+            Id = Guid.NewGuid(),
+            Email = "broadcast.atomic@petmagic.app",
+            UserName = "broadcast.atomic@petmagic.app",
+            EmailConfirmed = true,
+            IsActive = true,
+            IsPremium = true,
+            CreatedAtUtc = DateTime.UtcNow
+        });
+        await dbContext.SaveChangesAsync();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.SendBulkEmailAsync(
+            new SendBulkEmailCommand(
+                EmailAudiences.Premium,
+                "Atomic broadcast",
+                "Atomic body",
+                null,
+                "bulk-email:atomic-1"),
+            CancellationToken.None));
+
+        dbContext.ChangeTracker.Clear();
+        Assert.Empty(await dbContext.AdminEmailBroadcasts.AsNoTracking().ToListAsync());
+        Assert.Empty(await dbContext.EmailDispatchJobs.AsNoTracking()
+            .Where(x => x.Kind == EmailDispatchKind.Broadcast)
+            .ToListAsync());
+        Assert.Empty(await dbContext.AuditEvents.AsNoTracking()
+            .Where(x => x.Action == "admin.bulk_email.queued")
+            .ToListAsync());
+    }
+
+    [Fact]
+    public async Task AdminEmailBroadcastQueriesAndRetry_ShouldExposeOnlyAggregateProgress()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<IdentityModuleDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var dbContext = new IdentityModuleDbContext(options);
+        var service = await CreateServiceAsync(dbContext);
+        var broadcastId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        dbContext.AdminEmailBroadcasts.Add(new AdminEmailBroadcast
+        {
+            Id = broadcastId,
+            Audience = EmailAudiences.Premium,
+            Subject = "Premium update",
+            RequestHash = new string('A', 64),
+            Status = AdminEmailBroadcastStatus.PartiallyFailed,
+            RecipientCount = 2,
+            SentCount = 1,
+            FailedCount = 1,
+            CreatedAtUtc = now.AddMinutes(-2),
+            UpdatedAtUtc = now.AddMinutes(-1),
+            CompletedAtUtc = now.AddMinutes(-1)
+        });
+        dbContext.EmailDispatchJobs.Add(new EmailDispatchJob
+        {
+            Id = Guid.NewGuid(),
+            BroadcastId = broadcastId,
+            UserId = Guid.NewGuid(),
+            RecipientEmail = "private-recipient@petmagic.app",
+            Kind = EmailDispatchKind.Broadcast,
+            Status = EmailDispatchStatus.Failed,
+            Subject = "Premium update",
+            HtmlBody = "<p>private-body</p>",
+            TextBody = "private-body",
+            AttemptCount = 3,
+            QueuedAtUtc = now.AddMinutes(-2),
+            UpdatedAtUtc = now.AddMinutes(-1),
+            FailureCode = "email.smtp_failed",
+            FailureMessage = "private-provider-message"
+        });
+        await dbContext.SaveChangesAsync();
+
+        var page = await service.ListAdminEmailBroadcastsAsync(0, 50, "partially-failed", CancellationToken.None);
+        var detail = await service.GetAdminEmailBroadcastAsync(broadcastId, CancellationToken.None);
+        var retry = await service.RetryFailedAdminEmailBroadcastAsync(broadcastId, CancellationToken.None);
+
+        Assert.True(page.IsSuccess);
+        var pageItem = Assert.Single(page.Value.Items);
+        Assert.Equal(broadcastId, pageItem.BroadcastId);
+        Assert.Equal(0, pageItem.PendingCount);
+        Assert.True(detail.IsSuccess);
+        Assert.Equal(1, detail.Value.RetryableFailedCount);
+        Assert.True(retry.IsSuccess);
+        Assert.Equal(1, retry.Value.RetriedCount);
+        Assert.Equal(AdminEmailBroadcastStatuses.Processing, retry.Value.Status);
+        Assert.Equal(1, retry.Value.PendingCount);
+        Assert.Equal(0, retry.Value.FailedCount);
+
+        var retriedJob = await dbContext.EmailDispatchJobs.AsNoTracking().SingleAsync();
+        Assert.Equal(EmailDispatchStatus.Queued, retriedJob.Status);
+        Assert.Equal(0, retriedJob.AttemptCount);
+        Assert.Null(retriedJob.FailureCode);
+        Assert.Null(retriedJob.FailureMessage);
+        Assert.Single(await dbContext.AuditEvents
+            .Where(x => x.Action == "admin.bulk_email.retry_failed")
+            .ToListAsync());
+
+        var noOpReplay = await service.RetryFailedAdminEmailBroadcastAsync(broadcastId, CancellationToken.None);
+        Assert.True(noOpReplay.IsSuccess);
+        Assert.Equal(0, noOpReplay.Value.RetriedCount);
+        Assert.Single(await dbContext.AuditEvents
+            .Where(x => x.Action == "admin.bulk_email.retry_failed")
+            .ToListAsync());
     }
 
     private static IdentityModuleDbContext CreateDbContext()
@@ -886,6 +1107,24 @@ public sealed class IdentityServiceEmailFlowTests
                     && entry.Entity.Action == "auth.refresh.succeeded") == true)
             {
                 throw new InvalidOperationException("refresh audit persistence failed");
+            }
+
+            return base.SavingChangesAsync(eventData, result, cancellationToken);
+        }
+    }
+
+    private sealed class FailBulkEmailAuditInterceptor : SaveChangesInterceptor
+    {
+        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (eventData.Context?.ChangeTracker.Entries<AuditEvent>().Any(entry =>
+                    entry.State == EntityState.Added
+                    && entry.Entity.Action == "admin.bulk_email.queued") == true)
+            {
+                throw new InvalidOperationException("bulk email audit persistence failed");
             }
 
             return base.SavingChangesAsync(eventData, result, cancellationToken);

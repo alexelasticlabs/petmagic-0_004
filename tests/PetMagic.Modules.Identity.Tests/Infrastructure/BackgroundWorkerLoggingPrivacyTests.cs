@@ -43,6 +43,34 @@ public sealed class BackgroundWorkerLoggingPrivacyTests
         Assert.DoesNotContain("Errors={Errors}", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void AccountLifecycleCleanupWorker_ShouldRevalidateExpiredStateAndUseTheAdminInvariantLock()
+    {
+        var root = FindRepositoryRoot();
+        var workerSource = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "Modules",
+            "Identity",
+            "PetMagic.Modules.Identity.Infrastructure",
+            "AccountLifecycleCleanupWorker.cs"));
+        var identityConfigurationSource = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "Modules",
+            "Identity",
+            "PetMagic.Modules.Identity.Infrastructure",
+            "IdentityInfrastructureServiceCollectionExtensions.cs"));
+
+        Assert.Contains("&& !x.EmailConfirmed", workerSource, StringComparison.Ordinal);
+        Assert.Contains("AdminRoleInvariantExecutor.ExecuteAsync", workerSource, StringComparison.Ordinal);
+        Assert.Contains("dbContext.ChangeTracker.Clear();", workerSource, StringComparison.Ordinal);
+        Assert.Contains("user.AccountStatus != AccountStatus.Expired", workerSource, StringComparison.Ordinal);
+        Assert.Contains("IsLastActiveAdminAsync", workerSource, StringComparison.Ordinal);
+        Assert.Contains("existing.AccountStatus = AccountStatus.Active;", identityConfigurationSource, StringComparison.Ordinal);
+        Assert.Contains("AccountStatus = AccountStatus.Active,", identityConfigurationSource, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(
         "src/Modules/SupportChat/PetMagic.Modules.SupportChat.Infrastructure/SupportAttachmentCleanupProcessor.cs",

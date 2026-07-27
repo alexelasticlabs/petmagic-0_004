@@ -1,6 +1,11 @@
+using System.Text.Json;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
+using Npgsql;
+
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Contracts;
 using PetMagic.Modules.Economy.Infrastructure.Data;
@@ -12,8 +17,14 @@ namespace PetMagic.Modules.Economy.Infrastructure;
 
 internal sealed class EconomyAdminConfigurationService(
     EconomyDbContext dbContext,
-    IOptions<EconomyOptions> options)
+    IOptions<EconomyOptions> options,
+    EconomyAdminAuditOutbox? auditOutbox = null)
 {
+    private const string PaymentProviderConfigurationRouteUniqueIndexName =
+        "IX_economy_payment_provider_configs_Provider_Platform_Region";
+
+    private readonly EconomyAdminAuditOutbox _auditOutbox = auditOutbox ?? new EconomyAdminAuditOutbox(dbContext);
+
     public async Task<Result<IReadOnlyList<AdminCurrencyPackResponse>>> ListAdminCurrencyPacksAsync(CancellationToken cancellationToken)
     {
         var packs = await dbContext.CurrencyPacks
@@ -130,7 +141,26 @@ internal sealed class EconomyAdminConfigurationService(
         };
 
         dbContext.PaymentProviderConfigurations.Add(configuration);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        var pendingAudit = _auditOutbox.Enqueue(new AdminAuditEntry(
+            "admin.economy.payment_provider_configuration.created",
+            "payment_provider_configuration",
+            configuration.Id.ToString("D"),
+            null,
+            DescribePaymentProviderConfiguration(configuration),
+            "Payment provider configuration created."));
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (IsPaymentProviderConfigurationRouteUniqueViolation(exception))
+        {
+            // A concurrent create may pass the read pre-check before another request commits.
+            // Map only this exact route index to the same conflict returned by the pre-check.
+            dbContext.ChangeTracker.Clear();
+            return Result.Failure<AdminPaymentProviderConfigurationResponse>(EconomyErrors.PaymentProviderConfigurationAlreadyExists);
+        }
+
+        await _auditOutbox.TryDeliverAsync(pendingAudit, cancellationToken);
 
         return Result.Success(ToAdminPaymentProviderConfigurationResponse(configuration));
     }
@@ -187,7 +217,26 @@ internal sealed class EconomyAdminConfigurationService(
         };
 
         dbContext.PaymentProviderConfigurations.Add(clone);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        var pendingAudit = _auditOutbox.Enqueue(new AdminAuditEntry(
+            "admin.economy.payment_provider_configuration.cloned",
+            "payment_provider_configuration",
+            clone.Id.ToString("D"),
+            DescribePaymentProviderConfiguration(source),
+            DescribePaymentProviderConfiguration(clone),
+            $"Cloned from payment provider configuration {source.Id:D}."));
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (IsPaymentProviderConfigurationRouteUniqueViolation(exception))
+        {
+            // A concurrent clone/create may pass the read pre-check before another request commits.
+            // Map only this exact route index to the same conflict returned by the pre-check.
+            dbContext.ChangeTracker.Clear();
+            return Result.Failure<AdminPaymentProviderConfigurationResponse>(EconomyErrors.PaymentProviderConfigurationAlreadyExists);
+        }
+
+        await _auditOutbox.TryDeliverAsync(pendingAudit, cancellationToken);
 
         return Result.Success(ToAdminPaymentProviderConfigurationResponse(clone));
     }
@@ -204,8 +253,19 @@ internal sealed class EconomyAdminConfigurationService(
             return Result.Failure(EconomyErrors.PaymentProviderConfigurationNotFound);
         }
 
+        var oldValue = DescribePaymentProviderConfiguration(configuration);
         dbContext.PaymentProviderConfigurations.Remove(configuration);
+        var pendingAudit = _auditOutbox.Enqueue(new AdminAuditEntry(
+            "admin.economy.payment_provider_configuration.deleted",
+            "payment_provider_configuration",
+            configuration.Id.ToString("D"),
+            oldValue,
+            null,
+            "Payment provider configuration deleted."));
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await _auditOutbox.TryDeliverAsync(pendingAudit, cancellationToken);
+
         return Result.Success();
     }
 
@@ -294,6 +354,7 @@ internal sealed class EconomyAdminConfigurationService(
             return Result.Failure<AdminCurrencyPackResponse>(EconomyErrors.CurrencyPackNotFound);
         }
 
+        var oldValue = DescribeCurrencyPack(pack);
         pack.DisplayName = command.DisplayName.Trim();
         pack.PriceAmount = decimal.Round(command.PriceAmount, 2, MidpointRounding.AwayFromZero);
         pack.GrantedSpark = command.GrantedSpark;
@@ -301,7 +362,17 @@ internal sealed class EconomyAdminConfigurationService(
         pack.IsActive = command.IsActive;
         pack.SortOrder = command.SortOrder;
 
+        var pendingAudit = _auditOutbox.Enqueue(new AdminAuditEntry(
+            "admin.economy.currency_pack.updated",
+            "currency_pack",
+            pack.Id.ToString("D"),
+            oldValue,
+            DescribeCurrencyPack(pack),
+            "Currency pack updated."));
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await _auditOutbox.TryDeliverAsync(pendingAudit, cancellationToken);
+
         return Result.Success(ToAdminCurrencyPackResponse(pack));
     }
 
@@ -317,6 +388,7 @@ internal sealed class EconomyAdminConfigurationService(
             return Result.Failure<AdminSubscriptionPlanResponse>(EconomyErrors.PremiumPlanNotFound);
         }
 
+        var oldValue = DescribeSubscriptionPlan(plan);
         plan.Name = command.Name.Trim();
         plan.PriceAmount = decimal.Round(command.PriceAmount, 2, MidpointRounding.AwayFromZero);
         plan.CurrencyCode = command.CurrencyCode.Trim().ToUpperInvariant();
@@ -329,7 +401,16 @@ internal sealed class EconomyAdminConfigurationService(
         plan.DisplayOrder = command.DisplayOrder;
         plan.UpdatedAtUtc = DateTime.UtcNow;
 
+        var pendingAudit = _auditOutbox.Enqueue(new AdminAuditEntry(
+            "admin.economy.subscription_plan.updated",
+            "subscription_plan",
+            plan.Id ?? string.Empty,
+            oldValue,
+            DescribeSubscriptionPlan(plan),
+            "Subscription plan updated."));
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await _auditOutbox.TryDeliverAsync(pendingAudit, cancellationToken);
 
         return Result.Success(new AdminSubscriptionPlanResponse(
             plan.Id ?? string.Empty,
@@ -368,7 +449,22 @@ internal sealed class EconomyAdminConfigurationService(
             return Result.Failure<AdminPaymentProviderConfigurationResponse>(EconomyErrors.PaymentProviderDisclosureInvalid);
         }
 
-        configuration.Region = EconomyPaymentProviderPolicy.NormalizeConfigRegion(command.Region);
+        var region = EconomyPaymentProviderPolicy.NormalizeConfigRegion(command.Region);
+        var conflictingConfigurationExists = await dbContext.PaymentProviderConfigurations
+            .AsNoTracking()
+            .AnyAsync(
+                x => x.Id != configuration.Id
+                    && x.Provider == configuration.Provider
+                    && x.Platform == configuration.Platform
+                    && x.Region == region,
+                cancellationToken);
+        if (conflictingConfigurationExists)
+        {
+            return Result.Failure<AdminPaymentProviderConfigurationResponse>(EconomyErrors.PaymentProviderConfigurationAlreadyExists);
+        }
+
+        var oldValue = DescribePaymentProviderConfiguration(configuration);
+        configuration.Region = region;
         configuration.IsEnabled = command.IsEnabled;
         configuration.IsRecommended = command.IsRecommended;
         configuration.IsSelectedByDefault = command.IsSelectedByDefault;
@@ -385,7 +481,25 @@ internal sealed class EconomyAdminConfigurationService(
         configuration.Notes = notes;
         configuration.UpdatedAtUtc = DateTime.UtcNow;
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        var pendingAudit = _auditOutbox.Enqueue(new AdminAuditEntry(
+            "admin.economy.payment_provider_configuration.updated",
+            "payment_provider_configuration",
+            configuration.Id.ToString("D"),
+            oldValue,
+            DescribePaymentProviderConfiguration(configuration),
+            "Payment provider configuration updated."));
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (IsPaymentProviderConfigurationRouteUniqueViolation(exception))
+        {
+            // Updating a region has the same race window as create/clone.
+            dbContext.ChangeTracker.Clear();
+            return Result.Failure<AdminPaymentProviderConfigurationResponse>(EconomyErrors.PaymentProviderConfigurationAlreadyExists);
+        }
+
+        await _auditOutbox.TryDeliverAsync(pendingAudit, cancellationToken);
 
         return Result.Success(ToAdminPaymentProviderConfigurationResponse(configuration));
     }
@@ -445,6 +559,48 @@ internal sealed class EconomyAdminConfigurationService(
             configuration.UpdatedAtUtc);
     }
 
+    private static string DescribeCurrencyPack(CurrencyPack pack)
+    {
+        return JsonSerializer.Serialize(new
+        {
+            pack.Code,
+            pack.DisplayName,
+            pack.CurrencyCode,
+            pack.PriceAmount,
+            pack.GrantedSpark,
+            pack.BonusSpark,
+            pack.IsActive,
+            pack.SortOrder,
+        });
+    }
+
+    private static string DescribeSubscriptionPlan(SubscriptionPlan plan)
+    {
+        return JsonSerializer.Serialize(new
+        {
+            plan.Id,
+            plan.Name,
+            plan.BillingPeriod,
+            plan.PriceAmount,
+            plan.CurrencyCode,
+            plan.MonthlyTokenLimit,
+            plan.IsRecommended,
+            plan.IsActive,
+            AppleProductIdConfigured = !string.IsNullOrWhiteSpace(plan.AppleProductId),
+            GoogleProductIdConfigured = !string.IsNullOrWhiteSpace(plan.GoogleProductId),
+            StripePriceIdConfigured = !string.IsNullOrWhiteSpace(plan.StripePriceId),
+            plan.DisplayOrder,
+        });
+    }
+
+    private static string DescribePaymentProviderConfiguration(PaymentProviderConfiguration configuration)
+    {
+        return $"provider={configuration.Provider}; platform={configuration.Platform}; region={configuration.Region}; "
+            + $"enabled={configuration.IsEnabled}; recommended={configuration.IsRecommended}; "
+            + $"selectedByDefault={configuration.IsSelectedByDefault}; mode={configuration.Mode}; "
+            + $"externalCheckoutAllowed={configuration.ExternalCheckoutAllowed}";
+    }
+
     private static string? NullIfWhiteSpace(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
@@ -460,6 +616,27 @@ internal sealed class EconomyAdminConfigurationService(
             || warningText.Contains("native payment sheet", StringComparison.OrdinalIgnoreCase)
             || warningText.Contains("native payment sheets", StringComparison.OrdinalIgnoreCase)
             || noteText.Contains("external checkout", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsPaymentProviderConfigurationRouteUniqueViolation(DbUpdateException exception)
+    {
+        return exception.InnerException is PostgresException
+        {
+            SqlState: var sqlState,
+            ConstraintName: var constraintName
+        }
+            && IsPaymentProviderConfigurationRouteUniqueViolation(sqlState, constraintName);
+    }
+
+    internal static bool IsPaymentProviderConfigurationRouteUniqueViolation(
+        string? sqlState,
+        string? constraintName)
+    {
+        return string.Equals(sqlState, PostgresErrorCodes.UniqueViolation, StringComparison.Ordinal)
+            && string.Equals(
+                constraintName,
+                PaymentProviderConfigurationRouteUniqueIndexName,
+                StringComparison.Ordinal);
     }
 
     private static string? FirstNonEmpty(params string?[] candidates)

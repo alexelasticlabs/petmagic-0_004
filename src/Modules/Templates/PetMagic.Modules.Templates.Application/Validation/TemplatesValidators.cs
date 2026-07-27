@@ -231,10 +231,10 @@ public sealed class UpdateFeedbackAdminCommandValidator : AbstractValidator<Upda
         RuleFor(x => x.AdminUserId).NotEmpty();
         RuleFor(x => x.Status)
             .Must(value => value is null or "New" or "InReview" or "Resolved" or "Dismissed")
-            .WithMessage("templates.feedback_status_invalid");
+            .WithMessage("feedback.invalid_status");
         RuleFor(x => x.Priority)
             .Must(value => value is null or "Low" or "Medium" or "High" or "Critical")
-            .WithMessage("templates.feedback_priority_invalid");
+            .WithMessage("feedback.invalid_priority");
         RuleFor(x => x.AdminNote).MaximumLength(2000);
     }
 }

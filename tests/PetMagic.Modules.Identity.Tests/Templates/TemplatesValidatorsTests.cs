@@ -42,7 +42,7 @@ public sealed class TemplatesValidatorsTests
     }
 
     [Fact]
-    public void RefundFeedbackCreditsValidator_ShouldRejectNonPositiveAmount_AndOversizedReason()
+    public void RefundFeedbackCreditsValidator_ShouldRejectNonPositiveAmount_AndAllowOptionalReason()
     {
         var validator = new RefundFeedbackCreditsCommandValidator();
 
@@ -55,6 +55,20 @@ public sealed class TemplatesValidatorsTests
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, error => error.PropertyName == "Amount");
         Assert.Contains(result.Errors, error => error.PropertyName == "Reason");
+
+        var missingReason = validator.Validate(new RefundFeedbackCreditsCommand(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            null,
+            null));
+        var blankReason = validator.Validate(new RefundFeedbackCreditsCommand(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            null,
+            "   "));
+
+        Assert.True(missingReason.IsValid);
+        Assert.True(blankReason.IsValid);
     }
 
     [Fact]

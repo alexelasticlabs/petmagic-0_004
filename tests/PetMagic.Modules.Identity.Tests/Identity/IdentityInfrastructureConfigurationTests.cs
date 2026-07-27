@@ -284,6 +284,21 @@ public sealed class IdentityInfrastructureConfigurationTests
         Assert.True(options.TokenValidationParameters.ValidateLifetime);
         Assert.True(options.TokenValidationParameters.ValidateIssuerSigningKey);
         Assert.Equal(TimeSpan.FromMinutes(1), options.TokenValidationParameters.ClockSkew);
+        Assert.NotNull(options.Events.OnTokenValidated);
+    }
+
+    [Fact]
+    public void AddIdentityInfrastructure_ShouldRegisterAccessTokenSecurityStampValidator()
+    {
+        var services = CreateServices();
+
+        services.AddIdentityInfrastructure(CreateConfiguration([]));
+
+        var registration = Assert.Single(
+            services,
+            descriptor => descriptor.ServiceType == typeof(IIdentityAccessTokenValidator));
+        Assert.Equal(ServiceLifetime.Scoped, registration.Lifetime);
+        Assert.Equal(typeof(IdentityAccessTokenValidator), registration.ImplementationType);
     }
 
     [Fact]

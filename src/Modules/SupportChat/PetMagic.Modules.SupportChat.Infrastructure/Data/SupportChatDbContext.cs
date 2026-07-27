@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 
 using PetMagic.BuildingBlocks.Notifications;
+using PetMagic.Modules.SupportChat.Application.Contracts;
 using PetMagic.Modules.SupportChat.Infrastructure.Entities;
 
 namespace PetMagic.Modules.SupportChat.Infrastructure.Data;
@@ -15,6 +16,8 @@ public sealed class SupportChatDbContext(DbContextOptions<SupportChatDbContext> 
 
     public DbSet<SupportReplyTemplate> SupportReplyTemplates => Set<SupportReplyTemplate>();
 
+    public DbSet<SupportReplyTemplateRevision> SupportReplyTemplateRevisions => Set<SupportReplyTemplateRevision>();
+
     public DbSet<SupportPushDeviceToken> SupportPushDeviceTokens => Set<SupportPushDeviceToken>();
 
     public DbSet<PushOutboxMessage> PushOutboxMessages => Set<PushOutboxMessage>();
@@ -28,6 +31,7 @@ public sealed class SupportChatDbContext(DbContextOptions<SupportChatDbContext> 
             entity.ToTable("support_conversations");
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Status).HasConversion<int>().IsRequired();
+            entity.Property(x => x.Version).HasDefaultValue(1L).IsConcurrencyToken();
             entity.Property(x => x.Priority).HasConversion<int>().IsRequired();
             entity.Property(x => x.Source).HasConversion<int>().IsRequired();
             entity.Property(x => x.TagsJson).HasMaxLength(1024);
@@ -54,6 +58,7 @@ public sealed class SupportChatDbContext(DbContextOptions<SupportChatDbContext> 
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Body).HasMaxLength(4000).IsRequired();
             entity.Property(x => x.ReplyToPreview).HasMaxLength(280);
+            entity.Property(x => x.ClientIdempotencyKey).HasMaxLength(SupportMessageIdempotency.MaxKeyLength);
             entity.Property(x => x.SenderType).HasConversion<int>().IsRequired();
             entity.Property(x => x.AttachmentUrl).HasMaxLength(2048);
             entity.Property(x => x.AttachmentFileName).HasMaxLength(256);
@@ -64,6 +69,9 @@ public sealed class SupportChatDbContext(DbContextOptions<SupportChatDbContext> 
             entity.HasIndex(x => new { x.ConversationId, x.CreatedAtUtc });
             entity.HasIndex(x => new { x.ConversationId, x.IsFromAdmin, x.ReadAtUtc });
             entity.HasIndex(x => new { x.ConversationId, x.ReplyToMessageId });
+            entity.HasIndex(x => new { x.ConversationId, x.SenderUserId, x.ClientIdempotencyKey })
+                .IsUnique()
+                .HasDatabaseName("UX_support_messages_conversation_sender_idempotency");
             entity.HasOne(x => x.Conversation)
                 .WithMany(x => x.Messages)
                 .HasForeignKey(x => x.ConversationId)
@@ -100,7 +108,22 @@ public sealed class SupportChatDbContext(DbContextOptions<SupportChatDbContext> 
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Title).HasMaxLength(120).IsRequired();
             entity.Property(x => x.Body).HasMaxLength(4000).IsRequired();
+            entity.Property(x => x.Version).HasDefaultValue(1).IsConcurrencyToken();
             entity.HasIndex(x => new { x.SortOrder, x.IsEnabled });
+        });
+
+        builder.Entity<SupportReplyTemplateRevision>(entity =>
+        {
+            entity.ToTable("support_reply_template_revisions");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Title).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.Body).HasMaxLength(4000).IsRequired();
+            entity.Property(x => x.Reason).HasMaxLength(500);
+            entity.HasIndex(x => new { x.TemplateId, x.Version }).IsUnique();
+            entity.HasOne(x => x.Template)
+                .WithMany(x => x.Revisions)
+                .HasForeignKey(x => x.TemplateId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<SupportPushDeviceToken>(entity =>
@@ -115,6 +138,43 @@ public sealed class SupportChatDbContext(DbContextOptions<SupportChatDbContext> 
             entity.HasIndex(x => x.Token).IsUnique();
             entity.HasIndex(x => new { x.UserId, x.DisabledAtUtc });
         });
+    }
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        AdvanceConversationVersions();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(
+        bool acceptAllChangesOnSuccess,
+        CancellationToken cancellationToken = default)
+    {
+        AdvanceConversationVersions();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    private void AdvanceConversationVersions()
+    {
+        foreach (var entry in ChangeTracker.Entries<SupportConversation>())
+        {
+            if (entry.State == EntityState.Added)
+            {
+                entry.Entity.Version = Math.Max(1, entry.Entity.Version);
+            }
+            else if (entry.State == EntityState.Modified)
+            {
+                entry.Entity.Version = Math.Max(1, entry.Entity.Version + 1);
+            }
+        }
+
+        foreach (var entry in ChangeTracker.Entries<SupportReplyTemplate>())
+        {
+            if (entry.State == EntityState.Added)
+            {
+                entry.Entity.Version = Math.Max(1, entry.Entity.Version);
+            }
+        }
     }
 
     private static void ConfigurePushOutbox(ModelBuilder builder, string tableName)

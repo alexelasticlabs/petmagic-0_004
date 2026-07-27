@@ -10,11 +10,40 @@ using Microsoft.Extensions.DependencyInjection;
 using PetMagic.Modules.Templates.Api.Endpoints;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Application.Validation;
+using PetMagic.Modules.Templates.Infrastructure;
 
 namespace PetMagic.Modules.Identity.Tests.Templates;
 
 public sealed class FeedbackEndpointValidationTests
 {
+    [Fact]
+    public async Task SubmitFeedbackEndpoint_ShouldMapUnknownTargetToNotFoundProblem()
+    {
+        var method = typeof(FeedbackEndpoints).GetMethod(
+            "ToUserProblem",
+            BindingFlags.NonPublic | BindingFlags.Static);
+
+        Assert.NotNull(method);
+
+        var httpContext = new DefaultHttpContext();
+        httpContext.Response.Body = new MemoryStream();
+        httpContext.RequestServices = new ServiceCollection()
+            .AddLogging()
+            .AddProblemDetails()
+            .BuildServiceProvider();
+
+        var result = Assert.IsAssignableFrom<IResult>(
+            method!.Invoke(null, [TemplatesErrors.FeedbackNotFound]));
+
+        await result.ExecuteAsync(httpContext);
+
+        Assert.Equal(StatusCodes.Status404NotFound, httpContext.Response.StatusCode);
+
+        httpContext.Response.Body.Position = 0;
+        var body = await new StreamReader(httpContext.Response.Body, Encoding.UTF8).ReadToEndAsync();
+        Assert.Contains("feedback.not_found", body, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task SubmitFeedbackEndpoint_ShouldReturnValidationProblem_WhenTypeIsUnknown()
     {
@@ -130,8 +159,14 @@ public sealed class FeedbackEndpointValidationTests
         Assert.Contains("Amount", body, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public async Task UpdateAdminFeedbackEndpoint_ShouldReturnValidationProblem_WhenStatusIsInvalid()
+    [Theory]
+    [InlineData("not_open", null, "Status", "feedback.invalid_status")]
+    [InlineData(null, "urgent", "Priority", "feedback.invalid_priority")]
+    public async Task UpdateAdminFeedbackEndpoint_ShouldReturnValidationProblem_WhenAdminFieldIsInvalid(
+        string? status,
+        string? priority,
+        string propertyName,
+        string errorCode)
     {
         var method = typeof(FeedbackEndpoints).GetMethod(
             "UpdateAdminFeedbackAsync",
@@ -154,8 +189,8 @@ public sealed class FeedbackEndpointValidationTests
             typeof(FeedbackEndpoints).Assembly.GetType(
                 "PetMagic.Modules.Templates.Api.Endpoints.FeedbackEndpoints+UpdateFeedbackAdminRequest",
                 throwOnError: true)!,
-            "not_open",
-            null,
+            status,
+            priority,
             null);
         var validator = new UpdateFeedbackAdminCommandValidator();
 
@@ -181,6 +216,7 @@ public sealed class FeedbackEndpointValidationTests
 
         httpContext.Response.Body.Position = 0;
         var body = await new StreamReader(httpContext.Response.Body, Encoding.UTF8).ReadToEndAsync();
-        Assert.Contains("Status", body, StringComparison.Ordinal);
+        Assert.Contains(propertyName, body, StringComparison.Ordinal);
+        Assert.Contains(errorCode, body, StringComparison.Ordinal);
     }
 }

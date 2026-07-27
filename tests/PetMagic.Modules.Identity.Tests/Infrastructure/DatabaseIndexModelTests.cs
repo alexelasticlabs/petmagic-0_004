@@ -1,7 +1,9 @@
 using System.Text.RegularExpressions;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 using PetMagic.BuildingBlocks.Notifications;
 using PetMagic.Modules.Economy.Infrastructure.Data;
@@ -31,6 +33,36 @@ public sealed class DatabaseIndexModelTests
         AssertHasIndex<AuditEvent>(dbContext, ["SubjectUserId", "OccurredAtUtc"]);
         AssertHasIndex<EmailDispatchJob>(dbContext, ["Status", "NextAttemptAtUtc", "QueuedAtUtc"]);
         AssertHasIndex<EmailDispatchJob>(dbContext, ["Status", "UpdatedAtUtc"]);
+        AssertHasIndex<EmailDispatchJob>(dbContext, ["BroadcastId", "Status"]);
+        AssertHasIndex<AdminEmailBroadcast>(dbContext, ["CreatedAtUtc", "Id"]);
+        AssertHasIndex<AdminEmailBroadcast>(dbContext, ["Status", "CreatedAtUtc"]);
+    }
+
+    [Fact]
+    public void AdminEmailBroadcastMigration_ShouldBeDiscoverableAndBackfillExistingAuditRequests()
+    {
+        using var dbContext = new IdentityDbContext(
+            new DbContextOptionsBuilder<IdentityDbContext>()
+                .UseNpgsql("Host=localhost;Database=petmagic_migration_discovery;Username=postgres;Password=unused")
+                .Options);
+
+        var migrations = dbContext.GetService<IMigrationsAssembly>().Migrations;
+        Assert.Contains("20260727130000_AddAdminEmailBroadcasts", migrations.Keys);
+
+        var migration = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Identity",
+            "PetMagic.Modules.Identity.Infrastructure",
+            "Data",
+            "Migrations",
+            "20260727130000_AddAdminEmailBroadcasts.cs"));
+
+        Assert.Contains("FROM audit_events", migration, StringComparison.Ordinal);
+        Assert.Contains("WHERE \"Action\" = 'admin.bulk_email.queued'", migration, StringComparison.Ordinal);
+        Assert.Contains("IX_email_dispatch_jobs_BroadcastId_Status", migration, StringComparison.Ordinal);
+        Assert.Contains("FK_email_dispatch_jobs_admin_email_broadcasts_BroadcastId", migration, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -137,6 +169,40 @@ public sealed class DatabaseIndexModelTests
         Assert.Contains("DROP INDEX CONCURRENTLY IF EXISTS", migration);
         Assert.Contains("suppressTransaction: true", migration);
         Assert.DoesNotContain("migrationBuilder.CreateIndex(", migration);
+    }
+
+    [Fact]
+    public void SupportMessageIdempotencyIndexRenameMigration_ShouldRepairThePostgresTruncatedLegacyName()
+    {
+        var migration = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "SupportChat",
+            "PetMagic.Modules.SupportChat.Infrastructure",
+            "Data",
+            "Migrations",
+            "20260725124500_RenameSupportMessageIdempotencyIndex.cs"));
+
+        Assert.Contains("UX_support_messages_ConversationId_SenderUserId_ClientIdempoten", migration);
+        Assert.Contains("IX_support_messages_ConversationId_SenderUserId_ClientIdempoten", migration);
+        Assert.Contains("UX_support_messages_conversation_sender_idempotency", migration);
+        Assert.Contains("to_regclass", migration);
+        Assert.Contains("ALTER INDEX public.", migration);
+    }
+
+    [Fact]
+    public void SupportMessageIdempotencyMigrations_ShouldBeDiscoveredByEfCore()
+    {
+        using var dbContext = new SupportChatDbContext(
+            new DbContextOptionsBuilder<SupportChatDbContext>()
+                .UseNpgsql("Host=localhost;Database=petmagic_migration_discovery;Username=postgres;Password=unused")
+                .Options);
+
+        var migrations = dbContext.GetService<IMigrationsAssembly>().Migrations;
+
+        Assert.Contains("20260725123000_AddSupportMessageIdempotency", migrations.Keys);
+        Assert.Contains("20260725124500_RenameSupportMessageIdempotencyIndex", migrations.Keys);
     }
 
     [Fact]

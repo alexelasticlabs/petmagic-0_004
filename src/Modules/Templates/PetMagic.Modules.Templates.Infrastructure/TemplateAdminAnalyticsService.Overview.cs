@@ -22,9 +22,21 @@ internal sealed partial class TemplateAdminAnalyticsService
         var access = NormalizeAnalyticsFilter(query.Access);
         var category = string.IsNullOrWhiteSpace(query.Category) ? null : query.Category.Trim();
         var take = Math.Clamp(query.Take ?? 50, 1, 200);
+        var skip = Math.Max(0, query.Skip ?? 0);
+        var requestedTemplateIds = query.TemplateIds?
+            .Distinct()
+            .ToArray();
 
-        var allTemplates = await dbContext.TemplateItems
+        var templatesQuery = dbContext.TemplateItems
             .AsNoTracking()
+            .Where(x => x.DeletedAtUtc == null);
+
+        if (requestedTemplateIds is { Length: > 0 })
+        {
+            templatesQuery = templatesQuery.Where(x => requestedTemplateIds.Contains(x.Id));
+        }
+
+        var allTemplates = await templatesQuery
             .Include(x => x.Assets)
             .ToArrayAsync(cancellationToken);
 
@@ -78,6 +90,12 @@ internal sealed partial class TemplateAdminAnalyticsService
                 eventsByTemplate.GetValueOrDefault(template.Id) ?? []))
             .ToArray();
         var sortedRows = SortTemplatesAnalyticsRows(rows, query.Sort).ToArray();
+        var totalCount = sortedRows.Length;
+        var templatesPage = sortedRows
+            .Skip(skip)
+            .Take(take)
+            .ToArray();
+        var hasMore = (long)skip + take < totalCount;
 
         var totalStarts = rows.Sum(x => x.GenerationStarts);
         var completed = rows.Sum(x => x.CompletedGenerations);
@@ -128,7 +146,7 @@ internal sealed partial class TemplateAdminAnalyticsService
                 totalStarts == 0 ? 0 : Math.Round((double)totalTokenCost / totalStarts, 1, MidpointRounding.AwayFromZero),
                 Math.Round(totalProviderCostUsd, 4, MidpointRounding.AwayFromZero),
                 totalComplaints),
-            BuildTemplatesAnalyticsTrend(jobs, events),
+            BuildTemplatesAnalyticsTrend(jobs, events, periodStartUtc, periodDays.HasValue ? generatedAtUtc.Date : null),
             [.. sortedRows.Take(5)],
             BuildTemplatesAnalyticsBreakdown(rows, row => row.Category),
             BuildTemplatesAnalyticsBreakdown(rows, row => row.TemplateType),
@@ -142,13 +160,17 @@ internal sealed partial class TemplateAdminAnalyticsService
                 completed,
                 rows.Sum(x => x.FailedGenerations),
                 totalComplaints),
-            [.. sortedRows.Take(take)],
+            templatesPage,
             [.. allTemplates
                 .Select(x => x.Category)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(x => x)],
-            generatedAtUtc);
+            generatedAtUtc,
+            skip,
+            take,
+            totalCount,
+            hasMore);
 
         return Result.Success(response);
     }
@@ -185,7 +207,9 @@ internal sealed partial class TemplateAdminAnalyticsService
 
     private static IReadOnlyList<AdminTemplatesAnalyticsTrendPointResponse> BuildTemplatesAnalyticsTrend(
         IReadOnlyCollection<GenerationAnalyticsProjection> jobs,
-        IReadOnlyCollection<TemplateAnalyticsEvent> events)
+        IReadOnlyCollection<TemplateAnalyticsEvent> events,
+        DateTime? periodStartUtc,
+        DateTime? periodEndUtc)
     {
         var jobsByDay = jobs
             .GroupBy(x => x.CreatedAtUtc.Date)
@@ -194,10 +218,15 @@ internal sealed partial class TemplateAdminAnalyticsService
             .GroupBy(x => x.CreatedAtUtc.Date)
             .ToDictionary(x => x.Key, x => x.ToArray());
 
-        return [.. jobsByDay.Keys
-            .Concat(eventsByDay.Keys)
-            .Distinct()
-            .OrderBy(x => x)
+        var days = periodStartUtc.HasValue && periodEndUtc.HasValue
+            ? Enumerable.Range(0, (periodEndUtc.Value.Date - periodStartUtc.Value.Date).Days + 1)
+                .Select(offset => periodStartUtc.Value.Date.AddDays(offset))
+            : jobsByDay.Keys
+                .Concat(eventsByDay.Keys)
+                .Distinct()
+                .OrderBy(x => x);
+
+        return [.. days
             .Select(day =>
             {
                 var dayJobs = jobsByDay.GetValueOrDefault(day) ?? [];

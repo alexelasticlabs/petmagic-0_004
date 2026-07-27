@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
+using PetMagic.Modules.Economy.Domain.Enums;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
 using PetMagic.Modules.Identity.Application.Contracts;
 using PetMagic.Modules.Identity.Domain.Enums;
@@ -470,6 +471,54 @@ public sealed partial class IdentityServiceProfileTests
         Assert.Equal(2, ledger.Count);
         Assert.Equal("admin_grant", ledger[0].Source);
         Assert.Equal("admin_debit", ledger[1].Source);
+    }
+
+    [Fact]
+    public async Task AdjustAdminUserWalletAsync_ShouldReplayOneAdminWalletOperationWithoutDuplicateLedgerOrAudit()
+    {
+        await using var identityDb = CreateIdentityDbContext();
+        await using var economyDb = CreateEconomyDbContext();
+        await using var templatesDb = CreateTemplatesDbContext();
+        var service = await CreateServiceAsync(identityDb, economyDb, templatesDb, new TrackingAvatarStorage());
+
+        var userId = Guid.NewGuid();
+        identityDb.Users.Add(new AppUser
+        {
+            Id = userId,
+            Email = "wallet-idempotency@petmagic.app",
+            UserName = "wallet-idempotency@petmagic.app",
+            EmailConfirmed = true,
+            IsActive = true,
+            SecurityStamp = Guid.NewGuid().ToString("N"),
+            CreatedAtUtc = DateTime.UtcNow
+        });
+        await identityDb.SaveChangesAsync();
+
+        var command = new AdminAdjustUserWalletCommand(
+            userId,
+            "credit",
+            80,
+            "Customer support compensation",
+            "wallet-adjustment:identity-service-1");
+        var first = await service.AdjustAdminUserWalletAsync(command, CancellationToken.None);
+        var replay = await service.AdjustAdminUserWalletAsync(command, CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(replay.IsSuccess);
+        Assert.Equal(80, first.Value.Delta);
+        Assert.Equal(80, first.Value.NewBalance);
+        Assert.Equal(0, replay.Value.Delta);
+        Assert.Equal(80, replay.Value.NewBalance);
+
+        var ledger = await economyDb.WalletLedgerEntries.SingleAsync(x => x.UserId == userId);
+        Assert.Equal(WalletLedgerSource.AdminGrant, ledger.Source);
+        Assert.Equal("Customer support compensation", ledger.Reason);
+        Assert.Equal("internal", ledger.SourceProvider);
+
+        var auditEntries = await identityDb.AuditEvents
+            .Where(x => x.SubjectUserId == userId && x.Action == "admin.user.wallet.credited")
+            .ToListAsync();
+        Assert.Single(auditEntries);
     }
 
 }

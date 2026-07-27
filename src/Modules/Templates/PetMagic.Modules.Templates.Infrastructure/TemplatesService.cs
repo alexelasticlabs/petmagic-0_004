@@ -2,6 +2,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
 using PetMagic.BuildingBlocks.Observability;
+using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Infrastructure.Data;
 using PetMagic.Modules.Templates.Infrastructure.Options;
@@ -20,7 +21,8 @@ internal sealed partial class TemplatesService(
     TemplateWatermarkSettingsStore? watermarkSettings = null,
     ITemplateVisibilityPolicy? visibilityPolicy = null,
     ILogger<TemplatesService>? logger = null,
-    FalQueueClient? falQueueClient = null) : ITemplatesService
+    FalQueueClient? falQueueClient = null,
+    IIdentityUserLookupService? identityUserLookupService = null) : ITemplatesService
 {
     private readonly ITemplateVisibilityPolicy _visibilityPolicy =
         visibilityPolicy ?? new TemplateVisibilityPolicy();

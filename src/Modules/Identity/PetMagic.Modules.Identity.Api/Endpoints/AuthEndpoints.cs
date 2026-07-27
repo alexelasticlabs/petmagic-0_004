@@ -24,6 +24,8 @@ public static partial class AuthEndpoints
     private const string UserAlreadyExistsCode = "auth.user_exists";
     private const string RefreshTokenCookieName = "petmagic_refresh_token";
     private const string RefreshTokenCookiePath = "/api/auth";
+    private const string LogoutIntentHeaderName = "X-PetMagic-Logout-Intent";
+    private const string LogoutIntentHeaderValue = "logout";
     private const int RefreshTokenCookieLifetimeDays = 30;
     private const string ExternalRedirectUriProperty = "mobile_redirect_uri";
     private const string ExternalLinkTicketProperty = "external_link_ticket";
@@ -116,7 +118,7 @@ public static partial class AuthEndpoints
             .WithMetadata(new RequestSizeLimitAttribute(MaxAuthJsonRequestBodyBytes));
 
         group.MapPost("/logout", LogoutAsync)
-            .RequireAuthorization()
+            .AllowAnonymous()
             .WithMetadata(new RequestSizeLimitAttribute(MaxAuthJsonRequestBodyBytes));
 
         group.MapGet("/me", MeAsync)

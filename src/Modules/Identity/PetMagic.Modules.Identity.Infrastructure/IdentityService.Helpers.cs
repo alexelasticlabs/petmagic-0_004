@@ -25,11 +25,18 @@ public sealed partial class IdentityService
         return new string(chars);
     }
 
-    private static EmailDispatchJob CreateBroadcastEmailJob(Guid userId, string recipientEmail, string subject, string body, DateTime now)
+    private static EmailDispatchJob CreateBroadcastEmailJob(
+        Guid broadcastId,
+        Guid userId,
+        string recipientEmail,
+        string subject,
+        string body,
+        DateTime now)
     {
         return new EmailDispatchJob
         {
             Id = Guid.NewGuid(),
+            BroadcastId = broadcastId,
             UserId = userId,
             RecipientEmail = recipientEmail,
             Kind = EmailDispatchKind.Broadcast,

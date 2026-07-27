@@ -315,6 +315,63 @@ public sealed partial class SupportChatEndpointsIntegrationTests
     }
 
     [Fact]
+    public async Task AdminAttachmentEndpoint_ShouldReplaySameIdempotencyKeyWithoutUploadingTwice()
+    {
+        await using var application = await SupportChatTestApplication.CreateAsync();
+
+        var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
+            application.CreateClient(UserId, "User"),
+            "/api/support/conversation/open",
+            new OpenConversationRequest("Need idempotent attachment", SupportConversationPriority.Normal));
+        var adminClient = application.CreateClient(AdminId, "Admin");
+        _ = await PostEmptyAsync<SupportConversationDetailResponse>(
+            adminClient,
+            $"/api/admin/support/tickets/{created.ConversationId}/assign-to-me");
+
+        const string idempotencyKey = "admin-support-attachment-endpoint-retry";
+        var path = $"/api/admin/support/tickets/{created.ConversationId}/attachments";
+
+        using var firstRequest = new HttpRequestMessage(HttpMethod.Post, path)
+        {
+            Content = CreateImageAttachmentForm("idempotent.png", "Screenshot attached")
+        };
+        firstRequest.Headers.TryAddWithoutValidation(SupportMessageIdempotency.HeaderName, idempotencyKey);
+        using var firstResponse = await adminClient.SendAsync(firstRequest);
+        await AssertSuccessAsync(firstResponse);
+        var firstMessage = (await firstResponse.Content.ReadFromJsonAsync<SupportMessageResponse>(JsonOptions))!;
+
+        using var replayRequest = new HttpRequestMessage(HttpMethod.Post, path)
+        {
+            Content = CreateImageAttachmentForm("idempotent.png", "Screenshot attached")
+        };
+        replayRequest.Headers.TryAddWithoutValidation(SupportMessageIdempotency.HeaderName, idempotencyKey);
+        using var replayResponse = await adminClient.SendAsync(replayRequest);
+        await AssertSuccessAsync(replayResponse);
+        var replayMessage = (await replayResponse.Content.ReadFromJsonAsync<SupportMessageResponse>(JsonOptions))!;
+
+        Assert.False(firstMessage.IsIdempotencyReplay);
+        Assert.True(replayMessage.IsIdempotencyReplay);
+        Assert.Equal(firstMessage.MessageId, replayMessage.MessageId);
+        Assert.Equal(1, application.AttachmentStorage.StoreCallCount);
+
+        var detail = await GetFromJsonAsync<SupportConversationDetailResponse>(
+            application.CreateClient(UserId, "User"),
+            "/api/support/conversation");
+        Assert.Single(detail.Messages, message => message.MessageId == firstMessage.MessageId);
+        Assert.Single(detail.Messages, message => message.SenderType == "System" && message.Body == "Support replied");
+    }
+
+    private static MultipartFormDataContent CreateImageAttachmentForm(string fileName, string body)
+    {
+        var form = new MultipartFormDataContent();
+        var fileContent = new ByteArrayContent([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+        form.Add(fileContent, "file", fileName);
+        form.Add(new StringContent(body), "body");
+        return form;
+    }
+
+    [Fact]
     public async Task UserAttachmentRetryEndpoint_ShouldRetryFailedAttachmentAndUploadImage()
     {
         await using var application = await SupportChatTestApplication.CreateAsync();

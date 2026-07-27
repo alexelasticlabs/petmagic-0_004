@@ -66,6 +66,13 @@ public sealed record TokenPairResponse(
     DateTime ExpiresAtUtc,
     UserProfileResponse User);
 
+public static class IdentityJwtClaimTypes
+{
+    public const string SecurityStamp = "security_stamp";
+
+    public const string SessionId = "session_id";
+}
+
 public sealed record UserAvatarResponse(
     string Url,
     string FileName,
@@ -129,7 +136,8 @@ public sealed record SendBulkEmailCommand(
     string Audience,
     string Subject,
     string Body,
-    IReadOnlyList<Guid>? UserIds);
+    IReadOnlyList<Guid>? UserIds,
+    string? IdempotencyKey = null);
 
 public static class EmailAudiences
 {

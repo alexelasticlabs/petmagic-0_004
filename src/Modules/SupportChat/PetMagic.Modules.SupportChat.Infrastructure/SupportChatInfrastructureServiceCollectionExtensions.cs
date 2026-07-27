@@ -25,6 +25,7 @@ public static class SupportChatInfrastructureServiceCollectionExtensions
             configuration.GetSection("SupportChat:AttachmentStorage"));
         var attachmentReadUrlSigningOptions = BuildSupportAttachmentReadUrlSigningOptions(configuration);
         var pushOptions = BuildSupportChatPushOptions(configuration);
+        var slaOptions = BuildSupportSlaOptions(configuration.GetSection("SupportChat:Sla"));
         ValidateProductionPushConfiguration(pushOptions, isProduction);
 
         services.AddDbContextPool<SupportChatDbContext>(options =>
@@ -35,6 +36,7 @@ public static class SupportChatInfrastructureServiceCollectionExtensions
         services.AddSingleton(attachmentStorageOptions);
         services.AddSingleton(attachmentReadUrlSigningOptions);
         services.AddSingleton(pushOptions);
+        services.AddSingleton(slaOptions);
         services.AddSingleton<ISupportAttachmentStorage, LocalSupportAttachmentStorage>();
         services.AddSingleton<ISupportAttachmentReadUrlSigner, SupportAttachmentReadUrlSigner>();
         services.AddScoped<SupportAttachmentCleanupProcessor>();
@@ -155,6 +157,27 @@ public static class SupportChatInfrastructureServiceCollectionExtensions
                 ?? ReadValue(templateSection, "ServiceAccountJsonPath", "FIREBASE_SERVICE_ACCOUNT_JSON_PATH")
                 ?? string.Empty
         };
+    }
+
+    private static SupportSlaOptions BuildSupportSlaOptions(IConfigurationSection section)
+    {
+        return new SupportSlaOptions
+        {
+            Low = BuildSupportSlaTarget(section.GetSection("Low"), 480, 4320),
+            Normal = BuildSupportSlaTarget(section.GetSection("Normal"), 240, 1440),
+            High = BuildSupportSlaTarget(section.GetSection("High"), 60, 480),
+            Urgent = BuildSupportSlaTarget(section.GetSection("Urgent"), 15, 240),
+        };
+    }
+
+    private static SupportSlaTarget BuildSupportSlaTarget(
+        IConfigurationSection section,
+        int defaultFirstResponseMinutes,
+        int defaultResolutionMinutes)
+    {
+        return new SupportSlaTarget(
+            ParsePositiveInt(section["FirstResponseMinutes"], defaultFirstResponseMinutes),
+            ParsePositiveInt(section["ResolutionMinutes"], defaultResolutionMinutes));
     }
 
     private static void ValidateProductionPushConfiguration(SupportChatPushOptions options, bool isProduction)

@@ -361,6 +361,54 @@ public sealed partial class TemplatesApiIntegrationTests
     }
 
     [Fact]
+    public async Task AdminTemplateGenerations_ShouldAcceptCancellingStatusFilter()
+    {
+        await using var application = await TestApplication.CreateAsync(startGenerationWorker: false);
+        var created = await CreateActiveImageTemplateAsync(
+            application.Client,
+            "Admin Cancelling Filter",
+            "Admin Generation Filters",
+            ["admin", "cancelling"]);
+        var cancellingId = Guid.NewGuid();
+        var cancelledId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        await using (var scope = application.Services.CreateAsyncScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+            dbContext.TemplateGenerationJobs.AddRange(
+                CompletedJob(
+                    cancellingId,
+                    userId,
+                    created.TemplateId,
+                    created.TokenCost,
+                    now.AddMinutes(-2),
+                    "admin-cancelling",
+                    TemplateGenerationStatus.CancellationRequested),
+                CompletedJob(
+                    cancelledId,
+                    userId,
+                    created.TemplateId,
+                    created.TokenCost,
+                    now.AddMinutes(-1),
+                    "admin-cancelled",
+                    TemplateGenerationStatus.Cancelled));
+            await dbContext.SaveChangesAsync();
+        }
+
+        var page = await GetFromJsonAsync<AdminTemplateGenerationListPageResponse>(
+            application.Client,
+            "/api/admin/templates/generations?status=cancelling&skip=0&take=10");
+
+        Assert.Equal(1, page.TotalCount);
+        var item = Assert.Single(page.Items);
+        Assert.Equal(cancellingId, item.GenerationId);
+        Assert.Equal("Cancelling", item.Status);
+        Assert.DoesNotContain(page.Items, generation => generation.GenerationId == cancelledId);
+    }
+
+    [Fact]
     public async Task GenerationGalleryList_ShouldReturnExplicitMediaStates()
     {
         await using var application = await TestApplication.CreateAsync(startGenerationWorker: false);

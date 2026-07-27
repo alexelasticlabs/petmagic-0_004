@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 
 using PetMagic.Modules.Identity.Application.Contracts;
 using PetMagic.Modules.Identity.Domain.Enums;
@@ -112,6 +113,30 @@ public sealed partial class IdentityServiceProfileTests
         var item = Assert.Single(result.Value.Items);
         Assert.Equal(matching.Id, item.UserId);
         Assert.Contains(SystemRoles.Moderator, item.Roles);
+    }
+
+    [Fact]
+    public async Task ListUsersAsync_ShouldTreatLikeMetacharactersAsLiteralSearchText()
+    {
+        await using var identityDb = CreateIdentityDbContext();
+        await using var economyDb = CreateEconomyDbContext();
+        await using var templatesDb = CreateTemplatesDbContext();
+        var service = await CreateServiceAsync(identityDb, economyDb, templatesDb, new TrackingAvatarStorage());
+        var now = DateTime.UtcNow;
+        var literalPercent = CreateListUser("promo%code@petmagic.app", now);
+        var literalUnderscore = CreateListUser("promo_code@petmagic.app", now.AddMinutes(-1));
+        var wildcardOnly = CreateListUser("promoxcode@petmagic.app", now.AddMinutes(-2));
+
+        identityDb.Users.AddRange(literalPercent, literalUnderscore, wildcardOnly);
+        await identityDb.SaveChangesAsync();
+
+        var percentResult = await service.ListUsersAsync(0, 20, "%code", null, null, null, null, CancellationToken.None);
+        var underscoreResult = await service.ListUsersAsync(0, 20, "_code", null, null, null, null, CancellationToken.None);
+
+        Assert.True(percentResult.IsSuccess);
+        Assert.Equal([literalPercent.Id], percentResult.Value.Items.Select(item => item.UserId));
+        Assert.True(underscoreResult.IsSuccess);
+        Assert.Equal([literalUnderscore.Id], underscoreResult.Value.Items.Select(item => item.UserId));
     }
 
     [Fact]
@@ -301,6 +326,46 @@ public sealed partial class IdentityServiceProfileTests
             identityDb.UserRoles,
             userRole => userRole.UserId == user.Id
                 && userRole.RoleId == identityDb.Roles.Single(role => role.Name == SystemRoles.Moderator).Id);
+    }
+
+    [Fact]
+    public async Task RevokeRoleAsync_ShouldInvalidateExistingAccessAndAuditTheMutation()
+    {
+        await using var identityDb = CreateIdentityDbContext();
+        await using var economyDb = CreateEconomyDbContext();
+        await using var templatesDb = CreateTemplatesDbContext();
+        var service = await CreateServiceAsync(identityDb, economyDb, templatesDb, new TrackingAvatarStorage());
+        var user = CreateListUser("role-access@petmagic.app", DateTime.UtcNow);
+        var previousSecurityStamp = user.SecurityStamp;
+
+        identityDb.Users.Add(user);
+        identityDb.RefreshTokenSessions.Add(new RefreshTokenSession
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            TokenHash = "role-access-refresh-token",
+            CreatedAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(1)
+        });
+        await identityDb.SaveChangesAsync();
+        await AddUserRoleAsync(identityDb, user.Id, SystemRoles.Moderator);
+
+        var result = await service.RevokeRoleAsync(
+            new RevokeRoleCommand(user.Id, SystemRoles.Moderator),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var updatedUser = await identityDb.Users
+            .AsQueryable()
+            .SingleAsync(x => x.Id == user.Id);
+        Assert.NotEqual(previousSecurityStamp, updatedUser.SecurityStamp);
+        var revokedSession = await identityDb.RefreshTokenSessions
+            .AsQueryable()
+            .SingleAsync(x => x.UserId == user.Id);
+        Assert.NotNull(revokedSession.RevokedAtUtc);
+        Assert.Contains(
+            await identityDb.AuditEvents.AsQueryable().ToListAsync(),
+            auditEvent => auditEvent.SubjectUserId == user.Id && auditEvent.Action == "user.role.revoked");
     }
 
     [Fact]

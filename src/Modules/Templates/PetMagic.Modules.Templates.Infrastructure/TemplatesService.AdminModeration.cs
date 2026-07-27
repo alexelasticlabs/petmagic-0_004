@@ -11,6 +11,11 @@ internal sealed partial class TemplatesService
 {
     private const int AdminModerationDefaultTake = 25;
     private const int AdminModerationMaxTake = 100;
+    private const int AdminModerationDecisionReasonMinLength = 3;
+    private const int AdminModerationDecisionReasonMaxLength = 500;
+    private const string PendingModerationStatus = "pending";
+    private const string ApprovedModerationStatus = "approved";
+    private const string RejectedModerationStatus = "rejected";
 
     public async Task<Result<AdminModerationQueuePageResponse>> GetAdminModerationQueueAsync(
         AdminModerationQueueQuery query,
@@ -21,12 +26,29 @@ internal sealed partial class TemplatesService
         var status = NormalizeModerationStatus(query.Status);
         var search = NormalizeQueryValue(query.Search);
 
-        var events = dbContext.TemplateAnalyticsEvents
+        var moderationEvents = dbContext.TemplateAnalyticsEvents
             .AsNoTracking()
-            .Include(analyticsEvent => analyticsEvent.Template)
             .Where(analyticsEvent =>
                 analyticsEvent.EventType == TemplateAnalyticsEventTypes.Complaint ||
                 analyticsEvent.EventType == TemplateAnalyticsEventTypes.Feedback);
+        var summaryProjection = await moderationEvents
+            .GroupBy(_ => 1)
+            .Select(group => new AdminModerationSummaryProjection(
+                group.Count(analyticsEvent => analyticsEvent.ModerationStatus == PendingModerationStatus),
+                group.Count(analyticsEvent => analyticsEvent.ModerationStatus == ApprovedModerationStatus),
+                group.Count(analyticsEvent => analyticsEvent.ModerationStatus == RejectedModerationStatus),
+                group.Count(analyticsEvent =>
+                    analyticsEvent.ModerationStatus == PendingModerationStatus
+                    && analyticsEvent.EventType == TemplateAnalyticsEventTypes.Complaint),
+                group.Count(analyticsEvent =>
+                    analyticsEvent.ModerationStatus == PendingModerationStatus
+                    && analyticsEvent.EventType == TemplateAnalyticsEventTypes.Feedback),
+                group.Where(analyticsEvent => analyticsEvent.ModerationStatus == PendingModerationStatus)
+                    .Min(analyticsEvent => (DateTime?)analyticsEvent.CreatedAtUtc)))
+            .SingleOrDefaultAsync(cancellationToken);
+
+        IQueryable<Entities.TemplateAnalyticsEvent> events = moderationEvents
+            .Include(analyticsEvent => analyticsEvent.Template);
 
         if (!string.IsNullOrEmpty(status))
         {
@@ -44,7 +66,7 @@ internal sealed partial class TemplatesService
 
         var totalCount = await events.CountAsync(cancellationToken);
         var items = await events
-            .OrderBy(analyticsEvent => analyticsEvent.ModerationStatus == "pending" ? 0 : 1)
+            .OrderBy(analyticsEvent => analyticsEvent.ModerationStatus == PendingModerationStatus ? 0 : 1)
             .ThenByDescending(analyticsEvent => analyticsEvent.CreatedAtUtc)
             .ThenByDescending(analyticsEvent => analyticsEvent.Id)
             .Skip(skip)
@@ -58,13 +80,24 @@ internal sealed partial class TemplatesService
             items.RemoveAt(items.Count - 1);
         }
 
+        var generatedAtUtc = DateTime.UtcNow;
+        var summary = new AdminModerationQueueSummaryResponse(
+            summaryProjection?.PendingCount ?? 0,
+            summaryProjection?.ApprovedCount ?? 0,
+            summaryProjection?.RejectedCount ?? 0,
+            summaryProjection?.PendingComplaintsCount ?? 0,
+            summaryProjection?.PendingFeedbackCount ?? 0,
+            summaryProjection?.OldestPendingAtUtc,
+            generatedAtUtc);
+
         return Result.Success(new AdminModerationQueuePageResponse(
             items,
             skip,
             take,
             totalCount,
             hasMore,
-            DateTime.UtcNow));
+            generatedAtUtc,
+            summary));
     }
 
     public async Task<Result<AdminModerationQueueItemResponse>> DecideAdminModerationItemAsync(
@@ -77,45 +110,30 @@ internal sealed partial class TemplatesService
             return Result.Failure<AdminModerationQueueItemResponse>(TemplatesErrors.InvalidFeedback);
         }
 
-        var analyticsEvent = await dbContext.TemplateAnalyticsEvents
-            .Include(templateAnalyticsEvent => templateAnalyticsEvent.Template)
-            .FirstOrDefaultAsync(templateAnalyticsEvent => templateAnalyticsEvent.Id == command.EventId, cancellationToken);
-        if (analyticsEvent is null)
+        var reason = NormalizeModerationDecisionReason(command.Reason);
+        if (reason is null)
         {
-            return Result.Failure<AdminModerationQueueItemResponse>(TemplatesErrors.NotFound);
+            return Result.Failure<AdminModerationQueueItemResponse>(TemplatesErrors.InvalidModerationDecisionReason);
         }
 
-        var previousStatus = analyticsEvent.ModerationStatus;
-        analyticsEvent.ModerationStatus = action;
-        analyticsEvent.ModerationComment = NormalizeOptionalModerationComment(command.Reason);
-        analyticsEvent.ModeratedAtUtc = DateTime.UtcNow;
-
-        await dbContext.SaveChangesAsync(cancellationToken);
-        await WriteModerationAuditAsync(analyticsEvent, previousStatus, action, cancellationToken);
-
-        return Result.Success(MapModerationQueueItem(analyticsEvent));
+        return await DecideAdminModerationItemWithLeaseAsync(command, action, reason, cancellationToken);
     }
 
-    private async Task WriteModerationAuditAsync(
+    private static Result<AdminModerationQueueItemResponse> ResolveExistingModerationDecision(
         Entities.TemplateAnalyticsEvent analyticsEvent,
-        string oldValue,
-        string newValue,
-        CancellationToken cancellationToken)
+        string action,
+        string reason)
     {
-        if (adminAuditLog is null)
+        if (string.Equals(analyticsEvent.ModerationStatus, action, StringComparison.Ordinal)
+            && string.Equals(
+                NormalizePersistedModerationReason(analyticsEvent.ModerationComment),
+                reason,
+                StringComparison.Ordinal))
         {
-            return;
+            return Result.Success(MapModerationQueueItem(analyticsEvent));
         }
 
-        await adminAuditLog.WriteAsync(
-            new AdminAuditEntry(
-                newValue == "approved" ? "admin.content.approved" : "admin.content.rejected",
-                "template_analytics_event",
-                analyticsEvent.Id.ToString("D"),
-                oldValue,
-                newValue,
-                SubjectUserId: analyticsEvent.UserId),
-            cancellationToken);
+        return Result.Failure<AdminModerationQueueItemResponse>(TemplatesErrors.ModerationDecisionConflict);
     }
 
     private static AdminModerationQueueItemResponse MapModerationQueueItem(Entities.TemplateAnalyticsEvent analyticsEvent)
@@ -135,7 +153,11 @@ internal sealed partial class TemplatesService
             analyticsEvent.GenerationId,
             analyticsEvent.ModerationComment,
             analyticsEvent.CreatedAtUtc,
-            analyticsEvent.ModeratedAtUtc);
+            analyticsEvent.ModeratedAtUtc,
+            analyticsEvent.ModerationLeaseOwnerUserId,
+            analyticsEvent.ModerationLeaseClaimedAtUtc,
+            analyticsEvent.ModerationLeaseExpiresAtUtc,
+            analyticsEvent.ModerationVersion);
     }
 
     private static string NormalizeModerationStatus(string? value)
@@ -144,9 +166,9 @@ internal sealed partial class TemplatesService
         return normalized switch
         {
             "" or "all" => string.Empty,
-            "approved" or "approve" => "approved",
-            "rejected" or "reject" => "rejected",
-            "pending" => "pending",
+            "approved" or "approve" => ApprovedModerationStatus,
+            "rejected" or "reject" => RejectedModerationStatus,
+            "pending" => PendingModerationStatus,
             _ => string.Empty
         };
     }
@@ -156,20 +178,30 @@ internal sealed partial class TemplatesService
         var normalized = NormalizeQueryValue(value);
         return normalized switch
         {
-            "approved" or "approve" => "approved",
-            "rejected" or "reject" => "rejected",
+            "approved" or "approve" => ApprovedModerationStatus,
+            "rejected" or "reject" => RejectedModerationStatus,
             _ => string.Empty
         };
     }
 
-    private static string? NormalizeOptionalModerationComment(string? value)
+    private static string? NormalizeModerationDecisionReason(string? value)
     {
-        var trimmed = value?.Trim();
-        if (string.IsNullOrEmpty(trimmed))
-        {
-            return null;
-        }
-
-        return trimmed.Length <= 500 ? trimmed : trimmed[..500];
+        var normalized = value?.Trim() ?? string.Empty;
+        return normalized.Length is >= AdminModerationDecisionReasonMinLength and <= AdminModerationDecisionReasonMaxLength
+            ? normalized
+            : null;
     }
+
+    private static string NormalizePersistedModerationReason(string? value)
+    {
+        return value?.Trim() ?? string.Empty;
+    }
+
+    private sealed record AdminModerationSummaryProjection(
+        int PendingCount,
+        int ApprovedCount,
+        int RejectedCount,
+        int PendingComplaintsCount,
+        int PendingFeedbackCount,
+        DateTime? OldestPendingAtUtc);
 }

@@ -103,6 +103,7 @@ public static partial class AdminEconomyEndpoints
         group.MapGet("/ledger", GetWalletLedgerAsync);
         group.MapGet("/dashboard/metrics", GetDashboardMetricsAsync);
         group.MapGet("/purchases", GetPurchasesAsync);
+        group.MapGet("/purchases/{orderId:guid}", GetPurchaseAsync);
         group.MapPost("/purchases/{orderId:guid}/refund", RefundPurchaseAsync)
             .WithMetadata(new RequestSizeLimitAttribute(MaxAdminEconomyMutationRequestBodyBytes))
             .RequireAuthorization("AdminOnly");

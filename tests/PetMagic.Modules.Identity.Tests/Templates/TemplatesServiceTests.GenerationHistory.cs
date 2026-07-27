@@ -366,6 +366,97 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task ListAdminGenerationsAsync_ShouldSignPetPhotoInputPreview()
+    {
+        await using var dbContext = CreateDbContext();
+        var mediaStorage = new RecordingMediaStorage(signReadUrls: true);
+        var service = CreateService(dbContext, mediaStorage);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Pet photo admin preview", "Portrait", ["admin-jobs"]);
+        var userId = Guid.NewGuid();
+        var generationId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var petPhotoId = Guid.NewGuid();
+        var mediaId = Guid.NewGuid();
+        var previewPath = "templates-media/private/pets/admin-preview.webp";
+        var now = DateTime.UtcNow;
+
+        AddAdminPetPhotoFixture(dbContext, userId, petId, petPhotoId, mediaId, previewPath, now);
+        dbContext.TemplateGenerationJobs.Add(new TemplateGenerationJob
+        {
+            Id = generationId,
+            UserId = userId,
+            TemplateId = templateId,
+            Status = TemplateGenerationStatus.Completed,
+            TokenCost = 20,
+            SourceImageUrl = "templates-media/private/pets/admin-original.jpg",
+            SourceImageFileName = "admin-original.jpg",
+            SourceImageContentType = "image/jpeg",
+            InputSourceType = "pet_photo",
+            PetId = petId,
+            PetPhotoId = petPhotoId,
+            CreatedAtUtc = now.AddMinutes(-3),
+            QueuedAtUtc = now.AddMinutes(-3),
+            CompletedAtUtc = now.AddMinutes(-2),
+            UpdatedAtUtc = now.AddMinutes(-2)
+        });
+        await dbContext.SaveChangesAsync();
+
+        var page = await service.ListAdminGenerationsAsync(
+            new AdminTemplateGenerationsQuery("completed", null, userId.ToString(), generationId.ToString(), 0, 10),
+            CancellationToken.None);
+
+        Assert.True(page.IsSuccess, page.Error.Code);
+        var item = Assert.Single(page.Value.Items);
+        Assert.Equal($"{previewPath}?signed=1", item.InputPreviewUrl);
+        Assert.Contains(previewPath, mediaStorage.ReadUrls);
+    }
+
+    [Fact]
+    public async Task ListAdminGenerationsAsync_ShouldRedactPetPhotoInputPreview_WhenReadUrlSigningFails()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, new FailingReadMediaStorage());
+        var templateId = await CreateActiveImageTemplateAsync(service, "Private pet photo admin preview", "Portrait", ["admin-jobs"]);
+        var userId = Guid.NewGuid();
+        var generationId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var petPhotoId = Guid.NewGuid();
+        var mediaId = Guid.NewGuid();
+        var previewPath = "templates-media/private/pets/redacted-preview.webp";
+        var now = DateTime.UtcNow;
+
+        AddAdminPetPhotoFixture(dbContext, userId, petId, petPhotoId, mediaId, previewPath, now);
+        dbContext.TemplateGenerationJobs.Add(new TemplateGenerationJob
+        {
+            Id = generationId,
+            UserId = userId,
+            TemplateId = templateId,
+            Status = TemplateGenerationStatus.Completed,
+            TokenCost = 20,
+            SourceImageUrl = "templates-media/private/pets/redacted-original.jpg",
+            SourceImageFileName = "redacted-original.jpg",
+            SourceImageContentType = "image/jpeg",
+            InputSourceType = "pet_photo",
+            PetId = petId,
+            PetPhotoId = petPhotoId,
+            CreatedAtUtc = now.AddMinutes(-3),
+            QueuedAtUtc = now.AddMinutes(-3),
+            CompletedAtUtc = now.AddMinutes(-2),
+            UpdatedAtUtc = now.AddMinutes(-2)
+        });
+        await dbContext.SaveChangesAsync();
+
+        var page = await service.ListAdminGenerationsAsync(
+            new AdminTemplateGenerationsQuery("completed", null, userId.ToString(), generationId.ToString(), 0, 10),
+            CancellationToken.None);
+
+        Assert.True(page.IsSuccess, page.Error.Code);
+        var item = Assert.Single(page.Value.Items);
+        Assert.Null(item.InputPreviewUrl);
+        Assert.DoesNotContain(previewPath, JsonSerializer.Serialize(item), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task ListAdminGenerationsAsync_ShouldNotExposePrivatePreviewUrls_WhenReadUrlSigningFails()
     {
         await using var dbContext = CreateDbContext();
@@ -540,21 +631,30 @@ public sealed partial class TemplatesServiceTests
             CreateAdminMetricsJob(templateId, TemplateGenerationStatus.Retrying, todayStart.AddHours(3)),
             CreateAdminMetricsJob(templateId, TemplateGenerationStatus.Failed, todayStart.AddHours(4)),
             CreateAdminMetricsJob(templateId, TemplateGenerationStatus.Cancelled, todayStart.AddHours(5)),
-            CreateAdminMetricsJob(templateId, TemplateGenerationStatus.Completed, todayStart.AddDays(-40).AddHours(1)));
+            CreateAdminMetricsJob(templateId, TemplateGenerationStatus.SubmittingToProvider, todayStart.AddHours(6)),
+            CreateAdminMetricsJob(templateId, TemplateGenerationStatus.ProviderQueued, todayStart.AddHours(7)),
+            CreateAdminMetricsJob(templateId, TemplateGenerationStatus.ProviderProcessing, todayStart.AddHours(8)),
+            CreateAdminMetricsJob(templateId, TemplateGenerationStatus.ImportingMedia, todayStart.AddHours(9)),
+            CreateAdminMetricsJob(templateId, TemplateGenerationStatus.Completed, todayStart.AddDays(-40).AddHours(1)),
+            CreateAdminMetricsJob(
+                templateId,
+                TemplateGenerationStatus.Queued,
+                todayStart.AddHours(10),
+                TemplateGenerationService.AdminTestUserId));
         await dbContext.SaveChangesAsync();
 
         var metrics = await service.GetAdminGenerationDashboardMetricsAsync(CancellationToken.None);
 
         Assert.True(metrics.IsSuccess);
-        Assert.Equal(6, metrics.Value.TotalJobs);
-        Assert.Equal(5, metrics.Value.GenerationsToday);
-        Assert.Equal(5, metrics.Value.GenerationsThisWeek);
-        Assert.Equal(5, metrics.Value.GenerationsThisMonth);
+        Assert.Equal(10, metrics.Value.TotalJobs);
+        Assert.Equal(9, metrics.Value.GenerationsToday);
+        Assert.Equal(9, metrics.Value.GenerationsThisWeek);
+        Assert.Equal(9, metrics.Value.GenerationsThisMonth);
         Assert.Equal(1, metrics.Value.FailedGenerationsToday);
         Assert.Equal(1, metrics.Value.FailedGenerationsThisWeek);
         Assert.Equal(1, metrics.Value.FailedGenerationsThisMonth);
-        Assert.Equal(1, metrics.Value.PendingJobs);
-        Assert.Equal(1, metrics.Value.RunningJobs);
+        Assert.Equal(2, metrics.Value.PendingJobs);
+        Assert.Equal(5, metrics.Value.RunningJobs);
         Assert.Equal(1, metrics.Value.CompletedJobs);
         Assert.Equal(1, metrics.Value.FailedJobs);
         Assert.Equal(1, metrics.Value.CancelledJobs);
@@ -896,15 +996,63 @@ public sealed partial class TemplatesServiceTests
         };
     }
 
+    private static void AddAdminPetPhotoFixture(
+        PetMagic.Modules.Templates.Infrastructure.Data.TemplatesDbContext dbContext,
+        Guid userId,
+        Guid petId,
+        Guid petPhotoId,
+        Guid mediaId,
+        string thumbnailUrl,
+        DateTime createdAtUtc)
+    {
+        dbContext.Pets.Add(new Pet
+        {
+            Id = petId,
+            UserId = userId,
+            Name = "Admin preview pet",
+            Type = "dog",
+            Status = "active",
+            CreatedAtUtc = createdAtUtc,
+            UpdatedAtUtc = createdAtUtc
+        });
+        dbContext.TemplateMediaRecords.Add(new TemplateMediaRecord
+        {
+            Id = mediaId,
+            UserId = userId,
+            MediaType = "image",
+            StoragePath = "templates-media/private/pets/admin-original.jpg",
+            Url = "templates-media/private/pets/admin-original.jpg",
+            PreviewUrl = thumbnailUrl,
+            FileName = "admin-original.jpg",
+            ContentType = "image/jpeg",
+            SourceType = "pet_photo",
+            Role = TemplateMediaRole.GenerationSourceImage,
+            LifecycleState = TemplateMediaLifecycleState.AttachedToGeneration,
+            UploadedAtUtc = createdAtUtc,
+            AttachedAtUtc = createdAtUtc
+        });
+        dbContext.PetPhotos.Add(new PetPhoto
+        {
+            Id = petPhotoId,
+            PetId = petId,
+            UserId = userId,
+            MediaAssetId = mediaId,
+            ThumbnailUrl = thumbnailUrl,
+            Status = "active",
+            CreatedAtUtc = createdAtUtc
+        });
+    }
+
     private static TemplateGenerationJob CreateAdminMetricsJob(
         Guid templateId,
         TemplateGenerationStatus status,
-        DateTime createdAtUtc)
+        DateTime createdAtUtc,
+        Guid? userId = null)
     {
         return new TemplateGenerationJob
         {
             Id = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
+            UserId = userId ?? Guid.NewGuid(),
             TemplateId = templateId,
             Status = status,
             TokenCost = 20,

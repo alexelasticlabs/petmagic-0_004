@@ -10,7 +10,16 @@ public sealed record AdminAuditEntry(
     Guid? SubjectUserId = null,
     Guid? EventId = null,
     Guid? ActorUserId = null,
-    string? CorrelationId = null);
+    string? CorrelationId = null)
+{
+    public string? ActorRole { get; init; }
+
+    public string? IpAddress { get; init; }
+
+    public string? UserAgent { get; init; }
+
+    public DateTime? OccurredAtUtc { get; init; }
+}
 
 public interface IAdminAuditLog
 {

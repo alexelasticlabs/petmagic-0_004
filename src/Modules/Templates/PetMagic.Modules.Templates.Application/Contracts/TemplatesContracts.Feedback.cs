@@ -94,7 +94,8 @@ public sealed record AdminFeedbackDetailsResponse(
     string? AdminNote,
     AdminFeedbackGenerationContextResponse? Generation,
     bool CanRefund,
-    CreditRefundResponse? Refund);
+    CreditRefundResponse? Refund,
+    string? RefundUnavailableReason = null);
 
 public sealed record AdminFeedbackGenerationContextResponse(
     Guid GenerationId,

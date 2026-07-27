@@ -339,6 +339,43 @@ public sealed class AdminAdjustUserWalletCommandValidator : AbstractValidator<Ad
         RuleFor(x => x.Reason)
             .NotEmpty()
             .MaximumLength(120);
+        RuleFor(x => x.IdempotencyKey)
+            .MaximumLength(256);
+    }
+}
+
+public sealed class AdminRevokeUserSessionCommandValidator : AbstractValidator<AdminRevokeUserSessionCommand>
+{
+    public AdminRevokeUserSessionCommandValidator()
+    {
+        RuleFor(x => x.ActorUserId).NotEmpty();
+        RuleFor(x => x.UserId).NotEmpty();
+        RuleFor(x => x.SessionId).NotEmpty();
+        RuleFor(x => x.Reason)
+            .NotEmpty()
+            .Must(reason => !string.IsNullOrWhiteSpace(reason))
+            .WithMessage("users.session_reason_required")
+            .MaximumLength(240);
+        RuleFor(x => x.IdempotencyKey)
+            .NotEmpty()
+            .MaximumLength(256);
+    }
+}
+
+public sealed class AdminRevokeAllUserSessionsCommandValidator : AbstractValidator<AdminRevokeAllUserSessionsCommand>
+{
+    public AdminRevokeAllUserSessionsCommandValidator()
+    {
+        RuleFor(x => x.ActorUserId).NotEmpty();
+        RuleFor(x => x.UserId).NotEmpty();
+        RuleFor(x => x.Reason)
+            .NotEmpty()
+            .Must(reason => !string.IsNullOrWhiteSpace(reason))
+            .WithMessage("users.session_reason_required")
+            .MaximumLength(240);
+        RuleFor(x => x.IdempotencyKey)
+            .NotEmpty()
+            .MaximumLength(256);
     }
 }
 
@@ -358,6 +395,9 @@ public sealed class SendBulkEmailCommandValidator : AbstractValidator<SendBulkEm
         RuleFor(x => x.Body)
             .NotEmpty()
             .MaximumLength(10000);
+
+        RuleFor(x => x.IdempotencyKey)
+            .MaximumLength(256);
 
         RuleFor(x => x.UserIds)
             .Must((command, userIds) =>

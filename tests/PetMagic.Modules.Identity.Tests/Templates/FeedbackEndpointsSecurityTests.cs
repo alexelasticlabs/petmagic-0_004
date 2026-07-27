@@ -17,6 +17,7 @@ public sealed class FeedbackEndpointsSecurityTests
         Assert.Contains("private static ProblemHttpResult ToProblem(Error error)", source, StringComparison.Ordinal);
         Assert.Contains("\"templates.invalid_subject\" => StatusCodes.Status401Unauthorized", source, StringComparison.Ordinal);
         Assert.Contains("\"feedback.refund_unavailable\" => StatusCodes.Status409Conflict", source, StringComparison.Ordinal);
+        Assert.Contains("\"feedback.refund_already_issued\" => StatusCodes.Status409Conflict", source, StringComparison.Ordinal);
         Assert.Contains("extensions: BuildProblemExtensions(error.Code)", source, StringComparison.Ordinal);
         Assert.Contains("private static Dictionary<string, object?> BuildProblemExtensions(string errorCode)", source, StringComparison.Ordinal);
         Assert.Contains("[\"code\"] = errorCode", source, StringComparison.Ordinal);
@@ -127,7 +128,10 @@ public sealed class FeedbackEndpointsSecurityTests
             source,
             StringComparison.Ordinal);
         Assert.Contains("context.User.IsInRole(\"Admin\")", source, StringComparison.Ordinal);
-        Assert.Contains("details with { CanRefund = false, Refund = null }", source, StringComparison.Ordinal);
+        Assert.Contains(
+            "details with { CanRefund = false, Refund = null, RefundUnavailableReason = null }",
+            source,
+            StringComparison.Ordinal);
         Assert.Contains("GetAdminFeedbackAsync(", source, StringComparison.Ordinal);
         Assert.Contains("HttpContext context,", source, StringComparison.Ordinal);
     }

@@ -25,6 +25,9 @@ internal sealed class TemplateWatermarkRenderer(
     IHttpClientFactory httpClientFactory,
     ILogger<TemplateWatermarkRenderer> logger) : ITemplateWatermarkRenderer
 {
+    private static readonly FontCollection FallbackFontCollection = new();
+    private static readonly Lazy<FontFamily?> FallbackFontFamily = new(LoadFallbackFontFamily);
+
     public Task<Result<StoredMediaResponse>> CreateWatermarkedCopyAsync(
         StoredMediaResponse original,
         TemplateType mediaType,
@@ -389,16 +392,104 @@ internal sealed class TemplateWatermarkRenderer(
 
     private static Font ResolveFont(float size)
     {
-        var candidates = new[] { "Arial", "Helvetica", "DejaVu Sans", "Liberation Sans" };
-        foreach (var candidate in candidates)
+        var fallbackFamily = FallbackFontFamily.Value;
+        if (fallbackFamily is FontFamily fallbackFontFamily)
         {
-            if (SystemFonts.TryGet(candidate, out var family))
+            try
             {
-                return family.CreateFont(size, FontStyle.Bold);
+                return CreateWatermarkFont(fallbackFontFamily, size);
+            }
+            catch (Exception exception) when (exception is FontException or UnauthorizedAccessException)
+            {
+                // Continue to the system font list when this direct-file face cannot be used.
             }
         }
 
-        return SystemFonts.Collection.Families.First().CreateFont(size, FontStyle.Bold);
+        var candidates = new[] { "Arial", "Helvetica", "DejaVu Sans", "Liberation Sans" };
+        foreach (var candidate in candidates)
+        {
+            try
+            {
+                if (SystemFonts.TryGet(candidate, out var family))
+                {
+                    try
+                    {
+                        return CreateWatermarkFont(family, size);
+                    }
+                    catch (Exception exception) when (exception is FontException or UnauthorizedAccessException)
+                    {
+                        // A system font can be indexed but unreadable in a restricted host; try the file fallback.
+                    }
+                }
+            }
+            catch (Exception exception) when (exception is FontException or UnauthorizedAccessException)
+            {
+                // System font discovery can itself be denied in a restricted host.
+            }
+        }
+
+        try
+        {
+            foreach (var fallbackSystemFamily in SystemFonts.Collection.Families)
+            {
+                try
+                {
+                    return CreateWatermarkFont(fallbackSystemFamily, size);
+                }
+                catch (Exception exception) when (exception is FontException or UnauthorizedAccessException)
+                {
+                    // Try the next family instead of aborting watermark rendering on a single unreadable entry.
+                }
+            }
+        }
+        catch (Exception exception) when (exception is FontException or UnauthorizedAccessException)
+        {
+            // A final best-effort system font enumeration is not required when direct fallbacks are available.
+        }
+
+        throw new InvalidOperationException("No compatible font is available for image watermark rendering.");
+    }
+
+    private static Font CreateWatermarkFont(FontFamily family, float size)
+    {
+        return family.TryGetMetrics(FontStyle.Bold, out _)
+            ? family.CreateFont(size, FontStyle.Bold)
+            : family.CreateFont(size);
+    }
+
+    private static FontFamily? LoadFallbackFontFamily()
+    {
+        foreach (var fontFile in GetFallbackFontFiles())
+        {
+            if (!File.Exists(fontFile))
+            {
+                continue;
+            }
+
+            try
+            {
+                var fontBytes = File.ReadAllBytes(fontFile);
+                using var fontStream = new MemoryStream(fontBytes, writable: false);
+                return FallbackFontCollection.Add(fontStream);
+            }
+            catch (Exception exception) when (exception is FontException or IOException or UnauthorizedAccessException)
+            {
+                // A host font can be unreadable or malformed; continue to the next known-good candidate.
+            }
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<string> GetFallbackFontFiles()
+    {
+        yield return @"C:\Windows\Fonts\arialbd.ttf";
+        yield return @"C:\Windows\Fonts\arial.ttf";
+        yield return "/System/Library/Fonts/Supplemental/Arial Bold.ttf";
+        yield return "/System/Library/Fonts/Supplemental/Arial.ttf";
+        yield return "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
+        yield return "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
+        yield return "/usr/share/fonts/liberation/LiberationSans-Bold.ttf";
     }
 
     private static string? ResolveVideoFontFile()

@@ -421,6 +421,62 @@ public sealed class AuthEndpointsNativeGoogleTests
     }
 
     [Fact]
+    public async Task Logout_ShouldRevokeCookieBackedRefreshSessionWithoutAccessToken()
+    {
+        var service = new FakeIdentityService();
+        await using var app = await TestApplication.CreateAsync(
+            new FakeGoogleIdentityTokenVerifier(isConfigured: true, clientId: "google-web-client-id"),
+            service);
+        app.Client.DefaultRequestHeaders.Add("Cookie", "petmagic_refresh_token=cookie-refresh-token");
+        app.Client.DefaultRequestHeaders.Add("X-PetMagic-Logout-Intent", "logout");
+
+        var response = await app.Client.PostAsync("/api/auth/logout", null);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.NotNull(service.LastRefreshTokenLogoutCommand);
+        Assert.Equal("cookie-refresh-token", service.LastRefreshTokenLogoutCommand!.RefreshToken);
+        Assert.True(response.Headers.TryGetValues("Set-Cookie", out var setCookieValues));
+        Assert.Contains(
+            setCookieValues,
+            value => value.Contains("petmagic_refresh_token=", StringComparison.Ordinal)
+                && value.Contains("expires=", StringComparison.OrdinalIgnoreCase));
+        AssertNoStoreCacheHeaders(response);
+    }
+
+    [Fact]
+    public async Task Logout_ShouldRejectCookieBackedRequestWithoutIntentHeader()
+    {
+        var service = new FakeIdentityService();
+        await using var app = await TestApplication.CreateAsync(
+            new FakeGoogleIdentityTokenVerifier(isConfigured: true, clientId: "google-web-client-id"),
+            service);
+        app.Client.DefaultRequestHeaders.Add("Cookie", "petmagic_refresh_token=cookie-refresh-token");
+
+        var response = await app.Client.PostAsync("/api/auth/logout", null);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Null(service.LastRefreshTokenLogoutCommand);
+    }
+
+    [Fact]
+    public async Task Logout_ShouldRevokeBodyRefreshTokenForNativeClientWithoutIntentHeader()
+    {
+        var service = new FakeIdentityService();
+        await using var app = await TestApplication.CreateAsync(
+            new FakeGoogleIdentityTokenVerifier(isConfigured: true, clientId: "google-web-client-id"),
+            service);
+
+        var response = await app.Client.PostAsJsonAsync(
+            "/api/auth/logout",
+            new { refreshToken = "native-refresh-token" });
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.NotNull(service.LastRefreshTokenLogoutCommand);
+        Assert.Equal("native-refresh-token", service.LastRefreshTokenLogoutCommand!.RefreshToken);
+        AssertNoStoreCacheHeaders(response);
+    }
+
+    [Fact]
     public async Task Refresh_ShouldSetSecureRefreshCookie_WhenRequestIsHttps()
     {
         var verifier = new FakeGoogleIdentityTokenVerifier(isConfigured: true, clientId: "google-web-client-id");
@@ -689,6 +745,8 @@ public sealed class AuthEndpointsNativeGoogleTests
 
         public RefreshTokenCommand? LastRefreshCommand { get; private set; }
 
+        public RefreshTokenCommand? LastRefreshTokenLogoutCommand { get; private set; }
+
         public UpdateUserAvatarCommand? LastUpdateAvatarCommand { get; private set; }
 
         public Task<Result<LegalDocumentsResponse>> GetCurrentLegalDocumentsAsync(string? locale, CancellationToken cancellationToken)
@@ -806,9 +864,14 @@ public sealed class AuthEndpointsNativeGoogleTests
                     false,
                     DefaultLegalAcceptance,
                     ["user"],
-                    null))));
+                null))));
         }
         public Task<Result> LogoutAsync(LogoutCommand command, CancellationToken cancellationToken) => NotSupported();
+        public Task<Result> LogoutByRefreshTokenAsync(RefreshTokenCommand command, CancellationToken cancellationToken)
+        {
+            LastRefreshTokenLogoutCommand = command;
+            return Task.FromResult(Result.Success());
+        }
         public Task<Result> DeleteCurrentUserAsync(DeleteCurrentUserCommand command, CancellationToken cancellationToken) => NotSupported();
         public Task<Result<UserProfileResponse>> GetCurrentUserAsync(Guid userId, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
         public Task<Result<UserProfileResponse>> UpdateCurrentUserProfileAsync(Guid userId, UpdateCurrentUserProfileCommand command, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
@@ -823,8 +886,14 @@ public sealed class AuthEndpointsNativeGoogleTests
         public Task<Result<AdminUserDashboardMetricsResponse>> GetAdminUserDashboardMetricsAsync(CancellationToken cancellationToken) => NotSupported<AdminUserDashboardMetricsResponse>();
         public Task<Result<AdminUserDetailResponse>> GetAdminUserAsync(Guid userId, CancellationToken cancellationToken) => NotSupported<AdminUserDetailResponse>();
         public Task<Result<AdminUserAnalyticsResponse>> GetAdminUserAnalyticsAsync(Guid userId, CancellationToken cancellationToken) => NotSupported<AdminUserAnalyticsResponse>();
+        public Task<Result<AdminUserSessionsResponse>> GetAdminUserSessionsAsync(Guid userId, CancellationToken cancellationToken) => NotSupported<AdminUserSessionsResponse>();
+        public Task<Result<AdminUserSessionRevokeResponse>> RevokeAdminUserSessionAsync(AdminRevokeUserSessionCommand command, CancellationToken cancellationToken) => NotSupported<AdminUserSessionRevokeResponse>();
+        public Task<Result<AdminUserSessionRevokeResponse>> RevokeAllAdminUserSessionsAsync(AdminRevokeAllUserSessionsCommand command, CancellationToken cancellationToken) => NotSupported<AdminUserSessionRevokeResponse>();
         public Task<Result<AdminUserWalletOperationResponse>> AdjustAdminUserWalletAsync(AdminAdjustUserWalletCommand command, CancellationToken cancellationToken) => NotSupported<AdminUserWalletOperationResponse>();
-        public Task<Result> SendBulkEmailAsync(SendBulkEmailCommand command, CancellationToken cancellationToken) => NotSupported();
+        public Task<Result<AdminEmailBroadcastQueueResponse>> SendBulkEmailAsync(SendBulkEmailCommand command, CancellationToken cancellationToken) => NotSupported<AdminEmailBroadcastQueueResponse>();
+        public Task<Result<AdminEmailBroadcastsPageResponse>> ListAdminEmailBroadcastsAsync(int skip, int take, string? status, CancellationToken cancellationToken) => NotSupported<AdminEmailBroadcastsPageResponse>();
+        public Task<Result<AdminEmailBroadcastDetailResponse>> GetAdminEmailBroadcastAsync(Guid broadcastId, CancellationToken cancellationToken) => NotSupported<AdminEmailBroadcastDetailResponse>();
+        public Task<Result<AdminEmailBroadcastRetryResponse>> RetryFailedAdminEmailBroadcastAsync(Guid broadcastId, CancellationToken cancellationToken) => NotSupported<AdminEmailBroadcastRetryResponse>();
         public Task<Result> AssignRoleAsync(AssignRoleCommand command, CancellationToken cancellationToken) => NotSupported();
         public Task<Result> RevokeRoleAsync(RevokeRoleCommand command, CancellationToken cancellationToken) => NotSupported();
         public Task<Result> SetPremiumStatusAsync(SetPremiumStatusCommand command, CancellationToken cancellationToken) => NotSupported();

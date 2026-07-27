@@ -42,7 +42,8 @@ public sealed record AdminAdjustUserWalletCommand(
     Guid UserId,
     string Operation,
     int Amount,
-    string Reason);
+    string Reason,
+    string? IdempotencyKey = null);
 
 public sealed record DeleteAdminUserCommand(Guid UserId);
 

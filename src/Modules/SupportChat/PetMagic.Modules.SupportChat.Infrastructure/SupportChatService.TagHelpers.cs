@@ -1,5 +1,7 @@
 using System.Text.Json;
 
+using PetMagic.Modules.SupportChat.Application.Contracts;
+
 namespace PetMagic.Modules.SupportChat.Infrastructure;
 
 public sealed partial class SupportChatService
@@ -39,7 +41,8 @@ public sealed partial class SupportChatService
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        if (normalized.Count > 8 || normalized.Any(tag => tag.Length > 32))
+        if (normalized.Count > SupportConversationMetadataLimits.MaxTagCount ||
+            normalized.Any(tag => tag.Length > SupportConversationMetadataLimits.MaxTagLength))
         {
             return null;
         }

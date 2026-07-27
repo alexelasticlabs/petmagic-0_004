@@ -1,4 +1,8 @@
+using System.Security.Claims;
+
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
@@ -12,7 +16,9 @@ namespace PetMagic.Modules.Gamification.Infrastructure.Services;
 public sealed class GamificationAdminService(
     GamificationDbContext dbContext,
     IGamificationService gamificationService,
-    IAdminAuditLog adminAuditLog) : IGamificationAdminService
+    IAdminAuditLog adminAuditLog,
+    IHttpContextAccessor httpContextAccessor,
+    ILogger<GamificationAdminService> logger) : IGamificationAdminService
 {
     public async Task<Result<AdminGamificationDashboardMetricsResponse>> GetAdminDashboardMetricsAsync(CancellationToken cancellationToken)
     {
@@ -145,16 +151,122 @@ public sealed class GamificationAdminService(
             .ThenByDescending(x => x.Xp)
             .ThenByDescending(x => x.LastGenerationAtUtc)
             .ToListAsync(cancellationToken);
+        var history = await BuildAdminUserHistoryAsync(userId, cancellationToken);
 
         var response = new AdminUserGamificationOverviewResponse(
             userId,
             streak,
             pets.Select(MapPetProgress).ToList(),
             achievements,
-            currentChallenges);
+            currentChallenges)
+        {
+            History = history
+        };
 
         return Result.Success(response);
     }
+
+    private async Task<IReadOnlyList<AdminUserGamificationHistoryItemResponse>> BuildAdminUserHistoryAsync(
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        const int definitionVersion = 1;
+        const int itemLimit = 100;
+
+        var achievementRows = await dbContext.UserAchievements
+            .AsNoTracking()
+            .Where(x => x.UserId == userId)
+            .OrderByDescending(x => x.UnlockedAtUtc)
+            .Take(50)
+            .ToListAsync(cancellationToken);
+        var achievementKeys = achievementRows
+            .Select(x => NormalizeAchievementKey(x.AchievementKey))
+            .Where(x => x.Length > 0)
+            .ToHashSet(StringComparer.Ordinal);
+        var achievementRewards = achievementKeys.Count == 0
+            ? new Dictionary<string, int>(StringComparer.Ordinal)
+            : (await dbContext.AchievementDefinitions
+                    .AsNoTracking()
+                    .Where(x => achievementKeys.Contains(x.Key))
+                    .Select(x => new { x.Key, x.RewardSpark })
+                    .ToListAsync(cancellationToken))
+                .GroupBy(x => NormalizeAchievementKey(x.Key), StringComparer.Ordinal)
+                .ToDictionary(x => x.Key, x => x.First().RewardSpark, StringComparer.Ordinal);
+
+        var challengeRows = await (
+                from progress in dbContext.UserChallengeProgresses.AsNoTracking()
+                join challenge in dbContext.WeeklyChallenges.AsNoTracking()
+                    on progress.ChallengeId equals challenge.Id
+                where progress.UserId == userId
+                orderby progress.CompletedAtUtc ?? challenge.CreatedAtUtc descending
+                select new
+                {
+                    progress.Id,
+                    progress.Completed,
+                    progress.CompletedAtUtc,
+                    progress.RewardCredited,
+                    challenge.ChallengeType,
+                    challenge.RewardSpark,
+                    challenge.CreatedAtUtc
+                })
+            .Take(50)
+            .ToListAsync(cancellationToken);
+
+        var recentActivity = await dbContext.GenerationEvents
+            .AsNoTracking()
+            .Where(x => x.UserId == userId)
+            .OrderByDescending(x => x.OccurredAtUtc)
+            .Select(x => new { x.GenerationId, x.OccurredAtUtc })
+            .Take(200)
+            .ToListAsync(cancellationToken);
+
+        var items = new List<AdminUserGamificationHistoryItemResponse>(
+            achievementRows.Count + challengeRows.Count + 30);
+        items.AddRange(achievementRows.Select(row =>
+        {
+            var key = NormalizeAchievementKey(row.AchievementKey);
+            var rewardSpark = achievementRewards.GetValueOrDefault(key);
+            return new AdminUserGamificationHistoryItemResponse(
+                row.Id.ToString("D"),
+                "achievement_reward",
+                key,
+                ResolveRewardStatus(rewardSpark, row.RewardCredited),
+                rewardSpark,
+                row.UnlockedAtUtc,
+                definitionVersion);
+        }));
+        items.AddRange(challengeRows.Select(row => new AdminUserGamificationHistoryItemResponse(
+            row.Id.ToString("D"),
+            "challenge_reward",
+            row.ChallengeType?.Trim() ?? string.Empty,
+            row.Completed
+                ? ResolveRewardStatus(row.RewardSpark, row.RewardCredited)
+                : "in_progress",
+            row.RewardSpark,
+            row.CompletedAtUtc ?? row.CreatedAtUtc,
+            definitionVersion)));
+        items.AddRange(recentActivity
+            .GroupBy(x => DateOnly.FromDateTime(x.OccurredAtUtc))
+            .OrderByDescending(x => x.Key)
+            .Take(30)
+            .Select(group => new AdminUserGamificationHistoryItemResponse(
+                $"streak:{group.Key:yyyy-MM-dd}",
+                "streak_activity",
+                group.Key.ToString("yyyy-MM-dd"),
+                "recorded",
+                0,
+                DateTime.SpecifyKind(group.Key.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc),
+                definitionVersion)));
+
+        return items
+            .OrderByDescending(x => x.OccurredAtUtc)
+            .ThenBy(x => x.EventId, StringComparer.Ordinal)
+            .Take(itemLimit)
+            .ToList();
+    }
+
+    private static string ResolveRewardStatus(int rewardSpark, bool rewardCredited) =>
+        rewardSpark <= 0 ? "no_reward" : rewardCredited ? "credited" : "pending";
 
     public async Task<Result> ResetAdminUserStreakAsync(
         AdminResetUserStreakCommand command,
@@ -174,21 +286,48 @@ public sealed class GamificationAdminService(
             return Result.Failure(GamificationErrors.StreakNotFound);
         }
 
+        var occurredAtUtc = DateTime.UtcNow;
+        var httpContext = httpContextAccessor.HttpContext;
         var oldValue = $"current={streak.CurrentStreak};longest={streak.LongestStreak};last_active={streak.LastActiveDate:yyyy-MM-dd}";
+        var auditEntry = new AdminAuditEntry(
+            "admin.gamification.streak.reset",
+            "DailyStreak",
+            streak.Id.ToString("D"),
+            oldValue,
+            "deleted",
+            reason,
+            command.UserId,
+            EventId: Guid.NewGuid(),
+            ActorUserId: command.AdminUserId,
+            CorrelationId: CorrelationContext.ResolveOrCreate())
+        {
+            ActorRole = ResolveActorRole(httpContext),
+            IpAddress = SanitizeOptionalText(httpContext?.Connection.RemoteIpAddress?.ToString(), 64),
+            UserAgent = SanitizeOptionalText(httpContext?.Request.Headers.UserAgent.ToString(), 512),
+            OccurredAtUtc = occurredAtUtc
+        };
+
         dbContext.DailyStreaks.Remove(streak);
+        GamificationAdminAuditOutbox.Enqueue(dbContext, auditEntry);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        await adminAuditLog.WriteAsync(
-            new AdminAuditEntry(
-                "admin.gamification.streak.reset",
-                "DailyStreak",
-                streak.Id.ToString("D"),
-                oldValue,
-                "deleted",
-                reason,
-                command.UserId,
-                ActorUserId: command.AdminUserId),
-            cancellationToken);
+        try
+        {
+            await adminAuditLog.WriteAsync(auditEntry, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            logger.LogWarning(
+                "Immediate gamification streak reset audit was cancelled and remains queued. StreakIdHash={StreakIdHash}",
+                SafeLogValues.StableHash(streak.Id.ToString("D")));
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(
+                "Immediate gamification streak reset audit failed and remains queued. StreakIdHash={StreakIdHash} ExceptionType={ExceptionType}",
+                SafeLogValues.StableHash(streak.Id.ToString("D")),
+                SafeLogValues.ExceptionType(exception));
+        }
 
         return Result.Success();
     }
@@ -210,6 +349,25 @@ public sealed class GamificationAdminService(
             daysActive,
             progress.FavoriteTemplateId,
             progress.LastGenerationAtUtc);
+    }
+
+    private static string? ResolveActorRole(HttpContext? httpContext)
+    {
+        var roles = httpContext?.User.FindAll(ClaimTypes.Role)
+            .Select(claim => claim.Value)
+            .Where(role => !string.IsNullOrWhiteSpace(role))
+            .OrderBy(role => role, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return roles is { Length: > 0 }
+            ? SanitizeOptionalText(string.Join(",", roles), 80)
+            : null;
+    }
+
+    private static string? SanitizeOptionalText(string? value, int maxLength)
+    {
+        var sanitized = SafeLogValues.SanitizeText(value, maxLength);
+        return sanitized.Length > 0 ? sanitized : null;
     }
 
     private static string NormalizeAchievementKey(string? value) => value?.Trim() ?? string.Empty;

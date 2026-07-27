@@ -27,12 +27,41 @@ public sealed class DataProtectionCertificateLoaderTests
 
             Assert.True(File.Exists(certificatePath));
             Assert.False(string.IsNullOrWhiteSpace(certificate.Thumbprint));
+            Assert.True(certificate.HasPrivateKey);
             var entry = Assert.Single(logger.Entries, x => x.LogLevel == LogLevel.Information);
             Assert.Contains("Development Data Protection certificate generated.", entry.Message, StringComparison.Ordinal);
             Assert.Equal(Path.GetFileName(certificatePath), entry.Properties["CertificateFileName"]);
             Assert.Equal(SafeLogValues.StableHash(certificatePath), entry.Properties["CertificatePathHash"]);
             Assert.DoesNotContain("CertificatePath", entry.Properties.Keys);
             Assert.Equal("PetMagic.Host.Api", entry.Properties["ApplicationName"]);
+        }
+        finally
+        {
+            Directory.Delete(tempDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void LoadOrCreateDevelopmentCertificate_ShouldReloadExistingCertificate_WithPrivateKey()
+    {
+        var tempDirectory = CreateTempDirectory();
+        try
+        {
+            var certificatePath = Path.Combine(tempDirectory, "petmagic-data-protection-dev.pfx");
+
+            using var generatedCertificate = DataProtectionCertificateLoader.LoadOrCreateDevelopmentCertificate(
+                certificatePath,
+                "test-password",
+                "PetMagic.Host.Api");
+            using var reloadedCertificate = DataProtectionCertificateLoader.LoadOrCreateDevelopmentCertificate(
+                certificatePath,
+                "test-password",
+                "PetMagic.Host.Api");
+
+            Assert.Equal(generatedCertificate.Thumbprint, reloadedCertificate.Thumbprint);
+            Assert.True(reloadedCertificate.HasPrivateKey);
+            using var privateKey = reloadedCertificate.GetRSAPrivateKey();
+            Assert.NotNull(privateKey);
         }
         finally
         {

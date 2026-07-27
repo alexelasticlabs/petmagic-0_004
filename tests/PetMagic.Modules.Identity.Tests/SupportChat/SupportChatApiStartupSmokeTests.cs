@@ -15,6 +15,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
+using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.SupportChat.Api;
 using PetMagic.Modules.SupportChat.Application.Abstractions;
 
@@ -46,6 +47,7 @@ public sealed class SupportChatApiStartupSmokeTests
     [InlineData("POST", "/api/support/conversation/open", "support-chat")]
     [InlineData("POST", "/api/support/conversation/{conversationId:guid}/messages", "support-chat")]
     [InlineData("GET", "/api/admin/support/tickets", "admin")]
+    [InlineData("GET", "/api/admin/users/{userId:guid}/support/tickets", "admin")]
     [InlineData("POST", "/api/admin/support/tickets/{conversationId:guid}/messages", "support-chat")]
     [InlineData("GET", "/api/admin/support/templates", "admin")]
     public async Task SupportChatEndpoints_ShouldUseExpectedRateLimitPolicies(
@@ -175,6 +177,7 @@ public sealed class SupportChatApiStartupSmokeTests
                 throw new NotSupportedException("ISupportAttachmentStorage should not be resolved during startup smoke test."));
             builder.Services.AddScoped<ISupportReplyTemplateCatalogService>(_ =>
                 throw new NotSupportedException("ISupportReplyTemplateCatalogService should not be resolved during startup smoke test."));
+            builder.Services.AddScoped<IIdentityUserLookupService, StartupSmokeIdentityUserLookupService>();
 
             builder.Services.AddSupportChatApiModule();
 
@@ -278,6 +281,25 @@ public sealed class SupportChatApiStartupSmokeTests
                 .Order(StringComparer.Ordinal)
                 .ToArray();
         }
+    }
+
+    private sealed class StartupSmokeIdentityUserLookupService : IIdentityUserLookupService
+    {
+        public Task<IReadOnlyList<Guid>> GetActiveUserIdsInRolesAsync(
+            IReadOnlyCollection<string> roles,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<Guid>>([]);
+
+        public Task<IReadOnlyDictionary<Guid, IdentityUserLookup>> GetUsersByIdsAsync(
+            IReadOnlyCollection<Guid> userIds,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyDictionary<Guid, IdentityUserLookup>>(
+                new Dictionary<Guid, IdentityUserLookup>());
+
+        public Task<IdentityUserLookup?> GetUserByIdAsync(
+            Guid userId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IdentityUserLookup?>(null);
     }
 
     private sealed class TestAuthHandler(

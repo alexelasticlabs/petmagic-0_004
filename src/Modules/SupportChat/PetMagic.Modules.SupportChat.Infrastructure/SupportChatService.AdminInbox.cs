@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Identity.Application.Abstractions;
+using PetMagic.Modules.Identity.Domain.Enums;
 using PetMagic.Modules.SupportChat.Application.Contracts;
 using PetMagic.Modules.SupportChat.Domain.Enums;
 
@@ -14,6 +15,11 @@ public sealed partial class SupportChatService
         var conversationsQuery = supportChatDbContext.SupportConversations
             .AsNoTracking()
             .AsQueryable();
+
+        if (query.InitiatorUserId.HasValue)
+        {
+            conversationsQuery = conversationsQuery.Where(x => x.InitiatorUserId == query.InitiatorUserId.Value);
+        }
 
         var requestedStatusFilters = (query.Statuses is { Count: > 0 }
                 ? query.Statuses
@@ -49,7 +55,7 @@ public sealed partial class SupportChatService
         }
 
         var normalizedQueue = query.Queue?.Trim().ToLowerInvariant();
-        if (normalizedQueue is not (null or "" or "all" or "waiting_for_support"))
+        if (normalizedQueue is not (null or "" or "all" or "waiting_for_support" or "unread"))
         {
             return Result.Failure<SupportConversationInboxPageResponse>(InvalidQueue);
         }
@@ -59,6 +65,12 @@ public sealed partial class SupportChatService
             conversationsQuery = conversationsQuery.Where(x =>
                 x.Status == SupportConversationStatus.New
                 || x.Status == SupportConversationStatus.InProgress);
+        }
+
+        if (normalizedQueue == "unread")
+        {
+            conversationsQuery = conversationsQuery.Where(x =>
+                x.Messages.Any(message => !message.IsFromAdmin && message.ReadAtUtc == null));
         }
 
         if (!string.IsNullOrWhiteSpace(query.Source))
@@ -165,6 +177,7 @@ public sealed partial class SupportChatService
                 conversation.Id,
                 conversation.InitiatorUserId,
                 conversation.AssignedAdminId,
+                conversation.Version,
                 conversation.Status,
                 conversation.Priority,
                 conversation.Source,
@@ -174,6 +187,9 @@ public sealed partial class SupportChatService
                 conversation.LastMessagePreview,
                 conversation.LastMessageSenderType,
                 conversation.WaitingSinceUtc,
+                conversation.FirstResponseAtUtc,
+                conversation.ResolutionSlaPausedAtUtc,
+                conversation.ResolutionSlaPausedSeconds,
                 conversation.CreatedAtUtc,
                 conversation.UpdatedAtUtc,
                 conversation.ResolvedAtUtc,
@@ -250,7 +266,16 @@ public sealed partial class SupportChatService
                 conversation.ReopenedByUserId,
                 conversation.FeedbackRating,
                 IsConversationReadOnly(normalizedStatus, conversation.ResolvedAtUtc, conversation.ReopenUntilUtc, conversation.ClosedAtUtc, now),
-                CanReopenConversation(normalizedStatus, conversation.ResolvedAtUtc, conversation.ReopenUntilUtc, now));
+                CanReopenConversation(normalizedStatus, conversation.ResolvedAtUtc, conversation.ReopenUntilUtc, now),
+                conversation.Version,
+                BuildSla(
+                    conversation.Priority,
+                    conversation.CreatedAtUtc,
+                    conversation.FirstResponseAtUtc,
+                    conversation.ResolvedAtUtc,
+                    conversation.ResolutionSlaPausedAtUtc,
+                    conversation.ResolutionSlaPausedSeconds,
+                    now));
         }).ToList();
 
         return Result.Success(new SupportConversationInboxPageResponse(
@@ -277,16 +302,55 @@ public sealed partial class SupportChatService
             })
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (metrics is null)
-        {
-            return Result.Success(new AdminSupportInboxMetricsResponse(0, 0, 0, 0, 0));
-        }
+        var activeOperatorIds = await identityUserLookupService.GetActiveUserIdsInRolesAsync(
+            [SystemRoles.Admin, SystemRoles.Moderator],
+            cancellationToken);
+        var workloadRows = await supportChatDbContext.SupportConversations
+            .AsNoTracking()
+            .Where(conversation =>
+                conversation.AssignedAdminId.HasValue
+                && activeOperatorIds.Contains(conversation.AssignedAdminId.Value)
+                && conversation.Status != SupportConversationStatus.Closed)
+            .GroupBy(conversation => new
+            {
+                OperatorUserId = conversation.AssignedAdminId!.Value,
+                conversation.Priority,
+                conversation.Status,
+            })
+            .Select(group => new
+            {
+                group.Key.OperatorUserId,
+                group.Key.Priority,
+                group.Key.Status,
+                Count = group.Count(),
+            })
+            .ToListAsync(cancellationToken);
+        var operators = await identityUserLookupService.GetUsersByIdsAsync(activeOperatorIds, cancellationToken);
+        var workloads = activeOperatorIds
+            .Select(operatorUserId =>
+            {
+                operators.TryGetValue(operatorUserId, out var operatorUser);
+                var operatorRows = workloadRows.Where(row => row.OperatorUserId == operatorUserId).ToList();
+                return new AdminSupportOperatorWorkloadResponse(
+                    operatorUserId,
+                    ResolveDisplayName(operatorUser?.Email, operatorUser?.DisplayName, isAdminSender: true),
+                    operatorRows.Sum(row => row.Count),
+                    operatorRows.Where(row => row.Priority == SupportConversationPriority.High).Sum(row => row.Count),
+                    operatorRows.Where(row => row.Priority == SupportConversationPriority.Urgent).Sum(row => row.Count),
+                    operatorRows.Where(row => row.Status == SupportConversationStatus.WaitingForUser).Sum(row => row.Count));
+            })
+            .OrderByDescending(workload => workload.UrgentConversations)
+            .ThenByDescending(workload => workload.HighPriorityConversations)
+            .ThenByDescending(workload => workload.OpenConversations)
+            .ThenBy(workload => workload.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
         return Result.Success(new AdminSupportInboxMetricsResponse(
-            metrics.TotalConversations,
-            Math.Max(0, metrics.TotalConversations - metrics.ClosedConversations),
-            metrics.ClosedConversations,
-            metrics.UnassignedConversations,
-            metrics.UnreadForAdminConversations));
+            metrics?.TotalConversations ?? 0,
+            Math.Max(0, (metrics?.TotalConversations ?? 0) - (metrics?.ClosedConversations ?? 0)),
+            metrics?.ClosedConversations ?? 0,
+            metrics?.UnassignedConversations ?? 0,
+            metrics?.UnreadForAdminConversations ?? 0,
+            workloads));
     }
 }

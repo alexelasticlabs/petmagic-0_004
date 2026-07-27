@@ -74,7 +74,7 @@ public sealed record UpdateImageTemplateCommand(
     bool RecommendedAfterImageGeneration = false,
     bool SupportsGenerateSimilar = true,
     string DefaultVariationStrength = "medium",
-    bool IsQaOnly = false,
+    bool? IsQaOnly = null,
     TemplateAssetCommand? ThumbnailAsset = null,
     TemplateAssetCommand? AnimatedPreviewAsset = null,
     TemplateAssetCommand? FeedLoopLowAsset = null,
@@ -136,7 +136,7 @@ public sealed record UpdateVideoTemplateCommand(
     bool RecommendedAfterImageGeneration = false,
     bool SupportsGenerateSimilar = true,
     string DefaultVariationStrength = "medium",
-    bool IsQaOnly = false,
+    bool? IsQaOnly = null,
     TemplateAssetCommand? ThumbnailAsset = null,
     TemplateAssetCommand? AnimatedPreviewAsset = null,
     TemplateAssetCommand? FeedLoopLowAsset = null,
@@ -180,7 +180,8 @@ public sealed record UpdateTemplateOfTheDayCommand(
     int Priority,
     string? TitleOverride,
     string? SubtitleOverride,
-    string? BadgeTextOverride);
+    string? BadgeTextOverride,
+    Guid? UpdatedByAdminId = null);
 
 public sealed record AutoPickTemplateOfTheDayCommand(
     DateOnly Date,

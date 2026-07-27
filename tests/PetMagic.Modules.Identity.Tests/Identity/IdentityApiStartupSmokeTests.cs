@@ -124,6 +124,8 @@ public sealed class IdentityApiStartupSmokeTests
     [InlineData("DELETE", "/api/admin/users/{userId:guid}/role")]
     [InlineData("DELETE", "/api/admin/users/{userId:guid}")]
     [InlineData("PUT", "/api/admin/users/{userId:guid}/active")]
+    [InlineData("POST", "/api/admin/users/{userId:guid}/sessions/{sessionId:guid}/revoke")]
+    [InlineData("POST", "/api/admin/users/{userId:guid}/sessions/revoke-all")]
     public async Task AdminUserSmallMutationEndpoints_ShouldLimitRequestBodiesBeforeHandlerExecution(
         string method,
         string routePattern)

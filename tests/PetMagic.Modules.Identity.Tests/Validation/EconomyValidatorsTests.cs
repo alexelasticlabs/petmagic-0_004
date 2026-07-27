@@ -181,6 +181,38 @@ public sealed class EconomyValidatorsTests
         Assert.False(result.IsValid);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void AdminRevokePremiumSubscriptionValidator_ShouldRequireAuditReason(string? reason)
+    {
+        var validator = new AdminRevokePremiumSubscriptionCommandValidator();
+        var result = validator.Validate(new AdminRevokePremiumSubscriptionCommand(
+            Guid.NewGuid(),
+            "stripe",
+            reason));
+
+        Assert.False(result.IsValid);
+        Assert.Contains(
+            result.Errors,
+            error => error.PropertyName == "Reason"
+                && error.ErrorMessage == "economy.admin_premium_revoke_reason_required");
+    }
+
+    [Fact]
+    public void AdminRevokePremiumSubscriptionValidator_ShouldBoundAuditReason()
+    {
+        var validator = new AdminRevokePremiumSubscriptionCommandValidator();
+        var result = validator.Validate(new AdminRevokePremiumSubscriptionCommand(
+            Guid.NewGuid(),
+            "stripe",
+            new string('r', 501)));
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error => error.PropertyName == "Reason");
+    }
+
     [Fact]
     public void UpdateSubscriptionPlanValidator_ShouldFail_WhenActivePlanMissingProviderIds()
     {
@@ -301,5 +333,21 @@ public sealed class EconomyValidatorsTests
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, error => error.PropertyName == "WarningMessage");
+    }
+
+    [Fact]
+    public void AdminEconomyIncidentActionValidator_ShouldRequireExternalReference_ForManualRefundMark()
+    {
+        var validator = new AdminEconomyIncidentActionCommandValidator();
+        var result = validator.Validate(new AdminEconomyIncidentActionCommand(
+            Guid.NewGuid(),
+            "manual_refund_mark",
+            "Provider refund was verified."));
+
+        Assert.False(result.IsValid);
+        Assert.Contains(
+            result.Errors,
+            error => error.PropertyName == "ExternalReferenceId"
+                && error.ErrorMessage == "economy.incident_external_reference_required");
     }
 }

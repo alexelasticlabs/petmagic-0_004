@@ -31,18 +31,20 @@ internal sealed class IdentityAdminAuditLog(
             Id = entry.EventId ?? Guid.NewGuid(),
             SubjectUserId = entry.SubjectUserId,
             ActorUserId = entry.ActorUserId ?? ResolveActorUserId(httpContext),
-            ActorRole = ResolveActorRole(httpContext),
+            ActorRole = SanitizeAndTruncate(entry.ActorRole ?? ResolveActorRole(httpContext), 80),
             Action = Truncate(entry.Action, 120) ?? string.Empty,
             TargetType = Truncate(entry.TargetType, 80),
             TargetId = SanitizeAndTruncate(entry.TargetId, 160),
             OldValue = SanitizeAndTruncate(entry.OldValue, 2000),
             NewValue = SanitizeAndTruncate(entry.NewValue, 2000),
-            IpAddress = Truncate(ResolveClientIpAddress(httpContext), 64),
-            UserAgent = SanitizeAndTruncate(httpContext?.Request.Headers.UserAgent.ToString(), 512),
+            IpAddress = SanitizeAndTruncate(entry.IpAddress ?? ResolveClientIpAddress(httpContext), 64),
+            UserAgent = SanitizeAndTruncate(
+                entry.UserAgent ?? httpContext?.Request.Headers.UserAgent.ToString(),
+                512),
             CorrelationId = Truncate(entry.CorrelationId ?? CorrelationContext.ResolveOrCreate(), 128),
             Details = SanitizeAndTruncate(entry.Details ?? entry.Action, 2000) ?? string.Empty,
             CreatedAtUtc = now,
-            OccurredAtUtc = now
+            OccurredAtUtc = entry.OccurredAtUtc ?? now
         });
 
         try

@@ -35,6 +35,28 @@ public static partial class AuthEndpoints
         return null;
     }
 
+    private static string? ResolveLogoutRefreshToken(
+        HttpContext context,
+        string? requestRefreshToken,
+        out bool isCookieBacked)
+    {
+        if (context.Request.Cookies.TryGetValue(RefreshTokenCookieName, out var refreshTokenFromCookie)
+            && !string.IsNullOrWhiteSpace(refreshTokenFromCookie))
+        {
+            isCookieBacked = true;
+            return refreshTokenFromCookie;
+        }
+
+        isCookieBacked = false;
+        return string.IsNullOrWhiteSpace(requestRefreshToken) ? null : requestRefreshToken;
+    }
+
+    private static bool HasLogoutIntentHeader(HttpContext context) =>
+        string.Equals(
+            context.Request.Headers[LogoutIntentHeaderName].ToString(),
+            LogoutIntentHeaderValue,
+            StringComparison.Ordinal);
+
     private static void WriteRefreshTokenCookie(HttpContext context, string refreshToken)
     {
         if (string.IsNullOrWhiteSpace(refreshToken))

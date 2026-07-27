@@ -10,6 +10,8 @@ public sealed class SupportConversation
 
     public Guid? AssignedAdminId { get; set; }
 
+    public long Version { get; set; } = 1;
+
     public SupportConversationStatus Status { get; set; } = SupportConversationStatus.New;
 
     public SupportConversationPriority Priority { get; set; } = SupportConversationPriority.Normal;
@@ -37,6 +39,12 @@ public sealed class SupportConversation
     public SupportMessageSenderType? LastMessageSenderType { get; set; }
 
     public DateTime? WaitingSinceUtc { get; set; }
+
+    public DateTime? FirstResponseAtUtc { get; set; }
+
+    public DateTime? ResolutionSlaPausedAtUtc { get; set; }
+
+    public long ResolutionSlaPausedSeconds { get; set; }
 
     public DateTime? ResolvedAtUtc { get; set; }
 

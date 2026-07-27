@@ -29,6 +29,14 @@ public static partial class SupportChatEndpoints
             return unauthorized!;
         }
 
+        var idempotencyValidationErrors = ValidateOptionalSupportMessageIdempotencyKey(
+            httpContext.Request,
+            out var idempotencyKey);
+        if (idempotencyValidationErrors.Count > 0)
+        {
+            return TypedResults.ValidationProblem(idempotencyValidationErrors);
+        }
+
         if (file is null || file.Length == 0)
         {
             return TypedResults.ValidationProblem(new Dictionary<string, string[]>
@@ -63,12 +71,18 @@ public static partial class SupportChatEndpoints
                 IsAdmin: true,
                 AttachmentFileName: fileName,
                 AttachmentContentType: requestedContentType,
-                ReplyToMessageId: parsedReplyToMessageId),
+                ReplyToMessageId: parsedReplyToMessageId,
+                IdempotencyKey: idempotencyKey),
             cancellationToken);
 
         if (createMessageResult.IsFailure)
         {
             return ToProblem(createMessageResult.Error);
+        }
+
+        if (createMessageResult.Value.IsIdempotencyReplay)
+        {
+            return TypedResults.Ok(SignAttachmentUrls(createMessageResult.Value, attachmentReadUrlSigner));
         }
 
         var uploadingStatusResult = await service.UpdateAttachmentMessageAsync(

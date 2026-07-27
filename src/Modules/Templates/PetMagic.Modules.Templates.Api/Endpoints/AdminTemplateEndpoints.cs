@@ -37,11 +37,20 @@ public static partial class AdminTemplateEndpoints
         group.MapGet("/", ListAsync);
         group.MapGet("/analytics", GetAnalyticsOverviewAsync);
         group.MapGet("/moderation", GetModerationQueueAsync);
+        group.MapPost("/moderation/{eventId:guid}/claim", ClaimModerationItemAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateSmallJsonRequestBodyBytes));
+        group.MapPost("/moderation/{eventId:guid}/release", ReleaseModerationItemAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateSmallJsonRequestBodyBytes));
+        group.MapPost("/moderation/{eventId:guid}/handoff", HandoffModerationItemAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateSmallJsonRequestBodyBytes))
+            .RequireAuthorization("AdminOnly");
         group.MapPost("/moderation/{eventId:guid}/decision", DecideModerationItemAsync)
             .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateSmallJsonRequestBodyBytes));
         group.MapGet("/generations/metrics", GetGenerationDashboardMetricsAsync)
             .RequireAuthorization("AdminOnly");
         group.MapGet("/generations", ListGenerationsAsync)
+            .RequireAuthorization("AdminOnly");
+        group.MapGet("/generations/{generationId:guid}", GetGenerationAsync)
             .RequireAuthorization("AdminOnly");
         group.MapGet("/monetization/watermark", GetWatermarkSettingsAsync)
             .RequireAuthorization("AdminOnly");

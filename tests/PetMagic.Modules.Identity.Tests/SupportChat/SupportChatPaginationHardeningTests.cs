@@ -38,6 +38,8 @@ public sealed class SupportChatPaginationHardeningTests
         Assert.Contains("support.sort_invalid", source, StringComparison.Ordinal);
         Assert.Contains("support.queue_invalid", source, StringComparison.Ordinal);
         Assert.Contains("normalizedQueue == \"waiting_for_support\"", source, StringComparison.Ordinal);
+        Assert.Contains("normalizedQueue == \"unread\"", source, StringComparison.Ordinal);
+        Assert.Contains("!message.IsFromAdmin && message.ReadAtUtc == null", source, StringComparison.Ordinal);
         Assert.Contains("x.Status == SupportConversationStatus.New\n                || x.Status == SupportConversationStatus.InProgress", source, StringComparison.Ordinal);
     }
 

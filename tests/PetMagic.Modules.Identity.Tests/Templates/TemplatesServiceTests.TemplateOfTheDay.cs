@@ -162,12 +162,11 @@ public sealed partial class TemplatesServiceTests
     {
         await using var dbContext = CreateDbContext();
         var service = CreateService(dbContext);
-        var date = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1);
         await CreateActiveImageTemplateAsync(service, "Auto One", "Portrait", ["auto"]);
         await CreateActiveImageTemplateAsync(service, "Auto Two", "Portrait", ["auto"]);
 
-        var first = await service.GetPublicTemplateOfTheDayAsync(date, "en", CancellationToken.None);
-        var second = await service.GetPublicTemplateOfTheDayAsync(date, "en", CancellationToken.None);
+        var first = await service.GetPublicTemplateOfTheDayAsync(null, "en", CancellationToken.None);
+        var second = await service.GetPublicTemplateOfTheDayAsync(null, "en", CancellationToken.None);
 
         Assert.True(first.IsSuccess);
         Assert.True(second.IsSuccess);
@@ -175,7 +174,22 @@ public sealed partial class TemplatesServiceTests
         Assert.NotNull(second.Value.Template);
         Assert.Equal(first.Value.Template.TemplateId, second.Value.Template.TemplateId);
         Assert.Equal("auto", first.Value.Template.Source);
-        Assert.Equal(1, await dbContext.TemplateOfTheDay.CountAsync(x => !x.IsManual && x.StartDate == date));
+        Assert.Equal(1, await dbContext.TemplateOfTheDay.CountAsync(x => !x.IsManual && x.StartDate == first.Value.Template.Date));
+    }
+
+    [Fact]
+    public async Task GetPublicTemplateOfTheDayAsync_ShouldNotMaterializeAutoFallbackForExplicitDate()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var date = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1);
+        await CreateActiveImageTemplateAsync(service, "Read Only Explicit Date", "Portrait", ["auto"]);
+
+        var result = await service.GetPublicTemplateOfTheDayAsync(date, "en", CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Value.Template);
+        Assert.Empty(await dbContext.TemplateOfTheDay.ToArrayAsync());
     }
 
     [Fact]
@@ -183,7 +197,7 @@ public sealed partial class TemplatesServiceTests
     {
         await using var dbContext = CreateDbContext();
         var service = CreateService(dbContext);
-        var date = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(5);
+        var date = DateOnly.FromDateTime(DateTime.UtcNow);
         var manualTemplateId = await CreateActiveImageTemplateAsync(service, "Archived Manual Pick", "Portrait", ["daily"]);
         var activeTemplateId = await CreateActiveImageTemplateAsync(service, "Active Auto Pick", "Portrait", ["daily"]);
 
@@ -207,7 +221,7 @@ public sealed partial class TemplatesServiceTests
         archived.Status = TemplateStatus.Archived;
         await dbContext.SaveChangesAsync();
 
-        var result = await service.GetPublicTemplateOfTheDayAsync(date, "en", CancellationToken.None);
+        var result = await service.GetPublicTemplateOfTheDayAsync(null, "en", CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var template = Assert.IsType<PublicTemplateOfTheDayItemResponse>(result.Value.Template);
@@ -304,6 +318,7 @@ public sealed partial class TemplatesServiceTests
         Assert.True(result.Value.AutoModeEnabled);
         Assert.Equal("both", result.Value.AllowedTypes);
         Assert.Equal(7, result.Value.ExcludeRecentDays);
+        Assert.Equal(DateOnly.FromDateTime(DateTime.UtcNow), result.Value.BusinessDate);
     }
 
     [Fact]
@@ -311,7 +326,7 @@ public sealed partial class TemplatesServiceTests
     {
         await using var dbContext = CreateDbContext();
         var service = CreateService(dbContext);
-        var date = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1);
+        var date = DateOnly.FromDateTime(DateTime.UtcNow);
         await CreateActiveImageTemplateAsync(service, "Auto Disabled", "Portrait", ["auto"]);
 
         var settings = await service.UpdateAdminTemplateOfTheDaySettingsAsync(
@@ -319,7 +334,7 @@ public sealed partial class TemplatesServiceTests
             CancellationToken.None);
         Assert.True(settings.IsSuccess);
 
-        var result = await service.GetPublicTemplateOfTheDayAsync(date, "en", CancellationToken.None);
+        var result = await service.GetPublicTemplateOfTheDayAsync(null, "en", CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Null(result.Value.Template);
@@ -704,6 +719,144 @@ public sealed partial class TemplatesServiceTests
         Assert.Equal("templates.template_of_the_day_date_occupied", result.Error.Code);
         var unchanged = await dbContext.TemplateOfTheDay.SingleAsync(x => x.Id == second.Value.Id);
         Assert.Equal(startDate.AddDays(2), unchanged.StartDate);
+    }
+
+    [Fact]
+    public async Task UpdateTemplateOfTheDayAsync_ShouldPreserveExistingAutomaticMode()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var date = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(15);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Automatic Pick", "Portrait", ["auto"]);
+
+        var automatic = await service.AutoPickTemplateOfTheDayAsync(
+            new AutoPickTemplateOfTheDayCommand(date, "both", 0, Guid.NewGuid(), Force: true),
+            CancellationToken.None);
+        Assert.True(automatic.IsSuccess);
+        Assert.False(automatic.Value.IsManual);
+
+        var updated = await service.UpdateTemplateOfTheDayAsync(
+            new UpdateTemplateOfTheDayCommand(
+                automatic.Value.Id,
+                templateId,
+                date,
+                date,
+                true,
+                true,
+                25,
+                "Updated automatic title",
+                null,
+                null),
+            CancellationToken.None);
+
+        Assert.True(updated.IsSuccess);
+        Assert.False(updated.Value.IsManual);
+        var persisted = await dbContext.TemplateOfTheDay.SingleAsync(x => x.Id == automatic.Value.Id);
+        Assert.False(persisted.IsManual);
+        Assert.Equal(25, persisted.Priority);
+    }
+
+    [Fact]
+    public async Task TemplateOfTheDayAdminMutations_ShouldWriteAuditsWithSnapshotsAndActors()
+    {
+        await using var dbContext = CreateDbContext();
+        var auditLog = new RecordingAdminAuditLog();
+        var service = CreateService(dbContext, adminAuditLog: auditLog);
+        var adminId = Guid.NewGuid();
+        var templateId = await CreateActiveImageTemplateAsync(service, "Audited Daily Template", "Portrait", ["daily"]);
+        var manualDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(20);
+
+        var settings = await service.UpdateAdminTemplateOfTheDaySettingsAsync(
+            new UpdateTemplateOfTheDaySettingsCommand(true, "image", 2, adminId),
+            CancellationToken.None);
+        Assert.True(settings.IsSuccess);
+
+        var created = await service.CreateTemplateOfTheDayAsync(
+            new CreateTemplateOfTheDayCommand(
+                templateId,
+                manualDate,
+                manualDate,
+                true,
+                true,
+                0,
+                "Initial title",
+                "Initial subtitle",
+                "Initial badge",
+                adminId),
+            CancellationToken.None);
+        Assert.True(created.IsSuccess);
+
+        var updated = await service.UpdateTemplateOfTheDayAsync(
+            new UpdateTemplateOfTheDayCommand(
+                created.Value.Id,
+                templateId,
+                manualDate,
+                manualDate,
+                true,
+                true,
+                5,
+                "Updated title",
+                "Updated subtitle",
+                "Updated badge",
+                adminId),
+            CancellationToken.None);
+        Assert.True(updated.IsSuccess);
+
+        var deleted = await service.DeleteTemplateOfTheDayAsync(
+            created.Value.Id,
+            CancellationToken.None,
+            adminId);
+        Assert.True(deleted.IsSuccess);
+
+        var manualAutoPick = await service.AutoPickTemplateOfTheDayAsync(
+            new AutoPickTemplateOfTheDayCommand(manualDate.AddDays(1), "image", 0, adminId, Force: true),
+            CancellationToken.None);
+        Assert.True(manualAutoPick.IsSuccess);
+
+        var workerAutoPick = await service.AutoPickTemplateOfTheDayAsync(
+            new AutoPickTemplateOfTheDayCommand(manualDate.AddDays(2), "image", 0, null),
+            CancellationToken.None);
+        Assert.True(workerAutoPick.IsSuccess);
+
+        var audits = auditLog.Entries;
+        Assert.Equal(
+            [
+                "admin.template_of_the_day.settings_updated",
+                "admin.template_of_the_day.created",
+                "admin.template_of_the_day.updated",
+                "admin.template_of_the_day.deleted",
+                "admin.template_of_the_day.auto_picked"
+            ],
+            audits.Select(audit => audit.Action));
+        Assert.All(audits, audit =>
+        {
+            Assert.Equal(adminId, audit.ActorUserId);
+            Assert.Null(audit.SubjectUserId);
+        });
+
+        var settingsAudit = audits[0];
+        Assert.Equal("template_of_the_day_settings", settingsAudit.TargetType);
+        Assert.Contains("excludeRecentDays=7", settingsAudit.OldValue, StringComparison.Ordinal);
+        Assert.Contains("excludeRecentDays=2", settingsAudit.NewValue, StringComparison.Ordinal);
+
+        var createdAudit = audits[1];
+        Assert.Equal("template_of_the_day", createdAudit.TargetType);
+        Assert.Equal(created.Value.Id.ToString("D"), createdAudit.TargetId);
+        Assert.Null(createdAudit.OldValue);
+        Assert.Contains("titleOverride=Initial title", createdAudit.NewValue, StringComparison.Ordinal);
+
+        var updatedAudit = audits[2];
+        Assert.Contains("priority=0", updatedAudit.OldValue, StringComparison.Ordinal);
+        Assert.Contains("priority=5", updatedAudit.NewValue, StringComparison.Ordinal);
+        Assert.Contains("titleOverride=Updated title", updatedAudit.NewValue, StringComparison.Ordinal);
+
+        var deletedAudit = audits[3];
+        Assert.Contains("priority=5", deletedAudit.OldValue, StringComparison.Ordinal);
+        Assert.Equal("deleted", deletedAudit.NewValue);
+
+        var autoPickAudit = audits[4];
+        Assert.Equal(manualAutoPick.Value.Id.ToString("D"), autoPickAudit.TargetId);
+        Assert.Contains("isManual=false", autoPickAudit.NewValue, StringComparison.Ordinal);
     }
 
     private static (string TimeZoneId, DateOnly BusinessDate) ResolveBusinessDateDifferentFromUtc()

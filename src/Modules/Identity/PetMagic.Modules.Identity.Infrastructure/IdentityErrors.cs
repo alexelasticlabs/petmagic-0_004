@@ -52,7 +52,17 @@ public static class IdentityErrors
 
     public static readonly Error CannotRemoveLastAdmin = new("users.cannot_remove_last_admin", "At least one Admin must remain active.");
 
+    public static readonly Error BulkEmailIdempotencyConflict = new("users.bulk_email_idempotency_conflict", "The idempotency key was already used for a different email campaign.");
+
+    public static readonly Error BulkEmailBroadcastNotFound = new("users.bulk_email_broadcast_not_found", "Email broadcast was not found.");
+
+    public static readonly Error BulkEmailBroadcastStatusInvalid = new("users.bulk_email_broadcast_status_invalid", "Email broadcast status is invalid.");
+
     public static readonly Error InvalidUserSort = new("users.sort_invalid", "Users sort mode is invalid.");
+
+    public static readonly Error AdminUserSessionNotFound = new("users.session_not_found", "User session was not found.");
+
+    public static readonly Error AdminUserSessionIdempotencyConflict = new("users.session_idempotency_conflict", "The idempotency key was already used for a different session action.");
 
     public static readonly Error InvalidAvatarUpload = new("users.avatar_invalid_upload", "Avatar upload is invalid.");
 

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -34,13 +35,23 @@ public sealed partial class IdentityServiceProfileTests
     private const string CurrentLegalVersion = "2026-05-20";
     private const string LocalAvatarPublicBaseUrl = "http://localhost:5000";
 
-    private static IdentityModuleDbContext CreateIdentityDbContext()
+    private static IdentityModuleDbContext CreateIdentityDbContext(
+        string? databaseName = null,
+        InMemoryDatabaseRoot? databaseRoot = null)
     {
-        var options = new DbContextOptionsBuilder<IdentityModuleDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
-            .Options;
+        var builder = new DbContextOptionsBuilder<IdentityModuleDbContext>();
+        var resolvedDatabaseName = databaseName ?? Guid.NewGuid().ToString("N");
 
-        return new IdentityModuleDbContext(options);
+        if (databaseRoot is null)
+        {
+            builder.UseInMemoryDatabase(resolvedDatabaseName);
+        }
+        else
+        {
+            builder.UseInMemoryDatabase(resolvedDatabaseName, databaseRoot);
+        }
+
+        return new IdentityModuleDbContext(builder.Options);
     }
 
     private static EconomyDbContext CreateEconomyDbContext()

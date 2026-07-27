@@ -101,7 +101,7 @@ public sealed class BackendEnvironmentContractTests
     }
 
     [Fact]
-    public void DockerComposeBackend_ShouldRequireExplicitNonWildcardAllowedHosts()
+    public void DockerComposeBackend_ShouldRequireExplicitEnvironmentAppropriateAllowedHosts()
     {
         var repositoryRoot = FindRepositoryRoot();
         var dockerCompose = File.ReadAllText(Path.Combine(repositoryRoot, "docker-compose.yml"));
@@ -119,9 +119,11 @@ public sealed class BackendEnvironmentContractTests
         Assert.DoesNotContain("AllowedHosts: \"*\"", backendEnvironment, StringComparison.Ordinal);
         Assert.True(envExampleValues.TryGetValue("BACKEND_ALLOWED_HOSTS", out var allowedHosts));
         Assert.True(envExampleValues.TryGetValue("BACKEND_HEALTHCHECK_HOST", out var healthcheckHost));
+        Assert.True(envExampleValues.TryGetValue("ASPNETCORE_ENVIRONMENT", out var environment));
+        Assert.Equal("Development", environment);
         Assert.False(string.IsNullOrWhiteSpace(allowedHosts));
         Assert.DoesNotContain("*", allowedHosts, StringComparison.Ordinal);
-        Assert.DoesNotContain("localhost", allowedHosts, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("localhost", allowedHosts, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(healthcheckHost, allowedHosts.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries), StringComparer.Ordinal);
 
         var readme = File.ReadAllText(Path.Combine(repositoryRoot, "README.md"));
@@ -129,7 +131,7 @@ public sealed class BackendEnvironmentContractTests
         Assert.Contains("BACKEND_HEALTHCHECK_HOST=api.petmagic.app", readme, StringComparison.Ordinal);
         Assert.Contains("explicit non-wildcard `AllowedHosts`", readme, StringComparison.Ordinal);
 
-        var apiContracts = File.ReadAllText(Path.Combine(repositoryRoot, "docs", "API_CONTRACTS.md"));
+        var apiContracts = File.ReadAllText(Path.Combine(repositoryRoot, "docs", "api-contracts.md"));
         Assert.Contains("wildcard, localhost, loopback, private-network, malformed, or port-qualified `AllowedHosts`", apiContracts, StringComparison.Ordinal);
     }
 
@@ -456,7 +458,7 @@ public sealed class BackendEnvironmentContractTests
     public void LoadTestingManualHostDefaults_ShouldMatchComposeBackendHostPort()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var loadTestingDoc = File.ReadAllText(Path.Combine(repositoryRoot, "docs", "LOAD_TESTING.md"));
+        var loadTestingDoc = File.ReadAllText(Path.Combine(repositoryRoot, "docs", "load-testing.md"));
         var k6Script = File.ReadAllText(Path.Combine(repositoryRoot, "scripts", "k6", "template-generation-load-test.js"));
 
         Assert.Contains("http://localhost:5001", loadTestingDoc, StringComparison.Ordinal);

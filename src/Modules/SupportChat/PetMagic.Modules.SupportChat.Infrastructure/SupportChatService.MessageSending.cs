@@ -18,6 +18,7 @@ public sealed partial class SupportChatService
             [],
             command.ReplyToMessageId,
             command.Locale,
+            command.IdempotencyKey,
             cancellationToken);
     }
 
@@ -33,6 +34,7 @@ public sealed partial class SupportChatService
             command.Attachments,
             command.ReplyToMessageId,
             command.Locale,
+            command.IdempotencyKey,
             cancellationToken);
     }
 
@@ -44,6 +46,7 @@ public sealed partial class SupportChatService
         IReadOnlyList<SupportMessageAttachmentInput>? attachments,
         Guid? replyToMessageId,
         string? locale,
+        string? idempotencyKey,
         CancellationToken cancellationToken)
     {
         await using var transaction = isAdmin
@@ -73,6 +76,29 @@ public sealed partial class SupportChatService
             {
                 return Result.Failure<SupportMessageResponse>(ownershipError);
             }
+        }
+
+        string? normalizedIdempotencyKey = null;
+        if (isAdmin && !SupportMessageIdempotency.TryNormalize(idempotencyKey, out normalizedIdempotencyKey))
+        {
+            return Result.Failure<SupportMessageResponse>(SupportChatErrors.InvalidIdempotencyKey);
+        }
+        var existingMessage = await FindExistingIdempotentAdminMessageAsync(
+            conversationId,
+            senderUserId,
+            normalizedIdempotencyKey,
+            cancellationToken);
+        if (existingMessage is not null)
+        {
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+
+            return Result.Success(await BuildMessageResponseAsync(
+                existingMessage,
+                cancellationToken,
+                isIdempotencyReplay: true));
         }
 
         var canAppendError = ValidateConversationCanAcceptMessage(conversation, isAdmin, DateTime.UtcNow);
@@ -122,7 +148,8 @@ public sealed partial class SupportChatService
             attachmentUploadErrorCode: null,
             attachments: normalizedAttachments,
             markAsReadAtUtc: null,
-            updateAssignmentAndStatus: true);
+            updateAssignmentAndStatus: true,
+            clientIdempotencyKey: normalizedIdempotencyKey);
 
         if (shouldAppendAutomaticReply)
         {
@@ -220,6 +247,29 @@ public sealed partial class SupportChatService
             }
         }
 
+        string? normalizedIdempotencyKey = null;
+        if (command.IsAdmin && !SupportMessageIdempotency.TryNormalize(command.IdempotencyKey, out normalizedIdempotencyKey))
+        {
+            return Result.Failure<SupportMessageResponse>(SupportChatErrors.InvalidIdempotencyKey);
+        }
+        var existingMessage = await FindExistingIdempotentAdminMessageAsync(
+            command.ConversationId,
+            command.SenderUserId,
+            normalizedIdempotencyKey,
+            cancellationToken);
+        if (existingMessage is not null)
+        {
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+
+            return Result.Success(await BuildMessageResponseAsync(
+                existingMessage,
+                cancellationToken,
+                isIdempotencyReplay: true));
+        }
+
         var canAppendError = ValidateConversationCanAcceptMessage(conversation, command.IsAdmin, DateTime.UtcNow);
         if (canAppendError is not null)
         {
@@ -251,7 +301,8 @@ public sealed partial class SupportChatService
             attachmentUploadErrorCode: null,
             attachments: [],
             markAsReadAtUtc: null,
-            updateAssignmentAndStatus: true);
+            updateAssignmentAndStatus: true,
+            clientIdempotencyKey: normalizedIdempotencyKey);
 
         var nextStatus = ToCanonicalStatus(conversation.Status, conversation.AssignedAdminId);
         if (shouldAppendReopenedEvent)

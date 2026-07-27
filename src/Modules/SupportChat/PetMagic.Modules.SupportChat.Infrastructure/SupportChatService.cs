@@ -24,7 +24,8 @@ public sealed partial class SupportChatService(
     ITemplateGenerationService? templateGenerationService = null,
     IAdminUserTemplateAnalyticsReader? adminUserTemplateAnalyticsReader = null,
     IAdminAuditLog? adminAuditLog = null,
-    IUserEconomyResourceOwnershipReader? economyResourceOwnershipReader = null) : ISupportChatService
+    IUserEconomyResourceOwnershipReader? economyResourceOwnershipReader = null,
+    SupportSlaOptions? supportSlaOptions = null) : ISupportChatService
 {
     private const int DefaultConversationMessagesTake = 60;
     private const int MaxConversationMessagesTake = 120;
@@ -40,6 +41,7 @@ public sealed partial class SupportChatService(
     private static readonly Error InvalidStatusTransition = new("support.status_transition_invalid", "Support conversation status transition is not allowed.");
     private static readonly Error InvalidTags = new("support.tags_invalid", "Support conversation tags are invalid.");
     private const string NpgsqlProviderName = "Npgsql.EntityFrameworkCore.PostgreSQL";
+    private readonly SupportSlaOptions slaOptions = supportSlaOptions ?? new SupportSlaOptions();
 
     private static Error? ValidateAdminOwnership(Entities.SupportConversation conversation, Guid adminUserId)
     {

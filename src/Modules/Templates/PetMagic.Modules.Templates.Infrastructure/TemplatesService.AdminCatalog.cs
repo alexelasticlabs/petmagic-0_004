@@ -47,24 +47,23 @@ internal sealed partial class TemplatesService
         var normalizedSearch = NormalizeCatalogFilter(query.Search);
         var normalizedCategory = NormalizeCatalogFilter(query.Category);
         var normalizedAccess = NormalizeCatalogFilter(query.Access);
+        var normalizedVisibility = NormalizeCatalogFilter(query.Visibility);
+        var normalizedReadiness = NormalizeCatalogFilter(query.Readiness);
         var normalizedSort = NormalizeCatalogFilter(query.Sort);
         var normalizedStatus = NormalizeCatalogFilter(query.Status);
         var normalizedSkip = Math.Max(0, query.Skip ?? 0);
         var normalizedTake = NormalizeTake(query.Take, 24, 100);
         var excludeArchived = normalizedStatus == "not_archived";
 
-        var itemsQuery = dbContext.TemplateItems
+        var catalogQuery = dbContext.TemplateItems
             .AsNoTracking()
-            .Include(x => x.Assets)
             .Where(x => x.DeletedAtUtc == null)
             .Where(x => !templateType.HasValue || x.TemplateType == templateType.Value)
-            .Where(x => !templateStatus.HasValue || x.Status == templateStatus.Value)
-            .Where(x => !excludeArchived || x.Status != TemplateStatus.Archived)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(normalizedSearch))
         {
-            itemsQuery = itemsQuery.Where(x =>
+            catalogQuery = catalogQuery.Where(x =>
                 (x.Title ?? string.Empty).ToLower().Contains(normalizedSearch) ||
                 (x.ShortDescription ?? string.Empty).ToLower().Contains(normalizedSearch) ||
                 (x.Category ?? string.Empty).ToLower().Contains(normalizedSearch) ||
@@ -73,17 +72,73 @@ internal sealed partial class TemplatesService
 
         if (!string.IsNullOrWhiteSpace(normalizedCategory) && normalizedCategory != "all")
         {
-            itemsQuery = itemsQuery.Where(x => (x.Category ?? string.Empty).ToLower() == normalizedCategory);
+            catalogQuery = catalogQuery.Where(x => (x.Category ?? string.Empty).ToLower() == normalizedCategory);
         }
 
         if (normalizedAccess == "premium")
         {
-            itemsQuery = itemsQuery.Where(x => x.IsPremium);
+            catalogQuery = catalogQuery.Where(x => x.IsPremium);
         }
         else if (normalizedAccess == "free")
         {
-            itemsQuery = itemsQuery.Where(x => !x.IsPremium);
+            catalogQuery = catalogQuery.Where(x => !x.IsPremium);
         }
+
+        if (normalizedVisibility == "qa_only")
+        {
+            catalogQuery = catalogQuery.Where(x => x.IsQaOnly);
+        }
+        else if (normalizedVisibility == "public")
+        {
+            catalogQuery = catalogQuery.Where(x => !x.IsQaOnly);
+        }
+
+        if (normalizedReadiness == "ready")
+        {
+            catalogQuery = catalogQuery.Where(x =>
+                x.Assets.Any(asset => asset.AssetKind == TemplateAssetKind.Preview));
+        }
+        else if (normalizedReadiness == "missing_preview")
+        {
+            catalogQuery = catalogQuery.Where(x =>
+                !x.Assets.Any(asset => asset.AssetKind == TemplateAssetKind.Preview));
+        }
+
+        var summaryData = await catalogQuery
+            .GroupBy(_ => 1)
+            .Select(group => new
+            {
+                TotalTemplates = group.Count(),
+                ImageTemplates = group.Count(x => x.TemplateType == TemplateType.Image),
+                VideoTemplates = group.Count(x => x.TemplateType == TemplateType.Video),
+                ActiveTemplates = group.Count(x => x.Status == TemplateStatus.Active),
+                DraftTemplates = group.Count(x => x.Status == TemplateStatus.Draft),
+                ArchivedTemplates = group.Count(x => x.Status == TemplateStatus.Archived),
+                PremiumTemplates = group.Count(x => x.IsPremium),
+                QaOnlyTemplates = group.Count(x => x.IsQaOnly),
+                MissingPreviewTemplates = group.Count(x =>
+                    !x.Assets.Any(asset => asset.AssetKind == TemplateAssetKind.Preview))
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+
+        var summary = summaryData is null
+            ? new AdminTemplateCatalogSummaryResponse(0, 0, 0, 0, 0, 0, 0, 0, 0)
+            : new AdminTemplateCatalogSummaryResponse(
+                summaryData.TotalTemplates,
+                summaryData.ImageTemplates,
+                summaryData.VideoTemplates,
+                summaryData.ActiveTemplates,
+                summaryData.DraftTemplates,
+                summaryData.ArchivedTemplates,
+                summaryData.PremiumTemplates,
+                summaryData.QaOnlyTemplates,
+                summaryData.MissingPreviewTemplates);
+
+        var itemsQuery = catalogQuery
+            .Where(x => !templateStatus.HasValue || x.Status == templateStatus.Value)
+            .Where(x => !excludeArchived || x.Status != TemplateStatus.Archived)
+            .Include(x => x.Assets)
+            .AsQueryable();
 
         itemsQuery = normalizedSort switch
         {
@@ -109,7 +164,8 @@ internal sealed partial class TemplatesService
             normalizedSkip,
             normalizedTake,
             totalCount,
-            hasMore));
+            hasMore,
+            summary));
     }
 
     public async Task<Result<AdminTemplateResponse>> GetAdminAsync(Guid templateId, CancellationToken cancellationToken)

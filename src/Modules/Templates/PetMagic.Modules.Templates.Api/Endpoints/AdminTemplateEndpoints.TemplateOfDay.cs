@@ -105,7 +105,7 @@ public static partial class AdminTemplateEndpoints
                 request.StartDate,
                 request.EndDate,
                 request.IsActive,
-                request.IsManual,
+                true,
                 request.Priority,
                 request.TitleOverride,
                 request.SubtitleOverride,
@@ -119,9 +119,16 @@ public static partial class AdminTemplateEndpoints
     private static async Task<Results<Ok<AdminTemplateOfTheDayResponse>, ProblemHttpResult>> UpdateTemplateOfTheDayAsync(
         Guid id,
         [FromBody] TemplateOfTheDayRequest request,
+        HttpContext httpContext,
         [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
+        var (adminUserId, subjectError) = TryGetAdminUserId(httpContext);
+        if (subjectError is not null)
+        {
+            return ToAdminTemplateProblem(subjectError);
+        }
+
         var result = await service.UpdateTemplateOfTheDayAsync(
             new UpdateTemplateOfTheDayCommand(
                 id,
@@ -133,7 +140,8 @@ public static partial class AdminTemplateEndpoints
                 request.Priority,
                 request.TitleOverride,
                 request.SubtitleOverride,
-                request.BadgeTextOverride),
+                request.BadgeTextOverride,
+                adminUserId),
             cancellationToken);
 
         return result.IsFailure ? ToAdminTemplateProblem(result.Error) : TypedResults.Ok(result.Value);
@@ -141,10 +149,20 @@ public static partial class AdminTemplateEndpoints
 
     private static async Task<Results<NoContent, ProblemHttpResult>> DeleteTemplateOfTheDayAsync(
         Guid id,
+        HttpContext httpContext,
         [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
-        var result = await service.DeleteTemplateOfTheDayAsync(id, cancellationToken);
+        var (adminUserId, subjectError) = TryGetAdminUserId(httpContext);
+        if (subjectError is not null)
+        {
+            return ToAdminTemplateProblem(subjectError);
+        }
+
+        var result = await service.DeleteTemplateOfTheDayAsync(
+            id,
+            cancellationToken,
+            deletedByAdminId: adminUserId);
         return result.IsFailure ? ToAdminTemplateProblem(result.Error) : TypedResults.NoContent();
     }
 

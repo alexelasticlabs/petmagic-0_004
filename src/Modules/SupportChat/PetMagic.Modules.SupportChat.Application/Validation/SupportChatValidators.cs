@@ -46,6 +46,9 @@ public sealed class SendSupportMessageCommandValidator : AbstractValidator<SendS
         RuleFor(x => x.ReplyToMessageId)
             .NotEmpty()
             .When(x => x.ReplyToMessageId.HasValue);
+        RuleFor(x => x.IdempotencyKey)
+            .Must(value => SupportMessageIdempotency.TryNormalize(value, out _))
+            .WithMessage("support.idempotency_key_invalid");
     }
 }
 
@@ -64,6 +67,9 @@ public sealed class SendSupportAttachmentsCommandValidator : AbstractValidator<S
         RuleFor(x => x.ReplyToMessageId)
             .NotEmpty()
             .When(x => x.ReplyToMessageId.HasValue);
+        RuleFor(x => x.IdempotencyKey)
+            .Must(value => SupportMessageIdempotency.TryNormalize(value, out _))
+            .WithMessage("support.idempotency_key_invalid");
     }
 }
 
@@ -166,6 +172,8 @@ public sealed class UpdateSupportConversationStatusCommandValidator : AbstractVa
 
 public sealed class AssignSupportConversationCommandValidator : AbstractValidator<AssignSupportConversationCommand>
 {
+    private const int MaxReasonLength = 500;
+
     public AssignSupportConversationCommandValidator()
     {
         RuleFor(x => x.ConversationId).NotEmpty();
@@ -174,6 +182,18 @@ public sealed class AssignSupportConversationCommandValidator : AbstractValidato
             .NotEqual(Guid.Empty)
             .When(x => x.AssignedAdminId.HasValue)
             .WithMessage("support.assigned_admin_id_required");
+        RuleFor(x => x.Reason)
+            .NotEmpty()
+            .WithMessage("support.assignment_reason_required")
+            .MinimumLength(3)
+            .WithMessage("support.assignment_reason_too_short")
+            .MaximumLength(MaxReasonLength)
+            .WithMessage("support.assignment_reason_too_long");
+        RuleFor(x => x.ExpectedVersion)
+            .NotNull()
+            .WithMessage("support.assignment_expected_version_required")
+            .GreaterThan(0)
+            .WithMessage("support.assignment_expected_version_invalid");
     }
 }
 
@@ -189,10 +209,10 @@ public sealed class UpdateSupportConversationMetadataCommandValidator : Abstract
         RuleFor(x => x.Tags)
             .NotNull();
         RuleFor(x => x.Tags.Count)
-            .LessThanOrEqualTo(12);
+            .LessThanOrEqualTo(SupportConversationMetadataLimits.MaxTagCount);
         RuleForEach(x => x.Tags)
             .NotEmpty()
-            .MaximumLength(40);
+            .MaximumLength(SupportConversationMetadataLimits.MaxTagLength);
     }
 }
 
@@ -204,6 +224,8 @@ public sealed class UpsertSupportReplyTemplateCommandValidator : AbstractValidat
         RuleFor(x => x.Title).NotEmpty().MaximumLength(120);
         RuleFor(x => x.Body).NotEmpty().MaximumLength(4000);
         RuleFor(x => x.SortOrder).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.ExpectedVersion).GreaterThan(0).When(x => x.ExpectedVersion.HasValue);
+        RuleFor(x => x.Reason).MaximumLength(500).When(x => x.Reason is not null);
     }
 }
 
@@ -213,5 +235,7 @@ public sealed class DeleteSupportReplyTemplateCommandValidator : AbstractValidat
     {
         RuleFor(x => x.TemplateId).NotEmpty();
         RuleFor(x => x.AdminUserId).NotEmpty();
+        RuleFor(x => x.ExpectedVersion).GreaterThan(0).When(x => x.ExpectedVersion.HasValue);
+        RuleFor(x => x.Reason).MaximumLength(500).When(x => x.Reason is not null);
     }
 }

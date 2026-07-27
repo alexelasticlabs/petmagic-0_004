@@ -88,6 +88,62 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.ToTable("templates_push_outbox", (string)null);
                 });
 
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.AdminGenerationRefundRetryReceipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("GenerationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<int>("PreviousRefundAttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PreviousRefundLastErrorCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime?>("PreviousRefundLastAttemptedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GenerationId", "CreatedAtUtc")
+                        .HasDatabaseName("IX_tagrrr_GenerationId_CreatedAtUtc");
+
+                    b.HasIndex("ActorUserId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("UX_tagrrr_ActorUserId_IdempotencyKey");
+
+                    b.ToTable("templates_admin_generation_refund_retry_receipts", (string)null);
+                });
+
             modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.CreditRefund", b =>
                 {
                     b.Property<Guid>("Id")
@@ -113,6 +169,14 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<string>("SettlementStatus")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("Completed");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
@@ -386,6 +450,15 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.Property<DateTime?>("ModeratedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("ModerationLeaseClaimedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ModerationLeaseExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModerationLeaseOwnerUserId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("ModerationComment")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
@@ -394,6 +467,12 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
+
+                    b.Property<long>("ModerationVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L);
 
                     b.Property<string>("Source")
                         .IsRequired()
@@ -409,6 +488,9 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ModerationStatus", "CreatedAtUtc");
+
+                    b.HasIndex("ModerationStatus", "ModerationLeaseExpiresAtUtc", "CreatedAtUtc")
+                        .HasDatabaseName("IX_templates_analytics_events_moderation_lease");
 
                     b.HasIndex("TemplateId", "CountryCode");
 

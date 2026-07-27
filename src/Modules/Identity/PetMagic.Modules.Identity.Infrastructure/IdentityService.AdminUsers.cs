@@ -1,6 +1,12 @@
+using System.Data;
+
+using System.Security.Cryptography;
+using System.Text;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
@@ -14,6 +20,10 @@ namespace PetMagic.Modules.Identity.Infrastructure;
 
 public sealed partial class IdentityService
 {
+    private const string AdminWalletIdempotencyScope = "admin_user_wallet";
+    private const string AdminBulkEmailIdempotencyScope = "admin_bulk_email";
+    private const string AdminBulkEmailQueuedAction = "admin.bulk_email.queued";
+
     public async Task<Result<UserListPageResponse>> ListUsersAsync(
         int skip,
         int take,
@@ -37,15 +47,15 @@ public sealed partial class IdentityService
         if (!string.IsNullOrWhiteSpace(normalizedSearch))
         {
             var matchesUserId = Guid.TryParse(normalizedSearch, out var searchedUserId);
-            var searchPattern = $"%{normalizedSearch}%";
+            var searchPattern = $"%{EscapePostgresLikePattern(normalizedSearch)}%";
             var normalizedSearchLower = normalizedSearch.ToLowerInvariant();
             var useCaseInsensitiveLike = dbContext.Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true;
 
             query = useCaseInsensitiveLike
                 ? query.Where(user =>
                     (matchesUserId && user.Id == searchedUserId)
-                    || (user.Email != null && EF.Functions.ILike(user.Email, searchPattern))
-                    || (user.DisplayName != null && EF.Functions.ILike(user.DisplayName, searchPattern)))
+                    || (user.Email != null && EF.Functions.ILike(user.Email, searchPattern, "\\"))
+                    || (user.DisplayName != null && EF.Functions.ILike(user.DisplayName, searchPattern, "\\")))
                 : query.Where(user =>
                     (matchesUserId && user.Id == searchedUserId)
                     || ((user.Email ?? string.Empty).ToLower().Contains(normalizedSearchLower))
@@ -424,13 +434,27 @@ public sealed partial class IdentityService
         var economyService = serviceProvider.GetRequiredService<IEconomyService>();
         var normalizedOperation = command.Operation.Trim().ToLowerInvariant();
         var reason = command.Reason.Trim();
+        var idempotencyKey = command.IdempotencyKey?.Trim();
         var operationResult = normalizedOperation switch
         {
             "credit" => await economyService.CreditAsync(
-                new CreditBalanceCommand(command.UserId, command.Amount, WalletLedgerSource.AdminGrant, reason),
+                new CreditBalanceCommand(
+                    command.UserId,
+                    command.Amount,
+                    WalletLedgerSource.AdminGrant,
+                    reason,
+                    idempotencyKey,
+                    LedgerReason: reason,
+                    IdempotencyScope: AdminWalletIdempotencyScope),
                 cancellationToken),
             "debit" => await economyService.SpendAsync(
-                new SpendBalanceCommand(command.UserId, command.Amount, reason, WalletLedgerSource.AdminDebit),
+                new SpendBalanceCommand(
+                    command.UserId,
+                    command.Amount,
+                    reason,
+                    WalletLedgerSource.AdminDebit,
+                    idempotencyKey,
+                    IdempotencyScope: AdminWalletIdempotencyScope),
                 cancellationToken),
             _ => Result.Failure<WalletOperationResponse>(IdentityErrors.OperationFailed)
         };
@@ -449,16 +473,28 @@ public sealed partial class IdentityService
             cancellationToken,
             targetType: "user",
             targetId: command.UserId.ToString("D"),
-            newValue: $"{source}:{command.Amount}:{reason}");
+            newValue: $"{source}:{command.Amount}:{reason}",
+            eventId: CreateAdminWalletAuditEventId(command.UserId, idempotencyKey));
 
         return Result.Success(new AdminUserWalletOperationResponse(
             command.UserId,
             normalizedOperation,
-            normalizedOperation == "credit" ? command.Amount : -command.Amount,
+            operationResult.Value.Delta,
             operationResult.Value.NewBalance,
             source,
             reason,
             operationResult.Value.OccurredAtUtc));
+    }
+
+    private static Guid? CreateAdminWalletAuditEventId(Guid userId, string? idempotencyKey)
+    {
+        if (string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            return null;
+        }
+
+        var rawKey = $"{AdminWalletIdempotencyScope}:{userId:D}:{idempotencyKey.Trim()}";
+        return new Guid(SHA256.HashData(Encoding.UTF8.GetBytes(rawKey)).AsSpan(0, 16));
     }
 
     public async Task<Result> DeleteAdminUserAsync(DeleteAdminUserCommand command, CancellationToken cancellationToken)
@@ -470,125 +506,285 @@ public sealed partial class IdentityService
             cancellationToken);
     }
 
-    public async Task<Result> SendBulkEmailAsync(SendBulkEmailCommand command, CancellationToken cancellationToken)
+    public async Task<Result<AdminEmailBroadcastQueueResponse>> SendBulkEmailAsync(
+        SendBulkEmailCommand command,
+        CancellationToken cancellationToken)
     {
+        var normalizedAudience = command.Audience.Trim().ToLowerInvariant();
+        var normalizedSubject = command.Subject.Trim();
+        var normalizedBody = command.Body.Trim();
+        var selectedIds = string.Equals(normalizedAudience, EmailAudiences.Selected, StringComparison.Ordinal)
+            ? command.UserIds?
+                .Where(id => id != Guid.Empty)
+                .Distinct()
+                .OrderBy(id => id)
+                .ToArray() ?? []
+            : [];
+        var idempotencyKey = command.IdempotencyKey?.Trim();
+        var httpContext = httpContextAccessor.HttpContext;
+        var actorUserId = ResolveActorUserId(httpContext);
+        var requestHash = CreateAdminBulkEmailRequestHash(
+            normalizedAudience,
+            normalizedSubject,
+            normalizedBody,
+            selectedIds);
+        var idempotencyEventId = string.IsNullOrWhiteSpace(idempotencyKey)
+            ? (Guid?)null
+            : CreateAdminBulkEmailAuditEventId(actorUserId, idempotencyKey);
+
+        if (idempotencyEventId.HasValue)
+        {
+            var existingBroadcast = await dbContext.AdminEmailBroadcasts
+                .AsNoTracking()
+                .SingleOrDefaultAsync(x => x.Id == idempotencyEventId.Value, cancellationToken);
+            if (existingBroadcast is not null)
+            {
+                return ResolveAdminBulkEmailReplay(existingBroadcast, requestHash);
+            }
+        }
+
         var query = userManager.Users
             .Where(x => x.IsActive && x.EmailConfirmed && !string.IsNullOrWhiteSpace(x.Email));
 
-        if (string.Equals(command.Audience, EmailAudiences.Premium, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(normalizedAudience, EmailAudiences.Premium, StringComparison.Ordinal))
         {
             query = query.Where(x => x.IsPremium);
         }
-        else if (string.Equals(command.Audience, EmailAudiences.Selected, StringComparison.OrdinalIgnoreCase))
+        else if (string.Equals(normalizedAudience, EmailAudiences.Selected, StringComparison.Ordinal))
         {
-            var selectedIds = command.UserIds?
-                .Where(id => id != Guid.Empty)
-                .Distinct()
-                .ToArray() ?? [];
-
             query = query.Where(x => selectedIds.Contains(x.Id));
         }
 
         var recipients = await query
+            .OrderBy(x => x.Id)
             .Select(x => new { x.Id, x.Email })
             .ToListAsync(cancellationToken);
 
-        if (recipients.Count == 0)
-        {
-            return Result.Success();
-        }
-
         var now = DateTime.UtcNow;
+        var broadcastId = idempotencyEventId ?? Guid.NewGuid();
+        var broadcastStatus = recipients.Count == 0
+            ? AdminEmailBroadcastStatus.Completed
+            : AdminEmailBroadcastStatus.Queued;
+        dbContext.AdminEmailBroadcasts.Add(new AdminEmailBroadcast
+        {
+            Id = broadcastId,
+            ActorUserId = actorUserId,
+            Audience = normalizedAudience,
+            Subject = normalizedSubject,
+            RequestHash = requestHash,
+            Status = broadcastStatus,
+            RecipientCount = recipients.Count,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+            CompletedAtUtc = recipients.Count == 0 ? now : null
+        });
+
         foreach (var recipient in recipients)
         {
-            dbContext.EmailDispatchJobs.Add(CreateBroadcastEmailJob(recipient.Id, recipient.Email!, command.Subject, command.Body, now));
+            dbContext.EmailDispatchJobs.Add(CreateBroadcastEmailJob(
+                broadcastId,
+                recipient.Id,
+                recipient.Email!,
+                normalizedSubject,
+                normalizedBody,
+                now));
         }
 
-        await dbContext.SaveChangesAsync(cancellationToken);
-        await WriteAuditAsync(null, "admin.bulk_email.queued", $"Bulk email queued for {recipients.Count} recipients.", cancellationToken);
-        return Result.Success();
+        dbContext.AuditEvents.Add(new AuditEvent
+        {
+            Id = broadcastId,
+            ActorUserId = actorUserId,
+            ActorRole = ResolveActorRole(httpContext),
+            Action = AdminBulkEmailQueuedAction,
+            TargetType = "email-broadcast",
+            TargetId = broadcastId.ToString("D"),
+            NewValue = requestHash,
+            IpAddress = ResolveClientIpAddress(httpContext),
+            UserAgent = httpContext?.Request.Headers.UserAgent.ToString(),
+            CorrelationId = CorrelationContext.ResolveOrCreate(),
+            Details = $"Bulk email queued for {recipients.Count} recipients. Audience: {normalizedAudience}.",
+            CreatedAtUtc = now,
+            OccurredAtUtc = now
+        });
+
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException) when (idempotencyEventId.HasValue)
+        {
+            dbContext.ChangeTracker.Clear();
+            var persistedBroadcast = await dbContext.AdminEmailBroadcasts
+                .AsNoTracking()
+                .SingleOrDefaultAsync(x => x.Id == idempotencyEventId.Value, cancellationToken);
+            if (persistedBroadcast is not null)
+            {
+                return ResolveAdminBulkEmailReplay(persistedBroadcast, requestHash);
+            }
+
+            throw;
+        }
+
+        return Result.Success(ToAdminEmailBroadcastQueueResponse(
+            broadcastId,
+            recipients.Count,
+            broadcastStatus,
+            now));
+    }
+
+    private static Guid CreateAdminBulkEmailAuditEventId(Guid? actorUserId, string idempotencyKey)
+    {
+        var actorScope = actorUserId?.ToString("D") ?? "system";
+        var rawKey = $"{AdminBulkEmailIdempotencyScope}:{actorScope}:{idempotencyKey.Trim()}";
+        return new Guid(SHA256.HashData(Encoding.UTF8.GetBytes(rawKey)).AsSpan(0, 16));
+    }
+
+    private static string CreateAdminBulkEmailRequestHash(
+        string audience,
+        string subject,
+        string body,
+        IReadOnlyList<Guid> selectedUserIds)
+    {
+        var canonicalRequest = new StringBuilder();
+        AppendLengthPrefixed(canonicalRequest, audience);
+        AppendLengthPrefixed(canonicalRequest, subject);
+        AppendLengthPrefixed(canonicalRequest, body);
+        foreach (var userId in selectedUserIds)
+        {
+            AppendLengthPrefixed(canonicalRequest, userId.ToString("D"));
+        }
+
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonicalRequest.ToString())));
+    }
+
+    private static void AppendLengthPrefixed(StringBuilder builder, string value)
+    {
+        builder.Append(value.Length).Append(':').Append(value);
+    }
+
+    private static Result<AdminEmailBroadcastQueueResponse> ResolveAdminBulkEmailReplay(
+        AdminEmailBroadcast existingBroadcast,
+        string requestHash)
+    {
+        return string.Equals(existingBroadcast.RequestHash, requestHash, StringComparison.Ordinal)
+            ? Result.Success(ToAdminEmailBroadcastQueueResponse(
+                existingBroadcast.Id,
+                existingBroadcast.RecipientCount,
+                existingBroadcast.Status,
+                existingBroadcast.CreatedAtUtc))
+            : Result.Failure<AdminEmailBroadcastQueueResponse>(IdentityErrors.BulkEmailIdempotencyConflict);
     }
 
     public async Task<Result> AssignRoleAsync(AssignRoleCommand command, CancellationToken cancellationToken)
     {
         var normalizedRole = NormalizeSystemRole(command.Role);
-        var user = await userManager.FindByIdAsync(command.UserId.ToString());
-        if (user is null)
-        {
-            return Result.Failure(IdentityErrors.UserNotFound);
-        }
+        return await ExecuteAdminUserMutationAsync(
+            lockAdminInvariant: false,
+            async mutationCancellationToken =>
+            {
+                var user = await userManager.FindByIdAsync(command.UserId.ToString());
+                if (user is null)
+                {
+                    return Result.Failure(IdentityErrors.UserNotFound);
+                }
 
-        var currentRoles = await userManager.GetRolesAsync(user);
-        if (currentRoles.Contains(normalizedRole, StringComparer.Ordinal))
-        {
-            return Result.Success();
-        }
+                var currentRoles = await userManager.GetRolesAsync(user);
+                if (currentRoles.Contains(normalizedRole, StringComparer.Ordinal))
+                {
+                    return Result.Success();
+                }
 
-        if (!await roleManager.RoleExistsAsync(normalizedRole))
-        {
-            return Result.Failure(IdentityErrors.OperationFailed);
-        }
+                if (!await roleManager.RoleExistsAsync(normalizedRole))
+                {
+                    return Result.Failure(IdentityErrors.OperationFailed);
+                }
 
-        var addResult = await userManager.AddToRoleAsync(user, normalizedRole);
-        if (!addResult.Succeeded)
-        {
-            return Result.Failure(IdentityErrors.OperationFailed);
-        }
+                var addResult = await userManager.AddToRoleAsync(user, normalizedRole);
+                if (!addResult.Succeeded)
+                {
+                    return Result.Failure(IdentityErrors.OperationFailed);
+                }
 
-        await WriteAuditAsync(
-            user.Id,
-            "user.role.assigned",
-            $"Assigned role '{normalizedRole}'.",
-            cancellationToken,
-            targetType: "user",
-            targetId: user.Id.ToString("D"),
-            oldValue: string.Join(",", currentRoles.OrderBy(role => role, StringComparer.OrdinalIgnoreCase)),
-            newValue: string.Join(",", currentRoles.Append(normalizedRole).OrderBy(role => role, StringComparer.OrdinalIgnoreCase)));
-        return Result.Success();
+                var accessInvalidation = await InvalidateUserAccessAsync(
+                    user,
+                    revokeRefreshSessions: false,
+                    mutationCancellationToken);
+                if (accessInvalidation.IsFailure)
+                {
+                    return accessInvalidation;
+                }
+
+                await WriteAuditAsync(
+                    user.Id,
+                    "user.role.assigned",
+                    $"Assigned role '{normalizedRole}'.",
+                    mutationCancellationToken,
+                    targetType: "user",
+                    targetId: user.Id.ToString("D"),
+                    oldValue: string.Join(",", currentRoles.OrderBy(role => role, StringComparer.OrdinalIgnoreCase)),
+                    newValue: string.Join(",", currentRoles.Append(normalizedRole).OrderBy(role => role, StringComparer.OrdinalIgnoreCase)));
+                return Result.Success();
+            },
+            cancellationToken);
     }
 
     public async Task<Result> RevokeRoleAsync(RevokeRoleCommand command, CancellationToken cancellationToken)
     {
         var normalizedRole = NormalizeSystemRole(command.Role);
-        var user = await userManager.FindByIdAsync(command.UserId.ToString());
-        if (user is null)
-        {
-            return Result.Failure(IdentityErrors.UserNotFound);
-        }
+        return await ExecuteAdminUserMutationAsync(
+            lockAdminInvariant: string.Equals(normalizedRole, SystemRoles.Admin, StringComparison.Ordinal),
+            async mutationCancellationToken =>
+            {
+                var user = await userManager.FindByIdAsync(command.UserId.ToString());
+                if (user is null)
+                {
+                    return Result.Failure(IdentityErrors.UserNotFound);
+                }
 
-        if (string.Equals(normalizedRole, SystemRoles.User, StringComparison.Ordinal))
-        {
-            return Result.Failure(IdentityErrors.CannotRevokeBaseRole);
-        }
+                if (string.Equals(normalizedRole, SystemRoles.User, StringComparison.Ordinal))
+                {
+                    return Result.Failure(IdentityErrors.CannotRevokeBaseRole);
+                }
 
-        var currentRoles = await userManager.GetRolesAsync(user);
-        if (!currentRoles.Contains(normalizedRole, StringComparer.Ordinal))
-        {
-            return Result.Success();
-        }
+                var currentRoles = await userManager.GetRolesAsync(user);
+                if (!currentRoles.Contains(normalizedRole, StringComparer.Ordinal))
+                {
+                    return Result.Success();
+                }
 
-        if (string.Equals(normalizedRole, SystemRoles.Admin, StringComparison.Ordinal)
-            && await IsLastAdminAsync(user.Id, cancellationToken))
-        {
-            return Result.Failure(IdentityErrors.CannotRemoveLastAdmin);
-        }
+                if (string.Equals(normalizedRole, SystemRoles.Admin, StringComparison.Ordinal)
+                    && await IsLastAdminAsync(user.Id, mutationCancellationToken))
+                {
+                    return Result.Failure(IdentityErrors.CannotRemoveLastAdmin);
+                }
 
-        var removeResult = await userManager.RemoveFromRoleAsync(user, normalizedRole);
-        if (!removeResult.Succeeded)
-        {
-            return Result.Failure(IdentityErrors.OperationFailed);
-        }
+                var removeResult = await userManager.RemoveFromRoleAsync(user, normalizedRole);
+                if (!removeResult.Succeeded)
+                {
+                    return Result.Failure(IdentityErrors.OperationFailed);
+                }
 
-        await WriteAuditAsync(
-            user.Id,
-            "user.role.revoked",
-            $"Revoked role '{normalizedRole}'.",
-            cancellationToken,
-            targetType: "user",
-            targetId: user.Id.ToString("D"),
-            oldValue: string.Join(",", currentRoles.OrderBy(role => role, StringComparer.OrdinalIgnoreCase)),
-            newValue: string.Join(",", currentRoles.Where(role => !string.Equals(role, normalizedRole, StringComparison.Ordinal)).OrderBy(role => role, StringComparer.OrdinalIgnoreCase)));
-        return Result.Success();
+                var accessInvalidation = await InvalidateUserAccessAsync(
+                    user,
+                    revokeRefreshSessions: true,
+                    mutationCancellationToken);
+                if (accessInvalidation.IsFailure)
+                {
+                    return accessInvalidation;
+                }
+
+                await WriteAuditAsync(
+                    user.Id,
+                    "user.role.revoked",
+                    $"Revoked role '{normalizedRole}'.",
+                    mutationCancellationToken,
+                    targetType: "user",
+                    targetId: user.Id.ToString("D"),
+                    oldValue: string.Join(",", currentRoles.OrderBy(role => role, StringComparer.OrdinalIgnoreCase)),
+                    newValue: string.Join(",", currentRoles.Where(role => !string.Equals(role, normalizedRole, StringComparison.Ordinal)).OrderBy(role => role, StringComparer.OrdinalIgnoreCase)));
+                return Result.Success();
+            },
+            cancellationToken);
     }
 
     private static string NormalizeSystemRole(string? role)
@@ -640,38 +836,53 @@ public sealed partial class IdentityService
 
     public async Task<Result> SetUserActiveStatusAsync(SetUserActiveStatusCommand command, CancellationToken cancellationToken)
     {
-        var user = await userManager.FindByIdAsync(command.UserId.ToString());
-        if (user is null)
-        {
-            return Result.Failure(IdentityErrors.UserNotFound);
-        }
+        return await ExecuteAdminUserMutationAsync(
+            lockAdminInvariant: !command.IsActive,
+            async mutationCancellationToken =>
+            {
+                var user = await userManager.FindByIdAsync(command.UserId.ToString());
+                if (user is null)
+                {
+                    return Result.Failure(IdentityErrors.UserNotFound);
+                }
 
-        var oldValue = user.IsActive.ToString();
-        var roles = await userManager.GetRolesAsync(user);
-        if (!command.IsActive
-            && roles.Contains(SystemRoles.Admin, StringComparer.Ordinal)
-            && await IsLastAdminAsync(user.Id, cancellationToken))
-        {
-            return Result.Failure(IdentityErrors.CannotRemoveLastAdmin);
-        }
+                var oldValue = user.IsActive.ToString();
+                var roles = await userManager.GetRolesAsync(user);
+                if (!command.IsActive
+                    && roles.Contains(SystemRoles.Admin, StringComparer.Ordinal)
+                    && await IsLastAdminAsync(user.Id, mutationCancellationToken))
+                {
+                    return Result.Failure(IdentityErrors.CannotRemoveLastAdmin);
+                }
 
-        user.IsActive = command.IsActive;
-        var updateResult = await userManager.UpdateAsync(user);
-        if (!updateResult.Succeeded)
-        {
-            return Result.Failure(IdentityErrors.OperationFailed);
-        }
+                user.IsActive = command.IsActive;
+                var updateResult = await userManager.UpdateAsync(user);
+                if (!updateResult.Succeeded)
+                {
+                    return Result.Failure(IdentityErrors.OperationFailed);
+                }
 
-        await WriteAuditAsync(
-            user.Id,
-            command.IsActive ? "user.unblocked" : "user.blocked",
-            $"Active status changed to '{command.IsActive}'.",
-            cancellationToken,
-            targetType: "user",
-            targetId: user.Id.ToString("D"),
-            oldValue: oldValue,
-            newValue: command.IsActive.ToString());
-        return Result.Success();
+                var accessInvalidation = await InvalidateUserAccessAsync(
+                    user,
+                    revokeRefreshSessions: true,
+                    mutationCancellationToken);
+                if (accessInvalidation.IsFailure)
+                {
+                    return accessInvalidation;
+                }
+
+                await WriteAuditAsync(
+                    user.Id,
+                    command.IsActive ? "user.unblocked" : "user.blocked",
+                    $"Active status changed to '{command.IsActive}'.",
+                    mutationCancellationToken,
+                    targetType: "user",
+                    targetId: user.Id.ToString("D"),
+                    oldValue: oldValue,
+                    newValue: command.IsActive.ToString());
+                return Result.Success();
+            },
+            cancellationToken);
     }
 
     private async Task<Result> DeleteUserInternalAsync(
@@ -680,70 +891,83 @@ public sealed partial class IdentityService
         string auditDetails,
         CancellationToken cancellationToken)
     {
-        var user = await userManager.FindByIdAsync(userId.ToString());
-        if (user is null)
+        string? avatarUrl = null;
+        var result = await ExecuteAdminUserMutationAsync(
+            lockAdminInvariant: true,
+            async mutationCancellationToken =>
+            {
+                var user = await userManager.FindByIdAsync(userId.ToString());
+                if (user is null)
+                {
+                    return Result.Failure(IdentityErrors.UserNotFound);
+                }
+
+                var roles = await userManager.GetRolesAsync(user);
+                if (roles.Contains(SystemRoles.Admin, StringComparer.Ordinal)
+                    && await IsLastAdminAsync(user.Id, mutationCancellationToken))
+                {
+                    return Result.Failure(IdentityErrors.CannotRemoveLastAdmin);
+                }
+
+                avatarUrl = user.AvatarUrl;
+                var now = DateTime.UtcNow;
+                var externalProviders = await dbContext.ExternalAuthProviders
+                    .Where(x => x.UserId == userId)
+                    .ToListAsync(mutationCancellationToken);
+                await BlockDeletedAccountIdentifiersAsync(user.Email, externalProviders, now, mutationCancellationToken);
+
+                var deleteUserResult = await userManager.DeleteAsync(user);
+                if (!deleteUserResult.Succeeded)
+                {
+                    return Result.Failure(IdentityErrors.OperationFailed);
+                }
+
+                var refreshSessions = await dbContext.RefreshTokenSessions
+                    .Where(x => x.UserId == userId)
+                    .ToListAsync(mutationCancellationToken);
+
+                var emailCodes = await dbContext.UserEmailCodes
+                    .Where(x => x.UserId == userId)
+                    .ToListAsync(mutationCancellationToken);
+
+                var emailJobs = await dbContext.EmailDispatchJobs
+                    .Where(x => x.UserId == userId)
+                    .ToListAsync(mutationCancellationToken);
+
+                foreach (var refreshSession in refreshSessions.Where(static x => x.RevokedAtUtc is null))
+                {
+                    refreshSession.RevokedAtUtc = now;
+                }
+
+                if (emailCodes.Count > 0)
+                {
+                    dbContext.UserEmailCodes.RemoveRange(emailCodes);
+                }
+
+                if (emailJobs.Count > 0)
+                {
+                    dbContext.EmailDispatchJobs.RemoveRange(emailJobs);
+                }
+
+                await dbContext.SaveChangesAsync(mutationCancellationToken);
+                await WriteAuditAsync(
+                    userId,
+                    auditAction,
+                    auditDetails,
+                    mutationCancellationToken,
+                    targetType: "user",
+                    targetId: userId.ToString("D"));
+
+                return Result.Success();
+            },
+            cancellationToken);
+
+        if (result.IsSuccess)
         {
-            return Result.Failure(IdentityErrors.UserNotFound);
+            await avatarStorage.DeleteAsync(avatarUrl, CancellationToken.None);
         }
 
-        var roles = await userManager.GetRolesAsync(user);
-        if (roles.Contains(SystemRoles.Admin, StringComparer.Ordinal)
-            && await IsLastAdminAsync(user.Id, cancellationToken))
-        {
-            return Result.Failure(IdentityErrors.CannotRemoveLastAdmin);
-        }
-
-        var avatarUrl = user.AvatarUrl;
-        var now = DateTime.UtcNow;
-        var externalProviders = await dbContext.ExternalAuthProviders
-            .Where(x => x.UserId == userId)
-            .ToListAsync(cancellationToken);
-        await BlockDeletedAccountIdentifiersAsync(user.Email, externalProviders, now, cancellationToken);
-
-        var deleteUserResult = await userManager.DeleteAsync(user);
-        if (!deleteUserResult.Succeeded)
-        {
-            return Result.Failure(IdentityErrors.OperationFailed);
-        }
-
-        var refreshSessions = await dbContext.RefreshTokenSessions
-            .Where(x => x.UserId == userId)
-            .ToListAsync(cancellationToken);
-
-        var emailCodes = await dbContext.UserEmailCodes
-            .Where(x => x.UserId == userId)
-            .ToListAsync(cancellationToken);
-
-        var emailJobs = await dbContext.EmailDispatchJobs
-            .Where(x => x.UserId == userId)
-            .ToListAsync(cancellationToken);
-
-        foreach (var refreshSession in refreshSessions.Where(static x => x.RevokedAtUtc is null))
-        {
-            refreshSession.RevokedAtUtc = now;
-        }
-
-        if (emailCodes.Count > 0)
-        {
-            dbContext.UserEmailCodes.RemoveRange(emailCodes);
-        }
-
-        if (emailJobs.Count > 0)
-        {
-            dbContext.EmailDispatchJobs.RemoveRange(emailJobs);
-        }
-
-        await dbContext.SaveChangesAsync(cancellationToken);
-        await avatarStorage.DeleteAsync(avatarUrl, CancellationToken.None);
-        await WriteAuditAsync(
-            userId,
-            auditAction,
-            auditDetails,
-            cancellationToken,
-            targetType: "user",
-            targetId: userId.ToString("D"));
-
-        return Result.Success();
+        return result;
     }
 
     private async Task BlockDeletedAccountIdentifiersAsync(
@@ -802,6 +1026,38 @@ public sealed partial class IdentityService
             .AnyAsync(cancellationToken);
     }
 
+    private Task<Result> ExecuteAdminUserMutationAsync(
+        bool lockAdminInvariant,
+        Func<CancellationToken, Task<Result>> mutation,
+        CancellationToken cancellationToken)
+    {
+        return AdminRoleInvariantExecutor.ExecuteAsync(
+            dbContext,
+            lockAdminInvariant,
+            mutation,
+            static result => result.IsSuccess,
+            cancellationToken);
+    }
+
+    private async Task<Result> InvalidateUserAccessAsync(
+        AppUser user,
+        bool revokeRefreshSessions,
+        CancellationToken cancellationToken)
+    {
+        var securityStampResult = await userManager.UpdateSecurityStampAsync(user);
+        if (!securityStampResult.Succeeded)
+        {
+            return Result.Failure(IdentityErrors.OperationFailed);
+        }
+
+        if (revokeRefreshSessions)
+        {
+            await RevokeRefreshTokensAsync(user.Id, DateTime.UtcNow, cancellationToken);
+        }
+
+        return Result.Success();
+    }
+
     private static int NormalizeTake(int take, int fallback, int max)
     {
         if (take <= 0)
@@ -810,6 +1066,14 @@ public sealed partial class IdentityService
         }
 
         return Math.Min(take, max);
+    }
+
+    private static string EscapePostgresLikePattern(string value)
+    {
+        return value
+            .Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("%", "\\%", StringComparison.Ordinal)
+            .Replace("_", "\\_", StringComparison.Ordinal);
     }
 
     private static string? NormalizeAdminUsersSort(string? sort)

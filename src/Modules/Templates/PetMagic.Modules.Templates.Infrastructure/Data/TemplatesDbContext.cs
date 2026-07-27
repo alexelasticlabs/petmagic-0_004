@@ -15,6 +15,8 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
 
     public DbSet<TemplateGenerationJob> TemplateGenerationJobs => Set<TemplateGenerationJob>();
 
+    public DbSet<AdminGenerationRefundRetryReceipt> AdminGenerationRefundRetryReceipts => Set<AdminGenerationRefundRetryReceipt>();
+
     public DbSet<TemplateGenerationBillingCommand> TemplateGenerationBillingCommands => Set<TemplateGenerationBillingCommand>();
 
     public DbSet<Pet> Pets => Set<Pet>();
@@ -286,6 +288,22 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        builder.Entity<AdminGenerationRefundRetryReceipt>(entity =>
+        {
+            entity.ToTable("templates_admin_generation_refund_retry_receipts");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.IdempotencyKey).HasMaxLength(256).IsRequired();
+            entity.Property(x => x.RequestHash).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.Reason).HasMaxLength(500);
+            entity.Property(x => x.PreviousRefundLastErrorCode).HasMaxLength(128);
+            entity.Property(x => x.CorrelationId).HasMaxLength(128).IsRequired();
+            entity.HasIndex(x => new { x.ActorUserId, x.IdempotencyKey })
+                .IsUnique()
+                .HasDatabaseName("UX_tagrrr_ActorUserId_IdempotencyKey");
+            entity.HasIndex(x => new { x.GenerationId, x.CreatedAtUtc })
+                .HasDatabaseName("IX_tagrrr_GenerationId_CreatedAtUtc");
+        });
+
         builder.Entity<TemplateGenerationBillingCommand>(entity =>
         {
             entity.ToTable("templates_generation_billing_commands");
@@ -463,6 +481,10 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.ToTable("templates_credit_refunds");
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Reason).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.SettlementStatus)
+                .HasMaxLength(16)
+                .HasDefaultValue(CreditRefundSettlementStatus.Completed)
+                .IsConcurrencyToken();
             entity.HasIndex(x => x.FeedbackId).IsUnique()
                 .HasDatabaseName("UX_templates_credit_refunds_FeedbackId")
                 .HasFilter(""" "FeedbackId" IS NOT NULL """);
@@ -506,9 +528,14 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.Property(x => x.MetadataJson).HasMaxLength(2000);
             entity.Property(x => x.ModerationStatus).HasMaxLength(32).IsRequired();
             entity.Property(x => x.ModerationComment).HasMaxLength(500);
+            entity.Property(x => x.ModerationVersion)
+                .HasDefaultValue(0L)
+                .IsConcurrencyToken();
             entity.HasIndex(x => new { x.TemplateId, x.CreatedAtUtc });
             entity.HasIndex(x => new { x.TemplateId, x.EventType, x.CreatedAtUtc });
             entity.HasIndex(x => new { x.ModerationStatus, x.CreatedAtUtc });
+            entity.HasIndex(x => new { x.ModerationStatus, x.ModerationLeaseExpiresAtUtc, x.CreatedAtUtc })
+                .HasDatabaseName("IX_templates_analytics_events_moderation_lease");
             entity.HasIndex(x => new { x.TemplateId, x.Source });
             entity.HasIndex(x => new { x.TemplateId, x.DeviceClass });
             entity.HasIndex(x => new { x.TemplateId, x.CountryCode });

@@ -96,8 +96,11 @@ internal sealed partial class FeedbackService
                 return Result.Failure<AdminFeedbackDetailsResponse>(TemplatesErrors.InvalidFeedbackStatus);
             }
 
-            feedback.Status = normalizedStatus;
-            changed = true;
+            if (!string.Equals(feedback.Status, normalizedStatus, StringComparison.Ordinal))
+            {
+                feedback.Status = normalizedStatus;
+                changed = true;
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(command.Priority))
@@ -107,14 +110,21 @@ internal sealed partial class FeedbackService
                 return Result.Failure<AdminFeedbackDetailsResponse>(TemplatesErrors.InvalidFeedbackPriority);
             }
 
-            feedback.Priority = normalizedPriority;
-            changed = true;
+            if (!string.Equals(feedback.Priority, normalizedPriority, StringComparison.Ordinal))
+            {
+                feedback.Priority = normalizedPriority;
+                changed = true;
+            }
         }
 
         if (command.AdminNote is not null)
         {
-            feedback.AdminNote = NormalizeOptionalText(command.AdminNote, 2000);
-            changed = true;
+            var normalizedAdminNote = NormalizeOptionalText(command.AdminNote, 2000);
+            if (!string.Equals(feedback.AdminNote, normalizedAdminNote, StringComparison.Ordinal))
+            {
+                feedback.AdminNote = normalizedAdminNote;
+                changed = true;
+            }
         }
 
         if (changed)
@@ -211,15 +221,11 @@ internal sealed partial class FeedbackService
         TemplateGenerationFeedback feedback,
         CancellationToken cancellationToken)
     {
-        var refund = await dbContext.CreditRefunds
-            .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.FeedbackId == feedback.Id, cancellationToken);
         var generation = feedback.Generation;
-        var canRefund = generation is not null
-            && feedback.UserId is not null
-            && generation.ChargedAtUtc is not null
-            && generation.TokenCost > 0
-            && refund is null;
+        var refund = await FindExistingRefundAsync(feedback.Id, generation?.Id, cancellationToken);
+        var refundUnavailableReason = GetRefundUnavailableReason(feedback, generation, refund);
+        var canRefund = refundUnavailableReason is null;
+        var completedRefund = IsPendingRefund(refund) ? null : refund;
 
         var inputPreviewUrl = await CreateAdminFeedbackReadUrlAsync(generation?.SourceImageUrl, cancellationToken);
         var resultPreviewUrl = await CreateAdminFeedbackReadUrlAsync(
@@ -263,7 +269,8 @@ internal sealed partial class FeedbackService
                 generation.ChargedAtUtc,
                 generation.RefundedAtUtc),
             canRefund,
-            refund is null ? null : MapRefund(refund));
+            completedRefund is null ? null : MapRefund(completedRefund),
+            refundUnavailableReason);
     }
 
     private async Task<string?> CreateAdminFeedbackReadUrlAsync(string? assetUrl, CancellationToken cancellationToken)

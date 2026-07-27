@@ -1,3 +1,5 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Text;
 
 using Microsoft.AspNetCore.Authentication;
@@ -14,6 +16,7 @@ using PetMagic.BuildingBlocks.Images;
 using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Security;
 using PetMagic.Modules.Identity.Application.Abstractions;
+using PetMagic.Modules.Identity.Application.Contracts;
 using PetMagic.Modules.Identity.Domain.Enums;
 using PetMagic.Modules.Identity.Infrastructure.Data;
 using PetMagic.Modules.Identity.Infrastructure.Entities;
@@ -107,6 +110,39 @@ public static class IdentityInfrastructureServiceCollectionExtensions
                         }
 
                         return Task.CompletedTask;
+                    },
+                    OnTokenValidated = async context =>
+                    {
+                        var userIdValue = context.Principal?.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+                            ?? context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                        var securityStamp = context.Principal?.FindFirst(IdentityJwtClaimTypes.SecurityStamp)?.Value;
+                        if (!Guid.TryParse(userIdValue, out var userId) || string.IsNullOrWhiteSpace(securityStamp))
+                        {
+                            context.Fail("The access token does not contain a valid security stamp.");
+                            return;
+                        }
+
+                        var validator = context.HttpContext.RequestServices
+                            .GetRequiredService<IIdentityAccessTokenValidator>();
+                        var sessionIdValue = context.Principal?.FindFirst(IdentityJwtClaimTypes.SessionId)?.Value;
+                        if (!string.IsNullOrWhiteSpace(sessionIdValue)
+                            && !Guid.TryParse(sessionIdValue, out _))
+                        {
+                            context.Fail("The access token does not contain a valid session identifier.");
+                            return;
+                        }
+
+                        var sessionId = Guid.TryParse(sessionIdValue, out var parsedSessionId)
+                            ? parsedSessionId
+                            : (Guid?)null;
+                        if (!await validator.IsCurrentAsync(
+                            userId,
+                            securityStamp,
+                            sessionId,
+                            context.HttpContext.RequestAborted))
+                        {
+                            context.Fail("The access token is no longer current.");
+                        }
                     }
                 };
             });
@@ -143,8 +179,10 @@ public static class IdentityInfrastructureServiceCollectionExtensions
         services.AddScoped<IAppleIdentityTokenVerifier, AppleIdentityTokenVerifier>();
         services.AddSingleton<IExternalLoginCompletionStore, ExternalLoginCompletionStore>();
         services.AddSingleton<IExternalAccountLinkStore, ExternalAccountLinkStore>();
+        services.AddScoped<IIdentityAccessTokenValidator, IdentityAccessTokenValidator>();
         services.AddScoped<IIdentityUserLookupService, IdentityUserLookupService>();
         services.AddScoped<IAdminAuditLog, IdentityAdminAuditLog>();
+        services.AddScoped<IAdminAuditQueryService, IdentityAdminAuditQueryService>();
         services.AddScoped<IEmailSender, SmtpEmailSender>();
         services.AddScoped<EmailDispatchProcessor>();
         services.AddHostedService<EmailDispatchWorker>();
@@ -185,6 +223,8 @@ public static class IdentityInfrastructureServiceCollectionExtensions
             existing.EmailConfirmed = true;
             existing.IsActive = true;
             existing.IsPremium = true;
+            existing.AccountStatus = AccountStatus.Active;
+            existing.AccountStatusUpdatedAtUtc = DateTime.UtcNow;
 
             await userManager.UpdateAsync(existing);
 
@@ -212,6 +252,8 @@ public static class IdentityInfrastructureServiceCollectionExtensions
             DisplayName = options.DisplayName,
             IsActive = true,
             IsPremium = true,
+            AccountStatus = AccountStatus.Active,
+            AccountStatusUpdatedAtUtc = DateTime.UtcNow,
             CreatedAtUtc = DateTime.UtcNow
         };
 

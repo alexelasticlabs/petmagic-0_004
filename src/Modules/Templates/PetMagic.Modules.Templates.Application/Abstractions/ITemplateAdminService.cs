@@ -42,11 +42,19 @@ public interface ITemplateAdminService
 
     Task<Result<AdminModerationQueueItemResponse>> DecideAdminModerationItemAsync(AdminModerationDecisionCommand command, CancellationToken cancellationToken);
 
+    Task<Result<AdminModerationQueueItemResponse>> ClaimAdminModerationItemAsync(AdminModerationClaimCommand command, CancellationToken cancellationToken);
+
+    Task<Result<AdminModerationQueueItemResponse>> ReleaseAdminModerationItemAsync(AdminModerationReleaseCommand command, CancellationToken cancellationToken);
+
+    Task<Result<AdminModerationQueueItemResponse>> HandoffAdminModerationItemAsync(AdminModerationHandoffCommand command, CancellationToken cancellationToken);
+
     Task<Result<AdminTemplatesAnalyticsOverviewResponse>> GetAdminTemplatesAnalyticsAsync(AdminTemplatesAnalyticsQuery query, CancellationToken cancellationToken);
 
     Task<Result<AdminTemplateGenerationDashboardMetricsResponse>> GetAdminGenerationDashboardMetricsAsync(CancellationToken cancellationToken);
 
     Task<Result<AdminTemplateGenerationListPageResponse>> ListAdminGenerationsAsync(AdminTemplateGenerationsQuery query, CancellationToken cancellationToken);
+
+    Task<Result<AdminGenerationDetailResponse>> GetAdminGenerationAsync(Guid generationId, CancellationToken cancellationToken);
 
     Task<Result<AdminWatermarkSettingsResponse>> GetAdminWatermarkSettingsAsync(CancellationToken cancellationToken);
 
@@ -64,7 +72,10 @@ public interface ITemplateAdminService
 
     Task<Result<AdminTemplateOfTheDayResponse>> UpdateTemplateOfTheDayAsync(UpdateTemplateOfTheDayCommand command, CancellationToken cancellationToken);
 
-    Task<Result> DeleteTemplateOfTheDayAsync(Guid id, CancellationToken cancellationToken);
+    Task<Result> DeleteTemplateOfTheDayAsync(
+        Guid id,
+        CancellationToken cancellationToken,
+        Guid? deletedByAdminId = null);
 
     Task<Result<AdminTemplateOfTheDayResponse>> AutoPickTemplateOfTheDayAsync(AutoPickTemplateOfTheDayCommand command, CancellationToken cancellationToken);
 

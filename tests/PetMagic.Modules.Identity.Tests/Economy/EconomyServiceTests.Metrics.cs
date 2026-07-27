@@ -215,6 +215,61 @@ public sealed partial class EconomyServiceTests
         Assert.Equal("USD", result.Value.CurrencyCode);
         Assert.Equal(7, result.Value.RevenueSeries.Count);
         Assert.Equal(10m, result.Value.RevenueSeries.Sum(x => x.Amount));
+        Assert.Equal(7, result.Value.PeriodDays);
+        Assert.Equal(DateOnly.FromDateTime(result.Value.AsOfUtc.Date.AddDays(-6)), result.Value.RevenueSeries[0].Date);
+        Assert.Equal(DateOnly.FromDateTime(result.Value.AsOfUtc.Date), result.Value.RevenueSeries[^1].Date);
+    }
+
+    [Fact]
+    public async Task GetAdminDashboardMetricsAsync_ShouldReturnZeroFilledThirtyDayPeriodAndRejectUnsupportedPeriods()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var packId = AddStarterPack(dbContext);
+        var today = DateTime.UtcNow.Date;
+        dbContext.PurchaseOrders.AddRange(
+            new PurchaseOrder
+            {
+                Id = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
+                PackId = packId,
+                PaymentProvider = "stripe",
+                Status = PurchaseOrderStatus.Succeeded,
+                PriceAmount = 20m,
+                CurrencyCode = "USD",
+                SparkToGrant = 120,
+                CreatedAtUtc = today.AddDays(-29).AddHours(12),
+                ConfirmedAtUtc = today.AddDays(-29).AddHours(12)
+            },
+            new PurchaseOrder
+            {
+                Id = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
+                PackId = packId,
+                PaymentProvider = "stripe",
+                Status = PurchaseOrderStatus.Succeeded,
+                PriceAmount = 5m,
+                CurrencyCode = "USD",
+                SparkToGrant = 120,
+                CreatedAtUtc = today.AddDays(-31).AddHours(12),
+                ConfirmedAtUtc = today.AddDays(-31).AddHours(12)
+            });
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext);
+        var result = await service.GetAdminDashboardMetricsAsync(30, CancellationToken.None);
+        var invalidPeriod = await service.GetAdminDashboardMetricsAsync(14, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(30, result.Value.PeriodDays);
+        Assert.Equal(30, result.Value.RevenueSeries.Count);
+        Assert.Equal(20m, result.Value.RevenueThisWeek);
+        Assert.Equal(5m, result.Value.RevenuePreviousWeek);
+        Assert.Equal(20m, result.Value.RevenueSeries.Sum(point => point.Amount));
+        Assert.Equal(DateOnly.FromDateTime(result.Value.AsOfUtc.Date.AddDays(-29)), result.Value.RevenueSeries[0].Date);
+        Assert.Equal(DateOnly.FromDateTime(result.Value.AsOfUtc.Date), result.Value.RevenueSeries[^1].Date);
+        Assert.True(invalidPeriod.IsFailure);
+        Assert.Equal(EconomyErrors.DashboardPeriodInvalid.Code, invalidPeriod.Error.Code);
     }
 
     [Fact]

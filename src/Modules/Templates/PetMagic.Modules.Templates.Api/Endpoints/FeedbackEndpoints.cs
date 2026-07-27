@@ -234,7 +234,7 @@ public static class FeedbackEndpoints
     {
         return context.User.IsInRole("Admin")
             ? details
-            : details with { CanRefund = false, Refund = null };
+            : details with { CanRefund = false, Refund = null, RefundUnavailableReason = null };
     }
 
     private static ProblemHttpResult ToProblem(Error error)

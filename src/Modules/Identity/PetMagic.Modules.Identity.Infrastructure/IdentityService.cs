@@ -246,13 +246,16 @@ public sealed partial class IdentityService(
     {
         var now = DateTime.UtcNow;
         var expiresAt = now.AddMinutes(jwtOptions.Value.AccessTokenMinutes);
+        var sessionId = Guid.NewGuid();
 
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
             new("premium", user.IsPremium ? "true" : "false"),
-            new("account_status", user.AccountStatus.ToString())
+            new("account_status", user.AccountStatus.ToString()),
+            new(IdentityJwtClaimTypes.SecurityStamp, user.SecurityStamp ?? string.Empty),
+            new(IdentityJwtClaimTypes.SessionId, sessionId.ToString("D"))
         };
         claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
 
@@ -271,7 +274,7 @@ public sealed partial class IdentityService(
 
         dbContext.RefreshTokenSessions.Add(new RefreshTokenSession
         {
-            Id = Guid.NewGuid(),
+            Id = sessionId,
             UserId = user.Id,
             TokenHash = HashToken(refreshToken),
             CreatedAtUtc = now,
@@ -307,7 +310,7 @@ public sealed partial class IdentityService(
         return Result.Success();
     }
 
-    private Task WriteAuditAsync(
+    private async Task WriteAuditAsync(
         Guid? subjectUserId,
         string action,
         string details,
@@ -315,8 +318,17 @@ public sealed partial class IdentityService(
         string? targetType = null,
         string? targetId = null,
         string? oldValue = null,
-        string? newValue = null)
+        string? newValue = null,
+        Guid? eventId = null)
     {
+        if (eventId.HasValue
+            && await dbContext.AuditEvents.AsNoTracking().AnyAsync(
+                auditEvent => auditEvent.Id == eventId.Value,
+                cancellationToken))
+        {
+            return;
+        }
+
         var now = DateTime.UtcNow;
         var httpContext = httpContextAccessor.HttpContext;
         var actorUserId = ResolveActorUserId(httpContext);
@@ -325,7 +337,7 @@ public sealed partial class IdentityService(
 
         dbContext.AuditEvents.Add(new AuditEvent
         {
-            Id = Guid.NewGuid(),
+            Id = eventId ?? Guid.NewGuid(),
             SubjectUserId = subjectUserId,
             ActorUserId = actorUserId,
             ActorRole = actorRole,
@@ -342,7 +354,7 @@ public sealed partial class IdentityService(
             OccurredAtUtc = now
         });
 
-        return dbContext.SaveChangesAsync(cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private void LogAuthInformation(string operation, Guid userId, string result)

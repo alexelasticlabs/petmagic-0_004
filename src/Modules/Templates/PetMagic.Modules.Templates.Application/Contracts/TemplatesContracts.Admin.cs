@@ -39,14 +39,28 @@ public sealed record AdminTemplateCatalogQuery(
     string? Access,
     string? Sort,
     int? Skip,
-    int? Take);
+    int? Take,
+    string? Visibility = null,
+    string? Readiness = null);
+
+public sealed record AdminTemplateCatalogSummaryResponse(
+    int TotalTemplates,
+    int ImageTemplates,
+    int VideoTemplates,
+    int ActiveTemplates,
+    int DraftTemplates,
+    int ArchivedTemplates,
+    int PremiumTemplates,
+    int QaOnlyTemplates,
+    int MissingPreviewTemplates);
 
 public sealed record AdminTemplateCatalogPageResponse(
     IReadOnlyList<AdminTemplateListItemResponse> Items,
     int Skip,
     int Take,
     int TotalCount,
-    bool HasMore);
+    bool HasMore,
+    AdminTemplateCatalogSummaryResponse Summary);
 
 public sealed record AdminTemplateOfTheDayResponse(
     Guid Id,
@@ -82,7 +96,8 @@ public sealed record AdminTemplateOfTheDaySettingsResponse(
     string AllowedTypes,
     int ExcludeRecentDays,
     DateTime UpdatedAtUtc,
-    Guid? UpdatedByAdminId);
+    Guid? UpdatedByAdminId,
+    DateOnly BusinessDate = default);
 
 public sealed record AdminTemplateCategoryListItemResponse(
     Guid CategoryId,
@@ -106,8 +121,16 @@ public sealed record AdminTemplateCategoryDiagnosticsResponse(
     IReadOnlyList<AdminTemplateCategoryDiagnosticItemResponse> Items,
     DateTime GeneratedAtUtc);
 
+public static class AdminTemplateCategoryDiagnosticIssueKinds
+{
+    public const string EmptyCategory = "empty_category";
+    public const string ArchivedCategory = "archived_category";
+    public const string MissingCategory = "missing_category";
+}
+
 public sealed record AdminTemplateCategoryDiagnosticItemResponse(
     Guid TemplateId,
+    string IssueKind,
     string Title,
     string Category,
     string NormalizedCategory,
@@ -262,7 +285,20 @@ public sealed record AdminModerationQueueItemResponse(
     Guid? GenerationId,
     string? ModerationComment,
     DateTime CreatedAtUtc,
-    DateTime? ModeratedAtUtc);
+    DateTime? ModeratedAtUtc,
+    Guid? LeaseOwnerUserId = null,
+    DateTime? LeaseClaimedAtUtc = null,
+    DateTime? LeaseExpiresAtUtc = null,
+    long Version = 0);
+
+public sealed record AdminModerationQueueSummaryResponse(
+    int PendingCount,
+    int ApprovedCount,
+    int RejectedCount,
+    int PendingComplaintsCount,
+    int PendingFeedbackCount,
+    DateTime? OldestPendingAtUtc,
+    DateTime GeneratedAtUtc);
 
 public sealed record AdminModerationQueuePageResponse(
     IReadOnlyList<AdminModerationQueueItemResponse> Items,
@@ -270,12 +306,40 @@ public sealed record AdminModerationQueuePageResponse(
     int Take,
     int TotalCount,
     bool HasMore,
-    DateTime GeneratedAtUtc);
+    DateTime GeneratedAtUtc,
+    AdminModerationQueueSummaryResponse? Summary = null);
 
 public sealed record AdminModerationDecisionCommand(
     Guid EventId,
     string Action,
-    string Reason);
+    string Reason,
+    Guid? ActorUserId = null,
+    string? ActorRole = null,
+    long? ExpectedVersion = null);
+
+public sealed record AdminModerationClaimCommand(
+    Guid EventId,
+    Guid ActorUserId,
+    string ActorRole,
+    long? ExpectedVersion,
+    int? LeaseMinutes = null);
+
+public sealed record AdminModerationReleaseCommand(
+    Guid EventId,
+    Guid ActorUserId,
+    string ActorRole,
+    long? ExpectedVersion,
+    string Reason,
+    bool CanManageOtherLeases = false);
+
+public sealed record AdminModerationHandoffCommand(
+    Guid EventId,
+    Guid ActorUserId,
+    string ActorRole,
+    Guid AssigneeUserId,
+    long? ExpectedVersion,
+    string Reason,
+    int? LeaseMinutes = null);
 
 public sealed record AdminUserTemplateGenerationResponse(
     Guid GenerationId,
@@ -353,7 +417,9 @@ public sealed record AdminTemplatesAnalyticsQuery(
     string? Status,
     string? Access,
     string? Sort,
-    int? Take);
+    int? Take,
+    int? Skip = null,
+    IReadOnlyList<Guid>? TemplateIds = null);
 
 public sealed record AdminTemplatesAnalyticsSummaryResponse(
     int TotalTemplates,
@@ -429,7 +495,11 @@ public sealed record AdminTemplatesAnalyticsOverviewResponse(
     AdminTemplatesAnalyticsFunnelResponse ConversionFunnel,
     IReadOnlyList<AdminTemplatesAnalyticsTemplateRowResponse> Templates,
     string[] AvailableCategories,
-    DateTime GeneratedAtUtc);
+    DateTime GeneratedAtUtc,
+    int Skip,
+    int Take,
+    int TotalCount,
+    bool HasMore);
 
 public sealed record AdminTemplateGenerationDashboardMetricsResponse(
     int TotalJobs,
@@ -446,6 +516,8 @@ public sealed record AdminTemplateGenerationDashboardMetricsResponse(
     int CancelledJobs,
     int CancellingJobs,
     int RetryingJobs,
+    int PendingRefunds,
+    int ExhaustedRefunds,
     DateTime GeneratedAtUtc);
 
 public sealed record AdminTemplateGenerationsQuery(
@@ -454,7 +526,9 @@ public sealed record AdminTemplateGenerationsQuery(
     string? User,
     string? Search,
     int? Skip,
-    int? Take);
+    int? Take,
+    string? RefundState = null,
+    Guid? GenerationId = null);
 
 public sealed record AdminTemplateGenerationListItemResponse(
     Guid GenerationId,
@@ -474,7 +548,14 @@ public sealed record AdminTemplateGenerationListItemResponse(
     DateTime UpdatedAtUtc,
     DateTime? StartedAtUtc,
     DateTime? CompletedAtUtc,
+    DateTime? ChargedAtUtc,
     DateTime? RefundedAtUtc,
+    string RefundState,
+    int RefundAttemptCount,
+    int RefundAttemptLimit,
+    DateTime? RefundLastAttemptedAtUtc,
+    string? RefundLastErrorCode,
+    bool CanRetryRefund,
     bool IsWatermarkRequired,
     bool IsWatermarkRemoved,
     string? WatermarkedMediaPath,
@@ -511,6 +592,10 @@ public sealed record AdminTemplateGenerationListPageResponse(
     int Skip,
     int Take,
     bool HasMore,
+    DateTime GeneratedAtUtc);
+
+public sealed record AdminGenerationDetailResponse(
+    AdminTemplateGenerationListItemResponse Generation,
     DateTime GeneratedAtUtc);
 
 public sealed record AdminGamificationLegacyDeliveryResolutionCommand(

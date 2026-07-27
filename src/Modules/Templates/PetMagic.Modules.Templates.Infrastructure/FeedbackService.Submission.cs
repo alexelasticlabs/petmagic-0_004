@@ -64,6 +64,17 @@ internal sealed partial class FeedbackService
             }
         }
 
+        if (generation is null && command.TemplateId is Guid requestedTemplateId)
+        {
+            var templateExists = await dbContext.TemplateItems
+                .AsNoTracking()
+                .AnyAsync(x => x.Id == requestedTemplateId, cancellationToken);
+            if (!templateExists)
+            {
+                return Result.Failure<SubmitFeedbackResponse>(TemplatesErrors.FeedbackNotFound);
+            }
+        }
+
         if (command.PetId is Guid petId && userId is Guid petOwnerId)
         {
             var ownsPet = await dbContext.Pets
