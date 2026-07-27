@@ -38,9 +38,7 @@ void main() {
         tester.element(find.byType(GuestWelcomePage)),
       );
 
-      await tester.tap(
-        find.widgetWithText(FilledButton, text.profileSignInAction),
-      );
+      await tester.tap(find.bySemanticsLabel(text.profileSignInAction));
       await _pumpUntilVisible(tester, find.byType(AuthEntryPage));
       expect(find.byType(AuthEntryPage), findsOneWidget);
 

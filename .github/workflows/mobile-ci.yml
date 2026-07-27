@@ -130,11 +130,10 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot-save
           script: |
-            cd apps/petmagic-mobile
-            flutter test integration_test/core_user_journey_test.dart -d emulator-5554 --flavor staging --dart-define=APP_ENVIRONMENT=staging --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging --dart-define=API_BASE_URL=https://api.staging.petmagic.app
-            flutter test integration_test/templates_feed_stress_test.dart -d emulator-5554 --flavor staging --dart-define=APP_ENVIRONMENT=staging --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging --dart-define=API_BASE_URL=https://api.staging.petmagic.app
-            flutter test integration_test/gallery_cross_flow_test.dart -d emulator-5554 --flavor staging --dart-define=APP_ENVIRONMENT=staging --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging --dart-define=API_BASE_URL=https://api.staging.petmagic.app
-            flutter test integration_test/watermark_result_flow_test.dart -d emulator-5554 --flavor staging --dart-define=APP_ENVIRONMENT=staging --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging --dart-define=API_BASE_URL=https://api.staging.petmagic.app
+            cd apps/petmagic-mobile && flutter test integration_test/core_user_journey_test.dart -d emulator-5554 --flavor staging --dart-define=APP_ENVIRONMENT=staging --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging --dart-define=API_BASE_URL=https://api.staging.petmagic.app
+            cd apps/petmagic-mobile && flutter test integration_test/templates_feed_stress_test.dart -d emulator-5554 --flavor staging --dart-define=APP_ENVIRONMENT=staging --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging --dart-define=API_BASE_URL=https://api.staging.petmagic.app
+            cd apps/petmagic-mobile && flutter test integration_test/gallery_cross_flow_test.dart -d emulator-5554 --flavor staging --dart-define=APP_ENVIRONMENT=staging --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging --dart-define=API_BASE_URL=https://api.staging.petmagic.app
+            cd apps/petmagic-mobile && flutter test integration_test/watermark_result_flow_test.dart -d emulator-5554 --flavor staging --dart-define=APP_ENVIRONMENT=staging --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging --dart-define=API_BASE_URL=https://api.staging.petmagic.app
 
   ios-build:
     runs-on: macos-latest

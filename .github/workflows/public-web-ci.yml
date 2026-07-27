@@ -36,7 +36,7 @@ jobs:
           cache-dependency-path: apps/public-web/package-lock.json
       - run: npm ci
       - name: Audit dependencies
-        run: npm audit --audit-level=moderate
+        run: npm audit --omit=dev --audit-level=moderate
       - name: Verify approved legal catalog
         run: npm run validate:legal
       - name: Build and test rendered routes

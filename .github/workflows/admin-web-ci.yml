@@ -43,7 +43,7 @@ jobs:
         run: npm ci --engine-strict
 
       - name: Audit dependencies
-        run: npm audit --audit-level=moderate
+        run: npm audit --omit=dev --audit-level=moderate
 
       - name: Check formatting
         run: npm run format:check

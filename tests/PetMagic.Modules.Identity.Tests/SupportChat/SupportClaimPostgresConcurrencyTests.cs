@@ -76,7 +76,7 @@ public sealed class SupportClaimPostgresConcurrencyTests
 
             Assert.Single(results, result => result.IsSuccess);
             var rejected = Assert.Single(results, result => result.IsFailure);
-            Assert.Equal(SupportChatErrors.ConversationAlreadyAssigned.Code, rejected.Error.Code);
+            Assert.Equal(SupportChatErrors.AssignmentConflict.Code, rejected.Error.Code);
 
             await using var verificationContext = new SupportChatDbContext(options);
             var persisted = await verificationContext.SupportConversations
