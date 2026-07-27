@@ -2,12 +2,6 @@ name: backend-security
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-      - master
-      - develop
-  pull_request:
 
 permissions:
   contents: read

@@ -1,34 +1,7 @@
 name: repo-hygiene-ci
 
 on:
-  pull_request:
-    paths:
-      - render.yaml
-      - render.production.yaml
-      - .env.staging.local.example
-      - Dockerfile.api
-      - Dockerfile.generation-worker
-      - apps/admin-web/Dockerfile
-      - README.md
-      - docs/**
-      - scripts/**
-      - .github/workflows/**
-  push:
-    branches:
-      - main
-      - master
-      - develop
-    paths:
-      - render.yaml
-      - render.production.yaml
-      - .env.staging.local.example
-      - Dockerfile.api
-      - Dockerfile.generation-worker
-      - apps/admin-web/Dockerfile
-      - README.md
-      - docs/**
-      - scripts/**
-      - .github/workflows/**
+  workflow_dispatch:
 
 permissions:
   contents: read

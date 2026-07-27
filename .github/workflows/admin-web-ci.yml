@@ -1,22 +1,7 @@
 name: admin-web-ci
 
 on:
-  pull_request:
-    paths:
-      - apps/admin-web/**
-      - src/**
-      - docker-compose.yml
-      - docs/api-contracts.md
-      - .github/workflows/admin-web-ci.yml
-  push:
-    branches:
-      - master
-    paths:
-      - apps/admin-web/**
-      - src/**
-      - docker-compose.yml
-      - docs/api-contracts.md
-      - .github/workflows/admin-web-ci.yml
+  workflow_dispatch:
 
 permissions:
   contents: read

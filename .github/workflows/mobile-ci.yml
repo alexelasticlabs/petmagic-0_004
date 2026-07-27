@@ -1,16 +1,7 @@
 name: mobile-ci
 
 on:
-  pull_request:
-    paths:
-      - apps/petmagic-mobile/**
-      - .github/workflows/mobile-ci.yml
-  push:
-    branches:
-      - master
-    paths:
-      - apps/petmagic-mobile/**
-      - .github/workflows/mobile-ci.yml
+  workflow_dispatch:
 
 permissions:
   contents: read

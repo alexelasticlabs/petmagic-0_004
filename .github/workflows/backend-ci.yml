@@ -2,38 +2,6 @@ name: backend-ci
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-      - master
-      - develop
-    paths:
-      - src/**
-      - shared/legal/**
-      - tests/**
-      - scripts/k6/**
-      - scripts/db/**
-      - scripts/load/**
-      - docs/load-testing.md
-      - deploy/monitoring/**
-      - PetMagic.slnx
-      - Directory.Build.props
-      - .editorconfig
-      - .github/workflows/backend-ci.yml
-  pull_request:
-    paths:
-      - src/**
-      - shared/legal/**
-      - tests/**
-      - scripts/k6/**
-      - scripts/db/**
-      - scripts/load/**
-      - docs/load-testing.md
-      - deploy/monitoring/**
-      - PetMagic.slnx
-      - Directory.Build.props
-      - .editorconfig
-      - .github/workflows/backend-ci.yml
 
 permissions:
   contents: read

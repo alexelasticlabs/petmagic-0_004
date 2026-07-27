@@ -1,18 +1,7 @@
 name: public-web-ci
 
 on:
-  pull_request:
-    paths:
-      - apps/public-web/**
-      - shared/legal/**
-      - .github/workflows/public-web-ci.yml
-  push:
-    branches:
-      - master
-    paths:
-      - apps/public-web/**
-      - shared/legal/**
-      - .github/workflows/public-web-ci.yml
+  workflow_dispatch:
 
 permissions:
   contents: read
