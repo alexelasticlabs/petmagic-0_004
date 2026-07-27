@@ -3,18 +3,15 @@ import 'package:petmagic_mobile/features/premium/presentation/paywall_feedback_s
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 
 void main() {
-  test(
-    'paywall feedback scope resolver skips the signed-out flow',
-    () async {
-      final storage = _FakeAuthSessionStorage();
-      final resolver = PaywallFeedbackScopeResolver(sessionStorage: storage);
+  test('paywall feedback scope resolver skips the signed-out flow', () async {
+    final storage = _FakeAuthSessionStorage();
+    final resolver = PaywallFeedbackScopeResolver(sessionStorage: storage);
 
-      final scope = await resolver.resolve(isAuthenticated: false);
+    final scope = await resolver.resolve(isAuthenticated: false);
 
-      expect(scope, isNull);
-      expect(storage.readCalls, 0);
-    },
-  );
+    expect(scope, isNull);
+    expect(storage.readCalls, 0);
+  });
 
   test(
     'paywall feedback scope resolver prefers loaded profile user id',

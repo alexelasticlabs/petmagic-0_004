@@ -196,9 +196,9 @@ class _SettingsFeedbackSheetState extends State<_SettingsFeedbackSheet> {
                   const SizedBox(height: 6),
                   Text(
                     copy.subtitle,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: colors.textMuted,
-                    ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: colors.textMuted),
                   ),
                   const SizedBox(height: 16),
                   _SettingsFeedbackOptions(
