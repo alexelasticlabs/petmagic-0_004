@@ -38,7 +38,13 @@ void main() {
         tester.element(find.byType(GuestWelcomePage)),
       );
 
-      await tester.tap(find.bySemanticsLabel(text.profileSignInAction));
+      final welcomeSignIn = find.byKey(
+        const ValueKey<String>('guest-welcome-sign-in'),
+      );
+      await _pumpUntilVisible(tester, welcomeSignIn);
+      await tester.ensureVisible(welcomeSignIn);
+      await tester.pumpAndSettle();
+      await tester.tap(welcomeSignIn);
       await _pumpUntilVisible(tester, find.byType(AuthEntryPage));
       expect(find.byType(AuthEntryPage), findsOneWidget);
 

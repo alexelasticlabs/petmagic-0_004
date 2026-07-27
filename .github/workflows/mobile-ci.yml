@@ -85,6 +85,19 @@ jobs:
           --artifact build/app/outputs/bundle/stagingRelease/app-staging-release.aab
           --baseline-bytes 95104021
           --max-growth-percent 5
+  android-production-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/petmagic-mobile
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: '3.44.5'
+          cache: true
+      - name: Resolve dependencies
+        run: flutter pub get
       - name: Build Android production release smoke
         env:
           ORG_GRADLE_PROJECT_allowInsecureReleaseSigning: "true"
@@ -158,7 +171,31 @@ jobs:
             --dart-define=API_BASE_URL=https://api.staging.petmagic.app \
             --build-number="$GITHUB_RUN_NUMBER" \
             --obfuscate --split-debug-info=build/symbols/ios-staging
-      - name: Run deterministic iOS core flow
+      - name: Build iOS production release smoke
+        env:
+          PETMAGIC_ALLOW_PLACEHOLDER_FIREBASE: "true"
+        run: |
+          dart run tool/configure_firebase_smoke.dart --environment=production
+          flutter build ios --no-codesign --release --flavor production \
+            --dart-define=APP_ENVIRONMENT=production \
+            --dart-define=APP_PACKAGE_NAME=com.petmagic.app \
+            --dart-define=API_BASE_URL=https://api.petmagic.app \
+            --build-number="$GITHUB_RUN_NUMBER" \
+            --obfuscate --split-debug-info=build/symbols/ios-production
+
+  ios-device-ui-smoke:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: apps/petmagic-mobile
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: '3.44.5'
+          cache: true
+      - run: flutter pub get
+      - name: Run deterministic iOS core flows
         env:
           PETMAGIC_ALLOW_PLACEHOLDER_FIREBASE: "true"
         run: |
@@ -191,14 +228,3 @@ jobs:
             --dart-define=APP_ENVIRONMENT=staging \
             --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging \
             --dart-define=API_BASE_URL=https://api.staging.petmagic.app
-      - name: Build iOS production release smoke
-        env:
-          PETMAGIC_ALLOW_PLACEHOLDER_FIREBASE: "true"
-        run: |
-          dart run tool/configure_firebase_smoke.dart --environment=production
-          flutter build ios --no-codesign --release --flavor production \
-            --dart-define=APP_ENVIRONMENT=production \
-            --dart-define=APP_PACKAGE_NAME=com.petmagic.app \
-            --dart-define=API_BASE_URL=https://api.petmagic.app \
-            --build-number="$GITHUB_RUN_NUMBER" \
-            --obfuscate --split-debug-info=build/symbols/ios-production
