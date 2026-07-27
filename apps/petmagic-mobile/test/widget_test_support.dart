@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 
 import 'package:dio/dio.dart';
@@ -39,6 +40,15 @@ import 'support_chat_test_support.dart';
 
 void configureWidgetTestHarness() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  final defaultComparator = goldenFileComparator;
+  if (defaultComparator is LocalFileComparator &&
+      defaultComparator is! TolerantGoldenFileComparator) {
+    goldenFileComparator = TolerantGoldenFileComparator(
+      defaultComparator.basedir.resolve('widget_test_support.dart'),
+      // Font geometry is deterministic; Skia antialiasing still differs by OS.
+      precisionTolerance: 0.08,
+    );
+  }
   setUpAll(() async {
     VisibilityDetectorController.instance.updateInterval = Duration.zero;
     await _loadDeterministicTestFonts();
@@ -49,6 +59,35 @@ void configureWidgetTestHarness() {
   tearDown(() {
     PetMagicNotificationCenter.instance.clearQueue();
   });
+}
+
+class TolerantGoldenFileComparator extends LocalFileComparator {
+  TolerantGoldenFileComparator(
+    super.testFile, {
+    required double precisionTolerance,
+  }) : assert(
+         precisionTolerance >= 0 && precisionTolerance <= 1,
+         'precisionTolerance must be between 0 and 1',
+       ),
+       _precisionTolerance = precisionTolerance;
+
+  final double _precisionTolerance;
+
+  @override
+  Future<bool> compare(Uint8List imageBytes, Uri golden) async {
+    final result = await GoldenFileComparator.compareLists(
+      imageBytes,
+      await getGoldenBytes(golden),
+    );
+    if (result.passed || result.diffPercent <= _precisionTolerance) {
+      result.dispose();
+      return true;
+    }
+
+    final error = await generateFailureOutput(result, golden, basedir);
+    result.dispose();
+    throw FlutterError(error);
+  }
 }
 
 const _goldenComfortaaFamily = 'PetMagicGoldenComfortaa';
