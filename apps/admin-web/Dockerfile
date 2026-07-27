@@ -1,7 +1,9 @@
+# syntax=docker/dockerfile:1.7
 FROM node:24-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --engine-strict
+RUN --mount=type=cache,id=npm-admin-web,sharing=locked,target=/root/.npm \
+    npm ci --engine-strict --prefer-offline --fetch-retries=5 --fetch-retry-mintimeout=20000 --fetch-retry-maxtimeout=120000
 
 FROM deps AS builder
 WORKDIR /app
@@ -18,10 +20,9 @@ ENV NEXT_PUBLIC_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION=$NEXT_PUBLIC_ALLOW_LO
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
-FROM node:24-alpine AS production-deps
+FROM deps AS production-deps
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev --engine-strict
+RUN npm prune --omit=dev --engine-strict
 
 FROM node:24-alpine AS runner
 WORKDIR /app

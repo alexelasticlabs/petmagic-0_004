@@ -17,7 +17,9 @@ import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
 import styles from "@/components/templates/templates-catalog.module.css";
 import { getTemplatesCategoriesViewText } from "@/components/templates/templates-categories-view.content";
 import { TemplatesCategoriesTable } from "@/components/templates/templates-categories-view.table";
+import { TemplatesCategoryDiagnostics } from "@/components/templates/templates-category-diagnostics";
 import { useAdminTemplateCategories } from "@/components/templates/use-admin-template-categories";
+import { useAdminTemplateCategoryDiagnostics } from "@/components/templates/use-admin-template-category-diagnostics";
 import { Button } from "@/components/ui/button";
 import { Toast } from "@/components/ui/toast";
 import { getAdminErrorMessage } from "@/lib/admin-error-message";
@@ -93,6 +95,9 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
   );
   const isCategoryActionLocked = isSubmitting || busyCategoryId !== null || isFetching;
   const categoryText = useMemo(() => getTemplatesCategoriesViewText(locale), [locale]);
+  const categoryDiagnostics = useAdminTemplateCategoryDiagnostics({
+    enabled: canManageCategories,
+  });
   const categoryActionsAdminOnly = categoryText.actionsAdminOnly;
   const error = actionError ?? (hasError ? text.errorLoadingTemplates : null);
   const categoryIds = useMemo(
@@ -235,6 +240,7 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
 
     try {
       await createTemplateCategory({ name });
+      categoryDiagnostics.markStale();
       setNewCategoryName("");
       const result = await refresh();
       if (result.isError) {
@@ -273,6 +279,7 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
 
     try {
       await updateTemplateCategory(categoryId, { name });
+      categoryDiagnostics.markStale();
       setEditingCategoryId(null);
       setEditingName("");
       const result = await refresh();
@@ -308,6 +315,7 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
 
     try {
       await changeTemplateCategoryArchiveState(category.categoryId, !category.isArchived);
+      categoryDiagnostics.markStale();
       if (editingCategoryId === category.categoryId) {
         setEditingCategoryId(null);
         setEditingName("");
@@ -350,6 +358,7 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
 
     try {
       await deleteTemplateCategory(category.categoryId);
+      categoryDiagnostics.markStale();
       if (editingCategoryId === category.categoryId) {
         setEditingCategoryId(null);
         setEditingName("");
@@ -514,6 +523,18 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
           hint={categoryText.totalTemplatesHint}
         />
       </AdminPageGrid>
+
+      {canManageCategories ? (
+        <TemplatesCategoryDiagnostics
+          locale={locale}
+          diagnostics={categoryDiagnostics.diagnostics}
+          hasError={categoryDiagnostics.hasError}
+          hasRun={categoryDiagnostics.hasRun}
+          isFetching={categoryDiagnostics.isFetching}
+          isStale={categoryDiagnostics.isStale}
+          onRun={() => void categoryDiagnostics.run()}
+        />
+      ) : null}
 
       {canManageCategories ? (
         <AdminCard

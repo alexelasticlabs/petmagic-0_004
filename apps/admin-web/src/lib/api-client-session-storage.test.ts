@@ -7,6 +7,7 @@ import {
   cachedGet,
   clearSession,
   getSession,
+  invalidateCachedGetNamespaces,
   login,
   logout,
 } from "@/lib/api-client.core";
@@ -437,6 +438,28 @@ describe("api-client session storage", () => {
     expect(serializedLogs).not.toContain("upstream failed");
   });
 
+  it("preserves a bounded Retry-After delay from throttled API responses", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({ title: "rate_limited" }, { status: 429, headers: { "retry-after": "12" } })
+      )
+    );
+
+    let caughtError: unknown;
+    try {
+      await apiRequest("/api/admin/users", { method: "GET" }, { requireAuth: false });
+    } catch (error) {
+      caughtError = error;
+    }
+
+    expect(caughtError).toBeInstanceOf(Error);
+    const apiError = caughtError as Error & { retryAfterSeconds?: number };
+    expect(apiError.message).toBe("Too many requests. Try again shortly.");
+    expect(apiError.retryAfterSeconds).toBe(12);
+  });
+
   it("sanitizes backend error text before exposing ApiError messages", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const fetchMock = vi.fn(async () =>
@@ -605,8 +628,28 @@ describe("api-client session storage", () => {
     expect(String(url)).toBe("https://api.example.com/api/auth/logout");
     expect(init?.method).toBe("POST");
     expect(headers.get("X-Correlation-ID")).toBeTruthy();
+    expect(headers.get("X-PetMagic-Logout-Intent")).toBe("logout");
     expect(headers.get("Authorization")).toBe("Bearer access-secret");
     expect(String(init?.body)).toContain("refresh-secret");
+  });
+
+  it("sends a cookie-backed logout when no volatile tokens remain after reload", async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await logout();
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+    const calls = fetchMock.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit?]>;
+    const [url, init] = calls[0] ?? [];
+    const headers = init?.headers as Headers;
+
+    expect(String(url)).toBe("https://api.example.com/api/auth/logout");
+    expect(init?.method).toBe("POST");
+    expect(init?.body).toBeUndefined();
+    expect(init?.credentials).toBe("include");
+    expect(headers.get("X-PetMagic-Logout-Intent")).toBe("logout");
+    expect(headers.get("Authorization")).toBeNull();
   });
 
   it("replays authenticated GET requests once after a successful token refresh", async () => {
@@ -789,5 +832,30 @@ describe("api-client session storage", () => {
     await expect(secondRequest).resolves.toBe("second-response");
     expect(request).toHaveBeenCalledTimes(2);
     expect(cache.get("admin-list")?.value).toBe("second-response");
+  });
+
+  it("does not repopulate an invalidated cache namespace from a prior signal-scoped read", async () => {
+    const cache = new Map<string, { value: string; expiresAt: number }>();
+    const staleResponse = createDeferred<string>();
+    const request = vi
+      .fn<() => Promise<string>>()
+      .mockImplementationOnce(() => staleResponse.promise)
+      .mockResolvedValueOnce("fresh-response");
+
+    const staleRequest = cachedGet(
+      "support-templates",
+      cache,
+      request,
+      new AbortController().signal
+    );
+    invalidateCachedGetNamespaces(["support-templates"]);
+    staleResponse.resolve("stale-response");
+
+    await expect(staleRequest).resolves.toBe("stale-response");
+    await expect(
+      cachedGet("support-templates", cache, request, new AbortController().signal)
+    ).resolves.toBe("fresh-response");
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(cache.get("support-templates")?.value).toBe("fresh-response");
   });
 });

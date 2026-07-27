@@ -363,6 +363,22 @@
   line-height: 1.45;
 }
 
+.validationSummary {
+  display: grid;
+  gap: 0.28rem;
+  padding: 0.62rem 0.72rem;
+  border: 1px solid color-mix(in srgb, var(--danger) 42%, var(--border-soft));
+  border-radius: 0.72rem;
+  background: color-mix(in srgb, var(--danger) 11%, var(--surface-1));
+  color: var(--danger-soft-fg);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.validationSummary p {
+  margin: 0;
+}
+
 .tableCard :global(table thead th) {
   padding: 0.54rem 0.52rem;
   border-bottom: 1px solid var(--border-soft);

@@ -276,6 +276,10 @@
     border-bottom: 1px solid var(--border-soft);
   }
 
+  .right {
+    min-height: auto;
+  }
+
   .preview {
     display: none;
   }

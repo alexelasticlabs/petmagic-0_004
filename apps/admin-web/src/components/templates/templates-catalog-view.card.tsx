@@ -2,33 +2,33 @@
 
 import Link from "next/link";
 
+import { AdminActionMenu, type AdminActionMenuItem } from "@/components/admin/admin-action-menu";
 import {
   CancelCircleIcon,
-  ChartIcon,
   DollarIcon,
   ImageIcon,
-  PencilIcon,
   PlayCircleIcon,
-  RefreshIcon,
+  VideoIcon,
 } from "@/components/admin/admin-icons";
 import { AdminStatusBadge } from "@/components/admin/admin-primitives";
 import {
   getTemplateAccessLabel,
   getTemplateStatusLabel,
 } from "@/components/templates/template-admin-shared";
-import { TemplatePreviewCard } from "@/components/templates/template-phone-preview-card";
+import { inferTemplateMediaKind } from "@/components/templates/template-media-utils";
+import { TemplateSecureMedia } from "@/components/templates/template-secure-media";
 import {
   getTemplatesCatalogIntlLocale,
   type TemplatesCatalogViewText,
 } from "@/components/templates/templates-catalog-view.content";
 import styles from "@/components/templates/templates-catalog.module.css";
-import { Button } from "@/components/ui/button";
 import type {
   AdminTemplateListItem,
   AdminTemplatesAnalyticsTemplateRow,
   TemplateStatus,
 } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 import type { ReactElement } from "react";
 
@@ -50,9 +50,6 @@ export type TemplateCatalogCardProps = {
   copy: TemplatesCatalogViewText;
   template: AdminTemplateListItem;
   analytics?: AdminTemplatesAnalyticsTemplateRow;
-  editorBasePath: string;
-  analyticsBasePath: string;
-  testBasePath: string;
   busyTemplateId: string | null;
   canManageTemplates: boolean;
   onStatusChange: (templateId: string, status: TemplateStatus) => void;
@@ -64,9 +61,6 @@ export function TemplateCatalogCard({
   copy,
   template,
   analytics,
-  editorBasePath,
-  analyticsBasePath,
-  testBasePath,
   busyTemplateId,
   canManageTemplates,
   onStatusChange,
@@ -74,31 +68,128 @@ export function TemplateCatalogCard({
 }: TemplateCatalogCardProps) {
   const text = getDictionary(locale);
   const isBusy = busyTemplateId !== null;
+  const safeTemplateTitle = sanitizeSensitiveText(template.title, 96);
+  const safeTemplateDescription = sanitizeSensitiveText(template.shortDescription, 180);
+  const safeTemplateCategory = sanitizeSensitiveText(template.category, 64);
+  const templateTypeSegment = template.templateType === "Video" ? "video" : "image";
+  const templateBasePath = `/${locale}/templates/${templateTypeSegment}`;
+  const previewUrl = template.previewAsset?.url?.trim() ?? "";
+  const previewKind = inferTemplateMediaKind(
+    template.previewAsset?.contentType?.trim() ?? "",
+    previewUrl
+  );
+  const actionItems: AdminActionMenuItem[] = [
+    {
+      id: "analytics",
+      label: copy.analyticsAction,
+      href: `${templateBasePath}/analytics/${encodeURIComponent(template.templateId)}`,
+      disabled: isBusy,
+    },
+    {
+      id: "test",
+      label: copy.testAction,
+      href: `${templateBasePath}/test/${encodeURIComponent(template.templateId)}`,
+      disabled: isBusy,
+    },
+    ...(template.status !== "Active"
+      ? [
+          {
+            id: "activate",
+            label: text.activate,
+            disabled: isBusy,
+            onSelect: () => onStatusChange(template.templateId, "Active"),
+          } satisfies AdminActionMenuItem,
+        ]
+      : []),
+    ...(template.status !== "Archived"
+      ? [
+          {
+            id: "archive",
+            label: text.archive,
+            disabled: isBusy,
+            tone: "danger" as const,
+            onSelect: () => onStatusChange(template.templateId, "Archived"),
+          } satisfies AdminActionMenuItem,
+        ]
+      : []),
+    {
+      id: "delete",
+      label: text.deleteTemplate,
+      disabled: isBusy,
+      tone: "danger",
+      onSelect: () => onDeleteTemplate(template.templateId),
+    },
+  ];
 
   return (
     <article className={styles.templateCard}>
-      <TemplatePreviewCard
-        className={styles.previewCard}
-        title={template.title}
-        shortDescription={template.shortDescription}
-        tags={template.tags}
-        previewUrl={template.previewAsset?.url}
-        previewContentType={template.previewAsset?.contentType}
-        templateKind={template.templateType === "Video" ? "video" : "image"}
-        templateKindLabel={
-          template.templateType === "Video"
+      <div className={styles.cardMedia}>
+        {previewUrl ? (
+          previewKind === "video" ? (
+            <TemplateSecureMedia
+              className={styles.cardMediaAsset}
+              url={previewUrl}
+              kind="video"
+              muted
+              playsInline
+              preload="metadata"
+              ariaLabel={safeTemplateTitle}
+              logContext={{
+                templateId: template.templateId,
+                contentType: template.previewAsset?.contentType,
+                surface: "catalog_card",
+              }}
+            />
+          ) : (
+            <TemplateSecureMedia
+              className={styles.cardMediaAsset}
+              url={previewUrl}
+              kind="image"
+              alt={safeTemplateTitle}
+              width={640}
+              height={360}
+              logContext={{
+                templateId: template.templateId,
+                contentType: template.previewAsset?.contentType,
+                surface: "catalog_card",
+              }}
+            />
+          )
+        ) : (
+          <div className={styles.cardMediaPlaceholder} aria-label={copy.missingPreviewMetric}>
+            {template.templateType === "Video" ? (
+              <VideoIcon className={styles.cardMediaPlaceholderIcon} />
+            ) : (
+              <ImageIcon className={styles.cardMediaPlaceholderIcon} />
+            )}
+            <span>{copy.missingPreviewMetric}</span>
+          </div>
+        )}
+        <span className={styles.cardMediaKind}>
+          {template.templateType === "Video" ? (
+            <VideoIcon className={styles.cardMediaKindIcon} />
+          ) : (
+            <ImageIcon className={styles.cardMediaKindIcon} />
+          )}
+          {template.templateType === "Video"
             ? text.templateKindVideoBadge
-            : text.templateKindImageBadge
-        }
-        tokenCost={template.tokenCost}
-        category={template.category}
-        isPremium={template.isPremium}
-        accessLabel={getTemplateAccessLabel(template.isPremium, text)}
-        referenceDurationSeconds={template.referenceVideoDurationSeconds}
-        promoBadge={template.effectivePromoBadge}
-        musicDescription={template.musicDescription}
-      />
+            : text.templateKindImageBadge}
+        </span>
+      </div>
       <div className={styles.cardBody}>
+        <div className={styles.cardTitleRow}>
+          <div>
+            <h2 title={safeTemplateTitle}>{safeTemplateTitle}</h2>
+            <p>{safeTemplateDescription}</p>
+          </div>
+        </div>
+        <div className={styles.metaRow}>
+          <span>{safeTemplateCategory}</span>
+          <span className={template.isPremium ? styles.premiumPill : styles.freePill}>
+            {getTemplateAccessLabel(template.isPremium, text)}
+          </span>
+          {template.isQaOnly ? <span className={styles.qaOnlyPill}>{copy.qaOnlyLabel}</span> : null}
+        </div>
         <div className={styles.cardFooter}>
           <span className={styles.cardTimestamp}>
             {copy.updatedShort} {formatDate(template.updatedAtUtc, locale)}
@@ -109,7 +200,6 @@ export function TemplateCatalogCard({
           >
             {getTemplateStatusLabel(template.status, locale)}
           </AdminStatusBadge>
-          {template.isQaOnly ? <span className={styles.qaOnlyPill}>{copy.qaOnlyLabel}</span> : null}
         </div>
         <div className={styles.cardMetrics}>
           {getTemplateCardMetrics(template, analytics, locale, copy).map((metric) => (
@@ -119,101 +209,41 @@ export function TemplateCatalogCard({
               title={metric.label}
             >
               {METRIC_ICONS[metric.tone]}
+              <span className={styles.cardMetricLabel}>{metric.label}</span>
               <strong>{metric.value}</strong>
             </div>
           ))}
         </div>
         <div className={styles.cardActions}>
           <Link
-            href={`${analyticsBasePath}/${encodeURIComponent(template.templateId)}`}
-            className={`${styles.cardActionIconButton}${
+            href={
+              canManageTemplates
+                ? `${templateBasePath}/editor?templateId=${encodeURIComponent(template.templateId)}`
+                : `${templateBasePath}/analytics/${encodeURIComponent(template.templateId)}`
+            }
+            className={`ui-button ui-button--primary ui-button--sm${
               isBusy ? ` ${styles.cardActionIconButtonDisabled}` : ""
             }`}
-            aria-label={copy.analyticsAction}
+            aria-label={`${
+              canManageTemplates ? text.editTemplate : copy.analyticsAction
+            }: ${safeTemplateTitle}`}
             aria-disabled={isBusy}
             tabIndex={isBusy ? -1 : undefined}
-            title={copy.analyticsAction}
             onClick={(event) => {
               if (isBusy) {
                 event.preventDefault();
               }
             }}
           >
-            <ChartIcon className={styles.actionIcon} />
+            {canManageTemplates ? text.editTemplate : copy.analyticsAction}
           </Link>
           {canManageTemplates ? (
-            <>
-              <Link
-                href={`${editorBasePath}?templateId=${encodeURIComponent(template.templateId)}`}
-                className={`${styles.cardActionIconButton}${
-                  isBusy ? ` ${styles.cardActionIconButtonDisabled}` : ""
-                }`}
-                aria-label={text.editTemplate}
-                aria-disabled={isBusy}
-                tabIndex={isBusy ? -1 : undefined}
-                title={text.editTemplate}
-                onClick={(event) => {
-                  if (isBusy) {
-                    event.preventDefault();
-                  }
-                }}
-              >
-                <PencilIcon className={styles.actionIcon} />
-              </Link>
-              <Link
-                href={`${testBasePath}/${encodeURIComponent(template.templateId)}`}
-                className={`${styles.cardActionIconButton}${
-                  isBusy ? ` ${styles.cardActionIconButtonDisabled}` : ""
-                }`}
-                aria-label={copy.testAction}
-                aria-disabled={isBusy}
-                tabIndex={isBusy ? -1 : undefined}
-                title={copy.testAction}
-                onClick={(event) => {
-                  if (isBusy) {
-                    event.preventDefault();
-                  }
-                }}
-              >
-                <PlayCircleIcon className={styles.actionIcon} />
-              </Link>
-              {template.status !== "Active" ? (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className={styles.cardActionIconButton}
-                  disabled={isBusy}
-                  aria-label={text.activate}
-                  title={text.activate}
-                  onClick={() => onStatusChange(template.templateId, "Active")}
-                >
-                  <RefreshIcon className={styles.actionIcon} />
-                </Button>
-              ) : (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className={`${styles.cardActionIconButton} ${styles.cardActionDanger}`}
-                  disabled={isBusy}
-                  aria-label={text.archive}
-                  title={text.archive}
-                  onClick={() => onStatusChange(template.templateId, "Archived")}
-                >
-                  <RefreshIcon className={styles.actionIcon} />
-                </Button>
-              )}
-              <Button
-                size="sm"
-                variant="danger"
-                className={`${styles.cardActionIconButton} ${styles.cardActionDanger}`}
-                disabled={isBusy}
-                aria-label={text.deleteTemplate}
-                title={text.deleteTemplate}
-                onClick={() => onDeleteTemplate(template.templateId)}
-              >
-                <CancelCircleIcon className={styles.actionIcon} />
-              </Button>
-            </>
+            <AdminActionMenu
+              label={text.actionsLabel}
+              items={actionItems}
+              disabled={isBusy}
+              align="end"
+            />
           ) : null}
         </div>
       </div>

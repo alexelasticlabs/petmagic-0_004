@@ -14,9 +14,13 @@
 /coverage
 /playwright-report
 /test-results
+/test-results-*
 
 # next.js
 /.next/
+/.next-e2e*/
+/.next-build.lock
+/.tsconfig.e2e-*.json
 /out/
 
 # production

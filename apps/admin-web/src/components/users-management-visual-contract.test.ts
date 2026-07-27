@@ -4,18 +4,34 @@ import { describe, expect, it } from "vitest";
 
 import { readUsersManagementPageLibrarySource } from "@/components/users-management-page.test-source";
 
+const usersPagePath = fileURLToPath(new URL("./users-management-page.tsx", import.meta.url));
+const usersChromePath = fileURLToPath(
+  new URL("./users-management-page.chrome.tsx", import.meta.url)
+);
 const usersContentPath = fileURLToPath(
   new URL("./users-management-page.content.ts", import.meta.url)
 );
+const usersFiltersPath = fileURLToPath(
+  new URL("./users-management-users-card.filters.tsx", import.meta.url)
+);
+const usersTablePath = fileURLToPath(
+  new URL("./users-management-users-card.table.tsx", import.meta.url)
+);
 const usersStylesPath = fileURLToPath(
   new URL("./users-management-page.module.css", import.meta.url)
+);
+const bulkEmailDialogPath = fileURLToPath(
+  new URL("./users-bulk-email-dialog.tsx", import.meta.url)
+);
+const bulkEmailDialogStylesPath = fileURLToPath(
+  new URL("./users-bulk-email-dialog.module.css", import.meta.url)
 );
 const userDetailPath = fileURLToPath(new URL("./users/user-detail-page.tsx", import.meta.url));
 const userDetailStylesPath = fileURLToPath(
   new URL("./users/user-detail-page.module.css", import.meta.url)
 );
-const userInlineAnalyticsStylesPath = fileURLToPath(
-  new URL("./users/user-inline-analytics.module.css", import.meta.url)
+const walletStylesPath = fileURLToPath(
+  new URL("./users/user-wallet-panel.module.css", import.meta.url)
 );
 
 describe("users management visual contract", () => {
@@ -34,7 +50,7 @@ describe("users management visual contract", () => {
     expect(usersSource).toContain("premiumStatusColors.free");
     expect(detailSource).toContain("function getPurchaseStatusColor(status: string): string");
     expect(detailSource).toContain(
-      'return status === "succeeded" ? "var(--success)" : "var(--warning)"'
+      'return status.toLowerCase() === "succeeded" ? "var(--success)" : "var(--warning)"'
     );
     expect(detailSource).toContain("function getGenerationStatusColor(status: string): string");
     expect(detailSource).toContain('return "var(--danger)"');
@@ -43,43 +59,99 @@ describe("users management visual contract", () => {
     expect(detailSource).not.toMatch(/#[0-9a-fA-F]{3,8}/);
   });
 
-  it("keeps user overlays theme-aware instead of hardcoding dark rgba layers", () => {
-    const stylesSource = readFileSync(usersStylesPath, "utf8");
+  it("keeps the registry lightweight and uses the project Select for filters and the period", () => {
+    const pageSource = readFileSync(usersPagePath, "utf8");
+    const chromeSource = readFileSync(usersChromePath, "utf8");
+    const filtersSource = readFileSync(usersFiltersPath, "utf8");
 
-    expect(stylesSource).toContain("box-shadow: var(--shadow-strong);");
-    expect(stylesSource).toContain(
-      "background: color-mix(in srgb, var(--surface-0) 64%, transparent);"
+    expect(pageSource).toContain("const PAGE_SIZE = 24;");
+    expect(pageSource).toContain("const [rangeDays, setRangeDays] = useState<RangeDays>(30);");
+    expect(pageSource).not.toContain("UsersManagementHero");
+    expect(chromeSource).not.toContain("AdminPageHero");
+    expect(chromeSource).toContain("<AdminMetricStrip");
+    expect(chromeSource).toContain("className={styles.summaryGrid}");
+    expect(chromeSource).toContain("className={styles.summaryHeader}");
+    expect(chromeSource).toContain("className={styles.summaryTitle}");
+    expect(chromeSource).toContain("<Select");
+    expect(chromeSource).toContain("ariaLabel={ui.periodLabel}");
+    expect(chromeSource).toContain(
+      "onChange={(value) => setRangeDays(Number.parseInt(value, 10) as RangeDays)}"
     );
-    expect(stylesSource).toContain(
-      "background: color-mix(in srgb, var(--surface-0) 74%, transparent);"
-    );
-    expect(stylesSource).not.toContain("rgba(");
-    expect(stylesSource).not.toContain("0 20px 40px");
-    expect(stylesSource).not.toContain("0 20px 42px");
+    expect(filtersSource).toContain("AdminFilterBar");
+    expect(filtersSource).toContain("Select, type SelectOption");
+    expect(filtersSource).not.toContain("<select");
+    expect(filtersSource).toContain("setStatusFilter");
+    expect(filtersSource).toContain("resetUsersPage();");
+    expect(filtersSource).toContain('id: "search"');
+    expect(filtersSource).toContain('id: "sort"');
+    expect(filtersSource).toContain("const hasResettableControls = activeFilters.length > 0;");
+    expect(filtersSource).not.toContain("ActivityFilter");
+    expect(filtersSource).not.toContain("RangeDays");
+    expect(filtersSource).not.toContain("setRangeDays");
   });
 
-  it("keeps users pagination icon-based and accessible", () => {
+  it("keeps destructive per-user mutations out of the registry and routes them to the dossier", () => {
     const usersSource = readUsersManagementPageLibrarySource();
-    const usersContentSource = readFileSync(usersContentPath, "utf8");
-    const stylesSource = readFileSync(usersStylesPath, "utf8");
+    const tableSource = readFileSync(usersTablePath, "utf8");
 
-    expect(usersSource).toContain("CaretDownIcon");
-    expect(usersSource).toContain("aria-label={ui.previousPageLabel}");
-    expect(usersSource).toContain("aria-label={ui.nextPageLabel}");
-    expect(usersSource).toContain("title={ui.previousPageLabel}");
-    expect(usersSource).toContain("title={ui.nextPageLabel}");
-    expect(usersSource).toContain("className={`${styles.pageIcon} ${styles.pageIconPrevious}`}");
-    expect(usersSource).toContain("className={`${styles.pageIcon} ${styles.pageIconNext}`}");
-    expect(usersContentSource).toContain('previousPageLabel: "Previous users page"');
-    expect(usersContentSource).toContain('nextPageLabel: "Next users page"');
-    expect(stylesSource).toContain(".pageInfo {");
-    expect(stylesSource).toContain(".pageIconPrevious {");
-    expect(stylesSource).toContain(".pageIconNext {");
-    expect(usersSource).not.toContain("{ui.prevPage}");
-    expect(usersSource).not.toContain("{ui.nextPage}");
+    expect(tableSource).toContain("<span>{ui.userColumn}</span>");
+    expect(tableSource).toContain("<th>{ui.accountAndAccess}</th>");
+    expect(tableSource).toContain("<th>{ui.plan}</th>");
+    expect(tableSource).toContain("<th>{ui.quickActions}</th>");
+    expect(tableSource).toContain("data-label={ui.quickActions}");
+    expect(tableSource).toContain("href={`/${locale}/users/${encodeURIComponent(user.userId)}`}");
+    expect(tableSource).toContain("?tab=wallet");
+    expect(tableSource).toContain("?tab=support");
+    expect(tableSource).toContain('role="group"');
+
+    for (const legacyRegistryConcern of [
+      "ActivityFilter",
+      "fetchUserRowEnrichment",
+      "UsersManagementSidePanel",
+      "UsersManagementActionsMenu",
+      "adjustAdminUserWallet",
+      "setActive(user.userId",
+      "revokePremium(user.userId",
+      "assignRole(user.userId",
+      "revokeRole(user.userId",
+      "deleteAdminUser(user.userId",
+      "quickCredit",
+      "quickDebit",
+    ]) {
+      expect(usersSource).not.toContain(legacyRegistryConcern);
+    }
   });
 
-  it("keeps users page UI copy outside the client component", () => {
+  it("adds a deliberate, auditable bulk email workflow for eligible recipients", () => {
+    const usersSource = readUsersManagementPageLibrarySource();
+    const tableSource = readFileSync(usersTablePath, "utf8");
+    const dialogSource = readFileSync(bulkEmailDialogPath, "utf8");
+    const dialogStylesSource = readFileSync(bulkEmailDialogStylesPath, "utf8");
+    const contentSource = readFileSync(usersContentPath, "utf8");
+
+    expect(usersSource).toContain("UsersBulkEmailDialog");
+    expect(usersSource).toContain("useSyncToastToAdminNotifications");
+    expect(usersSource).toContain('source: "users-bulk-email"');
+    expect(tableSource).toContain("user.isActive && user.emailConfirmed");
+    expect(tableSource).toContain("selectAllRef.current.indeterminate");
+    expect(tableSource).toContain("onTogglePageSelection(eligibleUserIds");
+    expect(dialogSource).toContain('type DialogStage = "compose" | "review";');
+    expect(dialogSource).toContain("await queueAdminBulkEmail(");
+    expect(dialogSource).toContain("policyConfirmed");
+    expect(dialogSource).toContain("ADMIN_BULK_EMAIL_SUBJECT_MAX_LENGTH");
+    expect(dialogSource).toContain("ADMIN_BULK_EMAIL_BODY_MAX_LENGTH");
+    expect(dialogSource).toContain("deliveryIdempotencyKeyRef");
+    expect(dialogSource).toContain("`bulk-email:${createAdminCorrelationId()}`");
+    expect(dialogSource).toContain("markCampaignPayloadChanged");
+    expect(dialogSource).toContain("copy.reviewDescription");
+    expect(contentSource).toContain(
+      "backend создаст отдельные задания отправки и запишет действие в audit trail"
+    );
+    expect(dialogStylesSource).toContain("@media (max-width: 680px)");
+    expect(dialogStylesSource).toContain("grid-template-columns: minmax(0, 1fr);");
+  });
+
+  it("keeps registry copy localized outside client components", () => {
     const usersSource = readUsersManagementPageLibrarySource();
     const usersContentSource = readFileSync(usersContentPath, "utf8");
     const ruUsersContentSource = usersContentSource.slice(0, usersContentSource.indexOf("  en: {"));
@@ -90,161 +162,115 @@ describe("users management visual contract", () => {
     expect(usersSource).toContain(
       "const ui = useMemo(() => getUsersManagementPageText(locale), [locale]);"
     );
-    expect(usersSource).not.toContain('summaryTotal: "Total users"');
-    expect(usersSource).not.toContain('summaryTotal: "Всего пользователей"');
+    expect(usersSource).not.toContain('openProfile: "Открыть досье"');
     expect(usersContentSource).toContain("export type UsersManagementPageText = {");
     expect(usersContentSource).toContain(
       "const usersManagementPageText: Record<Locale, UsersManagementPageText>"
     );
-    expect(usersContentSource).toContain("export function getUsersManagementPageText");
-    expect(usersContentSource).toContain('summaryTotal: "Total users"');
-    expect(usersContentSource).toContain('summaryTotal: "Всего пользователей"');
-    expect(usersContentSource).toContain('sectionAudit: "Журнал аудита"');
-    expect(usersContentSource).toContain("будет записано в журнал аудита");
-    expect(ruUsersContentSource).not.toContain('sectionAudit: "Audit log"');
+    expect(usersContentSource).toContain('searchPlaceholder: "Поиск по имени, email или ID"');
+    expect(usersContentSource).toContain('openProfile: "Открыть досье"');
+    expect(usersContentSource).toContain('openProfile: "Open dossier"');
+    expect(usersContentSource).toContain('quickActions: "Быстрые действия"');
+    expect(usersContentSource).toContain('quickWallet: "Баланс"');
+    expect(usersContentSource).toContain('quickWallet: "Balance"');
+    expect(usersContentSource).toContain('filterStatus: "Состояние аккаунта"');
+    expect(ruUsersContentSource).not.toContain('openProfile: "Open dossier"');
   });
 
-  it("keeps users table identifier headers localized", () => {
+  it("keeps users pagination icon-based and accessible", () => {
     const usersSource = readUsersManagementPageLibrarySource();
+    const usersContentSource = readFileSync(usersContentPath, "utf8");
+    const stylesSource = readFileSync(usersStylesPath, "utf8");
+    const tableSource = readFileSync(usersTablePath, "utf8");
 
-    expect(usersSource).toContain("<th>{text.userIdLabel}</th>");
-    expect(usersSource).toContain("data-label={text.userIdLabel}");
-    expect(usersSource).not.toContain("<th>userId</th>");
-    expect(usersSource).not.toContain('data-label="userId"');
+    expect(usersSource).toContain("CaretDownIcon");
+    expect(usersSource).toContain("aria-label={ui.previousPageLabel}");
+    expect(usersSource).toContain("aria-label={ui.nextPageLabel}");
+    expect(usersSource).toContain("title={ui.previousPageLabel}");
+    expect(usersSource).toContain("title={ui.nextPageLabel}");
+    expect(usersSource).toContain("className={`${styles.pageIcon} ${styles.pageIconPrevious}`}");
+    expect(usersSource).toContain("className={`${styles.pageIcon} ${styles.pageIconNext}`}");
+    expect(usersSource).toContain("className={styles.identityArrow}");
+    expect(tableSource).toContain(
+      "const shouldShowPagination = totalPages > 1 || currentPage > 1;"
+    );
+    expect(tableSource).toContain("{shouldShowPagination ? (");
+    expect(tableSource).not.toContain("usersPageTotalCount");
+    expect(usersContentSource).toContain('previousPageLabel: "Previous users page"');
+    expect(usersContentSource).toContain('nextPageLabel: "Next users page"');
+    expect(stylesSource).toContain(".pageInfo {");
+    expect(stylesSource).toContain(".pageIconPrevious {");
+    expect(stylesSource).toContain(".pageIconNext {");
+    expect(usersSource).not.toContain("{ui.prevPage}");
+    expect(usersSource).not.toContain("{ui.nextPage}");
   });
 
-  it("keeps inline analytics cards theme-aware", () => {
-    const stylesSource = readFileSync(userInlineAnalyticsStylesPath, "utf8");
-
-    expect(stylesSource).toContain("background: var(--accent-soft-bg);");
-    expect(stylesSource).toContain("color: var(--accent-strong);");
-    expect(stylesSource).toContain("border: 1px solid var(--border-soft);");
-    expect(stylesSource).toContain("color-mix(in srgb, var(--surface-2) 72%, var(--surface-1))");
-    expect(stylesSource).toContain("color-mix(in srgb, var(--surface-2) 88%, var(--surface-0))");
-    expect(stylesSource).not.toContain("rgba(");
-    expect(stylesSource).not.toMatch(/#[0-9a-fA-F]{3,8}/);
-  });
-
-  it("keeps inline analytics readable on phone screens", () => {
-    const stylesSource = readFileSync(userInlineAnalyticsStylesPath, "utf8");
-
-    expect(stylesSource).toContain("@media (max-width: 640px)");
-    expect(stylesSource).toContain(".header,\n  .identity");
-    expect(stylesSource).toContain(".identity h3,\n  .identity p");
-    expect(stylesSource).toContain("overflow-wrap: anywhere;");
-    expect(stylesSource).toContain(".profileLink {\n    width: 100%;");
-    expect(stylesSource).toContain("justify-content: center;");
-    expect(stylesSource).toContain(".timelineHeader {\n    display: grid;");
-    expect(stylesSource).toContain("grid-template-columns: minmax(0, 1fr);");
-  });
-
-  it("keeps user detail cards and actions usable on phone screens", () => {
-    const stylesSource = readFileSync(userDetailStylesPath, "utf8");
-
-    expect(stylesSource).toContain("@media (max-width: 640px)");
-    expect(stylesSource).toContain(".backLink,\n  .errorActions > *");
-    expect(stylesSource).toContain("flex-direction: column;");
-    expect(stylesSource).toContain(".profileTitle,\n  .profileEmail");
-    expect(stylesSource).toContain("overflow-wrap: anywhere;");
-    expect(stylesSource).toContain(".timelineHeader,\n  .dataHeader");
-    expect(stylesSource).toContain("grid-template-columns: minmax(0, 1fr);");
-    expect(stylesSource).toContain(".petMediaGrid");
-  });
-
-  it("keeps users management filters and panels usable on phone screens", () => {
+  it("keeps the compact registry usable on phone screens without hidden overlays", () => {
     const stylesSource = readFileSync(usersStylesPath, "utf8");
 
     expect(stylesSource).toContain("@media (max-width: 640px)");
-    expect(stylesSource).toContain("min-width: clamp(20rem, 30vw, 28rem);");
-    expect(stylesSource).toContain("min-width: clamp(18rem, 34vw, 25rem);");
-    expect(stylesSource).toContain(".filtersBar {\n    grid-template-columns: minmax(0, 1fr);");
-    expect(stylesSource).toContain(".searchInput,\n  .filterSelect");
-    expect(stylesSource).toContain(".searchInput:focus-visible,\n.filterSelect:focus-visible");
+    expect(stylesSource).toContain("@media (max-width: 900px)");
+    expect(stylesSource).toContain(".tableWrap :global(thead) {");
+    expect(stylesSource).toContain("clip-path: inset(50%);");
+    expect(stylesSource).not.toContain(".tableWrap :global(thead) {\n    display: none;");
+    expect(stylesSource).toContain(".summaryGrid,\n  .filtersBar,\n  .advancedFilters {");
+    expect(stylesSource).toContain("grid-template-columns: minmax(0, 1fr);");
+    expect(stylesSource).toContain(".searchField,\n.selectField {");
+    expect(stylesSource).toContain(".selectField :global(button[class*=");
+    expect(stylesSource).toContain(".searchInput:focus-visible {");
     expect(stylesSource).toContain("box-shadow: var(--focus-ring);");
-    expect(stylesSource).toContain("width: 100%;\n    min-width: 0;");
+    expect(stylesSource).toContain(
+      ".quickActions {\n    display: flex;\n    width: 100%;\n    justify-content: stretch;"
+    );
+    expect(stylesSource).toContain(".quickActionLink {\n    flex: 1 1 min(10rem, 100%);");
     expect(stylesSource).toContain(".paginationControls {\n    width: 100%;");
     expect(stylesSource).toContain("justify-content: space-between;");
-    expect(stylesSource).toContain(".walletActions {\n    flex-direction: column;");
-    expect(stylesSource).toContain(".sidePanelHeader {\n    display: grid;");
-    expect(stylesSource).toContain(".closeBtn {\n    width: 100%;");
-    expect(stylesSource).toContain(
-      ".actionsCell {\n    min-width: min(18rem, calc(100vw - 2rem));"
-    );
-    expect(stylesSource).toContain(".quickActionBtn {\n    flex: 1 1 8rem;");
-    expect(stylesSource).toContain("white-space: normal;");
-    expect(stylesSource).toContain(".actionMenuPortal {\n    max-width: calc(100vw - 1rem);");
-    expect(stylesSource).toContain(
-      ".actionMenuList {\n    min-width: min(15.5rem, calc(100vw - 1rem));"
-    );
+    expect(stylesSource).not.toContain(".walletDialog");
+    expect(stylesSource).not.toContain(".sidePanel");
+    expect(stylesSource).not.toContain(".actionMenu");
     expect(stylesSource).not.toContain(".searchInput:focus,\n.filterSelect:focus");
   });
 
-  it("keeps users panels and wallet form controls on compact admin radii", () => {
-    const usersStylesSource = readFileSync(usersStylesPath, "utf8");
-    const walletStylesSource = readFileSync(
-      fileURLToPath(new URL("./users/user-wallet-panel.module.css", import.meta.url)),
-      "utf8"
-    );
+  it("keeps the dossier tabbed and its access and wallet controls responsive", () => {
+    const detailSource = readFileSync(userDetailPath, "utf8");
+    const detailStylesSource = readFileSync(userDetailStylesPath, "utf8");
+    const walletStylesSource = readFileSync(walletStylesPath, "utf8");
 
-    expect(usersStylesSource).toContain(".walletDialog {");
-    expect(usersStylesSource).toContain(".sidePanel {");
-    expect(usersStylesSource).toContain(
-      ".walletInput:focus-visible,\n.walletTextarea:focus-visible"
+    expect(detailSource).toContain("UserSupportTicketsPanel");
+    expect(detailSource).toContain("UserWalletPanel");
+    expect(detailSource).toContain("UserAccessControlPanel");
+    expect(detailSource).toContain('activeTab === "overview"');
+    expect(detailSource).toContain('activeTab === "wallet"');
+    expect(detailSource).toContain('activeTab === "support"');
+    expect(detailSource).toContain('activeTab === "content"');
+    expect(detailSource).toContain('activeTab === "access"');
+    expect(detailSource).toContain(
+      'function selectTab(nextTab: UserDetailTab, action?: "adjust-balance")'
     );
-    expect(usersStylesSource).toContain(".walletInput:disabled,\n.walletTextarea:disabled");
-    expect(walletStylesSource).toContain(".input,\n.select,\n.textarea");
-    expect(walletStylesSource).toContain(
-      ".input:focus-visible,\n.select:focus-visible,\n.textarea:focus-visible"
+    expect(detailSource).toContain("getUserActivityPresentation(item, workspaceText)");
+    expect(detailSource).toContain(
+      "<nav className={styles.tabs} aria-label={workspaceText.tabsLabel}>"
     );
+    expect(detailSource).toContain("href={getUserDetailHref(locale, userId, tab.id)}");
+    expect(detailSource).toContain('aria-current={activeTab === tab.id ? "page" : undefined}');
+    expect(detailSource).toContain("options={tabOptions}");
+    expect(detailSource).not.toContain('role="tablist"');
+    expect(detailSource).not.toContain('role="tabpanel"');
+    expect(detailSource).toContain("quickActionsTitle");
+    expect(detailStylesSource).toContain(".tabs {");
+    expect(detailStylesSource).toContain("overflow-x: auto;");
+    expect(detailStylesSource).toContain(".quickActions {");
+    expect(detailStylesSource).toContain(".tabSelect {");
+    expect(detailStylesSource).toContain(".tabs {\n    display: none;");
+    expect(detailStylesSource).toContain(".tabSelect {\n    display: grid;");
+    expect(detailStylesSource).toContain(".accessLayout {");
+    expect(detailStylesSource).toContain(".accessInformationRail {");
+    expect(detailStylesSource).toContain(".supportPagination > :global(.ui-button)");
+    expect(detailStylesSource).toContain(".deleteZone > :global(.ui-button)");
+    expect(walletStylesSource).toContain(".input,\n.textarea");
+    expect(walletStylesSource).toContain(".input:focus-visible,\n.textarea:focus-visible");
+    expect(walletStylesSource).toContain(".operationField :global(button[class*=");
     expect(walletStylesSource).toContain("box-shadow: var(--focus-ring);");
-    expect(walletStylesSource).toContain(".input:disabled,\n.select:disabled,\n.textarea:disabled");
-    expect(usersStylesSource).toContain("border-radius: var(--radius-sm);");
-    expect(walletStylesSource).toContain("border-radius: var(--radius-sm);");
-    expect(usersStylesSource).not.toContain(".walletInput:focus,\n.walletTextarea:focus");
     expect(walletStylesSource).not.toContain(".input:focus,\n.select:focus,\n.textarea:focus");
-    expect(`${usersStylesSource}\n${walletStylesSource}`).not.toMatch(
-      /border-radius:\s*(?:0\.9rem|1rem|1[2-9]px|[2-9][0-9]px)/
-    );
-  });
-
-  it("keeps users management action menu viewport-safe and theme-tokenized", () => {
-    const pageSource = readUsersManagementPageLibrarySource();
-    const stylesSource = readFileSync(usersStylesPath, "utf8");
-    const actionMenuPortalLayer = stylesSource.slice(
-      stylesSource.indexOf(".actionMenuPortal {"),
-      stylesSource.indexOf(".actionMenuList {")
-    );
-    const actionMenuLayer = stylesSource.slice(
-      stylesSource.indexOf(".actionMenuList {"),
-      stylesSource.indexOf(".actionMenuListUpward {")
-    );
-    const actionMenuItemLayer = stylesSource.slice(
-      stylesSource.indexOf(".actionMenuItem,\n.actionMenuLink"),
-      stylesSource.indexOf(".actionMenuItem:hover")
-    );
-
-    expect(actionMenuPortalLayer).toContain("max-width: calc(100vw - 1rem);");
-    expect(actionMenuPortalLayer).toContain("max-height: calc(100dvh - 1rem);");
-    expect(pageSource).toContain("const ACTIONS_MENU_TARGET_WIDTH_PX = 250;");
-    expect(pageSource).toContain("const ACTIONS_MENU_VIEWPORT_PADDING_PX = 8;");
-    expect(pageSource).toContain(
-      "const availableWidth = Math.max(0, window.innerWidth - viewportPadding * 2);"
-    );
-    expect(pageSource).toContain("window.innerWidth - viewportPadding * 2");
-    expect(pageSource).toContain(
-      "const minWidth = Math.min(ACTIONS_MENU_TARGET_WIDTH_PX, availableWidth);"
-    );
-    expect(pageSource).not.toContain("ACTIONS_MENU_MIN_WIDTH_PX");
-    expect(pageSource).not.toContain("const minWidth = 250;");
-    expect(actionMenuLayer).toContain("box-shadow: var(--shadow-strong);");
-    expect(actionMenuLayer).toContain("max-width: min(17rem, calc(100vw - 1rem));");
-    expect(actionMenuLayer).toContain("max-height: calc(100dvh - 1rem);");
-    expect(actionMenuLayer).toContain("overflow-y: auto;");
-    expect(actionMenuItemLayer).toContain("min-width: 0;");
-    expect(actionMenuItemLayer).toContain("white-space: normal;");
-    expect(actionMenuItemLayer).toContain("overflow-wrap: anywhere;");
-    expect(actionMenuLayer).not.toContain("rgba(");
-    expect(actionMenuLayer).not.toContain("0 14px 28px");
-    expect(`${actionMenuPortalLayer}\n${actionMenuLayer}`).not.toContain("100vh");
   });
 });

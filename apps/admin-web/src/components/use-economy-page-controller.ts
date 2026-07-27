@@ -1,10 +1,11 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ensureAdminSession } from "@/components/admin/admin-session";
+import { type EconomyWorkspace } from "@/components/economy-page-workspace";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
   fetchAdminCurrencyPacks,
@@ -26,9 +27,15 @@ import { type Locale } from "@/lib/i18n";
 
 type UseEconomyPageControllerParams = {
   locale: Locale;
+  workspace: EconomyWorkspace;
 };
 
 const ECONOMY_PAGE_SIZE = 20;
+
+function readEconomyPageIndex(value: string | null): number {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed - 1 : 0;
+}
 
 function useDebouncedValue(value: string, delayMs: number) {
   const [debounced, setDebounced] = useState(value);
@@ -41,29 +48,87 @@ function useDebouncedValue(value: string, delayMs: number) {
   return debounced;
 }
 
-export function useEconomyPageController({ locale }: UseEconomyPageControllerParams) {
+export function useEconomyPageController({ locale, workspace }: UseEconomyPageControllerParams) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const session = useAuthSession();
   const canLoadEconomy = session?.user.roles.includes("Admin") ?? false;
+  const shouldLoadOverview = workspace === "overview";
+  const shouldLoadCatalog = workspace === "catalog";
+  const shouldLoadSubscriptions = workspace === "subscriptions";
+  const shouldLoadPayments = workspace === "payments";
   const [ledgerSource, setLedgerSource] = useState("");
   const [ledgerPage, setLedgerPage] = useState(0);
-  const [purchaseStatus, setPurchaseStatus] = useState("");
-  const [purchaseProvider, setPurchaseProvider] = useState("");
-  const [purchaseSearch, setPurchaseSearch] = useState("");
-  const [purchasePage, setPurchasePage] = useState(0);
+  const [purchaseStatus, setPurchaseStatus] = useState(() =>
+    (searchParams.get("purchaseStatus") ?? "").trim().slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH)
+  );
+  const [purchaseProvider, setPurchaseProvider] = useState(() =>
+    (searchParams.get("purchaseProvider") ?? "").trim().slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH)
+  );
+  const [purchaseSearch, setPurchaseSearch] = useState(() =>
+    (searchParams.get("purchaseSearch") ?? "").trim().slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH)
+  );
+  const [purchasePage, setPurchasePage] = useState(() =>
+    readEconomyPageIndex(searchParams.get("purchasePage"))
+  );
   const [subscriptionStatus, setSubscriptionStatus] = useState("");
   const [subscriptionProvider, setSubscriptionProvider] = useState("");
   const [subscriptionSearch, setSubscriptionSearch] = useState("");
   const [subscriptionPage, setSubscriptionPage] = useState(0);
   const [eventStatus, setEventStatus] = useState("");
   const [eventProvider, setEventProvider] = useState("");
-  const [incidentStatus, setIncidentStatus] = useState("open");
-  const [incidentCategory, setIncidentCategory] = useState("");
-  const [incidentType, setIncidentType] = useState("");
-  const [incidentPage, setIncidentPage] = useState(0);
+  const [eventPage, setEventPage] = useState(0);
+  const [incidentStatus, setIncidentStatus] = useState(
+    () =>
+      (searchParams.get("incidentStatus") ?? "open")
+        .trim()
+        .slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH) || "open"
+  );
+  const [incidentCategory, setIncidentCategory] = useState(() =>
+    (searchParams.get("incidentCategory") ?? "").trim().slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH)
+  );
+  const [incidentType, setIncidentType] = useState(() =>
+    (searchParams.get("incidentType") ?? "").trim().slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH)
+  );
+  const [incidentPage, setIncidentPage] = useState(() =>
+    readEconomyPageIndex(searchParams.get("incidentPage"))
+  );
   const debouncedPurchaseSearch = useDebouncedValue(purchaseSearch, 350);
   const debouncedSubscriptionSearch = useDebouncedValue(subscriptionSearch, 350);
   const debouncedIncidentType = useDebouncedValue(incidentType, 350);
+
+  const applyUrlState = useCallback((nextSearchParams: URLSearchParams) => {
+    setPurchaseStatus(
+      (nextSearchParams.get("purchaseStatus") ?? "")
+        .trim()
+        .slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH)
+    );
+    setPurchaseProvider(
+      (nextSearchParams.get("purchaseProvider") ?? "")
+        .trim()
+        .slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH)
+    );
+    setPurchaseSearch(
+      (nextSearchParams.get("purchaseSearch") ?? "")
+        .trim()
+        .slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH)
+    );
+    setPurchasePage(readEconomyPageIndex(nextSearchParams.get("purchasePage")));
+    setIncidentStatus(
+      (nextSearchParams.get("incidentStatus") ?? "open")
+        .trim()
+        .slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH) || "open"
+    );
+    setIncidentCategory(
+      (nextSearchParams.get("incidentCategory") ?? "")
+        .trim()
+        .slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH)
+    );
+    setIncidentType(
+      (nextSearchParams.get("incidentType") ?? "").trim().slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH)
+    );
+    setIncidentPage(readEconomyPageIndex(nextSearchParams.get("incidentPage")));
+  }, []);
 
   useEffect(() => {
     ensureAdminSession(locale, router, { requiredRole: "Admin" });
@@ -104,6 +169,16 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
     setSubscriptionPage(0);
   }, []);
 
+  const updateEventStatus = useCallback((value: string) => {
+    setEventStatus(value);
+    setEventPage(0);
+  }, []);
+
+  const updateEventProvider = useCallback((value: string) => {
+    setEventProvider(value);
+    setEventPage(0);
+  }, []);
+
   const updateIncidentStatus = useCallback((value: string) => {
     setIncidentStatus(value);
     setIncidentPage(0);
@@ -131,7 +206,7 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
   const ledgerQuery = useQuery({
     queryKey: adminQueryKeys.economyLedger(ledgerQueryParams),
     queryFn: ({ signal }) => fetchAdminEconomyLedger(ledgerQueryParams, signal),
-    enabled: canLoadEconomy,
+    enabled: canLoadEconomy && shouldLoadOverview,
     placeholderData: keepPreviousData,
   });
 
@@ -150,7 +225,7 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
   const purchasesQuery = useQuery({
     queryKey: adminQueryKeys.economyPurchases(purchasesQueryParams),
     queryFn: ({ signal }) => fetchAdminEconomyPurchases(purchasesQueryParams, signal),
-    enabled: canLoadEconomy,
+    enabled: canLoadEconomy && shouldLoadOverview,
     placeholderData: keepPreviousData,
   });
 
@@ -169,37 +244,40 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
   const subscriptionsQuery = useQuery({
     queryKey: adminQueryKeys.economySubscriptions(subscriptionsQueryParams),
     queryFn: ({ signal }) => fetchAdminEconomySubscriptions(subscriptionsQueryParams, signal),
-    enabled: canLoadEconomy,
+    enabled: canLoadEconomy && shouldLoadSubscriptions,
     placeholderData: keepPreviousData,
   });
 
   const subscriptionPlansQuery = useQuery({
     queryKey: adminQueryKeys.economySubscriptionPlans,
     queryFn: ({ signal }) => fetchAdminSubscriptionPlans(signal),
-    enabled: canLoadEconomy,
+    enabled: canLoadEconomy && shouldLoadSubscriptions,
   });
 
   const providerConfigsQuery = useQuery({
     queryKey: adminQueryKeys.economyPaymentProviderConfigs,
     queryFn: ({ signal }) => fetchAdminPaymentProviderConfigs(signal),
-    enabled: canLoadEconomy,
+    enabled: canLoadEconomy && shouldLoadPayments,
   });
 
   const subscriptionEventsQuery = useQuery({
     queryKey: adminQueryKeys.economySubscriptionEvents(
       eventProvider || "all",
-      eventStatus || "all"
+      eventStatus || "all",
+      eventPage
     ),
     queryFn: ({ signal }) =>
       fetchAdminSubscriptionEvents(
         {
-          take: 20,
+          skip: eventPage * ECONOMY_PAGE_SIZE,
+          take: ECONOMY_PAGE_SIZE,
           provider: eventProvider || undefined,
           status: eventStatus || undefined,
         },
         signal
       ),
-    enabled: canLoadEconomy,
+    enabled: canLoadEconomy && shouldLoadSubscriptions,
+    placeholderData: keepPreviousData,
   });
 
   const incidentsQueryParams = useMemo(
@@ -217,33 +295,34 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
   const incidentsQuery = useQuery({
     queryKey: adminQueryKeys.economyIncidents(incidentsQueryParams),
     queryFn: ({ signal }) => fetchAdminEconomyIncidents(incidentsQueryParams, signal),
-    enabled: canLoadEconomy,
+    enabled: canLoadEconomy && shouldLoadPayments,
     placeholderData: keepPreviousData,
   });
 
   const packsQuery = useQuery({
     queryKey: adminQueryKeys.economyPacks,
     queryFn: ({ signal }) => fetchAdminCurrencyPacks(signal),
-    enabled: canLoadEconomy,
+    enabled: canLoadEconomy && shouldLoadCatalog,
   });
 
   const economyDashboardMetricsQuery = useQuery({
-    queryKey: adminQueryKeys.economyDashboardMetrics,
-    queryFn: ({ signal }) => fetchAdminEconomyDashboardMetrics(signal),
-    enabled: canLoadEconomy,
+    queryKey: adminQueryKeys.economyDashboardMetricsPeriod(),
+    queryFn: ({ signal }) => fetchAdminEconomyDashboardMetrics({ signal }),
+    enabled: canLoadEconomy && shouldLoadOverview,
     placeholderData: keepPreviousData,
     staleTime: 60_000,
   });
 
-  const visiblePurchasesPage = purchasesQuery.isPlaceholderData ? undefined : purchasesQuery.data;
-  const visibleSubscriptionsPage = subscriptionsQuery.isPlaceholderData
-    ? undefined
-    : subscriptionsQuery.data;
-  const visibleLedgerPage = ledgerQuery.isPlaceholderData ? undefined : ledgerQuery.data;
+  const visiblePurchasesPage = purchasesQuery.data;
+  const visibleSubscriptionsPage = subscriptionsQuery.data;
+  const visibleLedgerPage = ledgerQuery.data;
+  const visibleSubscriptionEventsPage = subscriptionEventsQuery.data;
   const ledgerIsRefreshing = ledgerQuery.isFetching && ledgerQuery.isPlaceholderData;
   const purchasesIsRefreshing = purchasesQuery.isFetching && purchasesQuery.isPlaceholderData;
   const subscriptionsIsRefreshing =
     subscriptionsQuery.isFetching && subscriptionsQuery.isPlaceholderData;
+  const subscriptionEventsIsRefreshing =
+    subscriptionEventsQuery.isFetching && subscriptionEventsQuery.isPlaceholderData;
   const incidentsIsRefreshing = incidentsQuery.isFetching && incidentsQuery.isPlaceholderData;
 
   const ledgerItems = useMemo(() => visibleLedgerPage?.items ?? [], [visibleLedgerPage?.items]);
@@ -258,10 +337,10 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
   const subscriptionPlans = subscriptionPlansQuery.data ?? [];
   const providerConfigs = providerConfigsQuery.data ?? [];
   const subscriptionEvents = useMemo(
-    () => subscriptionEventsQuery.data?.items ?? [],
-    [subscriptionEventsQuery.data?.items]
+    () => visibleSubscriptionEventsPage?.items ?? [],
+    [visibleSubscriptionEventsPage?.items]
   );
-  const visibleIncidentsPage = incidentsQuery.isPlaceholderData ? undefined : incidentsQuery.data;
+  const visibleIncidentsPage = incidentsQuery.data;
   const incidentItems = useMemo(
     () => visibleIncidentsPage?.items ?? [],
     [visibleIncidentsPage?.items]
@@ -273,17 +352,19 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
       return;
     }
 
-    await Promise.allSettled([
-      ledgerQuery.refetch(),
-      purchasesQuery.refetch(),
-      subscriptionsQuery.refetch(),
-      subscriptionPlansQuery.refetch(),
-      providerConfigsQuery.refetch(),
-      subscriptionEventsQuery.refetch(),
-      incidentsQuery.refetch(),
-      packsQuery.refetch(),
-      economyDashboardMetricsQuery.refetch(),
-    ]);
+    const refreshes = [
+      shouldLoadOverview ? ledgerQuery.refetch() : null,
+      shouldLoadOverview ? purchasesQuery.refetch() : null,
+      shouldLoadSubscriptions ? subscriptionsQuery.refetch() : null,
+      shouldLoadSubscriptions ? subscriptionPlansQuery.refetch() : null,
+      shouldLoadPayments ? providerConfigsQuery.refetch() : null,
+      shouldLoadSubscriptions ? subscriptionEventsQuery.refetch() : null,
+      shouldLoadPayments ? incidentsQuery.refetch() : null,
+      shouldLoadCatalog ? packsQuery.refetch() : null,
+      shouldLoadOverview ? economyDashboardMetricsQuery.refetch() : null,
+    ].filter((refresh) => refresh !== null);
+
+    await Promise.allSettled(refreshes);
   }, [
     economyDashboardMetricsQuery,
     canLoadEconomy,
@@ -295,19 +376,53 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
     subscriptionEventsQuery,
     subscriptionPlansQuery,
     subscriptionsQuery,
+    shouldLoadCatalog,
+    shouldLoadOverview,
+    shouldLoadPayments,
+    shouldLoadSubscriptions,
   ]);
 
   const metrics = useMemo(() => {
     const credited = economyDashboardMetricsQuery.data?.totalWalletCredits ?? 0;
     const debited = economyDashboardMetricsQuery.data?.totalWalletDebits ?? 0;
     const grossRevenue = economyDashboardMetricsQuery.data?.revenueThisWeek ?? 0;
+    const revenuePreviousWeek = economyDashboardMetricsQuery.data?.revenuePreviousWeek ?? 0;
     const revenueCurrencyCode = economyDashboardMetricsQuery.data?.currencyCode ?? "USD";
+    const purchasesThisWeek = economyDashboardMetricsQuery.data?.purchasesThisWeek ?? 0;
+    const purchasesPreviousWeek = economyDashboardMetricsQuery.data?.purchasesPreviousWeek ?? 0;
+    const successfulPaymentsThisWeek =
+      economyDashboardMetricsQuery.data?.successfulPaymentsThisWeek ?? 0;
+    const successfulPaymentsPreviousWeek =
+      economyDashboardMetricsQuery.data?.successfulPaymentsPreviousWeek ?? 0;
+    const failedPaymentsThisWeek = economyDashboardMetricsQuery.data?.failedPaymentsThisWeek ?? 0;
+    const failedPaymentsPreviousWeek =
+      economyDashboardMetricsQuery.data?.failedPaymentsPreviousWeek ?? 0;
     const activePacks = packs.filter((pack) => pack.isActive).length;
 
-    return { credited, debited, grossRevenue, revenueCurrencyCode, activePacks };
+    return {
+      credited,
+      debited,
+      grossRevenue,
+      revenuePreviousWeek,
+      revenueCurrencyCode,
+      purchasesThisWeek,
+      purchasesPreviousWeek,
+      successfulPaymentsThisWeek,
+      successfulPaymentsPreviousWeek,
+      failedPaymentsThisWeek,
+      failedPaymentsPreviousWeek,
+      activePacks,
+    };
   }, [
     economyDashboardMetricsQuery.data?.currencyCode,
+    economyDashboardMetricsQuery.data?.failedPaymentsPreviousWeek,
+    economyDashboardMetricsQuery.data?.failedPaymentsThisWeek,
     economyDashboardMetricsQuery.data?.revenueThisWeek,
+    economyDashboardMetricsQuery.data?.revenuePreviousWeek,
+    economyDashboardMetricsQuery.data?.purchasesPreviousWeek,
+    economyDashboardMetricsQuery.data?.purchasesThisWeek,
+    economyDashboardMetricsQuery.data?.successfulPaymentsPreviousWeek,
+    economyDashboardMetricsQuery.data?.successfulPaymentsThisWeek,
     economyDashboardMetricsQuery.data?.totalWalletCredits,
     economyDashboardMetricsQuery.data?.totalWalletDebits,
     packs,
@@ -318,65 +433,68 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
   const activePlans = subscriptionPlans.filter((item) => item.isActive).length;
   const enabledRoutes = providerConfigs.filter((item) => item.isEnabled).length;
   const premiumMetrics = { activeSubscriptions, renewalStops, activePlans, enabledRoutes };
-  const openIncidents = incidentItems.filter((item) => item.status.toLowerCase() === "open").length;
 
-  const isLoading =
-    ledgerQuery.isLoading ||
-    purchasesQuery.isLoading ||
-    subscriptionsQuery.isLoading ||
-    subscriptionPlansQuery.isLoading ||
-    providerConfigsQuery.isLoading ||
-    subscriptionEventsQuery.isLoading ||
-    incidentsQuery.isLoading ||
-    packsQuery.isLoading ||
-    economyDashboardMetricsQuery.isLoading;
+  const activeQueryIsLoading =
+    (shouldLoadOverview && ledgerQuery.isLoading) ||
+    (shouldLoadOverview && purchasesQuery.isLoading) ||
+    (shouldLoadSubscriptions && subscriptionsQuery.isLoading) ||
+    (shouldLoadSubscriptions && subscriptionPlansQuery.isLoading) ||
+    (shouldLoadPayments && providerConfigsQuery.isLoading) ||
+    (shouldLoadSubscriptions && subscriptionEventsQuery.isLoading) ||
+    (shouldLoadPayments && incidentsQuery.isLoading) ||
+    (shouldLoadCatalog && packsQuery.isLoading) ||
+    (shouldLoadOverview && economyDashboardMetricsQuery.isLoading);
 
   const hasError =
-    ledgerQuery.isError ||
-    purchasesQuery.isError ||
-    subscriptionsQuery.isError ||
-    subscriptionPlansQuery.isError ||
-    providerConfigsQuery.isError ||
-    subscriptionEventsQuery.isError ||
-    incidentsQuery.isError ||
-    packsQuery.isError ||
-    economyDashboardMetricsQuery.isError;
+    (shouldLoadOverview && ledgerQuery.isError) ||
+    (shouldLoadOverview && purchasesQuery.isError) ||
+    (shouldLoadSubscriptions && subscriptionsQuery.isError) ||
+    (shouldLoadSubscriptions && subscriptionPlansQuery.isError) ||
+    (shouldLoadPayments && providerConfigsQuery.isError) ||
+    (shouldLoadSubscriptions && subscriptionEventsQuery.isError) ||
+    (shouldLoadPayments && incidentsQuery.isError) ||
+    (shouldLoadCatalog && packsQuery.isError) ||
+    (shouldLoadOverview && economyDashboardMetricsQuery.isError);
 
   const hasResolvedData =
-    ledgerQuery.isSuccess ||
-    purchasesQuery.isSuccess ||
-    subscriptionsQuery.isSuccess ||
-    subscriptionPlansQuery.isSuccess ||
-    providerConfigsQuery.isSuccess ||
-    subscriptionEventsQuery.isSuccess ||
-    incidentsQuery.isSuccess ||
-    packsQuery.isSuccess ||
-    economyDashboardMetricsQuery.isSuccess;
+    (shouldLoadOverview && ledgerQuery.isSuccess) ||
+    (shouldLoadOverview && purchasesQuery.isSuccess) ||
+    (shouldLoadSubscriptions && subscriptionsQuery.isSuccess) ||
+    (shouldLoadSubscriptions && subscriptionPlansQuery.isSuccess) ||
+    (shouldLoadPayments && providerConfigsQuery.isSuccess) ||
+    (shouldLoadSubscriptions && subscriptionEventsQuery.isSuccess) ||
+    (shouldLoadPayments && incidentsQuery.isSuccess) ||
+    (shouldLoadCatalog && packsQuery.isSuccess) ||
+    (shouldLoadOverview && economyDashboardMetricsQuery.isSuccess);
+
+  const isLoading = activeQueryIsLoading && !hasResolvedData;
 
   const economyError =
-    ledgerQuery.error ??
-    purchasesQuery.error ??
-    subscriptionsQuery.error ??
-    subscriptionPlansQuery.error ??
-    providerConfigsQuery.error ??
-    subscriptionEventsQuery.error ??
-    incidentsQuery.error ??
-    packsQuery.error ??
-    economyDashboardMetricsQuery.error ??
+    (shouldLoadOverview ? ledgerQuery.error : null) ??
+    (shouldLoadOverview ? purchasesQuery.error : null) ??
+    (shouldLoadSubscriptions ? subscriptionsQuery.error : null) ??
+    (shouldLoadSubscriptions ? subscriptionPlansQuery.error : null) ??
+    (shouldLoadPayments ? providerConfigsQuery.error : null) ??
+    (shouldLoadSubscriptions ? subscriptionEventsQuery.error : null) ??
+    (shouldLoadPayments ? incidentsQuery.error : null) ??
+    (shouldLoadCatalog ? packsQuery.error : null) ??
+    (shouldLoadOverview ? economyDashboardMetricsQuery.error : null) ??
     null;
 
   const isFetching =
-    ledgerQuery.isFetching ||
-    purchasesQuery.isFetching ||
-    subscriptionsQuery.isFetching ||
-    subscriptionPlansQuery.isFetching ||
-    providerConfigsQuery.isFetching ||
-    subscriptionEventsQuery.isFetching ||
-    incidentsQuery.isFetching ||
-    packsQuery.isFetching ||
-    economyDashboardMetricsQuery.isFetching;
+    (shouldLoadOverview && ledgerQuery.isFetching) ||
+    (shouldLoadOverview && purchasesQuery.isFetching) ||
+    (shouldLoadSubscriptions && subscriptionsQuery.isFetching) ||
+    (shouldLoadSubscriptions && subscriptionPlansQuery.isFetching) ||
+    (shouldLoadPayments && providerConfigsQuery.isFetching) ||
+    (shouldLoadSubscriptions && subscriptionEventsQuery.isFetching) ||
+    (shouldLoadPayments && incidentsQuery.isFetching) ||
+    (shouldLoadCatalog && packsQuery.isFetching) ||
+    (shouldLoadOverview && economyDashboardMetricsQuery.isFetching);
 
   return {
+    applyUrlState,
+    eventPage,
     eventProvider,
     eventStatus,
     hasBlockingError: hasError && !hasResolvedData,
@@ -409,9 +527,9 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
     purchasesIsFetching: purchasesQuery.isFetching,
     purchasesIsRefreshing,
     premiumMetrics,
-    openIncidents,
-    setEventProvider,
-    setEventStatus,
+    setEventPage,
+    setEventProvider: updateEventProvider,
+    setEventStatus: updateEventStatus,
     setIncidentPage,
     setIncidentCategory: updateIncidentCategory,
     setIncidentStatus: updateIncidentStatus,
@@ -427,6 +545,9 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
     setSubscriptionSearch: updateSubscriptionSearch,
     setSubscriptionStatus: updateSubscriptionStatus,
     subscriptionEvents,
+    subscriptionEventsHasMore: visibleSubscriptionEventsPage?.hasMore ?? false,
+    subscriptionEventsIsFetching: subscriptionEventsQuery.isFetching,
+    subscriptionEventsIsRefreshing,
     subscriptionItems,
     subscriptionPage,
     subscriptionSearch,

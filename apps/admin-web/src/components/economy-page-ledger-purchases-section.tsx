@@ -1,13 +1,15 @@
 "use client";
 
+import { useState } from "react";
+
 import {
   AdminCard,
-  AdminPageGrid,
-  AdminSelectField,
+  AdminFilterBar,
   AdminStateCard,
   AdminStatusBadge,
   adminTableStyles,
 } from "@/components/admin/admin-primitives";
+import { EconomySelectField } from "@/components/economy-page-select-field";
 import {
   ledgerSourceOptions,
   purchaseStatusOptions,
@@ -35,6 +37,17 @@ import {
 import { formatDateTime } from "@/lib/format-date-time";
 import { type Locale } from "@/lib/i18n";
 
+const RECENT_ITEMS_LIMIT = 5;
+
+function formatCompactDateTime(value: string, locale: Locale) {
+  return new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", {
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "short",
+  }).format(new Date(value));
+}
+
 type EconomyPageLedgerPurchasesSectionProps = {
   locale: Locale;
   text: EconomyPageText;
@@ -44,7 +57,6 @@ type EconomyPageLedgerPurchasesSectionProps = {
   ledgerPage: number;
   ledgerHasMore: boolean;
   ledgerIsFetching: boolean;
-  ledgerIsRefreshing: boolean;
   setLedgerPage: (value: number | ((current: number) => number)) => void;
   purchaseStatus: string;
   setPurchaseStatus: (value: string) => void;
@@ -53,13 +65,13 @@ type EconomyPageLedgerPurchasesSectionProps = {
   purchaseSearch: string;
   setPurchaseSearch: (value: string) => void;
   purchasesIsFetching: boolean;
-  purchasesIsRefreshing: boolean;
   purchaseItems: AdminEconomyPurchase[];
   purchasePage: number;
   purchasesHasMore: boolean;
   setPurchasePage: (value: number | ((current: number) => number)) => void;
   isRefundPurchaseSubmitting: boolean;
   onRefundPurchase: (purchase: AdminEconomyPurchase) => void;
+  onInspectPurchase: (purchase: AdminEconomyPurchase) => void;
 };
 
 export function EconomyPageLedgerPurchasesSection({
@@ -71,7 +83,6 @@ export function EconomyPageLedgerPurchasesSection({
   ledgerPage,
   ledgerHasMore,
   ledgerIsFetching,
-  ledgerIsRefreshing,
   setLedgerPage,
   purchaseStatus,
   setPurchaseStatus,
@@ -80,124 +91,225 @@ export function EconomyPageLedgerPurchasesSection({
   purchaseSearch,
   setPurchaseSearch,
   purchasesIsFetching,
-  purchasesIsRefreshing,
   purchaseItems,
   purchasePage,
   purchasesHasMore,
   setPurchasePage,
   isRefundPurchaseSubmitting,
   onRefundPurchase,
+  onInspectPurchase,
 }: EconomyPageLedgerPurchasesSectionProps) {
+  const [showLedgerDetails, setShowLedgerDetails] = useState(false);
+  const [showPurchaseDetails, setShowPurchaseDetails] = useState(false);
+  const [showLedgerFilters, setShowLedgerFilters] = useState(false);
+  const [showPurchaseFilters, setShowPurchaseFilters] = useState(false);
+  const ledgerFilterCount = ledgerSource ? 1 : 0;
+  const purchaseFilterCount =
+    Number(Boolean(purchaseStatus)) +
+    Number(Boolean(purchaseProvider)) +
+    Number(Boolean(purchaseSearch.trim()));
+  const shouldShowLedgerFilters = showLedgerFilters || ledgerFilterCount > 0;
+  const shouldShowPurchaseFilters = showPurchaseFilters || purchaseFilterCount > 0;
+
   return (
-    <AdminPageGrid columns="two">
+    <div className={styles.overviewDataGrid}>
       <AdminCard
-        title={text.ledgerTitle}
-        description={text.ledgerDescription}
+        title={text.recentActivityTitle}
+        description={text.recentActivityDescription}
+        className={styles.overviewDataCard}
         action={
-          <AdminSelectField
-            label={text.ledgerFilterLabel}
-            value={ledgerSource}
-            onChange={setLedgerSource}
-            options={ledgerSourceOptions[locale]}
-            className={styles.compactSelect}
-          />
+          <div className={styles.overviewCardActions}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-expanded={shouldShowLedgerFilters}
+              aria-controls="economy-ledger-filters"
+              onClick={() => setShowLedgerFilters((current) => !current)}
+            >
+              {ledgerFilterCount
+                ? `${text.filtersAction} · ${ledgerFilterCount}`
+                : text.filtersAction}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              aria-expanded={showLedgerDetails}
+              aria-controls={showLedgerDetails ? "economy-ledger-details" : undefined}
+              onClick={() => setShowLedgerDetails((current) => !current)}
+            >
+              {showLedgerDetails ? text.collapseDetailsAction : text.allLedgerAction}
+            </Button>
+          </div>
         }
       >
-        {ledgerIsRefreshing ? (
+        <div id="economy-ledger-filters" hidden={!shouldShowLedgerFilters}>
+          <AdminFilterBar className={styles.tableFilterBar}>
+            <EconomySelectField
+              label={text.ledgerFilterLabel}
+              value={ledgerSource}
+              onChange={setLedgerSource}
+              options={ledgerSourceOptions[locale]}
+              className={styles.compactSelect}
+              disabled={ledgerIsFetching && ledgerItems.length === 0}
+            />
+          </AdminFilterBar>
+        </div>
+        {ledgerIsFetching && ledgerItems.length === 0 ? (
           <AdminStateCard tone="info" title={text.loadingTitle} />
         ) : (
           <TableOrEmpty hasItems={ledgerItems.length > 0} emptyTitle={text.noLedger}>
-            <div className={adminTableStyles.tableWrap}>
-              <table className={adminTableStyles.table}>
-                <thead>
-                  <tr>
-                    <th>{text.timeColumn}</th>
-                    <th>{text.userColumn}</th>
-                    <th>{text.deltaColumn}</th>
-                    <th>{text.balanceColumn}</th>
-                    <th>{text.sourceColumn}</th>
-                    <th>{text.tokenKindColumn}</th>
-                    <th>{text.operationKindColumn}</th>
-                    <th>{text.expiryColumn}</th>
-                    <th>{text.reasonColumn}</th>
-                    <th>{text.bucketAllocationColumn}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ledgerItems.map((item) => (
-                    <tr key={item.entryId}>
-                      <td>{formatDateTime(item.createdAtUtc, locale)}</td>
-                      <td className={adminTableStyles.mono}>{shortGuid(item.userId)}</td>
-                      <td>
-                        <span className={item.delta >= 0 ? styles.positive : styles.negative}>
-                          {item.delta >= 0 ? "+" : ""}
-                          {item.delta}
-                        </span>
-                      </td>
-                      <td>{item.balanceAfter}</td>
-                      <td>{humanizeSource(item.source, locale)}</td>
-                      <td>
-                        {humanizeTokenKind(item.tokenKind, locale, text.tokenKindLegacyLabel)}
-                      </td>
-                      <td>{safeText(item.operationKind ?? "-", 64)}</td>
-                      <td>{item.expiresAtUtc ? formatDateTime(item.expiresAtUtc, locale) : "-"}</td>
-                      <td>{safeText(item.reason)}</td>
-                      <td>{safeText(item.bucketDeltasJson ?? "-", 160)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className={styles.pager}>
-              <button
-                type="button"
-                className={styles.pagerButton}
-                disabled={ledgerPage === 0 || ledgerIsFetching}
-                aria-label={text.previousLedgerPageLabel}
-                onClick={() => setLedgerPage((current) => Math.max(0, current - 1))}
-              >
-                {text.previousPage}
-              </button>
-              <button
-                type="button"
-                className={styles.pagerButton}
-                disabled={!ledgerHasMore || ledgerIsFetching}
-                aria-label={text.nextLedgerPageLabel}
-                onClick={() => setLedgerPage((current) => current + 1)}
-              >
-                {text.nextPage}
-              </button>
-            </div>
+            {showLedgerDetails ? (
+              <div id="economy-ledger-details">
+                <div className={adminTableStyles.tableWrap} aria-busy={ledgerIsFetching}>
+                  <table className={`${adminTableStyles.table} ${styles.wideTable}`}>
+                    <thead>
+                      <tr>
+                        <th scope="col">{text.timeColumn}</th>
+                        <th scope="col">{text.userColumn}</th>
+                        <th scope="col">{text.deltaColumn}</th>
+                        <th scope="col">{text.balanceColumn}</th>
+                        <th scope="col">{text.sourceColumn}</th>
+                        <th scope="col">{text.tokenKindColumn}</th>
+                        <th scope="col">{text.operationKindColumn}</th>
+                        <th scope="col">{text.expiryColumn}</th>
+                        <th scope="col">{text.reasonColumn}</th>
+                        <th scope="col">{text.bucketAllocationColumn}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ledgerItems.map((item) => (
+                        <tr key={item.entryId}>
+                          <td>{formatDateTime(item.createdAtUtc, locale)}</td>
+                          <td className={adminTableStyles.mono}>{shortGuid(item.userId)}</td>
+                          <td>
+                            <span className={item.delta >= 0 ? styles.positive : styles.negative}>
+                              {item.delta >= 0 ? "+" : ""}
+                              {item.delta}
+                            </span>
+                          </td>
+                          <td>{item.balanceAfter}</td>
+                          <td>{humanizeSource(item.source, locale)}</td>
+                          <td>
+                            {humanizeTokenKind(item.tokenKind, locale, text.tokenKindLegacyLabel)}
+                          </td>
+                          <td>{safeText(item.operationKind ?? "-", 64)}</td>
+                          <td>
+                            {item.expiresAtUtc ? formatDateTime(item.expiresAtUtc, locale) : "-"}
+                          </td>
+                          <td>{safeText(item.reason)}</td>
+                          <td>{safeText(item.bucketDeltasJson ?? "-", 160)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className={styles.pager}>
+                  <button
+                    type="button"
+                    className={styles.pagerButton}
+                    disabled={ledgerPage === 0 || ledgerIsFetching}
+                    aria-label={text.previousLedgerPageLabel}
+                    onClick={() => setLedgerPage((current) => Math.max(0, current - 1))}
+                  >
+                    {text.previousPage}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.pagerButton}
+                    disabled={!ledgerHasMore || ledgerIsFetching}
+                    aria-label={text.nextLedgerPageLabel}
+                    onClick={() => setLedgerPage((current) => current + 1)}
+                  >
+                    {text.nextPage}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <ol className={styles.overviewActivityList} aria-busy={ledgerIsFetching}>
+                {ledgerItems.slice(0, RECENT_ITEMS_LIMIT).map((item) => (
+                  <li key={item.entryId} className={styles.overviewActivityItem}>
+                    <time className={styles.overviewActivityTime} dateTime={item.createdAtUtc}>
+                      {formatCompactDateTime(item.createdAtUtc, locale)}
+                    </time>
+                    <div className={styles.overviewActivityCopy}>
+                      <strong title={humanizeSource(item.source, locale)}>
+                        {humanizeSource(item.source, locale)}
+                      </strong>
+                      <span title={safeText(item.reason, 160)}>{safeText(item.reason, 96)}</span>
+                    </div>
+                    <div className={styles.overviewActivityValue}>
+                      <strong className={item.delta >= 0 ? styles.positive : styles.negative}>
+                        {item.delta >= 0 ? "+" : ""}
+                        {item.delta}
+                      </strong>
+                      <span>
+                        {text.balanceColumn}: {item.balanceAfter}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
           </TableOrEmpty>
         )}
       </AdminCard>
 
       <AdminCard
-        title={text.purchasesTitle}
-        description={text.purchasesDescription}
+        title={text.recentPurchasesTitle}
+        description={text.recentPurchasesDescription}
+        className={styles.overviewDataCard}
         action={
-          <div className={styles.filterRow}>
-            <AdminSelectField
+          <div className={styles.overviewCardActions}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-expanded={shouldShowPurchaseFilters}
+              aria-controls="economy-purchase-filters"
+              onClick={() => setShowPurchaseFilters((current) => !current)}
+            >
+              {purchaseFilterCount
+                ? `${text.filtersAction} · ${purchaseFilterCount}`
+                : text.filtersAction}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              aria-expanded={showPurchaseDetails}
+              aria-controls={showPurchaseDetails ? "economy-purchase-details" : undefined}
+              onClick={() => setShowPurchaseDetails((current) => !current)}
+            >
+              {showPurchaseDetails ? text.collapseDetailsAction : text.allPurchasesAction}
+            </Button>
+          </div>
+        }
+      >
+        <div id="economy-purchase-filters" hidden={!shouldShowPurchaseFilters}>
+          <AdminFilterBar className={styles.tableFilterBar}>
+            <EconomySelectField
               label={text.purchaseFilterLabel}
               value={purchaseStatus}
               onChange={setPurchaseStatus}
               options={purchaseStatusOptions[locale]}
               className={styles.compactSelect}
-              disabled={purchasesIsFetching || purchasesIsRefreshing}
+              disabled={purchasesIsFetching && purchaseItems.length === 0}
             />
-            <AdminSelectField
+            <EconomySelectField
               label={text.purchaseProviderFilterLabel}
               value={purchaseProvider}
               onChange={setPurchaseProvider}
               options={subscriptionProviderOptions[locale]}
               className={styles.compactSelect}
-              disabled={purchasesIsFetching || purchasesIsRefreshing}
+              disabled={purchasesIsFetching && purchaseItems.length === 0}
             />
             <label className={styles.filterField}>
               <span>{text.searchFilterLabel}</span>
               <input
                 className={styles.input}
-                disabled={purchasesIsFetching || purchasesIsRefreshing}
+                disabled={purchasesIsFetching && purchaseItems.length === 0}
                 value={purchaseSearch}
                 onChange={(event) =>
                   setPurchaseSearch(event.target.value.slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH))
@@ -206,104 +318,172 @@ export function EconomyPageLedgerPurchasesSection({
                 placeholder={text.purchaseSearchPlaceholder}
               />
             </label>
-          </div>
-        }
-      >
-        {purchasesIsRefreshing ? (
+          </AdminFilterBar>
+        </div>
+        {purchasesIsFetching && purchaseItems.length === 0 ? (
           <AdminStateCard tone="info" title={text.loadingTitle} />
         ) : (
           <TableOrEmpty hasItems={purchaseItems.length > 0} emptyTitle={text.noPurchases}>
-            <div className={adminTableStyles.tableWrap}>
-              <table className={adminTableStyles.table}>
-                <thead>
-                  <tr>
-                    <th>{text.timeColumn}</th>
-                    <th>{text.userColumn}</th>
-                    <th>{text.productTypeColumn}</th>
-                    <th>{text.packColumn}</th>
-                    <th>{text.providerColumn}</th>
-                    <th>{text.amountColumn}</th>
-                    <th>{text.statusColumn}</th>
-                    <th>{text.refundStatusColumn}</th>
-                    <th>{text.actionsColumn}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {purchaseItems.map((item) => {
-                    const canRefund =
-                      item.canRefund === true &&
-                      item.status !== "refunded" &&
-                      item.status !== "failed";
-
-                    return (
-                      <tr key={item.orderId}>
-                        <td>{formatDateTime(item.confirmedAtUtc ?? item.createdAtUtc, locale)}</td>
-                        <td className={adminTableStyles.mono}>{shortGuid(item.userId)}</td>
-                        <td>{safeText(item.productType ?? "TokenPack")}</td>
-                        <td>
-                          <div className={styles.packMeta}>
-                            <strong>{safeText(item.packDisplayName)}</strong>
-                            <span>
-                              {item.tokenAmount ?? item.sparkToGrant} {text.tokensShort}
-                            </span>
-                          </div>
-                        </td>
-                        <td>{humanizeProvider(item.paymentProvider, locale)}</td>
-                        <td>{formatCurrency(item.priceAmount, locale, item.currencyCode)}</td>
-                        <td>
-                          <AdminStatusBadge color={statusColor(item.status)}>
-                            {humanizeStatus(item.status, locale)}
-                          </AdminStatusBadge>
-                        </td>
-                        <td>
-                          {safeText(
-                            item.refundStatus ?? (item.status === "refunded" ? "refunded" : "none")
-                          )}
-                        </td>
-                        <td>
-                          {canRefund ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="danger"
-                              disabled={isRefundPurchaseSubmitting}
-                              onClick={() => onRefundPurchase(item)}
-                            >
-                              {text.refundPurchaseAction}
-                            </Button>
-                          ) : (
-                            <span className={styles.mutedText}>-</span>
-                          )}
-                        </td>
+            {showPurchaseDetails ? (
+              <div id="economy-purchase-details">
+                <div className={adminTableStyles.tableWrap} aria-busy={purchasesIsFetching}>
+                  <table className={`${adminTableStyles.table} ${styles.wideTable}`}>
+                    <thead>
+                      <tr>
+                        <th scope="col">{text.timeColumn}</th>
+                        <th scope="col">{text.userColumn}</th>
+                        <th scope="col">{text.productTypeColumn}</th>
+                        <th scope="col">{text.packColumn}</th>
+                        <th scope="col">{text.providerColumn}</th>
+                        <th scope="col">{text.amountColumn}</th>
+                        <th scope="col">{text.statusColumn}</th>
+                        <th scope="col">{text.refundStatusColumn}</th>
+                        <th scope="col">{text.actionsColumn}</th>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            <div className={styles.pager}>
-              <button
-                type="button"
-                className={styles.pagerButton}
-                disabled={purchasePage === 0 || purchasesIsFetching}
-                aria-label={text.previousPurchasesPageLabel}
-                onClick={() => setPurchasePage((current) => Math.max(0, current - 1))}
-              >
-                {text.previousPage}
-              </button>
-              <button
-                type="button"
-                className={styles.pagerButton}
-                disabled={!purchasesHasMore || purchasesIsFetching}
-                aria-label={text.nextPurchasesPageLabel}
-                onClick={() => setPurchasePage((current) => current + 1)}
-              >
-                {text.nextPage}
-              </button>
-            </div>
+                    </thead>
+                    <tbody>
+                      {purchaseItems.map((item) => {
+                        const canRefund =
+                          item.canRefund === true &&
+                          item.status !== "refunded" &&
+                          item.status !== "failed";
+
+                        return (
+                          <tr key={item.orderId}>
+                            <td>
+                              {formatDateTime(item.confirmedAtUtc ?? item.createdAtUtc, locale)}
+                            </td>
+                            <td className={adminTableStyles.mono}>{shortGuid(item.userId)}</td>
+                            <td>{safeText(item.productType ?? "TokenPack")}</td>
+                            <td>
+                              <div className={styles.packMeta}>
+                                <strong>{safeText(item.packDisplayName)}</strong>
+                                <span>
+                                  {item.tokenAmount ?? item.sparkToGrant} {text.tokensShort}
+                                </span>
+                              </div>
+                            </td>
+                            <td>{humanizeProvider(item.paymentProvider, locale)}</td>
+                            <td>{formatCurrency(item.priceAmount, locale, item.currencyCode)}</td>
+                            <td>
+                              <AdminStatusBadge color={statusColor(item.status)}>
+                                {humanizeStatus(item.status, locale)}
+                              </AdminStatusBadge>
+                            </td>
+                            <td>
+                              {safeText(
+                                item.refundStatus ??
+                                  (item.status === "refunded" ? "refunded" : "none")
+                              )}
+                            </td>
+                            <td>
+                              <div className={styles.tableActions}>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  aria-label={`${text.viewIncidentAction}: ${shortGuid(item.orderId)}`}
+                                  onClick={() => onInspectPurchase(item)}
+                                >
+                                  {text.viewIncidentAction}
+                                </Button>
+                                {canRefund ? (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="danger"
+                                    disabled={isRefundPurchaseSubmitting}
+                                    aria-label={`${text.refundPurchaseAction}: ${shortGuid(item.orderId)}`}
+                                    onClick={() => onRefundPurchase(item)}
+                                  >
+                                    {text.refundPurchaseAction}
+                                  </Button>
+                                ) : null}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div className={styles.pager}>
+                  <button
+                    type="button"
+                    className={styles.pagerButton}
+                    disabled={purchasePage === 0 || purchasesIsFetching}
+                    aria-label={text.previousPurchasesPageLabel}
+                    onClick={() => setPurchasePage((current) => Math.max(0, current - 1))}
+                  >
+                    {text.previousPage}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.pagerButton}
+                    disabled={!purchasesHasMore || purchasesIsFetching}
+                    aria-label={text.nextPurchasesPageLabel}
+                    onClick={() => setPurchasePage((current) => current + 1)}
+                  >
+                    {text.nextPage}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <ol className={styles.overviewPurchaseList} aria-busy={purchasesIsFetching}>
+                {purchaseItems.slice(0, RECENT_ITEMS_LIMIT).map((item) => {
+                  const canRefund =
+                    item.canRefund === true &&
+                    item.status !== "refunded" &&
+                    item.status !== "failed";
+
+                  return (
+                    <li key={item.orderId} className={styles.overviewPurchaseItem}>
+                      <div className={styles.overviewPurchaseCopy}>
+                        <strong title={safeText(item.packDisplayName, 160)}>
+                          {safeText(item.packDisplayName)}
+                        </strong>
+                        <span>
+                          {humanizeProvider(item.paymentProvider, locale)} ·{" "}
+                          {formatCompactDateTime(item.confirmedAtUtc ?? item.createdAtUtc, locale)}
+                        </span>
+                      </div>
+                      <div className={styles.overviewPurchaseValue}>
+                        <strong>
+                          {formatCurrency(item.priceAmount, locale, item.currencyCode)}
+                        </strong>
+                        <AdminStatusBadge color={statusColor(item.status)}>
+                          {humanizeStatus(item.status, locale)}
+                        </AdminStatusBadge>
+                      </div>
+                      {canRefund ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="danger"
+                          disabled={isRefundPurchaseSubmitting}
+                          aria-label={`${text.refundPurchaseAction}: ${shortGuid(item.orderId)}`}
+                          onClick={() => onRefundPurchase(item)}
+                        >
+                          {text.refundPurchaseAction}
+                        </Button>
+                      ) : null}
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        aria-label={`${text.viewIncidentAction}: ${shortGuid(item.orderId)}`}
+                        onClick={() => onInspectPurchase(item)}
+                      >
+                        {text.viewIncidentAction}
+                      </Button>
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
           </TableOrEmpty>
         )}
       </AdminCard>
-    </AdminPageGrid>
+    </div>
   );
 }

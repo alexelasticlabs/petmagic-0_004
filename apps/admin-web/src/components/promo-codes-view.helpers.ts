@@ -1,6 +1,7 @@
 import { getPromoCodesViewText } from "@/components/promo-codes-view.content";
 import {
   type AdminRedeemCode,
+  type AdminRedeemCodeWriteRewardKind,
   type AdminRedeemRewardKind,
   type AdminUserDetail,
 } from "@/lib/api-client";
@@ -82,7 +83,7 @@ export function toPromoForm(code: AdminRedeemCode): PromoForm {
 }
 
 export function toCreatePayload(form: PromoForm, text: PromoDictionary) {
-  validatePromoForm(form, 0, 0, text);
+  const rewardKind = validatePromoForm(form, 0, 0, text);
 
   return {
     code: normalizePromoText(form.code, PROMO_CODE_MAX_LENGTH),
@@ -91,7 +92,7 @@ export function toCreatePayload(form: PromoForm, text: PromoDictionary) {
     campaignChannel:
       normalizePromoText(form.campaignChannel, PROMO_CAMPAIGN_FIELD_MAX_LENGTH) || null,
     minimumSuccessfulPurchases: Number(form.minimumSuccessfulPurchases.trim()),
-    rewardKind: form.rewardKind,
+    rewardKind,
     rewardValue: Number(form.rewardValue.trim()),
     maxRedemptions: Number(form.maxRedemptions.trim()),
     maxRedemptionsPerUser: Number(form.maxRedemptionsPerUser.trim()),
@@ -102,7 +103,7 @@ export function toCreatePayload(form: PromoForm, text: PromoDictionary) {
 }
 
 export function toUpdatePayload(form: PromoForm, code: AdminRedeemCode, text: PromoDictionary) {
-  validatePromoForm(form, code.redeemedCount, getMaxUserRedemptions(code), text);
+  const rewardKind = validatePromoForm(form, code.redeemedCount, getMaxUserRedemptions(code), text);
 
   return {
     description: normalizePromoText(form.description, PROMO_DESCRIPTION_MAX_LENGTH),
@@ -111,7 +112,7 @@ export function toUpdatePayload(form: PromoForm, code: AdminRedeemCode, text: Pr
       normalizePromoText(form.campaignChannel, PROMO_CAMPAIGN_FIELD_MAX_LENGTH) || null,
     minimumSuccessfulPurchases: Number(form.minimumSuccessfulPurchases.trim()),
     createdBy: code.createdBy?.trim() || null,
-    rewardKind: form.rewardKind,
+    rewardKind,
     rewardValue: Number(form.rewardValue.trim()),
     maxRedemptions: Number(form.maxRedemptions.trim()),
     maxRedemptionsPerUser: Number(form.maxRedemptionsPerUser.trim()),
@@ -126,7 +127,7 @@ function validatePromoForm(
   redeemedCount: number,
   maxRedeemedBySingleUser: number,
   text: PromoDictionary
-) {
+): AdminRedeemCodeWriteRewardKind {
   const normalizedCode = form.code.trim();
   const rewardValue = parsePromoIntegerInput(form.rewardValue, false);
   const maxRedemptions = parsePromoIntegerInput(form.maxRedemptions, false);
@@ -169,6 +170,8 @@ function validatePromoForm(
   ) {
     throw new Error(text.promoCodesInvalidWindow);
   }
+
+  return form.rewardKind;
 }
 
 function normalizePromoText(value: string, maxLength: number): string {

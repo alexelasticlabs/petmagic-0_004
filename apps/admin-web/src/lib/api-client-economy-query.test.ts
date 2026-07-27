@@ -1,11 +1,17 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 
 import {
+  ADMIN_PREMIUM_REVOKE_REASON_MAX_LENGTH,
+  ECONOMY_INCIDENT_EXTERNAL_REFERENCE_MAX_LENGTH,
   ECONOMY_REFUND_REASON_MAX_LENGTH,
   ECONOMY_QUERY_FILTER_MAX_LENGTH,
+  adminCancelPremiumSubscription,
+  applyAdminEconomyIncidentAction,
+  createAdminRedeemCode,
   fetchAdminEconomyDashboardMetrics,
+  fetchAdminEconomyPurchase,
   fetchAdminEconomyLedger,
   fetchAdminRedeemCodeMetrics,
   fetchAdminRedeemCodes,
@@ -15,7 +21,9 @@ import {
   normalizeAdminRedeemCodesQuery,
   normalizeAdminEconomySubscriptionsQuery,
   refundAdminEconomyPurchase,
+  updateAdminRedeemCode,
 } from "@/lib/api-client.economy";
+import type { AdminRedeemCode } from "@/lib/api-client.types.economy";
 
 const economyClientPath = fileURLToPath(new URL("./api-client.economy.ts", import.meta.url));
 const economyControllerPath = fileURLToPath(
@@ -110,6 +118,21 @@ describe("api-client.economy query normalization", () => {
     });
   });
 
+  it("preserves every operational status supported by the admin economy endpoints", () => {
+    expect(normalizeAdminEconomyPurchasesQuery({ status: " refund_pending " }).status).toBe(
+      "refund_pending"
+    );
+    expect(normalizeAdminEconomyPurchasesQuery({ status: "refund_review" }).status).toBe(
+      "refund_review"
+    );
+    expect(normalizeAdminEconomySubscriptionsQuery({ status: " GracePeriod " }).status).toBe(
+      "grace_period"
+    );
+    expect(normalizeAdminEconomySubscriptionsQuery({ status: "past-due" }).status).toBe("past_due");
+    expect(normalizeAdminEconomySubscriptionsQuery({ status: "revoked" }).status).toBe("revoked");
+    expect(normalizeAdminEconomySubscriptionsQuery({ status: "pending" }).status).toBe("pending");
+  });
+
   it("normalizes redeem code list filters for backend pagination", () => {
     const overlongSearch = "r".repeat(ECONOMY_QUERY_FILTER_MAX_LENGTH + 20);
 
@@ -148,6 +171,16 @@ describe("api-client.economy query normalization", () => {
       rewardKind: undefined,
       sort: undefined,
     });
+  });
+
+  it("keeps historical reward-kind responses wider than redeem code write payloads", () => {
+    expectTypeOf<AdminRedeemCode["rewardKind"]>().toEqualTypeOf<"spark" | "premium_days">();
+    expectTypeOf<
+      Parameters<typeof createAdminRedeemCode>[0]["rewardKind"]
+    >().toEqualTypeOf<"spark">();
+    expectTypeOf<
+      Parameters<typeof updateAdminRedeemCode>[1]["rewardKind"]
+    >().toEqualTypeOf<"spark">();
   });
 
   it("drops non-finite economy pagination values", () => {
@@ -216,6 +249,44 @@ describe("api-client.economy query normalization", () => {
       `https://api.example.com/api/admin/economy/redeem-codes/redeem-1/activations?skip=10&take=200&userId=${"a".repeat(ECONOMY_QUERY_FILTER_MAX_LENGTH)}`,
     ]);
     expect(redeemCodes.totalCount).toBe(0);
+  });
+
+  it("loads a purchase inspector contract without sending a body", async () => {
+    const payload = {
+      orderId: "order/with spaces",
+      userId: "user-1",
+      packId: "pack-1",
+      packCode: "starter",
+      packDisplayName: "Starter",
+      paymentProvider: "stripe",
+      status: "succeeded",
+      priceAmount: 4.99,
+      currencyCode: "USD",
+      sparkToGrant: 100,
+      createdAtUtc: "2026-07-27T10:00:00Z",
+      confirmedAtUtc: "2026-07-27T10:01:00Z",
+      refundStatus: "none",
+      settlementState: "paid",
+      capabilities: { canRefund: true, canRetryRefund: false, requiresManualReview: false },
+      timeline: [],
+      incidents: [],
+    };
+    const fetchMock = vi.fn<typeof fetch>(async () => Response.json(payload));
+    vi.stubGlobal("fetch", fetchMock);
+    const controller = new AbortController();
+
+    await expect(fetchAdminEconomyPurchase(payload.orderId, controller.signal)).resolves.toEqual(
+      payload
+    );
+
+    const [input, init] = fetchMock.mock.calls[0];
+    expect(String(input)).toBe(
+      "https://api.example.com/api/admin/economy/purchases/order%2Fwith%20spaces"
+    );
+    expect(init?.method).toBe("GET");
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
+    expect(init?.signal?.aborted).toBe(false);
+    expect(init?.body).toBeUndefined();
   });
 
   it("drops unsupported subscription event filters before request URLs", async () => {
@@ -314,18 +385,26 @@ describe("api-client.economy query normalization", () => {
         renewalStops: 2,
         currencyCode: "USD",
         revenueSeries: [],
+        periodDays: 30,
+        asOfUtc: "2026-07-26T10:00:00Z",
       })
     );
     const controller = new AbortController();
     vi.stubGlobal("fetch", fetchMock);
 
-    const response = await fetchAdminEconomyDashboardMetrics(controller.signal);
+    const response = await fetchAdminEconomyDashboardMetrics({
+      periodDays: 30,
+      signal: controller.signal,
+    });
 
     const [url, init] = fetchMock.mock.calls[0] ?? [];
     expect(response.totalWalletCredits).toBe(180);
     expect(response.totalWalletDebits).toBe(60);
     expect(response.renewalStops).toBe(2);
-    expect(String(url)).toBe("https://api.example.com/api/admin/economy/dashboard/metrics");
+    expect(response.periodDays).toBe(30);
+    expect(String(url)).toBe(
+      "https://api.example.com/api/admin/economy/dashboard/metrics?periodDays=30"
+    );
     expect(init?.method).toBe("GET");
     expect(init?.signal).toBeInstanceOf(AbortSignal);
   });
@@ -360,6 +439,56 @@ describe("api-client.economy query normalization", () => {
     });
   });
 
+  it("uses the canonical bounded audit-reason contract for Premium revocation", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => Response.json({ userId: "user-1" }));
+    const reason = "r".repeat(ADMIN_PREMIUM_REVOKE_REASON_MAX_LENGTH);
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(adminCancelPremiumSubscription("user-1", "stripe")).rejects.toThrow(
+      "Premium revocation reason"
+    );
+    await expect(
+      adminCancelPremiumSubscription(
+        "user-1",
+        "stripe",
+        "r".repeat(ADMIN_PREMIUM_REVOKE_REASON_MAX_LENGTH + 1)
+      )
+    ).rejects.toThrow("Premium revocation reason");
+
+    await adminCancelPremiumSubscription("user-1", "stripe", ` ${reason} `);
+
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(ADMIN_PREMIUM_REVOKE_REASON_MAX_LENGTH).toBe(500);
+    expect(String(url)).toBe(
+      "https://api.example.com/api/admin/economy/users/user-1/premium/revoke"
+    );
+    expect(JSON.parse(String(init?.body))).toEqual({ paymentProvider: "stripe", reason });
+  });
+
+  it("keeps incident external references within the backend contract length", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json({ incident: {}, action: "manual_refund_mark", message: "ok" })
+    );
+    const overlongReference = "r".repeat(ECONOMY_INCIDENT_EXTERNAL_REFERENCE_MAX_LENGTH + 20);
+    vi.stubGlobal("fetch", fetchMock);
+
+    await applyAdminEconomyIncidentAction("incident-1", {
+      action: "manual_refund_mark",
+      reason: "confirmed by the payment provider",
+      externalReferenceId: ` ${overlongReference} `,
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(String(url)).toBe(
+      "https://api.example.com/api/admin/economy/incidents/incident-1/actions"
+    );
+    expect(JSON.parse(String(init?.body))).toEqual({
+      action: "manual_refund_mark",
+      reason: "confirmed by the payment provider",
+      externalReferenceId: "r".repeat(ECONOMY_INCIDENT_EXTERNAL_REFERENCE_MAX_LENGTH),
+    });
+  });
+
   it("propagates AbortSignal through economy GET helpers", () => {
     const source = readFileSync(economyClientPath, "utf8");
 
@@ -369,7 +498,8 @@ describe("api-client.economy query normalization", () => {
     expect(source).toContain("fetchAdminSubscriptionPlans(\n  signal?: AbortSignal");
     expect(source).toContain("fetchAdminPaymentProviderConfigs(\n  signal?: AbortSignal");
     expect(source).toContain("fetchAdminSubscriptionEvents(");
-    expect(source).toContain("fetchAdminEconomyDashboardMetrics(\n  signal?: AbortSignal");
+    expect(source).toContain("export type AdminEconomyDashboardMetricsOptions = {");
+    expect(source).toContain("signal?: AbortSignal;");
     expect(source).toContain("fetchAdminCurrencyPacks(signal?: AbortSignal)");
   });
 
@@ -394,8 +524,8 @@ describe("api-client.economy query normalization", () => {
     expect(source).toContain("fetchAdminPaymentProviderConfigs(signal)");
     expect(source).toMatch(/fetchAdminSubscriptionEvents\(\s*\{[\s\S]*?\},\s*signal\s*\)/);
     expect(source).toContain("fetchAdminCurrencyPacks(signal)");
-    expect(source).toContain("fetchAdminEconomyDashboardMetrics(signal)");
-    expect(source).toContain("adminQueryKeys.economyDashboardMetrics");
+    expect(source).toContain("fetchAdminEconomyDashboardMetrics({ signal })");
+    expect(source).toContain("adminQueryKeys.economyDashboardMetricsPeriod()");
     expect(source).toContain("placeholderData: keepPreviousData,");
     expect(source).not.toContain("queryFn: () => fetchAdminEconomyLedger");
     expect(source).not.toContain("queryFn: fetchAdminSubscriptionPlans");

@@ -1,18 +1,22 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import { getTemplatesDailyFeaturedPageText } from "@/components/templates/templates-daily-featured-page.content";
 import {
   SEARCH_DEBOUNCE_MS,
+  SCHEDULE_PAGE_SIZE,
   TEMPLATE_OPTIONS_TAKE,
   dateRangesOverlap,
   emptyForm,
+  getBusinessDateOrClientToday,
   formFromAssignment,
   getPreviewUrl,
   hasInvalidDateRange,
+  isExcludeRecentDaysValid,
+  isPriorityValid,
   optionFromAssignment,
   optionFromTemplate,
   parseExcludeRecentDays,
@@ -20,7 +24,6 @@ import {
   safeDisplayText,
   safeErrorDetails,
   toPayload,
-  todayIso,
   useDebouncedValue,
 } from "@/components/templates/templates-daily-featured-page.helpers";
 import type {
@@ -44,6 +47,7 @@ import {
   useAuthSession,
   type AdminTemplateListItem,
   type AdminTemplateOfTheDay,
+  type AdminTemplateOfTheDaySchedule,
   type AdminTemplateOfTheDaySettings,
   type TemplateType,
 } from "@/lib/api-client";
@@ -55,7 +59,14 @@ export function useTemplatesDailyFeaturedController({ locale }: TemplatesDailyFe
   const router = useRouter();
   const session = useAuthSession();
   const canManageTemplates = session?.user.roles.includes("Admin") ?? false;
-  const [schedule, setSchedule] = useState<AdminTemplateOfTheDay[]>([]);
+  const [schedulePage, setSchedulePage] = useState(0);
+  const [schedulePageData, setSchedulePageData] = useState<AdminTemplateOfTheDaySchedule | null>(
+    null
+  );
+  const schedule = useMemo(() => schedulePageData?.items ?? [], [schedulePageData]);
+  const scheduleTotalCount = schedulePageData?.totalCount ?? 0;
+  const schedulePageSize = schedulePageData?.take ?? SCHEDULE_PAGE_SIZE;
+  const scheduleHasMore = schedulePageData?.hasMore ?? false;
   const [current, setCurrent] = useState<AdminTemplateOfTheDay | null>(null);
   const [settings, setSettings] = useState<AdminTemplateOfTheDaySettings | null>(null);
   const [templates, setTemplates] = useState<AdminTemplateListItem[]>([]);
@@ -63,11 +74,11 @@ export function useTemplatesDailyFeaturedController({ locale }: TemplatesDailyFe
   const [templateTypeFilter, setTemplateTypeFilter] = useState<"" | TemplateType>("");
   const [templateAccessFilter, setTemplateAccessFilter] = useState<TemplateAccessFilter>("");
   const debouncedSearch = useDebouncedValue(search.trim(), SEARCH_DEBOUNCE_MS);
-  const [form, setForm] = useState<AssignmentFormState>(() => emptyForm());
+  const [form, setForm] = useState<AssignmentFormState>(() => emptyForm(""));
   const [selectedTemplateOptionSnapshot, setSelectedTemplateOptionSnapshot] =
     useState<TemplateOption | null>(null);
   const [autoPick, setAutoPick] = useState<AutoPickState>({
-    date: todayIso(),
+    date: "",
     autoModeEnabled: true,
     allowedTypes: "both",
     excludeRecentDays: "7",
@@ -76,9 +87,13 @@ export function useTemplatesDailyFeaturedController({ locale }: TemplatesDailyFe
   const [isTemplateOptionsLoading, setIsTemplateOptionsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [settingsLoadError, setSettingsLoadError] = useState<string | null>(null);
   const [templateOptionsError, setTemplateOptionsError] = useState<string | null>(null);
   const [assignmentPendingDelete, setAssignmentPendingDelete] =
     useState<AdminTemplateOfTheDay | null>(null);
+  const [isAutoPickConfirmationOpen, setIsAutoPickConfirmationOpen] = useState(false);
+  const settingsSnapshotRef = useRef<AdminTemplateOfTheDaySettings | null>(null);
 
   const selectedTemplate = templates.find((template) => template.templateId === form.templateId);
   const selectedAssignment = schedule.find((assignment) => assignment.id === form.id);
@@ -124,25 +139,37 @@ export function useTemplatesDailyFeaturedController({ locale }: TemplatesDailyFe
   const previewBadge = safeDisplayText(form.badgeTextOverride.trim() || text.heroBadge, 64);
   const previewType = selectedTemplateSnapshot?.templateType ?? ("Image" as TemplateType);
   const previewMediaUrl = getPreviewUrl(selectedTemplateSnapshot);
-  const isLoading = isScheduleLoading || isTemplateOptionsLoading;
-  const isActionLocked = isSubmitting || isLoading;
+  const isSettingsReady = settings !== null && settingsLoadError === null;
+  const isExcludeRecentDaysInvalid = !isExcludeRecentDaysValid(autoPick.excludeRecentDays);
+  const isPriorityInvalid = !isPriorityValid(form.priority);
+  const isStartDateMissing = form.startDate.trim().length === 0;
+  const isActionLocked = isSubmitting || isScheduleLoading;
   const isAutoPickSettingsDirty =
-    settings === null ||
-    autoPick.autoModeEnabled !== settings.autoModeEnabled ||
-    autoPick.allowedTypes !== settings.allowedTypes ||
-    parseExcludeRecentDays(autoPick.excludeRecentDays) !== settings.excludeRecentDays;
+    settings !== null &&
+    (autoPick.autoModeEnabled !== settings.autoModeEnabled ||
+      autoPick.allowedTypes !== settings.allowedTypes ||
+      parseExcludeRecentDays(autoPick.excludeRecentDays) !== settings.excludeRecentDays);
+  const isAutoPickRunAvailable =
+    isSettingsReady &&
+    settings?.autoModeEnabled === true &&
+    !isAutoPickSettingsDirty &&
+    !isExcludeRecentDaysInvalid;
   const scheduleAssignmentIds = useMemo(
     () => new Set(schedule.map((assignment) => assignment.id)),
     [schedule]
   );
   const dateOccupiedWarning = schedule.some(
     (assignment) =>
+      form.isManual &&
+      form.isActive &&
+      !isStartDateMissing &&
       assignment.isActive &&
       assignment.isManual &&
       assignment.id !== form.id &&
       dateRangesOverlap(form.startDate, form.endDate, assignment)
   );
-  const invalidDateRangeWarning = hasInvalidDateRange(form.startDate, form.endDate);
+  const invalidDateRangeWarning =
+    !isStartDateMissing && hasInvalidDateRange(form.startDate, form.endDate);
   const isAutoPickDateMissing = autoPick.date.trim().length === 0;
 
   const loadTemplateOptions = useCallback(
@@ -198,6 +225,11 @@ export function useTemplatesDailyFeaturedController({ locale }: TemplatesDailyFe
       }
 
       if (!canManageTemplates) {
+        setSchedulePage(0);
+        setSchedulePageData(null);
+        settingsSnapshotRef.current = null;
+        setSettings(null);
+        setSettingsLoadError(null);
         setIsScheduleLoading(false);
         return;
       }
@@ -206,7 +238,13 @@ export function useTemplatesDailyFeaturedController({ locale }: TemplatesDailyFe
       setError(null);
       try {
         const [scheduleResponse, currentResponse, settingsResponse] = await Promise.allSettled([
-          fetchTemplateOfTheDaySchedule(signal),
+          fetchTemplateOfTheDaySchedule(
+            {
+              skip: schedulePage * SCHEDULE_PAGE_SIZE,
+              take: SCHEDULE_PAGE_SIZE,
+            },
+            signal
+          ),
           fetchCurrentTemplateOfTheDay(undefined, signal),
           fetchTemplateOfTheDaySettings(signal),
         ]);
@@ -216,7 +254,17 @@ export function useTemplatesDailyFeaturedController({ locale }: TemplatesDailyFe
         let loadFailure: unknown = null;
 
         if (scheduleResponse.status === "fulfilled") {
-          setSchedule(scheduleResponse.value.items);
+          const lastSchedulePage = Math.max(
+            0,
+            Math.ceil(
+              scheduleResponse.value.totalCount / Math.max(scheduleResponse.value.take, 1)
+            ) - 1
+          );
+          if (schedulePage > lastSchedulePage) {
+            setSchedulePage(lastSchedulePage);
+          } else {
+            setSchedulePageData(scheduleResponse.value);
+          }
         } else {
           loadFailure ??= scheduleResponse.reason;
         }
@@ -228,14 +276,34 @@ export function useTemplatesDailyFeaturedController({ locale }: TemplatesDailyFe
         }
 
         if (settingsResponse.status === "fulfilled") {
+          const previousSettings = settingsSnapshotRef.current;
+          const businessDate = getBusinessDateOrClientToday(settingsResponse.value.businessDate);
+          settingsSnapshotRef.current = settingsResponse.value;
           setSettings(settingsResponse.value);
-          setAutoPick((state) => ({
-            ...state,
-            autoModeEnabled: settingsResponse.value.autoModeEnabled,
-            allowedTypes: settingsResponse.value.allowedTypes,
-            excludeRecentDays: String(settingsResponse.value.excludeRecentDays),
-          }));
+          setSettingsLoadError(null);
+          setAutoPick((state) => {
+            const hasUnsavedSettings =
+              previousSettings !== null &&
+              (state.autoModeEnabled !== previousSettings.autoModeEnabled ||
+                state.allowedTypes !== previousSettings.allowedTypes ||
+                parseExcludeRecentDays(state.excludeRecentDays) !==
+                  previousSettings.excludeRecentDays);
+
+            return {
+              ...state,
+              date: state.date || businessDate,
+              ...(hasUnsavedSettings
+                ? {}
+                : {
+                    autoModeEnabled: settingsResponse.value.autoModeEnabled,
+                    allowedTypes: settingsResponse.value.allowedTypes,
+                    excludeRecentDays: String(settingsResponse.value.excludeRecentDays),
+                  }),
+            };
+          });
+          setForm((state) => (state.startDate ? state : emptyForm(businessDate)));
         } else {
+          setSettingsLoadError(getAdminErrorMessage(settingsResponse.reason, text.loadError));
           loadFailure ??= settingsResponse.reason;
         }
 
@@ -253,7 +321,7 @@ export function useTemplatesDailyFeaturedController({ locale }: TemplatesDailyFe
         }
       }
     },
-    [canManageTemplates, text.loadError]
+    [canManageTemplates, schedulePage, text.loadError]
   );
 
   const refreshPageData = useCallback(async () => {
@@ -331,21 +399,38 @@ export function useTemplatesDailyFeaturedController({ locale }: TemplatesDailyFe
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canManageTemplates || !form.templateId || isActionLocked || invalidDateRangeWarning)
+    if (
+      !canManageTemplates ||
+      !form.templateId ||
+      isActionLocked ||
+      isStartDateMissing ||
+      invalidDateRangeWarning ||
+      dateOccupiedWarning ||
+      isPriorityInvalid
+    )
       return;
 
     setIsSubmitting(true);
     setError(null);
+    setNotice(null);
     try {
       const payload = toPayload(form);
-      if (form.id) {
-        await updateTemplateOfTheDay(form.id, payload);
-      } else {
-        await createTemplateOfTheDay(payload);
-      }
+      const isEditing = Boolean(form.id);
+      const savedAssignment = form.id
+        ? await updateTemplateOfTheDay(form.id, payload)
+        : await createTemplateOfTheDay(payload);
+      setNotice(
+        isEditing
+          ? text.assignmentUpdated(safeDisplayText(savedAssignment.templateTitle, 120))
+          : text.assignmentCreated(safeDisplayText(savedAssignment.templateTitle, 120))
+      );
       setSelectedTemplateOptionSnapshot(null);
       setForm(emptyForm(form.startDate));
-      await loadScheduleData();
+      if (!isEditing && schedulePage > 0) {
+        setSchedulePage(0);
+      } else {
+        await loadScheduleData();
+      }
     } catch (saveError) {
       clientLogger.warn("templates.daily_featured_save_failed", {
         ...safeActionContext({
@@ -368,6 +453,7 @@ export function useTemplatesDailyFeaturedController({ locale }: TemplatesDailyFe
 
     setIsSubmitting(true);
     setError(null);
+    setNotice(null);
     try {
       await deleteTemplateOfTheDay(assignment.id);
       if (form.id === assignment.id) {
@@ -375,6 +461,7 @@ export function useTemplatesDailyFeaturedController({ locale }: TemplatesDailyFe
         setForm(emptyForm(form.startDate));
       }
       await loadScheduleData();
+      setNotice(text.assignmentDeleted(safeDisplayText(assignment.templateTitle, 120)));
       return true;
     } catch (deleteError) {
       clientLogger.warn("templates.daily_featured_delete_failed", {
@@ -393,17 +480,28 @@ export function useTemplatesDailyFeaturedController({ locale }: TemplatesDailyFe
   }
 
   async function handleAutoPick() {
-    if (!canManageTemplates || isActionLocked || isAutoPickDateMissing) return;
+    if (
+      !canManageTemplates ||
+      isActionLocked ||
+      isAutoPickDateMissing ||
+      isExcludeRecentDaysInvalid ||
+      !isAutoPickRunAvailable
+    ) {
+      return false;
+    }
 
     setIsSubmitting(true);
     setError(null);
+    setNotice(null);
     try {
-      await autoPickTemplateOfTheDay({
+      const assignment = await autoPickTemplateOfTheDay({
         date: autoPick.date,
         allowedTypes: autoPick.allowedTypes,
         excludeRecentDays: parseExcludeRecentDays(autoPick.excludeRecentDays),
       });
       await loadScheduleData();
+      setNotice(text.autoPickSucceeded(safeDisplayText(assignment.templateTitle, 120)));
+      return true;
     } catch (autoPickError) {
       clientLogger.warn("templates.daily_featured_auto_pick_failed", {
         autoPickDate: sanitizeSensitiveText(autoPick.date, 20),
@@ -412,29 +510,41 @@ export function useTemplatesDailyFeaturedController({ locale }: TemplatesDailyFe
         ...safeErrorDetails(autoPickError),
       });
       setError(getAdminErrorMessage(autoPickError, text.saveError));
+      return false;
     } finally {
       setIsSubmitting(false);
     }
   }
 
   async function handleSaveSettings() {
-    if (!canManageTemplates || isActionLocked || !isAutoPickSettingsDirty) return;
+    if (
+      !canManageTemplates ||
+      isActionLocked ||
+      !isSettingsReady ||
+      !isAutoPickSettingsDirty ||
+      isExcludeRecentDaysInvalid
+    )
+      return;
 
     setIsSubmitting(true);
     setError(null);
+    setNotice(null);
     try {
       const saved = await updateTemplateOfTheDaySettings({
         autoModeEnabled: autoPick.autoModeEnabled,
         allowedTypes: autoPick.allowedTypes,
         excludeRecentDays: parseExcludeRecentDays(autoPick.excludeRecentDays),
       });
+      settingsSnapshotRef.current = saved;
       setSettings(saved);
+      setSettingsLoadError(null);
       setAutoPick((state) => ({
         ...state,
         autoModeEnabled: saved.autoModeEnabled,
         allowedTypes: saved.allowedTypes,
         excludeRecentDays: String(saved.excludeRecentDays),
       }));
+      setNotice(text.settingsSaved);
     } catch (settingsError) {
       clientLogger.warn("templates.daily_featured_settings_save_failed", {
         autoModeEnabled: autoPick.autoModeEnabled,
@@ -470,7 +580,24 @@ export function useTemplatesDailyFeaturedController({ locale }: TemplatesDailyFe
   const handleEditAssignment = useCallback((assignment: AdminTemplateOfTheDay) => {
     setSelectedTemplateOptionSnapshot(optionFromAssignment(assignment));
     setForm(formFromAssignment(assignment));
+    setNotice(null);
   }, []);
+
+  const requestSchedulePage = useCallback(
+    (nextPage: number) => {
+      if (
+        isScheduleLoading ||
+        nextPage < 0 ||
+        nextPage === schedulePage ||
+        (nextPage > schedulePage && !scheduleHasMore)
+      ) {
+        return;
+      }
+
+      setSchedulePage(nextPage);
+    },
+    [isScheduleLoading, scheduleHasMore, schedulePage]
+  );
 
   return {
     assignmentPendingDelete,
@@ -491,9 +618,16 @@ export function useTemplatesDailyFeaturedController({ locale }: TemplatesDailyFe
     handleTemplateSelectionChange,
     invalidDateRangeWarning,
     isActionLocked,
+    isAutoPickConfirmationOpen,
     isAutoPickDateMissing,
+    isAutoPickRunAvailable,
     isAutoPickSettingsDirty,
+    isExcludeRecentDaysInvalid,
+    isPriorityInvalid,
     isScheduleLoading,
+    isScheduleNavigationLocked: Boolean(form.id || assignmentPendingDelete),
+    isSettingsReady,
+    isStartDateMissing,
     isTemplateOptionsLoading,
     loadTemplateOptions,
     previewBadge,
@@ -501,16 +635,24 @@ export function useTemplatesDailyFeaturedController({ locale }: TemplatesDailyFe
     previewSubtitle,
     previewTitle,
     previewType,
+    notice,
     refreshPageData,
+    requestSchedulePage,
     schedule,
+    scheduleHasMore,
+    schedulePage,
+    schedulePageSize,
+    scheduleTotalCount,
     search,
     selectedTemplateSnapshot,
     setAssignmentPendingDelete,
     setAutoPick,
+    setIsAutoPickConfirmationOpen,
     setSearch,
     setTemplateAccessFilter,
     setTemplateTypeFilter,
     settings,
+    settingsLoadError,
     templateAccessFilter,
     templateOptions,
     templateOptionsError,

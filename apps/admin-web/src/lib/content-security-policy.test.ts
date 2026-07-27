@@ -32,6 +32,18 @@ describe("buildNonceContentSecurityPolicy", () => {
     expect(policy).toContain("http://localhost:5000");
   });
 
+  it("allows an explicit local Compose API origin in production", () => {
+    const policy = buildNonceContentSecurityPolicy(
+      "local-compose-nonce",
+      "http://localhost:5000",
+      "production",
+      undefined,
+      true
+    );
+
+    expect(policy).toContain("connect-src 'self' http://localhost:5000");
+  });
+
   it("rejects unsafe nonce values", () => {
     expect(() =>
       buildNonceContentSecurityPolicy("unsafe'; script-src *", undefined, "production")
@@ -68,5 +80,17 @@ describe("buildNonceContentSecurityPolicy", () => {
         buildNonceContentSecurityPolicy("nonce-value", apiOrigin, "production")
       ).toThrow();
     }
+  });
+
+  it("keeps non-local HTTP API origins forbidden with the local Compose opt-in", () => {
+    expect(() =>
+      buildNonceContentSecurityPolicy(
+        "nonce-value",
+        "http://api.petmagic.app",
+        "production",
+        undefined,
+        true
+      )
+    ).toThrow("NEXT_PUBLIC_API_BASE_URL must use HTTPS in production.");
   });
 });

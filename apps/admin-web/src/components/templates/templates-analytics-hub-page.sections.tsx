@@ -192,6 +192,7 @@ export function TrendChart({
     .map((point, index) => `${index === 0 ? "M" : "L"}${point.x},${point.y}`)
     .join(" ");
   const area = `${path} L${paddingX + chartWidth},${height - paddingY} L${paddingX},${height - paddingY} Z`;
+  const dateLabelStep = Math.max(1, Math.ceil(coordinates.length / 6));
 
   return (
     <div className={styles.chartWrap}>
@@ -232,14 +233,25 @@ export function TrendChart({
           strokeLinecap="round"
           strokeLinejoin="round"
         />
-        {coordinates.map((point, index) => (
-          <g key={`${point.point.dateUtc}-${index}`}>
-            <circle cx={point.x} cy={point.y} r="4.5" className={styles.chartPoint} />
-            <text x={point.x} y={height - 8} className={styles.dateLabel}>
-              {formatShortDate(point.point.dateUtc, locale)}
-            </text>
-          </g>
-        ))}
+        {coordinates.map((point, index) => {
+          const isDateLabelVisible =
+            index === 0 || index === coordinates.length - 1 || index % dateLabelStep === 0;
+
+          return (
+            <g key={`${point.point.dateUtc}-${index}`}>
+              <title>
+                {formatShortDate(point.point.dateUtc, locale)}:{" "}
+                {formatTrendValue(point.value, metric, locale)}
+              </title>
+              <circle cx={point.x} cy={point.y} r="4.5" className={styles.chartPoint} />
+              {isDateLabelVisible ? (
+                <text x={point.x} y={height - 8} className={styles.dateLabel}>
+                  {formatShortDate(point.point.dateUtc, locale)}
+                </text>
+              ) : null}
+            </g>
+          );
+        })}
       </svg>
       <div className={styles.chartSummary}>
         <span>{text.currentMetric}</span>
@@ -460,20 +472,31 @@ export function TopTemplatesPanel({
       </div>
       <div className={styles.topList}>
         {rows.map((row, index) => (
-          <div key={row.templateId} className={styles.topRow}>
+          <Link
+            key={row.templateId}
+            href={`/${locale}/templates/${row.templateType === "Video" ? "video" : "image"}/analytics/${encodeURIComponent(row.templateId)}`}
+            className={`${styles.topRow} ${styles.topRowLink}`}
+          >
             <span className={styles.rank}>{index + 1}</span>
             <TemplateThumb row={row} />
-            <div>
+            <div className={styles.topTemplateMeta}>
               <strong>{formatAnalyticsDisplayText(row.title, 120)}</strong>
               <span>
                 {getTemplateTypeLabel(row.templateType, dictionary)} ·{" "}
                 {formatAnalyticsDisplayText(row.category, 120)}
               </span>
             </div>
-            <span>{formatNumber(row.views, locale)}</span>
-            <span>{formatNumber(row.generationStarts, locale)}</span>
-          </div>
+            <span className={styles.topMetric}>
+              <span>{text.viewsColumn}</span>
+              <strong>{formatNumber(row.views, locale)}</strong>
+            </span>
+            <span className={styles.topMetric}>
+              <span>{text.startsColumn}</span>
+              <strong>{formatNumber(row.generationStarts, locale)}</strong>
+            </span>
+          </Link>
         ))}
+        {!rows.length ? <div className={styles.emptyState}>{text.noRows}</div> : null}
       </div>
     </section>
   );
@@ -490,64 +513,67 @@ export function TemplatesTable({
 }) {
   const dictionary = getDictionary(locale);
   return (
-    <div className={styles.tableWrap}>
-      <table className={styles.table}>
-        <thead>
-          <tr>
-            <th>{text.templateColumn}</th>
-            <th>{text.typeColumn}</th>
-            <th>{text.categoryColumn}</th>
-            <th>{text.statusColumn}</th>
-            <th>{text.accessColumn}</th>
-            <th>{text.viewsColumn}</th>
-            <th>{text.startsColumn}</th>
-            <th>{text.conversionColumn}</th>
-            <th>{text.tokensColumn}</th>
-            <th>{text.costColumn}</th>
-            <th>{text.actionsColumn}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.templateId}>
-              <td>
-                <div className={styles.templateCell}>
-                  <TemplateThumb row={row} />
-                  <div>
-                    <strong>{formatAnalyticsDisplayText(row.title, 120)}</strong>
-                    <span>{shortId(row.templateId)}</span>
-                  </div>
-                </div>
-              </td>
-              <td>{getTemplateTypeLabel(row.templateType, dictionary)}</td>
-              <td>{formatAnalyticsDisplayText(row.category, 120)}</td>
-              <td>
-                <span
-                  className={`${styles.statusBadge} ${styles[`status_${row.status.toLowerCase()}`]}`}
-                >
-                  {getTemplateStatusLabel(row.status, locale)}
-                </span>
-              </td>
-              <td>{getTemplateAccessLabel(row.isPremium, dictionary)}</td>
-              <td>{formatNumber(row.views, locale)}</td>
-              <td>{formatNumber(row.generationStarts, locale)}</td>
-              <td>{formatPercent(row.conversionPercent, locale)}</td>
-              <td>{formatTokens(row.totalTokenCost, locale)}</td>
-              <td>{formatMoney(row.totalProviderCostUsd, locale)}</td>
-              <td>
-                <Link
-                  className={styles.inlineAction}
-                  href={`/${locale}/templates/${row.templateType === "Video" ? "video" : "image"}/analytics/${encodeURIComponent(row.templateId)}`}
-                >
-                  {text.openAnalytics}
-                </Link>
-              </td>
+    <>
+      <div className={styles.tableWrap} role="region" aria-label={text.tableTitle} tabIndex={0}>
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th scope="col">{text.templateColumn}</th>
+              <th scope="col">{text.typeColumn}</th>
+              <th scope="col">{text.categoryColumn}</th>
+              <th scope="col">{text.statusColumn}</th>
+              <th scope="col">{text.accessColumn}</th>
+              <th scope="col">{text.viewsColumn}</th>
+              <th scope="col">{text.startsColumn}</th>
+              <th scope="col">{text.conversionColumn}</th>
+              <th scope="col">{text.tokensColumn}</th>
+              <th scope="col">{text.costColumn}</th>
+              <th scope="col">{text.actionsColumn}</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-      {!rows.length ? <div className={styles.emptyState}>{text.noRows}</div> : null}
-    </div>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.templateId}>
+                <td>
+                  <div className={styles.templateCell}>
+                    <TemplateThumb row={row} />
+                    <div>
+                      <strong>{formatAnalyticsDisplayText(row.title, 120)}</strong>
+                      <span>{shortId(row.templateId)}</span>
+                    </div>
+                  </div>
+                </td>
+                <td>{getTemplateTypeLabel(row.templateType, dictionary)}</td>
+                <td>{formatAnalyticsDisplayText(row.category, 120)}</td>
+                <td>
+                  <span
+                    className={`${styles.statusBadge} ${styles[`status_${row.status.toLowerCase()}`]}`}
+                  >
+                    {getTemplateStatusLabel(row.status, locale)}
+                  </span>
+                </td>
+                <td>{getTemplateAccessLabel(row.isPremium, dictionary)}</td>
+                <td>{formatNumber(row.views, locale)}</td>
+                <td>{formatNumber(row.generationStarts, locale)}</td>
+                <td>{formatPercent(row.conversionPercent, locale)}</td>
+                <td>{formatTokens(row.totalTokenCost, locale)}</td>
+                <td>{formatMoney(row.totalProviderCostUsd, locale)}</td>
+                <td>
+                  <Link
+                    className={styles.inlineAction}
+                    href={`/${locale}/templates/${row.templateType === "Video" ? "video" : "image"}/analytics/${encodeURIComponent(row.templateId)}`}
+                  >
+                    {text.openAnalytics}
+                  </Link>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!rows.length ? <div className={styles.emptyState}>{text.noRows}</div> : null}
+      </div>
+      <p className={styles.tableScrollHint}>{text.tableScrollHint}</p>
+    </>
   );
 }
 

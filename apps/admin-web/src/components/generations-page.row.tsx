@@ -147,6 +147,7 @@ export function GenerationRow({
   onGrantClean,
   onCancelGeneration,
   onRetryGeneration,
+  onRetryRefund,
   onResolveLegacyGamification,
   grantingGenerationId,
   grantCleanPending,
@@ -154,8 +155,13 @@ export function GenerationRow({
   cancelGenerationPending,
   retryingGenerationId,
   retryGenerationPending,
+  retryingRefundGenerationId,
+  refundRecoveryPending,
   legacyGamificationResolutionPending,
   isExpanded,
+  detailLoading,
+  detailError,
+  onRetryDetail,
   onToggleDetails,
 }: {
   item: AdminTemplateGenerationListItem;
@@ -164,6 +170,7 @@ export function GenerationRow({
   onGrantClean: (generationId: string) => void;
   onCancelGeneration: (generationId: string) => void;
   onRetryGeneration: (generationId: string) => void;
+  onRetryRefund: (generationId: string) => void;
   onResolveLegacyGamification: (generationId: string) => void;
   grantingGenerationId: string | null;
   grantCleanPending: boolean;
@@ -171,11 +178,17 @@ export function GenerationRow({
   cancelGenerationPending: boolean;
   retryingGenerationId: string | null;
   retryGenerationPending: boolean;
+  retryingRefundGenerationId: string | null;
+  refundRecoveryPending: boolean;
   legacyGamificationResolutionPending: boolean;
   isExpanded: boolean;
+  detailLoading: boolean;
+  detailError: string | null;
+  onRetryDetail: () => void;
   onToggleDetails: (generationId: string) => void;
 }) {
   const failureText = formatSafeText(item.failureCode, text.noFailure);
+  const failureDisplayText = failureText.replace(/([._:/-])/g, "$1\u200B");
   const providerText = formatSafeText(item.provider);
   const modelText = formatSafeText(item.model, "");
   const templateTitle = formatSafeText(item.templateTitle);
@@ -187,6 +200,7 @@ export function GenerationRow({
   const grantCleanLabel = `${text.grantClean}: ${generationIdText}`;
   const cancelGenerationLabel = `${text.cancelGeneration}: ${generationIdText}`;
   const retryGenerationLabel = `${text.retryGeneration}: ${generationIdText}`;
+  const retryRefundLabel = `${text.retryRefund}: ${generationIdText}`;
   const gamificationLegacyReviewLabel = `${text.gamificationLegacyReview}: ${generationIdText}`;
   const parentTitle = item.parentTemplateTitle
     ? sanitizeSensitiveText(item.parentTemplateTitle, 48)
@@ -288,6 +302,20 @@ export function GenerationRow({
                   : text.retryGeneration}
               </button>
             ) : null}
+            {item.canRetryRefund ? (
+              <button
+                type="button"
+                className={styles.inlineAction}
+                disabled={refundRecoveryPending}
+                onClick={() => onRetryRefund(item.generationId)}
+                aria-label={retryRefundLabel}
+                title={retryRefundLabel}
+              >
+                {retryingRefundGenerationId === item.generationId
+                  ? text.retryingRefund
+                  : text.retryRefund}
+              </button>
+            ) : null}
             {item.gamificationLegacyReviewRequired ? (
               <button
                 type="button"
@@ -319,7 +347,7 @@ export function GenerationRow({
             ) : null}
           </span>
         </td>
-        <td>
+        <td className={styles.statusCell}>
           <AdminStatusBadge color={getStatusTone(item.status)}>
             {formatStatus(item.status, text)}
           </AdminStatusBadge>
@@ -332,7 +360,9 @@ export function GenerationRow({
         <td className={adminTableStyles.numeric}>{item.attemptCount}</td>
         <td className={adminTableStyles.numeric}>{formatMoney(item.providerCostUsd, locale)}</td>
         <td>
-          <span className={styles.failure}>{failureText}</span>
+          <span className={styles.failure} aria-label={failureText} title={failureText}>
+            {failureDisplayText}
+          </span>
         </td>
         <td>
           <span className={styles.watermarkMeta}>
@@ -374,6 +404,19 @@ export function GenerationRow({
         <tr>
           <td colSpan={12} className={styles.detailsCell}>
             <div className={styles.detailsPanel} id={detailsPanelId}>
+              {detailLoading ? <p role="status">{text.loadingTitle}</p> : null}
+              {detailError ? (
+                <AdminStateCard
+                  tone="warning"
+                  title={text.errorTitle}
+                  description={detailError}
+                  action={
+                    <button type="button" className={styles.button} onClick={onRetryDetail}>
+                      {text.retry}
+                    </button>
+                  }
+                />
+              ) : null}
               <div className={styles.previewGrid}>
                 <section className={styles.previewCard}>
                   <header>
@@ -450,6 +493,28 @@ export function GenerationRow({
                 <div>
                   <span>{text.diagnosticsTitle}</span>
                   <strong>{watermarkState}</strong>
+                </div>
+                <div>
+                  <span>{text.refundState}</span>
+                  <strong>{text.refundStateOptions[item.refundState]}</strong>
+                </div>
+                <div>
+                  <span>{text.refundAttempts}</span>
+                  <strong>
+                    {item.refundAttemptCount} / {item.refundAttemptLimit}
+                  </strong>
+                </div>
+                <div>
+                  <span>{text.refundLastAttempt}</span>
+                  <strong>
+                    {item.refundLastAttemptedAtUtc
+                      ? formatDateTime(item.refundLastAttemptedAtUtc, locale)
+                      : "-"}
+                  </strong>
+                </div>
+                <div>
+                  <span>{text.refundLastError}</span>
+                  <strong>{formatSafeText(item.refundLastErrorCode)}</strong>
                 </div>
               </div>
               <section className={styles.feedbackPanel}>

@@ -13,12 +13,12 @@ const roleManagementContentPath = fileURLToPath(
 const roleManagementStylesPath = fileURLToPath(
   new URL("./role-management-page.module.css", import.meta.url)
 );
-const usersManagementStylesPath = fileURLToPath(
-  new URL("./users-management-page.module.css", import.meta.url)
-);
 const userDetailPagePath = fileURLToPath(new URL("./users/user-detail-page.tsx", import.meta.url));
-const userInlineAnalyticsPath = fileURLToPath(
-  new URL("./users/user-inline-analytics.tsx", import.meta.url)
+const userAccessControlPanelPath = fileURLToPath(
+  new URL("./users/user-access-control-panel.tsx", import.meta.url)
+);
+const userWalletPanelPath = fileURLToPath(
+  new URL("./users/user-wallet-panel.tsx", import.meta.url)
 );
 const useAdminUserProfilePath = fileURLToPath(
   new URL("./users/use-admin-user-profile.ts", import.meta.url)
@@ -54,20 +54,24 @@ describe("admin action hardening", () => {
     expect(source).toContain('const canManageRoles = sessionRoles.includes("Admin");');
     expect(source).toContain('ensureAdminSession(locale, router, { requiredRole: "Admin" });');
     expect(source).toContain("{!canManageRoles || isLoading ? (");
-    expect(source).toContain("{canManageRoles ? (\n        <AdminCard title={text.searchTitle}");
+    expect(source).toContain("className={styles.commandArea}");
+    expect(source).toContain("className={styles.directory}");
+    expect(source).toContain("function focusSearch()");
+    expect(source).toContain("searchInputRef.current?.focus();");
+    expect(source).toContain("className={styles.roleGroup}");
     expect(source).toContain("enabled: canManageRoles");
     expect(source).toContain("const normalizedSearch = debouncedSearch.trim();");
-    expect(source).toContain("enabled: canManageRoles && normalizedSearch.length >= 2");
+    expect(source).toContain(
+      "enabled: canManageRoles && isSearchActive && !isSearchPending && normalizedSearch.length >= 2"
+    );
     expect(contentSource).toContain(
       'roleActionsAdminOnly: "Изменять роли может только администратор."'
     );
     expect(contentSource).toContain('assignModeratorLabel: "Назначить модератора пользователю"');
     expect(contentSource).toContain('revokeModeratorLabel: "Снять модератора у пользователя"');
-    expect(contentSource).toContain(
-      'searchHint: "Введите минимум 2 символа. Поиск обновится автоматически."'
-    );
-    expect(contentSource).toContain('searchDescription: "Поиск по email, ID или имени."');
-    expect(contentSource).toContain('searchPlaceholder: "email, ID пользователя или имя"');
+    expect(contentSource).toContain('searchMinimumCharacters: "Введите минимум 2 символа."');
+    expect(contentSource).toContain('clearSearch: "Очистить поиск"');
+    expect(contentSource).toContain('searchPlaceholder: "Email, ID или имя пользователя"');
     expect(contentSource).toContain(
       'confirmAssignDescription: "Пользователь получит доступ к разрешенным разделам модерации."'
     );
@@ -81,12 +85,10 @@ describe("admin action hardening", () => {
     expect(contentSource.slice(0, contentSource.indexOf("  en: {"))).not.toMatch(
       /:\s*"[^"]*Moderator/
     );
-    expect(contentSource).toContain('adminAlreadyPrivileged: "Уже администратор"');
-    expect(contentSource).toContain('moderatorAlreadyPrivileged: "Уже модератор"');
-    expect(contentSource).toContain('eyebrow: "Контроль доступа"');
-    expect(contentSource).toContain('adminOnly: "Только администратор"');
     expect(contentSource).toContain('adminsTitle: "Администраторы"');
+    expect(contentSource).toContain('adminRole: "Администратор"');
     expect(contentSource).toContain('moderatorsTitle: "Модераторы"');
+    expect(contentSource).toContain('moderatorRole: "Модератор"');
     expect(source).toContain("function assertCanManageRoles(): boolean");
     expect(source).toContain('setToast({ type: "error", message: text.roleActionsAdminOnly });');
     expect(source).toContain("useRef,");
@@ -126,25 +128,37 @@ describe("admin action hardening", () => {
     expect(source).toContain('clientLogger.warn(\n        "roles.action_failed",');
     expect(source).not.toContain('clientLogger.warn("roles.action_failed", { error');
     expect(source).toContain("USER_SEARCH_MAX_LENGTH");
-    expect(source).toContain("setSearch(event.target.value.slice(0, USER_SEARCH_MAX_LENGTH))");
+    expect(source).toContain("function setSearchContext(nextSearch: string)");
+    expect(source).toContain("setSearch(nextSearch.slice(0, USER_SEARCH_MAX_LENGTH));");
     expect(source).toContain('type="search"');
     expect(source).toContain('autoComplete="off"');
-    expect(source).toContain('aria-describedby="role-search-hint"');
-    expect(source).toContain('<span id="role-search-hint" className={styles.hint}>');
-    expect(source).toContain("{text.searchHint}");
+    expect(source).toContain(
+      '<label className={styles.visuallyHidden} htmlFor="role-user-search">'
+    );
+    expect(source).toContain('id="role-user-search"');
+    expect(source).toContain(
+      'aria-describedby={searchStatusMessage ? "role-search-status" : undefined}'
+    );
+    expect(source).toContain('id="role-search-status"');
+    expect(source).toContain("text.searchMinimumCharacters");
+    expect(source).toContain("const searchStatusMessage =");
+    expect(source).toContain("const isSearchLoading =");
+    expect(source).toContain('role="status"');
+    expect(source).toContain('aria-busy={isSearchLoading ? "true" : undefined}');
     expect(source).toContain("maxLength={USER_SEARCH_MAX_LENGTH}");
     expect(source).toContain("const [adminsPage, setAdminsPage] = useState(0);");
     expect(source).toContain("skip: adminsPage * PAGE_SIZE");
     expect(source).toContain("skip: moderatorsPage * PAGE_SIZE");
     expect(source).toContain("queryKey: adminQueryKeys.usersRoot");
     expect(source).toContain("function RolePager(");
-    expect(contentSource).toContain('previousPageLabel: "Предыдущая страница списка ролей"');
-    expect(contentSource).toContain('nextPageLabel: "Следующая страница списка ролей"');
-    expect(source).toContain('import { CaretDownIcon } from "@/components/admin/admin-icons";');
+    expect(source).toContain("if (pageIndex === 0 && !hasMore && totalCount <= pageSize) {");
+    expect(contentSource).toContain('previousPageLabel: "Предыдущая страница"');
+    expect(contentSource).toContain('nextPageLabel: "Следующая страница"');
+    expect(source).toContain("CaretDownIcon,");
     expect(source).toContain("aria-label={text.previousPageLabel}");
     expect(source).toContain("aria-label={text.nextPageLabel}");
-    expect(source).toContain("title={text.previousPageLabel}");
-    expect(source).toContain("title={text.nextPageLabel}");
+    expect(source).toContain("label: string;");
+    expect(source).toContain("<nav className={styles.pager} aria-label={label}>");
     expect(source).toContain(
       "<CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconPrevious}`} />"
     );
@@ -156,57 +170,61 @@ describe("admin action hardening", () => {
     expect(stylesSource).toContain(".pagerButton {");
     expect(stylesSource).toContain(".pageIconPrevious {\n  transform: rotate(90deg);");
     expect(stylesSource).toContain(".pageIconNext {\n  transform: rotate(-90deg);");
-    expect(stylesSource).toContain(
-      ".pager {\n    flex-direction: column;\n    align-items: stretch;"
-    );
-    expect(stylesSource).toContain(".search {\n  display: grid;");
-    expect(stylesSource).toContain("grid-template-columns: minmax(0, 1fr);");
-    expect(stylesSource).not.toContain("grid-template-columns: minmax(14rem, 1fr) auto;");
-    expect(stylesSource).toContain(".input:focus-visible,\n.button:focus-visible");
+    expect(stylesSource).toContain("container-type: inline-size;");
+    expect(stylesSource).toContain("@container (max-width: 56rem)");
+    expect(stylesSource).toContain(".commandArea {");
+    expect(stylesSource).toContain(".searchControl {");
+    expect(stylesSource).toContain(".input:focus-visible,\n.userMain:focus-visible");
     expect(stylesSource).toContain("box-shadow: var(--focus-ring);");
     expect(stylesSource).toContain(".input:disabled {");
     expect(stylesSource).toContain("cursor: not-allowed;");
     expect(stylesSource).toContain("opacity: 0.62;");
     expect(stylesSource).not.toContain(".input:focus {");
-    expect(stylesSource).toContain(".pageInfo {\n    width: 100%;");
-    expect(stylesSource).toContain(".pagerActions {\n    justify-content: flex-start;");
-    expect(stylesSource).toContain("width: 100%;");
-    expect(stylesSource).toContain(".pagerButton {\n    flex: 0 0 auto;");
-    expect(stylesSource).not.toContain("grid-template-columns: 1fr 1fr;\n    width: 100%;");
     expect(stylesSource).toContain(".userName {\n    overflow: visible;");
     expect(stylesSource).toContain("text-overflow: clip;");
     expect(stylesSource).toContain("white-space: normal;");
     expect(stylesSource).toContain("overflow-wrap: anywhere;");
     expect(source).toContain("sanitizeSensitiveText(getAdminUserDisplayName(user), 96)");
     expect(source).toContain("shortIdentifier(user.userId)");
-    expect(source).toContain("sanitizeSensitiveText(role, 32)");
     expect(source).toContain("text: RoleManagementPageText;");
     expect(source).toContain(
       "<UserRow key={user.userId} user={user} locale={locale} text={text} />"
     );
-    expect(source).toContain("<RolePager\n                text={text}");
-    expect(source).toContain(
-      "const isRoleDataFetching = isRoleRetryFetching || searchQuery.isFetching;"
-    );
-    expect(source).toContain("const isRoleActionDisabled = isSubmitting || isRoleDataFetching;");
+    expect(source).toContain("<RolePager");
+    expect(source).toContain("const isRoleActionDisabled = isSubmitting;");
+    expect(source).not.toContain("const isRoleDataFetching");
     expect(source).toContain("disabled={!canManageRoles || isRoleActionDisabled}");
     expect(source).toContain(
       "aria-label={`${text.revokeModeratorLabel} ${userDisplayName(user)}`}"
     );
-    expect(source).toContain('const isAdmin = user.roles.includes("Admin");');
     expect(source).toContain(
-      "disabled={!canManageRoles || isAdmin || isModerator || isRoleActionDisabled}"
+      "function getExistingManagedRole(user: UserListItem, text: RoleManagementPageText)"
     );
+    expect(source).toContain('if (user.roles.includes("Admin"))');
+    expect(source).toContain('if (user.roles.includes("Moderator"))');
+    expect(source).toContain("const existingManagedRole = getExistingManagedRole(user, text);");
+    expect(source).toContain("<span className={styles.existingRole}>{existingManagedRole}</span>");
+    expect(source).not.toContain("showSearchDetails");
+    expect(source).not.toContain("function UserRoles");
+    expect(source).not.toContain("formatDateTime(user.createdAtUtc, locale)");
+    expect(source).not.toContain("sanitizeSensitiveText(role, 32)");
+    expect(stylesSource).toContain(".existingRole {");
+    expect(stylesSource).toContain("text-align: end;");
     expect(source).toContain(
       "aria-label={`${text.assignModeratorLabel} ${userDisplayName(user)}`}"
     );
-    expect(source).toContain("text.adminAlreadyPrivileged");
-    expect(source).toContain("text.moderatorAlreadyPrivileged");
+    expect(source).not.toContain("className={styles.profileAction}");
+    expect(source).toContain("text.openUserProfile");
+    expect(source).not.toContain(
+      "function getRoleLabel(role: string, text: RoleManagementPageText)"
+    );
+    expect(source).toContain("return text.adminRole;");
+    expect(source).toContain("return text.moderatorRole;");
     expect(source).not.toContain('? "Moderator"');
-    expect(stylesSource).toContain(".hint {");
-    expect(stylesSource).toContain("line-height: 1.35;");
+    expect(stylesSource).toContain(".searchStatus {");
+    expect(stylesSource).toContain("line-height: 1.4;");
     expect(stylesSource).toContain("overflow-wrap: anywhere;");
-    expect(stylesSource).toContain(".userRow > .button {\n    width: 100%;");
+    expect(stylesSource).toContain(".userAction button {\n    width: 100%;");
     expect(source).not.toContain("{user.userId} / {text.created}");
     expect(source).not.toContain("{role}\n        </AdminBadge>");
     expect(source).not.toContain("setSearch(event.target.value)");
@@ -217,116 +235,86 @@ describe("admin action hardening", () => {
   });
 
   it("guards users confirmation actions against repeated submit", () => {
-    const source = readUsersManagementPageLibrarySource();
-    const stylesSource = readFileSync(usersManagementStylesPath, "utf8");
-    const hookSource = readFileSync(useUsersAdminPath, "utf8");
+    const accessSource = readFileSync(userAccessControlPanelPath, "utf8");
+    const walletSource = readFileSync(userWalletPanelPath, "utf8");
 
-    expect(hookSource).toContain("): Promise<boolean> {");
-    expect(hookSource).toContain("useRef,");
-    expect(hookSource).toContain("const actionInFlightUserIdRef = useRef<string | null>(null);");
-    expect(hookSource).toContain(
-      "if (actionInFlightUserIdRef.current !== null) {\n      return false;\n    }\n\n    actionInFlightUserIdRef.current = userId;"
+    expect(accessSource).toContain("if (isSubmitting) {\n      return;");
+    expect(accessSource).toContain("if (!pendingAction || isSubmitting) {\n      return;");
+    expect(accessSource).toContain("setIsSubmitting(true);");
+    expect(accessSource).toContain("} finally {\n      setIsSubmitting(false);");
+    expect(accessSource).toContain("<ConfirmationDialog");
+    expect(accessSource).toContain("isSubmitting={isSubmitting}");
+    expect(accessSource).toContain(
+      "{feedback ? <AdminStateCard tone={feedback.tone} title={feedback.message} /> : null}"
     );
-    expect(hookSource).toContain("actionInFlightUserIdRef.current = null;");
-    expect(hookSource).toContain("return true;");
-    expect(hookSource).toContain("return false;");
-    expect(source).toContain("if (!confirmationDialog || confirmationSubmitting) {\n      return;");
-    expect(source).toContain("const refreshSelectedUserProfileAfterAction = useCallback(");
-    expect(source).toContain(
-      "const [refreshResult] = await Promise.allSettled([selectedUserProfile.refresh()]);"
+    expect(accessSource).toContain("if (!isSubmitting) {\n            setPendingAction(null);");
+    expect(walletSource).toContain(
+      "if (!canAdjustWallet || !pendingAdjustment || isSubmitting) {\n      return;"
     );
-    expect(source).toContain('clientLogger.warn("users.selected_profile_action_refresh_failed"');
-    expect(source).toContain("const succeeded = await runUserAction(confirmationDialog.userId");
-    expect(source).toContain("if (succeeded) {\n        confirmationDialog.afterSuccess?.();");
-    expect(source).toContain(
-      "if (succeeded) {\n        await refreshSelectedUserProfileAfterAction(userId);\n      }"
+    expect(walletSource).toContain(
+      "const isWalletFormLocked = isSubmitting || isWalletConfirmationOpen;"
     );
-    expect(source).toContain("[confirmationDialog, confirmationSubmitting, runUserAction]");
-    expect(source).toContain("[refreshSelectedUserProfileAfterAction, runAction]");
-    expect(source).not.toContain(
-      "if (succeeded && selectedUserId === userId) {\n        await selectedUserProfile.refresh();\n      }"
-    );
-    expect(source).toContain(
-      "const isUserActionLocked = confirmationSubmitting || walletDialogSubmitting;"
-    );
-    expect(source).toContain("if (!canManageRoles || isUserActionLocked) {\n        return;");
-    expect(source).toContain("if (isUserActionLocked) {\n        return;");
-    expect(source).toContain("const isBusy = busyUserId === user.userId || isUserActionLocked;");
-    expect(source).toContain("disabled={isUserActionLocked}");
-    expect(source).toContain(
-      "disabled={isUserActionLocked || busyUserId === openActionsUser.userId}"
-    );
-    expect(source).toContain(
-      "aria-disabled={isUserActionLocked || busyUserId === openActionsUser.userId}"
-    );
-    expect(source).toContain(
-      "isUserActionLocked || busyUserId === openActionsUser.userId ? -1 : undefined"
-    );
-    expect(source).toContain("event.preventDefault();\n                      return;");
-    expect(stylesSource).toContain(".actionMenuLinkDisabled,");
-    expect(stylesSource).toContain('.actionMenuLink[aria-disabled="true"]');
-    expect(stylesSource).toContain("pointer-events: none;");
-    expect(source).toContain("disabled={isUserActionLocked || busyUserId === selectedUser.userId}");
+    expect(walletSource).toContain("<ConfirmationDialog");
+    expect(walletSource).toContain("isSubmitting={isSubmitting}");
+    expect(walletSource).toContain("if (!isSubmitting) {\n            setPendingAdjustment(null);");
   });
 
   it("keeps users financial and destructive controls admin-only in the UI layer", () => {
-    const source = readUsersManagementPageLibrarySource();
+    const listSource = readUsersManagementPageLibrarySource();
+    const detailSource = readFileSync(userDetailPagePath, "utf8");
+    const accessSource = readFileSync(userAccessControlPanelPath, "utf8");
+    const walletSource = readFileSync(userWalletPanelPath, "utf8");
 
-    expect(source).toContain("if (!canManageRoles) {\n        return;");
-    expect(source).toContain("if (!canManageRoles || isUserActionLocked) {\n        return;");
-    expect(source).toContain("if (!canManageRoles || !walletDialog || walletDialogSubmitting) {");
-    expect(source).toContain("{canManageRoles ? (");
-    expect(source).toContain("{canManageRoles && (");
-    expect(source).toContain("section className={`${styles.panelSection} ${styles.dangerZone}`}");
-    expect(source).toContain("requestPremiumChange(user)");
-    expect(source).toContain('openWalletDialog(user.userId, "credit")');
-    expect(source).toContain("requestDeleteUser(selectedUser, closePanel)");
+    expect(detailSource).toContain(
+      'const canViewUserProfile = session?.user.roles.includes("Admin") ?? false;'
+    );
+    expect(detailSource).toContain("enabled: canViewUserProfile,");
+    expect(detailSource).toContain("if (!canViewUserProfile || isLoading) {");
+    expect(detailSource).toContain("canAdjustWallet={canViewUserProfile}");
+    expect(detailSource).toContain('{activeTab === "access" ? (');
+    expect(accessSource).toContain("await setActive(user.userId, !user.isActive);");
+    expect(accessSource).toContain("const updatedSummary = await revokePremium(");
+    expect(accessSource).toContain("normalizedPremiumRevokeReason");
+    expect(accessSource).toContain('latestEligibility.kind !== "recovery-pending"');
+    expect(accessSource).toContain("fetchAdminEconomyUserSubscriptionSummary(user.userId, signal)");
+    expect(accessSource).toContain('premiumEligibility.kind === "cancellable"');
+    expect(accessSource).toContain('premiumEligibility.kind === "recovery-pending"');
+    expect(accessSource).toContain("await deleteAdminUser(user.userId);");
+    expect(accessSource).toContain("<ConfirmationDialog");
+    expect(walletSource).toContain("canAdjustWallet &&");
+    expect(walletSource).toContain("{canAdjustWallet ? (");
+    expect(listSource).not.toContain("adjustAdminUserWallet");
+    expect(listSource).not.toContain("deleteAdminUser");
+    expect(listSource).not.toContain("revokePremium");
+    expect(listSource).not.toContain("setActive(");
   });
 
   it("keeps wallet adjustment dialog recoverable after backend failures", () => {
-    const source = readUsersManagementPageLibrarySource();
+    const source = readFileSync(userWalletPanelPath, "utf8");
 
     expect(source).toContain("USER_WALLET_REASON_MAX_LENGTH,");
     expect(source).toContain(
-      'import { useCallback, useEffect, useId, useMemo, useState } from "react";'
+      "const normalizedReason = reason.trim().slice(0, USER_WALLET_REASON_MAX_LENGTH);"
     );
-    expect(source).toContain('import { useCallback, useEffect, useRef, useState } from "react";');
-    expect(source).toContain("const walletDialogTitleId = useId();");
-    expect(source).toContain("const walletDialogErrorId = useId();");
-    expect(source).toContain("if (!canManageRoles || !walletDialog || walletDialogSubmitting) {");
-    expect(source).toContain(
-      "const reason = walletDialog.reason.trim().slice(0, USER_WALLET_REASON_MAX_LENGTH);"
-    );
-    expect(source).toContain('amount: event.target.value.replace(/\\D+/g, "").slice(0, 8)');
+    expect(source).toContain('event.target.value.replace(/\\D+/g, "").slice(0, 8)');
     expect(source).toContain("maxLength={8}");
-    expect(source).toContain("reason: event.target.value.slice(0, USER_WALLET_REASON_MAX_LENGTH)");
+    expect(source).toContain("event.target.value.slice(0, USER_WALLET_REASON_MAX_LENGTH)");
     expect(source).toContain("maxLength={USER_WALLET_REASON_MAX_LENGTH}");
-    expect(source).toContain("aria-labelledby={walletDialogTitleId}");
+    expect(source).toContain("const isWalletConfirmationOpen = pendingAdjustment !== null;");
     expect(source).toContain(
-      "aria-describedby={walletDialog.error ? walletDialogErrorId : undefined}"
+      "const isWalletFormLocked = isSubmitting || isWalletConfirmationOpen;"
     );
-    expect(source).toContain("<h3 id={walletDialogTitleId} className={styles.walletDialogTitle}>");
-    expect(source).toContain(
-      '<p id={walletDialogErrorId} className={styles.walletError} role="alert">'
-    );
-    expect(source).toContain(
-      'variant="ghost"\n                    size="sm"\n                    onClick={closeWalletDialog}\n                    disabled={walletDialogSubmitting}'
-    );
-    expect(source).toContain(
-      'variant="secondary"\n                    size="sm"\n                    onClick={() => {\n                      void submitWalletDialog();\n                    }}\n                    disabled={'
-    );
-    expect(source).toContain("!walletDialog.amount.trim()");
-    expect(source).toContain("!walletDialog.reason.trim()");
-    expect(source).toContain("setWalletDialogSubmitting(true);");
-    expect(source).toContain("try {\n      const succeeded = await runUserAction(");
-    expect(source).toContain("if (succeeded) {\n        setWalletDialog(null);");
-    expect(source).toContain("} finally {\n      setWalletDialogSubmitting(false);");
+    expect(source).toContain("setPendingAdjustment({");
+    expect(source).toContain("setIsSubmitting(true);");
+    expect(source).toContain("await adjustAdminUserWallet(");
+    expect(source).toContain("setPendingAdjustment(null);");
+    expect(source).toContain('setReason("");');
+    expect(source).toContain("message: getAdminErrorMessage(error, text.walletOperationError)");
+    expect(source).toContain("} finally {\n      setIsSubmitting(false);");
+    expect(source).toContain("<ConfirmationDialog");
+    expect(source).toContain("open={canAdjustWallet && isWalletConfirmationOpen}");
     expect(source).not.toContain("reason: event.target.value,");
-    expect(source).not.toContain("const reason = walletDialog.reason.trim();");
-    expect(source).not.toContain(
-      'aria-label={\n                  walletDialog.operation === "credit"'
-    );
-    expect(source).not.toContain("<p className={styles.walletError}>{walletDialog.error}</p>");
+    expect(source).not.toContain("const normalizedReason = reason.trim();");
   });
 
   it("keeps previous users page visible during background refetches", () => {
@@ -340,19 +328,16 @@ describe("admin action hardening", () => {
     expect(hookSource).toContain("const isFetching = usersQuery.isFetching;");
     expect(hookSource).toContain("isFetching,");
     expect(hookSource).toContain("async function refreshUsers()");
-    expect(hookSource).toContain("setActionError(null);");
     expect(hookSource).toContain(
       "if (!canManageRoles) {\n      return usersQuery;\n    }\n\n    const refreshedUsers = await usersQuery.refetch();"
     );
-    expect(hookSource).toContain("async function refreshUsersAfterAction(userId: string)");
-    expect(hookSource).toContain("await Promise.allSettled([refreshUsersAfterAction(userId)]);");
     expect(hookSource).toContain("refreshUsers,");
     expect(hookSource).not.toContain(
       "const isLoading = usersQuery.isLoading || usersQuery.isFetching;"
     );
     expect(source).toContain("if (!canManageRoles) {");
-    expect(source).toContain("<UsersManagementAccessState text={text} />");
-    expect(source).toContain("<UsersManagementLoadingState text={text} />");
+    expect(source).toContain("<UsersManagementAccessState ui={ui} />");
+    expect(source).toContain("<UsersManagementLoadingState ui={ui} />");
     expect(source).toContain("isFetching: isUsersFetching,");
     expect(source).toContain("refreshUsers,");
     expect(source).toContain("onClick={() => void refreshUsers().catch(() => undefined)}");
@@ -364,34 +349,22 @@ describe("admin action hardening", () => {
   });
 
   it("routes users sorting through backend query params", () => {
-    const source = readUsersManagementPageLibrarySource();
+    const listSource = readUsersManagementPageLibrarySource();
+    const hookSource = readFileSync(useUsersAdminPath, "utf8");
 
-    expect(source).toContain("const ROW_ENRICHMENT_CONCURRENCY = 4;");
-    expect(source).toContain("function fetchUserRowEnrichment<TValue>(");
-    expect(source).toContain("queryKey: adminQueryKeys.userRowAnalytics(pageUserIds)");
-    expect(source).toContain(
-      "queryKey: adminQueryKeys.economyUserSubscriptionSummaries(premiumPageUserIds)"
-    );
-    expect(source).toContain("fetchUserRowEnrichment<AdminUserAnalytics>");
-    expect(source).toContain("fetchUserRowEnrichment<AdminEconomyUserSubscriptionSummary>");
-    expect(source).not.toContain("useQueries");
-    expect(source).toContain(
+    expect(listSource).toContain("const PAGE_SIZE = 24;");
+    expect(listSource).toContain(
       'const [sortMode, setSortMode] = useState<UserSortMode>("created_desc");'
     );
-    expect(source).toContain("sort: sortMode");
-    expect(source).toContain("setSortMode={setSortMode}");
-    expect(source).toContain("sortMode={sortMode}");
-    expect(source).toContain("value={sortMode}");
-    expect(source).toContain('value="created_desc"');
-    expect(source).toContain('value="created_asc"');
-    expect(source).toContain('value="last_activity_desc"');
-    expect(source).toContain('value="last_activity_asc"');
-    expect(source).toContain("sortLastActivityDesc");
-    expect(source).toContain("sortLastActivityAsc");
-    expect(source).toContain("user.lastActivityAtUtc ?? rowAnalytics?.summary.lastActivityAtUtc");
-    expect(source).not.toContain("analyticsTargetUsers");
-    expect(source).toContain("const pageUsers = users;");
-    expect(source).toContain("const pagedUsers = pageUsers;");
+    expect(listSource).toContain("sort: sortMode,");
+    expect(listSource).toContain("setSortMode={setSortMode}");
+    expect(listSource).toContain("sortMode={sortMode}");
+    expect(hookSource).toContain("queryKey: adminQueryKeys.users(usersQueryParams)");
+    expect(hookSource).toContain("fetchUsers(usersQueryParams, signal)");
+    expect(listSource).not.toContain("fetchUserRowEnrichment");
+    expect(listSource).not.toContain("userRowAnalytics");
+    expect(listSource).not.toContain("economyUserSubscriptionSummaries");
+    expect(listSource).not.toContain("fetchAdminUserAnalytics");
   });
 
   it("sources users page summary cards from backend aggregate metrics", () => {
@@ -414,32 +387,25 @@ describe("admin action hardening", () => {
   });
 
   it("blocks obvious last-admin demotion in the frontend while preserving backend source of truth", () => {
-    const pageSource = readUsersManagementPageLibrarySource();
-    const hookSource = readFileSync(useUsersAdminPath, "utf8");
+    const listSource = readUsersManagementPageLibrarySource();
+    const accessSource = readFileSync(userAccessControlPanelPath, "utf8");
 
-    expect(pageSource).toContain("queryKey: adminQueryKeys.userDashboardMetrics");
-    expect(pageSource).toContain("queryFn: ({ signal }) => fetchAdminUserDashboardMetrics(signal)");
-    expect(pageSource).toContain("const totalAdminCount = userMetrics?.adminUsers ?? null;");
-    expect(pageSource).toContain("const cannotRevokeLastAdmin =");
-    expect(pageSource).toContain("totalAdminCount === null || totalAdminCount <= 1");
-    expect(pageSource).toContain(
-      "isUserActionLocked ||\n                        busyUserId === openActionsUser.userId ||\n                        cannotRevokeLastAdmin"
+    expect(accessSource).toContain("queryKey: adminQueryKeys.userDashboardMetrics");
+    expect(accessSource).toContain(
+      "queryFn: ({ signal }) => fetchAdminUserDashboardMetrics(signal)"
     );
-    expect(pageSource).toContain(
-      "title={cannotRevokeLastAdmin ? ui.lastAdminProtected : undefined}"
+    expect(accessSource).toContain("const isLastAdmin =");
+    expect(accessSource).toContain("const isAdminCountCheckPending =");
+    expect(accessSource).toContain("const isAdminCountCheckFailed =");
+    expect(accessSource).toContain("dashboardMetricsQuery.data?.adminUsers !== undefined");
+    expect(accessSource).toContain("dashboardMetricsQuery.data.adminUsers <= 1");
+    expect(accessSource).toContain(
+      "(isLastAdmin || isAdminCountCheckPending || isAdminCountCheckFailed);"
     );
-    expect(hookSource).toContain("import { getAdminErrorMessage }");
-    expect(hookSource).toContain("await Promise.allSettled([");
-    expect(hookSource).toContain(
-      "queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDashboardMetrics })"
-    );
-    expect(hookSource).not.toContain(
-      "await Promise.all([\n        queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDetail(userId) })"
-    );
-    expect(hookSource).toContain(
-      "getAdminErrorMessage(error, options?.errorMessage ?? text.errorLoadingUsers)"
-    );
-    expect(pageSource).not.toContain('fetchUsers({ role: "Admin", skip: 0, take: 1 }');
+    expect(accessSource).toContain("disabled={isSubmitting || isProtected}");
+    expect(accessSource).toContain("title={isProtected ? adminProtectionHint : undefined}");
+    expect(listSource).not.toContain('fetchUsers({ role: "Admin", skip: 0, take: 1 }');
+    expect(listSource).not.toContain("cannotRevokeLastAdmin");
   });
 
   it("guards logout confirmation against repeated submit", () => {
@@ -514,7 +480,7 @@ describe("admin action hardening", () => {
     expect(sidebarSource).toContain("logoutDisabled?: boolean;");
     expect(sidebarSource).toContain("logoutDisabled = false,");
     expect(sidebarSource).toContain("disabled={logoutDisabled}");
-    expect(sidebarSource).toContain('import { useMemo } from "react";');
+    expect(sidebarSource).toContain('import { useMemo, type RefObject } from "react";');
     expect(sidebarSource).toContain(
       "const navItems = useMemo(() => getAdminNavItems(locale, roles), [locale, roles]);"
     );
@@ -545,24 +511,21 @@ describe("admin action hardening", () => {
   });
 
   it("guards users page private detail queries behind a restored session", () => {
-    const source = readUsersManagementPageLibrarySource();
+    const listSource = readUsersManagementPageLibrarySource();
     const hookSource = readFileSync(useUsersAdminPath, "utf8");
     const profileHookSource = readFileSync(useAdminUserProfilePath, "utf8");
     const detailSource = readFileSync(userDetailPagePath, "utf8");
-    const inlineSource = readFileSync(userInlineAnalyticsPath, "utf8");
 
-    expect(hookSource).toContain("hasSession: canManageRoles");
-    expect(source).toContain("hasSession,");
-    expect(source).toContain("enabled: hasSession && pageUserIds.length > 0");
-    expect(source).toContain("enabled: hasSession && users.length > 0");
-    expect(source).toContain(
-      "const selectedUserProfile = useAdminUserProfile({ enabled: hasSession, userId: selectedUserId });"
+    expect(hookSource).toContain(
+      'const canManageRoles = session?.user.roles.includes("Admin") ?? false;'
     );
-    expect(source).toContain("enabled: hasSession && Boolean(selectedUserId)");
-    expect(source).toContain("enabled: hasSession && premiumPageUserIds.length > 0");
-    expect(source).not.toContain("enabled: users.length > 0");
-    expect(source).not.toContain("enabled: Boolean(selectedUserId)");
-    expect(source).not.toContain("enabled: true,\n      staleTime: 30_000");
+    expect(hookSource).toContain("enabled: canManageRoles,");
+    expect(hookSource).toContain("hasSession: canManageRoles");
+    expect(listSource).toContain("hasSession,");
+    expect(listSource).toContain("enabled: hasSession,");
+    expect(listSource).not.toContain("useAdminUserProfile");
+    expect(listSource).not.toContain("fetchAdminUserAnalytics");
+    expect(listSource).not.toContain("fetchAdminUserPet");
 
     expect(profileHookSource).toContain("enabled?: boolean;");
     expect(profileHookSource).toContain("const canLoadUser = enabled && Boolean(userId);");
@@ -571,17 +534,6 @@ describe("admin action hardening", () => {
       "const error = userQuery.error ?? analyticsQuery.error ?? null;"
     );
     expect(profileHookSource).toContain("error,");
-    expect(source).toContain("selectedUserProfile.hasError && !selectedUser");
-    expect(source).toContain(
-      "title={getAdminErrorMessage(selectedUserProfile.error, text.errorLoadingUsers)}"
-    );
-    expect(source).toContain("disabled={selectedUserProfile.isFetching}");
-    expect(source).toContain("function requestSelectedUserProfileRetry()");
-    expect(source).toContain(
-      "if (!selectedUserId || selectedUserProfile.isFetching) {\n      return;\n    }"
-    );
-    expect(source).toContain("onClick={requestSelectedUserProfileRetry}");
-    expect(source).toContain("void selectedUserProfile.refresh().catch(() => undefined)");
     expect(profileHookSource).not.toContain("enabled: Boolean(userId)");
     expect(detailSource).toContain(
       'const canViewUserProfile = session?.user.roles.includes("Admin") ?? false;'
@@ -592,11 +544,11 @@ describe("admin action hardening", () => {
     );
     expect(detailSource).toContain("if (!canViewUserProfile || isLoading) {");
     expect(detailSource).toContain("disabled={!canViewUserProfile || isFetching}");
-    expect(inlineSource).toContain(
-      'const canViewUserProfile = session?.user.roles.includes("Admin") ?? false;'
+    expect(detailSource).toContain(
+      'enabled: canViewUserProfile && activeTab === "content" && Boolean(userId),'
     );
-    expect(inlineSource).toContain("enabled: canViewUserProfile,");
-    expect(inlineSource).toContain("if (!canViewUserProfile || isLoading) {");
-    expect(inlineSource).toContain("disabled={!canViewUserProfile || isFetching}");
+    expect(detailSource).toContain('{activeTab === "support" ? (');
+    expect(detailSource).toContain("<UserSupportTicketsPanel");
+    expect(detailSource).not.toContain("UserInlineAnalytics");
   });
 });

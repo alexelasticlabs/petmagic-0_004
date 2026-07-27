@@ -1,0 +1,379 @@
+import { expect, test, type Page, type Route } from "@playwright/test";
+
+const apiOrigin = "https://api.petmagic.test";
+const adminUserId = "11111111-1111-4111-8111-111111111111";
+const generationId = "22222222-2222-4222-8222-222222222222";
+const userId = "33333333-3333-4333-8333-333333333333";
+const templateId = "44444444-4444-4444-8444-444444444444";
+const recoveryReason = "Verified provider recovery after exhausted automatic attempts.";
+
+function createAdminSession() {
+  return {
+    accessToken: "refund-recovery-access-token",
+    refreshToken: "refund-recovery-refresh-token",
+    expiresAtUtc: "2099-01-01T00:00:00Z",
+    user: {
+      userId: adminUserId,
+      email: "refund.admin@petmagic.test",
+      displayName: "Refund Admin",
+      isPremium: false,
+      emailConfirmed: true,
+      roles: ["Admin"],
+      legalAcceptance: {
+        termsOfUseAccepted: true,
+        privacyPolicyAccepted: true,
+        currentTermsOfUseVersion: "1",
+        currentPrivacyPolicyVersion: "1",
+        requiresAcceptance: false,
+      },
+    },
+  };
+}
+
+function corsHeaders(route: Route) {
+  return {
+    "Access-Control-Allow-Origin": route.request().headers().origin ?? "http://127.0.0.1",
+    "Access-Control-Allow-Credentials": "true",
+    "Access-Control-Allow-Headers":
+      "Authorization, Content-Type, Idempotency-Key, X-Correlation-ID",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  };
+}
+
+async function fulfillJson(route: Route, body: unknown, status = 200) {
+  await route.fulfill({
+    status,
+    contentType: "application/json",
+    headers: corsHeaders(route),
+    body: JSON.stringify(body),
+  });
+}
+
+function createGeneration(refundQueued: boolean) {
+  return {
+    generationId,
+    userId,
+    templateId,
+    templateTitle: "Refund recovery portrait",
+    templateType: "Image",
+    status: "Failed",
+    provider: "fal-ai",
+    model: "flux-pro",
+    tokenCost: 12,
+    attemptCount: 3,
+    providerCostUsd: 0.08,
+    failureCode: "generation.provider_failed",
+    failureMessage: "Provider generation failed.",
+    createdAtUtc: "2026-07-27T08:00:00Z",
+    updatedAtUtc: refundQueued ? "2026-07-27T09:30:00Z" : "2026-07-27T09:00:00Z",
+    startedAtUtc: "2026-07-27T08:01:00Z",
+    completedAtUtc: "2026-07-27T08:03:00Z",
+    refundedAtUtc: null,
+    chargedAtUtc: "2026-07-27T08:00:30Z",
+    refundState: refundQueued ? "pending" : "exhausted",
+    refundAttemptCount: refundQueued ? 0 : 5,
+    refundAttemptLimit: 5,
+    refundLastAttemptedAtUtc: "2026-07-27T09:00:00Z",
+    refundLastErrorCode: refundQueued ? "economy.retrying" : "economy.temporarily_unavailable",
+    canRetryRefund: !refundQueued,
+    isWatermarkRequired: false,
+    isWatermarkRemoved: false,
+    inputSourceType: "user_upload",
+    canCompareBeforeAfter: false,
+    childCount: 0,
+    generationMode: "normal",
+    canCancel: false,
+    canRetry: false,
+    gamificationLegacyReviewRequired: false,
+  };
+}
+
+function createGenerationDetail(refundQueued: boolean) {
+  return {
+    generation: {
+      ...createGeneration(refundQueued),
+      refundAttemptCount: refundQueued ? 1 : 5,
+      refundLastErrorCode: refundQueued
+        ? "economy.refund_retry_queued"
+        : "economy.temporarily_unavailable",
+    },
+    generatedAtUtc: "2026-07-27T09:30:00Z",
+  };
+}
+
+function createGenerationMetrics(refundQueued: boolean) {
+  return {
+    totalJobs: 1,
+    generationsToday: 1,
+    generationsThisWeek: 1,
+    generationsThisMonth: 1,
+    failedGenerationsToday: 1,
+    failedGenerationsThisWeek: 1,
+    failedGenerationsThisMonth: 1,
+    pendingJobs: 0,
+    runningJobs: 0,
+    completedJobs: 0,
+    failedJobs: 1,
+    cancelledJobs: 0,
+    cancellingJobs: 0,
+    retryingJobs: 0,
+    pendingRefunds: refundQueued ? 1 : 0,
+    exhaustedRefunds: refundQueued ? 0 : 1,
+    generatedAtUtc: "2026-07-27T09:30:00Z",
+  };
+}
+
+type RefundRequest = {
+  idempotencyKey: string | null;
+  body: unknown;
+};
+
+async function installRefundRecoveryMocks(page: Page, failFirstRefundRequest: boolean) {
+  const session = createAdminSession();
+  const refundRequests: RefundRequest[] = [];
+  let refundQueued = false;
+  let listRequests = 0;
+  let metricsRequests = 0;
+  let detailRequests = 0;
+  const requestedRefundStates: Array<string | null> = [];
+
+  await page.route(apiOrigin + "/api/**", async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+
+    if (request.method() === "OPTIONS") {
+      await route.fulfill({ status: 204, headers: corsHeaders(route) });
+      return;
+    }
+
+    if (url.pathname === "/api/auth/login" || url.pathname === "/api/auth/refresh") {
+      await fulfillJson(route, session);
+      return;
+    }
+
+    if (url.pathname === "/api/auth/logout") {
+      await fulfillJson(route, {});
+      return;
+    }
+
+    if (url.pathname === `/api/admin/templates/generations/${generationId}/retry-refund`) {
+      refundRequests.push({
+        idempotencyKey: request.headers()["idempotency-key"] ?? null,
+        body: request.postDataJSON(),
+      });
+
+      if (failFirstRefundRequest && refundRequests.length === 1) {
+        await fulfillJson(
+          route,
+          {
+            code: "templates.generation_refund_retry_temporarily_unavailable",
+            message: "The refund recovery request is temporarily unavailable.",
+          },
+          503
+        );
+        return;
+      }
+
+      refundQueued = true;
+      await fulfillJson(route, {
+        generationId,
+        status: "RefundRetryQueued",
+        canRetryRefund: false,
+      });
+      return;
+    }
+
+    if (
+      url.pathname === `/api/admin/templates/generations/${generationId}` &&
+      request.method() === "GET"
+    ) {
+      detailRequests += 1;
+      await fulfillJson(route, createGenerationDetail(refundQueued));
+      return;
+    }
+
+    if (url.pathname === "/api/admin/templates/generations/metrics") {
+      metricsRequests += 1;
+      await fulfillJson(route, createGenerationMetrics(refundQueued));
+      return;
+    }
+
+    if (url.pathname === "/api/admin/templates/generations") {
+      listRequests += 1;
+      const requestedRefundState = url.searchParams.get("refundState");
+      requestedRefundStates.push(requestedRefundState);
+      const generation = createGeneration(refundQueued);
+      const items =
+        !requestedRefundState || requestedRefundState === generation.refundState
+          ? [generation]
+          : [];
+      await fulfillJson(route, {
+        items,
+        totalCount: items.length,
+        skip: 0,
+        take: 25,
+        hasMore: false,
+        generatedAtUtc: "2026-07-27T09:30:00Z",
+      });
+      return;
+    }
+
+    await fulfillJson(route, {
+      items: [],
+      totalCount: 0,
+      skip: 0,
+      take: 25,
+      hasMore: false,
+      generatedAtUtc: "2026-07-27T09:30:00Z",
+    });
+  });
+
+  return {
+    getRefundRequests: () => refundRequests,
+    getListRequests: () => listRequests,
+    getMetricsRequests: () => metricsRequests,
+    getDetailRequests: () => detailRequests,
+    getRequestedRefundStates: () => requestedRefundStates,
+  };
+}
+
+async function loginAsAdmin(page: Page) {
+  await page.goto("/en");
+  await page.locator("#login-email").fill("refund.admin@petmagic.test");
+  await page.locator("#login-password").fill("production-ready-password");
+  await page.locator('form button[type="submit"]').click();
+  await expect(page).toHaveURL(/\/en\/dashboard$/);
+}
+
+function collectUnexpectedRuntimeErrors(page: Page) {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push("pageerror: " + error.message));
+  page.on("console", (message) => {
+    if (message.type() !== "error") {
+      return;
+    }
+
+    const text = message.text();
+    if (text.includes("503") && text.includes("Failed to load resource")) {
+      return;
+    }
+
+    errors.push("console: " + text);
+  });
+  return errors;
+}
+
+test("refund recovery keeps one idempotency key across a controlled retry", async ({
+  page,
+}, testInfo) => {
+  const api = await installRefundRecoveryMocks(page, true);
+  await page.setViewportSize({ width: 1440, height: 960 });
+  await loginAsAdmin(page);
+  const runtimeErrors = collectUnexpectedRuntimeErrors(page);
+
+  await page.goto("/en/generations?refundState=exhausted");
+  await expect(page.getByRole("heading", { name: "Generations", exact: true })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Charge refund", exact: true })).toHaveValue(
+    "exhausted"
+  );
+  await expect(page.getByText("Refund recovery portrait", { exact: true })).toBeVisible();
+
+  const retryButton = page.getByRole("button", { name: /Retry refund:/ });
+  await expect(retryButton).toBeVisible();
+  await retryButton.click();
+
+  const dialog = page.getByRole("dialog", { name: "Retry the charge refund?", exact: true });
+  await expect(dialog).toBeVisible();
+  const confirmButton = dialog.getByRole("button", { name: "Queue refund", exact: true });
+  await expect(confirmButton).toBeDisabled();
+  await expect(
+    dialog.getByText("Provide a verified reason for restoring the refund.", { exact: true })
+  ).toBeVisible();
+
+  await dialog.getByRole("textbox", { name: /Recovery reason/ }).fill(recoveryReason);
+  await expect(confirmButton).toBeEnabled();
+  await confirmButton.click();
+
+  await expect.poll(() => api.getRefundRequests().length).toBe(1);
+  await expect(dialog).toBeVisible();
+  await expect(confirmButton).toBeEnabled();
+  await page.screenshot({
+    path: testInfo.outputPath("generation-refund-recovery-desktop.png"),
+    fullPage: false,
+  });
+
+  await confirmButton.click();
+  await expect.poll(() => api.getRefundRequests().length).toBe(2);
+  const [firstRequest, secondRequest] = api.getRefundRequests();
+  expect(firstRequest.body).toEqual({ reason: recoveryReason });
+  expect(secondRequest.body).toEqual({ reason: recoveryReason });
+  expect(firstRequest.idempotencyKey).not.toBeNull();
+  expect(firstRequest.idempotencyKey).toMatch(/^generation-refund:.+/);
+  expect(secondRequest.idempotencyKey).toBe(firstRequest.idempotencyKey);
+
+  await expect(dialog).toBeHidden();
+  await expect.poll(api.getListRequests).toBeGreaterThan(1);
+  await expect.poll(api.getMetricsRequests).toBeGreaterThan(1);
+  await expect(retryButton).toHaveCount(0);
+  await expect(page.getByText("No generations found", { exact: true })).toBeVisible();
+
+  const refundFilter = page.getByRole("combobox", { name: "Charge refund", exact: true });
+  await refundFilter.selectOption("pending");
+  await expect(page).toHaveURL(/[?&]refundState=pending(?:&|$)/);
+  await expect.poll(() => api.getRequestedRefundStates().includes("pending")).toBe(true);
+  await expect(page.getByText("Refund recovery portrait", { exact: true })).toBeVisible();
+  const showDetails = page.getByRole("button", { name: /Show:/ });
+  await showDetails.click();
+  await expect(page).toHaveURL(new RegExp(`[?&]selected=${generationId}(?:&|$)`));
+  await expect.poll(api.getDetailRequests).toBeGreaterThan(0);
+  const hideDetails = page.getByRole("button", { name: /Hide:/ });
+  await expect(hideDetails).toHaveAttribute("aria-expanded", "true");
+  const detailsPanelId = await hideDetails.getAttribute("aria-controls");
+  expect(detailsPanelId).toBeTruthy();
+  const details = page.locator(`#${detailsPanelId}`);
+  await expect(details.getByText("Pending", { exact: true })).toBeVisible();
+  await expect(details.getByText("1 / 5", { exact: true })).toBeVisible();
+  await expect(details.getByText("economy.refund_retry_queued", { exact: true })).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("generation-refund-recovery-success-desktop.png"),
+    fullPage: true,
+  });
+
+  expect(runtimeErrors).toEqual([]);
+});
+
+test("exhausted refund recovery dialog stays within the 390px viewport", async ({
+  page,
+}, testInfo) => {
+  const api = await installRefundRecoveryMocks(page, false);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await loginAsAdmin(page);
+  const runtimeErrors = collectUnexpectedRuntimeErrors(page);
+
+  await page.goto("/en/generations?refundState=exhausted");
+  const retryButton = page.getByRole("button", { name: /Retry refund:/ });
+  await expect(retryButton).toBeVisible();
+  await retryButton.click();
+
+  const dialog = page.getByRole("dialog", { name: "Retry the charge refund?", exact: true });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Queue refund", exact: true })).toBeDisabled();
+
+  const dimensions = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+    dialogWidth:
+      document.querySelector<HTMLElement>('[role="dialog"]')?.getBoundingClientRect().width ?? 0,
+    viewportWidth: window.innerWidth,
+  }));
+  expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
+  expect(dimensions.clientWidth).toBe(dimensions.viewportWidth);
+  expect(dimensions.dialogWidth).toBeLessThanOrEqual(dimensions.viewportWidth);
+
+  await page.screenshot({
+    path: testInfo.outputPath("generation-refund-recovery-mobile-390.png"),
+    fullPage: false,
+  });
+  expect(api.getRefundRequests()).toEqual([]);
+  expect(runtimeErrors).toEqual([]);
+});

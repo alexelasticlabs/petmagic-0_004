@@ -36,6 +36,41 @@ export type AdminEconomyPurchase = {
   confirmedAtUtc?: string | null;
 };
 
+export type AdminEconomyPurchaseDetail = {
+  orderId: string;
+  userId: string;
+  packId: string;
+  packCode: string;
+  packDisplayName: string;
+  paymentProvider: string;
+  status: string;
+  priceAmount: number;
+  currencyCode: string;
+  sparkToGrant: number;
+  createdAtUtc: string;
+  confirmedAtUtc?: string | null;
+  refundStatus: string;
+  settlementState: string;
+  capabilities: {
+    canRefund: boolean;
+    canRetryRefund: boolean;
+    requiresManualReview: boolean;
+  };
+  timeline: Array<{
+    eventType: string;
+    status: string;
+    occurredAtUtc: string;
+  }>;
+  incidents: Array<{
+    incidentId: string;
+    type: string;
+    severity: string;
+    status: string;
+    firstDetectedAtUtc: string;
+    resolvedAtUtc?: string | null;
+  }>;
+};
+
 export type AdminEconomyDashboardRevenuePoint = {
   date: string;
   amount: number;
@@ -56,6 +91,8 @@ export type AdminEconomyDashboardMetrics = {
   renewalStops: number;
   currencyCode: string;
   revenueSeries: AdminEconomyDashboardRevenuePoint[];
+  periodDays: number;
+  asOfUtc: string;
 };
 
 export type AdminEconomySubscription = {
@@ -95,6 +132,7 @@ export type AdminEconomyUserSubscriptionSummary = {
   tokensAvailable: number;
   canManageSubscription: boolean;
   manageSubscriptionAction: string;
+  hasPendingAdminRevocation?: boolean;
 };
 
 export type AdminSubscriptionPlan = {
@@ -274,6 +312,7 @@ export type AdminCurrencyPack = {
 };
 
 export type AdminRedeemRewardKind = "spark" | "premium_days";
+export type AdminRedeemCodeWriteRewardKind = "spark";
 
 export type AdminRedeemCodeRedemption = {
   redemptionId: string;

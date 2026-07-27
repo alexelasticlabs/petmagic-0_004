@@ -5,6 +5,7 @@ import {
   maskEmail,
   maskPhone,
   maskSignedUrl,
+  sanitizeSensitiveMultilineText,
   sanitizeSensitiveText,
   shortIdentifier,
 } from "@/lib/sensitive-display";
@@ -74,6 +75,17 @@ describe("sensitive-display", () => {
     expect(sanitized).not.toContain("sig=secret");
     expect(sanitized).not.toContain("ios-receipt-data");
     expect(sanitized).not.toContain("4242 4242 4242 4242");
+  });
+
+  it("preserves logical feedback line breaks while redacting sensitive values", () => {
+    const sanitized = sanitizeSensitiveMultilineText(
+      "First line\nEmail alex.petmagic@example.com\nreceipt=ios-secret-data",
+      500
+    );
+
+    expect(sanitized).toBe("First line\nEmail al***@e***.com\nreceipt=[redacted]");
+    expect(sanitized).not.toContain("alex.petmagic@example.com");
+    expect(sanitized).not.toContain("ios-secret-data");
   });
 
   it("redacts session cookies, JWTs, credentials, and signatures in display text", () => {

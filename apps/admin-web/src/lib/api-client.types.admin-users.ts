@@ -19,6 +19,48 @@ export type UserListPage = OffsetPagedResponse<UserListItem> & {
   totalCount: number;
 };
 
+export type AdminEmailBroadcastStatus =
+  "legacy" | "queued" | "processing" | "completed" | "partially-failed" | "failed";
+
+export type AdminEmailBroadcastAccepted = {
+  broadcastId: string;
+  recipientCount: number;
+  status: AdminEmailBroadcastStatus;
+  createdAtUtc: string;
+};
+
+export type AdminEmailBroadcastListItem = {
+  broadcastId: string;
+  audience: string;
+  subject?: string | null;
+  status: AdminEmailBroadcastStatus;
+  recipientCount: number;
+  pendingCount: number;
+  sentCount: number;
+  failedCount: number;
+  createdAtUtc: string;
+  updatedAtUtc: string;
+  completedAtUtc?: string | null;
+};
+
+export type AdminEmailBroadcastsPage = OffsetPagedResponse<AdminEmailBroadcastListItem> & {
+  totalCount: number;
+};
+
+export type AdminEmailBroadcastDetail = AdminEmailBroadcastListItem & {
+  retryableFailedCount: number;
+};
+
+export type AdminEmailBroadcastRetryResult = {
+  broadcastId: string;
+  retriedCount: number;
+  status: AdminEmailBroadcastStatus;
+  pendingCount: number;
+  sentCount: number;
+  failedCount: number;
+  updatedAtUtc: string;
+};
+
 export type AdminUserDashboardMetrics = {
   totalUsers: number;
   premiumUsers: number;
@@ -41,9 +83,51 @@ export type AdminUserDetail = {
   isPremium: boolean;
   isActive: boolean;
   emailConfirmed: boolean;
+  termsOfUseAccepted: boolean;
+  privacyPolicyAccepted: boolean;
+  marketingEmailsEnabled: boolean;
+  legalAcceptance: AdminUserLegalAcceptance;
   roles: string[];
   createdAtUtc: string;
   avatar?: UserAvatar | null;
+};
+
+export type AdminUserSessionStatus = "active" | "expired" | "revoked";
+
+export type AdminUserSession = {
+  sessionId: string;
+  status: AdminUserSessionStatus;
+  canRevoke: boolean;
+  createdAtUtc: string;
+  expiresAtUtc: string;
+  revokedAtUtc?: string | null;
+};
+
+export type AdminUserSessions = {
+  items: AdminUserSession[];
+  totalCount: number;
+  activeCount: number;
+  hasMore: boolean;
+};
+
+export type AdminUserSessionRevokeResponse = {
+  userId: string;
+  sessionId?: string | null;
+  revokedCount: number;
+  occurredAtUtc: string;
+  replayed: boolean;
+};
+
+export type AdminUserLegalAcceptance = {
+  termsOfUseAccepted: boolean;
+  termsOfUseAcceptedVersion?: string | null;
+  termsOfUseAcceptedAtUtc?: string | null;
+  privacyPolicyAccepted: boolean;
+  privacyPolicyAcceptedVersion?: string | null;
+  privacyPolicyAcceptedAtUtc?: string | null;
+  currentTermsOfUseVersion: string;
+  currentPrivacyPolicyVersion: string;
+  requiresAcceptance: boolean;
 };
 
 export type AdminUserAnalyticsSummary = {

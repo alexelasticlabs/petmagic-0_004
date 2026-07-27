@@ -9,6 +9,7 @@ const env = {
   ...process.env,
   NEXT_PUBLIC_API_BASE_URL: nextPublicApiBaseUrl,
 };
+delete env.NEXT_DIST_DIR;
 
 await resetGeneratedTypeArtifacts();
 await run(process.execPath, [resolveTool("next/dist/bin/next"), "typegen"], env);

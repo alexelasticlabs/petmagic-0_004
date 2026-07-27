@@ -15,6 +15,126 @@
   gap: 0.45rem;
 }
 
+.catalogHero {
+  min-width: 0;
+}
+
+.typeTabs {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.28rem;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border-soft);
+  scrollbar-width: thin;
+}
+
+.typeTab,
+.typeTabActive {
+  min-height: 2.3rem;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 2px solid transparent;
+  padding: 0.46rem 0.72rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    color 140ms ease;
+}
+
+.typeTab:hover {
+  background: var(--surface-hover);
+  color: var(--text-strong);
+}
+
+.typeTabActive {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+
+.typeTab:focus-visible,
+.typeTabActive:focus-visible {
+  outline: none;
+  box-shadow: inset var(--focus-ring);
+}
+
+.catalogMetricStrip {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.createMenu {
+  position: relative;
+  min-width: 0;
+}
+
+.createMenu summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.createMenu summary::-webkit-details-marker {
+  display: none;
+}
+
+.createMenu[open] .createMenuCaret {
+  transform: rotate(180deg);
+}
+
+.createMenuCaret {
+  width: 0.72rem;
+  height: 0.72rem;
+  transition: transform 140ms ease;
+}
+
+.createMenuPanel {
+  position: absolute;
+  z-index: 12;
+  top: calc(100% + 0.42rem);
+  right: 0;
+  width: min(19rem, calc(100vw - 2rem));
+  display: grid;
+  gap: 0.34rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 0.42rem;
+  background: var(--surface-1);
+  box-shadow: var(--shadow-strong);
+}
+
+.createMenuItem {
+  min-width: 0;
+  min-height: 2.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.62rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 0.58rem 0.66rem;
+  color: var(--text-soft);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.createMenuItem:hover,
+.createMenuItem:focus-visible {
+  outline: none;
+  border-color: var(--border-accent);
+  background: var(--surface-hover);
+  color: var(--text-strong);
+}
+
+.createMenuIcon {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+
 .primaryLink,
 .secondaryLink,
 .compactLink {
@@ -144,7 +264,7 @@
 
 .catalogShell {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(15.5rem, 17.5rem);
   gap: clamp(0.76rem, 0.66rem + 0.24vw, 0.92rem);
   align-items: start;
 }
@@ -155,18 +275,71 @@
   gap: clamp(0.68rem, 0.6rem + 0.22vw, 0.84rem);
 }
 
-.filtersBar {
+.filtersDock {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(12rem, 1.45fr) repeat(4, minmax(6.4rem, 0.78fr)) minmax(
-      8.75rem,
-      0.9fr
-    );
-  gap: clamp(0.42rem, 0.34rem + 0.2vw, 0.56rem);
-  align-items: end;
-  border-color: var(--border-soft);
+  gap: 0.48rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  padding: 0.54rem;
   background: var(--surface-2);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 2%, transparent);
+}
+
+.filterLeadRow {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(14rem, 1fr) auto;
+  gap: 0.52rem;
+  align-items: center;
+}
+
+.filterUtilities {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.42rem;
+}
+
+.filterUtilities > button {
+  min-height: 2.2rem;
+}
+
+.activeFilterCount {
+  min-width: 1.25rem;
+  height: 1.25rem;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  padding-inline: 0.26rem;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+.mobileFiltersToggle {
+  display: none;
+}
+
+.filtersBar {
+  min-width: 0;
+  display: block;
+  border: 0;
+  border-top: 1px solid var(--border-soft);
+  border-radius: 0;
+  padding: 0.48rem 0 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.advancedFilters {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(7rem, 1fr));
+  gap: clamp(0.42rem, 0.34rem + 0.2vw, 0.56rem);
+  align-items: end;
 }
 
 .searchField,
@@ -176,19 +349,7 @@
   gap: 0.32rem;
 }
 
-.selectField span {
-  color: var(--text-muted);
-  font-size: 0.72rem;
-  font-weight: 600;
-}
-
-.viewToggleShell {
-  min-width: 0;
-  display: grid;
-  gap: 0.32rem;
-}
-
-.viewToggleCaption {
+.selectField > span {
   color: var(--text-muted);
   font-size: 0.72rem;
   font-weight: 600;
@@ -226,6 +387,7 @@
 }
 
 .viewToggle {
+  min-width: 10.5rem;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   min-height: 2.2rem;
@@ -308,6 +470,92 @@
   opacity: 0.92;
 }
 
+.catalogRail {
+  position: sticky;
+  top: 0.75rem;
+  min-width: 0;
+  display: grid;
+  gap: 0.72rem;
+}
+
+.railCard {
+  min-width: 0;
+}
+
+.railActions,
+.quickLinks {
+  min-width: 0;
+  display: grid;
+  gap: 0.42rem;
+}
+
+.railAction,
+.quickLink {
+  min-width: 0;
+  min-height: 2.75rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.48rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 0.56rem 0.62rem;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font: inherit;
+  font-size: 0.77rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.railAction:not(:disabled):hover,
+.quickLink:hover {
+  transform: translateY(-1px);
+  border-color: var(--border-accent);
+  background: var(--surface-hover);
+  color: var(--text-strong);
+}
+
+.railAction:focus-visible,
+.quickLink:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.railAction:disabled {
+  opacity: 0.56;
+  cursor: not-allowed;
+}
+
+.railAction strong {
+  color: var(--text-strong);
+  font-family: var(--font-heading), sans-serif;
+  font-size: 0.88rem;
+}
+
+.railActionIcon,
+.quickLinkCaret {
+  width: 0.68rem;
+  height: 0.68rem;
+  transform: rotate(-90deg);
+}
+
+.quickLink {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.quickLinkIcon {
+  width: 0.95rem;
+  height: 0.95rem;
+  color: var(--accent);
+}
+
 .resultSummary {
   margin: 0;
   color: var(--text-muted);
@@ -345,8 +593,64 @@
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
-.previewCard {
-  --phone-preview-card-aspect-ratio: 2 / 3;
+.cardMedia {
+  position: relative;
+  min-width: 0;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--surface-2);
+}
+
+.cardMediaAsset {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.cardMediaPlaceholder {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 0.46rem;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--accent) 8%, transparent), transparent 62%),
+    var(--surface-2);
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.cardMediaPlaceholderIcon {
+  width: 1.5rem;
+  height: 1.5rem;
+  color: var(--accent);
+}
+
+.cardMediaKind {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  min-height: 1.55rem;
+  border: 1px solid color-mix(in srgb, var(--accent-contrast) 18%, transparent);
+  border-radius: var(--radius-sm);
+  padding: 0.22rem 0.44rem;
+  background: color-mix(in srgb, var(--phone-screen-surface) 76%, transparent);
+  color: var(--accent-contrast);
+  font-size: 0.67rem;
+  font-weight: 600;
+  backdrop-filter: blur(10px);
+}
+
+.cardMediaKindIcon {
+  width: 0.78rem;
+  height: 0.78rem;
 }
 
 .cardBody {
@@ -511,6 +815,17 @@
   white-space: nowrap;
 }
 
+.cardMetricLabel {
+  max-width: 100%;
+  color: var(--text-muted);
+  font-size: 0.58rem;
+  font-weight: 600;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .cardMetricIcon {
   width: 0.85rem;
   height: 0.85rem;
@@ -552,8 +867,18 @@
 
 .cardActions {
   margin-left: 0;
-  justify-content: space-between;
+  justify-content: stretch;
   gap: 0.28rem;
+}
+
+.cardActions .cardActionIconButton {
+  flex: 1 1 calc(50% - 0.28rem);
+  width: auto;
+  min-width: 5.4rem;
+  min-height: 2.1rem;
+  height: auto;
+  gap: 0.34rem;
+  padding: 0.38rem 0.48rem;
 }
 
 .cardActionIconButton {
@@ -605,6 +930,16 @@
 .actionIcon {
   width: 0.9rem;
   height: 0.9rem;
+}
+
+.actionLabel {
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .listCard {
@@ -873,6 +1208,30 @@
   flex: 0 0 1.9rem;
 }
 
+.tablePrimaryAction {
+  display: inline-flex;
+  min-height: 2rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.38rem 0.62rem;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.tablePrimaryAction:hover {
+  background: var(--accent-strong);
+}
+
+.tablePrimaryAction:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 .cardActionIconButtonDisabled,
 .cardActionIconButton[aria-disabled="true"] {
   opacity: 0.62;
@@ -1019,9 +1378,20 @@
   }
 }
 
-@media (max-width: 1120px) {
-  .filtersBar {
+@media (max-width: 1280px) {
+  .catalogShell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .catalogRail {
+    position: static;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1120px) {
+  .advancedFilters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .cardGrid {
@@ -1031,20 +1401,147 @@
 
 @media (max-width: 760px) {
   .catalogHero {
-    grid-template-columns: 1fr;
+    min-width: 0;
   }
 
-  .heroActions {
-    justify-content: stretch;
+  .catalogActions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
   }
 
   .primaryLink,
-  .secondaryLink {
-    flex: 1 1 12rem;
+  .secondaryLink,
+  .createMenu {
+    width: 100%;
+    min-height: 2.75rem;
+  }
+
+  .createMenuPanel {
+    position: static;
+    width: 100%;
+    margin-top: 0.42rem;
+  }
+
+  .catalogMetricStrip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .catalogMetricStrip > *:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .filterLeadRow {
+    grid-template-columns: 1fr;
+  }
+
+  .filterUtilities {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-content: stretch;
+  }
+
+  .filterUtilities > * {
+    width: 100%;
+  }
+
+  .mobileFiltersToggle {
+    display: inline-flex;
+  }
+
+  .viewToggle {
+    grid-column: 1 / -1;
+    min-width: 0;
+    min-height: 2.75rem;
   }
 
   .filtersBar {
+    display: none;
+  }
+
+  .filtersBarExpanded {
+    display: block;
+  }
+
+  .advancedFilters {
     grid-template-columns: 1fr;
+  }
+
+  .catalogRail {
+    grid-template-columns: 1fr;
+  }
+
+  .cardActions .cardActionIconButton {
+    min-height: 2.75rem;
+  }
+
+  .listCard {
+    overflow: visible;
+  }
+
+  .listTable {
+    min-width: 0;
+    display: block;
+  }
+
+  .listTable thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .listTable tbody {
+    display: grid;
+    gap: 0.62rem;
+  }
+
+  .listTable tbody tr {
+    display: grid;
+    overflow: hidden;
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm);
+  }
+
+  .listTable tbody tr:hover {
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+
+  .listTable td {
+    position: static;
+    display: grid;
+    grid-template-columns: minmax(7.2rem, 0.7fr) minmax(0, 1fr);
+    gap: 0.65rem;
+    align-items: center;
+    border-bottom: 1px solid var(--border-soft);
+    padding: 0.58rem 0.64rem;
+  }
+
+  .listTable td::before {
+    content: attr(data-label);
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+
+  .listTable td:first-child {
+    display: block;
+  }
+
+  .listTable td:first-child::before {
+    content: none;
+  }
+
+  .listTable thead tr th:last-child,
+  .listTable tbody tr td:last-child {
+    position: static;
+    right: auto;
+    z-index: auto;
+    background: var(--surface-2);
+    border-left: 0;
+    box-shadow: none;
   }
 
   .tableActions {
@@ -1065,7 +1562,8 @@
   }
 
   .tableActions .cardActionIconButton {
-    flex: 1 1 2.1rem;
+    flex: 1 1 2.75rem;
+    min-height: 2.75rem;
   }
 
   .categoryToolbar {
@@ -1074,8 +1572,8 @@
 }
 
 @media (max-width: 560px) {
-  .heroCopy h1 {
-    font-size: 1.65rem;
+  .typeTabs {
+    padding-inline: 0.08rem;
   }
 
   .loadingGrid,
@@ -1085,6 +1583,16 @@
 
   .bigMetric {
     font-size: 1.56rem;
+  }
+
+  .paginationBar {
+    align-items: stretch;
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .paginationActions {
+    justify-content: center;
   }
 
   .tableActionsCell {
@@ -1101,5 +1609,26 @@
     width: 1.66rem;
     height: auto;
     flex-basis: 1.66rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .primaryLink,
+  .secondaryLink,
+  .compactLink,
+  .typeTab,
+  .typeTabActive,
+  .createMenuCaret,
+  .railAction,
+  .quickLink,
+  .templateCard,
+  .cardActionIconButton,
+  .viewButton,
+  .viewButtonActive {
+    transition: none;
+  }
+
+  .skeletonCard {
+    animation: none;
   }
 }

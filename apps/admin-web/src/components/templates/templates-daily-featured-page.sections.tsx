@@ -29,7 +29,7 @@ export function CurrentAssignmentCard({ current, text, locale }: CurrentAssignme
       {current ? (
         <AssignmentSummary assignment={current} text={text} locale={locale} />
       ) : (
-        <AdminStateCard description={text.noCurrent} />
+        <AdminStateCard title={text.noCurrent} description={text.noCurrentDescription} />
       )}
     </AdminCard>
   );
@@ -40,94 +40,162 @@ export function AutoPickSettingsCard({
   autoPick,
   canManageTemplates,
   isActionLocked,
+  isSettingsReady,
+  settingsLoadError,
   isAutoPickSettingsDirty,
+  isExcludeRecentDaysInvalid,
   isAutoPickDateMissing,
+  isAutoPickRunAvailable,
   onAutoModeEnabledChange,
   onAllowedTypesChange,
   onExcludeRecentDaysChange,
   onDateChange,
   onSaveSettings,
+  onRetrySettings,
   onRunAutoPick,
 }: AutoPickSettingsCardProps) {
   return (
     <AdminCard title={text.autoPick} description={text.autoPickDescription}>
-      <div className={styles.assignmentSummary}>
-        <strong>{text.autoModeStatus}</strong>
-        <span>{autoPick.autoModeEnabled ? text.autoModeEnabled : text.autoModeDisabled}</span>
-      </div>
-      <label className={styles.checkboxField}>
-        <input
-          type="checkbox"
-          checked={autoPick.autoModeEnabled}
-          disabled={!canManageTemplates || isActionLocked}
-          onChange={(event) => onAutoModeEnabledChange(event.target.checked)}
-        />
-        <span>{text.autoMode}</span>
-      </label>
-      <div className={styles.compactGrid}>
-        <AdminSelectField
-          label={text.allowedTypes}
-          value={autoPick.allowedTypes}
-          disabled={!canManageTemplates || isActionLocked}
-          onChange={(value) =>
-            onAllowedTypesChange(value as AutoPickSettingsCardProps["autoPick"]["allowedTypes"])
+      {!isSettingsReady ? (
+        <AdminStateCard
+          tone={settingsLoadError ? "warning" : "info"}
+          description={settingsLoadError ? text.autoPickSettingsUnavailable : text.loading}
+          action={
+            settingsLoadError ? (
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={!canManageTemplates || isActionLocked}
+                onClick={onRetrySettings}
+              >
+                {text.retry}
+              </Button>
+            ) : undefined
           }
-          options={[
-            { value: "both", label: text.allowedBoth },
-            { value: "image", label: text.image },
-            { value: "video", label: text.video },
-          ]}
         />
-        <label className={styles.field}>
-          <span>{text.excludeRecent}</span>
-          <input
-            className={styles.control}
-            type="number"
-            min={0}
-            max={365}
-            value={autoPick.excludeRecentDays}
+      ) : (
+        <div className={styles.autoPickWorkspace}>
+          <fieldset
+            className={styles.autoPickFieldset}
             disabled={!canManageTemplates || isActionLocked}
-            onChange={(event) => onExcludeRecentDaysChange(event.target.value)}
-          />
-        </label>
-      </div>
-      <div className={styles.actionRow}>
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={onSaveSettings}
-          disabled={!canManageTemplates || isActionLocked || !isAutoPickSettingsDirty}
-        >
-          {text.autoModeSave}
-        </Button>
-      </div>
-      <div className={styles.compactGrid}>
-        <label className={styles.field}>
-          <span>{text.startDate}</span>
-          <input
-            className={styles.control}
-            type="date"
-            required
-            value={autoPick.date}
-            disabled={!canManageTemplates || isActionLocked}
-            onChange={(event) => onDateChange(event.target.value)}
-          />
-        </label>
-      </div>
-      {isAutoPickDateMissing ? (
-        <AdminStateCard tone="warning" description={text.autoPickDateRequired} />
-      ) : null}
-      <div className={styles.actionRow}>
-        <Button
-          type="button"
-          variant="primary"
-          onClick={onRunAutoPick}
-          disabled={!canManageTemplates || isActionLocked || isAutoPickDateMissing}
-        >
-          <CalendarIcon className={styles.buttonIcon} />
-          {text.autoPickRun}
-        </Button>
-      </div>
+          >
+            <legend className={styles.sectionLabel}>{text.autoModeSettings}</legend>
+            <div className={styles.autoPickStatusRow}>
+              <div className={styles.assignmentSummary}>
+                <strong>{text.autoModeStatus}</strong>
+                <span>
+                  {autoPick.autoModeEnabled ? text.autoModeEnabled : text.autoModeDisabled}
+                </span>
+              </div>
+              <label className={`${styles.checkboxField} ${styles.autoModeToggle}`}>
+                <input
+                  type="checkbox"
+                  checked={autoPick.autoModeEnabled}
+                  onChange={(event) => onAutoModeEnabledChange(event.target.checked)}
+                />
+                <span>{text.autoMode}</span>
+              </label>
+            </div>
+            <div className={styles.compactGrid}>
+              <AdminSelectField
+                label={text.allowedTypes}
+                value={autoPick.allowedTypes}
+                disabled={!canManageTemplates || isActionLocked}
+                onChange={(value) =>
+                  onAllowedTypesChange(
+                    value as AutoPickSettingsCardProps["autoPick"]["allowedTypes"]
+                  )
+                }
+                options={[
+                  { value: "both", label: text.allowedBoth },
+                  { value: "image", label: text.image },
+                  { value: "video", label: text.video },
+                ]}
+              />
+              <label className={styles.field}>
+                <span>{text.excludeRecent}</span>
+                <input
+                  className={styles.control}
+                  type="number"
+                  min={0}
+                  max={365}
+                  step={1}
+                  inputMode="numeric"
+                  value={autoPick.excludeRecentDays}
+                  aria-invalid={isExcludeRecentDaysInvalid || undefined}
+                  aria-describedby={
+                    isExcludeRecentDaysInvalid
+                      ? "daily-featured-exclude-recent-validation"
+                      : undefined
+                  }
+                  onChange={(event) => onExcludeRecentDaysChange(event.target.value)}
+                />
+              </label>
+            </div>
+            {isExcludeRecentDaysInvalid ? (
+              <div id="daily-featured-exclude-recent-validation">
+                <AdminStateCard tone="warning" description={text.excludeRecentDaysInvalid} />
+              </div>
+            ) : null}
+            <div className={styles.actionRow}>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={onSaveSettings}
+                disabled={
+                  !canManageTemplates ||
+                  isActionLocked ||
+                  !isAutoPickSettingsDirty ||
+                  isExcludeRecentDaysInvalid
+                }
+              >
+                {text.autoModeSave}
+              </Button>
+            </div>
+          </fieldset>
+
+          <section className={styles.autoPickRun} aria-labelledby="daily-featured-auto-pick-run">
+            <div className={styles.autoPickRunHeader}>
+              <strong id="daily-featured-auto-pick-run">{text.autoPickRunSection}</strong>
+              <p>{text.autoPickRunDescription}</p>
+            </div>
+            <label className={styles.field}>
+              <span>{text.autoPickDate}</span>
+              <input
+                className={styles.control}
+                type="date"
+                required
+                value={autoPick.date}
+                disabled={!canManageTemplates || isActionLocked}
+                onChange={(event) => onDateChange(event.target.value)}
+              />
+            </label>
+            {isAutoPickDateMissing ? (
+              <AdminStateCard tone="warning" description={text.autoPickDateRequired} />
+            ) : null}
+            {!isAutoPickRunAvailable ? (
+              <AdminStateCard tone="info" description={text.autoPickRequiresSavedSettings} />
+            ) : null}
+            <div className={styles.actionRow}>
+              <Button
+                type="button"
+                variant="primary"
+                onClick={onRunAutoPick}
+                disabled={
+                  !canManageTemplates ||
+                  isActionLocked ||
+                  isAutoPickDateMissing ||
+                  isExcludeRecentDaysInvalid ||
+                  !isAutoPickRunAvailable
+                }
+              >
+                <CalendarIcon className={styles.buttonIcon} />
+                {text.autoPickRun}
+              </Button>
+            </div>
+          </section>
+        </div>
+      )}
     </AdminCard>
   );
 }
@@ -146,6 +214,8 @@ export function TemplateAssignmentEditorCard({
   templateOptionsError,
   dateOccupiedWarning,
   invalidDateRangeWarning,
+  isStartDateMissing,
+  isPriorityInvalid,
   onSearchChange,
   onTemplateTypeFilterChange,
   onTemplateAccessFilterChange,
@@ -155,10 +225,22 @@ export function TemplateAssignmentEditorCard({
   onReset,
   onSubmit,
 }: TemplateAssignmentEditorCardProps) {
+  const dateValidationId = "daily-featured-date-validation";
+  const priorityValidationId = "daily-featured-priority-validation";
+  const hasDateValidationError =
+    dateOccupiedWarning || invalidDateRangeWarning || isStartDateMissing;
+  const isEditingAutoAssignment = Boolean(form.id && !form.isManual);
+
   return (
     <AdminCard
-      title={text.form}
-      description={canManageTemplates ? text.formDescription : text.formAdminOnly}
+      title={isEditingAutoAssignment ? text.editAutoAssignment : text.form}
+      description={
+        canManageTemplates
+          ? isEditingAutoAssignment
+            ? text.editAutoAssignmentDescription
+            : text.formDescription
+          : text.formAdminOnly
+      }
     >
       <form onSubmit={onSubmit} className={styles.form} aria-busy={isActionLocked}>
         <label className={styles.field}>
@@ -237,11 +319,18 @@ export function TemplateAssignmentEditorCard({
         {!isTemplateOptionsLoading && !hasTemplateOptions ? (
           <AdminStateCard tone="info" description={text.noTemplates} />
         ) : null}
-        {dateOccupiedWarning ? (
-          <AdminStateCard tone="warning" description={text.dateOccupiedWarning} />
-        ) : null}
-        {invalidDateRangeWarning ? (
-          <AdminStateCard tone="danger" description={text.invalidDateRangeWarning} />
+        {hasDateValidationError ? (
+          <div id={dateValidationId}>
+            {isStartDateMissing ? (
+              <AdminStateCard tone="danger" description={text.startDateRequired} />
+            ) : null}
+            {dateOccupiedWarning ? (
+              <AdminStateCard tone="warning" description={text.dateOccupiedWarning} />
+            ) : null}
+            {invalidDateRangeWarning ? (
+              <AdminStateCard tone="danger" description={text.invalidDateRangeWarning} />
+            ) : null}
+          </div>
         ) : null}
         <div className={styles.compactGrid}>
           <label className={styles.field}>
@@ -251,6 +340,8 @@ export function TemplateAssignmentEditorCard({
               type="date"
               required
               value={form.startDate}
+              aria-invalid={hasDateValidationError || undefined}
+              aria-describedby={hasDateValidationError ? dateValidationId : undefined}
               disabled={!canManageTemplates || isActionLocked}
               onChange={(event) => onFormChange({ startDate: event.target.value })}
             />
@@ -261,6 +352,8 @@ export function TemplateAssignmentEditorCard({
               className={styles.control}
               type="date"
               value={form.endDate}
+              aria-invalid={hasDateValidationError || undefined}
+              aria-describedby={hasDateValidationError ? dateValidationId : undefined}
               disabled={!canManageTemplates || isActionLocked}
               onChange={(event) => onFormChange({ endDate: event.target.value })}
             />
@@ -270,7 +363,11 @@ export function TemplateAssignmentEditorCard({
             <input
               className={styles.control}
               type="number"
+              step={1}
+              inputMode="numeric"
               value={form.priority}
+              aria-invalid={isPriorityInvalid || undefined}
+              aria-describedby={isPriorityInvalid ? priorityValidationId : undefined}
               disabled={!canManageTemplates || isActionLocked}
               onChange={(event) => onFormChange({ priority: event.target.value })}
             />
@@ -285,6 +382,11 @@ export function TemplateAssignmentEditorCard({
             <span>{text.active}</span>
           </label>
         </div>
+        {isPriorityInvalid ? (
+          <div id={priorityValidationId}>
+            <AdminStateCard tone="danger" description={text.priorityInvalid} />
+          </div>
+        ) : null}
         <label className={styles.field}>
           <span>{text.titleOverride}</span>
           <input
@@ -332,7 +434,13 @@ export function TemplateAssignmentEditorCard({
             type="submit"
             variant="primary"
             disabled={
-              !canManageTemplates || isActionLocked || !form.templateId || invalidDateRangeWarning
+              !canManageTemplates ||
+              isActionLocked ||
+              !form.templateId ||
+              isStartDateMissing ||
+              invalidDateRangeWarning ||
+              dateOccupiedWarning ||
+              isPriorityInvalid
             }
           >
             <PencilIcon className={styles.buttonIcon} />

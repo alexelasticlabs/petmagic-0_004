@@ -1,11 +1,15 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { AdminPage, AdminStateCard } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
+import {
+  readSupportQueueUrlState,
+  resolveQueueFilter,
+} from "@/components/support/support-conversation-controller.helpers";
 import { sortSupportQueueItems } from "@/components/support/support-conversation-helpers";
 import { SupportConversationPage } from "@/components/support/support-conversation-page";
 import styles from "@/components/support/support-page.module.css";
@@ -27,6 +31,13 @@ const supportInboxStaleTimeMs = 8_000;
 
 export function SupportInboxPage({ locale }: SupportInboxPageProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialQueueState = useMemo(() => readSupportQueueUrlState(searchParams), [searchParams]);
+  const initialQueueFilter = resolveQueueFilter(initialQueueState.subFilter);
+  const initialQueueStatus =
+    initialQueueState.status === "all" ? initialQueueFilter.status : initialQueueState.status;
+  const initialQueuePriority =
+    initialQueueState.priority === "all" ? undefined : initialQueueState.priority;
   const session = useAuthSession();
   const sessionRoles = session?.user.roles ?? [];
   const canManageSupportWorkspace =
@@ -39,8 +50,28 @@ export function SupportInboxPage({ locale }: SupportInboxPageProps) {
   }, [locale, router, session]);
 
   const inboxQuery = useQuery<AdminSupportInboxPage>({
-    queryKey: adminQueryKeys.supportInbox("all", "all", { page: 1, pageSize: 50 }),
-    queryFn: ({ signal }) => fetchSupportInbox(undefined, "all", { page: 1, pageSize: 50, signal }),
+    queryKey: adminQueryKeys.supportInbox(
+      initialQueueStatus ?? "all",
+      initialQueueFilter.assignment,
+      {
+        search: initialQueueState.search,
+        priority: initialQueuePriority,
+        sort: initialQueueState.sort,
+        queue: initialQueueFilter.queue,
+        page: initialQueueState.page,
+        pageSize: 50,
+      }
+    ),
+    queryFn: ({ signal }) =>
+      fetchSupportInbox(initialQueueStatus, initialQueueFilter.assignment, {
+        search: initialQueueState.search,
+        priority: initialQueuePriority,
+        sort: initialQueueState.sort,
+        queue: initialQueueFilter.queue,
+        page: initialQueueState.page,
+        pageSize: 50,
+        signal,
+      }),
     enabled: canManageSupportWorkspace,
     staleTime: supportInboxStaleTimeMs,
   });
@@ -164,6 +195,7 @@ export function SupportInboxPage({ locale }: SupportInboxPageProps) {
       conversationId={activeConversationId}
       navigationMode="local"
       onConversationSelect={setSelectedConversationId}
+      initialQueueState={initialQueueState}
     />
   );
 }

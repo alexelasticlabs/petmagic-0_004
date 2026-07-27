@@ -14,6 +14,8 @@
 
 .trigger {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -25,9 +27,7 @@
   color: var(--text-strong);
   text-align: left;
   cursor: pointer;
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 3%, transparent),
-    0 6px 14px color-mix(in srgb, var(--surface-0) 14%, transparent);
+  box-shadow: none;
   transition:
     border-color 140ms ease,
     box-shadow 140ms ease,
@@ -38,8 +38,7 @@
 .trigger:hover {
   border-color: var(--border-strong);
   background: var(--surface-hover);
-  box-shadow: var(--shadow-soft);
-  transform: translateY(-1px);
+  box-shadow: none;
 }
 
 .trigger:disabled {
@@ -150,6 +149,12 @@
   animation: menuFadeIn 160ms ease;
 }
 
+.menuInline {
+  position: static;
+  max-height: min(18rem, calc(100dvh - 12rem));
+  margin-top: 0.42rem;
+}
+
 .menu::-webkit-scrollbar {
   width: 0.55rem;
 }
@@ -165,6 +170,7 @@
 
 .option {
   width: 100%;
+  min-width: 0;
   display: block;
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
@@ -173,7 +179,7 @@
   color: var(--text-soft);
   text-align: left;
   cursor: pointer;
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 3%, transparent);
+  box-shadow: none;
   transition:
     border-color 140ms ease,
     background-color 140ms ease,
@@ -185,7 +191,6 @@
   border-color: var(--border-strong);
   background: var(--surface-2);
   box-shadow: none;
-  transform: translateY(-1px);
 }
 
 .optionSelected {

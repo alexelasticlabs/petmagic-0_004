@@ -74,11 +74,18 @@ export const ECONOMY_PACK_INTEGER_MAX_LENGTH = 9;
 export const ECONOMY_PLAN_NAME_MAX_LENGTH = 80;
 export const ECONOMY_PLAN_PRODUCT_ID_MAX_LENGTH = 160;
 export const ECONOMY_PROVIDER_CODE_MAX_LENGTH = 48;
-export const ECONOMY_PROVIDER_REGION_MAX_LENGTH = 32;
+export const ECONOMY_PROVIDER_REGION_MAX_LENGTH = 16;
 export const ECONOMY_PROVIDER_VERSION_MAX_LENGTH = 32;
-export const ECONOMY_PROVIDER_LABEL_MAX_LENGTH = 120;
-export const ECONOMY_PROVIDER_MESSAGE_MAX_LENGTH = 240;
+export const ECONOMY_PROVIDER_LABEL_MAX_LENGTH = 80;
+export const ECONOMY_PROVIDER_SUBTITLE_MAX_LENGTH = 160;
+export const ECONOMY_PROVIDER_WARNING_TITLE_MAX_LENGTH = 120;
+export const ECONOMY_PROVIDER_MESSAGE_MAX_LENGTH = 800;
+export const ECONOMY_PROVIDER_NOTES_MAX_LENGTH = 240;
 export const ECONOMY_PROVIDER_BONUS_PERCENT_MAX_LENGTH = 3;
+
+export const paymentProviderOptions = ["stripe", "app_store", "google_play"] as const;
+export const paymentPlatformOptions = ["ios", "android", "web", "iphone", "ipad"] as const;
+export const paymentRouteModeOptions = ["test", "live"] as const;
 
 export function canRefundPurchase(purchase: AdminEconomyPurchase): boolean {
   return purchase.canRefund === true;
@@ -116,6 +123,16 @@ export function isPackDraftDirty(pack: AdminCurrencyPack, draft: PackDraft): boo
   );
 }
 
+export function isPackDraftInvalid(draft: PackDraft): boolean {
+  return (
+    !isBoundedRequiredText(draft.displayName, ECONOMY_PACK_DISPLAY_NAME_MAX_LENGTH) ||
+    parsePackDecimal(draft.priceAmount) === null ||
+    parsePackInteger(draft.grantedSpark, 1) === null ||
+    parsePackInteger(draft.bonusSpark, 0) === null ||
+    parsePackInteger(draft.sortOrder, 0) === null
+  );
+}
+
 export function updateDraft(
   setDrafts: Dispatch<SetStateAction<Record<string, PackDraft>>>,
   packId: string,
@@ -145,7 +162,7 @@ export function toCurrencyPackPayload(draft: PackDraft, text: EconomyValidationT
   const sortOrder = parsePackInteger(draft.sortOrder, 0);
 
   if (
-    !isBoundedRequiredText(displayName, ECONOMY_PACK_DISPLAY_NAME_MAX_LENGTH) ||
+    isPackDraftInvalid(draft) ||
     priceAmount === null ||
     grantedSpark === null ||
     bonusSpark === null ||
@@ -198,6 +215,25 @@ export function isSubscriptionPlanDraftDirty(
   );
 }
 
+export function isSubscriptionPlanDraftInvalid(draft: SubscriptionPlanDraft): boolean {
+  const currencyCode = draft.currencyCode.trim().toUpperCase();
+  const appleProductId = draft.appleProductId.trim();
+  const googleProductId = draft.googleProductId.trim();
+  const stripePriceId = draft.stripePriceId.trim();
+
+  return (
+    !isBoundedRequiredText(draft.name, ECONOMY_PLAN_NAME_MAX_LENGTH) ||
+    parsePackDecimal(draft.priceAmount) === null ||
+    parsePackInteger(draft.monthlyTokenLimit, 1) === null ||
+    parsePackInteger(draft.displayOrder, 0) === null ||
+    currencyCode.length !== 3 ||
+    appleProductId.length > ECONOMY_PLAN_PRODUCT_ID_MAX_LENGTH ||
+    googleProductId.length > ECONOMY_PLAN_PRODUCT_ID_MAX_LENGTH ||
+    stripePriceId.length > ECONOMY_PLAN_PRODUCT_ID_MAX_LENGTH ||
+    (draft.isActive && (!stripePriceId || !appleProductId || !googleProductId))
+  );
+}
+
 export function updateSubscriptionPlanDraft(
   setPlanDrafts: Dispatch<SetStateAction<Record<string, SubscriptionPlanDraft>>>,
   planId: string,
@@ -234,18 +270,11 @@ export function toSubscriptionPlanPayload(
   const currencyCode = draft.currencyCode.trim().toUpperCase();
 
   if (
-    !isBoundedRequiredText(name, ECONOMY_PLAN_NAME_MAX_LENGTH) ||
+    isSubscriptionPlanDraftInvalid(draft) ||
     priceAmount === null ||
     monthlyTokenLimit === null ||
     displayOrder === null ||
     currencyCode.length !== 3
-  ) {
-    throw new Error(text.invalidPlanNumbers);
-  }
-
-  if (
-    draft.isActive &&
-    (!draft.stripePriceId.trim() || !draft.appleProductId.trim() || !draft.googleProductId.trim())
   ) {
     throw new Error(text.invalidPlanNumbers);
   }
@@ -269,7 +298,7 @@ export function createDefaultProviderConfigDraft(): ProviderConfigCreateDraft {
     provider: "stripe",
     platform: "web",
     region: "*",
-    isEnabled: true,
+    isEnabled: false,
     isRecommended: false,
     isSelectedByDefault: false,
     requiresExternalWarning: false,
@@ -339,10 +368,7 @@ export function toProviderConfigCreatePayload(
   const provider = draft.provider.trim().toLowerCase();
   const platform = draft.platform.trim().toLowerCase();
 
-  if (
-    !isBoundedRequiredText(provider, ECONOMY_PROVIDER_CODE_MAX_LENGTH) ||
-    !isBoundedRequiredText(platform, ECONOMY_PROVIDER_CODE_MAX_LENGTH)
-  ) {
+  if (!isSupportedProvider(provider) || !isSupportedPlatform(platform)) {
     throw new Error(text.invalidProviderConfigCreate);
   }
 
@@ -363,10 +389,10 @@ export function toProviderConfigMatchPayload(
   const appVersion = draft.appVersion.trim();
 
   if (
-    !isBoundedRequiredText(provider, ECONOMY_PROVIDER_CODE_MAX_LENGTH) ||
-    !isBoundedRequiredText(platform, ECONOMY_PROVIDER_CODE_MAX_LENGTH) ||
-    !isBoundedRequiredText(country, ECONOMY_PROVIDER_REGION_MAX_LENGTH) ||
-    !isBoundedRequiredText(appVersion, ECONOMY_PROVIDER_VERSION_MAX_LENGTH)
+    !isSupportedProvider(provider) ||
+    !isSupportedPlatform(platform) ||
+    !isValidCountry(country) ||
+    !isValidAppVersion(appVersion)
   ) {
     throw new Error(text.invalidProviderConfigMatch);
   }
@@ -416,9 +442,9 @@ export function toProviderConfigPayload(draft: ProviderConfigDraft, text: Econom
   const bonusTokensPercent = parseBonusTokensPercent(draft.bonusTokensPercent);
 
   if (
-    !isBoundedRequiredText(region, ECONOMY_PROVIDER_REGION_MAX_LENGTH) ||
-    !isBoundedRequiredText(allowedFromAppVersion, ECONOMY_PROVIDER_VERSION_MAX_LENGTH) ||
-    !isBoundedRequiredText(mode, ECONOMY_PROVIDER_CODE_MAX_LENGTH) ||
+    !isValidRegion(region) ||
+    !isValidAppVersion(allowedFromAppVersion) ||
+    !isRouteMode(mode) ||
     bonusTokensPercent === null
   ) {
     throw new Error(text.invalidProviderConfig);
@@ -437,18 +463,48 @@ export function toProviderConfigPayload(draft: ProviderConfigDraft, text: Econom
     displayLabel: optionalBoundedText(draft.displayLabel, ECONOMY_PROVIDER_LABEL_MAX_LENGTH, text),
     displaySubtitle: optionalBoundedText(
       draft.displaySubtitle,
-      ECONOMY_PROVIDER_LABEL_MAX_LENGTH,
+      ECONOMY_PROVIDER_SUBTITLE_MAX_LENGTH,
       text
     ),
-    warningTitle: optionalBoundedText(draft.warningTitle, ECONOMY_PROVIDER_LABEL_MAX_LENGTH, text),
+    warningTitle: optionalBoundedText(
+      draft.warningTitle,
+      ECONOMY_PROVIDER_WARNING_TITLE_MAX_LENGTH,
+      text
+    ),
     warningMessage: optionalBoundedText(
       draft.warningMessage,
       ECONOMY_PROVIDER_MESSAGE_MAX_LENGTH,
       text
     ),
     mode,
-    notes: optionalBoundedText(draft.notes, ECONOMY_PROVIDER_MESSAGE_MAX_LENGTH, text),
+    notes: optionalBoundedText(draft.notes, ECONOMY_PROVIDER_NOTES_MAX_LENGTH, text),
   };
+}
+
+export function isProviderConfigCreateDraftInvalid(draft: ProviderConfigCreateDraft) {
+  return (
+    !isSupportedProvider(draft.provider.trim().toLowerCase()) ||
+    !isSupportedPlatform(draft.platform.trim().toLowerCase()) ||
+    isProviderConfigDraftInvalid(draft)
+  );
+}
+
+export function isProviderConfigMatchDraftInvalid(draft: ProviderConfigMatchDraft) {
+  return (
+    !isSupportedProvider(draft.provider.trim().toLowerCase()) ||
+    !isSupportedPlatform(draft.platform.trim().toLowerCase()) ||
+    !isValidCountry(draft.country.trim().toUpperCase()) ||
+    !isValidAppVersion(draft.appVersion.trim())
+  );
+}
+
+export function isProviderConfigDraftInvalid(draft: ProviderConfigDraft) {
+  return (
+    !isValidRegion(draft.region.trim().toUpperCase()) ||
+    !isRouteMode(draft.mode.trim().toLowerCase()) ||
+    !isValidAppVersion(draft.allowedFromAppVersion.trim()) ||
+    parseBonusTokensPercent(draft.bonusTokensPercent) === null
+  );
 }
 
 export function normalizeEconomyPercentInput(value: string): string {
@@ -506,6 +562,34 @@ function parseBonusTokensPercent(value: string): number | null {
 
   const parsed = Number(trimmed);
   return Number.isInteger(parsed) && parsed >= 0 && parsed <= 100 ? parsed : null;
+}
+
+function isSupportedProvider(value: string): value is (typeof paymentProviderOptions)[number] {
+  return paymentProviderOptions.includes(value as (typeof paymentProviderOptions)[number]);
+}
+
+function isSupportedPlatform(value: string): value is (typeof paymentPlatformOptions)[number] {
+  return paymentPlatformOptions.includes(value as (typeof paymentPlatformOptions)[number]);
+}
+
+function isRouteMode(value: string): value is (typeof paymentRouteModeOptions)[number] {
+  return paymentRouteModeOptions.includes(value as (typeof paymentRouteModeOptions)[number]);
+}
+
+function isValidRegion(value: string) {
+  return value === "*" || /^[A-Z]{2}$/.test(value);
+}
+
+function isValidCountry(value: string) {
+  return /^[A-Z]{2}$/.test(value);
+}
+
+function isValidAppVersion(value: string) {
+  return (
+    value.length > 0 &&
+    value.length <= ECONOMY_PROVIDER_VERSION_MAX_LENGTH &&
+    /^\d+(?:\.\d+){0,3}$/.test(value)
+  );
 }
 
 function parsePackDecimal(value: string): number | null {

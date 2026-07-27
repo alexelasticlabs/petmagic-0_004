@@ -11,6 +11,7 @@ export type TemplatesDailyFeaturedPageProps = {
 export type AssignmentFormState = {
   id: string | null;
   templateId: string;
+  isManual: boolean;
   startDate: string;
   endDate: string;
   priority: string;
@@ -51,13 +52,18 @@ export type AutoPickSettingsCardProps = {
   autoPick: AutoPickState;
   canManageTemplates: boolean;
   isActionLocked: boolean;
+  isSettingsReady: boolean;
+  settingsLoadError: string | null;
   isAutoPickSettingsDirty: boolean;
+  isExcludeRecentDaysInvalid: boolean;
   isAutoPickDateMissing: boolean;
+  isAutoPickRunAvailable: boolean;
   onAutoModeEnabledChange: (value: boolean) => void;
   onAllowedTypesChange: (value: AutoPickState["allowedTypes"]) => void;
   onExcludeRecentDaysChange: (value: string) => void;
   onDateChange: (value: string) => void;
   onSaveSettings: () => void;
+  onRetrySettings: () => void;
   onRunAutoPick: () => void;
 };
 
@@ -75,6 +81,8 @@ export type TemplateAssignmentEditorCardProps = {
   templateOptionsError: string | null;
   dateOccupiedWarning: boolean;
   invalidDateRangeWarning: boolean;
+  isStartDateMissing: boolean;
+  isPriorityInvalid: boolean;
   onSearchChange: (value: string) => void;
   onTemplateTypeFilterChange: (value: "" | TemplateType) => void;
   onTemplateAccessFilterChange: (value: TemplateAccessFilter) => void;
@@ -99,8 +107,15 @@ export type TemplateScheduleCardProps = {
   text: TemplatesDailyFeaturedPageText;
   locale: Locale;
   schedule: AdminTemplateOfTheDay[];
+  schedulePage: number;
+  schedulePageSize: number;
+  scheduleTotalCount: number;
+  scheduleHasMore: boolean;
   canManageTemplates: boolean;
   isActionLocked: boolean;
+  isScheduleNavigationLocked: boolean;
   onEditAssignment: (assignment: AdminTemplateOfTheDay) => void;
   onRequestDeleteAssignment: (assignment: AdminTemplateOfTheDay) => void;
+  onPreviousPage: () => void;
+  onNextPage: () => void;
 };

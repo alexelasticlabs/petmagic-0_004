@@ -1,0 +1,386 @@
+.diagnosticsCard {
+  min-width: 0;
+}
+
+.diagnosticsBody {
+  min-width: 0;
+  display: grid;
+  gap: 0.78rem;
+}
+
+.buttonIcon {
+  width: 0.88rem;
+  height: 0.88rem;
+  flex: 0 0 auto;
+}
+
+.stateBand {
+  --state-color: var(--text-muted);
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.68rem;
+  align-items: start;
+  border-block: 1px solid color-mix(in srgb, var(--state-color) 22%, var(--border-soft));
+  padding: 0.7rem 0;
+}
+
+.stateBand_info {
+  --state-color: var(--info);
+}
+
+.stateBand_success {
+  --state-color: var(--success);
+}
+
+.stateBand_warning {
+  --state-color: var(--warning);
+}
+
+.stateBand_danger {
+  --state-color: var(--danger);
+}
+
+.stateIndicator {
+  width: 0.55rem;
+  height: 0.55rem;
+  margin-top: 0.28rem;
+  border-radius: 50%;
+  background: var(--state-color);
+  box-shadow: 0 0 0 0.22rem color-mix(in srgb, var(--state-color) 12%, transparent);
+}
+
+.stateBand strong {
+  display: block;
+  color: var(--text-strong);
+  font-family: var(--font-heading), sans-serif;
+  font-size: 0.84rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.stateBand p {
+  margin: 0.22rem 0 0;
+  color: var(--text-soft);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.metricStrip {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.resultsRegion {
+  min-width: 0;
+  display: grid;
+  gap: 0.72rem;
+}
+
+.resultsHeading {
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.resultsHeading h3 {
+  margin: 0;
+  color: var(--text-strong);
+  font-family: var(--font-heading), sans-serif;
+  font-size: 0.96rem;
+  font-weight: 600;
+}
+
+.resultsHeading p {
+  margin: 0.22rem 0 0;
+  color: var(--text-soft);
+  font-size: 0.77rem;
+  line-height: 1.4;
+}
+
+.resultsHeading > span {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.filters {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(13rem, 1fr) minmax(11rem, 0.55fr);
+  gap: 0.55rem;
+  border-block: 1px solid var(--border-soft);
+  padding-block: 0.62rem;
+}
+
+.field {
+  min-width: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.field > span {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.field input,
+.field select {
+  width: 100%;
+  min-height: 2.35rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.64rem;
+  background: var(--surface-1);
+  color: var(--text-strong);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+  outline: none;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.field input::placeholder {
+  color: var(--text-muted);
+}
+
+.field input:hover,
+.field select:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+.field input:focus-visible,
+.field select:focus-visible {
+  border-color: var(--border-accent);
+  box-shadow: var(--focus-ring);
+}
+
+.desktopTableWrap {
+  min-width: 0;
+  overflow-x: auto;
+  border-block: 1px solid var(--border-soft);
+}
+
+.desktopTable {
+  width: 100%;
+  min-width: 62rem;
+  border-collapse: collapse;
+}
+
+.desktopTable th {
+  padding: 0.62rem 0.6rem;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.desktopTable td {
+  padding: 0.68rem 0.6rem;
+  border-top: 1px solid var(--border-soft);
+  color: var(--text-soft);
+  font-size: 0.76rem;
+  line-height: 1.4;
+  vertical-align: middle;
+}
+
+.desktopTable tbody tr {
+  transition: background-color 120ms ease;
+}
+
+.desktopTable tbody tr:hover {
+  background: var(--surface-hover);
+}
+
+.issueCell {
+  min-width: 13rem;
+  display: grid;
+  gap: 0.34rem;
+}
+
+.issueCell > span:last-child,
+.issueHint {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+.templateTitle {
+  display: block;
+  max-width: 18rem;
+  color: var(--text-strong);
+  font-size: 0.79rem;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.editorLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.58rem;
+  background: var(--surface-2);
+  color: var(--text-strong);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    transform 140ms ease;
+}
+
+.editorLink:hover {
+  transform: translateY(-1px);
+  border-color: var(--border-accent);
+  background: var(--surface-hover);
+}
+
+.editorLink:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.mobileCards {
+  display: none;
+}
+
+.filteredEmpty {
+  margin: 0;
+  border-block: 1px solid var(--border-soft);
+  padding: 1.3rem 0;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  .metricStrip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .resultsHeading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.38rem;
+  }
+
+  .filters {
+    grid-template-columns: 1fr;
+  }
+
+  .field input,
+  .field select {
+    min-height: 2.75rem;
+  }
+
+  .desktopTableWrap {
+    display: none;
+  }
+
+  .mobileCards {
+    min-width: 0;
+    display: grid;
+    gap: 0.62rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .mobileCard {
+    min-width: 0;
+    display: grid;
+    gap: 0.58rem;
+    border-block: 1px solid var(--border-soft);
+    padding: 0.72rem 0;
+  }
+
+  .mobileCardHeading {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+  }
+
+  .mobileCardHeading > span:last-child {
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-align: right;
+  }
+
+  .issueHint {
+    margin: 0;
+  }
+
+  .mobileCard dl {
+    display: grid;
+    gap: 0.38rem;
+    margin: 0;
+  }
+
+  .mobileCard dl > div {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: minmax(7rem, 0.65fr) minmax(0, 1fr);
+    gap: 0.6rem;
+    padding-top: 0.38rem;
+    border-top: 1px solid var(--border-soft);
+  }
+
+  .mobileCard dt {
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+
+  .mobileCard dd {
+    min-width: 0;
+    margin: 0;
+    color: var(--text-soft);
+    font-size: 0.74rem;
+    overflow-wrap: anywhere;
+  }
+
+  .editorLink {
+    width: 100%;
+    min-height: 2.75rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .metricStrip {
+    grid-template-columns: 1fr;
+  }
+
+  .mobileCardHeading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .mobileCardHeading > span:last-child {
+    text-align: left;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .field input,
+  .field select,
+  .desktopTable tbody tr,
+  .editorLink {
+    transition: none;
+  }
+}

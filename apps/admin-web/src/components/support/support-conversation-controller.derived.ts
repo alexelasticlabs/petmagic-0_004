@@ -90,7 +90,8 @@ export function getSupportConversationDerivedState({
   const conversationSla = getConversationSla(
     conversationWaitingSince,
     locale,
-    conversation?.adminUnreadCount ?? 0
+    conversation?.adminUnreadCount ?? 0,
+    conversation?.sla
   );
   const recentFailures = analytics?.failureBreakdown.slice(0, 4) ?? [];
   const failedGenerations =
@@ -109,9 +110,7 @@ export function getSupportConversationDerivedState({
     conversation?.createdAtUtc ??
     null;
   const activityTimeline = buildActivityTimeline(analytics);
-  const availableStatusActions = conversation
-    ? getAvailableStatusActions(conversation.status, text)
-    : [];
+  const availableStatusActions = conversation ? getAvailableStatusActions(conversation, text) : [];
   const primaryStatusAction =
     availableStatusActions.find((action) => action.variant === "primary") ?? null;
   const secondaryStatusActions = availableStatusActions.filter(

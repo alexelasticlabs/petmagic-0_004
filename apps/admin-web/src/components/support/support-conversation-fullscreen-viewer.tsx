@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+
 import styles from "@/components/support/support-conversation-fullscreen-viewer.module.css";
 import {
   formatDateTime,
@@ -50,9 +52,64 @@ export function SupportConversationFullscreenViewer({
   saveFullscreenImage,
   shareFullscreenImage,
 }: SupportConversationFullscreenViewerProps) {
+  const viewerRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    previouslyFocusedElementRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    closeButtonRef.current?.focus();
+
+    return () => {
+      previouslyFocusedElementRef.current?.focus();
+      previouslyFocusedElementRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const focusableElements = viewerRef.current?.querySelectorAll<HTMLElement>(
+        'a[href], button:not(:disabled), textarea:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])'
+      );
+      if (!focusableElements || focusableElements.length === 0) {
+        event.preventDefault();
+        viewerRef.current?.focus();
+        return;
+      }
+
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+      if (!viewerRef.current?.contains(document.activeElement)) {
+        event.preventDefault();
+        firstElement.focus();
+        return;
+      }
+
+      if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+        return;
+      }
+
+      if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   return (
     <div
       className={styles.imageViewerOverlay}
+      ref={viewerRef}
       role="dialog"
       aria-modal="true"
       aria-label={formatSafeSupportDisplay(
@@ -62,18 +119,19 @@ export function SupportConversationFullscreenViewer({
           : imageViewerLabels.imagePreview,
         120
       )}
+      tabIndex={-1}
       onClick={closeFullscreenImage}
     >
       <div className={styles.imageViewerPanel} onClick={(event) => event.stopPropagation()}>
         <div className={styles.imageViewerHeader}>
-          <strong>
+          <strong className={styles.imageViewerTitle}>
             {formatSafeSupportDisplay(
               fullscreenImage.fileName,
               fullscreenImage.mediaType === "video" ? copy.shared.video : copy.shared.photo,
               120
             )}
           </strong>
-          <Button variant="ghost" size="sm" onClick={closeFullscreenImage}>
+          <Button ref={closeButtonRef} variant="ghost" size="sm" onClick={closeFullscreenImage}>
             {imageViewerLabels.close}
           </Button>
         </div>

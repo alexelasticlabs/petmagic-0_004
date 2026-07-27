@@ -44,7 +44,11 @@ describe("templates analytics hub visual contract", () => {
     expect(styles).toContain("overscroll-behavior-inline: contain;");
     expect(styles).toContain("scrollbar-width: thin;");
     expect(styles).toContain(".tableWrap::after");
+    expect(styles).toContain("min-width: 70rem;");
     expect(styles).toContain(".table th {\n  position: sticky;");
+    expect(styles).toContain("@media (min-width: 1181px)");
+    expect(styles).toContain(".table th:last-child,\n  .table td:last-child {");
+    expect(styles).toContain("right: 0;");
     expect(styles).toContain("background: var(--surface-1);");
   });
 
@@ -52,7 +56,8 @@ describe("templates analytics hub visual contract", () => {
     const styles = readFileSync(hubStylesPath, "utf8");
 
     expect(styles).toContain("@media (max-width: 760px)");
-    expect(styles).toContain(".toolbar {\n    flex-direction: column;");
+    expect(styles).toContain(".toolbar {\n  display: grid;");
+    expect(styles).toContain(".toolbar {\n    grid-template-columns: 1fr;");
     expect(styles).toContain(".filters,\n  .segmented,\n  .chartTabs");
     expect(styles).toContain("width: 100%;\n    justify-content: flex-start;");
     expect(styles).toContain(".chartTab,\n  .chartTabActive");
@@ -119,7 +124,9 @@ describe("templates analytics hub visual contract", () => {
     const source = readTemplatesAnalyticsHubPageLibrarySource();
     const styles = readFileSync(hubStylesPath, "utf8");
 
-    expect(source).toContain("const isHubControlsLocked = overviewQuery.isFetching;");
+    expect(source).toContain(
+      "const isHubControlsLocked = overviewQuery.isFetching || isExporting;"
+    );
     expect(source).toContain("const isActivePeriod = period === option.key;");
     expect(source).toContain("disabled={isActivePeriod || isHubControlsLocked}");
     expect(source).toContain("const isActiveChartMetric = chartMetric === tab.key;");
@@ -135,5 +142,20 @@ describe("templates analytics hub visual contract", () => {
     expect(styles).toContain("opacity: 0.58;");
     expect(styles).toContain("transform: none;");
     expect(source).not.toContain("disabled={overviewQuery.isFetching}");
+  });
+
+  it("keeps dense analytics rows discoverable and keyboard-accessible", () => {
+    const source = readTemplatesAnalyticsHubPageLibrarySource();
+    const styles = readFileSync(hubStylesPath, "utf8");
+
+    expect(source).toContain("className={`${styles.topRow} ${styles.topRowLink}`}");
+    expect(source).toContain("className={styles.topTemplateMeta}");
+    expect(source).toContain("className={styles.topMetric}");
+    expect(source).toContain('role="region"');
+    expect(source).toContain("aria-label={text.tableTitle}");
+    expect(source).toContain("{text.tableScrollHint}");
+    expect(styles).toContain(".topRowLink:focus-visible,");
+    expect(styles).toContain(".tableScrollHint {");
+    expect(styles).toContain(".table th:first-child,");
   });
 });

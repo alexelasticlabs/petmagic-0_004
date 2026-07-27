@@ -159,12 +159,10 @@ describe("templates catalog actions", () => {
     expect(source).toContain("onClick={() => resetCatalogContext(Math.max(1, currentPage - 1))}");
     expect(source).toContain("onClick={() => resetCatalogContext(pageNumber)}");
     expect(source).toContain("onClick={() => resetCatalogContext(currentPage + 1)}");
-    expect(source).toContain('disabled={archiveFilter === "active" || isCatalogInteractionLocked}');
-    expect(source).toContain(
-      'disabled={archiveFilter === "archived" || isCatalogInteractionLocked}'
-    );
-    expect(source).toContain('disabled={viewMode === "cards" || isCatalogInteractionLocked}');
-    expect(source).toContain('disabled={viewMode === "list" || isCatalogInteractionLocked}');
+    expect(source).toContain('aria-pressed={archiveFilter === "active"}');
+    expect(source).toContain('aria-pressed={archiveFilter === "archived"}');
+    expect(source).toContain('aria-pressed={viewMode === "cards"}');
+    expect(source).toContain('aria-pressed={viewMode === "list"}');
     expect(source).toContain("const TEMPLATE_CATALOG_SEARCH_MAX_LENGTH = 120;");
     expect(source).toContain(
       "setSearch(event.target.value.slice(0, TEMPLATE_CATALOG_SEARCH_MAX_LENGTH))"
@@ -173,12 +171,16 @@ describe("templates catalog actions", () => {
     expect(source).toContain("disabled={isCatalogInteractionLocked}");
     expect(source).toContain("onChange={(value) => {");
     expect(source).toContain(
-      "href={`${analyticsBasePath}/${encodeURIComponent(template.templateId)}`}"
+      "`${templateBasePath}/analytics/${encodeURIComponent(template.templateId)}`"
     );
     expect(source).toContain(
-      "href={`${editorBasePath}?templateId=${encodeURIComponent(template.templateId)}`}"
+      "`${templateBasePath}/editor?templateId=${encodeURIComponent(template.templateId)}`"
     );
-    expect(source).toContain("href={`${testBasePath}/${encodeURIComponent(template.templateId)}`}");
+    expect(source).toContain(
+      "`${templateBasePath}/test/${encodeURIComponent(template.templateId)}`"
+    );
+    expect(source).toContain("<AdminActionMenu");
+    expect(source).toContain("className={`${styles.tablePrimaryAction}");
     expect(source).toContain('isBusy ? ` ${styles.cardActionIconButtonDisabled}` : ""');
     expect(source).toContain("aria-disabled={isBusy}");
     expect(source).toContain("tabIndex={isBusy ? -1 : undefined}");
@@ -219,9 +221,11 @@ describe("templates catalog actions", () => {
     expect(source).not.toContain("if (busyTemplateId === templateId) {\n      return;");
     expect(source).not.toContain("isSubmitting={templatePendingArchiveId === busyTemplateId}");
     expect(source).not.toContain("isSubmitting={templatePendingDeleteId === busyTemplateId}");
-    expect(source).not.toContain("href={`${analyticsBasePath}/${template.templateId}`}");
-    expect(source).not.toContain("href={`${editorBasePath}?templateId=${template.templateId}`}");
-    expect(source).not.toContain("href={`${testBasePath}/${template.templateId}`}");
+    expect(source).not.toContain("href={`${templateBasePath}/analytics/${template.templateId}`}");
+    expect(source).not.toContain(
+      "href={`${templateBasePath}/editor?templateId=${template.templateId}`}"
+    );
+    expect(source).not.toContain("href={`${templateBasePath}/test/${template.templateId}`}");
     expect(source).not.toContain("value: formatAnalyticsInteger(analytics?.views ?? 0)");
     expect(source).not.toContain("value: formatAnalyticsInteger(analytics?.generationStarts ?? 0)");
     expect(source).not.toContain(

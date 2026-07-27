@@ -8,22 +8,24 @@ import {
   CaretDownIcon,
   ClockIcon,
   PlayCircleIcon,
+  SearchIcon,
   SupportIcon,
 } from "@/components/admin/admin-icons";
 import { AdminStateCard } from "@/components/admin/admin-primitives";
 import paletteStyles from "@/components/support/support-conversation-chat-content.module.css";
+import { type SupportQueueSubFilter } from "@/components/support/support-conversation-controller.helpers";
 import {
   formatClockTime,
   formatRelativeTime,
   formatSafeSupportDisplay,
   getConversationSla,
   initialsFor,
-  shortId,
 } from "@/components/support/support-conversation-helpers";
 import styles from "@/components/support/support-conversation-queue-pane.module.css";
 import { getSupportConversationCopy } from "@/components/support/support-conversation.content";
 import { formatSupportMessagePreview } from "@/components/support/support-message-preview";
-import { sourceLabel, statusLabel } from "@/components/support/support-status-helpers";
+import { statusLabel } from "@/components/support/support-status-helpers";
+import { SUPPORT_SEARCH_MAX_LENGTH } from "@/components/support/use-support-conversation-controller";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import type {
@@ -35,8 +37,9 @@ import type {
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { maskEmail } from "@/lib/sensitive-display";
 
+import type { RefObject } from "react";
+
 type SupportConversationQueuePaneProps = {
-  archiveCount: number;
   canManageSupportWorkspace: boolean;
   canGoToNextQueuePage: boolean;
   canGoToPreviousQueuePage: boolean;
@@ -55,6 +58,7 @@ type SupportConversationQueuePaneProps = {
   onConversationSelect?: (conversationId: string) => void;
   queueCount: number;
   queueLabels: ReturnType<typeof getSupportConversationCopy>["page"]["queue"];
+  queueSearchParams: string;
   queuePriorityFilter: "all" | SupportConversationPriority;
   queueShownEnd: number;
   queueShownStart: number;
@@ -63,11 +67,14 @@ type SupportConversationQueuePaneProps = {
   requestInboxRetry: () => void;
   requestNextQueuePage: () => void;
   requestPreviousQueuePage: () => void;
+  searchInputRef: RefObject<HTMLInputElement | null>;
+  searchQuery: string;
   setExactQueuePriorityFilter: (value: "all" | SupportConversationPriority) => void;
   setExactQueueSort: (value: SupportInboxSort) => void;
   setExactQueueStatusFilter: (value: "all" | SupportConversationStatus) => void;
-  setQueueSubFilter: (value: "all" | "waiting" | "unassigned" | "archive") => void;
-  subFilter: "all" | "waiting" | "unassigned" | "archive";
+  setQueueSubFilter: (value: SupportQueueSubFilter) => void;
+  setSearchQuery: (value: string) => void;
+  subFilter: SupportQueueSubFilter;
   text: ReturnType<typeof getDictionary>;
   unassignedCount: number;
 };
@@ -96,7 +103,6 @@ function QueueStatusIcon({ status }: { status: SupportConversationStatus }) {
 }
 
 export function SupportConversationQueuePane({
-  archiveCount,
   canManageSupportWorkspace,
   canGoToNextQueuePage,
   canGoToPreviousQueuePage,
@@ -115,6 +121,7 @@ export function SupportConversationQueuePane({
   onConversationSelect,
   queueCount,
   queueLabels,
+  queueSearchParams,
   queuePriorityFilter,
   queueShownEnd,
   queueShownStart,
@@ -123,22 +130,32 @@ export function SupportConversationQueuePane({
   requestInboxRetry,
   requestNextQueuePage,
   requestPreviousQueuePage,
+  searchInputRef,
+  searchQuery,
   setExactQueuePriorityFilter,
   setExactQueueSort,
   setExactQueueStatusFilter,
   setQueueSubFilter,
+  setSearchQuery,
   subFilter,
   text,
   unassignedCount,
 }: SupportConversationQueuePaneProps) {
+  const activeAdvancedFilterCount =
+    Number(queueStatusFilter !== "all") +
+    Number(queuePriorityFilter !== "all") +
+    Number(queueSort !== "default");
+  const filterSummary =
+    activeAdvancedFilterCount > 0
+      ? queueLabels.filtersActive(activeAdvancedFilterCount)
+      : queueLabels.filters;
+
   return (
-    <div className={styles.inboxPaneFlat}>
+    <div className={styles.inboxPaneFlat} data-testid="support-queue-pane">
       <div className={styles.queuePaneHeader}>
         <div className={styles.queuePaneTitleRow}>
           <h2 className={styles.queuePaneTitle}>{queueLabels.title}</h2>
-          <span className={styles.paneCountBadge}>
-            {subFilter === "archive" ? archiveCount : queueCount}
-          </span>
+          <span className={styles.paneCountBadge}>{queueCount}</span>
           {incomingMessagesCount > 0 ? (
             <span
               className={`${styles.queueCountBadge} ${styles.queueCountBadgeIncoming}`}
@@ -151,98 +168,121 @@ export function SupportConversationQueuePane({
         </div>
       </div>
 
-      <div className={styles.queueSubFilters}>
+      <label className={styles.queueSearchField}>
+        <span className={styles.queueSearchIcon} aria-hidden="true">
+          <SearchIcon />
+        </span>
+        <span className={styles.queueSearchLabel}>{text.supportSearchPlaceholder}</span>
+        <input
+          ref={searchInputRef}
+          className={styles.queueSearchInput}
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          maxLength={SUPPORT_SEARCH_MAX_LENGTH}
+          placeholder={text.supportSearchPlaceholder}
+          aria-label={text.supportSearchPlaceholder}
+          title={text.supportSearchKeyboardHint}
+        />
+        <span className={styles.queueSearchShortcut} aria-hidden="true">
+          /
+        </span>
+      </label>
+
+      <div className={styles.queueQuickActions}>
         <button
           type="button"
-          className={subFilter === "all" ? styles.queueSubFilterActive : styles.queueSubFilter}
+          className={
+            subFilter === "unread" ? styles.queueQuickFilterActive : styles.queueQuickFilter
+          }
           disabled={isQueueControlsLocked}
-          onClick={() => setQueueSubFilter("all")}
+          aria-pressed={subFilter === "unread"}
+          onClick={() => setQueueSubFilter(subFilter === "unread" ? "all" : "unread")}
         >
-          {queueLabels.all} {queueCount}
-        </button>
-        <button
-          type="button"
-          className={subFilter === "waiting" ? styles.queueSubFilterActive : styles.queueSubFilter}
-          disabled={isQueueControlsLocked}
-          onClick={() => setQueueSubFilter("waiting")}
-        >
-          {queueLabels.waiting}
+          {queueLabels.unread} {incomingMessagesCount}
         </button>
         <button
           type="button"
           className={
-            subFilter === "unassigned" ? styles.queueSubFilterActive : styles.queueSubFilter
+            subFilter === "unassigned" ? styles.queueQuickFilterActive : styles.queueQuickFilter
           }
           disabled={isQueueControlsLocked}
-          onClick={() => setQueueSubFilter("unassigned")}
+          aria-pressed={subFilter === "unassigned"}
+          onClick={() => setQueueSubFilter(subFilter === "unassigned" ? "all" : "unassigned")}
         >
           {queueLabels.unassigned} {unassignedCount}
         </button>
-        <button
-          type="button"
-          className={subFilter === "archive" ? styles.queueSubFilterActive : styles.queueSubFilter}
-          disabled={isQueueControlsLocked}
-          onClick={() => setQueueSubFilter("archive")}
-        >
-          {queueLabels.archive} {archiveCount}
-        </button>
       </div>
 
-      <div className={styles.queueFiltersGrid}>
-        <label className={styles.queueToolField}>
-          <span>{queueLabels.status}</span>
-          <Select
-            value={queueStatusFilter}
-            disabled={isQueueControlsLocked}
-            onChange={(value) => {
-              setExactQueueStatusFilter(value as "all" | SupportConversationStatus);
-            }}
-            showSelectedDescription={false}
-            options={[
-              { value: "all", label: queueLabels.all },
-              { value: "New", label: statusLabel("New", text) },
-              { value: "InProgress", label: statusLabel("InProgress", text) },
-              { value: "WaitingForUser", label: statusLabel("WaitingForUser", text) },
-              { value: "Closed", label: statusLabel("Closed", text) },
-            ]}
-          />
-        </label>
-        <label className={styles.queueToolField}>
-          <span>{queueLabels.priority}</span>
-          <Select
-            value={queuePriorityFilter}
-            disabled={isQueueControlsLocked}
-            onChange={(value) => {
-              setExactQueuePriorityFilter(value as "all" | SupportConversationPriority);
-            }}
-            showSelectedDescription={false}
-            options={[
-              { value: "all", label: queueLabels.priorityAll },
-              { value: "High", label: queueLabels.priorityHigh },
-              { value: "Normal", label: queueLabels.priorityNormal },
-              { value: "Low", label: queueLabels.priorityLow },
-            ]}
-          />
-        </label>
-        <label className={styles.queueToolField}>
-          <span>{queueLabels.sort}</span>
-          <Select
-            value={queueSort}
-            disabled={isQueueControlsLocked}
-            onChange={(value) => {
-              setExactQueueSort(value as SupportInboxSort);
-            }}
-            showSelectedDescription={false}
-            options={[
-              { value: "default", label: queueLabels.sortDefault },
-              { value: "priority", label: queueLabels.sortPriority },
-              { value: "waiting", label: queueLabels.sortWaiting },
-              { value: "updated", label: queueLabels.sortUpdated },
-              { value: "created", label: queueLabels.sortCreated },
-            ]}
-          />
-        </label>
-      </div>
+      <details
+        className={styles.queueFiltersDisclosure}
+        open={activeAdvancedFilterCount > 0 ? true : undefined}
+      >
+        <summary className={styles.queueFiltersSummary}>
+          <span>{filterSummary}</span>
+          {activeAdvancedFilterCount > 0 ? (
+            <span className={styles.queueFiltersSummaryCount}>{activeAdvancedFilterCount}</span>
+          ) : null}
+          <CaretDownIcon className={styles.queueFiltersSummaryIcon} />
+        </summary>
+        <div className={styles.queueFiltersGrid}>
+          <label className={styles.queueToolField}>
+            <span>{queueLabels.status}</span>
+            <Select
+              value={queueStatusFilter}
+              ariaLabel={queueLabels.status}
+              disabled={isQueueControlsLocked}
+              onChange={(value) => {
+                setExactQueueStatusFilter(value as "all" | SupportConversationStatus);
+              }}
+              showSelectedDescription={false}
+              options={[
+                { value: "all", label: queueLabels.all },
+                { value: "New", label: statusLabel("New", text) },
+                { value: "InProgress", label: statusLabel("InProgress", text) },
+                { value: "WaitingForUser", label: statusLabel("WaitingForUser", text) },
+                { value: "Closed", label: statusLabel("Closed", text) },
+              ]}
+            />
+          </label>
+          <label className={styles.queueToolField}>
+            <span>{queueLabels.priority}</span>
+            <Select
+              value={queuePriorityFilter}
+              ariaLabel={queueLabels.priority}
+              disabled={isQueueControlsLocked}
+              onChange={(value) => {
+                setExactQueuePriorityFilter(value as "all" | SupportConversationPriority);
+              }}
+              showSelectedDescription={false}
+              options={[
+                { value: "all", label: queueLabels.priorityAll },
+                { value: "High", label: queueLabels.priorityHigh },
+                { value: "Normal", label: queueLabels.priorityNormal },
+                { value: "Low", label: queueLabels.priorityLow },
+              ]}
+            />
+          </label>
+          <label className={styles.queueToolField}>
+            <span>{queueLabels.sort}</span>
+            <Select
+              value={queueSort}
+              ariaLabel={queueLabels.sort}
+              disabled={isQueueControlsLocked}
+              onChange={(value) => {
+                setExactQueueSort(value as SupportInboxSort);
+              }}
+              showSelectedDescription={false}
+              options={[
+                { value: "default", label: queueLabels.sortDefault },
+                { value: "priority", label: queueLabels.sortPriority },
+                { value: "waiting", label: queueLabels.sortWaiting },
+                { value: "updated", label: queueLabels.sortUpdated },
+                { value: "created", label: queueLabels.sortCreated },
+              ]}
+            />
+          </label>
+        </div>
+      </details>
 
       {inboxQueryIsLoading ? (
         <AdminStateCard tone="info" title={text.loading} />
@@ -269,7 +309,8 @@ export function SupportConversationQueuePane({
             const itemSla = getConversationSla(
               item.waitingSinceUtc ?? item.lastMessageAtUtc ?? item.createdAtUtc,
               locale,
-              item.adminUnreadCount
+              item.adminUnreadCount,
+              item.sla
             );
             const hasUnread = item.adminUnreadCount > 0;
             const queueUserLabel = item.userDisplayName?.trim()
@@ -349,19 +390,6 @@ export function SupportConversationQueuePane({
                     </span>
                   ) : null}
                 </div>
-                <div className={styles.queueRowDetailLine}>
-                  <span className={styles.queueMetaChip}>{sourceLabel(item.source, text)}</span>
-                  <span className={styles.queueMetaChipMuted}>
-                    #{shortId(item.initiatorUserId)}
-                  </span>
-                  <span className={styles.queueMetaChipMuted}>
-                    {item.assignedAdminDisplayName?.trim()
-                      ? queueLabels.assignedOperator(
-                          formatSafeSupportDisplay(item.assignedAdminDisplayName, "", 72)
-                        )
-                      : queueLabels.unassignedOperator}
-                  </span>
-                </div>
               </>
             );
 
@@ -388,10 +416,13 @@ export function SupportConversationQueuePane({
             }
 
             const supportConversationPathId = encodeURIComponent(item.conversationId);
+            const supportConversationSearchSuffix = queueSearchParams
+              ? `?${queueSearchParams}`
+              : "";
             return (
               <Link
                 key={item.conversationId}
-                href={`/${locale}/support/${supportConversationPathId}`}
+                href={`/${locale}/support/${supportConversationPathId}${supportConversationSearchSuffix}`}
                 role="listitem"
                 aria-current={item.conversationId === conversationId ? "page" : undefined}
                 className={queueItemClassName}

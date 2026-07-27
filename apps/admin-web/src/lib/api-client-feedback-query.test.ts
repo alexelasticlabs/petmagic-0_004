@@ -2,8 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   ADMIN_FEEDBACK_ADMIN_NOTE_MAX_LENGTH,
-  ADMIN_FEEDBACK_FILTER_MAX_LENGTH,
+  ADMIN_FEEDBACK_CATEGORY_FILTER_MAX_LENGTH,
+  ADMIN_FEEDBACK_LOOKUP_ID_MAX_LENGTH,
+  ADMIN_FEEDBACK_PLATFORM_FILTER_MAX_LENGTH,
   ADMIN_FEEDBACK_REFUND_REASON_MAX_LENGTH,
+  isAdminFeedbackLookupId,
   normalizeAdminFeedbackQuery,
   refundAdminFeedbackCredits,
   updateAdminFeedback,
@@ -24,11 +27,11 @@ describe("api-client.feedback query normalization", () => {
     process.env.INTERNAL_API_BASE_URL = originalInternalApiBaseUrl;
   });
 
-  it("bounds feedback filters for stable cache keys and backend requests", () => {
-    const overlongCategory = "c".repeat(ADMIN_FEEDBACK_FILTER_MAX_LENGTH + 20);
-    const overlongPlatform = "p".repeat(ADMIN_FEEDBACK_FILTER_MAX_LENGTH + 20);
-    const overlongTemplateId = "t".repeat(ADMIN_FEEDBACK_FILTER_MAX_LENGTH + 20);
-    const overlongUserId = "u".repeat(ADMIN_FEEDBACK_FILTER_MAX_LENGTH + 20);
+  it("uses backend-aligned limits and drops invalid lookup IDs before requests", () => {
+    const overlongCategory = "c".repeat(ADMIN_FEEDBACK_CATEGORY_FILTER_MAX_LENGTH + 20);
+    const overlongPlatform = "p".repeat(ADMIN_FEEDBACK_PLATFORM_FILTER_MAX_LENGTH + 20);
+    const invalidTemplateId = "t".repeat(ADMIN_FEEDBACK_LOOKUP_ID_MAX_LENGTH + 20);
+    const invalidUserId = "u".repeat(ADMIN_FEEDBACK_LOOKUP_ID_MAX_LENGTH + 20);
 
     expect(
       normalizeAdminFeedbackQuery({
@@ -37,8 +40,8 @@ describe("api-client.feedback query normalization", () => {
         type: "All",
         category: ` ${overlongCategory} `,
         platform: ` ${overlongPlatform} `,
-        templateId: ` ${overlongTemplateId} `,
-        userId: ` ${overlongUserId} `,
+        templateId: ` ${invalidTemplateId} `,
+        userId: ` ${invalidUserId} `,
         skip: -10.8,
         take: 500.2,
       })
@@ -46,15 +49,34 @@ describe("api-client.feedback query normalization", () => {
       status: undefined,
       priority: undefined,
       type: undefined,
-      category: "c".repeat(ADMIN_FEEDBACK_FILTER_MAX_LENGTH),
-      platform: "p".repeat(ADMIN_FEEDBACK_FILTER_MAX_LENGTH),
-      templateId: "t".repeat(ADMIN_FEEDBACK_FILTER_MAX_LENGTH),
-      userId: "u".repeat(ADMIN_FEEDBACK_FILTER_MAX_LENGTH),
+      category: "c".repeat(ADMIN_FEEDBACK_CATEGORY_FILTER_MAX_LENGTH),
+      platform: "p".repeat(ADMIN_FEEDBACK_PLATFORM_FILTER_MAX_LENGTH),
+      templateId: undefined,
+      userId: undefined,
       fromUtc: undefined,
       toUtc: undefined,
       generationId: undefined,
       skip: 0,
       take: 100,
+    });
+  });
+
+  it("accepts canonical UUID lookup values", () => {
+    const lookupId = "0ec0f186-01a1-4a67-8c63-3b4ee5fcb498";
+
+    expect(lookupId).toHaveLength(ADMIN_FEEDBACK_LOOKUP_ID_MAX_LENGTH);
+    expect(isAdminFeedbackLookupId(lookupId)).toBe(true);
+    expect(isAdminFeedbackLookupId("not-an-id")).toBe(false);
+    expect(
+      normalizeAdminFeedbackQuery({
+        generationId: lookupId,
+        templateId: lookupId,
+        userId: lookupId,
+      })
+    ).toMatchObject({
+      generationId: lookupId,
+      templateId: lookupId,
+      userId: lookupId,
     });
   });
 
@@ -143,5 +165,9 @@ describe("api-client.feedback query normalization", () => {
       amount: 5,
       reason: "r".repeat(ADMIN_FEEDBACK_REFUND_REASON_MAX_LENGTH),
     });
+  });
+
+  it("matches the backend's 500-character refund reason contract", () => {
+    expect(ADMIN_FEEDBACK_REFUND_REASON_MAX_LENGTH).toBe(500);
   });
 });

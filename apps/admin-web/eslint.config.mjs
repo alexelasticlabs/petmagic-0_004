@@ -45,9 +45,16 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    ".next-e2e/**",
+    ".next-*/**",
     "out/**",
     "build/**",
     "coverage/**",
+    "test-results/**",
+    "playwright-report/**",
+    "blob-report/**",
+    // Production build and test artifacts are generated code, not application source.
+    "artifacts/**",
     "next-env.d.ts",
   ]),
 ]);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 
 import styles from "@/components/admin/confirmation-dialog.module.css";
@@ -14,7 +14,9 @@ type ConfirmationDialogProps = {
   cancelLabel: string;
   confirmDisabled?: boolean;
   children?: ReactNode;
+  initialFocusRef?: RefObject<HTMLElement | null>;
   isSubmitting?: boolean;
+  size?: "default" | "large";
   tone?: "danger" | "primary";
   onCancel: () => void;
   onConfirm: () => void;
@@ -28,7 +30,9 @@ export function ConfirmationDialog({
   cancelLabel,
   confirmDisabled = false,
   children,
+  initialFocusRef,
   isSubmitting = false,
+  size = "default",
   tone = "danger",
   onCancel,
   onConfirm,
@@ -49,14 +53,19 @@ export function ConfirmationDialog({
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    cancelButtonRef.current?.focus();
+    const initialFocusTarget = initialFocusRef?.current;
+    if (initialFocusTarget && !initialFocusTarget.matches(":disabled")) {
+      initialFocusTarget.focus();
+    } else {
+      cancelButtonRef.current?.focus();
+    }
 
     return () => {
       document.body.style.overflow = previousOverflow;
       previouslyFocusedElementRef.current?.focus();
       previouslyFocusedElementRef.current = null;
     };
-  }, [open]);
+  }, [initialFocusRef, open]);
 
   useEffect(() => {
     if (!open) {
@@ -112,7 +121,7 @@ export function ConfirmationDialog({
   return createPortal(
     <div className={styles.backdrop} onClick={isSubmitting ? undefined : onCancel}>
       <section
-        className={styles.dialog}
+        className={`${styles.dialog} ${size === "large" ? styles.dialogLarge : ""}`.trim()}
         ref={dialogRef}
         role="dialog"
         aria-modal="true"

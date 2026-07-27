@@ -3,7 +3,7 @@ export type SupportConversationStatus = "New" | "InProgress" | "WaitingForUser" 
 export type SupportConversationSource =
   "MobileChat" | "MobileAssistant" | "AdminCreated" | "System" | "Direct";
 
-export type SupportConversationPriority = "Low" | "Normal" | "High";
+export type SupportConversationPriority = "Low" | "Normal" | "High" | "Urgent";
 
 export type SupportInboxAssignmentScope = "all" | "mine" | "unassigned";
 
@@ -31,8 +31,18 @@ export type AdminSupportMessageAttachment = {
   height?: number | null;
 };
 
+export type AdminSupportMessagePendingAttachment = {
+  fileName: string;
+
+  mimeType: string;
+
+  sizeBytes?: number | null;
+};
+
 export type AdminSupportMessage = {
   messageId: string;
+
+  isIdempotencyReplay?: boolean;
 
   conversationId: string;
 
@@ -61,6 +71,8 @@ export type AdminSupportMessage = {
   attachmentUploadStatus?: string | null;
 
   attachmentUploadErrorCode?: string | null;
+
+  pendingAttachment?: AdminSupportMessagePendingAttachment | null;
 
   attachments?: AdminSupportMessageAttachment[] | null;
 
@@ -135,6 +147,10 @@ export type AdminSupportConversationSummary = {
   isReadOnly: boolean;
 
   canReopen: boolean;
+
+  version: number;
+
+  sla?: AdminSupportConversationSla | null;
 };
 
 export type AdminSupportInboxPage = {
@@ -159,6 +175,28 @@ export type AdminSupportInboxMetrics = {
   unassignedConversations: number;
 
   unreadForAdminConversations: number;
+
+  operatorWorkloads?: AdminSupportOperatorWorkload[] | null;
+};
+
+export type AdminSupportOperatorWorkload = {
+  operatorUserId: string;
+  displayName: string;
+  openConversations: number;
+  highPriorityConversations: number;
+  urgentConversations: number;
+  waitingForUserConversations: number;
+};
+
+export type AdminSupportConversationSla = {
+  firstResponseDueAtUtc: string;
+  resolutionDueAtUtc: string;
+  firstResponseAtUtc?: string | null;
+  firstResponseStatus: "Pending" | "Met" | "Breached";
+  resolutionStatus: "Pending" | "Paused" | "Met" | "Breached";
+  isResolutionPaused: boolean;
+  firstResponseRemainingMinutes: number;
+  resolutionRemainingMinutes: number;
 };
 
 export type AdminSupportConversation = {
@@ -237,6 +275,10 @@ export type AdminSupportConversation = {
   oldestLoadedMessageCreatedAtUtc?: string | null;
 
   messages: AdminSupportMessage[];
+
+  version: number;
+
+  sla?: AdminSupportConversationSla | null;
 };
 
 export type AdminSupportReplyTemplate = {
@@ -253,4 +295,21 @@ export type AdminSupportReplyTemplate = {
   createdAtUtc: string;
 
   updatedAtUtc: string;
+
+  version: number;
+
+  disabledAtUtc?: string | null;
+};
+
+export type AdminSupportReplyTemplateVersion = {
+  templateId: string;
+  version: number;
+  title: string;
+  body: string;
+  isEnabled: boolean;
+  sortOrder: number;
+  actorUserId: string;
+  reason?: string | null;
+  capturedAtUtc: string;
+  isCurrent: boolean;
 };

@@ -1,10 +1,12 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 const adminRoot = fileURLToPath(new URL("../../", import.meta.url));
 const packageJsonPath = join(adminRoot, "package.json");
+// A cold Windows filesystem scan of src and scripts can exceed Vitest's 5s default.
+const filesystemInventoryTimeoutMs = 20_000;
 
 type PackageManifest = {
   dependencies?: Record<string, string>;
@@ -21,7 +23,7 @@ const runtimeDependencyEvidence: Record<string, readonly string[]> = {
 };
 
 const devDependencyEvidence: Record<string, readonly string[]> = {
-  "@playwright/test": ['"test:e2e": "playwright test"'],
+  "@playwright/test": ['"test:e2e": "node ./scripts/test-e2e.mjs"'],
   "@types/node": ['from "node:', "node:fs", "node:path"],
   "@types/react": ['from "react"', ".tsx"],
   "@types/react-dom": ['"react-dom"'],
@@ -38,7 +40,13 @@ function readManifest(): PackageManifest {
   return JSON.parse(readFileSync(packageJsonPath, "utf8")) as PackageManifest;
 }
 
+let cachedAdminText: string | undefined;
+
 function readAdminText(): string {
+  if (cachedAdminText !== undefined) {
+    return cachedAdminText;
+  }
+
   const textFiles = [
     packageJsonPath,
     join(adminRoot, "eslint.config.mjs"),
@@ -47,9 +55,14 @@ function readAdminText(): string {
     join(adminRoot, "vitest.config.ts"),
     ...collectFiles(join(adminRoot, "scripts")),
     ...collectFiles(join(adminRoot, "src")),
-  ].filter((path) => /\.(cjs|css|js|json|mjs|ts|tsx)$/.test(path));
+  ].filter(
+    (path) =>
+      /\.(cjs|css|js|json|mjs|ts|tsx)$/.test(path) &&
+      !/\.(test|spec)\.(cjs|css|js|json|mjs|ts|tsx)$/.test(path)
+  );
 
-  return textFiles.map((path) => readFileSync(path, "utf8")).join("\n");
+  cachedAdminText = textFiles.map((path) => readFileSync(path, "utf8")).join("\n");
+  return cachedAdminText;
 }
 
 function collectFiles(root: string): string[] {
@@ -73,9 +86,18 @@ function collectFiles(root: string): string[] {
 }
 
 describe("admin dependency inventory", () => {
+  let adminText: string;
+
+  beforeAll(() => {
+    adminText = readAdminText();
+  }, filesystemInventoryTimeoutMs);
+
+  it("does not treat its own test assertions as dependency evidence", () => {
+    expect(adminText).not.toContain("const runtimeDependencyEvidence:");
+  });
+
   it("keeps runtime dependencies intentionally small and source-backed", () => {
     const manifest = readManifest();
-    const adminText = readAdminText();
     const dependencies = Object.keys(manifest.dependencies ?? {}).sort();
 
     expect(dependencies).toEqual(Object.keys(runtimeDependencyEvidence).sort());
@@ -86,11 +108,10 @@ describe("admin dependency inventory", () => {
         `${dependency} must have source/framework evidence before it stays in dependencies`
       ).toBe(true);
     }
-  }, 10_000);
+  });
 
   it("keeps dev dependencies tied to scripts or tool configs", () => {
     const manifest = readManifest();
-    const adminText = readAdminText();
     const devDependencies = Object.keys(manifest.devDependencies ?? {}).sort();
 
     expect(devDependencies).toEqual(Object.keys(devDependencyEvidence).sort());
@@ -101,5 +122,5 @@ describe("admin dependency inventory", () => {
         `${dependency} must be tied to an admin script, test, type, or lint config`
       ).toBe(true);
     }
-  }, 10_000);
+  });
 });

@@ -1,6 +1,8 @@
 "use client";
 
-import { ReplyIcon, SearchIcon } from "@/components/admin/admin-icons";
+import { useRef, type ReactNode, type RefObject } from "react";
+
+import { ReplyIcon } from "@/components/admin/admin-icons";
 import { AdminBadge, AdminStateCard } from "@/components/admin/admin-primitives";
 import styles from "@/components/support/support-conversation-chat-content.module.css";
 import {
@@ -18,18 +20,18 @@ import type {
   SupportMessageAttachment,
 } from "@/components/support/support-conversation-page.types";
 import { getSupportConversationCopy } from "@/components/support/support-conversation.content";
-import sharedStyles from "@/components/support/support-page.module.css";
 import {
   sourceLabel,
   statusLabel,
   toneForStatus,
 } from "@/components/support/support-status-helpers";
-import { SUPPORT_SEARCH_MAX_LENGTH } from "@/components/support/use-support-conversation-controller";
 import { Button } from "@/components/ui/button";
-import type { AdminSupportConversation } from "@/lib/api-client";
+import {
+  SUPPORT_ATTACHMENT_ACCEPT,
+  SUPPORT_MESSAGE_BODY_MAX_LENGTH,
+  type AdminSupportConversation,
+} from "@/lib/api-client";
 import { type Dictionary, type Locale } from "@/lib/i18n";
-
-import type { ReactNode, RefObject } from "react";
 
 type AttachmentTileOptions = {
   overlayCount?: number;
@@ -37,6 +39,7 @@ type AttachmentTileOptions = {
 };
 
 type SupportConversationChatHeaderProps = {
+  action?: ReactNode;
   conversation: AdminSupportConversation;
   conversationSla: {
     level: "good" | "warning" | "risk" | "critical";
@@ -44,10 +47,6 @@ type SupportConversationChatHeaderProps = {
   };
   deletedUserEmail: string;
   locale: Locale;
-  searchInputRef: RefObject<HTMLInputElement | null>;
-  searchQuery: string;
-  setSearchQuery: (value: string) => void;
-  supportWorkspaceSubtitle: string;
   text: Dictionary;
   userDisplayName: string;
   userEmailDisplay: string;
@@ -55,6 +54,7 @@ type SupportConversationChatHeaderProps = {
 
 type SupportConversationMessagesProps = {
   canManageSupportWorkspace: boolean;
+  canRetryAttachment: boolean;
   conversation: AdminSupportConversation;
   conversationQueryIsFetching: boolean;
   copy: ReturnType<typeof getSupportConversationCopy>;
@@ -65,6 +65,8 @@ type SupportConversationMessagesProps = {
   messageLabels: ReturnType<typeof getSupportConversationCopy>["page"]["message"];
   messagesById: Map<string, SupportMessage>;
   messagesEndRef: RefObject<HTMLDivElement | null>;
+  isAttachmentRetrySubmitting: boolean;
+  isLoadingOlderMessages: boolean;
   renderAttachmentTile: (
     message: SupportMessage,
     attachment: SupportMessageAttachment,
@@ -72,6 +74,7 @@ type SupportConversationMessagesProps = {
     options?: AttachmentTileOptions
   ) => ReactNode;
   renderReplyThumbnail: (attachment: SupportMessageAttachment | null | undefined) => ReactNode;
+  requestAttachmentRetry: (messageId: string, file: File) => void;
   requestOlderMessagesLoad: () => void;
   startReplyToMessage: (message: SupportMessage) => void;
   text: Dictionary;
@@ -95,98 +98,57 @@ function getSupportMessageElementId(messageId: string) {
 }
 
 export function SupportConversationChatHeader({
+  action,
   conversation,
   conversationSla,
   deletedUserEmail,
   locale,
-  searchInputRef,
-  searchQuery,
-  setSearchQuery,
-  supportWorkspaceSubtitle,
   text,
   userDisplayName,
   userEmailDisplay,
 }: SupportConversationChatHeaderProps) {
   return (
-    <div className={styles.supportPageHeader}>
-      <div className={styles.supportPageTitleWrap}>
-        <div className={styles.supportPageTitleRow}>
-          <h1 className={styles.supportPageTitle}>{text.supportTitle}</h1>
-        </div>
-        <span className={styles.supportPageSubtitle}>{supportWorkspaceSubtitle}</span>
-      </div>
-      <div className={styles.supportPageToolbar}>
-        <label className={`${sharedStyles.searchField} ${styles.supportPageHeroSearch}`}>
-          <span className={styles.supportSearchIcon} aria-hidden="true">
-            <SearchIcon />
+    <div className={styles.chatTopbar}>
+      <div className={styles.chatHeaderTop}>
+        <div className={styles.chatHeaderIdentity}>
+          <span
+            className={`${styles.avatarSm} ${avatarColorFor(userDisplayName)}`}
+            aria-hidden="true"
+          >
+            {initialsFor(userDisplayName)}
           </span>
-          <span className={sharedStyles.searchLabelHidden}>{text.supportSearchPlaceholder}</span>
-          <input
-            ref={searchInputRef}
-            className={`${sharedStyles.searchInput} ${styles.supportPageSearchInput}`}
-            value={searchQuery}
-            onChange={(event) =>
-              setSearchQuery(event.target.value.slice(0, SUPPORT_SEARCH_MAX_LENGTH))
-            }
-            maxLength={SUPPORT_SEARCH_MAX_LENGTH}
-            placeholder={text.supportSearchPlaceholder}
-            aria-label={text.supportSearchPlaceholder}
-            title={text.supportSearchKeyboardHint}
-          />
-          <span className={styles.supportSearchShortcut} aria-hidden="true">
-            /
-          </span>
-        </label>
-      </div>
-
-      <div className={styles.chatTopbar}>
-        <div className={styles.chatHeaderTop}>
-          <div className={styles.chatHeaderIdentity}>
-            <span
-              className={`${styles.avatarSm} ${avatarColorFor(userDisplayName)}`}
-              aria-hidden="true"
-            >
-              {initialsFor(userDisplayName)}
-            </span>
-            <div>
-              <div className={styles.chatHeaderNameRow}>
-                <strong>{userDisplayName}</strong>
-                <div className={styles.chatHeaderBadges}>
-                  <AdminBadge tone={toneForStatus(conversation.status)}>
-                    {statusLabel(conversation.status, text)}
-                  </AdminBadge>
-                  {conversationSla.waitLabel ? (
-                    <span
-                      className={`${styles.chatHeaderSlaBadge} ${
-                        conversationSla.level === "critical" || conversationSla.level === "risk"
-                          ? styles.chatHeaderSlaBadgeUrgent
-                          : ""
-                      }`}
-                    >
-                      {conversationSla.waitLabel}
-                    </span>
-                  ) : null}
-                </div>
+          <div>
+            <div className={styles.chatHeaderNameRow}>
+              <strong>{userDisplayName}</strong>
+              <div className={styles.chatHeaderBadges}>
+                <AdminBadge tone={toneForStatus(conversation.status)}>
+                  {statusLabel(conversation.status, text)}
+                </AdminBadge>
+                {conversationSla.waitLabel ? (
+                  <span
+                    className={`${styles.chatHeaderSlaBadge} ${
+                      conversationSla.level === "critical" || conversationSla.level === "risk"
+                        ? styles.chatHeaderSlaBadgeUrgent
+                        : ""
+                    }`}
+                  >
+                    {conversationSla.waitLabel}
+                  </span>
+                ) : null}
               </div>
-              <span className={styles.chatHeaderSubtext}>
-                {userEmailDisplay || deletedUserEmail} · #{shortId(conversation.initiatorUserId)}
-              </span>
             </div>
+            <span className={styles.chatHeaderSubtext}>
+              {userEmailDisplay || deletedUserEmail} · #{shortId(conversation.initiatorUserId)}
+            </span>
           </div>
         </div>
-        <div className={styles.chatMetaRow}>
-          <span>{sourceLabel(conversation.source, text)}</span>
-          <span className={styles.chatMetaDivider}>·</span>
-          <span>
-            {conversation.priority === "High"
-              ? text.supportPriorityHigh
-              : conversation.priority === "Low"
-                ? text.supportPriorityLow
-                : text.supportPriorityNormal}
-          </span>
-          <span className={styles.chatMetaDivider}>·</span>
-          <span>{formatDateTime(conversation.createdAtUtc, locale)}</span>
-        </div>
+        {action ? <div className={styles.chatHeaderAction}>{action}</div> : null}
+      </div>
+      <div className={styles.chatMetaRow}>
+        <span className={styles.chatMetaChip}>{sourceLabel(conversation.source, text)}</span>
+        <span className={styles.chatMetaTimestamp}>
+          {formatDateTime(conversation.createdAtUtc, locale)}
+        </span>
       </div>
     </div>
   );
@@ -194,6 +156,7 @@ export function SupportConversationChatHeader({
 
 export function SupportConversationMessages({
   canManageSupportWorkspace,
+  canRetryAttachment,
   conversation,
   conversationQueryIsFetching,
   copy,
@@ -204,27 +167,52 @@ export function SupportConversationMessages({
   messageLabels,
   messagesById,
   messagesEndRef,
+  isAttachmentRetrySubmitting,
+  isLoadingOlderMessages,
   renderAttachmentTile,
   renderReplyThumbnail,
+  requestAttachmentRetry,
   requestOlderMessagesLoad,
   startReplyToMessage,
   text,
 }: SupportConversationMessagesProps) {
+  const retryAttachmentInputRef = useRef<HTMLInputElement | null>(null);
+  const retryAttachmentMessageIdRef = useRef<string | null>(null);
+
   if (conversation.messages.length === 0) {
     return <AdminStateCard tone="info" title={text.supportNoMessages} />;
   }
 
   return (
     <div className={styles.messagesWrap}>
+      <input
+        ref={retryAttachmentInputRef}
+        type="file"
+        accept={SUPPORT_ATTACHMENT_ACCEPT}
+        hidden
+        disabled={isAttachmentRetrySubmitting || !canRetryAttachment}
+        onChange={(event) => {
+          const messageId = retryAttachmentMessageIdRef.current;
+          const file = event.currentTarget.files?.[0] ?? null;
+          retryAttachmentMessageIdRef.current = null;
+          event.currentTarget.value = "";
+          if (messageId && file) {
+            requestAttachmentRetry(messageId, file);
+          }
+        }}
+      />
       <div className={styles.messages}>
         {conversation.hasOlderMessages ? (
           <div className={styles.messagesLoadOlderRow}>
             <Button
               variant="ghost"
               onClick={requestOlderMessagesLoad}
-              disabled={!canManageSupportWorkspace || conversationQueryIsFetching}
+              disabled={
+                !canManageSupportWorkspace || conversationQueryIsFetching || isLoadingOlderMessages
+              }
+              aria-busy={isLoadingOlderMessages || undefined}
             >
-              {copy.page.loadPreviousMessages}
+              {isLoadingOlderMessages ? text.loading : copy.page.loadPreviousMessages}
             </Button>
           </div>
         ) : null}
@@ -356,7 +344,11 @@ export function SupportConversationMessages({
                     ) : null}
                     {shouldShowBody ? (
                       <div className={styles.messageBody}>
-                        {formatSafeSupportDisplay(message.body, "", 2000)}
+                        {formatSafeSupportDisplay(
+                          message.body,
+                          "",
+                          SUPPORT_MESSAGE_BODY_MAX_LENGTH
+                        )}
                       </div>
                     ) : null}
                     {shouldShowAttachmentFailure ? (
@@ -368,6 +360,19 @@ export function SupportConversationMessages({
                             ? copy.page.retryAttachmentUpload
                             : text.supportAttachmentFailedLabel}
                         </span>
+                        {message.isFromAdmin && canRetryAttachment ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              retryAttachmentMessageIdRef.current = message.messageId;
+                              retryAttachmentInputRef.current?.click();
+                            }}
+                            disabled={isAttachmentRetrySubmitting}
+                          >
+                            {copy.page.retryAttachmentUpload}
+                          </Button>
+                        ) : null}
                       </div>
                     ) : null}
                     <div className={styles.messageMeta}>

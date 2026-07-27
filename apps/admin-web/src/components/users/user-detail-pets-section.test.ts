@@ -31,8 +31,10 @@ describe("user detail pets section", () => {
     expect(source).toContain("return text.activeStatus;");
     expect(source).toContain('if (status === "hidden")');
     expect(source).toContain("return text.hiddenStatus;");
-    expect(source).toContain("title={petText.title}");
+    expect(source).toContain("title={workspaceText.tabContent}");
     expect(source).toContain("description={petText.description}");
+    expect(source).toContain('id="user-pets-section-title"');
+    expect(source).toContain('id="user-generations-section-title"');
     expect(source).toContain("formatPetStatus(pet.status, petText)");
     expect(source).toContain("formatPetStatus(photo.status, text)");
     expect(source).not.toContain('AdminCard title="Pets"');
@@ -84,24 +86,29 @@ describe("user detail pets section", () => {
     const styles = readFileSync(detailStylesPath, "utf8");
 
     expect(source).toContain("const [expandedPetIds, setExpandedPetIds]");
+    expect(source).toContain(
+      'enabled: canViewUserProfile && activeTab === "content" && Boolean(userId),'
+    );
     expect(source).toContain("{isExpanded ? (");
     expect(source).toContain("<AdminPetDetails");
     expect(source).toContain("showDetails");
     expect(source).toContain("hideDetails");
     expect(source).toContain("enabled: canManagePets");
     expect(source).toContain("function requestPetStatusChange(pet: AdminUserPet)");
-    expect(source).toContain("const [petActionError, setPetActionError]");
+    expect(source).toContain("const [pendingPetStatusChange, setPendingPetStatusChange]");
+    expect(source).toContain("const [petActionFeedback, setPetActionFeedback]");
     expect(source).toContain('clientLogger.warn("users.pet_status_update_failed", {');
     expect(source).toContain("petId: sanitizeSensitiveText(variables.petId, 80)");
     expect(source).toContain("status: variables.status");
     expect(source).toContain("function getUserPetActionErrorDetails(error: unknown)");
     expect(source).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
-    expect(source).toContain(
-      "setPetActionError(getAdminErrorMessage(error, petText.statusUpdateError));"
-    );
-    expect(source).toContain(
-      '{petActionError ? <AdminStateCard tone="warning" title={petActionError} /> : null}'
-    );
+    expect(source).toContain("message: getAdminErrorMessage(error, petText.statusUpdateError)");
+    expect(source).toContain("tone={petActionFeedback.tone}");
+    expect(source).toContain("function confirmPetStatusChange()");
+    expect(source).toContain("open={pendingPetStatusChange !== null}");
+    expect(source).toContain("title={petText.hideConfirmTitle}");
+    expect(source).toContain("petText.hidePetConfirmDescription");
+    expect(source).toContain("setPendingPetStatusChange(null);\n      setPetActionFeedback({");
     expect(source).toContain(
       "const isPetActionLocked = petStatusMutation.isPending || petsQuery.isFetching;"
     );
@@ -109,24 +116,26 @@ describe("user detail pets section", () => {
       "if (!canViewUserProfile || isPetActionLocked) {\n      return;\n    }"
     );
     expect(source).toContain("disabled={!canViewUserProfile || isPetActionLocked}");
-    expect(source).toContain(
-      'aria-label={`${\n                        pet.status === "active" ? petText.hidePetLabel : petText.restorePetLabel'
+    expect(source).toMatch(
+      /aria-label=\{`\$\{\s*pet\.status === "active"\s*\?\s*petText\.hidePetLabel\s*:\s*petText\.restorePetLabel/
     );
     expect(source).toContain("onClick={() => requestPetStatusChange(pet)}");
     expect(source).not.toContain(
       "onClick={() =>\n                        petStatusMutation.mutate({"
     );
     expect(source).toContain("function requestPhotoStatusChange(photo: AdminUserPetPhoto)");
-    expect(source).toContain("const [photoActionError, setPhotoActionError]");
+    expect(source).toContain("const [pendingPhotoStatusChange, setPendingPhotoStatusChange]");
+    expect(source).toContain("const [photoActionFeedback, setPhotoActionFeedback]");
     expect(source).toContain('clientLogger.warn("users.pet_photo_status_update_failed", {');
     expect(source).toContain("photoId: sanitizeSensitiveText(variables.photoId, 80)");
     expect(source).toContain("...getUserPetActionErrorDetails(error)");
-    expect(source).toContain(
-      "setPhotoActionError(getAdminErrorMessage(error, text.photoStatusUpdateError));"
-    );
-    expect(source).toContain(
-      '{photoActionError ? <AdminStateCard tone="warning" title={photoActionError} /> : null}'
-    );
+    expect(source).toContain("message: getAdminErrorMessage(error, text.photoStatusUpdateError)");
+    expect(source).toContain("tone={photoActionFeedback.tone}");
+    expect(source).toContain("function confirmPhotoStatusChange()");
+    expect(source).toContain("open={pendingPhotoStatusChange !== null}");
+    expect(source).toContain("text.hidePhotoConfirmDescription");
+    expect(source).toContain("id={detailsId}");
+    expect(source).toContain("setPendingPhotoStatusChange(null);\n      setPhotoActionFeedback({");
     expect(source).toContain(
       "const isPhotoActionLocked = photoStatusMutation.isPending || photosQuery.isFetching;"
     );

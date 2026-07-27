@@ -92,15 +92,11 @@ describe("template analytics error states", () => {
     );
     expect(detailSource).not.toContain("error,");
 
+    expect(hubSource).toContain("const overview = overviewQuery.data ?? null;");
     expect(hubSource).toContain(
-      "const isOverviewRefreshing = overviewQuery.isFetching && overviewQuery.isPlaceholderData;"
+      "const isOverviewRefreshing = overviewQuery.isFetching && Boolean(overview);"
     );
-    expect(hubSource).toContain(
-      "const overview = overviewQuery.isPlaceholderData ? null : (overviewQuery.data ?? null);"
-    );
-    expect(hubSource).toContain(
-      "const isLoading = (overviewQuery.isPending && !overview) || isOverviewRefreshing;"
-    );
+    expect(hubSource).toContain("const isLoading = overviewQuery.isPending && !overview;");
     expect(hubSource).toContain("const hasBlockingError = overviewQuery.isError && !overview;");
     expect(hubSource).toContain(
       "const hasPartialError = overviewQuery.isError && Boolean(overview);"
@@ -128,7 +124,9 @@ describe("template analytics error states", () => {
     expect(hubSource).toContain("enabled: canViewTemplateAnalytics");
     expect(hubSource).toContain("ensureAdminSession(locale, router);");
     expect(hubSource).toContain("disabled={!canViewTemplateAnalytics || overviewQuery.isFetching}");
-    expect(hubSource).toContain("const isHubControlsLocked = overviewQuery.isFetching;");
+    expect(hubSource).toContain(
+      "const isHubControlsLocked = overviewQuery.isFetching || isExporting;"
+    );
     expect(hubSource).toContain("disabled={isHubControlsLocked}");
     expect(hubSource).toContain("function requestOverviewRetry()");
     expect(hubSource).toContain(
@@ -194,8 +192,9 @@ describe("template analytics error states", () => {
       expect(source).toContain("document.body.append(link);");
       expect(source).toContain("link.remove();");
       expect(source).toContain("window.setTimeout(() => URL.revokeObjectURL(url), 1000);");
-      expect(source).toContain("} catch (error) {\n      URL.revokeObjectURL(url);");
-      expect(source).toContain("} finally {\n      link.remove();");
+      expect(source).toMatch(/catch \([^)]*\) \{\n\s+URL\.revokeObjectURL\(url\);/);
+      expect(source).toMatch(/throw (?:error|downloadError);/);
+      expect(source).toMatch(/finally \{\n\s+link\.remove\(\);/);
       expect(source).not.toContain("link.click();\n    URL.revokeObjectURL(url);");
     }
   });

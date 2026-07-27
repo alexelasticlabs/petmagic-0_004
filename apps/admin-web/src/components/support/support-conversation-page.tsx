@@ -1,10 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { AdminPage, AdminStateCard } from "@/components/admin/admin-primitives";
+import { useAdminUrlStateSyncGuard } from "@/components/admin/use-admin-url-state-sync-guard";
 import { SupportConversationChatPane } from "@/components/support/support-conversation-chat-pane";
+import {
+  buildSupportQueueSearchParams,
+  readSupportQueueUrlState,
+  type SupportQueueSubFilter,
+} from "@/components/support/support-conversation-controller.helpers";
+import { SupportConversationDetailsDrawer } from "@/components/support/support-conversation-details-drawer";
 import { SupportConversationFullscreenViewer } from "@/components/support/support-conversation-fullscreen-viewer";
 import { groupSupportConversationFeed } from "@/components/support/support-conversation-helpers";
 import { useSupportConversationMediaActions } from "@/components/support/support-conversation-media-actions";
@@ -36,19 +44,29 @@ export function SupportConversationPage({
   conversationId,
   navigationMode = "route",
   onConversationSelect,
+  initialQueueState: providedInitialQueueState,
 }: SupportConversationPageProps) {
   const copy = useMemo(() => getSupportConversationCopy(locale), [locale]);
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [initialQueueState] = useState(
+    () => providedInitialQueueState ?? readSupportQueueUrlState(searchParams)
+  );
   const [fullscreenImage, setFullscreenImage] = useState<FullscreenImage | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
-  const [subFilter, setSubFilter] = useState<"all" | "waiting" | "unassigned" | "archive">("all");
+  const [subFilter, setSubFilter] = useState<SupportQueueSubFilter>(initialQueueState.subFilter);
   const [queueStatusFilter, setQueueStatusFilter] = useState<"all" | SupportConversationStatus>(
-    "all"
+    initialQueueState.status
   );
   const [pendingAttachmentActionKey, setPendingAttachmentActionKey] = useState<string | null>(null);
   const [pendingFullscreenAction, setPendingFullscreenAction] = useState<
     "download" | "share" | "open" | null
   >(null);
+  const [isSupportDetailsDrawerMode, setIsSupportDetailsDrawerMode] = useState(false);
+  const [isSupportDetailsDrawerOpen, setIsSupportDetailsDrawerOpen] = useState(false);
+  const supportDetailsDrawerId = useId();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const messageHighlightTimerRef = useRef<number | null>(null);
@@ -58,6 +76,7 @@ export function SupportConversationPage({
     locale,
     conversationId,
     queueStatusFilter,
+    initialQueueState,
   });
   const {
     attachmentInputRef,
@@ -67,6 +86,7 @@ export function SupportConversationPage({
     conversation,
     conversationQuery,
     conversationSla,
+    debouncedSearchQuery,
     filteredInboxItems,
     canManageSupportWorkspace,
     canMutateConversation,
@@ -75,7 +95,8 @@ export function SupportConversationPage({
     hasComposerAttachment,
     inboxMetrics,
     inboxQuery,
-    isSidePanelOpen,
+    isAttachmentRetrySubmitting,
+    isLoadingOlderMessages,
     isSendReplySubmitting,
     loadOlderMessages,
     primaryStatusAction,
@@ -84,12 +105,14 @@ export function SupportConversationPage({
     reply,
     replyToMessage,
     replyToPreview,
+    requestAttachmentRetry,
     queuePage,
     requestSendReply,
     resetSelectedAttachment,
     searchQuery,
     secondaryStatusActions,
     selectedAttachment,
+    sessionUserRoles,
     selectReplyToMessage,
     setMessagesViewportVisible,
     setReply,
@@ -106,31 +129,96 @@ export function SupportConversationPage({
     userDisplayName,
   } = controller;
 
+  const currentSearchParams = searchParams.toString();
+  const { consumeUrlStateApplication, markUrlStateWritten } = useAdminUrlStateSyncGuard({
+    currentSearch: currentSearchParams,
+    applyUrlState: (nextSearchParams) => {
+      const nextQueueState = readSupportQueueUrlState(nextSearchParams);
+      setSubFilter(nextQueueState.subFilter);
+      setQueueStatusFilter(nextQueueState.status);
+      setQueueFilter(nextQueueState.subFilter);
+      setQueuePriorityFilter(nextQueueState.priority);
+      setQueueSort(nextQueueState.sort);
+      setSearchQuery(nextQueueState.search);
+      setQueuePage(nextQueueState.page);
+    },
+  });
+  const currentQueueUrlState = readSupportQueueUrlState(searchParams);
+  const isSupportUrlStatePending =
+    subFilter !== currentQueueUrlState.subFilter ||
+    queueStatusFilter !== currentQueueUrlState.status ||
+    queuePriorityFilter !== currentQueueUrlState.priority ||
+    queueSort !== currentQueueUrlState.sort ||
+    searchQuery.trim() !== currentQueueUrlState.search ||
+    debouncedSearchQuery !== currentQueueUrlState.search ||
+    queuePage !== currentQueueUrlState.page;
+  const queueSearchParams = buildSupportQueueSearchParams(
+    {
+      subFilter,
+      status: queueStatusFilter,
+      priority: queuePriorityFilter,
+      sort: queueSort,
+      search: debouncedSearchQuery,
+      page: queuePage,
+    },
+    currentSearchParams
+  );
+  const supportRouteSearchSuffix = queueSearchParams ? `?${queueSearchParams}` : "";
+
+  useEffect(() => {
+    if (consumeUrlStateApplication(isSupportUrlStatePending)) {
+      return;
+    }
+
+    if (queueSearchParams === currentSearchParams) {
+      return;
+    }
+
+    markUrlStateWritten(queueSearchParams);
+    router.replace(`${pathname}${supportRouteSearchSuffix}`, { scroll: false });
+  }, [
+    consumeUrlStateApplication,
+    currentSearchParams,
+    isSupportUrlStatePending,
+    markUrlStateWritten,
+    pathname,
+    queueSearchParams,
+    router,
+    supportRouteSearchSuffix,
+  ]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const media = window.matchMedia("(max-width: 1320px)");
+    const syncDrawerMode = () => {
+      setIsSupportDetailsDrawerMode(media.matches);
+      if (!media.matches) {
+        setIsSupportDetailsDrawerOpen(false);
+      }
+    };
+
+    syncDrawerMode();
+    media.addEventListener("change", syncDrawerMode);
+    return () => media.removeEventListener("change", syncDrawerMode);
+  }, []);
+
   const isConversationReadOnly = conversation?.isReadOnly ?? false;
   const isComposerBusy = isSendReplySubmitting;
   const isComposerDisabled = isConversationReadOnly || !canMutateConversation || isComposerBusy;
   const isConversationClosed = conversation?.status === "Closed";
   const isQueueControlsLocked = !canManageSupportWorkspace || inboxQuery.isFetching;
-  const setQueueSubFilter = (value: "all" | "waiting" | "unassigned" | "archive") => {
+  const setQueueSubFilter = (value: SupportQueueSubFilter) => {
     if (isQueueControlsLocked) {
       return;
     }
 
     setSubFilter(value);
     setQueueStatusFilter("all");
-    if (value === "waiting") {
-      setQueueFilter("waiting");
-      return;
-    }
-    if (value === "archive") {
-      setQueueFilter("Closed");
-      return;
-    }
-    if (value === "unassigned") {
-      setQueueFilter("unassigned");
-      return;
-    }
-    setQueueFilter("all");
+    setQueueFilter(value);
+    setQueuePage(1);
   };
   const setExactQueueStatusFilter = (value: "all" | SupportConversationStatus) => {
     if (isQueueControlsLocked) {
@@ -185,14 +273,13 @@ export function SupportConversationPage({
     void inboxQuery.refetch().catch(() => undefined);
   };
   const requestOlderMessagesLoad = () => {
-    if (!canManageSupportWorkspace || conversationQuery.isFetching) {
+    if (!canManageSupportWorkspace || conversationQuery.isFetching || isLoadingOlderMessages) {
       return;
     }
 
     void loadOlderMessages();
   };
 
-  const archiveCount = inboxMetrics?.closedConversations ?? 0;
   const queueCount = inboxMetrics?.openConversations ?? 0;
   const incomingMessagesCount = inboxMetrics?.unreadForAdminConversations ?? 0;
   const unassignedCount = inboxMetrics?.unassignedConversations ?? 0;
@@ -217,7 +304,6 @@ export function SupportConversationPage({
   const imageViewerLabels = copy.page.imageViewer;
   const queueLabels = copy.page.queue;
   const messageLabels = copy.page.message;
-  const supportWorkspaceSubtitle = copy.page.workspaceSubtitle;
   const {
     closeFullscreenImage,
     openFullscreenImageInNewTab,
@@ -372,6 +458,7 @@ export function SupportConversationPage({
       const tag = (event.target as HTMLElement).tagName;
       if (
         event.key === "/" &&
+        !fullscreenImage &&
         tag !== "INPUT" &&
         tag !== "TEXTAREA" &&
         !event.metaKey &&
@@ -383,7 +470,7 @@ export function SupportConversationPage({
     };
     window.addEventListener("keydown", handleGlobalKeyDown);
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
-  }, []);
+  }, [fullscreenImage]);
 
   useEffect(() => {
     if (!fullscreenImage || typeof document === "undefined") {
@@ -462,7 +549,7 @@ export function SupportConversationPage({
                 {text.supportRetryAction}
               </Button>
               <Link
-                href={`/${locale}/support`}
+                href={`/${locale}/support${supportRouteSearchSuffix}`}
                 className="ui-button ui-button--secondary ui-button--md"
               >
                 {text.supportBackToInbox}
@@ -472,11 +559,8 @@ export function SupportConversationPage({
         />
       ) : (
         <>
-          <div
-            className={`${styles.workspace} ${isSidePanelOpen ? styles.workspaceFullView : styles.workspaceCompact}`}
-          >
+          <div className={`${styles.workspace} ${styles.workspaceFullView}`}>
             <SupportConversationQueuePane
-              archiveCount={archiveCount}
               canManageSupportWorkspace={canManageSupportWorkspace}
               canGoToNextQueuePage={canGoToNextQueuePage}
               canGoToPreviousQueuePage={canGoToPreviousQueuePage}
@@ -495,6 +579,7 @@ export function SupportConversationPage({
               onConversationSelect={onConversationSelect}
               queueCount={queueCount}
               queueLabels={queueLabels}
+              queueSearchParams={queueSearchParams}
               queueShownEnd={queueShownEnd}
               queueShownStart={queueShownStart}
               queuePriorityFilter={queuePriorityFilter}
@@ -503,10 +588,13 @@ export function SupportConversationPage({
               requestInboxRetry={requestInboxRetry}
               requestNextQueuePage={requestNextQueuePage}
               requestPreviousQueuePage={requestPreviousQueuePage}
+              searchInputRef={searchInputRef}
+              searchQuery={searchQuery}
               setExactQueueStatusFilter={setExactQueueStatusFilter}
               setExactQueuePriorityFilter={setExactQueuePriorityFilter}
               setExactQueueSort={setExactQueueSort}
               setQueueSubFilter={setQueueSubFilter}
+              setSearchQuery={(value) => setSearchQuery(value.slice(0, SUPPORT_SEARCH_MAX_LENGTH))}
               subFilter={subFilter}
               text={text}
               unassignedCount={unassignedCount}
@@ -516,17 +604,34 @@ export function SupportConversationPage({
               attachmentInputRef={attachmentInputRef}
               attachmentPreviewUrl={attachmentPreviewUrl}
               canManageSupportWorkspace={canManageSupportWorkspace}
+              canManageReplyTemplates={sessionUserRoles.includes("Admin")}
+              canRetryAttachment={canMutateConversation}
               composerPlaceholder={composerPlaceholder}
               composerValue={composerValue}
               conversation={conversation}
               conversationQueryIsFetching={conversationQuery.isFetching}
               conversationSla={conversationSla}
               copy={copy}
+              detailsAction={
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className={styles.detailsTrigger}
+                  aria-controls={supportDetailsDrawerId}
+                  aria-expanded={isSupportDetailsDrawerOpen}
+                  aria-label={text.supportConversationDetailsTitle}
+                  onClick={() => setIsSupportDetailsDrawerOpen(true)}
+                >
+                  {text.supportConversationDetailsTitle}
+                </Button>
+              }
               groupedConversationFeed={groupedConversationFeed}
               hasComposerAttachment={hasComposerAttachment}
               highlightedMessageId={highlightedMessageId}
               isComposerBusy={isComposerBusy}
               isComposerDisabled={isComposerDisabled}
+              isAttachmentRetrySubmitting={isAttachmentRetrySubmitting}
+              isLoadingOlderMessages={isLoadingOlderMessages}
               isConversationClosed={isConversationClosed}
               isConversationReadOnly={isConversationReadOnly}
               isDragging={isDragging}
@@ -541,35 +646,37 @@ export function SupportConversationPage({
               replyComposerPreview={replyComposerPreview}
               replyToMessage={replyToMessage}
               replyToPreview={replyToPreview}
+              requestAttachmentRetry={requestAttachmentRetry}
               requestOlderMessagesLoad={requestOlderMessagesLoad}
               requestReopenConversation={requestReopenConversation}
               reopenStatusAction={reopenStatusAction}
               renderAttachmentTile={renderAttachmentTile}
               renderReplyThumbnail={renderReplyThumbnail}
               resetSelectedAttachment={resetSelectedAttachment}
-              searchInputRef={searchInputRef}
-              searchQuery={searchQuery}
               selectedAttachment={selectedAttachment}
               selectReplyToMessage={(messageId) => selectReplyToMessage(messageId)}
               setFullscreenImage={setFullscreenImage}
               setIsDragging={setIsDragging}
               setReply={(value) => setReply(value.slice(0, SUPPORT_REPLY_MAX_LENGTH))}
-              setSearchQuery={(value) => setSearchQuery(value.slice(0, SUPPORT_SEARCH_MAX_LENGTH))}
               setSelectedAttachment={setSelectedAttachment}
               startReplyToMessage={startReplyToMessage}
               statusMutationIsPending={statusMutation.isPending}
               submitReply={submitReply}
-              supportWorkspaceSubtitle={supportWorkspaceSubtitle}
               text={text}
               userDisplayName={userDisplayName}
               userEmailDisplay={userEmailDisplay}
             />
 
-            {isSidePanelOpen ? (
-              <>
-                <SupportInfoPanel locale={locale} controller={controller} />
-              </>
-            ) : null}
+            <SupportConversationDetailsDrawer
+              drawerId={supportDetailsDrawerId}
+              isDrawerMode={isSupportDetailsDrawerMode}
+              isOpen={isSupportDetailsDrawerOpen}
+              title={text.supportConversationDetailsTitle}
+              closeLabel={text.supportClosePanelAction}
+              onClose={() => setIsSupportDetailsDrawerOpen(false)}
+            >
+              <SupportInfoPanel locale={locale} controller={controller} />
+            </SupportConversationDetailsDrawer>
           </div>
           {fullscreenImage ? (
             <SupportConversationFullscreenViewer

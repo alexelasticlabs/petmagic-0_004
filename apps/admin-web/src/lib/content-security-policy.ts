@@ -1,8 +1,18 @@
-import { isUnsafeAdminMediaHost } from "@/lib/admin-unsafe-remote-host";
+import {
+  isAdminLocalDevelopmentHost,
+  isUnsafeAdminMediaHost,
+} from "@/lib/admin-unsafe-remote-host";
+
+function shouldAllowLocalApiBaseUrlInProduction(
+  rawValue = process.env.NEXT_PUBLIC_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION
+): boolean {
+  return rawValue?.trim().toLowerCase() === "true";
+}
 
 function resolveApiOrigins(
   configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL,
-  nodeEnv = process.env.NODE_ENV
+  nodeEnv = process.env.NODE_ENV,
+  allowLocalApiBaseUrlInProduction = shouldAllowLocalApiBaseUrlInProduction()
 ): string[] {
   const origins = new Set<string>();
   const normalized = configuredApiBaseUrl?.trim();
@@ -13,10 +23,13 @@ function resolveApiOrigins(
       throw new Error("NEXT_PUBLIC_API_BASE_URL must be credential-free.");
     }
     if (nodeEnv === "production") {
-      if (parsed.protocol !== "https:") {
+      const isLocalHost = isAdminLocalDevelopmentHost(parsed.hostname);
+      const isAllowedLocalOrigin = allowLocalApiBaseUrlInProduction && isLocalHost;
+
+      if (parsed.protocol !== "https:" && !isAllowedLocalOrigin) {
         throw new Error("NEXT_PUBLIC_API_BASE_URL must use HTTPS in production.");
       }
-      if (isUnsafeAdminMediaHost(parsed.hostname)) {
+      if (isUnsafeAdminMediaHost(parsed.hostname) && !isAllowedLocalOrigin) {
         throw new Error(
           "NEXT_PUBLIC_API_BASE_URL cannot target local, private, or placeholder hosts."
         );
@@ -78,13 +91,18 @@ export function buildNonceContentSecurityPolicy(
   nonce: string,
   configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL,
   nodeEnv = process.env.NODE_ENV,
-  configuredMediaOrigins = process.env.ADMIN_MEDIA_ORIGINS
+  configuredMediaOrigins = process.env.ADMIN_MEDIA_ORIGINS,
+  allowLocalApiBaseUrlInProduction = shouldAllowLocalApiBaseUrlInProduction()
 ): string {
   if (!/^[A-Za-z0-9+/=_-]+$/.test(nonce)) {
     throw new Error("CSP nonce contains unsupported characters.");
   }
 
-  const apiOrigins = resolveApiOrigins(configuredApiBaseUrl, nodeEnv);
+  const apiOrigins = resolveApiOrigins(
+    configuredApiBaseUrl,
+    nodeEnv,
+    allowLocalApiBaseUrlInProduction
+  );
   const mediaOrigins = resolveMediaOrigins(configuredMediaOrigins, nodeEnv);
   const remoteOrigins = Array.from(new Set([...apiOrigins, ...mediaOrigins]));
   const connectSrc = ["'self'", ...remoteOrigins].join(" ");

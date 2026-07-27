@@ -40,13 +40,26 @@ describe("shared admin select hardening", () => {
     expect(source).toContain("aria-controls={isMenuOpen ? listboxId : undefined}");
     expect(source).toContain("aria-label={effectiveAriaLabel}");
     expect(source).toContain("title={effectiveAriaLabel}");
+    expect(source).toContain("id={listboxId}");
     expect(source).toContain(
-      '<div id={listboxId} className={styles.menu} role="listbox" aria-label={effectiveAriaLabel}>'
+      'className={`${styles.menu} ${menuMode === "inline" ? styles.menuInline : ""}`.trim()}'
     );
+    expect(source).toContain('role="listbox"');
     expect(source).not.toContain("aria-controls={listboxId}");
     expect(source).not.toContain("aria-label={ariaLabel}");
     expect(source).not.toContain("title={ariaLabel}");
     expect(source).not.toContain('role="listbox" aria-label={ariaLabel}');
+  });
+
+  it("returns focus to the trigger when Escape closes an open listbox", () => {
+    const source = readFileSync(selectPath, "utf8");
+
+    expect(source).toContain(
+      'function handleEscape(event: KeyboardEvent) {\n      if (event.key === "Escape") {\n        closeMenu(true);\n      }\n    }'
+    );
+    expect(source).toContain(
+      'case "Escape":\n                      event.preventDefault();\n                      closeMenu(true);'
+    );
   });
 
   it("keeps select visual states on tokens without decorative tracking", () => {
@@ -97,5 +110,17 @@ describe("shared admin select hardening", () => {
     expect(css).toContain(".menu::-webkit-scrollbar-thumb");
     expect(mobileBlock).toContain("max-height: min(20rem, calc(100dvh - 10rem));");
     expect(css).not.toContain("100vh");
+  });
+
+  it("supports an inline menu where a scrollable parent would clip an overlay", () => {
+    const source = readFileSync(selectPath, "utf8");
+    const css = readFileSync(selectCssPath, "utf8");
+
+    expect(source).toContain('menuMode?: "overlay" | "inline";');
+    expect(source).toContain('menuMode = "overlay",');
+    expect(source).toContain('menuMode === "inline" ? styles.menuInline : ""');
+    expect(css).toContain(".menuInline {");
+    expect(css).toContain("position: static;");
+    expect(css).toContain("max-height: min(18rem, calc(100dvh - 12rem));");
   });
 });

@@ -40,6 +40,12 @@ export type SafeTemplatesAnalyticsQueryExport = Omit<AdminTemplatesAnalyticsQuer
   category?: string;
 };
 
+type FetchTemplatesAnalyticsOverview = (
+  query: AdminTemplatesAnalyticsQuery
+) => Promise<AdminTemplatesAnalyticsOverview>;
+
+const EXPORT_PAGE_SIZE = 200;
+
 function sanitizeAnalyticsText(value: string, maxLength = 160) {
   return sanitizeSensitiveText(value.replace(EXPORT_URL_PATTERN, "[redacted-url]"), maxLength);
 }
@@ -129,6 +135,10 @@ export function sanitizeTemplatesAnalyticsOverviewForExport(
     feedbackItems: overview.feedbackItems.map(sanitizeFeedbackForExport),
     conversionFunnel: overview.conversionFunnel,
     templates: overview.templates.map(sanitizeTemplateRowForExport),
+    skip: overview.skip,
+    take: overview.take,
+    totalCount: overview.totalCount,
+    hasMore: overview.hasMore,
     availableCategories: overview.availableCategories.map((category) =>
       sanitizeAnalyticsText(category, 120)
     ),
@@ -142,5 +152,52 @@ export function sanitizeTemplatesAnalyticsQueryForExport(
   return {
     ...query,
     category: query.category ? sanitizeAnalyticsText(query.category, 120) : undefined,
+  };
+}
+
+/**
+ * Exports must not silently stop at the page currently shown in the table.
+ * The API returns all aggregate panels on every page, so the first response
+ * remains the source of truth for those panels while template rows are read
+ * through the whole stable result set.
+ */
+export async function collectTemplatesAnalyticsOverviewForExport(
+  query: AdminTemplatesAnalyticsQuery,
+  fetchOverview: FetchTemplatesAnalyticsOverview
+): Promise<AdminTemplatesAnalyticsOverview> {
+  const firstPage = await fetchOverview({
+    ...query,
+    skip: 0,
+    take: EXPORT_PAGE_SIZE,
+  });
+  const templates = [...firstPage.templates];
+  let currentPage = firstPage;
+  const maximumPageCount = Math.max(1, Math.ceil(firstPage.totalCount / EXPORT_PAGE_SIZE) + 1);
+
+  for (let pageIndex = 1; currentPage.hasMore && pageIndex < maximumPageCount; pageIndex += 1) {
+    const nextSkip = currentPage.skip + currentPage.templates.length;
+    if (currentPage.templates.length === 0 || nextSkip <= currentPage.skip) {
+      throw new Error("Templates analytics export pagination did not advance.");
+    }
+
+    currentPage = await fetchOverview({
+      ...query,
+      skip: nextSkip,
+      take: EXPORT_PAGE_SIZE,
+    });
+    templates.push(...currentPage.templates);
+  }
+
+  if (currentPage.hasMore) {
+    throw new Error("Templates analytics export did not finish within the expected page count.");
+  }
+
+  return {
+    ...firstPage,
+    templates,
+    skip: 0,
+    take: EXPORT_PAGE_SIZE,
+    totalCount: firstPage.totalCount,
+    hasMore: false,
   };
 }

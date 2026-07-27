@@ -3,7 +3,7 @@ import {
   cachedGet,
   cachedSupportTemplates,
   encodePathSegment,
-  inflightGetRequests,
+  invalidateCachedGetNamespaces,
 } from "./api-client.core";
 
 import type {
@@ -12,6 +12,7 @@ import type {
   AdminSupportInboxPage,
   AdminSupportMessage,
   AdminSupportReplyTemplate,
+  AdminSupportReplyTemplateVersion,
   SupportConversationPriority,
   SupportConversationStatus,
   SupportInboxAssignmentScope,
@@ -25,15 +26,24 @@ function normalizePositiveInteger(value: number | undefined, maxValue: number): 
 
 export const SUPPORT_INBOX_SEARCH_MAX_LENGTH = 120;
 export const SUPPORT_CONVERSATION_MESSAGES_MAX_TAKE = 120;
-export const SUPPORT_MESSAGE_BODY_MAX_LENGTH = 2_000;
+export const SUPPORT_MESSAGE_BODY_MAX_LENGTH = 4_000;
+export const SUPPORT_IDEMPOTENCY_KEY_MAX_LENGTH = 128;
+export const SUPPORT_ATTACHMENT_ACCEPTED_MIME_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "video/mp4",
+  "video/quicktime",
+] as const;
+export const SUPPORT_ATTACHMENT_ACCEPT = SUPPORT_ATTACHMENT_ACCEPTED_MIME_TYPES.join(",");
 export type SupportInboxSort = "default" | "priority" | "waiting" | "updated" | "created";
-export type SupportInboxQueue = "all" | "waiting_for_support";
+export type SupportInboxQueue = "all" | "waiting_for_support" | "unread";
 
 const SUPPORT_INBOX_STATUSES = ["New", "InProgress", "WaitingForUser", "Closed"] as const;
 const SUPPORT_INBOX_ASSIGNMENTS = ["all", "mine", "unassigned"] as const;
 const SUPPORT_INBOX_PRIORITIES = ["Low", "Normal", "High"] as const;
 const SUPPORT_INBOX_SORTS = ["default", "priority", "waiting", "updated", "created"] as const;
-const SUPPORT_INBOX_QUEUES = ["all", "waiting_for_support"] as const;
+const SUPPORT_INBOX_QUEUES = ["all", "waiting_for_support", "unread"] as const;
 
 function normalizeSupportInboxSearch(value: string | undefined): string | undefined {
   return value?.trim().slice(0, SUPPORT_INBOX_SEARCH_MAX_LENGTH) || undefined;
@@ -41,6 +51,27 @@ function normalizeSupportInboxSearch(value: string | undefined): string | undefi
 
 function normalizeSupportMessageBody(value: string | undefined): string {
   return value?.trim().slice(0, SUPPORT_MESSAGE_BODY_MAX_LENGTH) ?? "";
+}
+
+function normalizeSupportMessageIdempotencyKey(value: string | undefined): string | undefined {
+  if (typeof value === "undefined") {
+    return undefined;
+  }
+
+  const normalizedValue = value.trim();
+  if (!normalizedValue || normalizedValue.length > SUPPORT_IDEMPOTENCY_KEY_MAX_LENGTH) {
+    throw new Error("support.idempotency_key_invalid");
+  }
+
+  return normalizedValue;
+}
+
+export function isSupportedSupportAttachmentMimeType(value: string | null | undefined): boolean {
+  const normalizedValue = value?.trim().toLowerCase();
+  return (
+    typeof normalizedValue === "string" &&
+    (SUPPORT_ATTACHMENT_ACCEPTED_MIME_TYPES as readonly string[]).includes(normalizedValue)
+  );
 }
 
 function normalizeSupportOption<const T extends string>(
@@ -119,6 +150,37 @@ export async function fetchSupportInbox(
   });
 }
 
+export async function fetchAdminUserSupportTickets(
+  userId: string,
+  options?: {
+    page?: number;
+    pageSize?: number;
+    signal?: AbortSignal;
+  }
+): Promise<AdminSupportInboxPage> {
+  const encodedUserId = encodePathSegment(userId);
+  const normalizedPage = normalizePositiveInteger(options?.page, 10_000);
+  const normalizedPageSize = normalizePositiveInteger(options?.pageSize, 100);
+  const searchParams = new URLSearchParams();
+
+  if (normalizedPage) {
+    searchParams.set("page", String(normalizedPage));
+  }
+
+  if (normalizedPageSize) {
+    searchParams.set("pageSize", String(normalizedPageSize));
+  }
+
+  const query = searchParams.size > 0 ? `?${searchParams.toString()}` : "";
+  return apiRequest<AdminSupportInboxPage>(
+    `/api/admin/users/${encodedUserId}/support/tickets${query}`,
+    {
+      method: "GET",
+      signal: options?.signal,
+    }
+  );
+}
+
 export async function fetchSupportInboxMetrics(
   signal?: AbortSignal
 ): Promise<AdminSupportInboxMetrics> {
@@ -169,10 +231,12 @@ export async function fetchSupportConversation(
 export async function sendSupportMessage(
   conversationId: string,
   body: string,
-  replyToMessageId?: string | null
+  replyToMessageId?: string | null,
+  idempotencyKey?: string
 ): Promise<AdminSupportMessage> {
   const encodedConversationId = encodePathSegment(conversationId);
   const normalizedBody = normalizeSupportMessageBody(body);
+  const normalizedIdempotencyKey = normalizeSupportMessageIdempotencyKey(idempotencyKey);
   const message = await apiRequest<AdminSupportMessage>(
     `/api/admin/support/tickets/${encodedConversationId}/messages`,
     {
@@ -181,6 +245,9 @@ export async function sendSupportMessage(
         body: normalizedBody,
         ...(replyToMessageId?.trim() ? { replyToMessageId: replyToMessageId.trim() } : {}),
       }),
+      headers: normalizedIdempotencyKey
+        ? { "Idempotency-Key": normalizedIdempotencyKey }
+        : undefined,
     }
   );
 
@@ -192,11 +259,13 @@ export async function sendSupportAttachment(
   conversationId: string,
   file: File,
   body?: string,
-  replyToMessageId?: string | null
+  replyToMessageId?: string | null,
+  idempotencyKey?: string
 ): Promise<AdminSupportMessage> {
   const encodedConversationId = encodePathSegment(conversationId);
   const formData = new FormData();
   const normalizedBody = normalizeSupportMessageBody(body);
+  const normalizedIdempotencyKey = normalizeSupportMessageIdempotencyKey(idempotencyKey);
   if (normalizedBody) {
     formData.append("body", normalizedBody);
   }
@@ -208,6 +277,31 @@ export async function sendSupportAttachment(
 
   const message = await apiRequest<AdminSupportMessage>(
     `/api/admin/support/tickets/${encodedConversationId}/attachments`,
+    {
+      method: "POST",
+      body: formData,
+      headers: normalizedIdempotencyKey
+        ? { "Idempotency-Key": normalizedIdempotencyKey }
+        : undefined,
+    }
+  );
+
+  clearSupportCaches(conversationId);
+  return message;
+}
+
+export async function retrySupportAttachment(
+  conversationId: string,
+  messageId: string,
+  file: File
+): Promise<AdminSupportMessage> {
+  const encodedConversationId = encodePathSegment(conversationId);
+  const encodedMessageId = encodePathSegment(messageId);
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const message = await apiRequest<AdminSupportMessage>(
+    `/api/admin/support/tickets/${encodedConversationId}/messages/${encodedMessageId}/attachment/retry`,
     {
       method: "POST",
       body: formData,
@@ -239,7 +333,10 @@ export async function updateSupportConversationStatus(
         ? "mark-in-progress"
         : status === "Closed"
           ? "close"
-          : "mark-in-progress";
+          : null;
+  if (!actionPath) {
+    throw new Error(`Unsupported support conversation status action: ${status}`);
+  }
   const conversation = await apiRequest<AdminSupportConversation>(
     `/api/admin/support/tickets/${encodedConversationId}/${actionPath}`,
     { method: "POST" }
@@ -249,26 +346,21 @@ export async function updateSupportConversationStatus(
   return conversation;
 }
 
-export async function assignSupportConversationToMe(
-  conversationId: string
+export async function assignSupportConversation(
+  conversationId: string,
+  payload: {
+    assignedAdminId: string | null;
+    reason: string;
+    expectedVersion: number;
+  }
 ): Promise<AdminSupportConversation> {
   const encodedConversationId = encodePathSegment(conversationId);
   const conversation = await apiRequest<AdminSupportConversation>(
-    `/api/admin/support/tickets/${encodedConversationId}/assign-to-me`,
-    { method: "POST" }
-  );
-
-  clearSupportCaches(conversationId);
-  return conversation;
-}
-
-export async function unassignSupportConversation(
-  conversationId: string
-): Promise<AdminSupportConversation> {
-  const encodedConversationId = encodePathSegment(conversationId);
-  const conversation = await apiRequest<AdminSupportConversation>(
-    `/api/admin/support/tickets/${encodedConversationId}/unassign`,
-    { method: "POST" }
+    `/api/admin/support/tickets/${encodedConversationId}/assignment`,
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }
   );
 
   clearSupportCaches(conversationId);
@@ -296,17 +388,33 @@ export async function updateSupportConversationMetadata(
 }
 
 export async function fetchSupportReplyTemplates(
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  includeDisabled = false
 ): Promise<AdminSupportReplyTemplate[]> {
+  const cacheKey = includeDisabled ? "support-templates:all" : "support-templates:enabled";
   return cachedGet(
-    "support-templates",
+    cacheKey,
     cachedSupportTemplates,
     () =>
-      apiRequest<AdminSupportReplyTemplate[]>("/api/admin/support/templates", {
-        method: "GET",
-        signal,
-      }),
+      apiRequest<AdminSupportReplyTemplate[]>(
+        `/api/admin/support/templates${includeDisabled ? "?includeDisabled=true" : ""}`,
+        {
+          method: "GET",
+          signal,
+        }
+      ),
     signal
+  );
+}
+
+export async function fetchSupportReplyTemplateVersions(
+  templateId: string,
+  signal?: AbortSignal
+): Promise<AdminSupportReplyTemplateVersion[]> {
+  const encodedTemplateId = encodePathSegment(templateId);
+  return apiRequest<AdminSupportReplyTemplateVersion[]>(
+    `/api/admin/support/templates/${encodedTemplateId}/versions`,
+    { method: "GET", signal }
   );
 }
 
@@ -315,6 +423,8 @@ export async function createSupportReplyTemplate(payload: {
   body: string;
   isEnabled: boolean;
   sortOrder: number;
+  expectedVersion?: number;
+  reason?: string;
 }): Promise<AdminSupportReplyTemplate> {
   const template = await apiRequest<AdminSupportReplyTemplate>("/api/admin/support/templates", {
     method: "POST",
@@ -332,6 +442,8 @@ export async function updateSupportReplyTemplate(
     body: string;
     isEnabled: boolean;
     sortOrder: number;
+    expectedVersion?: number;
+    reason?: string;
   }
 ): Promise<AdminSupportReplyTemplate> {
   const encodedTemplateId = encodePathSegment(templateId);
@@ -347,9 +459,20 @@ export async function updateSupportReplyTemplate(
   return template;
 }
 
-export async function deleteSupportReplyTemplate(templateId: string): Promise<void> {
+export async function deleteSupportReplyTemplate(
+  templateId: string,
+  options?: { expectedVersion?: number; reason?: string }
+): Promise<void> {
   const encodedTemplateId = encodePathSegment(templateId);
-  await apiRequest<void>(`/api/admin/support/templates/${encodedTemplateId}`, {
+  const query = new URLSearchParams();
+  if (options?.expectedVersion) {
+    query.set("expectedVersion", String(options.expectedVersion));
+  }
+  if (options?.reason?.trim()) {
+    query.set("reason", options.reason.trim());
+  }
+  const querySuffix = query.size > 0 ? `?${query.toString()}` : "";
+  await apiRequest<void>(`/api/admin/support/templates/${encodedTemplateId}${querySuffix}`, {
     method: "DELETE",
   });
 
@@ -361,6 +484,6 @@ function clearSupportCaches(conversationId?: string): void {
 }
 
 function clearSupportTemplateCaches(): void {
+  invalidateCachedGetNamespaces(["support-templates"]);
   cachedSupportTemplates.clear();
-  inflightGetRequests.delete("support-templates");
 }

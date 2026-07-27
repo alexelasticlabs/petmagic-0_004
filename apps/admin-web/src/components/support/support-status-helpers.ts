@@ -1,4 +1,8 @@
-import type { SupportConversationSource, SupportConversationStatus } from "@/lib/api-client";
+import type {
+  AdminSupportConversation,
+  SupportConversationSource,
+  SupportConversationStatus,
+} from "@/lib/api-client";
 import type { Dictionary } from "@/lib/i18n";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
@@ -54,33 +58,25 @@ export function statusHint(status: SupportConversationStatus, text: Dictionary) 
 }
 
 export function getAvailableStatusActions(
-  status: SupportConversationStatus,
+  conversation: Pick<AdminSupportConversation, "availableActions" | "canReopen" | "status">,
   text: Dictionary
 ): StatusActionDescriptor[] {
-  switch (normalizeStatus(status)) {
-    case "New":
-      return [
-        { status: "Closed", label: text.supportCloseConversationAction, variant: "secondary" },
-      ];
-    case "InProgress":
-      return [
-        { status: "Closed", label: text.supportCloseConversationAction, variant: "secondary" },
-      ];
-    case "WaitingForUser":
-      return [
-        {
-          status: "Closed",
-          label: text.supportCloseConversationAction,
-          variant: "secondary",
-        },
-      ];
-    case "Closed":
-      return [
-        { status: "InProgress", label: text.supportReopenConversationAction, variant: "primary" },
-      ];
-    default:
-      return [];
+  const availableActions = new Set(
+    conversation.availableActions.map((action) => action.trim().toLowerCase())
+  );
+  const normalizedStatus = normalizeStatus(conversation.status);
+
+  if (normalizedStatus === "Closed" && conversation.canReopen && availableActions.has("reopen")) {
+    return [
+      { status: "InProgress", label: text.supportReopenConversationAction, variant: "primary" },
+    ];
   }
+
+  if (normalizedStatus !== "Closed" && availableActions.has("close")) {
+    return [{ status: "Closed", label: text.supportCloseConversationAction, variant: "secondary" }];
+  }
+
+  return [];
 }
 
 export function sourceLabel(source: SupportConversationSource | string, text: Dictionary) {
@@ -103,6 +99,8 @@ export function priorityLabel(priority: string, text: Dictionary) {
   switch (priority.toLowerCase()) {
     case "critical":
       return text.supportPriorityCritical;
+    case "urgent":
+      return text.supportPriorityUrgent;
     case "high":
       return text.supportPriorityHigh;
     case "low":
@@ -115,6 +113,7 @@ export function priorityLabel(priority: string, text: Dictionary) {
 export function priorityTone(priority: string) {
   switch (priority.toLowerCase()) {
     case "critical":
+    case "urgent":
       return "danger" as const;
     case "high":
       return "warning" as const;

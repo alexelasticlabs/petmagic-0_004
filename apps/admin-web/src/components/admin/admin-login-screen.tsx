@@ -19,7 +19,7 @@ export function AdminLoginScreen({ locale, onToggleTheme, children }: AdminLogin
     <div className={styles.screen}>
       <div className={styles.left}>
         <BrandMark className={styles.brandMark} />
-        <h2 className={styles.welcome}>{copy.welcomeTitle}</h2>
+        <h1 className={styles.welcome}>{copy.welcomeTitle}</h1>
         <p className={styles.tagline}>{copy.welcomeSubtitle}</p>
         <LoginDashboardPreview title={copy.previewWindowTitle} />
       </div>

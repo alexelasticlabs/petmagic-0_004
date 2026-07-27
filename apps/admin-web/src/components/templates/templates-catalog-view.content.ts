@@ -4,13 +4,50 @@ import { type Locale } from "@/lib/i18n";
 const templatesCatalogLocaleText = {
   ru: {
     intlLocale: "ru-RU",
+    allTitle: "Управление шаблонами",
     videoTitle: "Видео шаблоны",
     imageTitle: "Шаблоны изображений",
+    allDescription:
+      "Каталог, публикация и качество image/video шаблонов в одном рабочем пространстве.",
     videoDescription: "Каталог видео-шаблонов, статусы, категории и параметры доступа.",
     imageDescription: "Каталог шаблонов изображений, статусы, категории и параметры доступа.",
     createVideoTemplate: "Создать видео шаблон",
     createImageTemplate: "Создать шаблон изображения",
+    createTemplate: "Создать шаблон",
+    chooseTemplateType: "Выберите тип нового шаблона",
     manageCategories: "Управление категориями",
+    typesLabel: "Тип шаблонов",
+    allTypes: "Все",
+    videoTypes: "Видео",
+    imageTypes: "Изображения",
+    totalMetric: "Всего",
+    activeMetric: "Активны",
+    draftsMetric: "Черновики",
+    missingPreviewMetric: "Без превью",
+    qaOnlyMetric: "Только QA",
+    filtersLabel: "Фильтры каталога",
+    showFilters: "Показать фильтры",
+    hideFilters: "Скрыть фильтры",
+    resetFilters: "Сбросить",
+    activeFilters: (count: number) => `Активных фильтров: ${count}`,
+    visibilityLabel: "Видимость",
+    allVisibility: "Любая",
+    publicVisibility: "Публичные",
+    qaVisibility: "Только QA",
+    readinessLabel: "Готовность",
+    allReadiness: "Любая",
+    readyReadiness: "С превью",
+    missingPreviewReadiness: "Без превью",
+    publicationControlTitle: "Контроль публикации",
+    publicationControlDescription: "Быстрый переход к шаблонам, требующим внимания.",
+    quickLinksTitle: "Быстрые переходы",
+    analyticsHubAction: "Аналитика шаблонов",
+    dailyFeaturedAction: "Шаблон дня",
+    categoriesAction: "Категории",
+    filteredEmptyTitle: "По этим условиям шаблонов нет",
+    filteredEmptyDescription: "Сбросьте фильтры или измените поисковый запрос.",
+    catalogEmptyTitle: "Каталог пока пуст",
+    catalogEmptyDescription: "Создайте первый шаблон, чтобы подготовить его к публикации.",
     analyticsAction: "Аналитика",
     templateActionsAdminOnly: "Управление шаблонами доступно только администратору.",
     analyticsUnavailableTitle: "Метрики шаблонов временно недоступны",
@@ -50,7 +87,7 @@ const templatesCatalogLocaleText = {
     tableStarts: "Запуски",
     tableConversion: "Конверсия",
     tableSuccess: "Успех",
-    tableAverageCost: "Средняя стоимость",
+    tableAverageCost: "Стоимость шаблона",
     tokenUnit: "ток.",
     metricCost: "Стоимость",
     metricViews: "Просмотры",
@@ -63,13 +100,50 @@ const templatesCatalogLocaleText = {
   },
   en: {
     intlLocale: "en-US",
+    allTitle: "Template management",
     videoTitle: "Video Templates",
     imageTitle: "Image Templates",
+    allDescription:
+      "Catalog, publishing, and image/video template quality in one operational workspace.",
     videoDescription: "Motion template catalog, statuses, categories, and access settings.",
     imageDescription: "Image template catalog, statuses, categories, and access settings.",
     createVideoTemplate: "Create video template",
     createImageTemplate: "Create image template",
+    createTemplate: "Create template",
+    chooseTemplateType: "Choose the new template type",
     manageCategories: "Manage categories",
+    typesLabel: "Template type",
+    allTypes: "All",
+    videoTypes: "Video",
+    imageTypes: "Images",
+    totalMetric: "Total",
+    activeMetric: "Active",
+    draftsMetric: "Drafts",
+    missingPreviewMetric: "Missing preview",
+    qaOnlyMetric: "QA only",
+    filtersLabel: "Catalog filters",
+    showFilters: "Show filters",
+    hideFilters: "Hide filters",
+    resetFilters: "Reset",
+    activeFilters: (count: number) => `Active filters: ${count}`,
+    visibilityLabel: "Visibility",
+    allVisibility: "Any",
+    publicVisibility: "Public",
+    qaVisibility: "QA only",
+    readinessLabel: "Readiness",
+    allReadiness: "Any",
+    readyReadiness: "Has preview",
+    missingPreviewReadiness: "Missing preview",
+    publicationControlTitle: "Publishing control",
+    publicationControlDescription: "Open templates that need operator attention.",
+    quickLinksTitle: "Quick links",
+    analyticsHubAction: "Template analytics",
+    dailyFeaturedAction: "Template of the day",
+    categoriesAction: "Categories",
+    filteredEmptyTitle: "No templates match these filters",
+    filteredEmptyDescription: "Reset the filters or change the search query.",
+    catalogEmptyTitle: "The catalog is empty",
+    catalogEmptyDescription: "Create the first template and prepare it for publishing.",
     analyticsAction: "Analytics",
     templateActionsAdminOnly: "Template management actions are available to Admin only.",
     analyticsUnavailableTitle: "Template metrics are temporarily unavailable",
@@ -109,7 +183,7 @@ const templatesCatalogLocaleText = {
     tableStarts: "Starts",
     tableConversion: "Conversion",
     tableSuccess: "Success",
-    tableAverageCost: "Average cost",
+    tableAverageCost: "Template cost",
     tokenUnit: "tok.",
     metricCost: "Template cost",
     metricViews: "Views",
@@ -128,21 +202,35 @@ export type TemplatesCatalogViewText = Omit<
   TemplatesCatalogLocaleText,
   | "videoTitle"
   | "imageTitle"
+  | "allTitle"
   | "videoDescription"
   | "imageDescription"
+  | "allDescription"
   | "createVideoTemplate"
   | "createImageTemplate"
+  | "createTemplate"
 > & {
   title: string;
   description: string;
+  createVideoTemplate: string;
+  createImageTemplate: string;
   createTemplate: string;
 };
 
 export function getTemplatesCatalogViewText(
   locale: Locale,
-  templateType: TemplateType
+  templateType?: TemplateType
 ): TemplatesCatalogViewText {
   const localeText = templatesCatalogLocaleText[locale] as TemplatesCatalogLocaleText;
+  if (!templateType) {
+    return {
+      ...localeText,
+      title: localeText.allTitle,
+      description: localeText.allDescription,
+      createTemplate: localeText.createTemplate,
+    };
+  }
+
   const isVideoTemplate = templateType === "Video";
 
   return {

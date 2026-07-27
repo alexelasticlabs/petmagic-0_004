@@ -1,6 +1,7 @@
 import { getSupportConversationCopy } from "@/components/support/support-conversation.content";
 import type {
   AdminSupportConversation,
+  AdminSupportConversationSla,
   AdminSupportConversationSummary,
   AdminUserAnalytics,
 } from "@/lib/api-client";
@@ -92,9 +93,51 @@ export function formatRelativeTime(
 export function getConversationSla(
   value: string | null | undefined,
   locale: Locale,
-  unreadCount = 0
+  unreadCount = 0,
+  serverSla?: AdminSupportConversationSla | null
 ) {
   const copy = getSupportConversationCopy(locale);
+  if (serverSla) {
+    const remainingMinutes = serverSla.resolutionRemainingMinutes;
+    const absoluteMinutes = Math.abs(remainingMinutes);
+    const duration =
+      absoluteMinutes < 60
+        ? locale === "ru"
+          ? `${absoluteMinutes} мин`
+          : `${absoluteMinutes} min`
+        : locale === "ru"
+          ? `${Math.floor(absoluteMinutes / 60)} ч ${absoluteMinutes % 60} мин`
+          : `${Math.floor(absoluteMinutes / 60)}h ${absoluteMinutes % 60}m`;
+    const waitLabel =
+      serverSla.resolutionStatus === "Breached"
+        ? locale === "ru"
+          ? `SLA просрочен на ${duration}`
+          : `SLA overdue by ${duration}`
+        : serverSla.isResolutionPaused
+          ? locale === "ru"
+            ? `SLA на паузе · осталось ${duration}`
+            : `SLA paused · ${duration} left`
+          : locale === "ru"
+            ? `SLA · осталось ${duration}`
+            : `SLA · ${duration} left`;
+    const level: "good" | "warning" | "risk" | "critical" =
+      serverSla.resolutionStatus === "Breached"
+        ? "critical"
+        : serverSla.isResolutionPaused
+          ? "warning"
+          : remainingMinutes <= 60
+            ? "risk"
+            : remainingMinutes <= 240
+              ? "warning"
+              : "good";
+
+    return {
+      level,
+      waitLabel,
+      primaryLabel: unreadCount > 0 ? copy.helpers.newUserReply : waitLabel,
+    };
+  }
+
   const diffMinutes = Math.max(
     0,
     Math.round((Date.now() - new Date(value ?? Date.now()).getTime()) / 60000)

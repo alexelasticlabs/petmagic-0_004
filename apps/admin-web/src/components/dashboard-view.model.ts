@@ -1,14 +1,24 @@
-import { getDashboardCopy, getDashboardIntlLocale } from "@/components/dashboard-view.content";
+import {
+  getDashboardCopy,
+  getDashboardIntlLocale,
+  type DashboardCommercePeriodDays,
+  type DashboardStatSection,
+} from "@/components/dashboard-view.content";
 import {
   fetchAdminEconomyDashboardMetrics,
   fetchAdminEconomyPurchases,
   fetchAdminModerationQueue,
+  fetchAdminSystemStatus,
   fetchAdminTemplateGenerationMetrics,
   fetchAdminUserDashboardMetrics,
   fetchSupportInbox,
+  fetchSupportInboxMetrics,
   fetchUsers,
   type AdminEconomyDashboardMetrics,
+  type AdminEconomyDashboardPeriodDays,
   type AdminEconomyPurchase,
+  type AdminSupportInboxMetrics,
+  type AdminSystemStatusResponse,
   type AdminTemplateGenerationDashboardMetrics,
   type AdminSupportConversationSummary,
   type AdminUserDashboardMetrics,
@@ -20,6 +30,47 @@ import { getAdminUserDisplayName, sanitizeSensitiveText } from "@/lib/sensitive-
 export type DashboardActivityType = "new" | "update" | "register" | "cancel";
 export type DashboardStatIcon = "people" | "cart" | "dollar" | "trendUp";
 export type DashboardOrderStatusType = "new" | "processing" | "delivered" | "cancelled";
+export type DashboardAttentionTone = "warning" | "danger";
+
+export function getAdminSystemStatusExpiresAt(
+  status: Pick<AdminSystemStatusResponse, "generatedAtUtc" | "staleAfterSeconds">
+): number | null {
+  const generatedAt = Date.parse(status.generatedAtUtc);
+  const staleAfterSeconds = status.staleAfterSeconds;
+  if (
+    !Number.isFinite(generatedAt) ||
+    !Number.isFinite(staleAfterSeconds) ||
+    staleAfterSeconds <= 0
+  ) {
+    return null;
+  }
+
+  return generatedAt + staleAfterSeconds * 1_000;
+}
+
+export function isAdminSystemStatusExpired(
+  status: Pick<AdminSystemStatusResponse, "generatedAtUtc" | "staleAfterSeconds">,
+  nowMs = Date.now()
+): boolean {
+  const expiresAt = getAdminSystemStatusExpiresAt(status);
+  return expiresAt === null || nowMs >= expiresAt;
+}
+
+export const DASHBOARD_DATA_SOURCES = [
+  "userMetrics",
+  "recentUsers",
+  "economyMetrics",
+  "purchases",
+  "generationMetrics",
+  "moderationQueue",
+  "supportMetrics",
+  "supportConversations",
+  "systemStatus",
+] as const;
+
+export type DashboardDataSource = (typeof DASHBOARD_DATA_SOURCES)[number];
+export type DashboardSourceAvailability = Record<DashboardDataSource, boolean>;
+export type DashboardSourceErrors = Record<DashboardDataSource, boolean>;
 
 export const DASHBOARD_ORDER_STATUS_COLORS: Record<DashboardOrderStatusType, string> = {
   new: "var(--success)",
@@ -35,12 +86,16 @@ export type DashboardStatItem = {
   subtext: string;
   accentColor: string;
   icon: DashboardStatIcon;
+  href: string;
+  section: DashboardStatSection;
   isPositiveTrend?: boolean;
 };
 
 export type DashboardOrderItem = {
   id: string;
+  orderHref: string;
   user: string;
+  userHref: string;
   amount: string;
   status: string;
   statusType: DashboardOrderStatusType;
@@ -51,6 +106,7 @@ export type DashboardActivityItem = {
   type: DashboardActivityType;
   text: string;
   time: string;
+  href: string;
 };
 
 export type DashboardUserDistributionItem = {
@@ -67,6 +123,22 @@ export type DashboardUserRoleCounts = {
   users: number;
 };
 
+export type DashboardAttentionItem = {
+  key:
+    | "supportUnread"
+    | "supportUnassigned"
+    | "failedPayments"
+    | "failedGenerations"
+    | "exhaustedRefunds"
+    | "moderation"
+    | "systemStatus";
+  label: string;
+  description: string;
+  value: string;
+  href: string;
+  tone: DashboardAttentionTone;
+};
+
 export type DashboardViewModel = {
   hero: {
     eyebrow: string;
@@ -81,7 +153,7 @@ export type DashboardViewModel = {
     xLabels: string[];
     values: number[];
     currencyCode: string;
-  };
+  } | null;
   ordersSection: {
     title: string;
     description: string;
@@ -102,60 +174,124 @@ export type DashboardViewModel = {
     title: string;
     description: string;
   };
+  attentionSection: {
+    title: string;
+    description: string;
+    openLabel: string;
+    state: "issues" | "issuesPartial" | "allClear" | "partial";
+    items: DashboardAttentionItem[];
+  };
   stats: DashboardStatItem[];
   orders: DashboardOrderItem[];
   activities: DashboardActivityItem[];
   userDistribution: DashboardUserDistributionItem[];
-  feedErrors: {
-    purchases: boolean;
-    supportConversations: boolean;
-  };
+  systemStatus: AdminSystemStatusResponse | null;
+  sourceAvailability: DashboardSourceAvailability;
+  sourceErrors: DashboardSourceErrors;
 };
 
 export async function loadDashboardViewModel(
   locale: Locale,
+  commercePeriodDays: DashboardCommercePeriodDays,
   signal?: AbortSignal
 ): Promise<DashboardViewModel> {
-  const requiredDataPromise = Promise.all([
-    fetchDashboardUsers(signal),
+  const [
+    userMetricsResult,
+    recentUsersResult,
+    moderationQueueResult,
+    generationMetricsResult,
+    economyMetricsResult,
+    purchasesResult,
+    supportConversationsResult,
+    supportMetricsResult,
+    systemStatusResult,
+  ] = await Promise.allSettled([
+    fetchAdminUserDashboardMetrics(signal),
+    fetchUsers({ skip: 0, take: 100 }, signal),
     fetchPendingModerationQueueCount(signal),
     fetchAdminTemplateGenerationMetrics(signal),
-    fetchAdminEconomyDashboardMetrics(signal),
-  ]);
-  const optionalFeedPromise = Promise.allSettled([
+    fetchAdminEconomyDashboardMetrics({
+      periodDays: commercePeriodDays as AdminEconomyDashboardPeriodDays,
+      signal,
+    }),
     fetchDashboardPurchases(signal),
     fetchDashboardSupportConversations(signal),
+    fetchSupportInboxMetrics(signal),
+    fetchAdminSystemStatus(signal),
   ] as const);
 
-  const [
-    [usersResult, moderationQueueCount, generationMetrics, economyMetrics],
-    [purchasesResult, supportConversationsResult],
-  ] = await Promise.all([requiredDataPromise, optionalFeedPromise]);
-
+  preserveAbortError([
+    userMetricsResult,
+    recentUsersResult,
+    moderationQueueResult,
+    generationMetricsResult,
+    economyMetricsResult,
+    purchasesResult,
+    supportConversationsResult,
+    supportMetricsResult,
+    systemStatusResult,
+  ]);
   throwIfAborted(signal);
 
-  const users = usersResult.items;
-  const userMetrics = usersResult.metrics;
-  const purchasesUnavailable = purchasesResult.status === "rejected";
-  const supportConversationsUnavailable = supportConversationsResult.status === "rejected";
-  const purchases = purchasesResult.status === "fulfilled" ? purchasesResult.value : [];
-  const supportConversations =
-    supportConversationsResult.status === "fulfilled" ? supportConversationsResult.value : [];
+  const sourceAvailability: DashboardSourceAvailability = {
+    userMetrics: userMetricsResult.status === "fulfilled",
+    recentUsers: recentUsersResult.status === "fulfilled",
+    economyMetrics: economyMetricsResult.status === "fulfilled",
+    purchases: purchasesResult.status === "fulfilled",
+    generationMetrics: generationMetricsResult.status === "fulfilled",
+    moderationQueue: moderationQueueResult.status === "fulfilled",
+    supportMetrics: supportMetricsResult.status === "fulfilled",
+    supportConversations: supportConversationsResult.status === "fulfilled",
+    systemStatus: systemStatusResult.status === "fulfilled",
+  };
+  const sourceErrors: DashboardSourceErrors = {
+    userMetrics: !sourceAvailability.userMetrics,
+    recentUsers: !sourceAvailability.recentUsers,
+    economyMetrics: !sourceAvailability.economyMetrics,
+    purchases: !sourceAvailability.purchases,
+    generationMetrics: !sourceAvailability.generationMetrics,
+    moderationQueue: !sourceAvailability.moderationQueue,
+    supportMetrics: !sourceAvailability.supportMetrics,
+    supportConversations: !sourceAvailability.supportConversations,
+    systemStatus: !sourceAvailability.systemStatus,
+  };
 
-  return buildDashboardFromData(
+  return buildDashboardFromData({
     locale,
-    users,
-    userMetrics,
-    generationMetrics,
-    economyMetrics,
-    purchases,
-    supportConversations,
-    moderationQueueCount,
-    {
-      purchases: purchasesUnavailable,
-      supportConversations: supportConversationsUnavailable,
+    commercePeriodDays,
+    users: settledValue(recentUsersResult)?.items,
+    userMetrics: settledValue(userMetricsResult),
+    generationMetrics: settledValue(generationMetricsResult),
+    economyMetrics: settledValue(economyMetricsResult),
+    purchases: settledValue(purchasesResult),
+    supportConversations: settledValue(supportConversationsResult),
+    supportMetrics: settledValue(supportMetricsResult),
+    systemStatus: settledValue(systemStatusResult),
+    moderationQueueCount: settledValue(moderationQueueResult),
+    sourceAvailability,
+    sourceErrors,
+  });
+}
+
+function preserveAbortError(results: readonly PromiseSettledResult<unknown>[]): void {
+  for (const result of results) {
+    if (result.status === "rejected" && isAbortError(result.reason)) {
+      throw result.reason;
     }
+  }
+}
+
+function isAbortError(reason: unknown): boolean {
+  return (
+    typeof reason === "object" &&
+    reason !== null &&
+    "name" in reason &&
+    reason.name === "AbortError"
   );
+}
+
+function settledValue<T>(result: PromiseSettledResult<T>): T | undefined {
+  return result.status === "fulfilled" ? result.value : undefined;
 }
 
 function throwIfAborted(signal?: AbortSignal): void {
@@ -164,21 +300,6 @@ function throwIfAborted(signal?: AbortSignal): void {
   }
 
   throw new DOMException("Dashboard request was aborted.", "AbortError");
-}
-
-async function fetchDashboardUsers(signal?: AbortSignal): Promise<{
-  items: UserListItem[];
-  metrics: AdminUserDashboardMetrics;
-}> {
-  const [metrics, recentUsersPage] = await Promise.all([
-    fetchAdminUserDashboardMetrics(signal),
-    fetchUsers({ skip: 0, take: 100 }, signal),
-  ]);
-
-  return {
-    items: recentUsersPage.items,
-    metrics,
-  };
 }
 
 async function fetchDashboardPurchases(signal?: AbortSignal): Promise<AdminEconomyPurchase[]> {
@@ -204,186 +325,454 @@ async function fetchPendingModerationQueueCount(signal?: AbortSignal): Promise<n
   return Math.max(0, response.totalCount);
 }
 
-function buildDashboardFromData(
-  locale: Locale,
-  users: UserListItem[],
-  userMetrics: AdminUserDashboardMetrics,
-  generationMetrics: AdminTemplateGenerationDashboardMetrics,
-  economyMetrics: AdminEconomyDashboardMetrics,
-  purchases: AdminEconomyPurchase[],
-  supportConversations: AdminSupportConversationSummary[],
-  moderationQueueCount: number,
-  feedErrors: DashboardViewModel["feedErrors"]
-): DashboardViewModel {
+type DashboardBuildData = {
+  locale: Locale;
+  commercePeriodDays: DashboardCommercePeriodDays;
+  users?: UserListItem[];
+  userMetrics?: AdminUserDashboardMetrics;
+  generationMetrics?: AdminTemplateGenerationDashboardMetrics;
+  economyMetrics?: AdminEconomyDashboardMetrics;
+  purchases?: AdminEconomyPurchase[];
+  supportConversations?: AdminSupportConversationSummary[];
+  supportMetrics?: AdminSupportInboxMetrics;
+  systemStatus?: AdminSystemStatusResponse;
+  moderationQueueCount?: number;
+  sourceAvailability: DashboardSourceAvailability;
+  sourceErrors: DashboardSourceErrors;
+};
+
+function buildDashboardFromData(data: DashboardBuildData): DashboardViewModel {
+  const {
+    locale,
+    commercePeriodDays,
+    userMetrics,
+    generationMetrics,
+    economyMetrics,
+    supportMetrics,
+    systemStatus,
+    moderationQueueCount,
+    sourceAvailability,
+    sourceErrors,
+  } = data;
   const copy = getDashboardCopy(locale);
+  const users = data.users ?? [];
+  const purchases = data.purchases ?? [];
+  const supportConversations = data.supportConversations ?? [];
+  const activeCommercePeriodDays =
+    economyMetrics && isDashboardCommercePeriodDays(economyMetrics.periodDays)
+      ? economyMetrics.periodDays
+      : commercePeriodDays;
+  const commercePeriodLabel = copy.commercePeriod.options[activeCommercePeriodDays];
   const purchasesSorted = [...purchases].sort((left, right) => {
     const leftTs = parseTimestamp(left.confirmedAtUtc ?? left.createdAtUtc) ?? 0;
     const rightTs = parseTimestamp(right.confirmedAtUtc ?? right.createdAtUtc) ?? 0;
     return rightTs - leftTs;
   });
-
   const userMap = new Map(users.map((item) => [item.userId, item]));
-  const totalUserCount = Math.max(0, userMetrics.totalUsers);
-  const premiumUserCount = Math.max(0, userMetrics.premiumUsers);
-  const currentUsers = Math.max(0, userMetrics.usersThisWeek);
-  const previousUsers = Math.max(0, userMetrics.usersPreviousWeek);
-  const roleCounts: DashboardUserRoleCounts = {
-    admins: Math.max(0, userMetrics.adminUsers),
-    moderators: Math.max(0, userMetrics.moderatorUsers),
-    users: Math.max(0, userMetrics.regularUsers),
-  };
+  const stats: DashboardStatItem[] = [];
+  let totalUserCount: number | undefined;
 
-  const currentPurchasesCount = Math.max(0, economyMetrics.purchasesThisWeek);
-  const previousPurchasesCount = Math.max(0, economyMetrics.purchasesPreviousWeek);
-  const currentSucceededCount = Math.max(0, economyMetrics.successfulPaymentsThisWeek);
-  const previousSucceededCount = Math.max(0, economyMetrics.successfulPaymentsPreviousWeek);
-  const currentFailedPayments = Math.max(0, economyMetrics.failedPaymentsThisWeek);
-  const activeSubscriptionCount = Math.max(0, economyMetrics.activeSubscriptions);
-  const revenueCurrency = normalizeCurrencyCode(economyMetrics.currencyCode);
-  const currentRevenue = safeNumber(economyMetrics.revenueThisWeek);
-  const previousRevenue = safeNumber(economyMetrics.revenuePreviousWeek);
+  if (userMetrics) {
+    totalUserCount = Math.max(0, userMetrics.totalUsers);
+    const premiumUserCount = Math.max(0, userMetrics.premiumUsers);
+    const currentUsers = Math.max(0, userMetrics.usersThisWeek);
+    const previousUsers = Math.max(0, userMetrics.usersPreviousWeek);
 
-  const currentConversion = currentPurchasesCount
-    ? (currentSucceededCount / currentPurchasesCount) * 100
-    : 0;
-  const previousConversion = previousPurchasesCount
-    ? (previousSucceededCount / previousPurchasesCount) * 100
-    : 0;
-  const revenueSeries = buildDashboardRevenueSeries(economyMetrics.revenueSeries);
+    stats.push(
+      {
+        label: copy.stats.users,
+        value: formatNumber(totalUserCount, locale),
+        delta: formatSignedPercentDelta(
+          currentUsers,
+          previousUsers,
+          locale,
+          copy.stats.noComparison
+        ),
+        subtext: copy.stats.usersSubtext,
+        icon: "people",
+        accentColor: "var(--brand)",
+        href: `/${locale}/users`,
+        section: "overview",
+        isPositiveTrend: hasPositiveTrend(currentUsers, previousUsers),
+      },
+      {
+        label: copy.stats.premiumUsers,
+        value: formatNumber(premiumUserCount, locale),
+        delta: `${formatNumber(calculatePercentage(premiumUserCount, totalUserCount), locale, 1)}%`,
+        subtext: copy.stats.premiumUsersSubtext,
+        icon: "people",
+        accentColor: "var(--accent)",
+        href: `/${locale}/users`,
+        section: "commerce",
+      }
+    );
+  }
 
-  const stats: DashboardStatItem[] = [
-    {
-      label: copy.stats.users,
-      value: formatNumber(totalUserCount, locale),
-      delta: formatSignedPercentDelta(currentUsers, previousUsers, locale),
-      subtext: copy.stats.usersSubtext,
-      icon: "people",
-      accentColor: "var(--brand)",
-      isPositiveTrend: currentUsers >= previousUsers,
-    },
-    {
-      label: copy.stats.orders,
-      value: formatNumber(currentPurchasesCount, locale),
-      delta: formatSignedPercentDelta(currentPurchasesCount, previousPurchasesCount, locale),
-      subtext: copy.stats.ordersSubtext,
-      icon: "cart",
-      accentColor: "var(--success)",
-      isPositiveTrend: currentPurchasesCount >= previousPurchasesCount,
-    },
-    {
-      label: copy.stats.revenue,
-      value: formatCurrency(currentRevenue, locale, revenueCurrency),
-      delta: formatSignedPercentDelta(currentRevenue, previousRevenue, locale),
-      subtext: copy.stats.revenueSubtext,
-      icon: "dollar",
-      accentColor: "var(--warning)",
-      isPositiveTrend: currentRevenue >= previousRevenue,
-    },
-    {
-      label: copy.stats.conversion,
-      value: `${formatNumber(currentConversion, locale, 1)}%`,
-      delta: formatSignedNumber(currentConversion - previousConversion, locale, 1, copy.stats.pp),
-      subtext: copy.stats.conversionSubtext,
-      icon: "trendUp",
-      accentColor: "var(--magenta)",
-      isPositiveTrend: currentConversion >= previousConversion,
-    },
-    {
-      label: copy.stats.premiumUsers,
-      value: formatNumber(premiumUserCount, locale),
-      delta: copy.stats.live,
-      subtext: copy.stats.premiumUsersSubtext,
-      icon: "people",
-      accentColor: "var(--accent)",
-    },
-    {
-      label: copy.stats.activeSubscriptions,
-      value: formatNumber(activeSubscriptionCount, locale),
-      delta: copy.stats.live,
-      subtext: copy.stats.activeSubscriptionsSubtext,
-      icon: "dollar",
-      accentColor: "var(--success)",
-    },
-    {
-      label: copy.stats.generationsToday,
-      value: formatNumber(generationMetrics.generationsToday, locale),
-      delta: `${formatNumber(generationMetrics.generationsThisWeek, locale)} ${copy.stats.weekShort}`,
-      subtext: `${formatNumber(generationMetrics.generationsThisMonth, locale)} ${copy.stats.monthShort}`,
-      icon: "trendUp",
-      accentColor: "var(--info)",
-    },
-    {
-      label: copy.stats.failedGenerations,
-      value: formatNumber(generationMetrics.failedGenerationsThisWeek, locale),
-      delta: `${formatNumber(generationMetrics.failedGenerationsToday, locale)} ${copy.stats.todayShort}`,
-      subtext: `${formatNumber(generationMetrics.failedGenerationsThisMonth, locale)} ${copy.stats.monthShort}`,
-      icon: "trendUp",
-      accentColor: "var(--danger)",
-    },
-    {
-      label: copy.stats.pendingJobs,
-      value: formatNumber(generationMetrics.pendingJobs, locale),
-      delta: `${formatNumber(generationMetrics.runningJobs, locale)} ${copy.stats.runningShort}`,
-      subtext: copy.stats.pendingJobsSubtext,
-      icon: "cart",
-      accentColor: "var(--warning)",
-    },
-    {
-      label: copy.stats.paymentSuccessFailure,
-      value: `${formatNumber(currentSucceededCount, locale)} / ${formatNumber(currentFailedPayments, locale)}`,
-      delta: copy.stats.currentWeek,
-      subtext: copy.stats.paymentSuccessFailureSubtext,
-      icon: "dollar",
-      accentColor: "var(--danger)",
-    },
-    {
+  if (economyMetrics) {
+    const currentPurchasesCount = Math.max(0, economyMetrics.purchasesThisWeek);
+    const previousPurchasesCount = Math.max(0, economyMetrics.purchasesPreviousWeek);
+    const currentSucceededCount = Math.max(0, economyMetrics.successfulPaymentsThisWeek);
+    const previousSucceededCount = Math.max(0, economyMetrics.successfulPaymentsPreviousWeek);
+    const currentFailedPayments = Math.max(0, economyMetrics.failedPaymentsThisWeek);
+    const activeSubscriptionCount = Math.max(0, economyMetrics.activeSubscriptions);
+    const revenueCurrency = normalizeCurrencyCode(economyMetrics.currencyCode);
+    const currentRevenue = safeNumber(economyMetrics.revenueThisWeek);
+    const previousRevenue = safeNumber(economyMetrics.revenuePreviousWeek);
+    const currentConversion = currentPurchasesCount
+      ? (currentSucceededCount / currentPurchasesCount) * 100
+      : 0;
+    const previousConversion = previousPurchasesCount
+      ? (previousSucceededCount / previousPurchasesCount) * 100
+      : 0;
+    const activeSubscriptionShare =
+      totalUserCount === undefined
+        ? undefined
+        : calculatePercentage(activeSubscriptionCount, totalUserCount);
+
+    stats.push(
+      {
+        label: copy.stats.orders,
+        value: formatNumber(currentPurchasesCount, locale),
+        delta: formatSignedPercentDelta(
+          currentPurchasesCount,
+          previousPurchasesCount,
+          locale,
+          copy.stats.noComparison
+        ),
+        subtext: copy.stats.ordersSubtext(commercePeriodLabel),
+        icon: "cart",
+        accentColor: "var(--success)",
+        href: `/${locale}/economy`,
+        section: "overview",
+        isPositiveTrend: hasPositiveTrend(currentPurchasesCount, previousPurchasesCount),
+      },
+      {
+        label: copy.stats.revenue,
+        value: formatCurrency(currentRevenue, locale, revenueCurrency),
+        delta: formatSignedPercentDelta(
+          currentRevenue,
+          previousRevenue,
+          locale,
+          copy.stats.noComparison
+        ),
+        subtext: copy.stats.revenueSubtext(commercePeriodLabel),
+        icon: "dollar",
+        accentColor: "var(--warning)",
+        href: `/${locale}/economy`,
+        section: "overview",
+        isPositiveTrend: hasPositiveTrend(currentRevenue, previousRevenue),
+      },
+      {
+        label: copy.stats.conversion,
+        value: `${formatNumber(currentConversion, locale, 1)}%`,
+        delta: formatSignedNumber(currentConversion - previousConversion, locale, 1, copy.stats.pp),
+        subtext: copy.stats.conversionSubtext(commercePeriodLabel),
+        icon: "trendUp",
+        accentColor: "var(--magenta)",
+        href: `/${locale}/economy`,
+        section: "overview",
+        isPositiveTrend: hasPositiveTrend(currentConversion, previousConversion),
+      },
+      {
+        label: copy.stats.activeSubscriptions,
+        value: formatNumber(activeSubscriptionCount, locale),
+        delta:
+          activeSubscriptionShare === undefined
+            ? copy.stats.loadedValue
+            : `${formatNumber(activeSubscriptionShare, locale, 1)}%`,
+        subtext:
+          activeSubscriptionShare === undefined
+            ? copy.stats.activeSubscriptionsCountSubtext
+            : copy.stats.activeSubscriptionsSubtext,
+        icon: "dollar",
+        accentColor: "var(--success)",
+        href: `/${locale}/economy`,
+        section: "commerce",
+      },
+      {
+        label: copy.stats.paymentSuccessFailure,
+        value: `${formatNumber(currentSucceededCount, locale)} / ${formatNumber(currentFailedPayments, locale)}`,
+        delta: copy.stats.currentPeriod(commercePeriodLabel),
+        subtext: copy.stats.paymentSuccessFailureSubtext(commercePeriodLabel),
+        icon: "dollar",
+        accentColor: currentFailedPayments > 0 ? "var(--danger)" : "var(--success)",
+        href: `/${locale}/economy`,
+        section: "commerce",
+      }
+    );
+  }
+
+  if (generationMetrics) {
+    const pendingRefunds = safeNumber(generationMetrics.pendingRefunds);
+    const exhaustedRefunds = safeNumber(generationMetrics.exhaustedRefunds);
+    stats.push(
+      {
+        label: copy.stats.generationsToday,
+        value: formatNumber(generationMetrics.generationsToday, locale),
+        delta: `${formatNumber(generationMetrics.generationsThisWeek, locale)} ${copy.stats.weekShort}`,
+        subtext: `${formatNumber(generationMetrics.generationsThisMonth, locale)} ${copy.stats.monthShort}`,
+        icon: "trendUp",
+        accentColor: "var(--info)",
+        href: `/${locale}/generations`,
+        section: "operations",
+      },
+      {
+        label: copy.stats.failedGenerations,
+        value: formatNumber(generationMetrics.failedGenerationsThisWeek, locale),
+        delta:
+          generationMetrics.failedGenerationsToday > 0
+            ? `${formatNumber(generationMetrics.failedGenerationsToday, locale)} ${copy.stats.todayShort}`
+            : copy.stats.noErrorsToday,
+        subtext: `${formatNumber(generationMetrics.failedGenerationsThisMonth, locale)} ${copy.stats.monthShort}`,
+        icon: "trendUp",
+        accentColor:
+          generationMetrics.failedGenerationsThisWeek > 0 ? "var(--danger)" : "var(--success)",
+        href: `/${locale}/generations`,
+        section: "operations",
+      },
+      {
+        label: copy.stats.pendingJobs,
+        value: formatNumber(generationMetrics.pendingJobs, locale),
+        delta: `${formatNumber(generationMetrics.runningJobs, locale)} ${copy.stats.runningShort}`,
+        subtext: copy.stats.pendingJobsSubtext,
+        icon: "cart",
+        accentColor: generationMetrics.pendingJobs > 0 ? "var(--warning)" : "var(--success)",
+        href: `/${locale}/generations`,
+        section: "operations",
+      },
+      {
+        label: copy.stats.refundRecovery,
+        value: formatNumber(pendingRefunds, locale),
+        delta: `${formatNumber(exhaustedRefunds, locale)} ${copy.stats.exhaustedShort}`,
+        subtext: copy.stats.refundRecoverySubtext,
+        icon: "cart",
+        accentColor: exhaustedRefunds > 0 ? "var(--danger)" : "var(--success)",
+        href: `/${locale}/generations?refundState=${
+          exhaustedRefunds > 0 ? "exhausted" : "pending"
+        }`,
+        section: "operations",
+      }
+    );
+  }
+
+  if (moderationQueueCount !== undefined) {
+    stats.push({
       label: copy.stats.moderationQueue,
       value: formatNumber(moderationQueueCount, locale),
-      delta: copy.stats.live,
+      delta: moderationQueueCount > 0 ? copy.stats.requiresReview : copy.stats.allClear,
       subtext: copy.stats.moderationQueueSubtext,
       icon: "people",
-      accentColor: "var(--magenta)",
-    },
-  ];
+      accentColor: moderationQueueCount > 0 ? "var(--warning)" : "var(--success)",
+      href: `/${locale}/moderation`,
+      section: "operations",
+    });
+  }
 
+  const attentionItems = buildDashboardAttentionItems({
+    locale,
+    commercePeriodLabel,
+    economyMetrics,
+    generationMetrics,
+    supportMetrics,
+    systemStatus,
+    moderationQueueCount,
+  });
+  const attentionSourcesAvailable = (
+    [
+      "supportMetrics",
+      "economyMetrics",
+      "generationMetrics",
+      "moderationQueue",
+      "systemStatus",
+    ] as const
+  ).every((source) => sourceAvailability[source]);
+  const attentionState = attentionItems.length
+    ? attentionSourcesAvailable
+      ? "issues"
+      : "issuesPartial"
+    : attentionSourcesAvailable
+      ? "allClear"
+      : "partial";
   const orders = purchasesSorted.slice(0, 5).map((item) => {
     const user = userMap.get(item.userId);
     const statusType = mapPurchaseStatus(item.status);
     return {
       id: shortOrderId(item.orderId),
+      orderHref: `/${locale}/economy?workspace=overview&purchaseSearch=${encodeURIComponent(
+        item.orderId
+      )}`,
       user: user ? formatDashboardUserLabel(user) : shortUserId(item.userId),
+      userHref: `/${locale}/users/${encodeURIComponent(item.userId)}`,
       amount: formatCurrency(item.priceAmount, locale, normalizeCurrencyCode(item.currencyCode)),
       status: getOrderStatusLabel(statusType, locale),
       statusType,
     } satisfies DashboardOrderItem;
   });
-
   const activities = buildActivities(locale, users, purchasesSorted, supportConversations, userMap);
-  const userDistribution = buildUserDistribution(locale, totalUserCount, roleCounts);
+  const roleCounts: DashboardUserRoleCounts | undefined = userMetrics
+    ? {
+        admins: Math.max(0, userMetrics.adminUsers),
+        moderators: Math.max(0, userMetrics.moderatorUsers),
+        users: Math.max(0, userMetrics.regularUsers),
+      }
+    : undefined;
+  const userDistribution =
+    totalUserCount !== undefined && roleCounts
+      ? buildUserDistribution(locale, totalUserCount, roleCounts)
+      : [];
+  const revenueSeries = economyMetrics
+    ? buildDashboardRevenueSeries(economyMetrics.revenueSeries, locale)
+    : [];
 
   return {
     hero: copy.hero,
-    revenueChart: {
-      title: copy.revenueChart.title,
-      description: copy.revenueChart.description,
-      rangeLabel: copy.revenueChart.rangeLabel,
-      ariaLabel: copy.revenueChart.ariaLabel,
-      xLabels: buildLast7DayLabels(locale),
-      values: revenueSeries,
-      currencyCode: revenueCurrency,
-    },
+    revenueChart: economyMetrics
+      ? {
+          title: copy.revenueChart.title,
+          description: copy.revenueChart.description(commercePeriodLabel),
+          rangeLabel: commercePeriodLabel,
+          ariaLabel: copy.revenueChart.ariaLabel,
+          xLabels: revenueSeries.map((point) => point.label),
+          values: revenueSeries.map((point) => point.value),
+          currencyCode: normalizeCurrencyCode(economyMetrics.currencyCode),
+        }
+      : null,
     ordersSection: copy.ordersSection,
     distributionSection: {
       ...copy.distributionSection,
-      totalValue: formatNumber(totalUserCount, locale),
+      totalValue: totalUserCount === undefined ? "—" : formatNumber(totalUserCount, locale),
     },
     activitySection: copy.activitySection,
+    attentionSection: {
+      title: copy.attentionSection.title,
+      description: copy.attentionSection.description,
+      openLabel: copy.attentionSection.openLabel,
+      state: attentionState,
+      items: attentionItems,
+    },
     stats,
     orders,
     activities,
     userDistribution,
-    feedErrors,
+    systemStatus: systemStatus ?? null,
+    sourceAvailability,
+    sourceErrors,
   };
+}
+
+function buildDashboardAttentionItems({
+  locale,
+  commercePeriodLabel,
+  economyMetrics,
+  generationMetrics,
+  supportMetrics,
+  systemStatus,
+  moderationQueueCount,
+}: {
+  locale: Locale;
+  commercePeriodLabel: string;
+  economyMetrics?: AdminEconomyDashboardMetrics;
+  generationMetrics?: AdminTemplateGenerationDashboardMetrics;
+  supportMetrics?: AdminSupportInboxMetrics;
+  systemStatus?: AdminSystemStatusResponse;
+  moderationQueueCount?: number;
+}): DashboardAttentionItem[] {
+  const copy = getDashboardCopy(locale).attentionSection.items;
+  const items: DashboardAttentionItem[] = [];
+
+  if (systemStatus && systemStatus.overallStatus !== "healthy") {
+    items.push({
+      key: "systemStatus",
+      label: copy.systemStatus.label,
+      description:
+        systemStatus.overallStatus === "unhealthy"
+          ? copy.systemStatus.unhealthyDescription
+          : copy.systemStatus.degradedDescription,
+      value: "!",
+      href: `/${locale}/dashboard#system-status`,
+      tone: systemStatus.overallStatus === "unhealthy" ? "danger" : "warning",
+    });
+  }
+
+  if (supportMetrics) {
+    const unreadCount = Math.max(0, supportMetrics.unreadForAdminConversations);
+    const unassignedCount = Math.max(0, supportMetrics.unassignedConversations);
+    if (unreadCount > 0) {
+      items.push({
+        key: "supportUnread",
+        label: copy.supportUnread.label,
+        description: copy.supportUnread.description,
+        value: formatNumber(unreadCount, locale),
+        href: `/${locale}/support?queue=unread`,
+        tone: "warning",
+      });
+    }
+    if (unassignedCount > 0) {
+      items.push({
+        key: "supportUnassigned",
+        label: copy.supportUnassigned.label,
+        description: copy.supportUnassigned.description,
+        value: formatNumber(unassignedCount, locale),
+        href: `/${locale}/support?queue=unassigned`,
+        tone: "warning",
+      });
+    }
+  }
+
+  const failedPayments = economyMetrics
+    ? Math.max(0, economyMetrics.failedPaymentsThisWeek)
+    : undefined;
+  if (failedPayments && failedPayments > 0) {
+    items.push({
+      key: "failedPayments",
+      label: copy.failedPayments.label,
+      description: copy.failedPayments.description(commercePeriodLabel),
+      value: formatNumber(failedPayments, locale),
+      href: `/${locale}/economy?workspace=overview&purchaseStatus=failed`,
+      tone: "danger",
+    });
+  }
+
+  const failedGenerations = generationMetrics
+    ? Math.max(0, generationMetrics.failedGenerationsThisWeek)
+    : undefined;
+  if (failedGenerations && failedGenerations > 0) {
+    items.push({
+      key: "failedGenerations",
+      label: copy.failedGenerations.label,
+      description: copy.failedGenerations.description,
+      value: formatNumber(failedGenerations, locale),
+      href: `/${locale}/generations?status=Failed`,
+      tone: "danger",
+    });
+  }
+
+  const exhaustedRefunds = generationMetrics
+    ? Math.max(0, safeNumber(generationMetrics.exhaustedRefunds))
+    : undefined;
+  if (exhaustedRefunds && exhaustedRefunds > 0) {
+    items.push({
+      key: "exhaustedRefunds",
+      label: copy.exhaustedRefunds.label,
+      description: copy.exhaustedRefunds.description,
+      value: formatNumber(exhaustedRefunds, locale),
+      href: `/${locale}/generations?refundState=exhausted`,
+      tone: "danger",
+    });
+  }
+
+  if (moderationQueueCount && moderationQueueCount > 0) {
+    items.push({
+      key: "moderation",
+      label: copy.moderation.label,
+      description: copy.moderation.description,
+      value: formatNumber(moderationQueueCount, locale),
+      href: `/${locale}/moderation?status=pending`,
+      tone: "warning",
+    });
+  }
+
+  return items;
 }
 
 function buildActivities(
@@ -403,6 +792,7 @@ function buildActivities(
         type: "register" as const,
         text: copy.activityMessages.registered(formatDashboardUserLabel(item)),
         time: formatRelativeTime(item.createdAtUtc, locale),
+        href: `/${locale}/users/${encodeURIComponent(item.userId)}`,
       },
     }))
     .filter((event) => event.at !== null);
@@ -425,6 +815,9 @@ function buildActivities(
               ? copy.activityMessages.orderFailed(userLabel, shortOrderId(item.orderId))
               : copy.activityMessages.orderUpdated(userLabel, shortOrderId(item.orderId)),
           time: formatRelativeTime(timestamp, locale),
+          href: `/${locale}/economy?workspace=overview&purchaseSearch=${encodeURIComponent(
+            item.orderId
+          )}`,
         } satisfies DashboardActivityItem,
       };
     })
@@ -443,6 +836,7 @@ function buildActivities(
           formatDashboardLabel(item.status, 48)
         ),
         time: formatRelativeTime(item.updatedAtUtc, locale),
+        href: `/${locale}/support/${encodeURIComponent(item.conversationId)}`,
       },
     }))
     .filter((event) => event.at !== null);
@@ -501,14 +895,32 @@ export function capitalizeTone(
 }
 
 function buildDashboardRevenueSeries(
-  points: AdminEconomyDashboardMetrics["revenueSeries"]
-): number[] {
-  const values = points.slice(-7).map((point) => safeNumber(point.amount));
-  while (values.length < 7) {
-    values.unshift(0);
+  points: AdminEconomyDashboardMetrics["revenueSeries"],
+  locale: Locale
+): Array<{ label: string; value: number }> {
+  return points.map((point) => ({
+    label: formatRevenuePointDate(point.date, locale),
+    value: safeNumber(point.amount),
+  }));
+}
+
+function formatRevenuePointDate(value: string, locale: Locale): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) {
+    return formatDashboardLabel(value, 32) || "—";
   }
 
-  return values;
+  const [, year, month, day] = match;
+  const timestamp = Date.UTC(Number(year), Number(month) - 1, Number(day));
+  if (Number.isNaN(timestamp)) {
+    return formatDashboardLabel(value, 32) || "—";
+  }
+
+  return new Intl.DateTimeFormat(getDashboardIntlLocale(locale), {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(timestamp));
 }
 
 function parseTimestamp(value: string | null | undefined): number | null {
@@ -538,8 +950,16 @@ function isSupportedCurrencyCode(currencyCode: string): boolean {
   }
 }
 
-function safeNumber(value: number): number {
-  return Number.isFinite(value) ? value : 0;
+function safeNumber(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function calculatePercentage(value: number, total: number): number {
+  if (total <= 0) {
+    return 0;
+  }
+
+  return Math.min(100, Math.max(0, (value / total) * 100));
 }
 
 function formatNumber(value: number, locale: Locale, maximumFractionDigits = 0): string {
@@ -562,13 +982,30 @@ function formatCurrency(value: number, locale: Locale, currencyCode: string): st
   }
 }
 
-function formatSignedPercentDelta(current: number, previous: number, locale: Locale): string {
+function formatSignedPercentDelta(
+  current: number,
+  previous: number,
+  locale: Locale,
+  noComparisonLabel: string
+): string {
   if (current === 0 && previous === 0) {
     return "0%";
   }
 
-  const raw = previous === 0 ? 100 : ((current - previous) / Math.abs(previous)) * 100;
+  if (previous === 0) {
+    return noComparisonLabel;
+  }
+
+  const raw = ((current - previous) / Math.abs(previous)) * 100;
   return formatSignedNumber(raw, locale, Math.abs(raw) < 10 ? 1 : 0, "%");
+}
+
+function hasPositiveTrend(current: number, previous: number): boolean {
+  return previous > 0 && current > previous;
+}
+
+function isDashboardCommercePeriodDays(value: number): value is DashboardCommercePeriodDays {
+  return value === 7 || value === 30 || value === 90;
 }
 
 function formatSignedNumber(
@@ -649,18 +1086,4 @@ function formatRelativeTime(value: string | null | undefined, locale: Locale): s
 
   const diffDays = Math.round(diffHours / 24);
   return relativeTimeCopy.daysAgo(diffDays);
-}
-
-function buildLast7DayLabels(locale: Locale): string[] {
-  const formatter = new Intl.DateTimeFormat(getDashboardIntlLocale(locale), {
-    month: "short",
-    day: "numeric",
-  });
-  const labels: string[] = [];
-
-  for (let offset = 6; offset >= 0; offset -= 1) {
-    labels.push(formatter.format(new Date(Date.now() - offset * 24 * 60 * 60 * 1000)));
-  }
-
-  return labels;
 }

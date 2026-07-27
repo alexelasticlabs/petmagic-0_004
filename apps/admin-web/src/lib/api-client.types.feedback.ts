@@ -152,6 +152,8 @@ export type AdminFeedbackDetails = {
   canRefund: boolean;
 
   refund?: CreditRefund | null;
+
+  refundUnavailableReason?: string | null;
 };
 
 export type AdminFeedbackQuery = {

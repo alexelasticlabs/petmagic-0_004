@@ -1,4 +1,6 @@
 .next
+.next-*
+.next-e2e
 node_modules
 npm-debug.log
 Dockerfile
@@ -9,4 +11,7 @@ Dockerfile
 .env.*
 .npmrc
 coverage
+artifacts
+test-results
+playwright-report
 dist

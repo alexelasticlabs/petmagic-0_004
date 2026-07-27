@@ -4,13 +4,16 @@ type AdminPageMetaCopy = {
   fallbackAdministratorName: string;
   dashboard: { title: string; description: (userName: string) => string };
   economy: { title: string; description: string };
+  gamification: { title: string; description: string };
   promoCodes: { title: string; description: string };
   users: { title: string; description: string };
+  userProfile: { title: string; description: string };
   generations: { title: string; description: string };
   feedback: { title: string; description: string };
   roleManagement: { title: string; description: string };
   support: { title: string; description: string };
   moderation: { title: string; description: string };
+  audit: { title: string; description: string };
   imageTemplates: { title: string; description: string };
   videoTemplates: { title: string; description: string };
   templateCategories: { title: string; description: string };
@@ -31,6 +34,11 @@ const adminPageMetaCopy: Record<Locale, AdminPageMetaCopy> = {
       title: "Экономика",
       description: "Баланс, покупки, история движения валюты и управление пакетами пополнения.",
     },
+    gamification: {
+      title: "Геймификация",
+      description:
+        "Метрики вовлечённости, недельные задания, достижения и диагностика прогресса пользователей.",
+    },
     promoCodes: {
       title: "Промокоды",
       description: "Промокоды: создание, лимиты, период действия и история активаций.",
@@ -38,6 +46,10 @@ const adminPageMetaCopy: Record<Locale, AdminPageMetaCopy> = {
     users: {
       title: "Пользователи",
       description: "Управление ролями, премиум-статусом и доступом пользователей.",
+    },
+    userProfile: {
+      title: "Профиль пользователя",
+      description: "",
     },
     generations: {
       title: "Генерации",
@@ -51,8 +63,7 @@ const adminPageMetaCopy: Record<Locale, AdminPageMetaCopy> = {
     },
     roleManagement: {
       title: "Управление ролями",
-      description:
-        "Списки администраторов и модераторов, назначение и снятие модератора с журналом аудита.",
+      description: "Поиск и управление доступом модераторов.",
     },
     support: {
       title: "Поддержка",
@@ -61,6 +72,11 @@ const adminPageMetaCopy: Record<Locale, AdminPageMetaCopy> = {
     moderation: {
       title: "Модерация",
       description: "Очередь жалоб и обратной связи по шаблонам с решением одобрить или отклонить.",
+    },
+    audit: {
+      title: "Журнал действий",
+      description:
+        "История административных действий с фильтрами по исполнителю, типу события и объекту.",
     },
     imageTemplates: {
       title: "Шаблоны изображений",
@@ -102,6 +118,11 @@ const adminPageMetaCopy: Record<Locale, AdminPageMetaCopy> = {
       title: "Economy",
       description: "Balance, purchases, currency movement history, and top-up pack management.",
     },
+    gamification: {
+      title: "Gamification",
+      description:
+        "Engagement metrics, weekly challenges, achievements, and user progress diagnostics.",
+    },
     promoCodes: {
       title: "Promo codes",
       description: "Promo codes: creation, limits, availability window, and redemption history.",
@@ -109,6 +130,10 @@ const adminPageMetaCopy: Record<Locale, AdminPageMetaCopy> = {
     users: {
       title: "Users",
       description: "Manage roles, premium status, and user access.",
+    },
+    userProfile: {
+      title: "User profile",
+      description: "",
     },
     generations: {
       title: "Generations",
@@ -121,8 +146,7 @@ const adminPageMetaCopy: Record<Locale, AdminPageMetaCopy> = {
     },
     roleManagement: {
       title: "Role Management",
-      description:
-        "Admin and Moderator lists with Moderator assignment and removal backed by audit log.",
+      description: "Find users and manage Moderator access.",
     },
     support: {
       title: "Support",
@@ -131,6 +155,10 @@ const adminPageMetaCopy: Record<Locale, AdminPageMetaCopy> = {
     moderation: {
       title: "Moderation",
       description: "Complaint and feedback queue for templates with approve/reject decisions.",
+    },
+    audit: {
+      title: "Audit trail",
+      description: "Administrative action history with actor, event type, and target filters.",
     },
     imageTemplates: {
       title: "Image templates",

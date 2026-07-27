@@ -10,9 +10,11 @@ import type {
   UpdateFeedbackAdminPayload,
 } from "./api-client.types";
 
-export const ADMIN_FEEDBACK_FILTER_MAX_LENGTH = 120;
+export const ADMIN_FEEDBACK_LOOKUP_ID_MAX_LENGTH = 36;
+export const ADMIN_FEEDBACK_CATEGORY_FILTER_MAX_LENGTH = 80;
+export const ADMIN_FEEDBACK_PLATFORM_FILTER_MAX_LENGTH = 32;
 export const ADMIN_FEEDBACK_ADMIN_NOTE_MAX_LENGTH = 2000;
-export const ADMIN_FEEDBACK_REFUND_REASON_MAX_LENGTH = 240;
+export const ADMIN_FEEDBACK_REFUND_REASON_MAX_LENGTH = 500;
 
 const ADMIN_FEEDBACK_STATUSES = ["New", "InReview", "Resolved", "Dismissed"] as const;
 const ADMIN_FEEDBACK_PRIORITIES = ["Low", "Medium", "High", "Critical"] as const;
@@ -25,9 +27,22 @@ const ADMIN_FEEDBACK_TYPES = [
   "General",
 ] as const;
 
-function clean(value?: string): string | undefined {
+function clean(value?: string, maxLength = 120): string | undefined {
   const trimmed = value?.trim();
-  return trimmed ? trimmed.slice(0, ADMIN_FEEDBACK_FILTER_MAX_LENGTH) : undefined;
+  return trimmed ? trimmed.slice(0, maxLength) : undefined;
+}
+
+const ADMIN_FEEDBACK_LOOKUP_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isAdminFeedbackLookupId(value: string): boolean {
+  const trimmed = value.trim();
+  return !trimmed || ADMIN_FEEDBACK_LOOKUP_ID_PATTERN.test(trimmed);
+}
+
+function cleanLookupId(value?: string): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed && isAdminFeedbackLookupId(trimmed) ? trimmed : undefined;
 }
 
 function cleanAllowed<const T extends string>(
@@ -71,13 +86,13 @@ export function normalizeAdminFeedbackQuery(query: AdminFeedbackQuery = {}): Adm
         ? undefined
         : cleanAllowed(query.priority, ADMIN_FEEDBACK_PRIORITIES),
     type: query.type === "All" ? undefined : cleanAllowed(query.type, ADMIN_FEEDBACK_TYPES),
-    category: clean(query.category),
-    generationId: clean(query.generationId),
-    templateId: clean(query.templateId),
-    platform: clean(query.platform),
+    category: clean(query.category, ADMIN_FEEDBACK_CATEGORY_FILTER_MAX_LENGTH),
+    generationId: cleanLookupId(query.generationId),
+    templateId: cleanLookupId(query.templateId),
+    platform: clean(query.platform, ADMIN_FEEDBACK_PLATFORM_FILTER_MAX_LENGTH),
     fromUtc: clean(query.fromUtc),
     toUtc: clean(query.toUtc),
-    userId: clean(query.userId),
+    userId: cleanLookupId(query.userId),
     skip: typeof query.skip === "number" ? Math.max(0, Math.floor(query.skip)) : undefined,
     take:
       typeof query.take === "number" && Number.isFinite(query.take)

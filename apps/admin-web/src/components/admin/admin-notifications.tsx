@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -12,6 +13,7 @@ import {
 } from "react";
 
 import { isActionableAdminNotification } from "@/lib/admin-notification-policy";
+import { useAuthSession } from "@/lib/api-client.core";
 import { clientLogger } from "@/lib/client-logger";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
@@ -55,6 +57,11 @@ type AdminNotificationsContextValue = {
   removeNotification: (notificationId: string) => void;
 };
 
+type AdminNotificationState = {
+  storageKey: string | null;
+  items: AdminNotificationItem[];
+};
+
 type ToastLike = {
   type: "success" | "error";
   message: string;
@@ -81,7 +88,8 @@ type SyncFeedbackOptions = {
 
 const MAX_ADMIN_NOTIFICATIONS = 24;
 const DEDUPE_WINDOW_MS = 4000;
-const ADMIN_NOTIFICATIONS_STORAGE_KEY = "petmagic.admin.notifications.v1";
+const ADMIN_NOTIFICATIONS_STORAGE_KEY_PREFIX = "petmagic.admin.notifications.v2";
+const LEGACY_ADMIN_NOTIFICATIONS_STORAGE_KEY = "petmagic.admin.notifications.v1";
 const MAX_PERSISTED_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_NOTIFICATION_TITLE_LENGTH = 120;
 const MAX_NOTIFICATION_MESSAGE_LENGTH = 280;
@@ -100,6 +108,13 @@ const notificationCategories = new Set<AdminNotificationCategory>([
 const notificationTones = new Set<AdminNotificationTone>(["info", "success", "warning", "error"]);
 const notificationPriorities = new Set<AdminNotificationPriority>(["normal", "critical"]);
 let adminNotificationIdSequence = 0;
+
+export function getAdminNotificationStorageKey(userId: string | null | undefined): string | null {
+  const normalizedUserId = userId?.trim();
+  return normalizedUserId
+    ? `${ADMIN_NOTIFICATIONS_STORAGE_KEY_PREFIX}:${encodeURIComponent(normalizedUserId)}`
+    : null;
+}
 
 export function createAdminNotificationId(now: number = Date.now()): string {
   const crypto = globalThis.crypto;
@@ -135,13 +150,16 @@ function getAdminNotificationStorageErrorDetails(error: unknown): {
   };
 }
 
-function removeStoredAdminNotifications(storageFailureEvent: string): void {
-  if (typeof window === "undefined") {
+function removeStoredAdminNotifications(
+  storageKey: string | null,
+  storageFailureEvent: string
+): void {
+  if (typeof window === "undefined" || !storageKey) {
     return;
   }
 
   try {
-    window.localStorage.removeItem(ADMIN_NOTIFICATIONS_STORAGE_KEY);
+    window.localStorage.removeItem(storageKey);
   } catch (error) {
     clientLogger.warn(storageFailureEvent, getAdminNotificationStorageErrorDetails(error));
   }
@@ -254,20 +272,23 @@ function toHydratedNotificationItem(rawValue: unknown, now: number): AdminNotifi
   };
 }
 
-function readInitialAdminNotifications(): AdminNotificationItem[] {
-  if (typeof window === "undefined") {
+function readInitialAdminNotifications(storageKey: string | null): AdminNotificationItem[] {
+  if (typeof window === "undefined" || !storageKey) {
     return [];
   }
 
   try {
-    const raw = window.localStorage.getItem(ADMIN_NOTIFICATIONS_STORAGE_KEY);
+    const raw = window.localStorage.getItem(storageKey);
     if (!raw) {
       return [];
     }
 
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) {
-      removeStoredAdminNotifications("admin.notifications_invalid_storage_cleanup_failed");
+      removeStoredAdminNotifications(
+        storageKey,
+        "admin.notifications_invalid_storage_cleanup_failed"
+      );
       return [];
     }
 
@@ -284,7 +305,10 @@ function readInitialAdminNotifications(): AdminNotificationItem[] {
       .slice(0, MAX_ADMIN_NOTIFICATIONS);
 
     if (hydrated.length === 0) {
-      removeStoredAdminNotifications("admin.notifications_empty_hydration_cleanup_failed");
+      removeStoredAdminNotifications(
+        storageKey,
+        "admin.notifications_empty_hydration_cleanup_failed"
+      );
     }
 
     return hydrated;
@@ -293,7 +317,7 @@ function readInitialAdminNotifications(): AdminNotificationItem[] {
       "admin.notifications_hydrate_failed",
       getAdminNotificationStorageErrorDetails(error)
     );
-    removeStoredAdminNotifications("admin.notifications_hydrate_cleanup_failed");
+    removeStoredAdminNotifications(storageKey, "admin.notifications_hydrate_cleanup_failed");
     return [];
   }
 }
@@ -301,28 +325,64 @@ function readInitialAdminNotifications(): AdminNotificationItem[] {
 const AdminNotificationsContext = createContext<AdminNotificationsContextValue | null>(null);
 
 export function AdminNotificationsProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<AdminNotificationItem[]>(readInitialAdminNotifications);
+  const session = useAuthSession();
+  const storageKey = getAdminNotificationStorageKey(session?.user.userId);
+  const [notificationState, setNotificationState] = useState<AdminNotificationState>(() => ({
+    storageKey,
+    items: readInitialAdminNotifications(storageKey),
+  }));
+  const items = notificationState.items;
   const dedupeMapRef = useRef<Map<string, number>>(new Map());
+  const previousStorageKeyRef = useRef<string | null | undefined>(undefined);
+  const legacyStorageCleanupRef = useRef(false);
+
+  useLayoutEffect(() => {
+    if (!legacyStorageCleanupRef.current) {
+      legacyStorageCleanupRef.current = true;
+      removeStoredAdminNotifications(
+        LEGACY_ADMIN_NOTIFICATIONS_STORAGE_KEY,
+        "admin.notifications_legacy_storage_cleanup_failed"
+      );
+    }
+
+    if (previousStorageKeyRef.current === storageKey) {
+      return;
+    }
+
+    previousStorageKeyRef.current = storageKey;
+    dedupeMapRef.current.clear();
+    setNotificationState({
+      storageKey,
+      items: storageKey ? readInitialAdminNotifications(storageKey) : [],
+    });
+  }, [storageKey]);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
+    if (
+      typeof window === "undefined" ||
+      !storageKey ||
+      notificationState.storageKey !== storageKey
+    ) {
       return;
     }
 
     if (items.length === 0) {
-      removeStoredAdminNotifications("admin.notifications_empty_persist_cleanup_failed");
+      removeStoredAdminNotifications(
+        storageKey,
+        "admin.notifications_empty_persist_cleanup_failed"
+      );
       return;
     }
 
     try {
-      window.localStorage.setItem(ADMIN_NOTIFICATIONS_STORAGE_KEY, JSON.stringify(items));
+      window.localStorage.setItem(storageKey, JSON.stringify(items));
     } catch (error) {
       clientLogger.warn(
         "admin.notifications_persist_failed",
         getAdminNotificationStorageErrorDetails(error)
       );
     }
-  }, [items]);
+  }, [items, notificationState.storageKey, storageKey]);
 
   const addNotification = useCallback((input: AddAdminNotificationInput) => {
     const tone = input.tone ?? "info";
@@ -375,13 +435,16 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
       read: false,
     };
 
-    setItems((current) => [notification, ...current].slice(0, MAX_ADMIN_NOTIFICATIONS));
+    setNotificationState((current) => ({
+      ...current,
+      items: [notification, ...current.items].slice(0, MAX_ADMIN_NOTIFICATIONS),
+    }));
   }, []);
 
   const markAsRead = useCallback((notificationId: string) => {
-    setItems((current) => {
+    setNotificationState((current) => {
       let didChange = false;
-      const next = current.map((item) => {
+      const next = current.items.map((item) => {
         if (item.id !== notificationId || item.read) {
           return item;
         }
@@ -390,14 +453,14 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
         return { ...item, read: true };
       });
 
-      return didChange ? next : current;
+      return didChange ? { ...current, items: next } : current;
     });
   }, []);
 
   const markCategoryAsRead = useCallback((category: AdminNotificationCategory) => {
-    setItems((current) => {
+    setNotificationState((current) => {
       let didChange = false;
-      const next = current.map((item) => {
+      const next = current.items.map((item) => {
         if (item.category !== category || item.read) {
           return item;
         }
@@ -406,14 +469,14 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
         return { ...item, read: true };
       });
 
-      return didChange ? next : current;
+      return didChange ? { ...current, items: next } : current;
     });
   }, []);
 
   const markAllAsRead = useCallback(() => {
-    setItems((current) => {
+    setNotificationState((current) => {
       let didChange = false;
-      const next = current.map((item) => {
+      const next = current.items.map((item) => {
         if (item.read) {
           return item;
         }
@@ -422,22 +485,25 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
         return { ...item, read: true };
       });
 
-      return didChange ? next : current;
+      return didChange ? { ...current, items: next } : current;
     });
   }, []);
 
   const clearRead = useCallback(() => {
-    setItems((current) => {
-      if (current.every((item) => !item.read)) {
+    setNotificationState((current) => {
+      if (current.items.every((item) => !item.read)) {
         return current;
       }
 
-      return current.filter((item) => !item.read);
+      return { ...current, items: current.items.filter((item) => !item.read) };
     });
   }, []);
 
   const removeNotification = useCallback((notificationId: string) => {
-    setItems((current) => current.filter((item) => item.id !== notificationId));
+    setNotificationState((current) => ({
+      ...current,
+      items: current.items.filter((item) => item.id !== notificationId),
+    }));
   }, []);
 
   const value = useMemo<AdminNotificationsContextValue>(

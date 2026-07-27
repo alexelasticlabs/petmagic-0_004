@@ -1,8 +1,16 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { usePathname, useRouter } from "next/navigation";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
 import { getAdminChromeCopy } from "@/components/admin/admin-chrome.content";
 import { AdminLoginScreen } from "@/components/admin/admin-login-screen";
@@ -34,13 +42,18 @@ import { getSupportUnreadCount } from "@/lib/support-unread-count";
 import {
   type AdminTheme,
   applyAdminTheme,
+  getAppliedAdminTheme,
   nextAdminTheme,
+  publishAdminThemeChange,
   readStoredAdminTheme,
-  resolveAdminTheme,
   storeAdminTheme,
+  subscribeToAdminTheme,
 } from "@/lib/theme";
 
 type AdminShellProps = { locale: Locale; children: ReactNode };
+
+const ADMIN_SIDEBAR_FOCUSABLE_SELECTOR =
+  'a[href], button:not(:disabled), [tabindex]:not([tabindex="-1"])';
 
 function AdminAccessGate({ locale }: { locale: Locale }) {
   const copy = getAdminChromeCopy(locale);
@@ -61,6 +74,7 @@ export function AdminShell({ locale, children }: AdminShellProps) {
   const text = getDictionary(locale);
   const copy = useMemo(() => getAdminChromeCopy(locale), [locale]);
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const { addNotification } = useAdminNotifications();
   const currentPath = stripLocalePrefix(pathname);
@@ -128,6 +142,40 @@ export function AdminShell({ locale, children }: AdminShellProps) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isSidebarDrawerMode, setIsSidebarDrawerMode] = useState(false);
   const previousPathnameRef = useRef(pathname);
+  const sidebarRef = useRef<HTMLElement | null>(null);
+  const sidebarTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const sidebarPreviouslyFocusedRef = useRef<HTMLElement | null>(null);
+
+  const closeSidebar = useCallback((restoreFocus = false) => {
+    setSidebarOpen(false);
+
+    if (!restoreFocus || typeof window === "undefined") {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      const previouslyFocused = sidebarPreviouslyFocusedRef.current;
+      const restoreTarget =
+        previouslyFocused?.isConnected && previouslyFocused !== document.body
+          ? previouslyFocused
+          : sidebarTriggerRef.current;
+
+      restoreTarget?.focus();
+      sidebarPreviouslyFocusedRef.current = null;
+    });
+  }, []);
+
+  function handleSidebarToggle() {
+    if (sidebarOpen) {
+      closeSidebar(true);
+      return;
+    }
+
+    sidebarPreviouslyFocusedRef.current =
+      sidebarTriggerRef.current ??
+      (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+    setSidebarOpen(true);
+  }
 
   useEffect(() => {
     if (!needsSessionRestore || isRestoringSessionRef.current) {
@@ -150,18 +198,19 @@ export function AdminShell({ locale, children }: AdminShellProps) {
         isRestoringSessionRef.current = false;
       });
   }, [locale, needsSessionRestore, router]);
-  const [theme, setTheme] = useState<AdminTheme>(() => {
-    if (typeof window === "undefined") {
-      return "dark";
-    }
-
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
-    return resolveAdminTheme(readStoredAdminTheme(), media.matches);
-  });
+  // The head script makes the persisted theme visible before first paint.
+  // The server snapshot keeps hydration deterministic until that DOM state is read.
+  const theme = useSyncExternalStore(
+    subscribeToAdminTheme,
+    getAppliedAdminTheme,
+    getServerAdminTheme
+  );
 
   useEffect(() => {
-    applyAdminTheme(theme);
-  }, [theme]);
+    // The head script skips invalid values rather than logging before React is ready.
+    // Reuse the guarded reader to remove an invalid persisted value after hydration.
+    readStoredAdminTheme();
+  }, []);
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -203,15 +252,72 @@ export function AdminShell({ locale, children }: AdminShellProps) {
     sessionRoles,
   ]);
 
-  /* Keyboard: close sidebar on Escape */
+  /* Keep keyboard focus inside the modal mobile navigation while it is open. */
   useEffect(() => {
-    if (!sidebarOpen) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setSidebarOpen(false);
+    if (!sidebarOpen || !isSidebarDrawerMode) {
+      return;
     }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [sidebarOpen]);
+
+    const sidebar = sidebarRef.current;
+    if (!sidebar) {
+      return;
+    }
+
+    // Keep a non-null snapshot for the keyboard handler's closure. The ref may
+    // change during React reconciliation while the drawer effect is still active.
+    const focusTrapSidebar: HTMLElement = sidebar;
+
+    const initialFocusTarget =
+      focusTrapSidebar.querySelector<HTMLElement>(ADMIN_SIDEBAR_FOCUSABLE_SELECTOR) ??
+      focusTrapSidebar;
+    initialFocusTarget.focus();
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        closeSidebar(true);
+        return;
+      }
+
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const focusableElements = Array.from(
+        focusTrapSidebar.querySelectorAll<HTMLElement>(ADMIN_SIDEBAR_FOCUSABLE_SELECTOR)
+      );
+      if (focusableElements.length === 0) {
+        event.preventDefault();
+        focusTrapSidebar.focus();
+        return;
+      }
+
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+      const activeElement = document.activeElement;
+
+      if (
+        event.shiftKey &&
+        (activeElement === firstElement || !focusTrapSidebar.contains(activeElement))
+      ) {
+        event.preventDefault();
+        lastElement.focus();
+        return;
+      }
+
+      if (
+        !event.shiftKey &&
+        (activeElement === lastElement || !focusTrapSidebar.contains(activeElement))
+      ) {
+        event.preventDefault();
+        firstElement.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [closeSidebar, isSidebarDrawerMode, sidebarOpen]);
 
   useEffect(() => {
     if (!sidebarOpen || !isSidebarDrawerMode || typeof document === "undefined") {
@@ -259,6 +365,16 @@ export function AdminShell({ locale, children }: AdminShellProps) {
       return;
     }
 
+    if (sidebarOpen && isSidebarDrawerMode && typeof window !== "undefined") {
+      setSidebarOpen(false);
+      window.requestAnimationFrame(() => {
+        sidebarTriggerRef.current?.focus();
+        sidebarPreviouslyFocusedRef.current = null;
+        setLogoutDialogOpen(true);
+      });
+      return;
+    }
+
     setSidebarOpen(false);
     setLogoutDialogOpen(true);
   }
@@ -279,12 +395,10 @@ export function AdminShell({ locale, children }: AdminShellProps) {
   }
 
   function handleToggleTheme() {
-    setTheme((currentTheme) => {
-      const nextThemeValue = nextAdminTheme(currentTheme);
-      applyAdminTheme(nextThemeValue);
-      storeAdminTheme(nextThemeValue);
-      return nextThemeValue;
-    });
+    const nextThemeValue = nextAdminTheme(theme);
+    applyAdminTheme(nextThemeValue);
+    storeAdminTheme(nextThemeValue);
+    publishAdminThemeChange();
   }
 
   /* ── Login screen ───────────────────────────────────────────── */
@@ -321,13 +435,23 @@ export function AdminShell({ locale, children }: AdminShellProps) {
   const userInitial = (userName || "A")[0].toUpperCase();
   const userBadgeName = userName || copy.roles.adminFallback;
   const pageMeta = getAdminPageMeta(locale, currentPath, userName);
-  const ruPath = buildLocaleSwitchPath("ru", pathname);
-  const enPath = buildLocaleSwitchPath("en", pathname);
+  const currentSearch = searchParams.toString();
+  const ruPath = buildLocaleSwitchPath("ru", pathname, currentSearch);
+  const enPath = buildLocaleSwitchPath("en", pathname, currentSearch);
 
   return (
     <div className={styles.layout}>
+      <a
+        className={styles.skipLink}
+        href="#admin-main"
+        aria-hidden={isSidebarDrawerMode && sidebarOpen ? "true" : undefined}
+        inert={isSidebarDrawerMode && sidebarOpen}
+      >
+        {copy.skipToContent}
+      </a>
+
       {sidebarOpen ? (
-        <div className={styles.backdrop} onClick={() => setSidebarOpen(false)} aria-hidden="true" />
+        <div className={styles.backdrop} onClick={() => closeSidebar(true)} aria-hidden="true" />
       ) : null}
 
       <AdminSidebar
@@ -335,7 +459,9 @@ export function AdminShell({ locale, children }: AdminShellProps) {
         currentPath={currentPath}
         isOpen={sidebarOpen}
         isDrawerMode={isSidebarDrawerMode}
-        onNavigate={() => setSidebarOpen(false)}
+        sidebarRef={sidebarRef}
+        onClose={() => closeSidebar(true)}
+        onNavigate={() => closeSidebar(true)}
         onLogout={handleLogoutRequest}
         logoutDisabled={isLoggingOut}
         logoutLabel={text.navLogout}
@@ -357,14 +483,18 @@ export function AdminShell({ locale, children }: AdminShellProps) {
           userName={userBadgeName}
           userRole={userRole}
           userInitial={userInitial}
+          roles={sessionRoles}
           ruPath={ruPath}
           enPath={enPath}
           sidebarOpen={sidebarOpen}
-          onToggleSidebar={() => setSidebarOpen((current) => !current)}
+          sidebarTriggerRef={sidebarTriggerRef}
+          onToggleSidebar={handleSidebarToggle}
           onToggleTheme={handleToggleTheme}
         />
 
-        <main className={styles.content}>{children}</main>
+        <main id="admin-main" className={styles.content} tabIndex={-1}>
+          {children}
+        </main>
       </div>
 
       <ConfirmationDialog
@@ -384,4 +514,8 @@ export function AdminShell({ locale, children }: AdminShellProps) {
       />
     </div>
   );
+}
+
+function getServerAdminTheme(): AdminTheme {
+  return "dark";
 }

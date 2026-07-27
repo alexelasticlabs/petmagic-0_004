@@ -23,6 +23,9 @@ describe("admin primitives responsive layout", () => {
     expect(source).toContain("var(--status-color, var(--success))");
     expect(source).not.toContain("var(--stat-accent, #");
     expect(source).not.toContain("var(--status-color, #");
+    expect(source).toContain(
+      "color-mix(in srgb, var(--status-color, var(--success)) 68%, var(--text-strong))"
+    );
   });
 
   it("lets composed dialogs bind shared card headings to aria-labelledby", () => {
@@ -32,6 +35,13 @@ describe("admin primitives responsive layout", () => {
     expect(source).toContain("titleId,");
     expect(source).toContain("<h2 id={titleId} className={styles.cardTitle}>");
     expect(source).not.toContain("{title ? <h2 className={styles.cardTitle}>{title}</h2> : null}");
+  });
+
+  it("keeps page hero headings below the shell page title", () => {
+    const source = readFileSync(primitivesSourcePath, "utf8");
+
+    expect(source).toContain("<h2 className={styles.pageTitle}>{title}</h2>");
+    expect(source).not.toContain("<h1 className={styles.pageTitle}>{title}</h1>");
   });
 
   it("keeps shared primitive typography and surfaces on theme tokens", () => {
@@ -47,6 +57,45 @@ describe("admin primitives responsive layout", () => {
     expect(source).not.toContain("var(--tone-color) 88%, white");
     expect(source).not.toMatch(/font-size:\s*[^;]*vw/);
     expect(nonZeroLetterSpacingRules).toEqual([]);
+  });
+
+  it("uses contrast-safe semantic foreground tokens for status badges", () => {
+    const source = readFileSync(primitivesCssPath, "utf8");
+
+    expect(source).toContain("--tone-foreground: var(--primary-soft-fg);");
+    expect(source).toContain("--tone-foreground: var(--success-soft-fg);");
+    expect(source).toContain("--tone-foreground: var(--warning-soft-fg);");
+    expect(source).toContain("--tone-foreground: var(--danger-soft-fg);");
+    expect(source).toContain("color: var(--tone-foreground);");
+    expect(source).not.toContain(
+      "color: color-mix(in srgb, var(--tone-color) 88%, var(--accent-contrast));"
+    );
+  });
+
+  it("does not give static cards interactive hover affordances", () => {
+    const source = readFileSync(primitivesCssPath, "utf8");
+
+    expect(source).not.toMatch(/^\.card:hover/m);
+    expect(source).not.toMatch(/^\.statCard:hover/m);
+    expect(source).not.toMatch(/^\.metricChip:hover/m);
+    expect(source).not.toMatch(/^\.kpiCard:hover/m);
+    expect(source).not.toMatch(/^\.stateCard:hover/m);
+  });
+
+  it("renders drill-down KPI cards as keyboard-accessible links without changing static cards", () => {
+    const source = readFileSync(primitivesSourcePath, "utf8");
+    const css = readFileSync(primitivesCssPath, "utf8");
+
+    expect(source).toContain('import Link from "next/link";');
+    expect(source).toContain("href?: string;");
+    expect(source).toContain("ariaLabel?: string;");
+    expect(source).toContain("if (!href) {");
+    expect(source).toContain(
+      "<Link href={href} aria-label={ariaLabel ?? label} className={styles.statCardLink}>"
+    );
+    expect(css).toContain(".statCardLink:hover .statCard");
+    expect(css).toContain(".statCardLink:focus-visible");
+    expect(css).toContain("box-shadow: var(--focus-ring);");
   });
 
   it("keeps shared data tables usable on narrow screens and long pages", () => {

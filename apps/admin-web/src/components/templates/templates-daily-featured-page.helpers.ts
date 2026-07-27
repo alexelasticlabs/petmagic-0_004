@@ -17,6 +17,7 @@ import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 export const SEARCH_LIMIT = 80;
 export const SEARCH_DEBOUNCE_MS = 300;
 export const TEMPLATE_OPTIONS_TAKE = 30;
+export const SCHEDULE_PAGE_SIZE = 30;
 
 export function useDebouncedValue(value: string, delayMs: number) {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -33,10 +34,16 @@ export function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
+export function getBusinessDateOrClientToday(value: string | null | undefined) {
+  const trimmed = value?.trim() ?? "";
+  return /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? trimmed : todayIso();
+}
+
 export function emptyForm(date = todayIso()): AssignmentFormState {
   return {
     id: null,
     templateId: "",
+    isManual: true,
     startDate: date,
     endDate: "",
     priority: "0",
@@ -56,14 +63,22 @@ export function parseExcludeRecentDays(value: string) {
   return Math.min(Math.max(parsed, 0), 365);
 }
 
+export function isExcludeRecentDaysValid(value: string) {
+  return isIntegerInRange(value, 0, 365);
+}
+
+export function isPriorityValid(value: string) {
+  return isIntegerInRange(value, -2147483648, 2147483647);
+}
+
 export function toPayload(form: AssignmentFormState): TemplateOfTheDayPayload {
   return {
     templateId: form.templateId,
     startDate: form.startDate,
     endDate: form.endDate.trim() || null,
     isActive: form.isActive,
-    isManual: true,
-    priority: Number.parseInt(form.priority || "0", 10) || 0,
+    isManual: form.isManual,
+    priority: Number.parseInt(form.priority, 10),
     titleOverride: form.titleOverride.trim() || null,
     subtitleOverride: form.subtitleOverride.trim() || null,
     badgeTextOverride: form.badgeTextOverride.trim() || null,
@@ -74,6 +89,7 @@ export function formFromAssignment(assignment: AdminTemplateOfTheDay): Assignmen
   return {
     id: assignment.id,
     templateId: assignment.templateId,
+    isManual: assignment.isManual,
     startDate: assignment.startDate,
     endDate: assignment.endDate ?? "",
     priority: String(assignment.priority),
@@ -196,4 +212,14 @@ export function dateRangesOverlap(
 
 export function hasInvalidDateRange(startDate: string, endDate: string) {
   return endDate.trim().length > 0 && endDate.trim() < (startDate || todayIso());
+}
+
+function isIntegerInRange(value: string, min: number, max: number) {
+  const trimmed = value.trim();
+  if (!/^-?\d+$/.test(trimmed)) {
+    return false;
+  }
+
+  const parsed = Number(trimmed);
+  return Number.isSafeInteger(parsed) && parsed >= min && parsed <= max;
 }

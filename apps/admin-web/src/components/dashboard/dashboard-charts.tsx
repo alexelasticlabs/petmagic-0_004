@@ -24,8 +24,17 @@ export function RevenueChart({
   dateHeader: string;
   revenueHeader: string;
 }) {
-  const xPositions = [50, 130, 210, 305, 390, 472, 560];
-  const normalizedValues = xPositions.map((_, index) => values[index] ?? 0);
+  const normalizedValues =
+    values.length > 0 ? values.map((value) => (Number.isFinite(value) ? value : 0)) : [0];
+  const normalizedLabels = normalizedValues.map((_, index) => xLabels[index] || "—");
+  const xPositions = normalizedValues.map((_, index) => {
+    if (normalizedValues.length === 1) {
+      return 305;
+    }
+
+    return 50 + (510 * index) / (normalizedValues.length - 1);
+  });
+  const tickIndexes = getChartTickIndexes(normalizedValues.length);
   const maxValue = Math.max(...normalizedValues, 1);
   const points = normalizedValues
     .map((value, index) => {
@@ -34,7 +43,7 @@ export function RevenueChart({
       return `${x},${Math.max(18, Math.min(196, Number(y.toFixed(2))))}`;
     })
     .join(" ");
-  const areaPoints = `${points} 560,196 50,196`;
+  const areaPoints = `${points} ${xPositions.at(-1) ?? 560},196 ${xPositions[0] ?? 50},196`;
   const yLabels = [1, 2 / 3, 1 / 3, 0].map((ratio) => ({
     y: 196 - 178 * ratio,
     label: formatCompactCurrency(maxValue * ratio, currencyCode, locale),
@@ -82,7 +91,8 @@ export function RevenueChart({
           fill="none"
           strokeLinejoin="round"
         />
-        {points.split(" ").map((point, index) => {
+        {tickIndexes.map((index) => {
+          const point = points.split(" ")[index] ?? "305,196";
           const [x, y] = point.split(",").map(Number);
           return (
             <circle
@@ -96,17 +106,17 @@ export function RevenueChart({
             />
           );
         })}
-        {xPositions.map((x, index) => (
+        {tickIndexes.map((index) => (
           <text
-            key={x}
-            x={x}
+            key={index}
+            x={xPositions[index] ?? 305}
             y={220}
             textAnchor="middle"
             fill="var(--text-muted)"
             fontSize="10"
             fontFamily="system-ui"
           >
-            {xLabels[index]}
+            {normalizedLabels[index]}
           </text>
         ))}
       </svg>
@@ -119,8 +129,8 @@ export function RevenueChart({
         </thead>
         <tbody>
           {normalizedValues.map((value, index) => (
-            <tr key={`${xLabels[index]}-${index}`}>
-              <td>{xLabels[index]}</td>
+            <tr key={`${normalizedLabels[index]}-${index}`}>
+              <td>{normalizedLabels[index]}</td>
               <td>
                 {formatChartCurrencyAmount(
                   value,
@@ -135,6 +145,16 @@ export function RevenueChart({
         </tbody>
       </table>
     </>
+  );
+}
+
+function getChartTickIndexes(pointCount: number, maximumTickCount = 7): number[] {
+  if (pointCount <= maximumTickCount) {
+    return Array.from({ length: pointCount }, (_, index) => index);
+  }
+
+  return Array.from({ length: maximumTickCount }, (_, index) =>
+    Math.round((index * (pointCount - 1)) / (maximumTickCount - 1))
   );
 }
 

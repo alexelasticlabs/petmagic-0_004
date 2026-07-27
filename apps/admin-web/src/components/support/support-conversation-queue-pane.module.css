@@ -3,8 +3,8 @@
   flex-direction: column;
   gap: 0.72rem;
   min-width: 0;
-  min-height: clamp(34rem, calc(100dvh - 9rem), 52rem);
-  height: clamp(34rem, calc(100dvh - 9rem), 52rem);
+  min-height: var(--support-workspace-height);
+  height: var(--support-workspace-height);
   overflow: hidden;
   padding: 0.92rem;
   border: 1px solid color-mix(in srgb, var(--text-muted) 34%, var(--border-soft));
@@ -26,6 +26,82 @@
   gap: 12px;
   padding-bottom: 0.52rem;
   border-bottom: 1px solid color-mix(in srgb, var(--border-soft) 70%, transparent);
+}
+
+.queueSearchField {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 2.7rem;
+}
+
+.queueSearchInput {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.7rem;
+  padding: 0.6rem 2.35rem 0.6rem 2.45rem;
+  border: 1px solid color-mix(in srgb, var(--text-muted) 30%, var(--border-soft));
+  border-radius: 0.8rem;
+  background: color-mix(in srgb, var(--surface-1) 96%, var(--surface-2));
+  color: var(--text-strong);
+  font: inherit;
+  font-size: 0.78rem;
+}
+
+.queueSearchInput::placeholder {
+  color: color-mix(in srgb, var(--text-muted) 88%, transparent);
+}
+
+.queueSearchInput:focus-visible {
+  outline: none;
+  border-color: var(--border-accent);
+  box-shadow: var(--focus-ring);
+}
+
+.queueSearchIcon,
+.queueSearchShortcut {
+  position: absolute;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.queueSearchIcon {
+  left: 0.82rem;
+  width: 0.92rem;
+  height: 0.92rem;
+  color: var(--text-muted);
+}
+
+.queueSearchIcon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.queueSearchShortcut {
+  right: 0.62rem;
+  min-width: 1.32rem;
+  height: 1.32rem;
+  padding-inline: 0.28rem;
+  border: 1px solid color-mix(in srgb, var(--text-muted) 25%, var(--border-soft));
+  border-radius: 0.42rem;
+  background: color-mix(in srgb, var(--surface-2) 94%, var(--surface-1));
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.queueSearchLabel {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .queuePaneTitleRow {
@@ -56,33 +132,24 @@
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border-soft));
   background: color-mix(in srgb, var(--accent) 14%, var(--surface-2));
-  color: color-mix(in srgb, var(--accent) 68%, var(--text-strong) 32%);
+  color: color-mix(in srgb, var(--accent) 78%, var(--text-strong));
   font-size: 0.85rem;
   font-weight: 700;
 }
 
-.queueSubFilters {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.34rem;
-  padding: 0.25rem;
-  border: 1px solid color-mix(in srgb, var(--border-soft) 82%, transparent);
-  border-radius: 13px;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--surface-2) 92%, var(--surface-1)),
-    color-mix(in srgb, var(--surface-2) 80%, var(--surface-0))
-  );
+.queueQuickActions {
+  display: flex;
+  align-items: center;
 }
 
-.queueSubFilter,
-.queueSubFilterActive {
+.queueQuickFilter,
+.queueQuickFilterActive {
   min-width: 0;
   min-height: 2rem;
-  padding: 0.25rem 0.42rem;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  background: transparent;
+  padding: 0.25rem 0.62rem;
+  border: 1px solid color-mix(in srgb, var(--border-soft) 86%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-2) 92%, var(--surface-1));
   color: var(--text-muted);
   font: inherit;
   font-size: 0.73rem;
@@ -99,23 +166,14 @@
     color 120ms ease;
 }
 
-.queueSubFilterActive {
+.queueQuickFilterActive {
   border-color: color-mix(in srgb, var(--accent) 26%, var(--border-soft));
-  background: linear-gradient(
-    180deg,
-    var(--surface-1),
-    color-mix(in srgb, var(--surface-2) 95%, var(--surface-1))
-  );
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface-2));
   color: var(--accent);
-  box-shadow: 0 6px 14px color-mix(in srgb, var(--surface-0) 8%, transparent);
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--surface-0) 7%, transparent);
 }
 
-.queueFiltersGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(7.2rem, 1fr));
-  gap: 0.44rem;
-  align-items: end;
-  padding: 0.44rem;
+.queueFiltersDisclosure {
   border: 1px solid color-mix(in srgb, var(--border-soft) 74%, transparent);
   border-radius: 12px;
   background: linear-gradient(
@@ -123,6 +181,62 @@
     color-mix(in srgb, var(--surface-2) 90%, var(--surface-1)),
     color-mix(in srgb, var(--surface-2) 72%, var(--surface-0))
   );
+}
+
+.queueFiltersSummary {
+  display: flex;
+  align-items: center;
+  gap: 0.44rem;
+  min-height: 2.55rem;
+  padding: 0.42rem 0.58rem;
+  color: var(--text-soft);
+  cursor: pointer;
+  font-size: 0.73rem;
+  font-weight: 700;
+  list-style: none;
+}
+
+.queueFiltersSummary::-webkit-details-marker {
+  display: none;
+}
+
+.queueFiltersSummaryCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.28rem;
+  height: 1.28rem;
+  padding-inline: 0.28rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 15%, var(--surface-2));
+  color: var(--accent);
+  font-size: 0.65rem;
+}
+
+.queueFiltersSummaryIcon {
+  width: 0.78rem;
+  height: 0.78rem;
+  margin-left: auto;
+  color: var(--text-muted);
+  transition: transform 160ms ease;
+}
+
+.queueFiltersDisclosure[open] .queueFiltersSummaryIcon {
+  transform: rotate(180deg);
+}
+
+.queueFiltersSummary:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: 0.62rem;
+}
+
+.queueFiltersGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7.2rem, 1fr));
+  gap: 0.44rem;
+  align-items: end;
+  padding: 0 0.44rem 0.44rem;
 }
 
 .queueToolField {
@@ -520,42 +634,6 @@
   animation: pulseSlaRing 2s ease-in-out infinite;
 }
 
-.queueRowDetailLine {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.34rem;
-  align-items: center;
-  margin-top: 0.1rem;
-  color: color-mix(in srgb, var(--text-muted) 88%, var(--text-strong) 12%);
-  font-size: 0.72rem;
-  font-weight: 600;
-}
-
-.queueMetaChip,
-.queueMetaChipMuted {
-  display: inline-flex;
-  align-items: center;
-  min-height: 1.36rem;
-  max-width: 100%;
-  padding: 0 0.46rem;
-  border: 1px solid color-mix(in srgb, var(--border-soft) 80%, transparent);
-  border-radius: 999px;
-  font-size: 0.65rem;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.queueMetaChip {
-  background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));
-  color: color-mix(in srgb, var(--accent) 78%, var(--text-strong));
-  border-color: color-mix(in srgb, var(--accent) 24%, var(--border-soft));
-}
-
-.queueMetaChipMuted {
-  background: color-mix(in srgb, var(--surface-2) 96%, var(--surface-1));
-  color: var(--text-muted);
-}
-
 .queueFooter {
   display: flex;
   flex-wrap: wrap;
@@ -623,8 +701,9 @@
 @media (prefers-reduced-motion: reduce) {
   .conversationRow,
   .queuePagerButton,
-  .queueSubFilter,
-  .queueSubFilterActive {
+  .queueQuickFilter,
+  .queueQuickFilterActive,
+  .queueFiltersSummaryIcon {
     transition: none !important;
   }
 
@@ -677,9 +756,15 @@
     border-radius: 1rem;
   }
 
-  .queueSubFilters,
   .queueFiltersGrid {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 1081px) {
+  .inboxPaneFlat {
+    min-height: var(--support-workspace-height);
+    height: var(--support-workspace-height);
   }
 }
 
@@ -727,10 +812,8 @@
     0 14px 30px color-mix(in srgb, var(--surface-0) 46%, transparent);
 }
 
-:global(:root:not([data-theme="light"])) .queueSubFilters,
-:global(:root[data-theme="dark"]) .queueSubFilters,
-:global(:root:not([data-theme="light"])) .queueFiltersGrid,
-:global(:root[data-theme="dark"]) .queueFiltersGrid {
+:global(:root:not([data-theme="light"])) .queueFiltersDisclosure,
+:global(:root[data-theme="dark"]) .queueFiltersDisclosure {
   border-color: color-mix(in srgb, var(--border-soft) 82%, var(--surface-0));
   background: color-mix(in srgb, var(--surface-2) 88%, var(--surface-0));
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 3%, transparent);
@@ -739,9 +822,7 @@
 :global(:root:not([data-theme="light"])) .queueToolField span,
 :global(:root[data-theme="dark"]) .queueToolField span,
 :global(:root:not([data-theme="light"])) .rowPreview span,
-:global(:root[data-theme="dark"]) .rowPreview span,
-:global(:root:not([data-theme="light"])) .queueMetaChipMuted,
-:global(:root[data-theme="dark"]) .queueMetaChipMuted {
+:global(:root[data-theme="dark"]) .rowPreview span {
   color: var(--text-muted);
 }
 
@@ -785,17 +866,7 @@
 :global(:root:not([data-theme="light"])) .queueStatusPill,
 :global(:root[data-theme="dark"]) .queueStatusPill,
 :global(:root:not([data-theme="light"])) .slaPill,
-:global(:root[data-theme="dark"]) .slaPill,
-:global(:root:not([data-theme="light"])) .queueMetaChip,
-:global(:root[data-theme="dark"]) .queueMetaChip,
-:global(:root:not([data-theme="light"])) .queueMetaChipMuted,
-:global(:root[data-theme="dark"]) .queueMetaChipMuted {
+:global(:root[data-theme="dark"]) .slaPill {
   border-color: color-mix(in srgb, var(--border-soft) 78%, var(--surface-0));
   background: color-mix(in srgb, var(--surface-1) 80%, var(--surface-0));
-}
-
-:global(:root:not([data-theme="light"])) .queueMetaChip,
-:global(:root[data-theme="dark"]) .queueMetaChip {
-  color: color-mix(in srgb, var(--accent) 78%, var(--text-strong));
-  background: color-mix(in srgb, var(--accent) 20%, var(--surface-2));
 }

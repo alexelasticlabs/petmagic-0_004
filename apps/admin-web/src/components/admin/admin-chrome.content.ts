@@ -9,6 +9,7 @@ export type AdminNotificationFilter = "all" | "unread" | AdminNotificationCatego
 type AdminChromeCopy = {
   rtfLocale: "ru" | "en";
   accessGateChecking: string;
+  skipToContent: string;
   roles: {
     admin: string;
     moderator: string;
@@ -26,6 +27,7 @@ type AdminChromeCopy = {
   sidebar: {
     brandTitle: string;
     brandCaption: string;
+    closeNavigationLabel: string;
     navigationLabel: string;
     supportUnreadLabel: (count: number) => string;
   };
@@ -54,6 +56,31 @@ type AdminChromeCopy = {
     categoryLabels: Record<AdminNotificationCategory, string>;
     emptyTitle: string;
     emptyMessage: string;
+  };
+  commandPalette: {
+    triggerLabel: string;
+    triggerAriaLabel: string;
+    dialogTitle: string;
+    searchLabel: string;
+    searchPlaceholder: string;
+    userSearchLabel: string;
+    userSearchPlaceholder: string;
+    resultsLabel: string;
+    sectionsLabel: string;
+    usersLabel: string;
+    userSearchMinimum: string;
+    usersLoading: string;
+    usersLoadingMessage: string;
+    usersErrorTitle: string;
+    usersErrorMessage: string;
+    retryLabel: string;
+    usersEmptyTitle: string;
+    usersEmptyMessage: string;
+    currentPage: string;
+    emptyTitle: string;
+    emptyMessage: string;
+    closeLabel: string;
+    navigateHint: string;
   };
   langDropdown: {
     languageLabel: string;
@@ -88,6 +115,7 @@ const adminChromeCopy: Record<Locale, AdminChromeCopy> = {
   ru: {
     rtfLocale: "ru",
     accessGateChecking: "Проверяем доступ...",
+    skipToContent: "Перейти к основному содержимому",
     roles: {
       admin: "Администратор",
       moderator: "Модератор",
@@ -105,6 +133,7 @@ const adminChromeCopy: Record<Locale, AdminChromeCopy> = {
     sidebar: {
       brandTitle: "PetMagic Admin",
       brandCaption: "Операционная админ-зона",
+      closeNavigationLabel: "Закрыть навигацию",
       navigationLabel: "Навигация админ-панели",
       supportUnreadLabel: (count) => `${count} новых сообщений в поддержке`,
     },
@@ -157,6 +186,31 @@ const adminChromeCopy: Record<Locale, AdminChromeCopy> = {
       emptyMessage:
         "Важные действия из поддержки, пользователей и шаблонов будут появляться здесь.",
     },
+    commandPalette: {
+      triggerLabel: "Поиск",
+      triggerAriaLabel: "Поиск по разделам и командам",
+      dialogTitle: "Быстрый переход",
+      searchLabel: "Найти раздел",
+      searchPlaceholder: "Пользователи, экономика, шаблоны...",
+      userSearchLabel: "Найти раздел или пользователя",
+      userSearchPlaceholder: "Раздел, имя, email или ID пользователя...",
+      resultsLabel: "Доступные результаты",
+      sectionsLabel: "Разделы",
+      usersLabel: "Пользователи",
+      userSearchMinimum: "Введите не менее 2 символов для поиска пользователей.",
+      usersLoading: "Ищем пользователей",
+      usersLoadingMessage: "Разделы остаются доступны во время поиска.",
+      usersErrorTitle: "Не удалось найти пользователей",
+      usersErrorMessage: "Разделы доступны. Повторите поиск пользователей.",
+      retryLabel: "Повторить",
+      usersEmptyTitle: "Пользователи не найдены",
+      usersEmptyMessage: "Проверьте имя, email или ID. Разделы выше по-прежнему доступны.",
+      currentPage: "Текущая страница",
+      emptyTitle: "Ничего не найдено",
+      emptyMessage: "Попробуйте название раздела или группы навигации.",
+      closeLabel: "Закрыть",
+      navigateHint: "Enter — открыть, ↑↓ — выбрать, Esc — закрыть",
+    },
     langDropdown: {
       languageLabel: "Язык интерфейса",
       triggerLabel: "Выбрать язык интерфейса",
@@ -188,6 +242,7 @@ const adminChromeCopy: Record<Locale, AdminChromeCopy> = {
   en: {
     rtfLocale: "en",
     accessGateChecking: "Checking access...",
+    skipToContent: "Skip to main content",
     roles: {
       admin: "Administrator",
       moderator: "Moderator",
@@ -205,6 +260,7 @@ const adminChromeCopy: Record<Locale, AdminChromeCopy> = {
     sidebar: {
       brandTitle: "PetMagic Admin",
       brandCaption: "Operational admin workspace",
+      closeNavigationLabel: "Close navigation",
       navigationLabel: "Admin navigation",
       supportUnreadLabel: (count) => `${count} new support messages`,
     },
@@ -253,6 +309,31 @@ const adminChromeCopy: Record<Locale, AdminChromeCopy> = {
       },
       emptyTitle: "Nothing here yet",
       emptyMessage: "Important events from support, users, and templates will appear here.",
+    },
+    commandPalette: {
+      triggerLabel: "Search",
+      triggerAriaLabel: "Search sections and commands",
+      dialogTitle: "Quick navigation",
+      searchLabel: "Find a section",
+      searchPlaceholder: "Users, economy, templates...",
+      userSearchLabel: "Find a section or user",
+      userSearchPlaceholder: "Section, name, email, or user ID...",
+      resultsLabel: "Available results",
+      sectionsLabel: "Sections",
+      usersLabel: "Users",
+      userSearchMinimum: "Enter at least 2 characters to search users.",
+      usersLoading: "Searching users",
+      usersLoadingMessage: "Sections remain available while the search runs.",
+      usersErrorTitle: "Could not search users",
+      usersErrorMessage: "Sections are still available. Retry the user search.",
+      retryLabel: "Retry",
+      usersEmptyTitle: "No users found",
+      usersEmptyMessage: "Check the name, email, or ID. Sections above remain available.",
+      currentPage: "Current page",
+      emptyTitle: "No results",
+      emptyMessage: "Try a section or navigation group name.",
+      closeLabel: "Close",
+      navigateHint: "Enter to open, ↑↓ to select, Esc to close",
     },
     langDropdown: {
       languageLabel: "Interface language",

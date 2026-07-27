@@ -20,10 +20,20 @@ describe("promo codes editor drawer production form", () => {
 
   it("keeps submit guarded by client validation and mutation state", () => {
     const source = readFileSync(drawerPath, "utf8");
+    const styles = readFileSync(stylesPath, "utf8");
 
     expect(source).toContain("useId,");
     expect(source).toContain("const panelTitleId = useId();");
     expect(source).toContain("aria-labelledby={panelTitleId}");
+    expect(source).toContain("const drawerRef = useRef<HTMLElement>(null);");
+    expect(source).toContain("const cancelButtonRef = useRef<HTMLButtonElement>(null);");
+    expect(source).toContain("previouslyFocusedElementRef.current?.focus();");
+    expect(source).toContain('if (event.key !== "Tab") {');
+    expect(source).toContain(
+      "const focusableElements = drawerRef.current?.querySelectorAll<HTMLElement>("
+    );
+    expect(source).toContain("ref={drawerRef}");
+    expect(source).toContain("ref={cancelButtonRef}");
     expect(source).toContain("titleId={panelTitleId}");
     expect(source).not.toContain("aria-label={panelTitle}");
     expect(source).toContain("onClick={isMutating ? undefined : onClose}");
@@ -49,6 +59,13 @@ describe("promo codes editor drawer production form", () => {
     expect(source).toContain("maxLength={PROMO_NUMERIC_FIELD_MAX_LENGTH}");
     expect(source).not.toContain('type="number"');
     expect(source).toContain("aria-invalid={isCodeInvalid}");
+    expect(source).toContain("aria-describedby={");
+    expect(source).toContain("className={styles.validationSummary}");
+    expect(source).toContain("text.promoCodesInvalidCode");
+    expect(source).toContain("text.promoCodesInvalidNumbers");
+    expect(source).toContain("text.promoCodesInvalidWindow");
+    expect(styles).toContain(".validationSummary");
+    expect(styles).toContain("var(--danger-soft-fg)");
   });
 
   it("bounds free-text state updates before payload construction", () => {
@@ -83,5 +100,38 @@ describe("promo codes editor drawer production form", () => {
     expect(source).not.toContain("🔢");
     expect(source).not.toContain("📅");
     expect(styles).toContain(".formSummaryIcon");
+  });
+
+  it("keeps the edit flow accessible without allowing an in-flight mutation to close it", () => {
+    const source = readFileSync(drawerPath, "utf8");
+
+    expect(source).toContain("const drawerRef = useRef<HTMLElement>(null);");
+    expect(source).toContain("const cancelButtonRef = useRef<HTMLButtonElement>(null);");
+    expect(source).toContain(
+      "const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);"
+    );
+    expect(source).toContain('document.body.style.overflow = "hidden";');
+    expect(source).toContain("document.body.style.overflow = previousOverflow;");
+    expect(source).toContain("cancelButtonRef.current?.focus();");
+    expect(source).toContain("previouslyFocusedElementRef.current?.focus();");
+    expect(source).toContain("ref={drawerRef}");
+    expect(source).toContain("ref={cancelButtonRef}");
+    expect(source).toContain("tabIndex={-1}");
+    expect(source).toContain("aria-busy={isMutating}");
+    expect(source).toContain('if (event.key === "Escape") {\n        if (isMutating) {');
+    expect(source).toContain("onClose();\n        return;");
+    expect(source).toContain('if (event.key !== "Tab") {');
+    expect(source).toContain(
+      "const focusableElements = drawerRef.current?.querySelectorAll<HTMLElement>("
+    );
+    expect(source).toContain("drawerRef.current?.focus();");
+    expect(source).toContain("const firstElement = focusableElements[0];");
+    expect(source).toContain(
+      "const lastElement = focusableElements[focusableElements.length - 1];"
+    );
+    expect(source).toContain("if (event.shiftKey && document.activeElement === firstElement)");
+    expect(source).toContain("if (!event.shiftKey && document.activeElement === lastElement)");
+    expect(source).toContain("}, [isMutating, isOpen, onClose]);");
+    expect(source).toContain("onClick={isMutating ? undefined : onClose}");
   });
 });

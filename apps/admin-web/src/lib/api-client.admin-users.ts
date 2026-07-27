@@ -5,15 +5,25 @@ import {
   cachedGet,
   cachedUsersLists,
   encodePathSegment,
+  invalidateCachedGetNamespaces,
 } from "./api-client.core";
+import { adminCancelPremiumSubscription } from "./api-client.economy";
 
 import type {
+  AdminEconomyUserSubscriptionSummary,
+  AdminEmailBroadcastAccepted,
+  AdminEmailBroadcastDetail,
+  AdminEmailBroadcastRetryResult,
+  AdminEmailBroadcastsPage,
+  AdminEmailBroadcastStatus,
   AdminUserAnalytics,
   AdminUserDashboardMetrics,
   AdminUserDetail,
   AdminUserPet,
   AdminUserPetGeneration,
   AdminUserPetPhoto,
+  AdminUserSessionRevokeResponse,
+  AdminUserSessions,
   AdminUserWalletOperation,
   UserListPage,
 } from "./api-client.types";
@@ -30,13 +40,44 @@ export type FetchUsersQuery = {
 
 export type AdminUserSort =
   "created_desc" | "created_asc" | "last_activity_desc" | "last_activity_asc";
+export type AdminBulkEmailAudience = "all-active" | "premium" | "selected";
+export type AdminBulkEmailRequest = {
+  audience: AdminBulkEmailAudience;
+  subject: string;
+  body: string;
+  userIds?: readonly string[];
+};
+export type AdminEmailBroadcastsQuery = {
+  skip?: number;
+  take?: number;
+  status?: AdminEmailBroadcastStatus | "all";
+};
+
 type AdminAssignableRole = "Admin" | "Moderator";
 type AdminUserRoleFilter = AdminAssignableRole | "User";
 type AdminUserStatusFilter = "active" | "blocked" | "unconfirmed";
 
 const USER_LIST_MAX_TAKE = 100;
+const EMAIL_BROADCASTS_DEFAULT_TAKE = 10;
+const EMAIL_BROADCASTS_MAX_TAKE = 100;
 export const USER_SEARCH_MAX_LENGTH = 120;
-export const USER_WALLET_REASON_MAX_LENGTH = 240;
+export const USER_WALLET_REASON_MAX_LENGTH = 120;
+export const USER_SESSION_REVOKE_REASON_MAX_LENGTH = 240;
+export const ADMIN_BULK_EMAIL_SUBJECT_MAX_LENGTH = 200;
+export const ADMIN_BULK_EMAIL_BODY_MAX_LENGTH = 10_000;
+const allowedBulkEmailAudiences: readonly AdminBulkEmailAudience[] = [
+  "all-active",
+  "premium",
+  "selected",
+];
+const allowedEmailBroadcastStatuses: readonly AdminEmailBroadcastStatus[] = [
+  "legacy",
+  "queued",
+  "processing",
+  "completed",
+  "partially-failed",
+  "failed",
+];
 const allowedUserRoles: readonly AdminUserRoleFilter[] = ["Admin", "Moderator", "User"];
 const allowedUserStatuses: readonly AdminUserStatusFilter[] = ["active", "blocked", "unconfirmed"];
 const allowedUserSorts: readonly AdminUserSort[] = [
@@ -135,7 +176,63 @@ function assertAssignableRole(role: string): AdminAssignableRole {
   throw new Error("Invalid admin role.");
 }
 
+export function normalizeAdminBulkEmailRequest(
+  request: AdminBulkEmailRequest
+): Required<AdminBulkEmailRequest> {
+  const audience = normalizeAllowedValue(request.audience, allowedBulkEmailAudiences);
+  const subject = request.subject.trim();
+  const body = request.body.trim();
+  const userIds = [
+    ...new Set((request.userIds ?? []).map((userId) => userId.trim()).filter(Boolean)),
+  ];
+
+  if (!audience) {
+    throw new Error("Invalid bulk email audience.");
+  }
+
+  if (!subject || subject.length > ADMIN_BULK_EMAIL_SUBJECT_MAX_LENGTH) {
+    throw new Error("Invalid bulk email subject.");
+  }
+
+  if (!body || body.length > ADMIN_BULK_EMAIL_BODY_MAX_LENGTH) {
+    throw new Error("Invalid bulk email body.");
+  }
+
+  if (audience === "selected" && userIds.length === 0) {
+    throw new Error("Selected bulk email audience requires at least one user.");
+  }
+
+  return {
+    audience,
+    subject,
+    body,
+    userIds: audience === "selected" ? userIds : [],
+  };
+}
+
+export function normalizeAdminEmailBroadcastsQuery(
+  query: AdminEmailBroadcastsQuery = {}
+): AdminEmailBroadcastsQuery {
+  const status =
+    query.status === "all"
+      ? undefined
+      : normalizeAllowedValue(query.status, allowedEmailBroadcastStatuses);
+
+  return {
+    skip:
+      typeof query.skip === "number" && Number.isFinite(query.skip)
+        ? Math.max(0, Math.floor(query.skip))
+        : 0,
+    take:
+      typeof query.take === "number" && Number.isFinite(query.take) && query.take > 0
+        ? Math.min(Math.floor(query.take), EMAIL_BROADCASTS_MAX_TAKE)
+        : EMAIL_BROADCASTS_DEFAULT_TAKE,
+    status,
+  };
+}
+
 function clearAdminUserCaches(userId: string): void {
+  invalidateCachedGetNamespaces(["users", "admin-user", "admin-user-analytics"]);
   cachedUsersLists.clear();
   cachedAdminUserDetails.delete(`admin-user:${userId}`);
   cachedAdminUserAnalytics.delete(`admin-user-analytics:${userId}`);
@@ -170,6 +267,59 @@ export async function fetchAdminUserDashboardMetrics(
   });
 }
 
+export async function queueAdminBulkEmail(
+  request: AdminBulkEmailRequest,
+  idempotencyKey?: string
+): Promise<AdminEmailBroadcastAccepted> {
+  const payload = normalizeAdminBulkEmailRequest(request);
+  const normalizedIdempotencyKey = idempotencyKey?.trim();
+  return apiRequest<AdminEmailBroadcastAccepted>("/api/admin/users/emails", {
+    method: "POST",
+    headers: normalizedIdempotencyKey ? { "Idempotency-Key": normalizedIdempotencyKey } : undefined,
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchAdminEmailBroadcasts(
+  query: AdminEmailBroadcastsQuery = {},
+  signal?: AbortSignal
+): Promise<AdminEmailBroadcastsPage> {
+  const normalizedQuery = normalizeAdminEmailBroadcastsQuery(query);
+  const params = new URLSearchParams({
+    skip: String(normalizedQuery.skip ?? 0),
+    take: String(normalizedQuery.take ?? EMAIL_BROADCASTS_DEFAULT_TAKE),
+  });
+  if (normalizedQuery.status) {
+    params.set("status", normalizedQuery.status);
+  }
+
+  return apiRequest<AdminEmailBroadcastsPage>(
+    `/api/admin/users/email-broadcasts?${params.toString()}`,
+    { method: "GET", signal }
+  );
+}
+
+export async function fetchAdminEmailBroadcast(
+  broadcastId: string,
+  signal?: AbortSignal
+): Promise<AdminEmailBroadcastDetail> {
+  const encodedBroadcastId = encodePathSegment(broadcastId);
+  return apiRequest<AdminEmailBroadcastDetail>(
+    `/api/admin/users/email-broadcasts/${encodedBroadcastId}`,
+    { method: "GET", signal }
+  );
+}
+
+export async function retryFailedAdminEmailBroadcast(
+  broadcastId: string
+): Promise<AdminEmailBroadcastRetryResult> {
+  const encodedBroadcastId = encodePathSegment(broadcastId);
+  return apiRequest<AdminEmailBroadcastRetryResult>(
+    `/api/admin/users/email-broadcasts/${encodedBroadcastId}/retry-failed`,
+    { method: "POST" }
+  );
+}
+
 export async function fetchAdminUser(
   userId: string,
   signal?: AbortSignal
@@ -201,6 +351,66 @@ export async function fetchAdminUserAnalytics(
         signal,
       }),
     signal
+  );
+}
+
+export async function fetchAdminUserSessions(
+  userId: string,
+  signal?: AbortSignal
+): Promise<AdminUserSessions> {
+  const encodedUserId = encodePathSegment(userId);
+  return apiRequest<AdminUserSessions>(`/api/admin/users/${encodedUserId}/sessions`, {
+    method: "GET",
+    signal,
+  });
+}
+
+function normalizeAdminUserSessionRevokeInput(reason: string, idempotencyKey: string) {
+  const normalizedReason = reason.trim().slice(0, USER_SESSION_REVOKE_REASON_MAX_LENGTH);
+  const normalizedIdempotencyKey = idempotencyKey.trim().slice(0, 256);
+  if (!normalizedReason) {
+    throw new Error("Session revocation reason is required.");
+  }
+  if (!normalizedIdempotencyKey) {
+    throw new Error("Session revocation idempotency key is required.");
+  }
+
+  return { reason: normalizedReason, idempotencyKey: normalizedIdempotencyKey };
+}
+
+export async function revokeAdminUserSession(
+  userId: string,
+  sessionId: string,
+  reason: string,
+  idempotencyKey: string
+): Promise<AdminUserSessionRevokeResponse> {
+  const encodedUserId = encodePathSegment(userId);
+  const encodedSessionId = encodePathSegment(sessionId);
+  const normalized = normalizeAdminUserSessionRevokeInput(reason, idempotencyKey);
+  return apiRequest<AdminUserSessionRevokeResponse>(
+    `/api/admin/users/${encodedUserId}/sessions/${encodedSessionId}/revoke`,
+    {
+      method: "POST",
+      headers: { "Idempotency-Key": normalized.idempotencyKey },
+      body: JSON.stringify({ reason: normalized.reason }),
+    }
+  );
+}
+
+export async function revokeAllAdminUserSessions(
+  userId: string,
+  reason: string,
+  idempotencyKey: string
+): Promise<AdminUserSessionRevokeResponse> {
+  const encodedUserId = encodePathSegment(userId);
+  const normalized = normalizeAdminUserSessionRevokeInput(reason, idempotencyKey);
+  return apiRequest<AdminUserSessionRevokeResponse>(
+    `/api/admin/users/${encodedUserId}/sessions/revoke-all`,
+    {
+      method: "POST",
+      headers: { "Idempotency-Key": normalized.idempotencyKey },
+      body: JSON.stringify({ reason: normalized.reason }),
+    }
   );
 }
 
@@ -282,14 +492,19 @@ export async function adjustAdminUserWallet(
   userId: string,
   operation: "credit" | "debit",
   amount: number,
-  reason: string
+  reason: string,
+  idempotencyKey?: string
 ): Promise<AdminUserWalletOperation> {
   const encodedUserId = encodePathSegment(userId);
   const normalizedReason = reason.trim().slice(0, USER_WALLET_REASON_MAX_LENGTH);
+  const normalizedIdempotencyKey = idempotencyKey?.trim();
   const result = await apiRequest<AdminUserWalletOperation>(
     `/api/admin/users/${encodedUserId}/wallet`,
     {
       method: "POST",
+      headers: normalizedIdempotencyKey
+        ? { "Idempotency-Key": normalizedIdempotencyKey }
+        : undefined,
       body: JSON.stringify({ operation, amount, reason: normalizedReason }),
     }
   );
@@ -318,13 +533,19 @@ export async function revokeRole(userId: string, role: string): Promise<void> {
   clearAdminUserCaches(userId);
 }
 
-export async function revokePremium(userId: string): Promise<void> {
-  const encodedUserId = encodePathSegment(userId);
-  await apiRequest<void>(`/api/admin/economy/users/${encodedUserId}/premium/revoke`, {
-    method: "PUT",
-    body: JSON.stringify({ paymentProvider: "stripe" }),
-  });
+export async function revokePremium(
+  userId: string,
+  paymentProvider: string,
+  reason: string
+): Promise<AdminEconomyUserSubscriptionSummary> {
+  const normalizedPaymentProvider = paymentProvider.trim().toLowerCase();
+  if (normalizedPaymentProvider !== "stripe") {
+    throw new Error("Admin Premium revocation is supported only for Stripe subscriptions.");
+  }
+
+  const summary = await adminCancelPremiumSubscription(userId, normalizedPaymentProvider, reason);
   clearAdminUserCaches(userId);
+  return summary;
 }
 
 export async function setActive(userId: string, isActive: boolean): Promise<void> {

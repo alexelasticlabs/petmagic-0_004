@@ -19,6 +19,7 @@ type SelectProps = {
   onChange: (value: string) => void;
   ariaLabel?: string;
   showSelectedDescription?: boolean;
+  menuMode?: "overlay" | "inline";
   disabled?: boolean;
 };
 
@@ -28,6 +29,7 @@ export function Select({
   onChange,
   ariaLabel,
   showSelectedDescription = true,
+  menuMode = "overlay",
   disabled = false,
 }: SelectProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -78,7 +80,7 @@ export function Select({
 
     function handleEscape(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        setIsOpen(false);
+        closeMenu(true);
       }
     }
 
@@ -215,7 +217,12 @@ export function Select({
       </button>
 
       {isMenuOpen ? (
-        <div id={listboxId} className={styles.menu} role="listbox" aria-label={effectiveAriaLabel}>
+        <div
+          id={listboxId}
+          className={`${styles.menu} ${menuMode === "inline" ? styles.menuInline : ""}`.trim()}
+          role="listbox"
+          aria-label={effectiveAriaLabel}
+        >
           {options.map((option, index) => {
             const isSelected = option.value === value;
 

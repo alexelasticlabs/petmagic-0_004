@@ -1,4 +1,5 @@
 import type {
+  AdminGenerationRefundState,
   AdminGenerationStatus,
   FeedbackPriority,
   FeedbackStatus,
@@ -7,6 +8,7 @@ import type {
 import { type Locale } from "@/lib/i18n";
 
 type GenerationStatusOption = AdminGenerationStatus | "All";
+type GenerationRefundStateOption = AdminGenerationRefundState | "all";
 
 type OptionLabels<T extends string> = Record<T, string>;
 
@@ -23,12 +25,15 @@ export type GenerationsPageText = {
   cancelled: string;
   cancelling: string;
   retrying: string;
+  pendingRefunds: string;
+  exhaustedRefunds: string;
   allJobsScope: string;
   filtersTitle: string;
   filtersDescription: string;
   searchLabel: string;
   searchPlaceholder: string;
   statusLabel: string;
+  refundStateLabel: string;
   providerLabel: string;
   providerPlaceholder: string;
   userLabel: string;
@@ -83,6 +88,21 @@ export type GenerationsPageText = {
   retryGenerationConfirmDescription: (generationId: string) => string;
   retryGenerationConfirmCancel: string;
   retryGenerationConfirmSubmit: string;
+  retryRefund: string;
+  retryingRefund: string;
+  retryRefundError: string;
+  retryRefundConflict: string;
+  retryRefundConfirmTitle: string;
+  retryRefundConfirmDescription: (generationId: string) => string;
+  retryRefundReasonLabel: string;
+  retryRefundReasonPlaceholder: string;
+  retryRefundReasonRequired: string;
+  retryRefundConfirmCancel: string;
+  retryRefundConfirmSubmit: string;
+  refundState: string;
+  refundAttempts: string;
+  refundLastAttempt: string;
+  refundLastError: string;
   grantClean: string;
   grantingClean: string;
   grantCleanError: string;
@@ -116,6 +136,7 @@ export type GenerationsPageText = {
   variationLabel: string;
   seedLabel: string;
   generationStatusOptions: OptionLabels<GenerationStatusOption>;
+  refundStateOptions: OptionLabels<GenerationRefundStateOption>;
   templateTypeLabels: OptionLabels<"Image" | "Video">;
   inputSourceTypeLabels: OptionLabels<"generation_result" | "pet_photo" | "user_upload">;
   feedbackTypeOptions: OptionLabels<FeedbackType>;
@@ -143,12 +164,15 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
     cancelled: "Отменена",
     cancelling: "Отменяется",
     retrying: "Повторяется",
+    pendingRefunds: "Возврат в очереди",
+    exhaustedRefunds: "Возврат исчерпан",
     allJobsScope: "Все задания",
     filtersTitle: "Фильтры",
     filtersDescription: "Сузьте список по ID задания, статусу, провайдеру или ID пользователя.",
     searchLabel: "ID задания",
     searchPlaceholder: "Поиск по ID генерации",
     statusLabel: "Статус",
+    refundStateLabel: "Возврат списания",
     providerLabel: "Провайдер",
     providerPlaceholder: "fal, openai...",
     userLabel: "ID пользователя",
@@ -206,6 +230,24 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
       `Задание ${generationId} будет возвращено в очередь с новым бюджетом попыток. Действие доступно только если списание ещё не было возвращено пользователю.`,
     retryGenerationConfirmCancel: "Назад",
     retryGenerationConfirmSubmit: "Запустить снова",
+    retryRefund: "Повторить возврат",
+    retryingRefund: "Повторяем возврат…",
+    retryRefundError: "Не удалось повторно поставить возврат в очередь.",
+    retryRefundConflict:
+      "Этот ключ операции уже использован с другой причиной. Закройте окно и создайте новый запрос.",
+    retryRefundConfirmTitle: "Повторить возврат списания?",
+    retryRefundConfirmDescription: (generationId: string) =>
+      `Для задания ${generationId} будет восстановлена только очередь возврата. Баланс напрямую не изменяется: фактический возврат выполнит идемпотентный worker.`,
+    retryRefundReasonLabel: "Причина восстановления",
+    retryRefundReasonPlaceholder:
+      "Например: лимит автоматических попыток исчерпан, провайдер снова доступен",
+    retryRefundReasonRequired: "Укажите проверенную причину восстановления возврата.",
+    retryRefundConfirmCancel: "Назад",
+    retryRefundConfirmSubmit: "Поставить возврат в очередь",
+    refundState: "Состояние возврата",
+    refundAttempts: "Попытки возврата",
+    refundLastAttempt: "Последняя попытка возврата",
+    refundLastError: "Последняя ошибка возврата",
     grantClean: "Выдать чистый файл",
     grantingClean: "Выдаём...",
     grantCleanError: "Не удалось выдать файл без водяного знака.",
@@ -250,6 +292,13 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
       Cancelled: "Отменена",
       Cancelling: "Отменяется",
       Retrying: "Повторяется",
+    },
+    refundStateOptions: {
+      all: "Все состояния",
+      not_applicable: "Возврат не требуется",
+      pending: "В очереди",
+      exhausted: "Попытки исчерпаны",
+      refunded: "Возвращено",
     },
     templateTypeLabels: {
       Image: "Изображение",
@@ -300,12 +349,15 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
     cancelled: "Cancelled",
     cancelling: "Cancelling",
     retrying: "Retrying",
+    pendingRefunds: "Refund pending",
+    exhaustedRefunds: "Refund exhausted",
     allJobsScope: "All jobs",
     filtersTitle: "Filters",
     filtersDescription: "Narrow the list by job id, status, provider, or user id.",
     searchLabel: "Job id",
     searchPlaceholder: "Search by generation id",
     statusLabel: "Status",
+    refundStateLabel: "Charge refund",
     providerLabel: "Provider",
     providerPlaceholder: "fal, openai...",
     userLabel: "User id",
@@ -363,6 +415,24 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
       `Generation ${generationId} will be returned to the queue with a fresh attempt budget. This is only available when the original charge has not been refunded.`,
     retryGenerationConfirmCancel: "Back",
     retryGenerationConfirmSubmit: "Retry job",
+    retryRefund: "Retry refund",
+    retryingRefund: "Retrying refund…",
+    retryRefundError: "Failed to queue another refund attempt.",
+    retryRefundConflict:
+      "This operation key was already used with a different reason. Close the dialog and create a new request.",
+    retryRefundConfirmTitle: "Retry the charge refund?",
+    retryRefundConfirmDescription: (generationId: string) =>
+      `Only the refund queue for generation ${generationId} will be restored. The balance is not changed directly; the idempotent worker performs the actual refund.`,
+    retryRefundReasonLabel: "Recovery reason",
+    retryRefundReasonPlaceholder:
+      "For example: automatic attempts exhausted and the provider is available again",
+    retryRefundReasonRequired: "Provide a verified reason for restoring the refund.",
+    retryRefundConfirmCancel: "Back",
+    retryRefundConfirmSubmit: "Queue refund",
+    refundState: "Refund state",
+    refundAttempts: "Refund attempts",
+    refundLastAttempt: "Last refund attempt",
+    refundLastError: "Last refund error",
     grantClean: "Grant clean",
     grantingClean: "Granting...",
     grantCleanError: "Failed to grant clean download.",
@@ -406,6 +476,13 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
       Cancelled: "Cancelled",
       Cancelling: "Cancelling",
       Retrying: "Retrying",
+    },
+    refundStateOptions: {
+      all: "All states",
+      not_applicable: "Not required",
+      pending: "Pending",
+      exhausted: "Attempts exhausted",
+      refunded: "Refunded",
     },
     templateTypeLabels: {
       Image: "Image",

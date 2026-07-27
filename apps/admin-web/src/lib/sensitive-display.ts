@@ -78,10 +78,8 @@ export function maskSignedUrl(value: string | null | undefined): string {
   }
 }
 
-export function sanitizeSensitiveText(value: string | null | undefined, maxLength = 512): string {
-  const normalized = value
-    ?.replace(/\s+/g, " ")
-    .trim()
+function redactSensitiveDisplayValues(value: string): string {
+  return value
     .replace(EMAIL_PATTERN, (match) => maskEmail(match))
     .replace(URL_PATTERN, (match) => maskSignedUrl(match))
     .replace(SECRET_ASSIGNMENT_PATTERN, (_match, key: string) => `${key}=[redacted]`)
@@ -95,16 +93,41 @@ export function sanitizeSensitiveText(value: string | null | undefined, maxLengt
     .replace(BEARER_TOKEN_PATTERN, "Bearer [redacted]")
     .replace(JWT_PATTERN, "[redacted-token]")
     .replace(STRIPE_SECRET_PATTERN, "[redacted-secret]");
+}
 
+function finalizeSensitiveDisplayText(
+  normalized: string | null | undefined,
+  maxLength: number
+): string {
   if (!normalized) {
     return EMPTY_DISPLAY;
   }
 
-  if (normalized.length <= maxLength) {
-    return normalized;
+  const redacted = redactSensitiveDisplayValues(normalized);
+
+  if (redacted.length <= maxLength) {
+    return redacted;
   }
 
-  return `${normalized.slice(0, Math.max(0, maxLength - 3)).trimEnd()}...`;
+  return `${redacted.slice(0, Math.max(0, maxLength - 3)).trimEnd()}...`;
+}
+
+export function sanitizeSensitiveText(value: string | null | undefined, maxLength = 512): string {
+  return finalizeSensitiveDisplayText(value?.replace(/\s+/g, " ").trim(), maxLength);
+}
+
+export function sanitizeSensitiveMultilineText(
+  value: string | null | undefined,
+  maxLength = 512
+): string {
+  const normalized = value
+    ?.replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((line) => line.replace(/[^\S\r\n]+/g, " ").trim())
+    .join("\n")
+    .trim();
+
+  return finalizeSensitiveDisplayText(normalized, maxLength);
 }
 
 export function getAdminUserDisplayName(user: {

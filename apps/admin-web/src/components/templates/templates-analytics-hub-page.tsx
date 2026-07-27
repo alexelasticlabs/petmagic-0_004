@@ -29,6 +29,7 @@ import {
   getTemplateTypeLabel,
 } from "@/components/templates/template-admin-shared";
 import {
+  collectTemplatesAnalyticsOverviewForExport,
   sanitizeTemplatesAnalyticsOverviewForExport,
   sanitizeTemplatesAnalyticsQueryForExport,
 } from "@/components/templates/templates-analytics-hub-export";
@@ -76,6 +77,8 @@ type TemplatesAnalyticsHubPageProps = {
 
 type PeriodKey = "7" | "30" | "90" | "all";
 
+const ANALYTICS_PAGE_SIZE = 50;
+
 export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageProps) {
   const text = useMemo(() => getTemplatesAnalyticsHubPageText(locale), [locale]);
   const periodOptions = useMemo(() => getTemplatesAnalyticsHubPeriodOptions(locale), [locale]);
@@ -92,6 +95,9 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
   const [access, setAccess] = useState<"all" | "free" | "premium">("all");
   const [sort, setSort] = useState<NonNullable<AdminTemplatesAnalyticsQuery["sort"]>>("views");
   const [chartMetric, setChartMetric] = useState<TrendMetricKey>("totalViews");
+  const [tableSkip, setTableSkip] = useState(0);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState(false);
 
   const query = useMemo<AdminTemplatesAnalyticsQuery>(
     () =>
@@ -102,9 +108,10 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
         status,
         access,
         sort,
-        take: 50,
+        skip: tableSkip,
+        take: ANALYTICS_PAGE_SIZE,
       }),
-    [access, category, period, sort, status, templateType]
+    [access, category, period, sort, status, tableSkip, templateType]
   );
 
   useEffect(() => {
@@ -124,6 +131,7 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
       query.status ?? null,
       query.access ?? null,
       query.sort ?? null,
+      query.skip ?? null,
       query.take ?? null,
     ],
     queryFn: ({ signal }) => fetchAdminTemplatesAnalyticsOverview(query, signal),
@@ -151,12 +159,19 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
     });
   }, [overviewQuery.error, query]);
 
-  const isOverviewRefreshing = overviewQuery.isFetching && overviewQuery.isPlaceholderData;
-  const overview = overviewQuery.isPlaceholderData ? null : (overviewQuery.data ?? null);
-  const isLoading = (overviewQuery.isPending && !overview) || isOverviewRefreshing;
+  const overview = overviewQuery.data ?? null;
+  const isLoading = overviewQuery.isPending && !overview;
+  const isOverviewRefreshing = overviewQuery.isFetching && Boolean(overview);
   const hasBlockingError = overviewQuery.isError && !overview;
   const hasPartialError = overviewQuery.isError && Boolean(overview);
-  const isHubControlsLocked = overviewQuery.isFetching;
+  const isHubControlsLocked = overviewQuery.isFetching || isExporting;
+  const hasActiveFilters =
+    period !== "30" ||
+    templateType !== "All" ||
+    category !== "" ||
+    status !== "All" ||
+    access !== "all" ||
+    sort !== "views";
 
   if (!canViewTemplateAnalytics) {
     return (
@@ -166,40 +181,67 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
     );
   }
 
-  function handleExport() {
+  async function handleExport() {
     if (!overview) {
       return;
     }
 
-    const blob = new Blob(
-      [
-        JSON.stringify(
-          {
-            query: sanitizeTemplatesAnalyticsQueryForExport(query),
-            overview: sanitizeTemplatesAnalyticsOverviewForExport(overview),
-          },
-          null,
-          2
-        ),
-      ],
-      {
-        type: "application/json",
-      }
-    );
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `templates-analytics-${new Date().toISOString().slice(0, 10)}.json`;
+    setExportError(false);
+    setIsExporting(true);
+
     try {
-      document.body.append(link);
-      link.click();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const completeOverview = await collectTemplatesAnalyticsOverviewForExport(
+        query,
+        (pageQuery) => fetchAdminTemplatesAnalyticsOverview(pageQuery)
+      );
+      const blob = new Blob(
+        [
+          JSON.stringify(
+            {
+              query: sanitizeTemplatesAnalyticsQueryForExport(query),
+              overview: sanitizeTemplatesAnalyticsOverviewForExport(completeOverview),
+            },
+            null,
+            2
+          ),
+        ],
+        {
+          type: "application/json",
+        }
+      );
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `templates-analytics-${new Date().toISOString().slice(0, 10)}.json`;
+      try {
+        document.body.append(link);
+        link.click();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } catch (downloadError) {
+        URL.revokeObjectURL(url);
+        throw downloadError;
+      } finally {
+        link.remove();
+      }
     } catch (error) {
-      URL.revokeObjectURL(url);
-      throw error;
+      clientLogger.error("templates.analytics_hub_export_failed", {
+        query: sanitizeTemplatesAnalyticsQueryForExport(query),
+        errorName: error instanceof Error ? error.name : "UnknownError",
+      });
+      setExportError(true);
     } finally {
-      link.remove();
+      setIsExporting(false);
     }
+  }
+
+  function resetFilters() {
+    setPeriod("30");
+    setTemplateType("All");
+    setCategory("");
+    setStatus("All");
+    setAccess("all");
+    setSort("views");
+    setTableSkip(0);
   }
 
   function requestOverviewRetry() {
@@ -299,7 +341,7 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
         description={text.description}
         actions={
           <div className={styles.heroActions}>
-            <Link href={`/${locale}/templates/video`} className={styles.secondaryLink}>
+            <Link href={`/${locale}/templates`} className={styles.secondaryLink}>
               <TableIcon className={styles.controlIcon} />
               <span>{text.catalog}</span>
             </Link>
@@ -308,9 +350,10 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
               className={styles.primaryButton}
               onClick={handleExport}
               disabled={isHubControlsLocked}
+              aria-busy={isExporting}
             >
               <DownloadIcon className={styles.controlIcon} />
-              <span>{text.export}</span>
+              <span>{isExporting ? text.exporting : text.export}</span>
             </button>
           </div>
         }
@@ -328,6 +371,8 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
           { label: text.premium, value: formatNumber(summary.premiumTemplates, locale) },
         ]}
       />
+
+      {exportError ? <AdminStateCard tone="warning" title={text.exportError} /> : null}
 
       {hasPartialError ? (
         <AdminStateCard
@@ -348,23 +393,30 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
       ) : null}
 
       <AdminToolbar className={styles.toolbar}>
-        <div className={styles.segmented} aria-label={text.periodLabel}>
-          {periodOptions.map((option) => {
-            const isActivePeriod = period === option.key;
+        <div className={styles.periodGroup}>
+          <span className={styles.filterLabel}>{text.periodLabel}</span>
+          <div className={styles.segmented} aria-label={text.periodLabel}>
+            {periodOptions.map((option) => {
+              const isActivePeriod = period === option.key;
 
-            return (
-              <button
-                key={option.key}
-                type="button"
-                className={isActivePeriod ? styles.segmentedActive : styles.segmentedButton}
-                disabled={isActivePeriod || isHubControlsLocked}
-                onClick={() => setPeriod(option.key)}
-              >
-                <CalendarIcon className={styles.controlIcon} />
-                <span>{option.label}</span>
-              </button>
-            );
-          })}
+              return (
+                <button
+                  key={option.key}
+                  type="button"
+                  className={isActivePeriod ? styles.segmentedActive : styles.segmentedButton}
+                  disabled={isActivePeriod || isHubControlsLocked}
+                  aria-pressed={isActivePeriod}
+                  onClick={() => {
+                    setPeriod(option.key);
+                    setTableSkip(0);
+                  }}
+                >
+                  <CalendarIcon className={styles.controlIcon} />
+                  <span>{option.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <AdminFilterBar className={styles.filters}>
@@ -372,7 +424,10 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
             label={text.typeFilter}
             value={templateType}
             disabled={isHubControlsLocked}
-            onChange={(value) => setTemplateType(value as TemplateType | "All")}
+            onChange={(value) => {
+              setTemplateType(value as TemplateType | "All");
+              setTableSkip(0);
+            }}
             options={[
               { value: "All", label: text.allTemplates },
               { value: "Video", label: getTemplateTypeLabel("Video", dictionary) },
@@ -383,7 +438,10 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
             label={text.categoryFilter}
             value={category}
             disabled={isHubControlsLocked}
-            onChange={setCategory}
+            onChange={(value) => {
+              setCategory(value);
+              setTableSkip(0);
+            }}
             options={[
               { value: "", label: text.allCategories },
               ...overview.availableCategories.map((value) => ({
@@ -396,7 +454,10 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
             label={text.statusFilter}
             value={status}
             disabled={isHubControlsLocked}
-            onChange={(value) => setStatus(value as TemplateStatus | "All")}
+            onChange={(value) => {
+              setStatus(value as TemplateStatus | "All");
+              setTableSkip(0);
+            }}
             options={[
               { value: "All", label: text.allStatuses },
               { value: "Active", label: getTemplateStatusLabel("Active", locale) },
@@ -408,7 +469,10 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
             label={text.accessFilter}
             value={access}
             disabled={isHubControlsLocked}
-            onChange={(value) => setAccess(value as "all" | "free" | "premium")}
+            onChange={(value) => {
+              setAccess(value as "all" | "free" | "premium");
+              setTableSkip(0);
+            }}
             options={[
               { value: "all", label: text.allAccess },
               { value: "free", label: getTemplateAccessLabel(false, dictionary) },
@@ -419,17 +483,29 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
             label={text.sortFilter}
             value={sort}
             disabled={isHubControlsLocked}
-            onChange={(value) =>
-              setSort(value as NonNullable<AdminTemplatesAnalyticsQuery["sort"]>)
-            }
+            onChange={(value) => {
+              setSort(value as NonNullable<AdminTemplatesAnalyticsQuery["sort"]>);
+              setTableSkip(0);
+            }}
             options={[
               { value: "views", label: text.sortViews },
               { value: "starts", label: text.sortStarts },
               { value: "conversion", label: text.sortConversion },
               { value: "cost", label: text.sortCost },
+              { value: "tokens", label: text.sortTokens },
               { value: "updated", label: text.sortUpdated },
             ]}
           />
+          {hasActiveFilters ? (
+            <button
+              type="button"
+              className={styles.filterResetButton}
+              disabled={isHubControlsLocked}
+              onClick={resetFilters}
+            >
+              {text.resetFilters}
+            </button>
+          ) : null}
         </AdminFilterBar>
       </AdminToolbar>
 
@@ -465,6 +541,7 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
                     type="button"
                     className={isActiveChartMetric ? styles.chartTabActive : styles.chartTab}
                     disabled={isActiveChartMetric || isHubControlsLocked}
+                    aria-pressed={isActiveChartMetric}
                     onClick={() => setChartMetric(tab.key)}
                   >
                     {tab.label}
@@ -546,12 +623,57 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
             </h2>
             <p>{text.tableHint}</p>
           </div>
-          {overviewQuery.isFetching ? (
+          {isOverviewRefreshing ? (
             <span className={styles.refreshPill}>{text.refreshing}</span>
           ) : null}
         </div>
         <TemplatesTable rows={overview.templates} locale={locale} text={text} />
+        <div className={styles.tableFooter}>
+          <span className={styles.tableRange} aria-live="polite">
+            {formatTableRange(
+              text.tableRange,
+              overview.skip,
+              overview.templates.length,
+              overview.totalCount,
+              locale
+            )}
+          </span>
+          <div className={styles.paginationActions}>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isHubControlsLocked || overview.skip <= 0}
+              onClick={() => setTableSkip(Math.max(0, overview.skip - overview.take))}
+            >
+              {text.previousPage}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isHubControlsLocked || !overview.hasMore}
+              onClick={() => setTableSkip(overview.skip + overview.templates.length)}
+            >
+              {text.nextPage}
+            </Button>
+          </div>
+        </div>
       </section>
     </AdminPage>
   );
+}
+
+function formatTableRange(
+  template: string,
+  skip: number,
+  rowCount: number,
+  totalCount: number,
+  locale: AppLocale
+) {
+  const from = totalCount > 0 && rowCount > 0 ? skip + 1 : 0;
+  const to = totalCount > 0 && rowCount > 0 ? Math.min(skip + rowCount, totalCount) : 0;
+
+  return template
+    .replace("{from}", formatNumber(from, locale))
+    .replace("{to}", formatNumber(to, locale))
+    .replace("{total}", formatNumber(totalCount, locale));
 }

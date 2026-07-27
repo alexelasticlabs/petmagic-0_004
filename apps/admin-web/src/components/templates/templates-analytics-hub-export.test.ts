@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  collectTemplatesAnalyticsOverviewForExport,
   sanitizeTemplatesAnalyticsOverviewForExport,
   sanitizeTemplatesAnalyticsQueryForExport,
 } from "@/components/templates/templates-analytics-hub-export";
@@ -98,6 +99,10 @@ function createOverview(): AdminTemplatesAnalyticsOverview {
       complaints: 1,
     },
     templates: [templateRow],
+    skip: 50,
+    take: 50,
+    totalCount: 130,
+    hasMore: true,
     availableCategories: [
       "Fun https://cdn.example.com/category?secret=1",
       "Internal token=raw-category-token",
@@ -116,6 +121,7 @@ describe("templates analytics hub export", () => {
     expect(sanitized.feedbackItems[0]?.hasFeedbackMessage).toBe(true);
     expect(sanitized.feedbackItems[0]?.hasUser).toBe(true);
     expect(sanitized.feedbackItems[0]?.hasGeneration).toBe(true);
+    expect(sanitized).toMatchObject({ skip: 50, take: 50, totalCount: 130, hasMore: true });
     expect(serialized).not.toContain('"url"');
     expect(serialized).not.toContain("preview.jpg");
     expect(serialized).not.toContain("X-Amz-Signature");
@@ -153,5 +159,47 @@ describe("templates analytics hub export", () => {
     expect(serialized).toContain("token=[redacted]");
     expect(serialized).not.toContain("secret=1");
     expect(serialized).not.toContain("raw-query-token");
+  });
+
+  it("collects every table page instead of exporting only the visible page", async () => {
+    const templateRow = createOverview().templates[0]!;
+    const firstPage = {
+      ...createOverview(),
+      skip: 0,
+      take: 200,
+      totalCount: 205,
+      hasMore: true,
+      templates: Array.from({ length: 200 }, (_, index) => ({
+        ...templateRow,
+        templateId: `template-${index + 1}`,
+      })),
+    };
+    const secondPage = {
+      ...createOverview(),
+      skip: 200,
+      take: 200,
+      totalCount: 205,
+      hasMore: false,
+      templates: Array.from({ length: 5 }, (_, index) => ({
+        ...templateRow,
+        templateId: `template-${index + 201}`,
+      })),
+    };
+    const requestedQueries: Array<{ skip?: number; take?: number }> = [];
+
+    const overview = await collectTemplatesAnalyticsOverviewForExport(
+      { periodDays: 30, templateType: "Video", sort: "views", skip: 50, take: 50 },
+      async (query) => {
+        requestedQueries.push({ skip: query.skip, take: query.take });
+        return query.skip === 0 ? firstPage : secondPage;
+      }
+    );
+
+    expect(requestedQueries).toEqual([
+      { skip: 0, take: 200 },
+      { skip: 200, take: 200 },
+    ]);
+    expect(overview.templates).toHaveLength(205);
+    expect(overview).toMatchObject({ skip: 0, take: 200, totalCount: 205, hasMore: false });
   });
 });

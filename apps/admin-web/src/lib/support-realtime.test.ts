@@ -55,6 +55,10 @@ describe("support realtime connection policy", () => {
       'logUnexpectedSupportRealtimeFailure("support.realtime_start_failed", error);'
     );
     expect(source).toContain(
+      'logUnexpectedSupportRealtimeFailure("support.realtime_stop_failed", error);'
+    );
+    expect(source).toContain("void connection.stop().catch((error) => {");
+    expect(source).toContain(
       '} else {\n      setSupportRealtimeStatus("idle");\n      logUnexpectedSupportRealtimeFailure('
     );
     expect(source).not.toContain("blockedUntil: supportRealtimeBlockedUntil,\n      error,");

@@ -18,8 +18,14 @@ const supportChatContentStylesPath = fileURLToPath(
 const supportChatPaneStylesPath = fileURLToPath(
   new URL("./support-conversation-chat-pane.module.css", import.meta.url)
 );
+const supportChatPanePath = fileURLToPath(
+  new URL("./support-conversation-chat-pane.tsx", import.meta.url)
+);
 const supportFullscreenViewerStylesPath = fileURLToPath(
   new URL("./support-conversation-fullscreen-viewer.module.css", import.meta.url)
+);
+const supportFullscreenViewerPath = fileURLToPath(
+  new URL("./support-conversation-fullscreen-viewer.tsx", import.meta.url)
 );
 
 const adminIconsPath = fileURLToPath(new URL("../admin/admin-icons.tsx", import.meta.url));
@@ -44,8 +50,16 @@ function readSupportChatPaneStyles(): string {
   return readFileSync(supportChatPaneStylesPath, "utf8");
 }
 
+function readSupportChatPane(): string {
+  return readFileSync(supportChatPanePath, "utf8");
+}
+
 function readSupportFullscreenViewerStyles(): string {
   return readFileSync(supportFullscreenViewerStylesPath, "utf8");
+}
+
+function readSupportFullscreenViewer(): string {
+  return readFileSync(supportFullscreenViewerPath, "utf8");
 }
 
 function sliceBetween(source: string, startMarker: string, endMarker: string): string {
@@ -59,6 +73,16 @@ function sliceBetween(source: string, startMarker: string, endMarker: string): s
 }
 
 describe("support visual contract", () => {
+  it("names each branded Select by its field instead of the selected option", () => {
+    const pageSource = readSupportConversationPageLibrarySource();
+    const infoPanelSource = readSupportInfoPanelLibrarySource();
+
+    expect(pageSource).toContain("ariaLabel={queueLabels.status}");
+    expect(pageSource).toContain("ariaLabel={queueLabels.priority}");
+    expect(pageSource).toContain("ariaLabel={queueLabels.sort}");
+    expect(infoPanelSource).toContain("ariaLabel={text.supportPriorityLabel}");
+  });
+
   it("uses shared admin icons for support controls and attachment affordances", () => {
     const pageSource = readSupportConversationPageLibrarySource();
     const iconsSource = readFileSync(adminIconsPath, "utf8");
@@ -123,11 +147,7 @@ describe("support visual contract", () => {
 
   it("keeps the primary workspace status layer on semantic theme tokens", () => {
     const source = readSupportQueuePaneStyles();
-    const primaryWorkspaceStatusLayer = sliceBetween(
-      source,
-      ".slaPill_good",
-      ".queueRowDetailLine"
-    );
+    const primaryWorkspaceStatusLayer = sliceBetween(source, ".slaPill_good", ".queueFooter");
 
     expect(primaryWorkspaceStatusLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
     expect(primaryWorkspaceStatusLayer).not.toContain("rgba(");
@@ -298,6 +318,10 @@ describe("support visual contract", () => {
     );
     expect(infoPanelStatsLayer).toContain("color: var(--text-strong);");
     expect(infoPanelStatsLayer).toContain("width: 100%;");
+    expect(infoPanelStatsLayer).toContain("grid-template-columns: repeat(2, minmax(0, 1fr));");
+    expect(infoPanelStatsLayer).toContain("display: grid;");
+    expect(infoPanelStatsLayer).toContain("overflow-wrap: anywhere;");
+    expect(source).toContain("@container (max-width: 23rem)");
   });
 
   it("keeps side-panel tabs theme-aware across hover and active states", () => {
@@ -411,6 +435,27 @@ describe("support visual contract", () => {
     );
   });
 
+  it("keeps the fullscreen viewer keyboard-contained and long filenames mobile-safe", () => {
+    const viewerSource = readSupportFullscreenViewer();
+    const viewerStyles = readSupportFullscreenViewerStyles();
+    const pageSource = readSupportConversationPageLibrarySource();
+
+    expect(viewerSource).toContain("const viewerRef = useRef<HTMLDivElement>(null);");
+    expect(viewerSource).toContain("const closeButtonRef = useRef<HTMLButtonElement>(null);");
+    expect(viewerSource).toContain("previouslyFocusedElementRef.current?.focus();");
+    expect(viewerSource).toContain('if (event.key !== "Tab") {');
+    expect(viewerSource).toContain(
+      "const focusableElements = viewerRef.current?.querySelectorAll<HTMLElement>("
+    );
+    expect(viewerSource).toContain("ref={viewerRef}");
+    expect(viewerSource).toContain("ref={closeButtonRef}");
+    expect(viewerSource).toContain("className={styles.imageViewerTitle}");
+    expect(pageSource).toContain("!fullscreenImage");
+    expect(viewerStyles).toContain(".imageViewerTitle {");
+    expect(viewerStyles).toContain("overflow-wrap: anywhere;");
+    expect(viewerStyles).toContain(".imageViewerHeader :global(.ui-button)");
+  });
+
   it("keeps redesigned support queue identity and danger actions theme-aware", () => {
     const queueIdentityActionLayer = readSupportQueuePaneStyles();
 
@@ -419,7 +464,7 @@ describe("support visual contract", () => {
     expect(queueIdentityActionLayer).not.toMatch(/letter-spacing:\s*-/);
 
     expect(queueIdentityActionLayer).toContain(
-      "box-shadow: 0 6px 14px color-mix(in srgb, var(--surface-0) 8%, transparent);"
+      "box-shadow: 0 4px 10px color-mix(in srgb, var(--surface-0) 7%, transparent);"
     );
     expect(queueIdentityActionLayer).toContain("background: linear-gradient(");
     expect(queueIdentityActionLayer).toContain(
@@ -461,6 +506,7 @@ describe("support visual contract", () => {
   it("keeps support workspace typography readable without decorative tracking", () => {
     const source = `${readSupportPageStyles()}\n${readSupportChatContentStyles()}`;
     const queueSource = readSupportQueuePaneStyles();
+    const chatPaneSource = readSupportChatPane();
     const nonZeroLetterSpacingRules = [...source.matchAll(/letter-spacing:\s*([^;]+);/g)]
       .map((match) => match[1].trim())
       .filter((value) => value !== "0");
@@ -469,11 +515,12 @@ describe("support visual contract", () => {
     expect(source).not.toMatch(/letter-spacing:\s*-/);
     expect(source).not.toMatch(/font-size:\s*[^;]*vw/);
     expect(source).toContain("letter-spacing: 0;");
-    expect(source).toContain(".supportPageTitle {");
-    expect(source).toContain("font-size: 1.9rem;");
-    expect(source).toContain("font-size: 1.52rem;");
     expect(source).toContain(".chatHeaderNameRow strong {");
+    expect(source).toContain(".chatMetaChip {");
+    expect(source).toContain(".chatMetaTimestamp {");
     expect(queueSource).toContain(".queuePaneTitle {");
+    expect(chatPaneSource).toContain("className={styles.chatWorkspacePane}");
+    expect(chatPaneSource).toContain('data-testid="support-chat-pane"');
   });
 
   it("keeps final support chat readability styles on semantic tokens", () => {
@@ -505,10 +552,15 @@ describe("support visual contract", () => {
   it("keeps late support workspace height rules viewport-safe on tablet and mobile", () => {
     const source = readSupportChatPaneStyles();
     const queueSource = readSupportQueuePaneStyles();
+    const workspaceSource = readSupportPageStyles();
 
-    expect(source).toContain("min-height: clamp(34rem, calc(100dvh - 9rem), 52rem);");
-    expect(queueSource).toContain("min-height: clamp(34rem, calc(100dvh - 9rem), 52rem);");
-    expect(queueSource).toContain("height: clamp(34rem, calc(100dvh - 9rem), 52rem);");
+    expect(workspaceSource).toContain(
+      "--support-workspace-height: clamp(38rem, calc(100dvh - 10rem), 66rem);"
+    );
+    expect(source).toContain(".chatWorkspacePane {");
+    expect(source).toContain("height: var(--support-workspace-height);");
+    expect(queueSource).toContain("min-height: var(--support-workspace-height);");
+    expect(queueSource).toContain("height: var(--support-workspace-height);");
     expect(source).toContain("@media (max-width: 1180px) {");
     expect(source).toContain(
       ".chatShell {\n    min-height: auto;\n    height: auto;\n    max-height: none;\n  }"
@@ -595,6 +647,8 @@ describe("support visual contract", () => {
 
     expect(composerPaneLayer).toContain("color: var(--text-muted);");
     expect(composerPaneLayer).toContain("background: transparent;");
+    expect(paneSource).toContain(".composerInputBar .composerIconBtn {");
+    expect(paneSource).not.toMatch(/\.composerInputBar \.composerIconBtn\s*\{\s*width:\s*34px;/);
     expect(mediaReplyLayer).toContain(
       "background: color-mix(in srgb, var(--surface-0) 76%, transparent);"
     );
@@ -603,9 +657,6 @@ describe("support visual contract", () => {
     );
     expect(mediaReplyLayer).toContain(
       "background: color-mix(in srgb, var(--success) 10%, var(--surface-2));"
-    );
-    expect(composerPaneLayer).toContain(
-      "background: color-mix(in srgb, var(--text-muted) 10%, var(--surface-2));"
     );
   });
 
@@ -662,31 +713,22 @@ describe("support visual contract", () => {
     );
   });
 
-  it("keeps support reference header chrome on semantic theme tokens", () => {
-    const source = readSupportChatContentStyles();
-    const referenceHeaderLayer = sliceBetween(
-      source,
-      "/* ── Support Workspace Reference Refresh ── */",
-      "/* ── Chat Header Redesign ── */"
-    );
+  it("keeps queue search chrome on semantic theme tokens", () => {
+    const source = readSupportQueuePaneStyles();
+    const queueSearchLayer = sliceBetween(source, ".queueSearchField {", ".queuePaneTitleRow {");
 
-    expect(referenceHeaderLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
-    expect(referenceHeaderLayer).not.toContain("rgba(");
-    expect(referenceHeaderLayer).not.toMatch(/letter-spacing:\s*-/);
+    expect(queueSearchLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
+    expect(queueSearchLayer).not.toContain("rgba(");
+    expect(queueSearchLayer).not.toMatch(/letter-spacing:\s*-/);
 
-    expect(referenceHeaderLayer).toContain(
-      "color: color-mix(in srgb, var(--text-muted) 92%, var(--text-strong) 8%);"
+    expect(queueSearchLayer).toContain(
+      "border: 1px solid color-mix(in srgb, var(--text-muted) 30%, var(--border-soft));"
     );
-    expect(referenceHeaderLayer).toContain(
-      "border: 1px solid color-mix(in srgb, var(--text-muted) 28%, var(--border-soft));"
+    expect(queueSearchLayer).toContain(
+      "background: color-mix(in srgb, var(--surface-1) 96%, var(--surface-2));"
     );
-    expect(referenceHeaderLayer).toContain(
-      "box-shadow: 0 14px 30px color-mix(in srgb, var(--surface-0) 6%, transparent);"
-    );
-    expect(referenceHeaderLayer).toContain(
-      "background: color-mix(in srgb, var(--surface-2) 96%, var(--surface-1));"
-    );
-    expect(referenceHeaderLayer).toContain("color: var(--text-muted);");
+    expect(queueSearchLayer).toContain("box-shadow: var(--focus-ring);");
+    expect(queueSearchLayer).toContain("color: var(--text-muted);");
   });
 
   it("keeps support workspace queue shell chrome on semantic theme tokens", () => {
@@ -704,13 +746,13 @@ describe("support visual contract", () => {
       "0 14px 30px color-mix(in srgb, var(--surface-0) 14%, transparent)"
     );
     expect(queueShellLayer).toContain("background: linear-gradient(");
-    expect(queueShellLayer).toContain("min-height: clamp(34rem, calc(100dvh - 9rem), 52rem);");
+    expect(queueShellLayer).toContain("min-height: var(--support-workspace-height);");
     expect(queueShellLayer).toContain("border-radius: 24px;");
   });
 
   it("keeps support queue counters and status pills on semantic theme tokens", () => {
     const source = readSupportQueuePaneStyles();
-    const queueStatusLayer = sliceBetween(source, ".queueCountBadge", ".queueRowDetailLine");
+    const queueStatusLayer = sliceBetween(source, ".queueCountBadge", ".queueFooter");
 
     expect(queueStatusLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
     expect(queueStatusLayer).not.toContain("rgba(");
@@ -762,7 +804,7 @@ describe("support visual contract", () => {
     expect(lateDarkOverrideLayer).not.toMatch(/letter-spacing:\s*-/);
 
     expect(queueDarkOverrideLayer).toContain(
-      ':global(:root:not([data-theme="light"])) .queueSubFilters'
+      ':global(:root:not([data-theme="light"])) .queueFiltersDisclosure'
     );
     expect(queueDarkOverrideLayer).toContain(
       ':global(:root:not([data-theme="light"])) .conversationRow'

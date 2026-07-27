@@ -145,7 +145,9 @@ describe("support sensitive display", () => {
     expect(contentSource).toContain('supportAttachmentFallback: "Вложение поддержки"');
     expect(contentSource).toContain('supportAttachmentFallback: "Support attachment"');
     expect(supportPageSource).toMatch(/formatSafeSupportDisplay\(\s*message\.replyToPreview/);
-    expect(supportPageSource).toContain('formatSafeSupportDisplay(message.body, "", 2000)');
+    expect(supportPageSource).toMatch(
+      /formatSafeSupportDisplay\(\s*message\.body,\s*"",\s*SUPPORT_MESSAGE_BODY_MAX_LENGTH\s*\)/
+    );
     expect(supportPageSource).toContain("const requestInboxRetry = () => {");
     expect(supportPageSource).toContain("if (isQueueControlsLocked) {\n      return;\n    }");
     expect(supportPageSource).toContain("void inboxQuery.refetch().catch(() => undefined);");

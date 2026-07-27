@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildLocaleSwitchPath,
+  filterAdminCommandItems,
+  getAdminCommandItems,
   getAdminNavItems,
   getAdminPageMeta,
   matchesAdminPath,
@@ -28,6 +30,15 @@ describe("admin-navigation", () => {
     expect(buildLocaleSwitchPath("en", "/ru/support")).toBe("/en/support");
     expect(buildLocaleSwitchPath("ru", "/en")).toBe("/ru");
     expect(buildLocaleSwitchPath("ru", undefined)).toBe("/ru");
+  });
+
+  it("preserves direct-link query state when changing locale", () => {
+    expect(
+      buildLocaleSwitchPath("en", "/ru/users/160156be", "tab=wallet&action=adjust-balance")
+    ).toBe("/en/users/160156be?tab=wallet&action=adjust-balance");
+    expect(buildLocaleSwitchPath("ru", "/en/support", "?status=open")).toBe(
+      "/ru/support?status=open"
+    );
   });
 
   it("matches admin paths including nested routes", () => {
@@ -68,10 +79,12 @@ describe("admin-navigation", () => {
     expect(templateKeys).not.toContain("template-daily-featured");
     expect(keys).not.toContain("dashboard");
     expect(keys).not.toContain("economy");
+    expect(keys).not.toContain("gamification");
     expect(keys).not.toContain("promo-codes");
     expect(keys).not.toContain("users");
     expect(keys).not.toContain("generations");
     expect(keys).not.toContain("role-management");
+    expect(keys).not.toContain("audit");
   });
 
   it("shows admin-only operations navigation for admins only", () => {
@@ -79,9 +92,42 @@ describe("admin-navigation", () => {
     const userKeys = getAdminNavItems("en", ["User"]).map((item) => item.key);
 
     expect(adminKeys).toContain("generations");
+    expect(adminKeys).toContain("gamification");
     expect(adminKeys).toContain("role-management");
+    expect(adminKeys).toContain("audit");
     expect(userKeys).not.toContain("generations");
+    expect(userKeys).not.toContain("gamification");
     expect(userKeys).not.toContain("role-management");
+    expect(userKeys).not.toContain("audit");
+  });
+
+  it("builds a searchable command list from RBAC-filtered navigation", () => {
+    const adminCommands = getAdminCommandItems("ru", ["Admin"]);
+    const moderatorCommands = getAdminCommandItems("ru", ["Moderator"]);
+
+    expect(adminCommands.some((item) => item.key === "dashboard")).toBe(true);
+    expect(adminCommands.some((item) => item.key === "users")).toBe(true);
+    expect(adminCommands.some((item) => item.key === "audit")).toBe(true);
+    expect(adminCommands.find((item) => item.key === "template-categories")?.groupLabel).toBe(
+      "Шаблоны"
+    );
+    expect(moderatorCommands.some((item) => item.key === "dashboard")).toBe(false);
+    expect(moderatorCommands.some((item) => item.key === "users")).toBe(false);
+    expect(moderatorCommands.some((item) => item.key === "audit")).toBe(false);
+    expect(moderatorCommands.some((item) => item.key === "template-categories")).toBe(true);
+
+    expect(
+      filterAdminCommandItems(adminCommands, "  ПОЛЬЗОВАТЕЛИ  ").map((item) => item.key)
+    ).toEqual(["users"]);
+    expect(filterAdminCommandItems(adminCommands, "шаблоны").map((item) => item.key)).toEqual(
+      expect.arrayContaining([
+        "video-templates",
+        "image-templates",
+        "template-analytics",
+        "template-daily-featured",
+        "template-categories",
+      ])
+    );
   });
 
   it("keeps Russian sidebar section labels localized", () => {
@@ -92,10 +138,15 @@ describe("admin-navigation", () => {
       text.navSectionGrowth,
       text.navSectionContent,
       text.navSectionUsers,
-    ]).toEqual(["Обзор", "Рост", "Контент", "Пользователи"]);
+      text.navSectionOperations,
+    ]).toEqual(["Обзор", "Рост", "Контент", "Пользователи и доступ", "Операции"]);
   });
 
   it("keeps Russian page meta free of editorial English labels", () => {
+    expect(getAdminPageMeta("ru", "/users/160156be", "Admin")).toEqual({
+      title: "Профиль пользователя",
+      description: "",
+    });
     expect(getAdminPageMeta("ru", "/feedback", "Admin").title).toBe("Фидбек");
     expect(getAdminPageMeta("ru", "/feedback", "Admin").description).toBe(
       "Обратная связь по генерациям, багам, оплате и предложениям со статусами и возвратом кредитов."
@@ -103,12 +154,22 @@ describe("admin-navigation", () => {
     expect(getAdminPageMeta("ru", "/generations", "Admin").description).toBe(
       "Очередь и история генераций с фильтрами по статусу, провайдеру, пользователю и ID задания."
     );
+    expect(getAdminPageMeta("ru", "/gamification", "Admin")).toEqual({
+      title: "Геймификация",
+      description:
+        "Метрики вовлечённости, недельные задания, достижения и диагностика прогресса пользователей.",
+    });
     expect(getAdminPageMeta("ru", "/roles", "Admin").description).toBe(
-      "Списки администраторов и модераторов, назначение и снятие модератора с журналом аудита."
+      "Поиск и управление доступом модераторов."
     );
     expect(getAdminPageMeta("ru", "/moderation", "Admin").description).toBe(
       "Очередь жалоб и обратной связи по шаблонам с решением одобрить или отклонить."
     );
+    expect(getAdminPageMeta("ru", "/audit", "Admin")).toEqual({
+      title: "Журнал действий",
+      description:
+        "История административных действий с фильтрами по исполнителю, типу события и объекту.",
+    });
     expect(getAdminPageMeta("ru", "/templates/daily-featured", "Admin").description).toBe(
       "Ручные назначения и автоматический выбор шаблона дня."
     );
@@ -129,6 +190,8 @@ describe("admin-navigation", () => {
     expect(contentSource).toContain('title: "Дашборд"');
     expect(contentSource).toContain('title: "Dashboard"');
     expect(contentSource).toContain('title: "Фидбек"');
+    expect(contentSource).toContain('title: "Журнал действий"');
+    expect(contentSource).toContain('title: "Audit trail"');
     expect(ruContentSource).not.toContain('title: "Feedback",');
     expect(ruContentSource).not.toContain("auto-pick для Template of the Day");
     expect(contentSource).toContain('fallbackAdministratorName: "администратор"');

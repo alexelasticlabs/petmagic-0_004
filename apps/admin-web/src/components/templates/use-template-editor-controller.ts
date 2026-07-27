@@ -47,6 +47,14 @@ type ToastState = {
 
 type EditorVisibilityStatus = Extract<TemplateStatus, "Draft" | "Active">;
 
+function isTemplateRouteTypeCompatible(
+  initialTemplateId: string | undefined,
+  selectedTemplate: AdminTemplate | null,
+  templateType: TemplateType
+): boolean {
+  return !initialTemplateId || selectedTemplate?.templateType === templateType;
+}
+
 function getTemplateEditorErrorDetails(error: unknown) {
   return {
     errorName: error instanceof Error ? error.name : "UnknownError",
@@ -92,6 +100,7 @@ export function useTemplateEditorController({
   const isVideo = templateType === "Video";
   const runtimeText = getTemplateEditorRuntimeText(locale);
   const templateEditorActionsAdminOnly = runtimeText.actionsAdminOnly;
+  const templateEditorTypeMismatch = runtimeText.templateTypeMismatch;
   const notificationTitle = isVideo ? text.videoTemplatesTitle : text.imageTemplatesTitle;
 
   useSyncToastToAdminNotifications(toast, {
@@ -106,10 +115,15 @@ export function useTemplateEditorController({
     unknown,
     { targetStatus: EditorVisibilityStatus; form: TemplateFormState }
   >({
-    mutationFn: ({ targetStatus, form: templateForm }) =>
-      templateType === "Video"
+    mutationFn: ({ targetStatus, form: templateForm }) => {
+      if (!isTemplateRouteTypeCompatible(initialTemplateId, selectedTemplate, templateType)) {
+        throw new Error(templateEditorTypeMismatch);
+      }
+
+      return templateType === "Video"
         ? saveVideoTemplateFromForm(selectedTemplate?.templateId, templateForm, targetStatus)
-        : saveImageTemplateFromForm(selectedTemplate?.templateId, templateForm, targetStatus),
+        : saveImageTemplateFromForm(selectedTemplate?.templateId, templateForm, targetStatus);
+    },
     onSuccess: (savedTemplate) => {
       setSelectedTemplate(savedTemplate);
       setForm(createFormFromTemplate(savedTemplate));
@@ -180,6 +194,22 @@ export function useTemplateEditorController({
             return;
           }
 
+          if (templateResponse.templateType !== templateType) {
+            clientLogger.warn("templates.editor_template_type_mismatch", {
+              initialTemplateId: sanitizeSensitiveText(initialTemplateId, 80),
+              routeTemplateType: templateType,
+              responseTemplateType: templateResponse.templateType,
+            });
+            setSelectedTemplate(null);
+            setForm(createInitialTemplateForm(templateType));
+            setEditorStatus("Draft");
+            setPreviewFile(null);
+            setReferenceFile(null);
+            setInitializationError(templateEditorTypeMismatch);
+            setToast({ type: "error", message: templateEditorTypeMismatch });
+            return;
+          }
+
           setSelectedTemplate(templateResponse);
           setForm(createFormFromTemplate(templateResponse));
           setEditorStatus(resolveEditorVisibilityStatus(templateResponse.status));
@@ -225,6 +255,7 @@ export function useTemplateEditorController({
     locale,
     router,
     templateType,
+    templateEditorTypeMismatch,
     text.errorLoadingTemplates,
   ]);
 
@@ -254,8 +285,21 @@ export function useTemplateEditorController({
     return false;
   }
 
+  function assertTemplateMatchesEditorRoute(): boolean {
+    if (isTemplateRouteTypeCompatible(initialTemplateId, selectedTemplate, templateType)) {
+      return true;
+    }
+
+    setToast({ type: "error", message: templateEditorTypeMismatch });
+    return false;
+  }
+
   async function handleSave(targetStatus: EditorVisibilityStatus) {
     if (!assertCanManageTemplateEditor()) {
+      return;
+    }
+
+    if (!assertTemplateMatchesEditorRoute()) {
       return;
     }
 

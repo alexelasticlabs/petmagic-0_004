@@ -37,7 +37,16 @@ describe("admin login screen visual contract", () => {
     expect(styles).toContain("letter-spacing: 0;");
     expect(styles).not.toMatch(/font-size:\s*[^;]*vw/);
     expect(styles).toContain("min-height: 100dvh;");
+    expect(styles).toContain("@media (max-width: 820px)");
+    expect(styles).toContain(".right {\n    min-height: auto;\n  }");
     expect(styles).not.toContain("100vh");
+  });
+
+  it("exposes the login screen title as the page heading", () => {
+    const source = readFileSync(loginScreenPath, "utf8");
+
+    expect(source).toContain("<h1 className={styles.welcome}>{copy.welcomeTitle}</h1>");
+    expect(source).not.toContain("<h2 className={styles.welcome}>{copy.welcomeTitle}</h2>");
   });
 
   it("keeps preview window title localized through admin chrome copy", () => {

@@ -6,7 +6,6 @@ import { apiImageRemotePatterns } from "../../next.config";
 
 const adminDockerfilePath = fileURLToPath(new URL("../../Dockerfile", import.meta.url));
 const adminRootLayoutPath = fileURLToPath(new URL("../app/layout.tsx", import.meta.url));
-const adminEnvExamplePath = fileURLToPath(new URL("../../.env.example", import.meta.url));
 const adminDevEnvExamplePath = fileURLToPath(
   new URL("../../.env.development.example", import.meta.url)
 );
@@ -124,28 +123,23 @@ describe("next admin env config", () => {
     expect(rootLayout).not.toContain("next/font/google");
   });
 
-  it("keeps active root env example values free of localhost frontend defaults", () => {
+  it("keeps the root env example configured for local Docker Compose", () => {
     const activeLines = readActiveEnvLines(rootEnvExamplePath);
-    const publicFrontendLines = activeLines.filter((line) =>
-      /^(NEXT_PUBLIC_API_BASE_URL|INTERNAL_API_BASE_URL|BACKEND_PUBLIC_BASE_URL|STRIPE_CHECKOUT_SUCCESS_URL|STRIPE_CHECKOUT_CANCEL_URL|STRIPE_BILLING_PORTAL_RETURN_URL)=/.test(
-        line
-      )
-    );
 
-    expect(publicFrontendLines.length).toBeGreaterThan(0);
-    expect(publicFrontendLines.join("\n")).not.toMatch(/localhost|127\.0\.0\.1|http:\/\/backend/);
-    expect(publicFrontendLines.join("\n")).toMatch(/https:\/\/.*petmagic\.app/);
+    expect(activeLines).toContain("ASPNETCORE_ENVIRONMENT=Development");
+    expect(activeLines).toContain("NEXT_PUBLIC_API_BASE_URL=http://localhost:5001");
+    expect(activeLines).toContain("INTERNAL_API_BASE_URL=http://backend:5000");
+    expect(activeLines).toContain("BACKEND_PUBLIC_BASE_URL=http://localhost:5001");
+    expect(activeLines).toContain("BACKEND_ALLOWED_HOSTS=localhost;127.0.0.1;[::1];backend");
+    expect(activeLines).toContain("BACKEND_HEALTHCHECK_HOST=localhost");
+    expect(activeLines).toContain("ADMIN_WEB_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION=true");
   });
 
   it("keeps admin dev, staging, and production env examples separated", () => {
-    const baseExample = readFileSync(adminEnvExamplePath, "utf8");
     const devLines = readActiveEnvLines(adminDevEnvExamplePath);
     const stagingLines = readActiveEnvLines(adminStagingEnvExamplePath);
     const productionLines = readActiveEnvLines(adminProductionEnvExamplePath);
 
-    expect(baseExample).toContain(".env.development.example");
-    expect(baseExample).toContain(".env.staging.example");
-    expect(baseExample).toContain(".env.production.example");
     expect(devLines).toEqual([
       "NEXT_PUBLIC_API_BASE_URL=http://localhost:5001",
       "INTERNAL_API_BASE_URL=http://localhost:5001",

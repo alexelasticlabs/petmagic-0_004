@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getAdminErrorMessage } from "@/lib/admin-error-message";
+import { getAdminErrorMessage, getAdminRetryAfterSeconds } from "@/lib/admin-error-message";
 
 describe("admin-error-message", () => {
   it("uses validation errors first", () => {
@@ -13,6 +13,22 @@ describe("admin-error-message", () => {
     expect(getAdminErrorMessage({ status: 403, message: "auth.forbidden" }, "Localized")).toBe(
       "Localized"
     );
+    expect(
+      getAdminErrorMessage(
+        {
+          code: "auth.retry_required_after_refresh",
+          message: "Session was refreshed. Review and retry this action.",
+        },
+        "Localized retry guidance"
+      )
+    ).toBe("Localized retry guidance");
+  });
+
+  it("exposes a bounded Retry-After delay without trusting invalid error data", () => {
+    expect(getAdminRetryAfterSeconds({ retryAfterSeconds: 12 })).toBe(12);
+    expect(getAdminRetryAfterSeconds({ retryAfterSeconds: 0 })).toBeNull();
+    expect(getAdminRetryAfterSeconds({ retryAfterSeconds: 3_601 })).toBeNull();
+    expect(getAdminRetryAfterSeconds({ retryAfterSeconds: "12" })).toBeNull();
   });
 
   it("uses localized fallbacks for generic backend problem details", () => {

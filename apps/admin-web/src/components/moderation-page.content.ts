@@ -48,6 +48,44 @@ export type ModerationPageText = {
   workspaceBadge: string;
   approveItemLabel: string;
   rejectItemLabel: string;
+  summaryPending: string;
+  summaryApproved: string;
+  summaryRejected: string;
+  summaryOldest: string;
+  summaryScope: string;
+  pendingComposition: string;
+  updatedAt: string;
+  noPending: string;
+  queueRegionLabel: string;
+  mobileQueueLabel: string;
+  review: string;
+  reviewItemLabel: string;
+  reviewTitle: string;
+  reviewDescription: string;
+  saveDecision: string;
+  contextTitle: string;
+  templateId: string;
+  device: string;
+  country: string;
+  userId: string;
+  generationId: string;
+  noMessage: string;
+  decisionTitle: string;
+  decisionHelp: string;
+  approveHelp: string;
+  rejectHelp: string;
+  reasonHint: string;
+  characterCountLabel: string;
+  previousDecision: string;
+  decisionConflict: string;
+  queueShowing: string;
+  complaintsShort: string;
+  feedbackShort: string;
+  workspaceTitle: string;
+  workspaceDescription: string;
+  closeInspector: string;
+  claimBeforeDecision: string;
+  leaseConflict: string;
 };
 
 const moderationPageText: Record<Locale, ModerationPageText> = {
@@ -70,13 +108,13 @@ const moderationPageText: Record<Locale, ModerationPageText> = {
     source: "Источник",
     created: "Создано",
     actions: "Действия",
-    approve: "Одобрить",
-    reject: "Отклонить",
+    approve: "Оставить без изменений",
+    reject: "Подтвердить нарушение",
     reason: "Причина/комментарий",
     reasonPlaceholder: "Коротко укажите причину решения",
     cancel: "Отмена",
-    confirmApprove: "Одобрить элемент?",
-    confirmReject: "Отклонить элемент?",
+    confirmApprove: "Оставить без изменений?",
+    confirmReject: "Подтвердить нарушение?",
     saved: "Решение сохранено",
     failed: "Не удалось сохранить решение",
     moderationActionsForbidden:
@@ -99,8 +137,51 @@ const moderationPageText: Record<Locale, ModerationPageText> = {
     templateVideo: "Видео",
     userPrefix: "пользователь",
     workspaceBadge: "Модератор",
-    approveItemLabel: "Одобрить элемент",
-    rejectItemLabel: "Отклонить элемент",
+    approveItemLabel: "Оставить элемент без изменений",
+    rejectItemLabel: "Подтвердить нарушение",
+    summaryPending: "Ожидают решения",
+    summaryApproved: "Одобрено",
+    summaryRejected: "Отклонено",
+    summaryOldest: "Самая старая",
+    summaryScope: "По всей очереди, без учёта фильтров",
+    pendingComposition: "Состав ожидающей очереди",
+    updatedAt: "Обновлено",
+    noPending: "Ожидающих решений нет",
+    queueRegionLabel: "Таблица очереди модерации. Для прокрутки используйте стрелки.",
+    mobileQueueLabel: "Очередь модерации",
+    review: "Рассмотреть",
+    reviewItemLabel: "Рассмотреть элемент",
+    reviewTitle: "Проверка обращения",
+    reviewDescription:
+      "Сначала изучите контекст обращения, затем выберите решение и оставьте причину для журнала аудита.",
+    saveDecision: "Выберите решение",
+    contextTitle: "Контекст",
+    templateId: "ID шаблона",
+    device: "Устройство",
+    country: "Страна",
+    userId: "ID пользователя",
+    generationId: "ID генерации",
+    noMessage: "Текст обращения не указан",
+    decisionTitle: "Решение",
+    decisionHelp: "Действие применится только к элементу, который всё ещё ожидает модерации.",
+    approveHelp: "Сигнал проверен: нарушение не подтверждено, контент остаётся без изменений.",
+    rejectHelp: "Нарушение подтверждено: контент получит статус rejected.",
+    reasonHint: "От 3 до 500 символов. Причина попадёт в журнал аудита.",
+    characterCountLabel: "Количество символов",
+    previousDecision: "Предыдущее решение",
+    decisionConflict:
+      "Элемент уже обработан другим модератором. Очередь обновлена — проверьте актуальный статус.",
+    queueShowing: "Показано",
+    complaintsShort: "жалоб",
+    feedbackShort: "отзывов",
+    workspaceTitle: "Контекст обращения",
+    workspaceDescription:
+      "Выберите элемент очереди, возьмите его в работу и только затем зафиксируйте решение.",
+    closeInspector: "Закрыть инспектор модерации",
+    claimBeforeDecision:
+      "Сначала возьмите элемент в работу. Решение доступно только владельцу активной блокировки.",
+    leaseConflict:
+      "Элемент уже изменён или занят другим модератором. Очередь обновлена — проверьте актуальное состояние.",
   },
   en: {
     eyebrow: "Content safety",
@@ -121,13 +202,13 @@ const moderationPageText: Record<Locale, ModerationPageText> = {
     source: "Source",
     created: "Created",
     actions: "Actions",
-    approve: "Approve",
-    reject: "Reject",
+    approve: "Leave unchanged",
+    reject: "Confirm violation",
     reason: "Reason/comment",
     reasonPlaceholder: "Briefly explain the decision",
     cancel: "Cancel",
-    confirmApprove: "Approve item?",
-    confirmReject: "Reject item?",
+    confirmApprove: "Leave this item unchanged?",
+    confirmReject: "Confirm this violation?",
     saved: "Decision saved",
     failed: "Failed to save decision",
     moderationActionsForbidden: "Moderation actions are available only to Admin or Moderator.",
@@ -149,8 +230,51 @@ const moderationPageText: Record<Locale, ModerationPageText> = {
     templateVideo: "Video",
     userPrefix: "user",
     workspaceBadge: "Moderator",
-    approveItemLabel: "Approve item",
-    rejectItemLabel: "Reject item",
+    approveItemLabel: "Leave item unchanged",
+    rejectItemLabel: "Confirm violation",
+    summaryPending: "Awaiting decision",
+    summaryApproved: "Approved",
+    summaryRejected: "Rejected",
+    summaryOldest: "Oldest pending",
+    summaryScope: "Across the full queue, regardless of active filters",
+    pendingComposition: "Pending queue composition",
+    updatedAt: "Updated",
+    noPending: "No pending decisions",
+    queueRegionLabel: "Moderation queue table. Use arrow keys to scroll.",
+    mobileQueueLabel: "Moderation queue",
+    review: "Review",
+    reviewItemLabel: "Review item",
+    reviewTitle: "Review report",
+    reviewDescription:
+      "Review the report context first, then select a decision and record an audit reason.",
+    saveDecision: "Select a decision",
+    contextTitle: "Context",
+    templateId: "Template ID",
+    device: "Device",
+    country: "Country",
+    userId: "User ID",
+    generationId: "Generation ID",
+    noMessage: "No report message was provided",
+    decisionTitle: "Decision",
+    decisionHelp: "The action is applied only while this item is still pending moderation.",
+    approveHelp: "The report was reviewed; no violation was confirmed and content stays unchanged.",
+    rejectHelp: "A violation was confirmed and the content will receive the rejected status.",
+    reasonHint: "3 to 500 characters. The reason is written to the audit log.",
+    characterCountLabel: "Character count",
+    previousDecision: "Previous decision",
+    decisionConflict:
+      "Another moderator already processed this item. The queue was refreshed; review its current status.",
+    queueShowing: "Showing",
+    complaintsShort: "complaints",
+    feedbackShort: "feedback",
+    workspaceTitle: "Report context",
+    workspaceDescription:
+      "Select a queue item, claim it, and only then record the moderation decision.",
+    closeInspector: "Close moderation inspector",
+    claimBeforeDecision:
+      "Claim the item first. Decisions are available only to the owner of an active processing lease.",
+    leaseConflict:
+      "The item changed or another moderator owns it. The queue was refreshed; review the current state.",
   },
 };
 

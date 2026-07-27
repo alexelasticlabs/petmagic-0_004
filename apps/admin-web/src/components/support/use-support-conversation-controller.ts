@@ -8,11 +8,14 @@ import { useAdminNotifications } from "@/components/admin/admin-notifications";
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import { getSupportConversationDerivedState } from "@/components/support/support-conversation-controller.derived";
 import {
+  DEFAULT_SUPPORT_QUEUE_URL_STATE,
   SUPPORT_INBOX_PAGE_SIZE,
+  SUPPORT_QUEUE_PAGE_MAX,
   SUPPORT_REPLY_MAX_LENGTH,
   SUPPORT_SEARCH_MAX_LENGTH,
   buildSupportRealtimeToastMessage,
   formatSupportControllerLogText,
+  getSupportActionErrorMessage,
   getSupportControllerErrorDetails,
   isUserSupportMessageEvent,
   mergeSupportConversationMessages,
@@ -38,6 +41,7 @@ import {
   fetchSupportConversation,
   fetchSupportInbox,
   fetchSupportInboxMetrics,
+  isSupportedSupportAttachmentMimeType,
   markSupportConversationRead,
   useAuthSession,
   type AdminSupportConversation,
@@ -61,6 +65,7 @@ export function useSupportConversationController({
   locale,
   conversationId,
   queueStatusFilter = "all",
+  initialQueueState = DEFAULT_SUPPORT_QUEUE_URL_STATE,
 }: UseSupportConversationControllerParams) {
   const text = useMemo(() => getDictionary(locale), [locale]);
   const copy = useMemo(() => getSupportConversationCopy(locale), [locale]);
@@ -73,21 +78,18 @@ export function useSupportConversationController({
     sessionUserRoles.includes("Admin") || sessionUserRoles.includes("Moderator");
   const supportActionsForbidden = copy.controller.actionsForbidden;
   const supportOwnershipRequired = copy.controller.ownershipRequired;
-  const [queueFilter, setQueueFilter] = useState<SupportQueueFilter>("all");
+  const [queueFilter, setQueueFilter] = useState<SupportQueueFilter>(initialQueueState.subFilter);
   const [queuePriorityFilter, setQueuePriorityFilter] = useState<
     "all" | SupportConversationPriority
-  >("all");
-  const [queueSort, setQueueSort] = useState<SupportInboxSort>("default");
-  const [queuePage, setQueuePage] = useState(1);
-  const [searchQuery, setRawSearchQuery] = useState("");
+  >(initialQueueState.priority);
+  const [queueSort, setQueueSort] = useState<SupportInboxSort>(initialQueueState.sort);
+  const [queuePage, setQueuePage] = useState(initialQueueState.page);
+  const [searchQuery, setRawSearchQuery] = useState(initialQueueState.search);
   const debouncedSearchQuery = useDebouncedValue(searchQuery.trim(), 350);
   const [reply, setReply] = useState("");
   const [replyToMessageId, setReplyToMessageId] = useState<string | null>(null);
   const [replyToPreview, setReplyToPreview] = useState<string | null>(null);
   const [activeSidePanelTab, setActiveSidePanelTab] = useState<SidePanelTab>("user");
-  const [isSidePanelOpen, setIsSidePanelOpen] = useState(
-    () => typeof window !== "undefined" && window.matchMedia("(min-width: 1321px)").matches
-  );
   const [toast, setToast] = useState<ToastState | null>(null);
   const [selectedAttachment, setSelectedAttachmentState] = useState<File | null>(null);
   const [attachmentPreview, setAttachmentPreview] = useState<{
@@ -102,6 +104,7 @@ export function useSupportConversationController({
   const messagesViewportVisibleRef = useRef(false);
   const lastConversationRealtimeFetchRef = useRef(0);
   const loadOlderAbortControllerRef = useRef<AbortController | null>(null);
+  const [isLoadingOlderMessages, setIsLoadingOlderMessages] = useState(false);
 
   const revokeAttachmentPreviewUrl = useCallback(() => {
     if (!attachmentPreviewUrlRef.current) {
@@ -119,10 +122,18 @@ export function useSupportConversationController({
 
   const setSupportSelectedAttachment = useCallback(
     (file: File | null) => {
+      if (file && !isSupportedSupportAttachmentMimeType(file.type)) {
+        if (attachmentInputRef.current) {
+          attachmentInputRef.current.value = "";
+        }
+        setToast({ type: "error", message: text.supportAttachmentFailedLabel });
+        return;
+      }
+
       clearAttachmentPreview();
       setSelectedAttachmentState(file);
 
-      if (!file?.type.startsWith("image/")) {
+      if (!file?.type.startsWith("image/") && !file?.type.startsWith("video/")) {
         return;
       }
 
@@ -138,7 +149,7 @@ export function useSupportConversationController({
         throw error;
       }
     },
-    [clearAttachmentPreview]
+    [clearAttachmentPreview, text.supportAttachmentFailedLabel]
   );
 
   const resetSelectedAttachment = useCallback(() => {
@@ -174,7 +185,9 @@ export function useSupportConversationController({
 
   const pushSupportError = useCallback(
     (error: unknown, action = "support_action") => {
-      const message = getAdminErrorMessage(error, text.supportLoadError);
+      const message =
+        getSupportActionErrorMessage(error, text) ??
+        getAdminErrorMessage(error, text.supportLoadError);
       clientLogger.warn("support.action_failed", {
         conversationId: formatSupportControllerLogText(conversationId),
         action: formatSupportControllerLogText(action, 40),
@@ -183,7 +196,7 @@ export function useSupportConversationController({
       setToast({ type: "error", message });
       pushSupportNotification("error", message);
     },
-    [conversationId, pushSupportNotification, text.supportLoadError]
+    [conversationId, pushSupportNotification, text]
   );
 
   const assertCanManageSupportWorkspace = useCallback(() => {
@@ -226,7 +239,7 @@ export function useSupportConversationController({
   const setSupportQueuePage = useCallback((value: number | ((currentPage: number) => number)) => {
     setQueuePage((currentPage) => {
       const nextPage = typeof value === "function" ? value(currentPage) : value;
-      return Math.max(1, nextPage);
+      return Math.min(SUPPORT_QUEUE_PAGE_MAX, Math.max(1, nextPage));
     });
   }, []);
 
@@ -258,6 +271,14 @@ export function useSupportConversationController({
       loadOlderAbortControllerRef.current?.abort();
     };
   }, [revokeAttachmentPreviewUrl]);
+
+  useEffect(() => {
+    return () => {
+      loadOlderAbortControllerRef.current?.abort();
+      loadOlderAbortControllerRef.current = null;
+      setIsLoadingOlderMessages(false);
+    };
+  }, [conversationId]);
 
   const supportRealtimeStatus = useSupportRealtime(
     canManageSupportWorkspace ? session?.accessToken : undefined,
@@ -446,7 +467,7 @@ export function useSupportConversationController({
   );
 
   const loadOlderMessages = useCallback(async () => {
-    if (!canManageSupportWorkspace) {
+    if (!canManageSupportWorkspace || loadOlderAbortControllerRef.current) {
       return;
     }
 
@@ -463,9 +484,9 @@ export function useSupportConversationController({
     }
     const beforeMessageId = currentConversation.messages[0]?.messageId;
 
-    loadOlderAbortControllerRef.current?.abort();
     const abortController = new AbortController();
     loadOlderAbortControllerRef.current = abortController;
+    setIsLoadingOlderMessages(true);
 
     let olderConversation: AdminSupportConversation;
     try {
@@ -480,10 +501,12 @@ export function useSupportConversationController({
         return;
       }
 
-      throw error;
+      pushSupportError(error, "support_load_older_messages");
+      return;
     } finally {
       if (loadOlderAbortControllerRef.current === abortController) {
         loadOlderAbortControllerRef.current = null;
+        setIsLoadingOlderMessages(false);
       }
     }
 
@@ -498,10 +521,12 @@ export function useSupportConversationController({
           return olderConversation;
         }
 
-        return mergeSupportConversationMessages(latestConversation, olderConversation);
+        return mergeSupportConversationMessages(latestConversation, olderConversation, {
+          replacePagination: true,
+        });
       }
     );
-  }, [canManageSupportWorkspace, conversationId, queryClient]);
+  }, [canManageSupportWorkspace, conversationId, pushSupportError, queryClient]);
 
   useEffect(() => {
     if (!conversationQuery.data || conversationQuery.data.adminUnreadCount <= 0) {
@@ -533,9 +558,10 @@ export function useSupportConversationController({
   }, [scheduleMarkRead]);
 
   const {
-    assignmentMutation,
+    isAttachmentRetrySubmitting,
     isSendReplySubmitting,
     metadataMutation,
+    requestAttachmentRetry,
     requestSendReply,
     sendMutation,
     statusMutation,
@@ -554,8 +580,8 @@ export function useSupportConversationController({
     optimisticAttachmentPreview: copy.controller.optimisticAttachmentPreview,
     operatorLabel: copy.shared.operator,
     supportReplySent: text.supportReplySent,
+    supportAttachmentRetryRequired: text.supportAttachmentRetryRequired,
     supportStatusSaved: text.supportStatusSaved,
-    supportAssignmentSaved: text.supportAssignmentSaved,
     pushSupportNotification,
     pushSupportError,
     setToast,
@@ -693,7 +719,6 @@ export function useSupportConversationController({
     accountCreatedAt,
     activityTimeline,
     analyticsQuery,
-    assignmentMutation,
     attachmentInputRef,
     attachmentPreviewUrl,
     composerPlaceholder,
@@ -715,7 +740,6 @@ export function useSupportConversationController({
     inboxMetricsQuery,
     inboxQuery,
     isAssignedToCurrentAdmin,
-    isSidePanelOpen,
     primaryStatusAction,
     purchasesQuery,
     recentUserPurchases,
@@ -725,17 +749,20 @@ export function useSupportConversationController({
     reply,
     replyToMessage,
     replyToPreview,
+    requestAttachmentRetry,
     requestSendReply,
     resetSelectedAttachment,
+    debouncedSearchQuery,
     searchQuery,
     selectedAttachment,
     secondaryStatusActions,
     sendMutation,
+    isAttachmentRetrySubmitting,
+    isLoadingOlderMessages,
     isSendReplySubmitting,
     sessionUserId,
     sessionUserRoles,
     setActiveSidePanelTab,
-    setIsSidePanelOpen,
     setReply: setSupportReply,
     setReplyToMessageId,
     setReplyToPreview,

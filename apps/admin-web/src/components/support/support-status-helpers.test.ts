@@ -6,9 +6,20 @@ import {
 } from "@/components/support/support-status-helpers";
 import { getDictionary } from "@/lib/i18n";
 
+function createConversationActionState(
+  status: "New" | "InProgress" | "WaitingForUser" | "Closed",
+  availableActions: string[],
+  canReopen = false
+) {
+  return { status, availableActions, canReopen };
+}
+
 describe("getAvailableStatusActions", () => {
-  it("does not expose manual InProgress action for New status", () => {
-    const actions = getAvailableStatusActions("New", getDictionary("ru"));
+  it("uses the close action advertised by the backend for open tickets", () => {
+    const actions = getAvailableStatusActions(
+      createConversationActionState("New", ["close"]),
+      getDictionary("ru")
+    );
 
     expect(actions.some((action) => action.status === "InProgress")).toBe(false);
     expect(actions).toEqual([
@@ -20,30 +31,42 @@ describe("getAvailableStatusActions", () => {
     ]);
   });
 
-  it("does not expose manual InProgress action for WaitingForUser status", () => {
-    const actions = getAvailableStatusActions("WaitingForUser", getDictionary("en"));
+  it("does not invent a status action when the backend does not advertise it", () => {
+    const actions = getAvailableStatusActions(
+      createConversationActionState("WaitingForUser", []),
+      getDictionary("en")
+    );
 
-    expect(actions.some((action) => action.status === "InProgress")).toBe(false);
-    expect(actions).toEqual([
-      {
-        status: "Closed",
-        label: getDictionary("en").supportCloseConversationAction,
-        variant: "secondary",
-      },
-    ]);
+    expect(actions).toEqual([]);
   });
 
-  it("does not expose manual WaitingForUser action for InProgress status", () => {
-    const actions = getAvailableStatusActions("InProgress", getDictionary("ru"));
+  it("exposes reopen only when both backend signals permit it", () => {
+    const text = getDictionary("ru");
+    const actions = getAvailableStatusActions(
+      createConversationActionState("Closed", ["reopen"], true),
+      text
+    );
 
-    expect(actions.some((action) => action.status === "WaitingForUser")).toBe(false);
     expect(actions).toEqual([
       {
-        status: "Closed",
-        label: getDictionary("ru").supportCloseConversationAction,
-        variant: "secondary",
+        status: "InProgress",
+        label: text.supportReopenConversationAction,
+        variant: "primary",
       },
     ]);
+
+    expect(
+      getAvailableStatusActions(createConversationActionState("Closed", ["reopen"]), text)
+    ).toEqual([]);
+  });
+
+  it("ignores backend actions that are not status transitions rendered in this UI", () => {
+    const actions = getAvailableStatusActions(
+      createConversationActionState("InProgress", ["unassign", "unknown-action"]),
+      getDictionary("en")
+    );
+
+    expect(actions).toEqual([]);
   });
 });
 

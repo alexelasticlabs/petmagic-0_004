@@ -4,9 +4,25 @@
   margin: 0 auto;
 }
 
-.topGrid,
-.editorGrid {
+.workspace {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
   align-items: start;
+}
+
+.workspaceColumn {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 0.9rem;
+}
+
+.previewPanel {
+  min-width: 0;
+  position: sticky;
+  top: 1rem;
 }
 
 .compactGrid {
@@ -117,6 +133,68 @@
   accent-color: var(--accent);
 }
 
+.autoPickWorkspace,
+.autoPickFieldset,
+.autoPickRun {
+  min-width: 0;
+  display: grid;
+  gap: 0.76rem;
+}
+
+.autoPickFieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.sectionLabel {
+  padding: 0;
+  color: var(--text-strong);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.autoPickStatusRow {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.62rem;
+}
+
+.autoModeToggle {
+  align-self: auto;
+  padding: 0.5rem 0.62rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+}
+
+.autoPickRun {
+  padding-top: 0.82rem;
+  border-top: 1px solid var(--border-soft);
+}
+
+.autoPickRunHeader {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.autoPickRunHeader strong {
+  color: var(--text-strong);
+  font-size: 0.8rem;
+  line-height: 1.3;
+}
+
+.autoPickRunHeader p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
 .actionRow,
 .tableActions {
   min-width: 0;
@@ -124,6 +202,22 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 0.52rem;
+}
+
+.schedulePager {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.42rem;
+}
+
+.schedulePageInfo {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  line-height: 1.3;
+  white-space: nowrap;
 }
 
 .buttonIcon {
@@ -231,9 +325,12 @@
 }
 
 @media (max-width: 960px) {
-  .editorGrid,
-  .topGrid {
+  .workspace {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .previewPanel {
+    position: static;
   }
 }
 
@@ -242,9 +339,22 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .autoPickStatusRow {
+    align-items: stretch;
+  }
+
+  .autoModeToggle {
+    justify-content: flex-start;
+  }
+
   .actionRow,
   .tableActions {
     align-items: stretch;
+  }
+
+  .schedulePager {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .actionRow > *,
@@ -257,7 +367,59 @@
   }
 
   .scheduleTable {
-    min-width: 40rem;
+    min-width: 0;
+    display: block;
+  }
+
+  .scheduleTable thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .scheduleTable tbody {
+    display: grid;
+    gap: 0.65rem;
+  }
+
+  .scheduleTable tr {
+    display: grid;
+    gap: 0.55rem;
+    padding: 0.76rem;
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm);
+    background: var(--surface-1);
+  }
+
+  .scheduleTable td {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: minmax(5.5rem, 0.72fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0;
+    border: 0;
+  }
+
+  .scheduleTable td[data-label]::before {
+    content: attr(data-label);
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .scheduleTable td:last-child {
+    align-items: stretch;
+  }
+
+  .scheduleTable td:last-child .tableActions {
+    width: 100%;
   }
 
   .previewOverlay h3 {

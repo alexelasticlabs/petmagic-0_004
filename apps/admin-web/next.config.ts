@@ -175,6 +175,13 @@ export function apiImageRemotePatterns(
   return patterns;
 }
 
+export function nextTypeScriptConfiguration(
+  rawTsconfigPath = process.env.NEXT_TYPESCRIPT_TSCONFIG_PATH
+): NextConfig["typescript"] | undefined {
+  const tsconfigPath = rawTsconfigPath?.trim();
+  return tsconfigPath ? { tsconfigPath } : undefined;
+}
+
 const securityHeaders = [
   {
     key: "X-Frame-Options",
@@ -194,8 +201,12 @@ const securityHeaders = [
   },
 ];
 
+const configuredTypeScript = nextTypeScriptConfiguration();
+
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  distDir: process.env.NEXT_DIST_DIR?.trim() || undefined,
+  ...(configuredTypeScript ? { typescript: configuredTypeScript } : {}),
   async headers() {
     return [
       {

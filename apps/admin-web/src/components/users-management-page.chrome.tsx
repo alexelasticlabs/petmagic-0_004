@@ -1,50 +1,33 @@
 "use client";
 
-import {
-  AdminKpiCard,
-  AdminPageHero,
-  AdminPageGrid,
-  AdminStateCard,
-} from "@/components/admin/admin-primitives";
+import { AdminMetricStrip, AdminStateCard } from "@/components/admin/admin-primitives";
+import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import type { UsersManagementPageText } from "@/components/users-management-page.content";
 import styles from "@/components/users-management-page.module.css";
-import type { Dictionary } from "@/lib/i18n";
-
-type UsersManagementHeroProps = {
-  text: Dictionary;
-};
-
-export function UsersManagementHero({ text }: UsersManagementHeroProps) {
-  return (
-    <AdminPageHero
-      eyebrow={text.usersHeroEyebrow}
-      title={text.usersTitle}
-      description={text.usersHeroDescription}
-    />
-  );
-}
+import type { RangeDays } from "@/components/users-management-page.types";
 
 type UsersManagementAccessStateProps = {
-  text: Dictionary;
+  ui: UsersManagementPageText;
 };
 
-export function UsersManagementAccessState({ text }: UsersManagementAccessStateProps) {
+export function UsersManagementAccessState({ ui }: UsersManagementAccessStateProps) {
   return (
     <AdminStateCard
       tone="info"
-      title={text.usersTitle}
-      description={text.usersLoadingDescription}
+      title={ui.accessRestrictedTitle}
+      description={ui.accessRestrictedDescription}
     />
   );
 }
 
 type UsersManagementLoadingStateProps = {
-  text: Dictionary;
+  ui: UsersManagementPageText;
 };
 
-export function UsersManagementLoadingState({ text }: UsersManagementLoadingStateProps) {
+export function UsersManagementLoadingState({ ui }: UsersManagementLoadingStateProps) {
   return (
-    <AdminStateCard tone="info" title={text.usersTitle} description={text.usersLoadingDescription}>
+    <AdminStateCard tone="info" title={ui.loadingTitle} description={ui.loadingDescription}>
       <div className={styles.skeletonStack} aria-busy="true" aria-live="polite">
         {Array.from({ length: 8 }).map((_, index) => (
           <div key={index} className={styles.skeletonLine} />
@@ -57,41 +40,85 @@ export function UsersManagementLoadingState({ text }: UsersManagementLoadingStat
 type UsersManagementSummaryGridProps = {
   blockedUsersValue: string;
   newUsersValue: string;
-  openSupportUserCount: number;
   premiumUsersValue: string;
-  rangeDays: number;
+  rangeDays: RangeDays;
+  setRangeDays: (value: RangeDays) => void;
   totalUsersValue: string;
   activeUsersValue: string;
+  isMetricsError: boolean;
+  isMetricsFetching: boolean;
+  refreshMetrics: () => Promise<void>;
   ui: UsersManagementPageText;
 };
 
 export function UsersManagementSummaryGrid({
   blockedUsersValue,
   newUsersValue,
-  openSupportUserCount,
   premiumUsersValue,
   rangeDays,
+  setRangeDays,
   totalUsersValue,
   activeUsersValue,
+  isMetricsError,
+  isMetricsFetching,
+  refreshMetrics,
   ui,
 }: UsersManagementSummaryGridProps) {
+  const periodLabel = rangeDays === 7 ? ui.period7 : rangeDays === 90 ? ui.period90 : ui.period30;
+
   return (
-    <AdminPageGrid columns="four" className={styles.summaryGrid}>
-      <AdminKpiCard label={ui.summaryTotal} value={totalUsersValue} tone="primary" />
-      <AdminKpiCard label={ui.summaryActive} value={activeUsersValue} tone="success" />
-      <AdminKpiCard label={ui.summaryPremium} value={premiumUsersValue} tone="warning" />
-      <AdminKpiCard label={ui.summaryBlocked} value={blockedUsersValue} tone="danger" />
-      <AdminKpiCard
-        label={ui.summaryNew}
-        value={newUsersValue}
-        hint={`${ui.periodLabel}: ${rangeDays}`}
-        tone="info"
+    <div className={styles.summarySection}>
+      <div className={styles.summaryHeader}>
+        <span className={styles.summaryTitle}>{ui.summaryTitle}</span>
+        <div className={styles.summaryPeriodControl}>
+          <span>{ui.periodLabel}</span>
+          <div className={styles.summaryPeriodSelect}>
+            <Select
+              value={String(rangeDays)}
+              ariaLabel={ui.periodLabel}
+              showSelectedDescription={false}
+              options={[
+                { value: "7", label: ui.period7 },
+                { value: "30", label: ui.period30 },
+                { value: "90", label: ui.period90 },
+              ]}
+              onChange={(value) => setRangeDays(Number.parseInt(value, 10) as RangeDays)}
+            />
+          </div>
+        </div>
+      </div>
+      <AdminMetricStrip
+        className={styles.summaryGrid}
+        items={[
+          { label: ui.summaryTotal, value: totalUsersValue },
+          { label: ui.summaryActive, value: activeUsersValue },
+          { label: ui.summaryPremium, value: premiumUsersValue },
+          {
+            label: ui.summaryNewForPeriod.replace("{period}", periodLabel),
+            value: newUsersValue,
+          },
+          ...(blockedUsersValue === "0"
+            ? []
+            : [{ label: ui.summaryBlocked, value: blockedUsersValue }]),
+        ]}
       />
-      <AdminKpiCard
-        label={ui.summaryOpenSupport}
-        value={String(openSupportUserCount)}
-        tone="magenta"
-      />
-    </AdminPageGrid>
+      {isMetricsError ? (
+        <AdminStateCard
+          tone="warning"
+          className={styles.summaryError}
+          title={ui.summaryUnavailable}
+          action={
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={isMetricsFetching}
+              onClick={() => void refreshMetrics().catch(() => undefined)}
+            >
+              {ui.summaryRetry}
+            </Button>
+          }
+        />
+      ) : null}
+    </div>
   );
 }

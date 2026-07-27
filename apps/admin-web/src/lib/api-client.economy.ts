@@ -8,6 +8,7 @@ import type {
   AdminEconomyIncident,
   AdminEconomyLedgerItem,
   AdminEconomyPurchase,
+  AdminEconomyPurchaseDetail,
   AdminEconomySubscription,
   AdminEconomyUserSubscriptionSummary,
   AdminPaymentProviderConfiguration,
@@ -16,12 +17,22 @@ import type {
   AdminRedeemCodeMetrics,
   AdminRedeemCodeRedemption,
   AdminRedeemCodesPage,
-  AdminRedeemRewardKind,
+  AdminRedeemCodeWriteRewardKind,
   AdminSubscriptionEvent,
   AdminSubscriptionPlan,
   EconomyReconciliationRun,
   OffsetPagedResponse,
 } from "./api-client.types";
+
+export const ADMIN_PREMIUM_REVOKE_REASON_MAX_LENGTH = 500;
+export const ADMIN_ECONOMY_DASHBOARD_PERIOD_DAYS = [7, 30, 90] as const;
+
+export type AdminEconomyDashboardPeriodDays = (typeof ADMIN_ECONOMY_DASHBOARD_PERIOD_DAYS)[number];
+
+export type AdminEconomyDashboardMetricsOptions = {
+  periodDays?: AdminEconomyDashboardPeriodDays;
+  signal?: AbortSignal;
+};
 
 export type AdminEconomyPurchasesQuery = {
   skip?: number;
@@ -61,22 +72,38 @@ export type AdminRedeemCodesQuery = {
 export const ECONOMY_QUERY_FILTER_MAX_LENGTH = 120;
 export const ECONOMY_REFUND_REASON_MAX_LENGTH = 240;
 export const ECONOMY_INCIDENT_REASON_MAX_LENGTH = 1000;
+export const ECONOMY_INCIDENT_EXTERNAL_REFERENCE_MAX_LENGTH = 160;
 
 const ECONOMY_PAYMENT_PROVIDERS = ["stripe", "app_store", "google_play"] as const;
-const ECONOMY_PURCHASE_STATUSES = ["pending", "succeeded", "failed", "refunded"] as const;
+const ECONOMY_PURCHASE_STATUSES = [
+  "pending",
+  "succeeded",
+  "failed",
+  "refund_pending",
+  "refund_review",
+  "refunded",
+] as const;
 const ECONOMY_SUBSCRIPTION_STATUSES = [
   "active",
   "trialing",
+  "grace_period",
   "past_due",
   "canceled",
   "expired",
+  "refunded",
+  "revoked",
+  "pending",
 ] as const;
 const ECONOMY_SUBSCRIPTION_EVENT_STATUSES = [
   "active",
+  "trialing",
+  "grace_period",
+  "past_due",
   "canceled",
   "expired",
   "processed",
   "failed",
+  "pending",
 ] as const;
 const ECONOMY_INCIDENT_STATUSES = ["open", "resolved", "suppressed"] as const;
 const ECONOMY_INCIDENT_CATEGORIES = [
@@ -118,6 +145,10 @@ function normalizeFilterValue(value: string | undefined): string | undefined {
   return value?.trim().slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH) || undefined;
 }
 
+function normalizeIncidentExternalReference(value: string | undefined): string | undefined {
+  return value?.trim().slice(0, ECONOMY_INCIDENT_EXTERNAL_REFERENCE_MAX_LENGTH) || undefined;
+}
+
 function normalizeAllowedFilter<const T extends string>(
   value: string | undefined,
   allowed: readonly T[],
@@ -129,6 +160,21 @@ function normalizeAllowedFilter<const T extends string>(
   }
 
   return allowed.includes(normalized as T) ? (normalized as T) : undefined;
+}
+
+function normalizeSubscriptionStatusAlias(value: string | undefined): string | undefined {
+  const normalized = value?.trim().toLowerCase();
+
+  switch (normalized) {
+    case "graceperiod":
+    case "grace-period":
+      return "grace_period";
+    case "pastdue":
+    case "past-due":
+      return "past_due";
+    default:
+      return normalized;
+  }
 }
 
 export function normalizeAdminEconomyPurchasesQuery(
@@ -150,7 +196,10 @@ export function normalizeAdminEconomySubscriptionsQuery(
   return {
     skip: normalizePagedValue(params.skip),
     take: normalizeTakeValue(params.take),
-    status: normalizeAllowedFilter(params.status, ECONOMY_SUBSCRIPTION_STATUSES),
+    status: normalizeAllowedFilter(
+      normalizeSubscriptionStatusAlias(params.status),
+      ECONOMY_SUBSCRIPTION_STATUSES
+    ),
     provider: normalizeAllowedFilter(params.provider, ECONOMY_PAYMENT_PROVIDERS),
     search: normalizeFilterValue(params.search),
   };
@@ -228,12 +277,30 @@ export async function fetchAdminEconomyPurchases(
   );
 }
 
-export async function fetchAdminEconomyDashboardMetrics(
+export async function fetchAdminEconomyPurchase(
+  orderId: string,
   signal?: AbortSignal
-): Promise<AdminEconomyDashboardMetrics> {
-  return apiRequest<AdminEconomyDashboardMetrics>("/api/admin/economy/dashboard/metrics", {
+): Promise<AdminEconomyPurchaseDetail> {
+  const encodedOrderId = encodePathSegment(orderId);
+  return apiRequest<AdminEconomyPurchaseDetail>(`/api/admin/economy/purchases/${encodedOrderId}`, {
     method: "GET",
     signal,
+  });
+}
+
+export async function fetchAdminEconomyDashboardMetrics(
+  options: AdminEconomyDashboardMetricsOptions = {}
+): Promise<AdminEconomyDashboardMetrics> {
+  const periodDays = ADMIN_ECONOMY_DASHBOARD_PERIOD_DAYS.includes(
+    options.periodDays as AdminEconomyDashboardPeriodDays
+  )
+    ? options.periodDays
+    : undefined;
+  const query = periodDays ? `?periodDays=${periodDays}` : "";
+
+  return apiRequest<AdminEconomyDashboardMetrics>(`/api/admin/economy/dashboard/metrics${query}`, {
+    method: "GET",
+    signal: options.signal,
   });
 }
 
@@ -281,14 +348,20 @@ export async function fetchAdminEconomySubscriptions(
 
 export async function adminCancelPremiumSubscription(
   userId: string,
-  paymentProvider = "stripe"
+  paymentProvider = "stripe",
+  reason = ""
 ): Promise<AdminEconomyUserSubscriptionSummary> {
   const encodedUserId = encodePathSegment(userId);
+  const normalizedReason = reason.trim();
+  if (!normalizedReason || normalizedReason.length > ADMIN_PREMIUM_REVOKE_REASON_MAX_LENGTH) {
+    throw new Error("A Premium revocation reason between 1 and 500 characters is required.");
+  }
+
   return apiRequest<AdminEconomyUserSubscriptionSummary>(
     `/api/admin/economy/users/${encodedUserId}/premium/revoke`,
     {
       method: "PUT",
-      body: JSON.stringify({ paymentProvider }),
+      body: JSON.stringify({ paymentProvider, reason: normalizedReason }),
     }
   );
 }
@@ -448,7 +521,7 @@ export async function fetchAdminSubscriptionEvents(
   const normalizedTake = normalizeTakeValue(params?.take);
   const normalizedProvider = normalizeAllowedFilter(params?.provider, ECONOMY_PAYMENT_PROVIDERS);
   const normalizedStatus = normalizeAllowedFilter(
-    params?.status,
+    normalizeSubscriptionStatusAlias(params?.status),
     ECONOMY_SUBSCRIPTION_EVENT_STATUSES
   );
   const search = new URLSearchParams();
@@ -553,7 +626,7 @@ export async function applyAdminEconomyIncidentAction(
           typeof payload.amount === "number" && Number.isFinite(payload.amount)
             ? Math.trunc(payload.amount)
             : undefined,
-        externalReferenceId: normalizeFilterValue(payload.externalReferenceId),
+        externalReferenceId: normalizeIncidentExternalReference(payload.externalReferenceId),
       }),
     }
   );
@@ -621,7 +694,7 @@ export async function createAdminRedeemCode(payload: {
   campaignChannel?: string | null;
   minimumSuccessfulPurchases?: number;
   createdBy?: string | null;
-  rewardKind: AdminRedeemRewardKind;
+  rewardKind: AdminRedeemCodeWriteRewardKind;
   rewardValue: number;
   maxRedemptions: number;
   maxRedemptionsPerUser: number;
@@ -662,21 +735,26 @@ export async function fetchAdminRedeemCodeActivations(
 
 export async function updateAdminRedeemCode(
   redeemCodeId: string,
-  payload: Pick<
-    AdminRedeemCode,
-    | "description"
-    | "campaignName"
-    | "campaignChannel"
-    | "minimumSuccessfulPurchases"
-    | "createdBy"
-    | "rewardKind"
-    | "rewardValue"
-    | "maxRedemptions"
-    | "maxRedemptionsPerUser"
-    | "isActive"
-    | "startsAtUtc"
-    | "expiresAtUtc"
-  >
+  payload: Omit<
+    Pick<
+      AdminRedeemCode,
+      | "description"
+      | "campaignName"
+      | "campaignChannel"
+      | "minimumSuccessfulPurchases"
+      | "createdBy"
+      | "rewardKind"
+      | "rewardValue"
+      | "maxRedemptions"
+      | "maxRedemptionsPerUser"
+      | "isActive"
+      | "startsAtUtc"
+      | "expiresAtUtc"
+    >,
+    "rewardKind"
+  > & {
+    rewardKind: AdminRedeemCodeWriteRewardKind;
+  }
 ): Promise<AdminRedeemCode> {
   const encodedRedeemCodeId = encodePathSegment(redeemCodeId);
   return apiRequest<AdminRedeemCode>(`/api/admin/economy/redeem-codes/${encodedRedeemCodeId}`, {

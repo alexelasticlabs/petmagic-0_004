@@ -170,7 +170,8 @@ function getSupportRealtimeStatus(): SupportRealtimeStatus {
 }
 
 function logUnexpectedSupportRealtimeFailure(
-  event: "support.realtime_closed" | "support.realtime_start_failed",
+  event:
+    "support.realtime_closed" | "support.realtime_start_failed" | "support.realtime_stop_failed",
   error: unknown
 ): void {
   clientLogger.warn(event, {
@@ -190,7 +191,11 @@ function stopSupportRealtimeConnection(): void {
   }
 
   connection.off("conversation-updated");
-  void connection.stop();
+  void connection.stop().catch((error) => {
+    if (!isExpectedConnectionFailure(error)) {
+      logUnexpectedSupportRealtimeFailure("support.realtime_stop_failed", error);
+    }
+  });
 }
 
 function isExpectedConnectionFailure(error: unknown) {

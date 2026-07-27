@@ -38,14 +38,7 @@
   transition:
     border-color 150ms ease,
     box-shadow 150ms ease,
-    background-color 150ms ease,
-    transform 160ms ease;
-}
-
-.card:hover {
-  border-color: var(--border-strong);
-  box-shadow: var(--interactive-glow);
-  transform: translateY(-1px);
+    background-color 150ms ease;
 }
 
 .cardPaddingMd {
@@ -58,6 +51,7 @@
 
 .cardHeader {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: clamp(0.58rem, 0.5rem + 0.22vw, 0.72rem);
@@ -77,6 +71,7 @@
   font-weight: 500;
   letter-spacing: 0;
   line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .cardDescription {
@@ -84,17 +79,19 @@
   color: var(--text-soft);
   font-size: 0.75rem;
   line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .cardAction {
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   flex-shrink: 0;
   color: var(--accent);
   font-size: 0.82rem;
   font-weight: 600;
-}
-
-.cardAction:hover {
-  color: var(--text-strong);
 }
 
 .statCard {
@@ -114,14 +111,25 @@
   transition:
     border-color 150ms ease,
     box-shadow 150ms ease,
-    background-color 150ms ease,
-    transform 160ms ease;
+    background-color 150ms ease;
 }
 
-.statCard:hover {
-  border-color: color-mix(in srgb, var(--stat-accent, var(--success)) 28%, var(--border-strong));
-  box-shadow: var(--interactive-glow);
-  transform: translateY(-1px);
+.statCardLink {
+  min-width: 0;
+  display: block;
+  border-radius: var(--radius);
+  color: inherit;
+  text-decoration: none;
+}
+
+.statCardLink:hover .statCard {
+  border-color: color-mix(in srgb, var(--stat-accent, var(--success)) 34%, var(--border-soft));
+  background: var(--surface-2);
+}
+
+.statCardLink:focus-visible {
+  outline: 0;
+  box-shadow: var(--focus-ring);
 }
 
 .pageHero {
@@ -137,12 +145,15 @@
 
 .pageHeroHead {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.72rem;
 }
 
 .pageHeroAside {
+  min-width: 0;
+  max-width: 100%;
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
@@ -174,6 +185,7 @@
   font-weight: 500;
   letter-spacing: 0;
   line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 
 .pageDescription {
@@ -182,9 +194,12 @@
   color: var(--text-soft);
   font-size: 0.8125rem;
   line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .pageBadge {
+  min-width: 0;
+  max-width: 100%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -196,7 +211,8 @@
   color: var(--text-strong);
   font-size: 0.74rem;
   font-weight: 600;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  text-align: center;
 }
 
 .pageMeta {
@@ -206,6 +222,8 @@
 }
 
 .pageMetaItem {
+  min-width: 0;
+  max-width: 100%;
   display: inline-flex;
   align-items: center;
   min-height: 1.6rem;
@@ -216,10 +234,12 @@
   color: var(--text-muted);
   font-size: 0.74rem;
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .sectionHeader {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.72rem;
@@ -259,6 +279,8 @@
 }
 
 .sectionHeaderAside {
+  min-width: 0;
+  max-width: 100%;
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
@@ -283,15 +305,7 @@
   transition:
     border-color 140ms ease,
     background-color 140ms ease,
-    box-shadow 140ms ease,
-    transform 140ms ease;
-}
-
-.metricChip:hover {
-  border-color: var(--border-strong);
-  background: var(--surface-hover);
-  box-shadow: var(--interactive-glow);
-  transform: translateY(-1px);
+    box-shadow 140ms ease;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -299,12 +313,6 @@
   .statCard,
   .metricChip {
     transition: none;
-  }
-
-  .card:hover,
-  .statCard:hover,
-  .metricChip:hover {
-    transform: none;
   }
 }
 
@@ -475,6 +483,8 @@
 }
 
 .statusBadge {
+  min-width: 0;
+  max-width: 100%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -483,10 +493,11 @@
   border: 1px solid color-mix(in srgb, var(--status-color, var(--success)) 24%, transparent);
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--status-color, var(--success)) 14%, var(--surface-2));
-  color: var(--status-color, var(--success));
+  color: color-mix(in srgb, var(--status-color, var(--success)) 68%, var(--text-strong));
   font-size: 0.74rem;
   font-weight: 600;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  text-align: center;
 }
 
 .tableEmpty {
@@ -541,6 +552,7 @@
 .stateCard_primary {
   --tile-color: var(--accent);
   --tone-color: var(--accent);
+  --tone-foreground: var(--primary-soft-fg);
 }
 
 .iconTile_info,
@@ -549,6 +561,7 @@
 .stateCard_info {
   --tile-color: var(--info);
   --tone-color: var(--info);
+  --tone-foreground: var(--info-soft-fg);
 }
 
 .iconTile_success,
@@ -557,6 +570,7 @@
 .stateCard_success {
   --tile-color: var(--success);
   --tone-color: var(--success);
+  --tone-foreground: var(--success-soft-fg);
 }
 
 .iconTile_warning,
@@ -565,6 +579,7 @@
 .stateCard_warning {
   --tile-color: var(--warning);
   --tone-color: var(--warning);
+  --tone-foreground: var(--warning-soft-fg);
 }
 
 .iconTile_danger,
@@ -573,6 +588,7 @@
 .stateCard_danger {
   --tile-color: var(--danger);
   --tone-color: var(--danger);
+  --tone-foreground: var(--danger-soft-fg);
 }
 
 .iconTile_magenta,
@@ -607,11 +623,6 @@
     border-color 150ms ease,
     box-shadow 150ms ease,
     background-color 150ms ease;
-}
-
-.kpiCard:hover {
-  border-color: color-mix(in srgb, var(--tone-color) 30%, var(--border-strong));
-  box-shadow: var(--interactive-glow);
 }
 
 .kpiBody {
@@ -651,7 +662,10 @@
 }
 
 .badge {
+  min-width: 0;
+  max-width: 100%;
   --tone-color: var(--neutral);
+  --tone-foreground: var(--text-strong);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -660,11 +674,12 @@
   border: 1px solid color-mix(in srgb, var(--tone-color) 34%, transparent);
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--tone-color) 14%, var(--surface-2));
-  color: color-mix(in srgb, var(--tone-color) 88%, var(--accent-contrast));
+  color: var(--tone-foreground);
   font-size: 0.74rem;
   font-weight: 600;
   line-height: 1;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  text-align: center;
 }
 
 .stateCard {
@@ -683,11 +698,6 @@
     border-color 150ms ease,
     box-shadow 150ms ease,
     background-color 150ms ease;
-}
-
-.stateCard:hover {
-  border-color: color-mix(in srgb, var(--tone-color) 30%, var(--border-strong));
-  box-shadow: var(--interactive-glow);
 }
 
 .stateCardBody {
@@ -712,6 +722,10 @@
 }
 
 .stateCardAction {
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  flex-wrap: wrap;
   flex: 0 0 auto;
 }
 
@@ -761,124 +775,14 @@
 }
 
 @media (min-width: 1600px) {
-  .page {
-    gap: 0.88rem;
-  }
-
-  .pageGrid {
-    gap: 0.76rem;
-  }
-
   .pageGrid_auto {
-    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-  }
-
-  .cardPaddingMd {
-    padding: 0.72rem;
-  }
-
-  .cardPaddingLg,
-  .pageHero,
-  .filterBar {
-    padding: 0.78rem;
-  }
-
-  .card,
-  .pageHero,
-  .kpiCard,
-  .stateCard,
-  .filterBar {
-    gap: 0.58rem;
-  }
-
-  .metricStrip {
-    grid-template-columns: repeat(auto-fit, minmax(8.4rem, 1fr));
-    gap: 0.46rem;
-  }
-
-  .metricChip {
-    padding: 0.32rem 0.46rem;
-  }
-
-  .statCard {
-    min-height: 6.9rem;
-    gap: 0.62rem;
-    padding: 0.72rem;
-  }
-
-  .statValue,
-  .kpiValue {
-    font-size: 1.18rem;
-  }
-
-  .statDelta,
-  .kpiDelta,
-  .kpiHint,
-  .stateCardText,
-  .pageDescription,
-  .table td {
-    font-size: 0.78rem;
-  }
-
-  .table th {
-    padding: 0 0.46rem 0.34rem;
-    font-size: 0.66rem;
-  }
-
-  .table td {
-    padding: 0.44rem 0.46rem;
-  }
-
-  .statusBadge,
-  .badge,
-  .pageMetaItem {
-    min-height: 1.42rem;
-    padding-block: 0.14rem;
-  }
-
-  .toolbar,
-  .filterBar,
-  .sectionHeader,
-  .cardHeader,
-  .pageHeroHead,
-  .pageHeroAside,
-  .sectionHeaderAside {
-    gap: 0.56rem;
-  }
-
-  .iconTile,
-  .statIcon {
-    width: 1.62rem;
-    height: 1.62rem;
-  }
-
-  .iconTile svg,
-  .statIcon svg {
-    width: 1.02rem;
-    height: 1.02rem;
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
   }
 }
 
 @media (min-width: 2200px) {
   .pageGrid_auto {
-    grid-template-columns: repeat(auto-fit, minmax(12.25rem, 1fr));
-  }
-
-  .cardPaddingMd,
-  .metricChip {
-    padding: 0.68rem;
-  }
-
-  .cardPaddingLg,
-  .pageHero,
-  .filterBar,
-  .kpiCard,
-  .stateCard {
-    padding: 0.74rem;
-  }
-
-  .table {
-    min-width: 30rem;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
   }
 }
 

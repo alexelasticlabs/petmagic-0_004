@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { type CSSProperties, type HTMLAttributes, type ReactNode } from "react";
 
 import styles from "@/components/admin/admin-primitives.module.css";
@@ -22,6 +23,8 @@ type AdminStatCardProps = {
   subtext: string;
   accentColor: string;
   icon: ReactNode;
+  href?: string;
+  ariaLabel?: string;
 };
 
 type AdminStatusBadgeProps = {
@@ -318,11 +321,12 @@ export function AdminStatCard({
   subtext,
   accentColor,
   icon,
+  href,
+  ariaLabel,
 }: AdminStatCardProps) {
   const style = { "--stat-accent": accentColor } as CSSProperties;
-
-  return (
-    <section className={styles.statCard} style={style}>
+  const content = (
+    <div className={styles.statCard} style={style}>
       <div className={styles.statContent}>
         <p className={styles.statLabel}>{label}</p>
         <p className={styles.statValue}>{value}</p>
@@ -330,7 +334,17 @@ export function AdminStatCard({
         <p className={styles.statSubtext}>{subtext}</p>
       </div>
       <div className={styles.statIcon}>{icon}</div>
-    </section>
+    </div>
+  );
+
+  if (!href) {
+    return <section>{content}</section>;
+  }
+
+  return (
+    <Link href={href} aria-label={ariaLabel ?? label} className={styles.statCardLink}>
+      {content}
+    </Link>
   );
 }
 
@@ -379,7 +393,7 @@ export function AdminPageHero({
       <div className={styles.pageHeroHead}>
         <div className={styles.pageTitleGroup}>
           {eyebrow ? <p className={styles.pageEyebrow}>{eyebrow}</p> : null}
-          <h1 className={styles.pageTitle}>{title}</h1>
+          <h2 className={styles.pageTitle}>{title}</h2>
           {description ? <p className={styles.pageDescription}>{description}</p> : null}
         </div>
         {hasAside ? (

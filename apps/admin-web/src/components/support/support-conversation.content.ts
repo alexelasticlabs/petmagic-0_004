@@ -25,7 +25,7 @@ type SupportConversationCopy = {
   page: {
     workspaceSubtitle: string;
     closedConversationReadonly: string;
-    dragAndDropImage: string;
+    dragAndDropAttachment: string;
     loadPreviousMessages: string;
     retryAttachmentUpload: string;
     imageViewer: {
@@ -46,8 +46,11 @@ type SupportConversationCopy = {
       title: string;
       all: string;
       waiting: string;
+      unread: string;
       unassigned: string;
       archive: string;
+      filters: string;
+      filtersActive: (count: number) => string;
       status: string;
       priority: string;
       priorityAll: string;
@@ -198,7 +201,7 @@ const supportConversationCopy: Record<Locale, SupportConversationCopy> = {
     page: {
       workspaceSubtitle: "Единое рабочее пространство для очереди, переписки и действий оператора",
       closedConversationReadonly: "Диалог закрыт. Чтобы продолжить, переоткройте обращение.",
-      dragAndDropImage: "Перетащите фото сюда",
+      dragAndDropAttachment: "Перетащите фото или видео сюда",
       loadPreviousMessages: "Загрузить предыдущие сообщения",
       retryAttachmentUpload: "Повторить",
       imageViewer: {
@@ -219,8 +222,11 @@ const supportConversationCopy: Record<Locale, SupportConversationCopy> = {
         title: "Очередь",
         all: "Все",
         waiting: "Ждут ответа",
+        unread: "Непрочитанные",
         unassigned: "Без ответств.",
         archive: "Архив",
+        filters: "Фильтры",
+        filtersActive: (count) => `Фильтры: ${count}`,
         status: "Статус",
         priority: "Приоритет",
         priorityAll: "Любой",
@@ -353,7 +359,7 @@ const supportConversationCopy: Record<Locale, SupportConversationCopy> = {
     page: {
       workspaceSubtitle: "Unified workspace for queue, conversation, and operator actions",
       closedConversationReadonly: "Conversation is closed. Reopen it to continue.",
-      dragAndDropImage: "Drop image here",
+      dragAndDropAttachment: "Drop a photo or video here",
       loadPreviousMessages: "Load previous messages",
       retryAttachmentUpload: "Retry",
       imageViewer: {
@@ -374,8 +380,11 @@ const supportConversationCopy: Record<Locale, SupportConversationCopy> = {
         title: "Queue",
         all: "All",
         waiting: "Waiting",
+        unread: "Unread",
         unassigned: "Unassigned",
         archive: "Archive",
+        filters: "Filters",
+        filtersActive: (count) => `Filters: ${count}`,
         status: "Status",
         priority: "Priority",
         priorityAll: "Any",

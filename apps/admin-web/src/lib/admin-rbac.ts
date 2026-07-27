@@ -74,6 +74,10 @@ export function canAccessAdminPath(
     return canAccessAdminSection(roles, "economy");
   }
 
+  if (matchesAdminPath(currentPath, "/gamification")) {
+    return canAccessAdminSection(roles, "gamification");
+  }
+
   if (matchesAdminPath(currentPath, "/promo-codes")) {
     return canAccessAdminSection(roles, "promo-codes");
   }
@@ -100,6 +104,10 @@ export function canAccessAdminPath(
 
   if (matchesAdminPath(currentPath, "/moderation")) {
     return canAccessAdminSection(roles, "moderation");
+  }
+
+  if (matchesAdminPath(currentPath, "/audit")) {
+    return canAccessAdminSection(roles, "audit");
   }
 
   if (matchesAdminPath(currentPath, "/templates/categories")) {

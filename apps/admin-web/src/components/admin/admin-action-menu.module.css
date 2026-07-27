@@ -1,0 +1,100 @@
+.root {
+  position: relative;
+  display: inline-flex;
+}
+
+.trigger {
+  gap: 0.45rem;
+  white-space: nowrap;
+}
+
+.triggerGlyph {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  line-height: 1;
+}
+
+.menu {
+  position: absolute;
+  z-index: 32;
+  inset-block-start: calc(100% + 0.35rem);
+  display: grid;
+  width: max-content;
+  min-width: 13rem;
+  max-width: min(20rem, calc(100vw - 2rem));
+  gap: 0.2rem;
+  padding: 0.35rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-strong);
+}
+
+.menu[data-align="start"] {
+  inset-inline-start: 0;
+}
+
+.menu[data-align="end"] {
+  inset-inline-end: 0;
+}
+
+.menuItem {
+  display: grid;
+  width: 100%;
+  gap: 0.1rem;
+  padding: 0.6rem 0.7rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-soft);
+  cursor: pointer;
+  font: inherit;
+  text-align: start;
+  text-decoration: none;
+}
+
+.menuItem:hover:not([aria-disabled="true"]),
+.menuItem:focus-visible {
+  background: var(--surface-hover);
+  color: var(--text-strong);
+  outline: none;
+}
+
+.menuItem:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+
+.menuItem[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.menuItemDanger {
+  color: var(--danger-soft-fg);
+}
+
+.menuItemDanger:hover:not([aria-disabled="true"]),
+.menuItemDanger:focus-visible {
+  background: var(--danger-soft-bg);
+  color: var(--danger-soft-fg);
+}
+
+.menuItemLabel {
+  font-size: 0.84rem;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.menuItemDescription {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu,
+  .menuItem {
+    animation: none;
+    transition: none;
+  }
+}

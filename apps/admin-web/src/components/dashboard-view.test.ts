@@ -11,36 +11,98 @@ const dashboardChartsPath = fileURLToPath(
 const dashboardStylesPath = fileURLToPath(new URL("./dashboard-view.module.css", import.meta.url));
 
 describe("dashboard production data handling", () => {
-  it("fails required KPI data instead of silently substituting zero metrics", () => {
+  it("settles independent sources without substituting unavailable KPI metrics with zeroes", () => {
     const source = readDashboardViewLibrarySource();
 
-    expect(source).toContain("const requiredDataPromise = Promise.all([");
-    expect(source).toContain("fetchDashboardUsers(signal)");
+    expect(source).toContain("] = await Promise.allSettled([");
+    expect(source).toContain("fetchAdminUserDashboardMetrics(signal)");
+    expect(source).toContain("fetchUsers({ skip: 0, take: 100 }, signal)");
     expect(source).toContain("fetchPendingModerationQueueCount(signal)");
     expect(source).toContain("fetchAdminTemplateGenerationMetrics(signal)");
-    expect(source).toContain("fetchAdminEconomyDashboardMetrics(signal)");
+    expect(source).toContain("fetchAdminEconomyDashboardMetrics({");
+    expect(source).toContain("fetchDashboardPurchases(signal)");
+    expect(source).toContain("fetchDashboardSupportConversations(signal)");
+    expect(source).toContain("fetchSupportInboxMetrics(signal)");
+    expect(source).toContain("fetchAdminSystemStatus(signal)");
+    expect(source).toContain("periodDays: commercePeriodDays");
+    expect(source).toContain("preserveAbortError([");
+    expect(source).toContain('reason.name === "AbortError"');
+    expect(source).toContain("sourceAvailability: DashboardSourceAvailability");
+    expect(source).toContain("sourceErrors: DashboardSourceErrors");
+    expect(source).toContain("revenueChart: economyMetrics");
+    expect(source).toContain("if (userMetrics) {");
+    expect(source).toContain("if (economyMetrics) {");
+    expect(source).not.toContain("const requiredDataPromise = Promise.all([");
     expect(source).not.toContain("getEmptyGenerationMetrics");
     expect(source).not.toContain("generatedAtUtc: new Date(0).toISOString()");
   });
 
-  it("keeps optional dashboard feeds partial and locally retryable", () => {
+  it("keeps partial dashboard sections locally visible and retryable", () => {
     const source = readDashboardViewLibrarySource();
     const contentSource = readFileSync(dashboardContentPath, "utf8");
     const stylesSource = readFileSync(dashboardStylesPath, "utf8");
 
-    expect(source).toContain("const optionalFeedPromise = Promise.allSettled([");
-    expect(source).toContain("fetchDashboardPurchases(signal)");
-    expect(source).toContain("fetchDashboardSupportConversations(signal)");
-    expect(source).toContain("feedErrors: {");
-    expect(source).toContain("purchases: purchasesUnavailable");
-    expect(source).toContain("supportConversations: supportConversationsUnavailable");
-    expect(source).toContain("viewModel.feedErrors.purchases ? (");
+    expect(source).toContain("viewModel.sourceErrors.purchases ? (");
+    expect(source).toContain("viewModel.sourceErrors.userMetrics ? (");
+    expect(source).toContain("hasDashboardSourceError(viewModel, DASHBOARD_ACTIVITY_SOURCES)");
+    expect(source).toContain("DASHBOARD_STAT_SECTION_SOURCES[section]");
+    expect(source).toContain("<DashboardSectionNotice");
     expect(source).toContain("copy.states.ordersUnavailableTitle");
     expect(source).toContain("copy.states.activityUnavailableTitle");
+    expect(source).toContain("copy.states.revenueUnavailableTitle");
+    expect(source).toContain("copy.states.distributionUnavailableTitle");
     expect(contentSource).toContain('ordersUnavailableTitle: "Orders temporarily unavailable"');
     expect(contentSource).toContain('activityUnavailableTitle: "Some activity is unavailable"');
     expect(source).toContain("dashboardQuery.refetch().catch(() => undefined)");
-    expect(stylesSource).toContain(".feedWarning");
+    expect(stylesSource).toContain(".sectionNoticeWarning");
+    expect(source.match(/<AdminStateCard/g)).toHaveLength(2);
+  });
+
+  it("renders a compact attention list with honest all-clear semantics and deep links", () => {
+    const source = readDashboardViewLibrarySource();
+    const contentSource = readFileSync(dashboardContentPath, "utf8");
+    const stylesSource = readFileSync(dashboardStylesPath, "utf8");
+
+    expect(source).toContain("fetchSupportInboxMetrics(signal)");
+    expect(source).toContain("supportMetrics.unreadForAdminConversations");
+    expect(source).toContain("supportMetrics.unassignedConversations");
+    expect(source).toContain("economyMetrics.failedPaymentsThisWeek");
+    expect(source).toContain("generationMetrics.failedGenerationsThisWeek");
+    expect(source).toContain("generationMetrics.exhaustedRefunds");
+    expect(source).toContain("href: `/${locale}/support?queue=unassigned`");
+    expect(source).toContain("href: `/${locale}/economy?workspace=overview&purchaseStatus=failed`");
+    expect(source).toContain("href: `/${locale}/generations?status=Failed`");
+    expect(source).toContain("href: `/${locale}/generations?refundState=exhausted`");
+    expect(source).toContain("href: `/${locale}/moderation?status=pending`");
+    expect(source).toContain("attentionSourcesAvailable");
+    expect(source).toContain('? "issues"\n      : "issuesPartial"');
+    expect(source).toContain('? "allClear"\n      : "partial"');
+    expect(source).toContain('viewModel.attentionSection.state === "issuesPartial"');
+    expect(source).toContain("viewModel.attentionSection.items.length > 0");
+    expect(source).toContain('viewModel.attentionSection.state === "allClear"');
+    expect(contentSource).toContain('title: "Требует внимания"');
+    expect(contentSource).toContain('title: "Needs attention"');
+    expect(contentSource).toContain("an all-clear status cannot be confirmed yet");
+    expect(stylesSource).toContain(".attentionList");
+    expect(stylesSource).toContain(".attentionItem");
+    expect(stylesSource).toContain("grid-template-columns: auto minmax(0, 1fr) auto auto;");
+  });
+
+  it("renders a localized bounded system status without raw backend summaries", () => {
+    const source = readDashboardViewLibrarySource();
+    const contentSource = readFileSync(dashboardContentPath, "utf8");
+    const stylesSource = readFileSync(dashboardStylesPath, "utf8");
+
+    expect(source).toContain('id="system-status"');
+    expect(source).toContain("viewModel.systemStatus.checks.map");
+    expect(source).toContain("isAdminSystemStatusExpired(systemStatus)");
+    expect(source).toContain("viewModel.systemStatus && !systemStatusExpired");
+    expect(source).toContain("copy.systemStatusSection.staleTitle");
+    expect(source).toContain("copy.systemStatusSection.statusDescriptions[check.status]");
+    expect(source).not.toContain("{check.summary}");
+    expect(contentSource).toContain('title: "Состояние системы"');
+    expect(contentSource).toContain('title: "System status"');
+    expect(stylesSource).toContain(".systemStatusGrid");
   });
 
   it("exposes retry, busy, and empty states for dashboard failures and empty live sections", () => {
@@ -53,7 +115,9 @@ describe("dashboard production data handling", () => {
     expect(source).toContain("enabled: canViewDashboard");
     expect(source).toContain('ensureAdminSession(locale, router, { requiredRole: "Admin" });');
     expect(source).toContain('import { adminQueryKeys } from "@/lib/admin-query-keys";');
-    expect(source).toContain("queryKey: adminQueryKeys.dashboard(locale)");
+    expect(source).toContain("queryKey: adminQueryKeys.dashboard(locale, commercePeriodDays)");
+    expect(source).toContain("refetchInterval: 60_000");
+    expect(source).toContain("refetchIntervalInBackground: false");
     expect(source).toContain(
       "function requestDashboardRetry() {\n    if (!canViewDashboard || dashboardQuery.isFetching) {\n      return;\n    }\n\n    void dashboardQuery.refetch().catch(() => undefined);"
     );
@@ -78,6 +142,8 @@ describe("dashboard production data handling", () => {
       'staleDescription: "Showing the last loaded dashboard because the KPI refresh failed."'
     );
     expect(contentSource).toContain('refreshing: "Refreshing..."');
+    expect(contentSource).toContain('refresh: "Refresh data"');
+    expect(contentSource).toContain("lastUpdated: (time) => `Last loaded: ${time}`");
     expect(contentSource).toContain('retry: "Retry"');
     expect(contentSource).toContain('noPaymentsTitle: "No payments yet"');
     expect(contentSource).toContain('noActivityTitle: "No recent activity"');
@@ -91,18 +157,41 @@ describe("dashboard production data handling", () => {
   it("sources economy dashboard KPI values from backend aggregate metrics", () => {
     const source = readDashboardViewLibrarySource();
 
-    expect(source).toContain("fetchAdminEconomyDashboardMetrics(signal)");
-    expect(source).toContain("economyMetrics: AdminEconomyDashboardMetrics");
+    expect(source).toContain("fetchAdminEconomyDashboardMetrics({");
+    expect(source).toContain("economyMetrics?: AdminEconomyDashboardMetrics");
     expect(source).toContain("economyMetrics.purchasesThisWeek");
     expect(source).toContain("economyMetrics.successfulPaymentsThisWeek");
     expect(source).toContain("economyMetrics.failedPaymentsThisWeek");
     expect(source).toContain("economyMetrics.revenueThisWeek");
     expect(source).toContain("economyMetrics.activeSubscriptions");
-    expect(source).toContain("buildDashboardRevenueSeries(economyMetrics.revenueSeries)");
+    expect(source).toContain("buildDashboardRevenueSeries(economyMetrics.revenueSeries, locale)");
     expect(source).not.toContain("const currentSucceeded = currentPurchases.filter");
     expect(source).not.toContain("buildRevenueSeries(purchases");
     expect(source).not.toContain("fetchActiveSubscriptionCount");
     expect(source).not.toContain("fetchAdminEconomySubscriptions");
+  });
+
+  it("groups KPI cards by workflow and provides drill-down links to real admin sections", () => {
+    const source = readDashboardViewLibrarySource();
+    const contentSource = readFileSync(dashboardContentPath, "utf8");
+
+    expect(source).toContain(
+      'const DASHBOARD_STAT_SECTIONS: DashboardStatSection[] = ["overview", "commerce", "operations"];'
+    );
+    expect(source).toContain('section: "overview"');
+    expect(source).toContain('section: "commerce"');
+    expect(source).toContain('section: "operations"');
+    expect(source).toContain("href: `/${locale}/users`");
+    expect(source).toContain("href: `/${locale}/economy`");
+    expect(source).toContain("href: `/${locale}/generations`");
+    expect(source).toContain("href: `/${locale}/moderation`");
+    expect(source).toContain("href={stat.href}");
+    expect(source).toContain("ariaLabel={copy.stats.openSection(stat.label)}");
+    expect(source).not.toContain("delta: copy.stats.live");
+    expect(contentSource).toContain('title: "Ключевые показатели"');
+    expect(contentSource).toContain('title: "Subscriptions and payments"');
+    expect(contentSource).toContain("openSection: (label) => `Открыть раздел: ${label}`");
+    expect(contentSource).toContain("openSection: (label) => `Open section: ${label}`");
   });
 
   it("sources moderation queue KPI from the moderation backend, not support tickets", () => {
@@ -122,9 +211,9 @@ describe("dashboard production data handling", () => {
     expect(contentSource).toContain('moderationQueueSubtext: "pending moderation items"');
     expect(contentSource).toContain('moderationQueueSubtext: "ожидающие элементы модерации"');
     expect(contentSource).toContain('eyebrow: "Центр управления"');
-    expect(contentSource).toContain('live: "онлайн"');
+    expect(contentSource).toContain('loadedValue: "загружено"');
     expect(ruContentSource).not.toContain('eyebrow: "Control center"');
-    expect(ruContentSource).not.toContain('live: "live"');
+    expect(ruContentSource).not.toContain('loadedValue: "loaded"');
     expect(ruContentSource).not.toContain("pending элементы");
     expect(source).not.toContain("const maxPages = 20");
     expect(source).not.toContain("count += response.items.length");
@@ -138,7 +227,7 @@ describe("dashboard production data handling", () => {
     const source = readDashboardViewLibrarySource();
 
     expect(source).toContain("fetchAdminUserDashboardMetrics(signal)");
-    expect(source).toContain("metrics: AdminUserDashboardMetrics");
+    expect(source).toContain("userMetrics?: AdminUserDashboardMetrics");
     expect(source).toContain("userMetrics.totalUsers");
     expect(source).toContain("userMetrics.premiumUsers");
     expect(source).toContain("userMetrics.usersThisWeek");
@@ -155,7 +244,7 @@ describe("dashboard production data handling", () => {
     expect(source).not.toContain("adminRolePage.totalCount");
     expect(source).not.toContain("moderatorRolePage.totalCount");
     expect(source).not.toContain("userRolePage.totalCount");
-    expect(source).toContain("const roleCounts: DashboardUserRoleCounts = {");
+    expect(source).toContain("const roleCounts: DashboardUserRoleCounts | undefined = userMetrics");
     expect(source).toContain('status: "pending"');
     expect(source).not.toContain("function getOptionalTotalCount(response: unknown)");
   });
@@ -165,9 +254,7 @@ describe("dashboard production data handling", () => {
     const contentSource = readFileSync(dashboardContentPath, "utf8");
 
     expect(source).toContain("type DashboardUserRoleCounts = {");
-    expect(source).toContain(
-      "const userDistribution = buildUserDistribution(locale, totalUserCount, roleCounts)"
-    );
+    expect(source).toContain("? buildUserDistribution(locale, totalUserCount, roleCounts)");
     expect(source).toContain("const admins = Math.max(0, roleCounts.admins)");
     expect(source).toContain("const moderators = Math.max(0, roleCounts.moderators)");
     expect(source).toContain("const regular = Math.max(0, roleCounts.users)");
@@ -221,6 +308,35 @@ describe("dashboard production data handling", () => {
     expect(chartSource).not.toContain('return new Intl.NumberFormat("en-US"');
   });
 
+  it("uses dated backend revenue points and honest deltas for configurable commerce periods", () => {
+    const source = readDashboardViewLibrarySource();
+    const componentSource = readFileSync(
+      fileURLToPath(new URL("./dashboard-view.tsx", import.meta.url)),
+      "utf8"
+    );
+    const contentSource = readFileSync(dashboardContentPath, "utf8");
+    const chartSource = readFileSync(dashboardChartsPath, "utf8");
+
+    expect(source).toContain("function formatRevenuePointDate(value: string, locale: Locale)");
+    expect(source).toContain('timeZone: "UTC"');
+    expect(source).toContain("economyMetrics.periodDays");
+    expect(source).toContain("if (previous === 0) {");
+    expect(source).toContain("return noComparisonLabel;");
+    expect(source).not.toContain("previous === 0 ? 100");
+    expect(source).not.toContain("function buildLast7DayLabels");
+    expect(componentSource).toContain("DASHBOARD_COMMERCE_PERIOD_DAYS.map");
+    expect(componentSource).toContain("setCommercePeriodDays(periodDays)");
+    expect(componentSource).toContain("styles.periodSelector");
+    expect(contentSource).toContain('noComparison: "нет базы"');
+    expect(contentSource).toContain('noComparison: "no baseline"');
+    expect(chartSource).toContain(
+      "function getChartTickIndexes(pointCount: number, maximumTickCount = 7)"
+    );
+    expect(chartSource).toContain(
+      "const tickIndexes = getChartTickIndexes(normalizedValues.length);"
+    );
+  });
+
   it("keeps dashboard chart and status colors theme-token based", () => {
     const source = readDashboardViewLibrarySource();
     const chartSource = readFileSync(dashboardChartsPath, "utf8");
@@ -256,8 +372,11 @@ describe("dashboard production data handling", () => {
     const source = readDashboardViewLibrarySource();
     const stylesSource = readFileSync(dashboardStylesPath, "utf8");
 
-    expect(source).toContain("CaretDownIcon");
-    expect(source).toContain("styles.toolbarChevron");
+    expect(source).toContain("<RefreshIcon className={styles.refreshActionIcon} />");
+    expect(source).toContain("{refreshLabel}");
+    expect(source).not.toContain("CaretDownIcon");
+    expect(source).not.toContain("styles.toolbarChevron");
+    expect(stylesSource).toContain(".refreshActionIcon");
     expect(source).toContain("styles.activityIconSuccess");
     expect(source).toContain("styles.activityIconInfo");
     expect(source).toContain("styles.activityIconBrand");

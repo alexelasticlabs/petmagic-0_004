@@ -1,14 +1,16 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type RefObject } from "react";
 
 import {
   getAdminChromeCopy,
   type AdminNotificationCategory,
 } from "@/components/admin/admin-chrome.content";
-import { BellIcon, CaretDownIcon, MenuIcon } from "@/components/admin/admin-icons";
+import commandPaletteStyles from "@/components/admin/admin-command-palette.module.css";
+import { BellIcon, MenuIcon, SearchIcon } from "@/components/admin/admin-icons";
 import { AdminLangDropdown } from "@/components/admin/admin-lang-dropdown";
 import {
   sanitizeAdminNotificationText,
@@ -17,6 +19,12 @@ import {
 import styles from "@/components/admin/admin-shell.module.css";
 import { type Locale } from "@/lib/i18n";
 import { type AdminTheme } from "@/lib/theme";
+
+const AdminCommandPalette = dynamic(
+  () =>
+    import("@/components/admin/admin-command-palette").then((module) => module.AdminCommandPalette),
+  { ssr: false }
+);
 
 type NotificationFilter =
   "all" | "unread" | "support" | "users" | "templates" | "economy" | "promo" | "system";
@@ -30,9 +38,11 @@ type AdminTopbarProps = {
   userName: string;
   userRole: string;
   userInitial: string;
+  roles: readonly string[];
   ruPath: string;
   enPath: string;
   sidebarOpen: boolean;
+  sidebarTriggerRef: RefObject<HTMLButtonElement | null>;
   onToggleSidebar: () => void;
   onToggleTheme: () => void;
 };
@@ -49,9 +59,11 @@ export function AdminTopbar({
   userName,
   userRole,
   userInitial,
+  roles,
   ruPath,
   enPath,
   sidebarOpen,
+  sidebarTriggerRef,
   onToggleSidebar,
   onToggleTheme,
 }: AdminTopbarProps) {
@@ -61,6 +73,7 @@ export function AdminTopbar({
     useAdminNotifications();
   const [notificationPanelPathname, setNotificationPanelPathname] = useState<string | null>(null);
   const [notificationFilter, setNotificationFilter] = useState<NotificationFilter>("all");
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const notificationRootRef = useRef<HTMLDivElement | null>(null);
   const notificationTriggerRef = useRef<HTMLButtonElement | null>(null);
   const notificationPanelRef = useRef<HTMLDivElement | null>(null);
@@ -192,9 +205,29 @@ export function AdminTopbar({
     };
   }, [closeNotificationPanel, isNotificationsOpen]);
 
+  useEffect(() => {
+    function handleCommandShortcut(event: KeyboardEvent) {
+      if (
+        event.key.toLocaleLowerCase() !== "k" ||
+        (!event.ctrlKey && !event.metaKey) ||
+        event.altKey
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      closeNotificationPanel();
+      setCommandPaletteOpen((open) => !open);
+    }
+
+    window.addEventListener("keydown", handleCommandShortcut);
+    return () => window.removeEventListener("keydown", handleCommandShortcut);
+  }, [closeNotificationPanel]);
+
   return (
     <header className={styles.topbar}>
       <button
+        ref={sidebarTriggerRef}
         type="button"
         className={styles.sidebarToggle}
         onClick={onToggleSidebar}
@@ -208,10 +241,30 @@ export function AdminTopbar({
 
       <div className={styles.topbarHeading}>
         <h1 className={styles.topbarTitle}>{pageTitle}</h1>
-        <p className={styles.topbarSummary}>{pageDescription}</p>
+        {pageDescription ? <p className={styles.topbarSummary}>{pageDescription}</p> : null}
       </div>
 
       <div className={styles.topbarActions}>
+        <button
+          type="button"
+          className={commandPaletteStyles.trigger}
+          aria-haspopup="dialog"
+          aria-expanded={commandPaletteOpen}
+          aria-keyshortcuts="Control+K Meta+K"
+          aria-label={copy.commandPalette.triggerAriaLabel}
+          title={`${copy.commandPalette.triggerAriaLabel} (Ctrl+K)`}
+          onClick={() => {
+            closeNotificationPanel();
+            setCommandPaletteOpen(true);
+          }}
+        >
+          <SearchIcon className={commandPaletteStyles.triggerIcon} />
+          <span className={commandPaletteStyles.triggerLabel}>
+            {copy.commandPalette.triggerLabel}
+          </span>
+          <kbd>Ctrl K</kbd>
+        </button>
+
         <div className={styles.notificationRoot} ref={notificationRootRef}>
           <button
             ref={notificationTriggerRef}
@@ -486,6 +539,8 @@ export function AdminTopbar({
           className={`${styles.localeTrigger} ${styles.themeTrigger}`}
           onClick={onToggleTheme}
           aria-label={nextThemeAriaLabel}
+          aria-pressed={theme === "dark"}
+          title={nextThemeAriaLabel}
         >
           <span className={styles.themeIndicator} aria-hidden="true" />
           <span>{themeLabel}</span>
@@ -499,9 +554,16 @@ export function AdminTopbar({
             <span className={styles.userName}>{userName}</span>
             <span className={styles.userRole}>{userRole}</span>
           </div>
-          <CaretDownIcon className={styles.caret} />
         </div>
       </div>
+
+      {commandPaletteOpen ? (
+        <AdminCommandPalette
+          locale={locale}
+          roles={roles}
+          onClose={() => setCommandPaletteOpen(false)}
+        />
+      ) : null}
     </header>
   );
 }

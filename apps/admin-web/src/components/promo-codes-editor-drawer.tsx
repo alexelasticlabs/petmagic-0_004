@@ -1,6 +1,13 @@
 "use client";
 
-import { useId, type Dispatch, type FormEvent, type SetStateAction } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  type Dispatch,
+  type FormEvent,
+  type SetStateAction,
+} from "react";
 
 import { CalendarIcon, PeopleIcon, PromoCodeIcon } from "@/components/admin/admin-icons";
 import { AdminCard } from "@/components/admin/admin-primitives";
@@ -17,7 +24,7 @@ import {
 import styles from "@/components/promo-codes-view.module.css";
 import { Button } from "@/components/ui/button";
 import { Select, type SelectOption } from "@/components/ui/select";
-import { type AdminRedeemCode, type AdminRedeemRewardKind } from "@/lib/api-client";
+import { type AdminRedeemCode, type AdminRedeemCodeWriteRewardKind } from "@/lib/api-client";
 import { getDictionary } from "@/lib/i18n";
 
 type PromoCodesEditorDrawerProps = {
@@ -52,6 +59,79 @@ export function PromoCodesEditorDrawer({
   onToggleCodeState,
 }: PromoCodesEditorDrawerProps) {
   const panelTitleId = useId();
+  const drawerRef = useRef<HTMLElement>(null);
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
+  const codeHelpId = useId();
+  const codeErrorId = useId();
+  const numbersErrorId = useId();
+  const dateWindowErrorId = useId();
+
+  useEffect(() => {
+    if (!isOpen || typeof document === "undefined") {
+      return;
+    }
+
+    previouslyFocusedElementRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    cancelButtonRef.current?.focus();
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      previouslyFocusedElementRef.current?.focus();
+      previouslyFocusedElementRef.current = null;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        if (isMutating) {
+          event.preventDefault();
+          return;
+        }
+
+        onClose();
+        return;
+      }
+
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const focusableElements = drawerRef.current?.querySelectorAll<HTMLElement>(
+        'a[href], button:not(:disabled), textarea:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])'
+      );
+      if (!focusableElements || focusableElements.length === 0) {
+        event.preventDefault();
+        drawerRef.current?.focus();
+        return;
+      }
+
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+      if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+        return;
+      }
+
+      if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isMutating, isOpen, onClose]);
 
   if (!isOpen) {
     return null;
@@ -82,9 +162,12 @@ export function PromoCodesEditorDrawer({
     <div className={styles.drawerBackdrop} onClick={isMutating ? undefined : onClose}>
       <aside
         className={styles.editorDrawer}
+        ref={drawerRef}
         role="dialog"
         aria-modal="true"
+        aria-busy={isMutating}
         aria-labelledby={panelTitleId}
+        tabIndex={-1}
         onClick={(event) => event.stopPropagation()}
       >
         <AdminCard
@@ -109,6 +192,7 @@ export function PromoCodesEditorDrawer({
                     minLength={4}
                     maxLength={PROMO_CODE_MAX_LENGTH}
                     aria-invalid={isCodeInvalid}
+                    aria-describedby={isCodeInvalid ? `${codeHelpId} ${codeErrorId}` : codeHelpId}
                     onChange={(event) =>
                       setForm((current) => ({
                         ...current,
@@ -127,7 +211,9 @@ export function PromoCodesEditorDrawer({
                     {text.promoCodesGenerateCodeAction}
                   </Button>
                 </div>
-                <span className={styles.helperText}>{text.promoCodesCodeHelp}</span>
+                <span id={codeHelpId} className={styles.helperText}>
+                  {text.promoCodesCodeHelp}
+                </span>
               </label>
 
               <label className={styles.formField}>
@@ -176,7 +262,7 @@ export function PromoCodesEditorDrawer({
                     onChange={(event) =>
                       setForm((current) => ({
                         ...current,
-                        rewardKind: event.target.value as AdminRedeemRewardKind,
+                        rewardKind: event.target.value as AdminRedeemCodeWriteRewardKind,
                       }))
                     }
                     disabled={isFormLocked}
@@ -197,6 +283,9 @@ export function PromoCodesEditorDrawer({
                     required
                     maxLength={PROMO_NUMERIC_FIELD_MAX_LENGTH}
                     aria-invalid={!isPromoIntegerInput(form.rewardValue, false)}
+                    aria-describedby={
+                      isPromoIntegerInput(form.rewardValue, false) ? undefined : numbersErrorId
+                    }
                     value={form.rewardValue}
                     onChange={(event) =>
                       setForm((current) => ({
@@ -242,6 +331,9 @@ export function PromoCodesEditorDrawer({
                     required
                     maxLength={PROMO_NUMERIC_FIELD_MAX_LENGTH}
                     aria-invalid={!isPromoIntegerInput(form.maxRedemptions, false)}
+                    aria-describedby={
+                      isPromoIntegerInput(form.maxRedemptions, false) ? undefined : numbersErrorId
+                    }
                     value={form.maxRedemptions}
                     onChange={(event) =>
                       setForm((current) => ({
@@ -278,6 +370,11 @@ export function PromoCodesEditorDrawer({
                     required
                     maxLength={PROMO_NUMERIC_FIELD_MAX_LENGTH}
                     aria-invalid={!isPromoIntegerInput(form.maxRedemptionsPerUser, false)}
+                    aria-describedby={
+                      isPromoIntegerInput(form.maxRedemptionsPerUser, false)
+                        ? undefined
+                        : numbersErrorId
+                    }
                     value={form.maxRedemptionsPerUser}
                     onChange={(event) =>
                       setForm((current) => ({
@@ -320,6 +417,7 @@ export function PromoCodesEditorDrawer({
                       type="datetime-local"
                       value={form.startsAtUtc}
                       aria-invalid={hasInvalidDateWindow}
+                      aria-describedby={hasInvalidDateWindow ? dateWindowErrorId : undefined}
                       onChange={(event) =>
                         setForm((current) => ({ ...current, startsAtUtc: event.target.value }))
                       }
@@ -356,6 +454,7 @@ export function PromoCodesEditorDrawer({
                       type="datetime-local"
                       value={form.expiresAtUtc}
                       aria-invalid={hasInvalidDateWindow}
+                      aria-describedby={hasInvalidDateWindow ? dateWindowErrorId : undefined}
                       onChange={(event) =>
                         setForm((current) => ({ ...current, expiresAtUtc: event.target.value }))
                       }
@@ -406,6 +505,11 @@ export function PromoCodesEditorDrawer({
                     required
                     maxLength={PROMO_NUMERIC_FIELD_MAX_LENGTH}
                     aria-invalid={!isPromoIntegerInput(form.minimumSuccessfulPurchases, true)}
+                    aria-describedby={
+                      isPromoIntegerInput(form.minimumSuccessfulPurchases, true)
+                        ? undefined
+                        : numbersErrorId
+                    }
                     value={form.minimumSuccessfulPurchases}
                     onChange={(event) =>
                       setForm((current) => ({
@@ -455,6 +559,18 @@ export function PromoCodesEditorDrawer({
               </div>
             </section>
 
+            {isCodeInvalid || hasInvalidNumber || hasInvalidDateWindow ? (
+              <div className={styles.validationSummary} aria-live="polite">
+                {isCodeInvalid ? <p id={codeErrorId}>{text.promoCodesInvalidCode}</p> : null}
+                {hasInvalidNumber ? (
+                  <p id={numbersErrorId}>{text.promoCodesInvalidNumbers}</p>
+                ) : null}
+                {hasInvalidDateWindow ? (
+                  <p id={dateWindowErrorId}>{text.promoCodesInvalidWindow}</p>
+                ) : null}
+              </div>
+            ) : null}
+
             <div className={styles.formSummary} aria-label={text.promoCodesFormSummaryLabel}>
               <span className={styles.formSummaryItem}>
                 <PromoCodeIcon className={styles.formSummaryIcon} />
@@ -498,7 +614,13 @@ export function PromoCodesEditorDrawer({
               )}
 
               <div className={styles.formActions}>
-                <Button type="button" variant="secondary" onClick={onClose} disabled={isMutating}>
+                <Button
+                  ref={cancelButtonRef}
+                  type="button"
+                  variant="secondary"
+                  onClick={onClose}
+                  disabled={isMutating}
+                >
                   {text.editorCancel}
                 </Button>
                 <Button type="button" variant="secondary" onClick={onReset} disabled={isMutating}>

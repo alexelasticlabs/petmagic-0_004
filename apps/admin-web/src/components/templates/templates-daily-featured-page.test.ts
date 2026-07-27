@@ -24,9 +24,9 @@ describe("templates daily featured page", () => {
     expect(pageSource).toContain('ensureAdminSession(locale, router, { requiredRole: "Admin" });');
     expect(pageSource).toContain('session?.user.roles.includes("Admin") ?? false');
     expect(pageSource).toContain("if (!canManageTemplates) {\n        setTemplates([]);");
-    expect(pageSource).toContain(
-      "if (!canManageTemplates) {\n        setIsScheduleLoading(false);"
-    );
+    expect(pageSource).toContain("settingsSnapshotRef.current = null;");
+    expect(pageSource).toContain("setSettings(null);");
+    expect(pageSource).toContain("setSettingsLoadError(null);");
     expect(pageSource).toContain("disabled={!canManageTemplates || isActionLocked}");
   });
 
@@ -211,11 +211,20 @@ describe("templates daily featured page", () => {
     );
   });
 
-  it("warns on occupied manual dates and sends manual assignment payloads", () => {
+  it("blocks known occupied manual dates before the backend rejects the conflict", () => {
     expect(pageSource).toContain("function dateRangesOverlap");
     expect(pageSource).toContain("dateOccupiedWarning");
+    expect(pageSource).toContain("form.isManual &&");
+    expect(pageSource).toContain("form.isActive &&");
     expect(pageSource).toContain("assignment.isManual");
-    expect(pageSource).toContain("isManual: true");
+    expect(pageSource).toContain("isManual: form.isManual");
+    expect(pageSource).toMatch(
+      /!form\.templateId \|\|\s+isActionLocked \|\|\s+isStartDateMissing \|\|\s+invalidDateRangeWarning \|\|\s+dateOccupiedWarning \|\|\s+isPriorityInvalid/
+    );
+    expect(pageSource).toContain("aria-invalid={hasDateValidationError || undefined}");
+    expect(pageSource).toContain(
+      "aria-describedby={hasDateValidationError ? dateValidationId : undefined}"
+    );
     expect(contentSource).toContain("Версия v1 поддерживает одно ручное назначение на дату.");
     expect(contentSource).toContain("v1 supports one manual assignment per date.");
   });
@@ -225,19 +234,40 @@ describe("templates daily featured page", () => {
     expect(pageSource).toContain("invalidDateRangeWarning");
     expect(contentSource).toContain("End date cannot be earlier than start date.");
     expect(contentSource).toContain("Дата окончания не может быть раньше даты начала.");
-    expect(pageSource).toContain("isActionLocked || invalidDateRangeWarning");
-    expect(pageSource).toContain("!form.templateId || invalidDateRangeWarning");
+    expect(pageSource).toContain("!isStartDateMissing && hasInvalidDateRange");
+    expect(pageSource).toContain("dateOccupiedWarning");
+    expect(pageSource).toMatch(
+      /!form\.templateId \|\|\s+isActionLocked \|\|\s+isStartDateMissing \|\|\s+invalidDateRangeWarning \|\|\s+dateOccupiedWarning \|\|\s+isPriorityInvalid/
+    );
+  });
+
+  it("uses backend schedule pagination and exposes its visible page state", () => {
+    expect(pageSource).toContain("const SCHEDULE_PAGE_SIZE = 30;");
+    expect(pageSource).toContain("const [schedulePage, setSchedulePage] = useState(0);");
+    expect(pageSource).toContain("const [schedulePageData, setSchedulePageData] =");
+    expect(pageSource).toContain("const scheduleTotalCount = schedulePageData?.totalCount ?? 0;");
+    expect(pageSource).toContain("const scheduleHasMore = schedulePageData?.hasMore ?? false;");
+    expect(pageSource).toContain("skip: schedulePage * SCHEDULE_PAGE_SIZE");
+    expect(pageSource).toContain("take: SCHEDULE_PAGE_SIZE");
+    expect(pageSource).toContain("const requestSchedulePage = useCallback(");
+    expect(pageSource).toContain("scheduleTotalCount={scheduleTotalCount}");
+    expect(pageSource).toContain("scheduleHasMore={scheduleHasMore}");
+    expect(pageSource).toContain("description={text.scheduleCount(scheduleTotalCount)}");
+    expect(pageSource).toContain("{text.schedulePage(visibleSchedulePage, totalSchedulePages)}");
+    expect(pageSource).toContain("onPreviousPage");
+    expect(pageSource).toContain("onNextPage");
+    expect(contentSource).toContain('schedulePaginationLabel: "Навигация по расписанию"');
+    expect(contentSource).toContain('schedulePaginationLabel: "Schedule pagination"');
   });
 
   it("locks daily featured mutations and form edits while data is loading or submitting", () => {
-    expect(pageSource).toContain("const isActionLocked = isSubmitting || isLoading;");
+    expect(pageSource).toContain("const isActionLocked = isSubmitting || isScheduleLoading;");
     expect(pageSource).toMatch(
-      /if \(!canManageTemplates \|\| !form\.templateId \|\| isActionLocked \|\| invalidDateRangeWarning\)\s+return;/
+      /if \(\s*!canManageTemplates \|\|\s*!form\.templateId \|\|\s*isActionLocked \|\|\s*isStartDateMissing \|\|\s*invalidDateRangeWarning \|\|\s*dateOccupiedWarning \|\|\s*isPriorityInvalid\s*\)\s*return;/
     );
     expect(pageSource).toContain("if (!canManageTemplates || isActionLocked) {");
-    expect(pageSource).toContain(
-      "if (!canManageTemplates || isActionLocked || !isAutoPickSettingsDirty) return;"
-    );
+    expect(pageSource).toContain("!isSettingsReady ||");
+    expect(pageSource).toContain("isExcludeRecentDaysInvalid");
     expect(pageSource).toContain("disabled={!canManageTemplates || isActionLocked}");
     expect(pageSource).toContain("aria-busy={isActionLocked}");
     expect(pageSource).not.toContain("disabled={isActionLocked}");
@@ -257,30 +287,72 @@ describe("templates daily featured page", () => {
     expect(pageSource).toContain(
       "const isAutoPickDateMissing = autoPick.date.trim().length === 0;"
     );
-    expect(pageSource).toContain(
-      "if (!canManageTemplates || isActionLocked || isAutoPickDateMissing) return;"
-    );
-    expect(pageSource).toContain(
-      "disabled={!canManageTemplates || isActionLocked || isAutoPickDateMissing}"
-    );
+    expect(pageSource).toContain("isAutoPickDateMissing ||");
+    expect(pageSource).toContain("!isAutoPickRunAvailable");
     expect(pageSource).toContain("description={text.autoPickDateRequired}");
     expect(pageSource).toContain("date: autoPick.date");
+    expect(pageSource).toContain("setIsAutoPickConfirmationOpen(true)");
+    expect(pageSource).toContain("title={text.autoPickConfirmTitle}");
   });
 
   it("does not save auto-pick settings when nothing changed", () => {
     expect(pageSource).toContain("const isAutoPickSettingsDirty =");
-    expect(pageSource).toContain("settings === null ||");
+    expect(pageSource).toContain("settings !== null &&");
     expect(pageSource).toContain("autoPick.autoModeEnabled !== settings.autoModeEnabled");
     expect(pageSource).toContain("autoPick.allowedTypes !== settings.allowedTypes");
     expect(pageSource).toContain(
       "parseExcludeRecentDays(autoPick.excludeRecentDays) !== settings.excludeRecentDays"
     );
+    expect(pageSource).toContain("!isSettingsReady ||");
+    expect(pageSource).toContain("settingsLoadError");
+    expect(pageSource).toContain("text.autoPickSettingsUnavailable");
+  });
+
+  it("uses the backend business date and never enables unknown auto-pick settings", () => {
     expect(pageSource).toContain(
-      "if (!canManageTemplates || isActionLocked || !isAutoPickSettingsDirty) return;"
+      "getBusinessDateOrClientToday(settingsResponse.value.businessDate)"
     );
     expect(pageSource).toContain(
-      "disabled={!canManageTemplates || isActionLocked || !isAutoPickSettingsDirty}"
+      "setForm((state) => (state.startDate ? state : emptyForm(businessDate)))"
     );
+    expect(pageSource).toContain(
+      "const isSettingsReady = settings !== null && settingsLoadError === null;"
+    );
+    expect(pageSource).toContain(
+      "setSettingsLoadError(getAdminErrorMessage(settingsResponse.reason, text.loadError));"
+    );
+    expect(pageSource).toContain("!isSettingsReady ? (");
+    expect(pageSource).toContain("isAutoPickRunAvailable");
+    expect(pageSource).toContain("isSettingsReady &&\n    settings?.autoModeEnabled === true");
+    expect(contentSource).toContain("autoPickSettingsUnavailable");
+    expect(contentSource).toContain("autoPickRequiresSavedSettings");
+  });
+
+  it("keeps auto assignments auto when an administrator edits them", () => {
+    expect(pageSource).toContain("isManual: assignment.isManual");
+    expect(pageSource).toContain("isManual: form.isManual");
+    expect(pageSource).toContain("editAutoAssignment");
+    expect(pageSource).toContain("editAutoAssignmentDescription");
+  });
+
+  it("uses independent work columns instead of a height-coupled two-row grid", () => {
+    expect(pageSource).toContain("<div className={styles.workspace}>");
+    expect(pageSource).toContain("styles.workspaceColumn");
+    expect(pageSource).toContain("styles.previewPanel");
+    expect(stylesSource).toContain(".workspace {");
+    expect(stylesSource).toContain(".workspaceColumn {");
+    expect(stylesSource).toContain(".previewPanel {");
+    expect(stylesSource).not.toContain(".topGrid,");
+  });
+
+  it("keeps schedule actions visible as cards on narrow screens", () => {
+    expect(pageSource).toContain("data-label={text.actions}");
+    expect(pageSource).toContain("data-label={text.date}");
+    expect(stylesSource).toContain(".scheduleTable tbody {");
+    expect(stylesSource).toContain(".scheduleTable tr {");
+    expect(stylesSource).toContain(".scheduleTable td[data-label]::before {");
+    expect(stylesSource).toContain(".scheduleTable td:last-child .tableActions {");
+    expect(stylesSource).not.toContain("min-width: 40rem;");
   });
 
   it("filters assignment candidates by active status, type, access, and search", () => {

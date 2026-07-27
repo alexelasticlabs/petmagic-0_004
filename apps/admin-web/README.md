@@ -23,6 +23,17 @@ npm run build
 
 По умолчанию dev server открывается на `http://localhost:3000`.
 
+## Configuration
+
+При запуске через корневой Docker Compose источник переменных — root `.env`,
+созданный из `../../.env.example`; не создавайте второй admin `.env`.
+
+При самостоятельном запуске этого приложения используйте только один шаблон по
+назначению: `.env.development.example`, `.env.staging.example` или
+`.env.production.example`. Render-конфигурация остаётся в корневых
+`../../render.yaml` и `../../render.production.yaml`; реальные секреты живут в
+platform secret storage.
+
 ## Structure
 
 - `src/app/[locale]` - локализованные routes и общий `AdminShell` layout.
@@ -34,7 +45,7 @@ npm run build
 
 ## UI Rules
 
-См. [../../docs/md/ADMIN_STYLE_GUIDE.md](../../docs/md/ADMIN_STYLE_GUIDE.md) перед добавлением новых вкладок, таблиц, карточек, форм или глобальных стилей.
+См. [../../docs/admin-style-guide.md](../../docs/admin-style-guide.md) перед добавлением новых вкладок, таблиц, карточек, форм или глобальных стилей.
 Правила локализации и light/dark theme зафиксированы в
 [../../docs/localization-and-theme.md](../../docs/localization-and-theme.md).
 Новый пользовательский текст добавляйте через typed dictionaries в

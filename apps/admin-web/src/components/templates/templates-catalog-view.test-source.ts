@@ -6,6 +6,7 @@ const templatesCatalogViewLibraryPaths = [
   fileURLToPath(new URL("./templates-catalog-view.card.tsx", import.meta.url)),
   fileURLToPath(new URL("./templates-catalog-view.list.tsx", import.meta.url)),
   fileURLToPath(new URL("./templates-catalog-view.dialogs.tsx", import.meta.url)),
+  fileURLToPath(new URL("./templates-catalog-workspace.tsx", import.meta.url)),
 ];
 
 export function readTemplatesCatalogViewLibrarySource(): string {

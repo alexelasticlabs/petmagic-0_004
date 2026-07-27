@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildAdminNotificationDedupeKey,
   createAdminNotificationId,
+  getAdminNotificationStorageKey,
   sanitizeAdminNotificationDedupeKey,
   sanitizeAdminNotificationSource,
   sanitizeAdminNotificationText,
@@ -16,6 +17,16 @@ const adminShellStylesPath = fileURLToPath(new URL("./admin-shell.module.css", i
 const adminNotificationsPath = fileURLToPath(new URL("./admin-notifications.tsx", import.meta.url));
 
 describe("admin notification sanitization", () => {
+  it("uses an isolated persisted storage key for every admin user", () => {
+    const firstAdminKey = getAdminNotificationStorageKey("admin/one");
+    const secondAdminKey = getAdminNotificationStorageKey("admin-two");
+
+    expect(firstAdminKey).toBe("petmagic.admin.notifications.v2:admin%2Fone");
+    expect(secondAdminKey).toBe("petmagic.admin.notifications.v2:admin-two");
+    expect(firstAdminKey).not.toBe(secondAdminKey);
+    expect(getAdminNotificationStorageKey("   ")).toBeNull();
+  });
+
   it("masks sensitive values before notifications are persisted", () => {
     const sanitized = sanitizeAdminNotificationText(
       [
@@ -128,11 +139,13 @@ describe("admin notification sanitization", () => {
     const source = readFileSync(adminNotificationsPath, "utf8");
 
     expect(source).toContain("let didChange = false;");
-    expect(source).toContain("return didChange ? next : current;");
+    expect(source).toContain("return didChange ? { ...current, items: next } : current;");
     expect(source).toContain("if (item.id !== notificationId || item.read)");
     expect(source).toContain("if (item.category !== category || item.read)");
-    expect(source).toContain("if (current.every((item) => !item.read))");
-    expect(source).toContain("return current.filter((item) => !item.read);");
+    expect(source).toContain("if (current.items.every((item) => !item.read))");
+    expect(source).toContain(
+      "return { ...current, items: current.items.filter((item) => !item.read) };"
+    );
     expect(source).not.toContain(
       "current.map((item) => (item.id === notificationId ? { ...item, read: true } : item))"
     );
@@ -143,8 +156,20 @@ describe("admin notification sanitization", () => {
 
     expect(source).toContain("function getAdminNotificationStorageErrorDetails(error: unknown)");
     expect(source).toContain(
-      "function removeStoredAdminNotifications(storageFailureEvent: string)"
+      "function removeStoredAdminNotifications(\n  storageKey: string | null,\n  storageFailureEvent: string\n)"
     );
+    expect(source).toContain(
+      "const storageKey = getAdminNotificationStorageKey(session?.user.userId);"
+    );
+    expect(source).toContain("notificationState, setNotificationState");
+    expect(source).toContain("useLayoutEffect(() => {");
+    expect(source).toContain("previousStorageKeyRef.current === storageKey");
+    expect(source).toContain("dedupeMapRef.current.clear();");
+    expect(source).toContain("notificationState.storageKey !== storageKey");
+    expect(source.indexOf("notificationState.storageKey !== storageKey")).toBeLessThan(
+      source.indexOf("window.localStorage.setItem(storageKey")
+    );
+    expect(source).toContain("LEGACY_ADMIN_NOTIFICATIONS_STORAGE_KEY");
     expect(source).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
     expect(source).toContain("clientLogger.warn(storageFailureEvent,");
     expect(source).toContain("getAdminNotificationStorageErrorDetails(error)");
@@ -161,7 +186,7 @@ describe("admin notification sanitization", () => {
       'clientLogger.warn("admin.notifications_persist_failed", { error });'
     );
     expect(source).not.toContain(
-      'catch (error) {\n    clientLogger.warn(\n      "admin.notifications_hydrate_failed",\n      getAdminNotificationStorageErrorDetails(error)\n    );\n    window.localStorage.removeItem(ADMIN_NOTIFICATIONS_STORAGE_KEY);'
+      'catch (error) {\n    clientLogger.warn(\n      "admin.notifications_hydrate_failed",\n      getAdminNotificationStorageErrorDetails(error)\n    );\n    window.localStorage.removeItem(storageKey);'
     );
   });
 
@@ -169,24 +194,18 @@ describe("admin notification sanitization", () => {
     const source = readFileSync(adminNotificationsPath, "utf8");
 
     expect(source).toContain("if (items.length === 0)");
-    expect(
-      source.indexOf(
-        'removeStoredAdminNotifications("admin.notifications_empty_persist_cleanup_failed");'
-      )
-    ).toBeLessThan(source.indexOf("window.localStorage.setItem(ADMIN_NOTIFICATIONS_STORAGE_KEY"));
+    expect(source.indexOf('"admin.notifications_empty_persist_cleanup_failed"')).toBeLessThan(
+      source.indexOf("window.localStorage.setItem(storageKey")
+    );
   });
 
   it("cleans malformed or fully stale notification storage through safe cleanup", () => {
     const source = readFileSync(adminNotificationsPath, "utf8");
 
+    expect(source).toContain('"admin.notifications_invalid_storage_cleanup_failed"');
+    expect(source).toContain('"admin.notifications_empty_hydration_cleanup_failed"');
     expect(source).toContain(
-      'removeStoredAdminNotifications("admin.notifications_invalid_storage_cleanup_failed");'
-    );
-    expect(source).toContain(
-      'removeStoredAdminNotifications("admin.notifications_empty_hydration_cleanup_failed");'
-    );
-    expect(source).toContain(
-      'removeStoredAdminNotifications("admin.notifications_hydrate_cleanup_failed");'
+      'removeStoredAdminNotifications(storageKey, "admin.notifications_hydrate_cleanup_failed");'
     );
     expect(source).not.toContain("if (!Array.isArray(parsed)) {\n      return [];\n    }");
   });
@@ -322,6 +341,9 @@ describe("admin notification sanitization", () => {
     expect(source).not.toContain("radial-gradient");
     expect(nonZeroLetterSpacingRules).toEqual([]);
     expect(source).toContain(".topbarTitle {");
+    expect(source).toContain(".topbarHeading {\n  min-width: 0;\n  flex: 1 1 0;");
+    expect(source).toContain("text-overflow: ellipsis;");
+    expect(source).toContain("white-space: nowrap;");
     expect(source).toContain("font-size: 1.05rem;");
     expect(source).toContain(".topbarTitle {\n    font-size: 0.98rem;");
     expect(source).not.toMatch(/font-size:\s*[^;]*vw/);

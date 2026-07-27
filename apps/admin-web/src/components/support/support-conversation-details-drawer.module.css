@@ -1,0 +1,96 @@
+.detailsSlot {
+  min-width: 0;
+  min-height: 0;
+  height: var(--support-workspace-height);
+}
+
+.detailsPanel {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.detailsPanel > div {
+  min-height: 0;
+  height: 100%;
+  max-height: none;
+}
+
+.drawerHeader,
+.detailsBackdrop {
+  display: none;
+}
+
+@media (max-width: 1320px) {
+  .detailsSlot {
+    display: none;
+  }
+
+  .detailsSlotDrawerOpen {
+    position: fixed;
+    inset: 0;
+    z-index: 38;
+    display: flex;
+    justify-content: flex-end;
+    height: auto;
+    padding: 0.9rem;
+  }
+
+  .detailsBackdrop {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: color-mix(in srgb, var(--surface-0) 74%, transparent);
+    backdrop-filter: blur(3px);
+    cursor: default;
+  }
+
+  .detailsPanel {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    width: min(28rem, 100%);
+    height: min(100%, calc(100dvh - 1.8rem));
+    overflow: hidden;
+    border-radius: var(--radius);
+  }
+
+  .drawerHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.78rem 0.82rem 0.62rem;
+    border: 1px solid var(--border-soft);
+    border-bottom: 0;
+    border-radius: var(--radius) var(--radius) 0 0;
+    background: var(--surface-1);
+  }
+
+  .drawerHeader strong {
+    min-width: 0;
+    color: var(--text-strong);
+    font-size: 0.98rem;
+    overflow-wrap: anywhere;
+  }
+
+  .detailsPanel > div {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .detailsSlotDrawerOpen {
+    padding: 0.56rem;
+  }
+
+  .detailsPanel {
+    width: 100%;
+    height: min(100%, calc(100dvh - 1.12rem));
+  }
+}

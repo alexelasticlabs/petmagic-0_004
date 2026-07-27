@@ -1,3 +1,4 @@
+import type { SupportQueueUrlState } from "@/components/support/support-conversation-controller.helpers";
 import { getMessageAttachments } from "@/components/support/support-conversation-helpers";
 import type { AdminSupportConversation } from "@/lib/api-client";
 import type { Locale } from "@/lib/i18n";
@@ -7,6 +8,7 @@ export type SupportConversationPageProps = {
   conversationId: string;
   navigationMode?: "route" | "local";
   onConversationSelect?: (conversationId: string) => void;
+  initialQueueState?: SupportQueueUrlState;
 };
 
 export type FullscreenImage = {

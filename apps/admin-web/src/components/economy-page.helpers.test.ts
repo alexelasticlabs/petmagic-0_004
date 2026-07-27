@@ -5,8 +5,10 @@ import {
   canRefundPurchase,
   createDefaultProviderConfigDraft,
   isPackDraftDirty,
+  isPackDraftInvalid,
   isProviderConfigDraftDirty,
   isSubscriptionPlanDraftDirty,
+  isSubscriptionPlanDraftInvalid,
   normalizeEconomyCurrencyInput,
   normalizeEconomyIntegerInput,
   normalizeEconomyPackDisplayNameInput,
@@ -24,6 +26,7 @@ import {
   toSubscriptionPlanPayload,
   type EconomyValidationText,
 } from "@/components/economy-page.helpers";
+import { humanizeStatus, statusColor } from "@/components/economy-page.shared";
 import type {
   AdminCurrencyPack,
   AdminEconomyPurchase,
@@ -143,6 +146,17 @@ describe("economy action guards", () => {
     expect(isPackDraftDirty(pack, { ...toDraft(pack), isActive: false })).toBe(true);
   });
 
+  it("flags invalid pack drafts before an operator can save them", () => {
+    const draft = toDraft(createCurrencyPack());
+
+    expect(isPackDraftInvalid(draft)).toBe(false);
+    expect(isPackDraftInvalid({ ...draft, displayName: " " })).toBe(true);
+    expect(isPackDraftInvalid({ ...draft, priceAmount: "0" })).toBe(true);
+    expect(isPackDraftInvalid({ ...draft, grantedSpark: "0" })).toBe(true);
+    expect(isPackDraftInvalid({ ...draft, bonusSpark: "-1" })).toBe(true);
+    expect(isPackDraftInvalid({ ...draft, sortOrder: "1.5" })).toBe(true);
+  });
+
   it("detects whether a subscription plan draft differs from the backend plan", () => {
     const plan = createSubscriptionPlan();
 
@@ -155,6 +169,29 @@ describe("economy action guards", () => {
     ).toBe(true);
     expect(
       isSubscriptionPlanDraftDirty(plan, { ...toSubscriptionPlanDraft(plan), isRecommended: false })
+    ).toBe(true);
+  });
+
+  it("flags invalid subscription plan drafts before an operator can save them", () => {
+    const draft = toSubscriptionPlanDraft(createSubscriptionPlan());
+
+    expect(isSubscriptionPlanDraftInvalid(draft)).toBe(false);
+    expect(isSubscriptionPlanDraftInvalid({ ...draft, currencyCode: "US" })).toBe(true);
+    expect(isSubscriptionPlanDraftInvalid({ ...draft, monthlyTokenLimit: "0" })).toBe(true);
+    expect(isSubscriptionPlanDraftInvalid({ ...draft, displayOrder: "-1" })).toBe(true);
+    expect(
+      isSubscriptionPlanDraftInvalid({
+        ...draft,
+        isActive: true,
+        stripePriceId: "",
+      })
+    ).toBe(true);
+    expect(
+      isSubscriptionPlanDraftInvalid({
+        ...draft,
+        isActive: false,
+        appleProductId: "x".repeat(161),
+      })
     ).toBe(true);
   });
 
@@ -188,6 +225,18 @@ describe("economy action guards", () => {
     expect(canCancelSubscription(createSubscription({ status: "canceled" }))).toBe(false);
     expect(canCancelSubscription(createSubscription({ provider: "apple" }))).toBe(false);
     expect(canCancelSubscription(createSubscription({ cancelAtPeriodEnd: true }))).toBe(false);
+  });
+});
+
+describe("economy status presentation", () => {
+  it("normalizes backend title-cased and aliased statuses before rendering", () => {
+    expect(humanizeStatus("GracePeriod", "ru")).toBe("Льготный период");
+    expect(humanizeStatus("PastDue", "en")).toBe("Past due");
+    expect(humanizeStatus("Open", "ru")).toBe("Открыт");
+    expect(humanizeStatus("Resolved", "en")).toBe("Resolved");
+    expect(statusColor("Active")).toBe("var(--success)");
+    expect(statusColor("RefundPending")).toBe("var(--warning)");
+    expect(statusColor("RefundReview")).toBe("var(--danger)");
   });
 });
 
@@ -366,8 +415,11 @@ describe("subscription plan payloads", () => {
 });
 
 describe("provider config payloads", () => {
-  it("uses live mode for new production payment routes by default", () => {
-    expect(createDefaultProviderConfigDraft().mode).toBe("live");
+  it("creates a disabled live route draft until an operator explicitly enables it", () => {
+    expect(createDefaultProviderConfigDraft()).toMatchObject({
+      mode: "live",
+      isEnabled: false,
+    });
   });
 
   it("trims and normalizes payment route create payloads", () => {
@@ -416,12 +468,34 @@ describe("provider config payloads", () => {
     ).toThrow(validationText.invalidProviderConfigCreate);
 
     expect(() =>
+      toProviderConfigCreatePayload(
+        {
+          ...createDefaultProviderConfigDraft(),
+          provider: "paypal",
+        },
+        validationText
+      )
+    ).toThrow(validationText.invalidProviderConfigCreate);
+
+    expect(() =>
       toProviderConfigMatchPayload(
         {
           provider: "stripe",
           platform: "web",
           country: "US",
           appVersion: "1".repeat(33),
+        },
+        validationText
+      )
+    ).toThrow(validationText.invalidProviderConfigMatch);
+
+    expect(() =>
+      toProviderConfigMatchPayload(
+        {
+          provider: "stripe",
+          platform: "web",
+          country: "USA",
+          appVersion: "1.0.0",
         },
         validationText
       )
@@ -441,7 +515,7 @@ describe("provider config payloads", () => {
       toProviderConfigPayload(
         {
           ...createDefaultProviderConfigDraft(),
-          warningMessage: "x".repeat(241),
+          warningMessage: "x".repeat(801),
         },
         validationText
       )

@@ -1,15 +1,17 @@
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, type RefObject } from "react";
 
 import { getAdminChromeCopy } from "@/components/admin/admin-chrome.content";
 import {
   BrandMark,
   CaretDownIcon,
   ChartIcon,
+  ClockIcon,
   DashboardIcon,
   DollarIcon,
   ImageIcon,
   LogoutIcon,
+  PawIcon,
   PromoCodeIcon,
   SupportIcon,
   TemplatesIcon,
@@ -17,19 +19,17 @@ import {
   VideoIcon,
 } from "@/components/admin/admin-icons";
 import styles from "@/components/admin/admin-shell.module.css";
-import {
-  getAdminNavItems,
-  matchesAdminPath,
-  type AdminNavEntry,
-  type AdminSectionKey,
-} from "@/lib/admin-navigation";
-import { getDictionary, type Locale } from "@/lib/i18n";
+import { getAdminNavItems, matchesAdminPath, type AdminNavEntry } from "@/lib/admin-navigation";
+import { buildAdminNavigationAreas } from "@/lib/admin-navigation-areas";
+import { type Locale } from "@/lib/i18n";
 
 type AdminSidebarProps = {
   locale: Locale;
   currentPath: string;
   isOpen: boolean;
   isDrawerMode: boolean;
+  sidebarRef: RefObject<HTMLElement | null>;
+  onClose: () => void;
   onNavigate: () => void;
   onLogout: () => void;
   logoutDisabled?: boolean;
@@ -41,9 +41,11 @@ type AdminSidebarProps = {
 const iconMap = {
   dashboard: DashboardIcon,
   economy: DollarIcon,
+  gamification: PawIcon,
   "promo-codes": PromoCodeIcon,
   support: SupportIcon,
   moderation: ChartIcon,
+  audit: ClockIcon,
   users: UsersIcon,
   generations: ChartIcon,
   feedback: SupportIcon,
@@ -61,36 +63,8 @@ function getTargetPath(href: string) {
   return normalized.startsWith("/") ? normalized : `/${normalized}`;
 }
 
-type NavSection = {
-  key: string;
-  label: string;
-  items: AdminNavEntry[];
-};
-
-function buildNavSections(navItems: AdminNavEntry[], locale: Locale): NavSection[] {
-  const text = getDictionary(locale);
-  const byKey = new Map<AdminSectionKey, AdminNavEntry>(navItems.map((item) => [item.key, item]));
-
-  const sections: Array<{ key: string; label: string; itemKeys: AdminSectionKey[] }> = [
-    { key: "overview", label: text.navSectionOverview, itemKeys: ["dashboard", "economy"] },
-    { key: "growth", label: text.navSectionGrowth, itemKeys: ["promo-codes"] },
-    { key: "content", label: text.navSectionContent, itemKeys: ["templates"] },
-    {
-      key: "users",
-      label: text.navSectionUsers,
-      itemKeys: ["users", "role-management", "generations", "feedback", "support", "moderation"],
-    },
-  ];
-
-  return sections
-    .map((section) => ({
-      key: section.key,
-      label: section.label,
-      items: section.itemKeys
-        .map((itemKey) => byKey.get(itemKey))
-        .filter((item): item is AdminNavEntry => Boolean(item)),
-    }))
-    .filter((section) => section.items.length > 0);
+function buildNavSections(navItems: readonly AdminNavEntry[], locale: Locale) {
+  return buildAdminNavigationAreas(locale, navItems);
 }
 
 export function AdminSidebar({
@@ -98,6 +72,8 @@ export function AdminSidebar({
   currentPath,
   isOpen,
   isDrawerMode,
+  sidebarRef,
+  onClose,
   onNavigate,
   onLogout,
   logoutDisabled = false,
@@ -111,6 +87,7 @@ export function AdminSidebar({
   const brandTitle = copy.sidebar.brandTitle;
   const brandCaption = copy.sidebar.brandCaption;
   const navigationLabel = copy.sidebar.navigationLabel;
+  const isDrawerDialog = isDrawerMode && isOpen;
 
   function renderNavEntry(item: AdminNavEntry) {
     if (item.type === "group") {
@@ -119,19 +96,20 @@ export function AdminSidebar({
       const groupActive = item.items.some((child) =>
         matchesAdminPath(currentPath, getTargetPath(child.href))
       );
+      const groupSelected = groupCurrent || groupActive;
 
       return (
         <div key={item.key} className={styles.navGroup}>
           <Link
             href={item.href}
-            className={`${styles.navItem}${groupActive ? ` ${styles.navItemActive}` : ""}`}
+            className={`${styles.navItem}${groupSelected ? ` ${styles.navItemActive}` : ""}`}
             aria-current={groupCurrent ? "page" : undefined}
             onClick={onNavigate}
           >
             <Icon className={styles.navIcon} />
             <span className={styles.navLabel}>{item.label}</span>
             <CaretDownIcon
-              className={`${styles.groupCaret}${groupActive ? ` ${styles.groupCaretOpen}` : ""}`}
+              className={`${styles.groupCaret}${groupSelected ? ` ${styles.groupCaretOpen}` : ""}`}
             />
           </Link>
 
@@ -183,11 +161,15 @@ export function AdminSidebar({
 
   return (
     <aside
+      ref={sidebarRef}
       id="admin-sidebar"
       className={`${styles.sidebar}${isOpen ? ` ${styles.sidebarOpen}` : ""}`}
+      role={isDrawerDialog ? "dialog" : undefined}
+      aria-modal={isDrawerDialog ? "true" : undefined}
       aria-label={navigationLabel}
       aria-hidden={isDrawerMode && !isOpen ? "true" : undefined}
       inert={isDrawerMode && !isOpen}
+      tabIndex={isDrawerDialog ? -1 : undefined}
     >
       <div className={styles.brand}>
         <BrandMark className={styles.brandMark} />
@@ -195,6 +177,16 @@ export function AdminSidebar({
           <span className={styles.brandName}>{brandTitle}</span>
           <span className={styles.brandCaption}>{brandCaption}</span>
         </div>
+        <button
+          type="button"
+          className={styles.sidebarClose}
+          onClick={onClose}
+          aria-label={copy.sidebar.closeNavigationLabel}
+          title={copy.sidebar.closeNavigationLabel}
+          data-admin-sidebar-close
+        >
+          <span aria-hidden="true">×</span>
+        </button>
       </div>
 
       <nav className={styles.nav} aria-label={navigationLabel}>

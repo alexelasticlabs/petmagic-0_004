@@ -243,6 +243,7 @@ export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps
       </div>
 
       <UserWalletPanel
+        actorId={session?.user.userId ?? ""}
         locale={locale}
         userId={user.userId}
         analytics={analytics}

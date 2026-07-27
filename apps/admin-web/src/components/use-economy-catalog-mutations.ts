@@ -47,10 +47,23 @@ type FeedbackSetter = (feedback: { tone: "success" | "danger"; message: string }
 type UseEconomyCatalogMutationsParams = {
   text: EconomyPageText;
   canManageEconomy: boolean;
+  loadWatermark: boolean;
   packs: AdminCurrencyPack[];
   subscriptionPlans: AdminSubscriptionPlan[];
   providerConfigs: AdminPaymentProviderConfiguration[];
   setFeedback: FeedbackSetter;
+};
+
+type ProviderConfigMatchRequest = ReturnType<typeof toProviderConfigMatchPayload>;
+
+type ProviderConfigMatchTestVariables = {
+  payload: ProviderConfigMatchRequest;
+  draftKey: string;
+};
+
+type ProviderConfigMatchResultState = {
+  draftKey: string;
+  result: AdminPaymentProviderConfigurationMatch;
 };
 
 function assertCanManage(canManageEconomy: boolean, message: string) {
@@ -59,9 +72,14 @@ function assertCanManage(canManageEconomy: boolean, message: string) {
   }
 }
 
+function getProviderConfigMatchDraftKey(draft: ProviderConfigMatchDraft) {
+  return [draft.provider, draft.platform, draft.country, draft.appVersion].join("\u0000");
+}
+
 export function useEconomyCatalogMutations({
   text,
   canManageEconomy,
+  loadWatermark,
   packs,
   subscriptionPlans,
   providerConfigs,
@@ -83,15 +101,17 @@ export function useEconomyCatalogMutations({
     country: "US",
     appVersion: "1.0.0",
   });
-  const [matchResult, setMatchResult] = useState<AdminPaymentProviderConfigurationMatch | null>(
+  const [matchResultState, setMatchResultState] = useState<ProviderConfigMatchResultState | null>(
     null
   );
   const [watermarkDraft, setWatermarkDraft] = useState<AdminWatermarkSettings | null>(null);
+  const matchDraftKey = getProviderConfigMatchDraftKey(matchDraft);
+  const matchResult = matchResultState?.draftKey === matchDraftKey ? matchResultState.result : null;
 
   const watermarkQuery = useQuery({
     queryKey: adminQueryKeys.templateWatermarkSettings,
     queryFn: ({ signal }) => fetchAdminWatermarkSettings(signal),
-    enabled: canManageEconomy,
+    enabled: canManageEconomy && loadWatermark,
   });
 
   function updateWatermarkDraft(patch: Partial<AdminWatermarkSettings>) {
@@ -281,16 +301,15 @@ export function useEconomyCatalogMutations({
   });
 
   const testProviderConfigMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async ({ payload }: ProviderConfigMatchTestVariables) => {
       assertCanManage(canManageEconomy, text.financialActionsAdminOnly);
-      const payload = toProviderConfigMatchPayload(matchDraft, text);
       return testAdminPaymentProviderConfigMatch(payload);
     },
-    onSuccess: (result) => {
-      setMatchResult(result);
+    onSuccess: (result, variables) => {
+      setMatchResultState({ draftKey: variables.draftKey, result });
     },
     onError: (error) => {
-      setMatchResult(null);
+      setMatchResultState(null);
       setFeedback({
         tone: "danger",
         message: getAdminErrorMessage(error, text.providerConfigTestError),
@@ -354,7 +373,10 @@ export function useEconomyCatalogMutations({
       return;
     }
 
-    testProviderConfigMutation.mutate();
+    testProviderConfigMutation.mutate({
+      payload: toProviderConfigMatchPayload(matchDraft, text),
+      draftKey: matchDraftKey,
+    });
   }
 
   function requestCloneProviderConfig(payload: { configurationId: string; region: string }) {
@@ -376,7 +398,10 @@ export function useEconomyCatalogMutations({
 
   const effectiveWatermarkDraft = watermarkDraft ?? watermarkQuery.data ?? null;
   const isSaveWatermarkDisabled =
-    !canManageEconomy || !effectiveWatermarkDraft || saveWatermarkMutation.isPending;
+    !canManageEconomy ||
+    !loadWatermark ||
+    !effectiveWatermarkDraft ||
+    saveWatermarkMutation.isPending;
 
   function requestSaveWatermark() {
     if (isSaveWatermarkDisabled) {

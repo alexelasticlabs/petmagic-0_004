@@ -1,28 +1,90 @@
-.kpiGrid {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 0.8rem;
-}
-
-.metrics {
-  margin-top: 1rem;
-}
-
 .grid {
   display: grid;
-  grid-template-columns: minmax(18rem, 24rem) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
+  align-items: start;
   gap: 1rem;
   margin-top: 1rem;
 }
 
-.controls,
+.gridLedgerOnly {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.walletSummary {
+  display: grid;
+  grid-template-columns: minmax(11rem, 0.7fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.currentBalance,
+.balanceTotals,
+.balanceTotals div {
+  display: grid;
+}
+
+.currentBalance {
+  gap: 0.22rem;
+}
+
+.currentBalance span,
+.balanceTotals dt {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.currentBalance strong {
+  color: var(--text-strong);
+  font-size: 1.45rem;
+  line-height: 1.1;
+}
+
+.currentBalance small {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.balanceTotals {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.balanceTotals div {
+  min-width: 0;
+  gap: 0.22rem;
+}
+
+.balanceTotals dd {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 1rem;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.controls {
+  display: grid;
+  align-self: start;
+  gap: 0.9rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
 .ledger,
 .list,
 .field {
   display: grid;
 }
 
-.controls,
 .ledger {
   gap: 0.9rem;
 }
@@ -32,13 +94,13 @@
   gap: 0.35rem;
 }
 
-.sectionHeader h4,
+.sectionHeader h3,
 .sectionHeader p,
 .card p {
   margin: 0;
 }
 
-.sectionHeader h4 {
+.sectionHeader h3 {
   color: var(--text-strong);
   font-size: 0.95rem;
   font-weight: 600;
@@ -48,6 +110,32 @@
 .meta,
 .card span {
   color: var(--text-muted);
+}
+
+.adjustmentHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0.75rem;
+}
+
+.adjustmentHeader .sectionHeader {
+  gap: 0.22rem;
+}
+
+.adjustmentToggle {
+  white-space: nowrap;
+}
+
+.adjustmentFields {
+  display: grid;
+  gap: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--border-soft);
+}
+
+.adjustmentFields[hidden] {
+  display: none;
 }
 
 .formGrid {
@@ -67,7 +155,6 @@
 }
 
 .input,
-.select,
 .textarea {
   width: 100%;
   border: 1px solid var(--border-soft);
@@ -79,7 +166,6 @@
 }
 
 .input:focus-visible,
-.select:focus-visible,
 .textarea:focus-visible {
   outline: none;
   border-color: var(--border-accent);
@@ -87,10 +173,18 @@
 }
 
 .input:disabled,
-.select:disabled,
 .textarea:disabled {
   opacity: 0.62;
   cursor: not-allowed;
+}
+
+.operationField :global(button[class*="select-module"][class*="__trigger"]) {
+  min-height: 2.75rem;
+  padding: 0.8rem 0.95rem;
+}
+
+.operationField :global(span[class*="select-module"][class*="__value"]) {
+  font-size: 1rem;
 }
 
 .textarea {
@@ -103,24 +197,73 @@
   justify-content: flex-start;
 }
 
+.balancePreview {
+  display: grid;
+  gap: 0.16rem;
+  padding: 0.62rem 0.68rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.balancePreview span,
+.validationHint {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.balancePreview strong {
+  color: var(--text-strong);
+  font-size: 0.84rem;
+}
+
+.validationHint {
+  margin: -0.12rem 0 0;
+}
+
+.validationHint[data-tone="warning"] {
+  color: color-mix(in srgb, var(--warning) 88%, var(--text-strong));
+}
+
 .feedback {
   margin-top: 0.2rem;
 }
 
+.emptyLedger {
+  display: flex;
+  align-items: center;
+  min-height: 4.5rem;
+  padding: 0.9rem 1rem;
+  border: 1px dashed var(--border-soft);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+}
+
+.emptyLedger strong {
+  color: var(--text-strong);
+  font-size: 0.9rem;
+}
+
 .list {
-  gap: 0.65rem;
-  max-height: min(64vh, 42rem);
-  overflow: auto;
-  padding-right: 0.2rem;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
 }
 
 .card {
   display: grid;
   gap: 0.45rem;
   padding: 0.9rem 1rem;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-soft);
-  background: var(--surface-2);
+  border: 0;
+  border-bottom: 1px solid var(--border-soft);
+  background: transparent;
+}
+
+.card:last-child {
+  border-bottom: 0;
 }
 
 .cardHeader,
@@ -135,6 +278,18 @@
   font-size: 1.05rem;
 }
 
+.operationLabel {
+  color: var(--text-strong);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.note {
+  color: var(--text-soft);
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
 .positive {
   color: color-mix(in srgb, var(--success) 82%, var(--text-strong));
 }
@@ -143,36 +298,31 @@
   color: color-mix(in srgb, var(--danger) 86%, var(--text-strong));
 }
 
-@media (max-width: 1360px) {
-  .kpiGrid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 980px) {
-  .grid,
-  .formGrid {
+@media (max-width: 1080px) {
+  .grid {
     grid-template-columns: 1fr;
   }
 
-  .list {
-    max-height: none;
-    overflow: visible;
-    padding-right: 0;
+  .controls {
+    order: -1;
   }
 }
 
-@media (max-width: 760px) {
-  .kpiGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+@media (max-width: 640px) {
+  .walletSummary,
+  .formGrid,
+  .balanceTotals,
+  .adjustmentHeader {
+    grid-template-columns: 1fr;
+  }
+
+  .adjustmentToggle {
+    width: 100%;
+    min-height: 2.75rem;
   }
 }
 
 @media (max-width: 560px) {
-  .kpiGrid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .actions > * {
     width: 100%;
   }

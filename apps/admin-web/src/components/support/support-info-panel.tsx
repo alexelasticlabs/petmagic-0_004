@@ -37,7 +37,6 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
     canManageSupportWorkspace,
     canMutateConversation,
     canViewSubjectUserContext,
-    lastActivityAtUtc,
     operatorPriority,
     operatorTags,
     primaryStatusAction,
@@ -49,25 +48,20 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
     setOperatorPriority,
     sidePanelTabs,
     statusMutation,
-    assignmentMutation,
     isAssignedToCurrentAdmin,
+    sessionUserId,
+    sessionUserRoles,
     text,
-    totalPurchases,
     userQuery,
   } = controller;
 
   const panelText = useMemo(() => getSupportConversationCopy(locale).infoPanel, [locale]);
   const isUserPremium = canViewSubjectUserContext ? (userQuery.data?.isPremium ?? false) : false;
-  const {
-    attachmentPreviewEntries,
-    openAttachmentBlob,
-    pendingAttachmentOpenKey,
-    recentAttachments,
-    remainingAttachmentCount,
-  } = useSupportInfoPanelAttachmentActions({
-    canManageSupportWorkspace,
-    conversationMessages: conversation?.messages,
-  });
+  const { openAttachmentBlob, pendingAttachmentOpenKey, recentAttachments } =
+    useSupportInfoPanelAttachmentActions({
+      canManageSupportWorkspace,
+      conversationMessages: conversation?.messages,
+    });
 
   useEffect(() => {
     let isActive = true;
@@ -143,7 +137,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
   };
 
   return (
-    <div className={styles.infoPanelFlat}>
+    <div className={styles.infoPanelFlat} data-testid="support-info-panel">
       <div className={styles.infoPanel}>
         <SupportInfoPanelTabs
           activeSidePanelTab={activeSidePanelTab}
@@ -152,78 +146,78 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
           sidePanelTabs={sidePanelTabs}
         />
 
-        {activeSidePanelTab === "user" ? (
-          <SupportInfoPanelUserTab
-            accountCreatedAt={accountCreatedAt}
-            analyticsQuery={analyticsQuery}
-            attachmentPreviewEntries={attachmentPreviewEntries}
-            canManageSupportWorkspace={canManageSupportWorkspace}
-            canMutateConversation={canMutateConversation}
-            canViewSubjectUserContext={canViewSubjectUserContext}
-            confirmPendingStatusChange={confirmPendingStatusChange}
-            conversation={conversation}
-            assignmentMutation={assignmentMutation}
-            isAssignedToCurrentAdmin={isAssignedToCurrentAdmin}
-            destructiveStatusAction={destructiveStatusAction}
-            handleAddTag={handleAddTag}
-            isTagEditorOpen={isTagEditorOpen}
-            isUserPremium={isUserPremium}
-            lastActivityAtUtc={lastActivityAtUtc}
-            locale={locale}
-            openAttachmentBlob={openAttachmentBlob}
-            operatorPriority={operatorPriority}
-            operatorTags={operatorTags}
-            panelText={panelText}
-            pendingAttachmentOpenKey={pendingAttachmentOpenKey}
-            pendingStatusConfirm={pendingStatusConfirm}
-            primaryStatusAction={primaryStatusAction}
-            recentAttachments={recentAttachments}
-            remainingAttachmentCount={remainingAttachmentCount}
-            removeOperatorTag={removeOperatorTag}
-            requestStatusChange={requestStatusChange}
-            secondaryStatusActions={secondaryStatusActions}
-            setActiveSidePanelTab={setActiveSidePanelTab}
-            setIsTagEditorOpen={setIsTagEditorOpen}
-            setOperatorPriority={setOperatorPriority}
-            setPendingStatusConfirm={setPendingStatusConfirm}
-            setTagInput={setTagInput}
-            statusMutation={statusMutation}
-            tagInput={tagInput}
-            tagInputRef={tagInputRef}
-            text={text}
-            totalPurchases={totalPurchases}
-          />
-        ) : null}
+        <div
+          id={`support-panel-tabpanel-${activeSidePanelTab}`}
+          role="tabpanel"
+          aria-labelledby={`support-panel-tab-${activeSidePanelTab}`}
+          className={styles.infoPanelTabContent}
+        >
+          {activeSidePanelTab === "user" ? (
+            <SupportInfoPanelUserTab
+              accountCreatedAt={accountCreatedAt}
+              analyticsQuery={analyticsQuery}
+              canManageSupportWorkspace={canManageSupportWorkspace}
+              canMutateConversation={canMutateConversation}
+              canViewSubjectUserContext={canViewSubjectUserContext}
+              confirmPendingStatusChange={confirmPendingStatusChange}
+              conversation={conversation}
+              isAssignedToCurrentAdmin={isAssignedToCurrentAdmin}
+              sessionUserId={sessionUserId}
+              sessionUserRoles={sessionUserRoles}
+              destructiveStatusAction={destructiveStatusAction}
+              handleAddTag={handleAddTag}
+              isTagEditorOpen={isTagEditorOpen}
+              isUserPremium={isUserPremium}
+              locale={locale}
+              operatorPriority={operatorPriority}
+              operatorTags={operatorTags}
+              panelText={panelText}
+              pendingStatusConfirm={pendingStatusConfirm}
+              primaryStatusAction={primaryStatusAction}
+              removeOperatorTag={removeOperatorTag}
+              requestStatusChange={requestStatusChange}
+              secondaryStatusActions={secondaryStatusActions}
+              setIsTagEditorOpen={setIsTagEditorOpen}
+              setOperatorPriority={setOperatorPriority}
+              setPendingStatusConfirm={setPendingStatusConfirm}
+              setTagInput={setTagInput}
+              statusMutation={statusMutation}
+              tagInput={tagInput}
+              tagInputRef={tagInputRef}
+              text={text}
+            />
+          ) : null}
 
-        {activeSidePanelTab === "attachments" ? (
-          <SupportInfoPanelAttachmentsTab
-            canManageSupportWorkspace={canManageSupportWorkspace}
-            locale={locale}
-            openAttachmentBlob={openAttachmentBlob}
-            panelText={panelText}
-            pendingAttachmentOpenKey={pendingAttachmentOpenKey}
-            recentAttachments={recentAttachments}
-          />
-        ) : null}
+          {activeSidePanelTab === "attachments" ? (
+            <SupportInfoPanelAttachmentsTab
+              canManageSupportWorkspace={canManageSupportWorkspace}
+              locale={locale}
+              openAttachmentBlob={openAttachmentBlob}
+              panelText={panelText}
+              pendingAttachmentOpenKey={pendingAttachmentOpenKey}
+              recentAttachments={recentAttachments}
+            />
+          ) : null}
 
-        {activeSidePanelTab === "activity" ? (
-          <SupportInfoPanelActivityTab
-            activityTimeline={activityTimeline}
-            canViewSubjectUserContext={canViewSubjectUserContext}
-            locale={locale}
-            panelText={panelText}
-            recentFailures={recentFailures}
-            recentUserPurchases={recentUserPurchases}
-          />
-        ) : null}
+          {activeSidePanelTab === "activity" ? (
+            <SupportInfoPanelActivityTab
+              activityTimeline={activityTimeline}
+              canViewSubjectUserContext={canViewSubjectUserContext}
+              locale={locale}
+              panelText={panelText}
+              recentFailures={recentFailures}
+              recentUserPurchases={recentUserPurchases}
+            />
+          ) : null}
 
-        {activeSidePanelTab === "dialog" ? (
-          <SupportInfoPanelDialogTab
-            conversationTimeline={conversationTimeline}
-            locale={locale}
-            panelText={panelText}
-          />
-        ) : null}
+          {activeSidePanelTab === "dialog" ? (
+            <SupportInfoPanelDialogTab
+              conversationTimeline={conversationTimeline}
+              locale={locale}
+              panelText={panelText}
+            />
+          ) : null}
+        </div>
       </div>
     </div>
   );

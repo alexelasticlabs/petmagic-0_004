@@ -12,6 +12,16 @@ const generationsStylesPath = fileURLToPath(
 );
 
 describe("generations page hardening", () => {
+  it("loads the selected generation through the resolvable admin detail contract and polls pending states", () => {
+    const source = readGenerationsPageLibrarySource();
+
+    expect(source).toContain("fetchAdminTemplateGenerationDetail");
+    expect(source).toContain("adminQueryKeys.templateGenerationDetail");
+    expect(source).toContain('["Pending", "Running", "Retrying", "Cancelling"]');
+    expect(source).toContain("detailLoading");
+    expect(source).toContain("detailError");
+  });
+
   it("sanitizes generation display strings instead of rendering provider or failure values raw", () => {
     const source = readGenerationsPageLibrarySource();
 
@@ -146,7 +156,7 @@ describe("generations page hardening", () => {
     expect(source).toContain("const areGenerationFiltersLocked = generationsQuery.isFetching;");
     expect(source).toContain("generationsQuery.isLoading || isGenerationsRefreshing");
     expect(source).toContain("disabled={!canViewGenerations || generationsQuery.isFetching}");
-    expect(source.match(/disabled=\{areGenerationFiltersLocked\}/g) ?? []).toHaveLength(4);
+    expect(source.match(/disabled=\{areGenerationFiltersLocked\}/g) ?? []).toHaveLength(5);
     expect(source).toContain("function requestGenerationsRetry()");
     expect(source).toContain(
       "if (!canViewGenerations || generationsQuery.isFetching) {\n      return;\n    }"
@@ -203,6 +213,8 @@ describe("generations page hardening", () => {
     expect(source).toContain("generationMetrics?.failedJobs");
     expect(source).toContain("generationMetrics?.retryingJobs");
     expect(source).toContain("generationMetrics?.cancelledJobs");
+    expect(source).toContain("generationMetrics?.pendingRefunds");
+    expect(source).toContain("generationMetrics?.exhaustedRefunds");
     expect(source).toContain("hint={text.allJobsScope}");
     expect(source).toContain('aria-busy={generationsQuery.isFetching ? "true" : undefined}');
     expect(source).not.toContain('currentPageScope: isRu ? "Текущая страница" : "Current page"');
@@ -349,9 +361,11 @@ describe("generations page hardening", () => {
   it("keeps clean watermark grant refresh non-blocking after success", () => {
     const source = readGenerationsPageLibrarySource();
 
+    expect(source).toContain("await Promise.allSettled([");
     expect(source).toContain(
-      "await Promise.allSettled([\n        queryClient.invalidateQueries({ queryKey: adminQueryKeys.templateGenerations(query) }),\n      ]);"
+      "queryClient.invalidateQueries({ queryKey: adminQueryKeys.templateGenerations(query) })"
     );
+    expect(source).toContain("adminQueryKeys.templateGenerationDetail(generationId)");
     expect(source).not.toContain(
       "await queryClient.invalidateQueries({ queryKey: adminQueryKeys.templateGenerations(query) });"
     );
@@ -447,11 +461,9 @@ describe("generations page hardening", () => {
     expect(source).toContain("visibleItems.map((item) =>");
     expect(source).toContain('{visibleTotalCount} {text.tableTotalLabel} /{" "}');
     expect(source).toContain("{text.page} {pageIndex + 1} {text.of} {visiblePageCount}");
-    expect(source).toContain("const [expandedGeneration, setExpandedGeneration] = useState<{");
-    expect(source).toContain("const queryKey = JSON.stringify(query);");
-    expect(source).toContain(
-      "expandedGeneration?.queryKey === queryKey ? expandedGeneration.generationId : null"
-    );
+    expect(source).toContain("const [expandedGenerationId, setExpandedGenerationId]");
+    expect(source).toContain('searchParams.get("selected")');
+    expect(source).toContain('setOptional("selected", expandedGenerationId ?? "")');
     expect(source).toContain(
       "const visibleGenerationIds = useMemo(\n    () => new Set(visibleItems.map((item) => item.generationId)),"
     );
@@ -460,18 +472,16 @@ describe("generations page hardening", () => {
     );
     expect(source).toContain("let isActive = true;");
     expect(source).toContain("queueMicrotask(() => {");
-    expect(source).toContain("if (isActive) {\n        setExpandedGeneration(null);");
+    expect(source).toContain("if (isActive) {\n        setExpandedGenerationId(null);");
     expect(source).toContain("return () => {\n      isActive = false;\n    };");
     expect(source).toContain("function resetGenerationListContext(nextPageIndex = 0)");
-    expect(source).toContain("setExpandedGeneration(null);");
+    expect(source).toContain("setExpandedGenerationId(null);");
     expect(source).toContain("setPageIndex(nextPageIndex);");
     expect(source).toContain("resetGenerationListContext();");
     expect(source).toContain("resetGenerationListContext(Math.max(0, pageIndex - 1))");
     expect(source).toContain("resetGenerationListContext(pageIndex + 1)");
-    expect(source).toContain("setExpandedGeneration((current) =>");
-    expect(source).toContain(
-      "current?.queryKey === queryKey && current.generationId === generationId"
-    );
+    expect(source).toContain("setExpandedGenerationId((current) =>");
+    expect(source).toContain("current === generationId ? null : generationId");
     expect(source).not.toContain("setPageIndex((value) => Math.max(0, value - 1))");
     expect(source).not.toContain("setPageIndex((value) => value + 1)");
     expect(source).not.toContain("const items = page?.items ?? []");

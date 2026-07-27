@@ -224,39 +224,73 @@ export function humanizeBillingPeriod(value: string, locale: Locale) {
 }
 
 export function humanizeStatus(value: string, locale: Locale) {
+  const normalizedValue = normalizeEconomyStatus(value);
   const labels: Record<string, { ru: string; en: string }> = {
     pending: { ru: "Ожидает", en: "Pending" },
     succeeded: { ru: "Успешно", en: "Succeeded" },
     failed: { ru: "Ошибка", en: "Failed" },
+    refund_pending: { ru: "Ожидает возврата", en: "Refund pending" },
+    refund_review: { ru: "Нужна проверка возврата", en: "Refund review" },
     refunded: { ru: "Возврат", en: "Refunded" },
     active: { ru: "Активна", en: "Active" },
     trialing: { ru: "Пробный период", en: "Trialing" },
+    grace_period: { ru: "Льготный период", en: "Grace period" },
     past_due: { ru: "Просрочка", en: "Past due" },
     canceled: { ru: "Отменена", en: "Canceled" },
     expired: { ru: "Истекла", en: "Expired" },
+    revoked: { ru: "Отозвана", en: "Revoked" },
     processed: { ru: "Обработано", en: "Processed" },
+    open: { ru: "Открыт", en: "Open" },
+    resolved: { ru: "Закрыт", en: "Resolved" },
+    suppressed: { ru: "Скрыт", en: "Suppressed" },
   };
 
-  return labels[value]?.[locale] ?? value;
+  return labels[normalizedValue]?.[locale] ?? safeText(value, 48);
 }
 
 export function statusColor(value: string) {
-  switch (value) {
+  switch (normalizeEconomyStatus(value)) {
     case "active":
     case "succeeded":
     case "processed":
+    case "resolved":
       return "var(--success)";
     case "trialing":
+    case "grace_period":
       return "var(--info)";
     case "past_due":
     case "failed":
+    case "refund_review":
+    case "revoked":
       return "var(--danger)";
     case "canceled":
     case "expired":
     case "refunded":
+    case "suppressed":
       return "var(--neutral)";
     default:
       return "var(--warning)";
+  }
+}
+
+function normalizeEconomyStatus(value: string) {
+  const normalized = value.trim().toLowerCase();
+
+  switch (normalized) {
+    case "graceperiod":
+    case "grace-period":
+      return "grace_period";
+    case "pastdue":
+    case "past-due":
+      return "past_due";
+    case "refundpending":
+      return "refund_pending";
+    case "refundreview":
+      return "refund_review";
+    case "cancelled":
+      return "canceled";
+    default:
+      return normalized;
   }
 }
 

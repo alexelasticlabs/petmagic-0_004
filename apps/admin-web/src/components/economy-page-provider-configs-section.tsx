@@ -7,18 +7,27 @@ import {
   useState,
 } from "react";
 
-import { AdminCard, AdminStateCard, adminTableStyles } from "@/components/admin/admin-primitives";
+import { AdminCard, AdminStateCard } from "@/components/admin/admin-primitives";
 import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
+import { EconomySelectField } from "@/components/economy-page-select-field";
 import { type EconomyPageText } from "@/components/economy-page.content";
 import {
   ECONOMY_PROVIDER_BONUS_PERCENT_MAX_LENGTH,
-  ECONOMY_PROVIDER_CODE_MAX_LENGTH,
   ECONOMY_PROVIDER_LABEL_MAX_LENGTH,
   ECONOMY_PROVIDER_MESSAGE_MAX_LENGTH,
+  ECONOMY_PROVIDER_NOTES_MAX_LENGTH,
   ECONOMY_PROVIDER_REGION_MAX_LENGTH,
+  ECONOMY_PROVIDER_SUBTITLE_MAX_LENGTH,
   ECONOMY_PROVIDER_VERSION_MAX_LENGTH,
+  ECONOMY_PROVIDER_WARNING_TITLE_MAX_LENGTH,
+  isProviderConfigCreateDraftInvalid,
   isProviderConfigDraftDirty,
+  isProviderConfigDraftInvalid,
+  isProviderConfigMatchDraftInvalid,
   normalizeEconomyPercentInput,
+  paymentPlatformOptions,
+  paymentProviderOptions,
+  paymentRouteModeOptions,
   toProviderConfigDraft,
   updateProviderConfigDraft,
   type ProviderConfigCreateDraft,
@@ -33,6 +42,15 @@ import {
 } from "@/lib/api-client";
 import { type Locale } from "@/lib/i18n";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
+
+const providerOptions = paymentProviderOptions.map((value) => ({
+  value,
+  label: value === "stripe" ? "Stripe" : value === "app_store" ? "Apple App Store" : "Google Play",
+}));
+const platformOptions = paymentPlatformOptions.map((value) => ({
+  value,
+  label: value.toUpperCase(),
+}));
 
 type EconomyPageProviderConfigsSectionProps = {
   locale: Locale;
@@ -110,13 +128,27 @@ export function EconomyPageProviderConfigsSection({
   const [configurationPendingDeleteId, setConfigurationPendingDeleteId] = useState<string | null>(
     null
   );
+  const [configurationPendingClone, setConfigurationPendingClone] = useState<{
+    configurationId: string;
+    region: string;
+  } | null>(null);
+  const [editingConfigurationId, setEditingConfigurationId] = useState<string | null>(null);
   const configurationPendingDelete = configurationPendingDeleteId
     ? providerConfigs.find((config) => config.configurationId === configurationPendingDeleteId)
+    : null;
+  const configurationPendingCloneSource = configurationPendingClone
+    ? providerConfigs.find(
+        (config) => config.configurationId === configurationPendingClone.configurationId
+      )
     : null;
   const providerConfigIds = useMemo(
     () => new Set(providerConfigs.map((config) => config.configurationId)),
     [providerConfigs]
   );
+  const editingConfiguration = editingConfigurationId
+    ? providerConfigs.find((config) => config.configurationId === editingConfigurationId)
+    : null;
+
   useEffect(() => {
     let isActive = true;
     if (
@@ -137,18 +169,55 @@ export function EconomyPageProviderConfigsSection({
       isActive = false;
     };
   }, [configurationPendingDeleteId, deleteProviderConfigPending, providerConfigIds]);
+
+  useEffect(() => {
+    let isActive = true;
+    if (
+      !configurationPendingClone ||
+      providerConfigIds.has(configurationPendingClone.configurationId) ||
+      cloneProviderConfigPending
+    ) {
+      return;
+    }
+
+    queueMicrotask(() => {
+      if (isActive) {
+        setConfigurationPendingClone(null);
+      }
+    });
+
+    return () => {
+      isActive = false;
+    };
+  }, [cloneProviderConfigPending, configurationPendingClone, providerConfigIds]);
+
+  useEffect(() => {
+    let isActive = true;
+    if (!editingConfigurationId || providerConfigIds.has(editingConfigurationId)) {
+      return;
+    }
+
+    queueMicrotask(() => {
+      if (isActive) {
+        setEditingConfigurationId(null);
+      }
+    });
+
+    return () => {
+      isActive = false;
+    };
+  }, [editingConfigurationId, providerConfigIds]);
+
+  const isCreateProviderRegionValid = isValidPaymentRouteRegion(createProviderDraft.region);
+  const isProviderConfigMatchCountryValid = isValidPaymentRouteCountry(matchDraft.country);
   const isCreateProviderConfigInvalid =
-    !createProviderDraft.provider.trim() ||
-    !createProviderDraft.platform.trim() ||
-    !createProviderDraft.region.trim() ||
-    !createProviderDraft.mode.trim() ||
-    !createProviderDraft.allowedFromAppVersion.trim() ||
-    !createProviderDraft.bonusTokensPercent.trim();
+    !isCreateProviderRegionValid || isProviderConfigCreateDraftInvalid(createProviderDraft);
   const isProviderConfigMatchInvalid =
-    !matchDraft.provider.trim() ||
-    !matchDraft.platform.trim() ||
-    !matchDraft.country.trim() ||
-    !matchDraft.appVersion.trim();
+    !isProviderConfigMatchCountryValid || isProviderConfigMatchDraftInvalid(matchDraft);
+  const modeOptions = paymentRouteModeOptions.map((value) => ({
+    value,
+    label: value === "test" ? text.providerModeTestLabel : text.providerModeLiveLabel,
+  }));
   const requestCreateProviderConfig = () => {
     if (createProviderConfigPending || isCreateProviderConfigInvalid) {
       return;
@@ -167,39 +236,30 @@ export function EconomyPageProviderConfigsSection({
   return (
     <AdminCard title={text.providerConfigsTitle} description={text.providerConfigsDescription}>
       <div className={styles.redeemGrid}>
-        <div className={styles.redeemForm}>
-          <strong>{text.providerConfigCreateTitle}</strong>
+        <details className={`${styles.redeemForm} ${styles.utilityDisclosure}`}>
+          <summary className={styles.utilityDisclosureSummary}>
+            <strong>{text.providerConfigCreateTitle}</strong>
+            <span>{text.providerConfigCreateAction}</span>
+          </summary>
           <div className={styles.formRow}>
-            <label className={styles.field}>
-              <span>{text.providerColumn}</span>
-              <input
-                value={createProviderDraft.provider}
-                onChange={(event) =>
-                  setCreateProviderDraft((current) => ({
-                    ...current,
-                    provider: normalizeProviderCodeInput(event.target.value),
-                  }))
-                }
-                className={styles.input}
-                placeholder={text.providerCodePlaceholder}
-                maxLength={ECONOMY_PROVIDER_CODE_MAX_LENGTH}
-              />
-            </label>
-            <label className={styles.field}>
-              <span>{text.platformColumn}</span>
-              <input
-                value={createProviderDraft.platform}
-                onChange={(event) =>
-                  setCreateProviderDraft((current) => ({
-                    ...current,
-                    platform: normalizeProviderCodeInput(event.target.value),
-                  }))
-                }
-                className={styles.input}
-                placeholder={text.platformCodePlaceholder}
-                maxLength={ECONOMY_PROVIDER_CODE_MAX_LENGTH}
-              />
-            </label>
+            <EconomySelectField
+              label={text.providerColumn}
+              value={createProviderDraft.provider}
+              options={providerOptions}
+              disabled={createProviderConfigPending}
+              onChange={(provider) =>
+                setCreateProviderDraft((current) => ({ ...current, provider }))
+              }
+            />
+            <EconomySelectField
+              label={text.platformColumn}
+              value={createProviderDraft.platform}
+              options={platformOptions}
+              disabled={createProviderConfigPending}
+              onChange={(platform) =>
+                setCreateProviderDraft((current) => ({ ...current, platform }))
+              }
+            />
             <label className={styles.field}>
               <span>{text.regionColumn}</span>
               <input
@@ -213,23 +273,18 @@ export function EconomyPageProviderConfigsSection({
                 className={styles.input}
                 placeholder={text.providerRegionPlaceholder}
                 maxLength={ECONOMY_PROVIDER_REGION_MAX_LENGTH}
+                pattern="[A-Za-z]{2}|[*]"
+                aria-invalid={!isCreateProviderRegionValid || undefined}
+                disabled={createProviderConfigPending}
               />
             </label>
-            <label className={styles.field}>
-              <span>{text.modeColumn}</span>
-              <input
-                value={createProviderDraft.mode}
-                onChange={(event) =>
-                  setCreateProviderDraft((current) => ({
-                    ...current,
-                    mode: normalizeProviderCodeInput(event.target.value),
-                  }))
-                }
-                className={styles.input}
-                placeholder={text.providerModePlaceholder}
-                maxLength={ECONOMY_PROVIDER_CODE_MAX_LENGTH}
-              />
-            </label>
+            <EconomySelectField
+              label={text.modeColumn}
+              value={createProviderDraft.mode}
+              options={modeOptions}
+              disabled={createProviderConfigPending}
+              onChange={(mode) => setCreateProviderDraft((current) => ({ ...current, mode }))}
+            />
           </div>
 
           <div className={styles.formRow}>
@@ -246,6 +301,7 @@ export function EconomyPageProviderConfigsSection({
                 className={styles.input}
                 placeholder={text.providerAppVersionPlaceholder}
                 maxLength={ECONOMY_PROVIDER_VERSION_MAX_LENGTH}
+                disabled={createProviderConfigPending}
               />
             </label>
             <label className={styles.field}>
@@ -264,6 +320,7 @@ export function EconomyPageProviderConfigsSection({
                 className={styles.input}
                 placeholder={text.providerBonusPlaceholder}
                 maxLength={ECONOMY_PROVIDER_BONUS_PERCENT_MAX_LENGTH}
+                disabled={createProviderConfigPending}
               />
             </label>
           </div>
@@ -273,6 +330,7 @@ export function EconomyPageProviderConfigsSection({
               <input
                 type="checkbox"
                 checked={createProviderDraft.isEnabled}
+                disabled={createProviderConfigPending}
                 onChange={(event) =>
                   setCreateProviderDraft((current) => ({
                     ...current,
@@ -286,6 +344,7 @@ export function EconomyPageProviderConfigsSection({
               <input
                 type="checkbox"
                 checked={createProviderDraft.externalCheckoutAllowed}
+                disabled={createProviderConfigPending}
                 onChange={(event) =>
                   setCreateProviderDraft((current) => ({
                     ...current,
@@ -299,6 +358,7 @@ export function EconomyPageProviderConfigsSection({
               <input
                 type="checkbox"
                 checked={createProviderDraft.isRecommended}
+                disabled={createProviderConfigPending}
                 onChange={(event) =>
                   setCreateProviderDraft((current) => ({
                     ...current,
@@ -312,6 +372,7 @@ export function EconomyPageProviderConfigsSection({
               <input
                 type="checkbox"
                 checked={createProviderDraft.isSelectedByDefault}
+                disabled={createProviderConfigPending}
                 onChange={(event) =>
                   setCreateProviderDraft((current) => ({
                     ...current,
@@ -329,41 +390,28 @@ export function EconomyPageProviderConfigsSection({
           >
             {createProviderConfigPending ? text.savingAction : text.providerConfigCreateAction}
           </Button>
-        </div>
+        </details>
 
-        <div className={styles.redeemForm}>
-          <strong>{text.providerConfigTestTitle}</strong>
+        <details className={`${styles.redeemForm} ${styles.utilityDisclosure}`}>
+          <summary className={styles.utilityDisclosureSummary}>
+            <strong>{text.providerConfigTestTitle}</strong>
+            <span>{text.providerConfigTestAction}</span>
+          </summary>
           <div className={styles.formRow}>
-            <label className={styles.field}>
-              <span>{text.providerColumn}</span>
-              <input
-                value={matchDraft.provider}
-                onChange={(event) =>
-                  setMatchDraft((current) => ({
-                    ...current,
-                    provider: normalizeProviderCodeInput(event.target.value),
-                  }))
-                }
-                className={styles.input}
-                placeholder={text.providerCodePlaceholder}
-                maxLength={ECONOMY_PROVIDER_CODE_MAX_LENGTH}
-              />
-            </label>
-            <label className={styles.field}>
-              <span>{text.platformColumn}</span>
-              <input
-                value={matchDraft.platform}
-                onChange={(event) =>
-                  setMatchDraft((current) => ({
-                    ...current,
-                    platform: normalizeProviderCodeInput(event.target.value),
-                  }))
-                }
-                className={styles.input}
-                placeholder={text.platformCodePlaceholder}
-                maxLength={ECONOMY_PROVIDER_CODE_MAX_LENGTH}
-              />
-            </label>
+            <EconomySelectField
+              label={text.providerColumn}
+              value={matchDraft.provider}
+              options={providerOptions}
+              disabled={testProviderConfigPending}
+              onChange={(provider) => setMatchDraft((current) => ({ ...current, provider }))}
+            />
+            <EconomySelectField
+              label={text.platformColumn}
+              value={matchDraft.platform}
+              options={platformOptions}
+              disabled={testProviderConfigPending}
+              onChange={(platform) => setMatchDraft((current) => ({ ...current, platform }))}
+            />
             <label className={styles.field}>
               <span>{text.regionColumn}</span>
               <input
@@ -377,6 +425,9 @@ export function EconomyPageProviderConfigsSection({
                 className={styles.input}
                 placeholder={text.providerRegionPlaceholder}
                 maxLength={ECONOMY_PROVIDER_REGION_MAX_LENGTH}
+                pattern="[A-Za-z]{2}"
+                aria-invalid={!isProviderConfigMatchCountryValid || undefined}
+                disabled={testProviderConfigPending}
               />
             </label>
             <label className={styles.field}>
@@ -392,6 +443,7 @@ export function EconomyPageProviderConfigsSection({
                 className={styles.input}
                 placeholder={text.providerAppVersionPlaceholder}
                 maxLength={ECONOMY_PROVIDER_VERSION_MAX_LENGTH}
+                disabled={testProviderConfigPending}
               />
             </label>
           </div>
@@ -409,404 +461,117 @@ export function EconomyPageProviderConfigsSection({
               title={`${safeText(matchResult.decisionCode, 80)}: ${safeText(matchResult.decisionMessage, 180)}`}
               description={
                 matchResult.matchedConfiguration
-                  ? `${text.providerConfigMatchLabel}: ${humanizeProvider(matchResult.matchedConfiguration.provider, locale)}/${safeText(matchResult.matchedConfiguration.platform, 48)}/${safeText(matchResult.matchedConfiguration.region, 48)} (${safeText(matchResult.matchedConfiguration.mode, 48)})`
+                  ? `${text.providerConfigMatchLabel}: ${humanizeProvider(matchResult.matchedConfiguration.provider, locale)}/${safeText(matchResult.matchedConfiguration.platform, 48)}/${safeText(matchResult.matchedConfiguration.region, 48)} (${humanizeRouteMode(matchResult.matchedConfiguration.mode, text)})`
                   : text.providerConfigNoMatchLabel
               }
             />
           ) : null}
-        </div>
+        </details>
       </div>
 
       <TableOrEmpty hasItems={providerConfigs.length > 0} emptyTitle={text.noProviderConfigs}>
-        <div className={adminTableStyles.tableWrap}>
-          <table className={adminTableStyles.table}>
-            <thead>
-              <tr>
-                <th>{text.providerColumn}</th>
-                <th>{text.platformColumn}</th>
-                <th>{text.regionColumn}</th>
-                <th>{text.statusColumn}</th>
-                <th>{text.flagsColumn}</th>
-                <th>{text.modeColumn}</th>
-                <th>{text.actionsColumn}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {providerConfigs.map((config) => {
-                const draft =
-                  providerConfigDrafts[config.configurationId] ?? toProviderConfigDraft(config);
-                const isSavingConfig =
-                  saveProviderConfigPending && saveProviderConfigId === config.configurationId;
-                const isProviderConfigInvalid = isPaymentRouteDraftInvalid(draft);
-                const isProviderConfigDraftLocked =
-                  saveProviderConfigPending ||
-                  cloneProviderConfigPending ||
-                  deleteProviderConfigPending;
-                const isSaveProviderConfigDisabled =
-                  isProviderConfigDraftLocked ||
-                  isProviderConfigInvalid ||
-                  !isProviderConfigDraftDirty(config, draft);
-                const cloneRegion = cloneRegionDrafts[config.configurationId] ?? "";
-                const isCloneProviderConfigDisabled =
-                  isProviderConfigDraftLocked || !cloneRegion.trim();
+        <ul className={styles.providerConfigSummaryList} aria-label={text.providerConfigsTitle}>
+          {providerConfigs.map((config) => {
+            const draft =
+              providerConfigDrafts[config.configurationId] ?? toProviderConfigDraft(config);
+            const isProviderConfigDraftDirtyState = isProviderConfigDraftDirty(config, draft);
+            const isProviderConfigBusy =
+              (saveProviderConfigPending && saveProviderConfigId === config.configurationId) ||
+              (cloneProviderConfigPending && cloneProviderConfigId === config.configurationId) ||
+              (deleteProviderConfigPending && deleteProviderConfigId === config.configurationId);
+            const isProviderConfigEditorOpen = editingConfigurationId === config.configurationId;
+            const editorId = `economy-provider-config-editor-${config.configurationId}`;
 
-                return (
-                  <tr key={config.configurationId}>
-                    <td>{humanizeProvider(config.provider, locale)}</td>
-                    <td>{safeText(config.platform, 48)}</td>
-                    <td>
-                      <input
-                        value={draft.region}
-                        onChange={(event) =>
-                          updateProviderConfigDraft(
-                            setProviderConfigDrafts,
-                            config.configurationId,
-                            {
-                              region: normalizeProviderRegionInput(event.target.value),
-                            }
-                          )
-                        }
-                        className={styles.input}
-                        maxLength={ECONOMY_PROVIDER_REGION_MAX_LENGTH}
-                        disabled={isProviderConfigDraftLocked}
-                      />
-                    </td>
-                    <td>
-                      <label className={styles.checkboxField}>
-                        <input
-                          type="checkbox"
-                          checked={draft.isEnabled}
-                          disabled={isProviderConfigDraftLocked}
-                          onChange={(event) =>
-                            updateProviderConfigDraft(
-                              setProviderConfigDrafts,
-                              config.configurationId,
-                              {
-                                isEnabled: event.target.checked,
-                              }
-                            )
-                          }
-                        />
-                        <span>{draft.isEnabled ? text.activeState : text.inactiveState}</span>
-                      </label>
-                    </td>
-                    <td>
-                      <div className={styles.windowFields}>
-                        <label className={styles.checkboxField}>
-                          <input
-                            type="checkbox"
-                            checked={draft.externalCheckoutAllowed}
-                            disabled={isProviderConfigDraftLocked}
-                            onChange={(event) =>
-                              updateProviderConfigDraft(
-                                setProviderConfigDrafts,
-                                config.configurationId,
-                                { externalCheckoutAllowed: event.target.checked }
-                              )
-                            }
-                          />
-                          <span>{text.externalCheckoutFlag}</span>
-                        </label>
-                        <label className={styles.checkboxField}>
-                          <input
-                            type="checkbox"
-                            checked={draft.isRecommended}
-                            disabled={isProviderConfigDraftLocked}
-                            onChange={(event) =>
-                              updateProviderConfigDraft(
-                                setProviderConfigDrafts,
-                                config.configurationId,
-                                {
-                                  isRecommended: event.target.checked,
-                                }
-                              )
-                            }
-                          />
-                          <span>{text.recommendedFlag}</span>
-                        </label>
-                        <label className={styles.checkboxField}>
-                          <input
-                            type="checkbox"
-                            checked={draft.isSelectedByDefault}
-                            disabled={isProviderConfigDraftLocked}
-                            onChange={(event) =>
-                              updateProviderConfigDraft(
-                                setProviderConfigDrafts,
-                                config.configurationId,
-                                { isSelectedByDefault: event.target.checked }
-                              )
-                            }
-                          />
-                          <span>{text.defaultFlag}</span>
-                        </label>
-                        <label className={styles.checkboxField}>
-                          <input
-                            type="checkbox"
-                            checked={draft.requiresExternalWarning}
-                            disabled={isProviderConfigDraftLocked}
-                            onChange={(event) =>
-                              updateProviderConfigDraft(
-                                setProviderConfigDrafts,
-                                config.configurationId,
-                                { requiresExternalWarning: event.target.checked }
-                              )
-                            }
-                          />
-                          <span>{text.externalWarningFlag}</span>
-                        </label>
-                        <label className={styles.checkboxField}>
-                          <input
-                            type="checkbox"
-                            checked={draft.requiresStoreDisclosure}
-                            disabled={isProviderConfigDraftLocked}
-                            onChange={(event) =>
-                              updateProviderConfigDraft(
-                                setProviderConfigDrafts,
-                                config.configurationId,
-                                { requiresStoreDisclosure: event.target.checked }
-                              )
-                            }
-                          />
-                          <span>{text.storeDisclosureFlag}</span>
-                        </label>
-                        <label className={styles.field}>
-                          <span>{text.minVersionLabel}</span>
-                          <input
-                            value={draft.allowedFromAppVersion}
-                            onChange={(event) =>
-                              updateProviderConfigDraft(
-                                setProviderConfigDrafts,
-                                config.configurationId,
-                                {
-                                  allowedFromAppVersion: normalizeProviderVersionInput(
-                                    event.target.value
-                                  ),
-                                }
-                              )
-                            }
-                            className={styles.input}
-                            maxLength={ECONOMY_PROVIDER_VERSION_MAX_LENGTH}
-                            disabled={isProviderConfigDraftLocked}
-                          />
-                        </label>
-                        <label className={styles.field}>
-                          <span>{text.bonusPercentLabel}</span>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            value={draft.bonusTokensPercent}
-                            onChange={(event) =>
-                              updateProviderConfigDraft(
-                                setProviderConfigDrafts,
-                                config.configurationId,
-                                {
-                                  bonusTokensPercent: normalizeEconomyPercentInput(
-                                    event.target.value
-                                  ),
-                                }
-                              )
-                            }
-                            className={styles.input}
-                            maxLength={ECONOMY_PROVIDER_BONUS_PERCENT_MAX_LENGTH}
-                            disabled={isProviderConfigDraftLocked}
-                          />
-                        </label>
-                      </div>
-                    </td>
-                    <td>
-                      <div className={styles.windowFields}>
-                        <label className={styles.field}>
-                          <span>{text.modeColumn}</span>
-                          <input
-                            value={draft.mode}
-                            onChange={(event) =>
-                              updateProviderConfigDraft(
-                                setProviderConfigDrafts,
-                                config.configurationId,
-                                {
-                                  mode: normalizeProviderCodeInput(event.target.value),
-                                }
-                              )
-                            }
-                            className={styles.input}
-                            maxLength={ECONOMY_PROVIDER_CODE_MAX_LENGTH}
-                            disabled={isProviderConfigDraftLocked}
-                          />
-                        </label>
-                        <label className={styles.field}>
-                          <span>{text.displayLabelLabel}</span>
-                          <input
-                            value={draft.displayLabel}
-                            onChange={(event) =>
-                              updateProviderConfigDraft(
-                                setProviderConfigDrafts,
-                                config.configurationId,
-                                {
-                                  displayLabel: normalizeProviderLabelInput(event.target.value),
-                                }
-                              )
-                            }
-                            className={styles.input}
-                            placeholder={humanizeProvider(config.provider, locale)}
-                            maxLength={ECONOMY_PROVIDER_LABEL_MAX_LENGTH}
-                            disabled={isProviderConfigDraftLocked}
-                          />
-                        </label>
-                        <label className={styles.field}>
-                          <span>{text.displaySubtitleLabel}</span>
-                          <input
-                            value={draft.displaySubtitle}
-                            onChange={(event) =>
-                              updateProviderConfigDraft(
-                                setProviderConfigDrafts,
-                                config.configurationId,
-                                {
-                                  displaySubtitle: normalizeProviderLabelInput(event.target.value),
-                                }
-                              )
-                            }
-                            className={styles.input}
-                            placeholder={text.noDescription}
-                            maxLength={ECONOMY_PROVIDER_LABEL_MAX_LENGTH}
-                            disabled={isProviderConfigDraftLocked}
-                          />
-                        </label>
-                        <label className={styles.field}>
-                          <span>{text.warningTitleLabel}</span>
-                          <input
-                            value={draft.warningTitle}
-                            onChange={(event) =>
-                              updateProviderConfigDraft(
-                                setProviderConfigDrafts,
-                                config.configurationId,
-                                {
-                                  warningTitle: normalizeProviderLabelInput(event.target.value),
-                                }
-                              )
-                            }
-                            className={styles.input}
-                            placeholder={text.noDescription}
-                            maxLength={ECONOMY_PROVIDER_LABEL_MAX_LENGTH}
-                            disabled={isProviderConfigDraftLocked}
-                          />
-                        </label>
-                        <label className={styles.field}>
-                          <span>{text.warningMessageLabel}</span>
-                          <input
-                            value={draft.warningMessage}
-                            onChange={(event) =>
-                              updateProviderConfigDraft(
-                                setProviderConfigDrafts,
-                                config.configurationId,
-                                {
-                                  warningMessage: normalizeProviderMessageInput(event.target.value),
-                                }
-                              )
-                            }
-                            className={styles.input}
-                            placeholder={text.noDescription}
-                            maxLength={ECONOMY_PROVIDER_MESSAGE_MAX_LENGTH}
-                            disabled={isProviderConfigDraftLocked}
-                          />
-                        </label>
-                        <label className={styles.field}>
-                          <span>{text.notesLabel}</span>
-                          <input
-                            value={draft.notes}
-                            onChange={(event) =>
-                              updateProviderConfigDraft(
-                                setProviderConfigDrafts,
-                                config.configurationId,
-                                {
-                                  notes: normalizeProviderMessageInput(event.target.value),
-                                }
-                              )
-                            }
-                            className={styles.input}
-                            placeholder={text.noDescription}
-                            maxLength={ECONOMY_PROVIDER_MESSAGE_MAX_LENGTH}
-                            disabled={isProviderConfigDraftLocked}
-                          />
-                        </label>
-                      </div>
-                    </td>
-                    <td>
-                      <div className={styles.tableActions}>
-                        <Button
-                          onClick={() => {
-                            if (isSaveProviderConfigDisabled) {
-                              return;
-                            }
+            return (
+              <li
+                key={config.configurationId}
+                className={styles.providerConfigSummaryItem}
+                data-selected={isProviderConfigEditorOpen || undefined}
+              >
+                <div className={styles.providerConfigSummaryIdentity}>
+                  <strong>{humanizeProvider(config.provider, locale)}</strong>
+                  <span>
+                    {safeText(config.platform.toUpperCase(), 48)} · {safeText(draft.region, 48)}
+                  </span>
+                </div>
 
-                            onSaveProviderConfig(config.configurationId);
-                          }}
-                          disabled={isSaveProviderConfigDisabled}
-                        >
-                          {isSavingConfig ? text.savingAction : text.saveAction}
-                        </Button>
+                <div className={styles.providerConfigSummaryValue}>
+                  <strong>{humanizeRouteMode(draft.mode, text)}</strong>
+                  <span>
+                    {text.minVersionLabel}: {safeText(draft.allowedFromAppVersion, 48)}
+                  </span>
+                </div>
 
-                        <input
-                          value={cloneRegion}
-                          onChange={(event) =>
-                            setCloneRegionDrafts((current) => ({
-                              ...current,
-                              [config.configurationId]: normalizeProviderRegionInput(
-                                event.target.value
-                              ),
-                            }))
-                          }
-                          className={styles.input}
-                          placeholder={text.cloneRegionPlaceholder}
-                          maxLength={ECONOMY_PROVIDER_REGION_MAX_LENGTH}
-                          disabled={isProviderConfigDraftLocked}
-                        />
+                <div className={`${styles.flagList} ${styles.providerConfigSummaryFlags}`}>
+                  <span>{draft.isEnabled ? text.activeState : text.inactiveState}</span>
+                  {draft.externalCheckoutAllowed ? <span>{text.externalCheckoutFlag}</span> : null}
+                  {draft.isRecommended ? <span>{text.recommendedFlag}</span> : null}
+                  {draft.isSelectedByDefault ? <span>{text.defaultFlag}</span> : null}
+                  {draft.requiresExternalWarning ? <span>{text.externalWarningFlag}</span> : null}
+                  {draft.requiresStoreDisclosure ? <span>{text.storeDisclosureFlag}</span> : null}
+                  {isProviderConfigDraftDirtyState ? (
+                    <span className={styles.providerConfigSummaryDirty}>
+                      {text.unsavedChangesLabel}
+                    </span>
+                  ) : null}
+                </div>
 
-                        <Button
-                          onClick={() => {
-                            const nextCloneRegion = cloneRegion.trim();
-                            if (isCloneProviderConfigDisabled) {
-                              return;
-                            }
+                <Button
+                  aria-controls={editorId}
+                  aria-expanded={isProviderConfigEditorOpen}
+                  aria-label={`${text.editAction}: ${humanizeProvider(config.provider, locale)} / ${safeText(config.platform, 48)} / ${safeText(draft.region, 48)}`}
+                  disabled={isProviderConfigBusy}
+                  onClick={() =>
+                    setEditingConfigurationId((currentConfigurationId) =>
+                      currentConfigurationId === config.configurationId
+                        ? null
+                        : config.configurationId
+                    )
+                  }
+                >
+                  {text.editAction}
+                </Button>
+              </li>
+            );
+          })}
+        </ul>
 
-                            onCloneProviderConfig({
-                              configurationId: config.configurationId,
-                              region: nextCloneRegion,
-                            });
-                          }}
-                          disabled={isCloneProviderConfigDisabled}
-                        >
-                          {cloneProviderConfigPending &&
-                          cloneProviderConfigId === config.configurationId
-                            ? text.savingAction
-                            : text.cloneAction}
-                        </Button>
-
-                        <Button
-                          onClick={() => {
-                            if (isProviderConfigDraftLocked) {
-                              return;
-                            }
-
-                            setConfigurationPendingDeleteId(config.configurationId);
-                          }}
-                          disabled={isProviderConfigDraftLocked}
-                          variant="danger"
-                        >
-                          {deleteProviderConfigPending &&
-                          deleteProviderConfigId === config.configurationId
-                            ? text.savingAction
-                            : text.deleteAction}
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        {editingConfiguration ? (
+          <ProviderConfigEditor
+            editorId={`economy-provider-config-editor-${editingConfiguration.configurationId}`}
+            locale={locale}
+            text={text}
+            config={editingConfiguration}
+            draft={
+              providerConfigDrafts[editingConfiguration.configurationId] ??
+              toProviderConfigDraft(editingConfiguration)
+            }
+            setProviderConfigDrafts={setProviderConfigDrafts}
+            cloneRegion={cloneRegionDrafts[editingConfiguration.configurationId] ?? ""}
+            setCloneRegionDrafts={setCloneRegionDrafts}
+            modeOptions={modeOptions}
+            saveProviderConfigPending={saveProviderConfigPending}
+            saveProviderConfigId={saveProviderConfigId}
+            cloneProviderConfigPending={cloneProviderConfigPending}
+            cloneProviderConfigId={cloneProviderConfigId}
+            deleteProviderConfigPending={deleteProviderConfigPending}
+            deleteProviderConfigId={deleteProviderConfigId}
+            onSaveProviderConfig={onSaveProviderConfig}
+            onRequestClone={(region) =>
+              setConfigurationPendingClone({
+                configurationId: editingConfiguration.configurationId,
+                region,
+              })
+            }
+            onRequestDelete={() =>
+              setConfigurationPendingDeleteId(editingConfiguration.configurationId)
+            }
+            onClose={() => setEditingConfigurationId(null)}
+            humanizeProvider={humanizeProvider}
+          />
+        ) : null}
       </TableOrEmpty>
+
       <ConfirmationDialog
         open={configurationPendingDeleteId !== null}
         title={text.deleteAction}
@@ -841,7 +606,417 @@ export function EconomyPageProviderConfigsSection({
           });
         }}
       />
+      <ConfirmationDialog
+        open={configurationPendingClone !== null}
+        title={text.providerConfigCloneConfirmTitle}
+        description={
+          configurationPendingClone && configurationPendingCloneSource
+            ? `${humanizeProvider(configurationPendingCloneSource.provider, locale)} / ${safeText(configurationPendingCloneSource.platform, 48)} / ${configurationPendingClone.region} · ${humanizeRouteMode(configurationPendingCloneSource.mode, text)} · ${configurationPendingCloneSource.isEnabled ? text.activeState : text.inactiveState}${configurationPendingCloneSource.isSelectedByDefault ? ` · ${text.defaultFlag}` : ""}. ${text.providerConfigCloneConfirmDescription}`
+            : text.providerConfigCloneConfirmDescription
+        }
+        confirmLabel={text.cloneAction}
+        cancelLabel={text.confirmationCancel}
+        isSubmitting={false}
+        onCancel={() => setConfigurationPendingClone(null)}
+        onConfirm={() => {
+          if (
+            !configurationPendingClone ||
+            !configurationPendingCloneSource ||
+            cloneProviderConfigPending ||
+            !isValidPaymentRouteRegion(configurationPendingClone.region)
+          ) {
+            return;
+          }
+
+          const payload = configurationPendingClone;
+          setConfigurationPendingClone(null);
+          onCloneProviderConfig(payload);
+        }}
+      />
     </AdminCard>
+  );
+}
+
+type ProviderConfigEditorProps = {
+  editorId: string;
+  locale: Locale;
+  text: EconomyPageText;
+  config: AdminPaymentProviderConfiguration;
+  draft: ProviderConfigDraft;
+  setProviderConfigDrafts: Dispatch<SetStateAction<Record<string, ProviderConfigDraft>>>;
+  cloneRegion: string;
+  setCloneRegionDrafts: Dispatch<SetStateAction<Record<string, string>>>;
+  modeOptions: Array<{ value: string; label: string }>;
+  saveProviderConfigPending: boolean;
+  saveProviderConfigId?: string;
+  cloneProviderConfigPending: boolean;
+  cloneProviderConfigId?: string;
+  deleteProviderConfigPending: boolean;
+  deleteProviderConfigId?: string;
+  onSaveProviderConfig: (configurationId: string) => void;
+  onRequestClone: (region: string) => void;
+  onRequestDelete: () => void;
+  onClose: () => void;
+  humanizeProvider: (value: string, locale: Locale) => string;
+};
+
+function ProviderConfigEditor({
+  editorId,
+  locale,
+  text,
+  config,
+  draft,
+  setProviderConfigDrafts,
+  cloneRegion,
+  setCloneRegionDrafts,
+  modeOptions,
+  saveProviderConfigPending,
+  saveProviderConfigId,
+  cloneProviderConfigPending,
+  cloneProviderConfigId,
+  deleteProviderConfigPending,
+  deleteProviderConfigId,
+  onSaveProviderConfig,
+  onRequestClone,
+  onRequestDelete,
+  onClose,
+  humanizeProvider,
+}: ProviderConfigEditorProps) {
+  const isSavingConfig =
+    saveProviderConfigPending && saveProviderConfigId === config.configurationId;
+  const isProviderConfigRegionValid = isValidPaymentRouteRegion(draft.region);
+  const isProviderConfigInvalid =
+    !isProviderConfigRegionValid || isProviderConfigDraftInvalid(draft);
+  const isProviderConfigDraftLocked =
+    isSavingConfig ||
+    (cloneProviderConfigPending && cloneProviderConfigId === config.configurationId) ||
+    (deleteProviderConfigPending && deleteProviderConfigId === config.configurationId);
+  const isSaveProviderConfigDisabled =
+    saveProviderConfigPending ||
+    isProviderConfigInvalid ||
+    !isProviderConfigDraftDirty(config, draft);
+  const isCloneRegionValid = isValidPaymentRouteRegion(cloneRegion);
+  const isCloneProviderConfigDisabled =
+    isProviderConfigDraftLocked || cloneProviderConfigPending || !isCloneRegionValid;
+
+  function updateDraft(patch: Partial<ProviderConfigDraft>) {
+    updateProviderConfigDraft(setProviderConfigDrafts, config.configurationId, patch);
+  }
+
+  return (
+    <section
+      className={styles.providerConfigEditor}
+      id={editorId}
+      aria-labelledby={`${editorId}-title`}
+    >
+      <div className={styles.providerConfigEditorHeader}>
+        <div className={styles.packMeta}>
+          <h3 id={`${editorId}-title`}>
+            {`${text.editAction}: ${humanizeProvider(config.provider, locale)}`}
+          </h3>
+          <span>
+            {safeText(config.platform.toUpperCase(), 48)} · {safeText(draft.region, 48)}
+          </span>
+        </div>
+        <button
+          type="button"
+          className={styles.pagerButton}
+          disabled={isProviderConfigDraftLocked}
+          onClick={onClose}
+        >
+          {text.collapseEditorAction}
+        </button>
+      </div>
+
+      <form
+        className={styles.providerConfigEditorForm}
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!isSaveProviderConfigDisabled) {
+            onSaveProviderConfig(config.configurationId);
+          }
+        }}
+      >
+        <div className={styles.providerConfigEditorRouteFields}>
+          <label className={styles.field}>
+            <span>{text.regionColumn}</span>
+            <input
+              value={draft.region}
+              onChange={(event) =>
+                updateDraft({ region: normalizeProviderRegionInput(event.target.value) })
+              }
+              className={styles.input}
+              maxLength={ECONOMY_PROVIDER_REGION_MAX_LENGTH}
+              pattern="[A-Za-z]{2}|[*]"
+              aria-invalid={!isProviderConfigRegionValid || undefined}
+              disabled={isProviderConfigDraftLocked}
+            />
+          </label>
+          <EconomySelectField
+            label={text.modeColumn}
+            value={draft.mode}
+            options={modeOptions}
+            onChange={(mode) => updateDraft({ mode })}
+            disabled={isProviderConfigDraftLocked}
+          />
+          <label className={styles.field}>
+            <span>{text.minVersionLabel}</span>
+            <input
+              value={draft.allowedFromAppVersion}
+              onChange={(event) =>
+                updateDraft({
+                  allowedFromAppVersion: normalizeProviderVersionInput(event.target.value),
+                })
+              }
+              className={styles.input}
+              maxLength={ECONOMY_PROVIDER_VERSION_MAX_LENGTH}
+              disabled={isProviderConfigDraftLocked}
+            />
+          </label>
+          <label className={styles.field}>
+            <span>{text.bonusPercentLabel}</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={draft.bonusTokensPercent}
+              onChange={(event) =>
+                updateDraft({
+                  bonusTokensPercent: normalizeEconomyPercentInput(event.target.value),
+                })
+              }
+              className={styles.input}
+              maxLength={ECONOMY_PROVIDER_BONUS_PERCENT_MAX_LENGTH}
+              disabled={isProviderConfigDraftLocked}
+            />
+          </label>
+        </div>
+
+        <div className={styles.providerConfigEditorFlags}>
+          <label className={styles.checkboxField}>
+            <input
+              type="checkbox"
+              checked={draft.isEnabled}
+              disabled={isProviderConfigDraftLocked}
+              onChange={(event) => updateDraft({ isEnabled: event.target.checked })}
+            />
+            <span>{draft.isEnabled ? text.activeState : text.inactiveState}</span>
+          </label>
+          <label className={styles.checkboxField}>
+            <input
+              type="checkbox"
+              checked={draft.externalCheckoutAllowed}
+              disabled={isProviderConfigDraftLocked}
+              onChange={(event) => updateDraft({ externalCheckoutAllowed: event.target.checked })}
+            />
+            <span>{text.externalCheckoutFlag}</span>
+          </label>
+          <label className={styles.checkboxField}>
+            <input
+              type="checkbox"
+              checked={draft.isRecommended}
+              disabled={isProviderConfigDraftLocked}
+              onChange={(event) => updateDraft({ isRecommended: event.target.checked })}
+            />
+            <span>{text.recommendedFlag}</span>
+          </label>
+          <label className={styles.checkboxField}>
+            <input
+              type="checkbox"
+              checked={draft.isSelectedByDefault}
+              disabled={isProviderConfigDraftLocked}
+              onChange={(event) => updateDraft({ isSelectedByDefault: event.target.checked })}
+            />
+            <span>{text.defaultFlag}</span>
+          </label>
+          <label className={styles.checkboxField}>
+            <input
+              type="checkbox"
+              checked={draft.requiresExternalWarning}
+              disabled={isProviderConfigDraftLocked}
+              onChange={(event) => updateDraft({ requiresExternalWarning: event.target.checked })}
+            />
+            <span>{text.externalWarningFlag}</span>
+          </label>
+          <label className={styles.checkboxField}>
+            <input
+              type="checkbox"
+              checked={draft.requiresStoreDisclosure}
+              disabled={isProviderConfigDraftLocked}
+              onChange={(event) => updateDraft({ requiresStoreDisclosure: event.target.checked })}
+            />
+            <span>{text.storeDisclosureFlag}</span>
+          </label>
+        </div>
+
+        <div className={styles.providerConfigEditorDisplayFields}>
+          <label className={styles.field}>
+            <span>{text.displayLabelLabel}</span>
+            <input
+              value={draft.displayLabel}
+              onChange={(event) =>
+                updateDraft({
+                  displayLabel: normalizeProviderTextInput(
+                    event.target.value,
+                    ECONOMY_PROVIDER_LABEL_MAX_LENGTH
+                  ),
+                })
+              }
+              className={styles.input}
+              placeholder={humanizeProvider(config.provider, locale)}
+              maxLength={ECONOMY_PROVIDER_LABEL_MAX_LENGTH}
+              disabled={isProviderConfigDraftLocked}
+            />
+          </label>
+          <label className={styles.field}>
+            <span>{text.displaySubtitleLabel}</span>
+            <input
+              value={draft.displaySubtitle}
+              onChange={(event) =>
+                updateDraft({
+                  displaySubtitle: normalizeProviderTextInput(
+                    event.target.value,
+                    ECONOMY_PROVIDER_SUBTITLE_MAX_LENGTH
+                  ),
+                })
+              }
+              className={styles.input}
+              placeholder={text.noDescription}
+              maxLength={ECONOMY_PROVIDER_SUBTITLE_MAX_LENGTH}
+              disabled={isProviderConfigDraftLocked}
+            />
+          </label>
+          <label className={styles.field}>
+            <span>{text.warningTitleLabel}</span>
+            <input
+              value={draft.warningTitle}
+              onChange={(event) =>
+                updateDraft({
+                  warningTitle: normalizeProviderTextInput(
+                    event.target.value,
+                    ECONOMY_PROVIDER_WARNING_TITLE_MAX_LENGTH
+                  ),
+                })
+              }
+              className={styles.input}
+              placeholder={text.noDescription}
+              maxLength={ECONOMY_PROVIDER_WARNING_TITLE_MAX_LENGTH}
+              disabled={isProviderConfigDraftLocked}
+            />
+          </label>
+          <label className={styles.field}>
+            <span>{text.warningMessageLabel}</span>
+            <input
+              value={draft.warningMessage}
+              onChange={(event) =>
+                updateDraft({
+                  warningMessage: normalizeProviderTextInput(
+                    event.target.value,
+                    ECONOMY_PROVIDER_MESSAGE_MAX_LENGTH
+                  ),
+                })
+              }
+              className={styles.input}
+              placeholder={text.noDescription}
+              maxLength={ECONOMY_PROVIDER_MESSAGE_MAX_LENGTH}
+              disabled={isProviderConfigDraftLocked}
+            />
+          </label>
+          <label className={styles.field}>
+            <span>{text.notesLabel}</span>
+            <input
+              value={draft.notes}
+              onChange={(event) =>
+                updateDraft({
+                  notes: normalizeProviderTextInput(
+                    event.target.value,
+                    ECONOMY_PROVIDER_NOTES_MAX_LENGTH
+                  ),
+                })
+              }
+              className={styles.input}
+              placeholder={text.noDescription}
+              maxLength={ECONOMY_PROVIDER_NOTES_MAX_LENGTH}
+              disabled={isProviderConfigDraftLocked}
+            />
+          </label>
+        </div>
+
+        <div className={styles.providerConfigEditorClone}>
+          <label className={styles.field}>
+            <span>{text.cloneRegionPlaceholder}</span>
+            <input
+              value={cloneRegion}
+              onChange={(event) =>
+                setCloneRegionDrafts((current) => ({
+                  ...current,
+                  [config.configurationId]: normalizeProviderRegionInput(event.target.value),
+                }))
+              }
+              className={styles.input}
+              placeholder={text.providerRegionPlaceholder}
+              maxLength={ECONOMY_PROVIDER_REGION_MAX_LENGTH}
+              pattern="[A-Za-z]{2}|[*]"
+              aria-invalid={!isCloneRegionValid || undefined}
+              disabled={isProviderConfigDraftLocked}
+            />
+          </label>
+          <Button
+            type="button"
+            onClick={() => {
+              const nextCloneRegion = cloneRegion.trim();
+              if (isCloneProviderConfigDisabled) {
+                return;
+              }
+
+              onRequestClone(nextCloneRegion);
+            }}
+            disabled={isCloneProviderConfigDisabled}
+            aria-label={`${text.cloneAction}: ${humanizeProvider(config.provider, locale)} / ${safeText(config.platform, 48)} / ${cloneRegion}`}
+          >
+            {cloneProviderConfigPending && cloneProviderConfigId === config.configurationId
+              ? text.savingAction
+              : text.cloneAction}
+          </Button>
+        </div>
+
+        <div className={styles.providerConfigEditorActions}>
+          <Button type="submit" disabled={isSaveProviderConfigDisabled}>
+            {isSavingConfig ? text.savingAction : text.saveAction}
+          </Button>
+          <Button
+            type="button"
+            onClick={() => {
+              if (deleteProviderConfigPending || isProviderConfigDraftLocked) {
+                return;
+              }
+
+              onRequestDelete();
+            }}
+            disabled={deleteProviderConfigPending || isProviderConfigDraftLocked}
+            variant="danger"
+          >
+            {deleteProviderConfigPending && deleteProviderConfigId === config.configurationId
+              ? text.savingAction
+              : text.deleteAction}
+          </Button>
+          <button
+            type="button"
+            className={styles.pagerButton}
+            disabled={isProviderConfigDraftLocked}
+            onClick={onClose}
+          >
+            {text.collapseEditorAction}
+          </button>
+        </div>
+
+        {isProviderConfigInvalid && isProviderConfigDraftDirty(config, draft) ? (
+          <p className={styles.validationMessage} aria-live="polite">
+            {text.invalidProviderConfig}
+          </p>
+        ) : null}
+      </form>
+    </section>
   );
 }
 
@@ -850,36 +1025,29 @@ function safeText(value: string | null | undefined, maxLength = 120) {
   return trimmed ? sanitizeSensitiveText(trimmed, maxLength) : "-";
 }
 
-function normalizeProviderCodeInput(value: string) {
-  return value.toLowerCase().slice(0, ECONOMY_PROVIDER_CODE_MAX_LENGTH);
-}
-
 function normalizeProviderRegionInput(value: string) {
   return value.toUpperCase().slice(0, ECONOMY_PROVIDER_REGION_MAX_LENGTH);
+}
+
+function isValidPaymentRouteRegion(value: string) {
+  const normalizedValue = value.trim().toUpperCase();
+  return normalizedValue === "*" || /^[A-Z]{2}$/.test(normalizedValue);
+}
+
+function isValidPaymentRouteCountry(value: string) {
+  return /^[A-Z]{2}$/.test(value.trim().toUpperCase());
+}
+
+function humanizeRouteMode(value: string, text: EconomyPageText) {
+  return value.trim().toLowerCase() === "test"
+    ? text.providerModeTestLabel
+    : text.providerModeLiveLabel;
 }
 
 function normalizeProviderVersionInput(value: string) {
   return value.slice(0, ECONOMY_PROVIDER_VERSION_MAX_LENGTH);
 }
 
-function normalizeProviderLabelInput(value: string) {
-  return value.slice(0, ECONOMY_PROVIDER_LABEL_MAX_LENGTH);
-}
-
-function normalizeProviderMessageInput(value: string) {
-  return value.slice(0, ECONOMY_PROVIDER_MESSAGE_MAX_LENGTH);
-}
-
-function isPaymentRouteDraftInvalid(draft: ProviderConfigDraft) {
-  const bonusPercent = Number(draft.bonusTokensPercent);
-
-  return (
-    !draft.region.trim() ||
-    !draft.mode.trim() ||
-    !draft.allowedFromAppVersion.trim() ||
-    !draft.bonusTokensPercent.trim() ||
-    !Number.isInteger(bonusPercent) ||
-    bonusPercent < 0 ||
-    bonusPercent > 100
-  );
+function normalizeProviderTextInput(value: string, maxLength: number) {
+  return value.slice(0, maxLength);
 }

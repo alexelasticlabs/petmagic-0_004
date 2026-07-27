@@ -1,0 +1,98 @@
+.pagination {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.pages {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.directionButton,
+.pageButton {
+  display: inline-flex;
+  min-height: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  color: var(--text-soft);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+}
+
+.directionButton {
+  padding-inline: 0.7rem;
+}
+
+.pageButton {
+  min-width: 2.25rem;
+  padding-inline: 0.45rem;
+  font-family: var(--font-mono);
+}
+
+.directionButton:hover:not(:disabled),
+.pageButton:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+  color: var(--text-strong);
+}
+
+.directionButton:focus-visible,
+.pageButton:focus-visible {
+  border-color: var(--border-accent);
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.pageButton[data-current="true"] {
+  border-color: var(--primary-border);
+  background: var(--primary-bg);
+  color: var(--accent-contrast);
+}
+
+.directionButton:disabled,
+.pageButton:disabled:not([data-current="true"]) {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.ellipsis {
+  display: inline-grid;
+  min-width: 1.5rem;
+  place-items: center;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+@media (max-width: 640px) {
+  .pagination {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .pages {
+    order: -1;
+    width: 100%;
+  }
+
+  .directionButton {
+    flex: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .directionButton,
+  .pageButton {
+    transition: none;
+  }
+}

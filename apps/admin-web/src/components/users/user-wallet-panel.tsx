@@ -1,16 +1,14 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
-import {
-  AdminCard,
-  AdminKpiCard,
-  AdminMetricStrip,
-  AdminStateCard,
-} from "@/components/admin/admin-primitives";
+import { AdminCard, AdminStateCard } from "@/components/admin/admin-primitives";
 import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import styles from "@/components/users/user-wallet-panel.module.css";
+import { getUserWalletLedgerPresentation } from "@/components/users/user-wallet-presentation";
+import { createAdminCorrelationId } from "@/lib/admin-correlation-id";
 import { getAdminErrorMessage } from "@/lib/admin-error-message";
 import {
   adjustAdminUserWallet,
@@ -23,19 +21,38 @@ import { getDictionary, type Locale } from "@/lib/i18n";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 type UserWalletPanelProps = {
+  actorId: string;
   locale: Locale;
   userId: string;
   analytics: AdminUserAnalytics;
   canAdjustWallet: boolean;
+  autoFocusAdjustment?: boolean;
+  onAdjustmentIntentDismissed?: () => void;
   onUpdated?: () => Promise<void> | void;
 };
 
 const LEDGER_ITEMS_LIMIT = 20;
+const WALLET_ADJUSTMENT_STORAGE_VERSION = "v2";
+const WALLET_ADJUSTMENT_STORAGE_TTL_MS = 30 * 60_000;
 
 type PendingWalletAdjustment = {
   operation: "credit" | "debit";
   amount: number;
   reason: string;
+  idempotencyKey: string;
+};
+
+type StoredPendingWalletAdjustment = PendingWalletAdjustment & {
+  createdAtEpochMs: number;
+};
+
+type WalletAdjustmentRecovery = PendingWalletAdjustment | null;
+
+type WalletFeedback = {
+  canRetryAdjustment?: boolean;
+  canRetryRefresh?: boolean;
+  message: string;
+  tone: "danger" | "success" | "warning";
 };
 
 function getWalletActionErrorDetails(error: unknown) {
@@ -48,40 +65,243 @@ function getWalletActionErrorDetails(error: unknown) {
   };
 }
 
+function getPendingWalletAdjustmentStorageKey(actorId: string, userId: string): string | null {
+  const normalizedActorId = actorId.trim();
+  if (!normalizedActorId) {
+    return null;
+  }
+
+  return `petmagic.admin.wallet.adjustment:${WALLET_ADJUSTMENT_STORAGE_VERSION}:${encodeURIComponent(normalizedActorId)}:${encodeURIComponent(userId)}`;
+}
+
+function isStoredPendingWalletAdjustment(value: unknown): value is StoredPendingWalletAdjustment {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<StoredPendingWalletAdjustment>;
+  return (
+    (candidate.operation === "credit" || candidate.operation === "debit") &&
+    typeof candidate.amount === "number" &&
+    Number.isInteger(candidate.amount) &&
+    candidate.amount > 0 &&
+    typeof candidate.reason === "string" &&
+    candidate.reason.trim().length > 0 &&
+    candidate.reason.length <= USER_WALLET_REASON_MAX_LENGTH &&
+    typeof candidate.idempotencyKey === "string" &&
+    candidate.idempotencyKey.length > 0 &&
+    typeof candidate.createdAtEpochMs === "number" &&
+    Number.isFinite(candidate.createdAtEpochMs)
+  );
+}
+
+function readPendingWalletAdjustment(actorId: string, userId: string): WalletAdjustmentRecovery {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const storageKey = getPendingWalletAdjustmentStorageKey(actorId, userId);
+  if (!storageKey) {
+    return null;
+  }
+
+  try {
+    const rawValue = window.sessionStorage.getItem(storageKey);
+    if (!rawValue) {
+      return null;
+    }
+
+    const storedAdjustment: unknown = JSON.parse(rawValue);
+    const isExpired =
+      isStoredPendingWalletAdjustment(storedAdjustment) &&
+      Date.now() - storedAdjustment.createdAtEpochMs > WALLET_ADJUSTMENT_STORAGE_TTL_MS;
+
+    if (!isStoredPendingWalletAdjustment(storedAdjustment) || isExpired) {
+      window.sessionStorage.removeItem(storageKey);
+      return null;
+    }
+
+    return {
+      operation: storedAdjustment.operation,
+      amount: storedAdjustment.amount,
+      reason: storedAdjustment.reason,
+      idempotencyKey: storedAdjustment.idempotencyKey,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function persistPendingWalletAdjustment(
+  actorId: string,
+  userId: string,
+  adjustment: PendingWalletAdjustment
+): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const storageKey = getPendingWalletAdjustmentStorageKey(actorId, userId);
+  if (!storageKey) {
+    return;
+  }
+
+  try {
+    const storedAdjustment: StoredPendingWalletAdjustment = {
+      ...adjustment,
+      createdAtEpochMs: Date.now(),
+    };
+    window.sessionStorage.setItem(storageKey, JSON.stringify(storedAdjustment));
+  } catch {
+    // Browser storage can be unavailable in private or restricted contexts.
+  }
+}
+
+function clearPendingWalletAdjustment(actorId: string, userId: string): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const storageKey = getPendingWalletAdjustmentStorageKey(actorId, userId);
+  if (!storageKey) {
+    return;
+  }
+
+  try {
+    window.sessionStorage.removeItem(storageKey);
+  } catch {
+    // Browser storage can be unavailable in private or restricted contexts.
+  }
+}
+
 export function UserWalletPanel({
+  actorId,
   locale,
   userId,
   analytics,
   canAdjustWallet,
+  autoFocusAdjustment = false,
+  onAdjustmentIntentDismissed,
   onUpdated,
 }: UserWalletPanelProps) {
   const text = getDictionary(locale);
   const [operation, setOperation] = useState<"credit" | "debit">("credit");
   const [amount, setAmount] = useState("50");
   const [reason, setReason] = useState("");
+  const [adjustmentOpenOverride, setAdjustmentOpenOverride] = useState<boolean | null>(null);
   const [pendingAdjustment, setPendingAdjustment] = useState<PendingWalletAdjustment | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [feedback, setFeedback] = useState<{ tone: "success" | "danger"; message: string } | null>(
+  const [retryableAdjustment, setRetryableAdjustment] = useState<PendingWalletAdjustment | null>(
     null
   );
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [feedback, setFeedback] = useState<WalletFeedback | null>(null);
+  const [hasAttemptedAdjustment, setHasAttemptedAdjustment] = useState(false);
+  const [hasTouchedAmount, setHasTouchedAmount] = useState(false);
+  const [hasTouchedReason, setHasTouchedReason] = useState(false);
+  const amountInputRef = useRef<HTMLInputElement>(null);
+  const recoveredWalletScopeRef = useRef<string | null>(null);
   const parsedAmount = Number(amount);
   const normalizedReason = reason.trim().slice(0, USER_WALLET_REASON_MAX_LENGTH);
   const isWalletConfirmationOpen = pendingAdjustment !== null;
   const isWalletFormLocked = isSubmitting || isWalletConfirmationOpen;
+  const hasValidAmount = Number.isInteger(parsedAmount) && parsedAmount > 0;
+  const hasSufficientBalance =
+    operation !== "debit" || (hasValidAmount && parsedAmount <= analytics.summary.walletBalance);
+  const projectedBalance = hasValidAmount
+    ? analytics.summary.walletBalance + (operation === "credit" ? parsedAmount : -parsedAmount)
+    : analytics.summary.walletBalance;
+  const walletValidationMessage = !hasValidAmount
+    ? text.walletAmountInvalidHint
+    : !hasSufficientBalance
+      ? text.walletDebitBalanceHint
+      : normalizedReason.length === 0
+        ? text.walletReasonRequiredHint
+        : null;
+  const shouldShowWalletValidation =
+    hasAttemptedAdjustment ||
+    ((!hasValidAmount || !hasSufficientBalance) && hasTouchedAmount) ||
+    (normalizedReason.length === 0 && hasTouchedReason);
+  const visibleWalletValidationMessage = shouldShowWalletValidation
+    ? walletValidationMessage
+    : null;
   const canSubmit =
     canAdjustWallet &&
-    Number.isInteger(parsedAmount) &&
-    parsedAmount > 0 &&
+    hasValidAmount &&
+    hasSufficientBalance &&
     normalizedReason.length > 0 &&
+    !retryableAdjustment &&
     !isWalletFormLocked;
+  const isAdjustmentOpen = adjustmentOpenOverride ?? (autoFocusAdjustment && canAdjustWallet);
+
+  useEffect(() => {
+    if (autoFocusAdjustment && canAdjustWallet && isAdjustmentOpen) {
+      amountInputRef.current?.focus();
+    }
+  }, [autoFocusAdjustment, canAdjustWallet, isAdjustmentOpen]);
+
+  useEffect(() => {
+    const recoveryScope = `${actorId}:${userId}`;
+    if (!canAdjustWallet || !actorId.trim() || recoveredWalletScopeRef.current === recoveryScope) {
+      return;
+    }
+
+    recoveredWalletScopeRef.current = recoveryScope;
+    const recoveredAdjustment = readPendingWalletAdjustment(actorId, userId);
+    if (!recoveredAdjustment) {
+      return;
+    }
+
+    const recoveryTimer = window.setTimeout(() => {
+      if (recoveredWalletScopeRef.current !== recoveryScope) {
+        return;
+      }
+
+      setOperation(recoveredAdjustment.operation);
+      setAmount(String(recoveredAdjustment.amount));
+      setReason(recoveredAdjustment.reason);
+      setRetryableAdjustment(recoveredAdjustment);
+      setAdjustmentOpenOverride(true);
+      setFeedback({
+        tone: "warning",
+        message: text.walletPendingRecoveryWarning,
+        canRetryAdjustment: true,
+      });
+    }, 0);
+
+    return () => window.clearTimeout(recoveryTimer);
+  }, [actorId, canAdjustWallet, text.walletPendingRecoveryWarning, userId]);
+
+  function discardRetryableAdjustment() {
+    setRetryableAdjustment(null);
+    clearPendingWalletAdjustment(actorId, userId);
+  }
+
+  function handleAdjustmentDraftChange() {
+    setFeedback(null);
+    discardRetryableAdjustment();
+  }
 
   function handleSubmit() {
     if (!canAdjustWallet || isWalletFormLocked) {
       return;
     }
 
-    if (!Number.isInteger(parsedAmount) || parsedAmount <= 0 || normalizedReason.length === 0) {
-      setFeedback({ tone: "danger", message: text.walletOperationError });
+    if (retryableAdjustment) {
+      setFeedback({
+        tone: "warning",
+        message: text.walletPendingRecoveryWarning,
+        canRetryAdjustment: true,
+      });
+      return;
+    }
+
+    setHasAttemptedAdjustment(true);
+
+    if (!canSubmit) {
+      setFeedback({
+        tone: "danger",
+        message: walletValidationMessage ?? text.walletOperationError,
+      });
       return;
     }
 
@@ -89,7 +309,9 @@ export function UserWalletPanel({
       operation,
       amount: parsedAmount,
       reason: normalizedReason,
+      idempotencyKey: `wallet-adjustment:${createAdminCorrelationId()}`,
     });
+    discardRetryableAdjustment();
   }
 
   function handleFormSubmit(event: FormEvent<HTMLFormElement>) {
@@ -97,8 +319,92 @@ export function UserWalletPanel({
     handleSubmit();
   }
 
+  function toggleAdjustmentFields() {
+    const nextIsOpen = !isAdjustmentOpen;
+    setAdjustmentOpenOverride(nextIsOpen);
+
+    if (!nextIsOpen && autoFocusAdjustment) {
+      onAdjustmentIntentDismissed?.();
+    }
+  }
+
   async function confirmWalletAdjustment() {
     if (!canAdjustWallet || !pendingAdjustment || isSubmitting) {
+      return;
+    }
+
+    await submitWalletAdjustment(pendingAdjustment);
+  }
+
+  async function submitWalletAdjustment(adjustment: PendingWalletAdjustment) {
+    setIsSubmitting(true);
+    setFeedback(null);
+    persistPendingWalletAdjustment(actorId, userId, adjustment);
+
+    try {
+      await adjustAdminUserWallet(
+        userId,
+        adjustment.operation,
+        adjustment.amount,
+        adjustment.reason,
+        adjustment.idempotencyKey
+      );
+    } catch (error) {
+      clientLogger.error("users.wallet_adjust_failed", {
+        userId: sanitizeSensitiveText(userId, 80),
+        operation: adjustment.operation,
+        amount: adjustment.amount,
+        ...getWalletActionErrorDetails(error),
+      });
+      setFeedback({
+        tone: "danger",
+        message: getAdminErrorMessage(error, text.walletOperationError),
+        canRetryAdjustment: true,
+      });
+      setRetryableAdjustment(adjustment);
+      setPendingAdjustment(null);
+      setIsSubmitting(false);
+      return;
+    }
+
+    setPendingAdjustment(null);
+    setRetryableAdjustment(null);
+    clearPendingWalletAdjustment(actorId, userId);
+    setReason("");
+    setHasAttemptedAdjustment(false);
+    setHasTouchedAmount(false);
+    setHasTouchedReason(false);
+
+    try {
+      await onUpdated?.();
+      setFeedback({ tone: "success", message: text.walletOperationSaved });
+    } catch (error) {
+      clientLogger.warn("users.wallet_adjust_refresh_failed", {
+        userId: sanitizeSensitiveText(userId, 80),
+        operation: adjustment.operation,
+        amount: adjustment.amount,
+        ...getWalletActionErrorDetails(error),
+      });
+      setFeedback({
+        tone: "warning",
+        message: text.walletRefreshWarning,
+        canRetryRefresh: Boolean(onUpdated),
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function retryWalletAdjustment() {
+    if (!retryableAdjustment || isSubmitting) {
+      return;
+    }
+
+    void submitWalletAdjustment(retryableAdjustment);
+  }
+
+  async function retryWalletRefresh() {
+    if (!onUpdated || isSubmitting) {
       return;
     }
 
@@ -106,27 +412,14 @@ export function UserWalletPanel({
     setFeedback(null);
 
     try {
-      await adjustAdminUserWallet(
-        userId,
-        pendingAdjustment.operation,
-        pendingAdjustment.amount,
-        pendingAdjustment.reason
-      );
-      setPendingAdjustment(null);
-      setReason("");
+      await onUpdated();
       setFeedback({ tone: "success", message: text.walletOperationSaved });
-      await onUpdated?.();
     } catch (error) {
-      clientLogger.error("users.wallet_adjust_failed", {
+      clientLogger.warn("users.wallet_refresh_failed", {
         userId: sanitizeSensitiveText(userId, 80),
-        operation: pendingAdjustment.operation,
-        amount: pendingAdjustment.amount,
         ...getWalletActionErrorDetails(error),
       });
-      setFeedback({
-        tone: "danger",
-        message: getAdminErrorMessage(error, text.walletOperationError),
-      });
+      setFeedback({ tone: "warning", message: text.walletRefreshWarning, canRetryRefresh: true });
     } finally {
       setIsSubmitting(false);
     }
@@ -142,109 +435,187 @@ export function UserWalletPanel({
         .replace("{amount}", String(pendingAdjustment.amount))
         .replace("{reason}", sanitizeSensitiveText(pendingAdjustment.reason, 120))
     : "";
+  const pendingBalanceAfter = pendingAdjustment
+    ? analytics.summary.walletBalance +
+      (pendingAdjustment.operation === "credit"
+        ? pendingAdjustment.amount
+        : -pendingAdjustment.amount)
+    : analytics.summary.walletBalance;
 
   return (
     <AdminCard title={text.userWalletTitle} description={text.userWalletDescription}>
-      <div className={styles.kpiGrid}>
-        <AdminKpiCard
-          label={text.tokenBalanceLabel}
-          value={String(analytics.summary.walletBalance)}
-          tone="primary"
-        />
-        <AdminKpiCard
-          label={text.tokensGrantedLabel}
-          value={String(analytics.summary.totalTokensCredited)}
-          tone="success"
-        />
-        <AdminKpiCard
-          label={text.tokensSpentLabel}
-          value={String(analytics.summary.totalTokensSpent)}
-          tone="warning"
-        />
-        <AdminKpiCard
-          label={text.viewsLabel}
-          value={String(analytics.summary.totalViews)}
-          hint={`${text.videoViewsLabel}: ${analytics.summary.totalVideoViews}`}
-          tone="info"
-        />
-        <AdminKpiCard
-          label={text.loginsLabel}
-          value={String(analytics.summary.successfulLogins)}
-          hint={`${text.failedLoginsLabel}: ${analytics.summary.failedLogins}`}
-          tone="magenta"
-        />
-        <AdminKpiCard
-          label={text.lastLoginLabel}
-          value={formatDateTime(analytics.summary.lastLoginAtUtc, locale)}
-          tone="neutral"
-        />
-      </div>
+      <section className={styles.walletSummary} aria-label={text.userWalletTitle}>
+        <div className={styles.currentBalance}>
+          <span>{text.walletBalanceLabel}</span>
+          <strong>
+            {analytics.summary.walletBalance} <small>PawSpark</small>
+          </strong>
+        </div>
+        <dl className={styles.balanceTotals}>
+          <div>
+            <dt>{text.tokensGrantedLabel}</dt>
+            <dd>{analytics.summary.totalTokensCredited}</dd>
+          </div>
+          <div>
+            <dt>{text.tokensSpentLabel}</dt>
+            <dd>{analytics.summary.totalTokensSpent}</dd>
+          </div>
+        </dl>
+      </section>
 
-      <AdminMetricStrip
-        className={styles.metrics}
-        items={[
-          { label: text.manualGrantLabel, value: analytics.summary.manualTokensGranted },
-          { label: text.manualDebitLabel, value: analytics.summary.manualTokensDebited },
-          { label: text.walletBalanceLabel, value: analytics.summary.walletBalance },
-        ]}
-      />
+      <div className={`${styles.grid} ${!canAdjustWallet ? styles.gridLedgerOnly : ""}`}>
+        <section className={styles.ledger}>
+          <div className={styles.sectionHeader}>
+            <h3>{text.walletRecentActivityTitle}</h3>
+            <p>{text.walletRecentActivityDescription}</p>
+          </div>
 
-      <div className={styles.grid}>
+          {analytics.recentWalletLedger.length ? (
+            <div className={styles.list}>
+              {analytics.recentWalletLedger.slice(0, LEDGER_ITEMS_LIMIT).map((item) => {
+                const presentation = getUserWalletLedgerPresentation(item, text);
+
+                return (
+                  <article key={item.entryId} className={styles.card}>
+                    <div className={styles.cardHeader}>
+                      <strong className={item.delta >= 0 ? styles.positive : styles.negative}>
+                        {item.delta >= 0 ? "+" : ""}
+                        {item.delta}
+                      </strong>
+                      <span>{formatDateTime(item.createdAtUtc, locale)}</span>
+                    </div>
+                    <p className={styles.operationLabel}>{presentation.operationLabel}</p>
+                    {presentation.note ? <p className={styles.note}>{presentation.note}</p> : null}
+                    <div className={styles.meta}>
+                      <span>
+                        {text.walletBalanceLabel}: {item.balanceAfter}
+                      </span>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <div className={styles.emptyLedger} role="status">
+              <strong>{text.userNoWalletActivity}</strong>
+            </div>
+          )}
+        </section>
+
         {canAdjustWallet ? (
-          <form className={styles.controls} onSubmit={handleFormSubmit}>
-            <div className={styles.sectionHeader}>
-              <h4>{text.walletAdjustmentTitle}</h4>
-              <p>{text.walletAdjustmentHint}</p>
+          <form id="wallet-adjustment" className={styles.controls} onSubmit={handleFormSubmit}>
+            <div className={styles.adjustmentHeader}>
+              <div className={styles.sectionHeader}>
+                <h3>{text.walletAdjustmentTitle}</h3>
+                <p>{text.walletAdjustmentHint}</p>
+              </div>
+              <Button
+                type="button"
+                variant={isAdjustmentOpen ? "secondary" : "primary"}
+                size="sm"
+                className={styles.adjustmentToggle}
+                aria-controls="wallet-adjustment-fields"
+                aria-expanded={isAdjustmentOpen}
+                disabled={isWalletFormLocked}
+                onClick={toggleAdjustmentFields}
+              >
+                {isAdjustmentOpen
+                  ? text.walletAdjustmentCloseAction
+                  : text.walletAdjustmentOpenAction}
+              </Button>
             </div>
 
-            <div className={styles.formGrid}>
-              <label className={styles.field}>
-                <span>{text.walletOperationLabel}</span>
-                <select
-                  value={operation}
-                  onChange={(event) => setOperation(event.target.value as "credit" | "debit")}
-                  className={styles.select}
-                  disabled={isWalletFormLocked}
-                >
-                  <option value="credit">{text.walletOperationCredit}</option>
-                  <option value="debit">{text.walletOperationDebit}</option>
-                </select>
-              </label>
+            <div
+              id="wallet-adjustment-fields"
+              className={styles.adjustmentFields}
+              hidden={!isAdjustmentOpen}
+            >
+              <div className={styles.formGrid}>
+                <div className={`${styles.field} ${styles.operationField}`}>
+                  <span>{text.walletOperationLabel}</span>
+                  <Select
+                    value={operation}
+                    options={[
+                      { value: "credit", label: text.walletOperationCredit },
+                      { value: "debit", label: text.walletOperationDebit },
+                    ]}
+                    onChange={(value) => {
+                      setOperation(value as "credit" | "debit");
+                      handleAdjustmentDraftChange();
+                    }}
+                    ariaLabel={text.walletOperationLabel}
+                    showSelectedDescription={false}
+                    disabled={isWalletFormLocked}
+                  />
+                </div>
+
+                <label className={styles.field}>
+                  <span>{text.walletAmountLabel}</span>
+                  <input
+                    ref={amountInputRef}
+                    value={amount}
+                    onChange={(event) => {
+                      setAmount(event.target.value.replace(/\D+/g, "").slice(0, 8));
+                      handleAdjustmentDraftChange();
+                    }}
+                    onBlur={() => setHasTouchedAmount(true)}
+                    inputMode="numeric"
+                    maxLength={8}
+                    className={styles.input}
+                    aria-describedby="wallet-adjustment-feedback"
+                    aria-invalid={
+                      (hasAttemptedAdjustment || hasTouchedAmount) &&
+                      (!hasValidAmount || !hasSufficientBalance)
+                    }
+                    disabled={isWalletFormLocked}
+                  />
+                </label>
+              </div>
 
               <label className={styles.field}>
-                <span>{text.walletAmountLabel}</span>
-                <input
-                  value={amount}
-                  onChange={(event) =>
-                    setAmount(event.target.value.replace(/\D+/g, "").slice(0, 8))
+                <span>{text.walletReasonLabel}</span>
+                <textarea
+                  value={reason}
+                  onChange={(event) => {
+                    setReason(event.target.value.slice(0, USER_WALLET_REASON_MAX_LENGTH));
+                    handleAdjustmentDraftChange();
+                  }}
+                  onBlur={() => setHasTouchedReason(true)}
+                  rows={3}
+                  maxLength={USER_WALLET_REASON_MAX_LENGTH}
+                  className={styles.textarea}
+                  placeholder={text.walletReasonPlaceholder}
+                  aria-describedby="wallet-adjustment-feedback"
+                  aria-invalid={
+                    (hasAttemptedAdjustment || hasTouchedReason) && normalizedReason.length === 0
                   }
-                  inputMode="numeric"
-                  maxLength={8}
-                  className={styles.input}
                   disabled={isWalletFormLocked}
                 />
               </label>
-            </div>
 
-            <label className={styles.field}>
-              <span>{text.walletReasonLabel}</span>
-              <textarea
-                value={reason}
-                onChange={(event) =>
-                  setReason(event.target.value.slice(0, USER_WALLET_REASON_MAX_LENGTH))
-                }
-                rows={3}
-                maxLength={USER_WALLET_REASON_MAX_LENGTH}
-                className={styles.textarea}
-                placeholder={text.walletReasonPlaceholder}
-                disabled={isWalletFormLocked}
-              />
-            </label>
+              <div className={styles.balancePreview}>
+                <span>
+                  {text.walletBalanceBeforeLabel}: {analytics.summary.walletBalance} PawSpark
+                </span>
+                <strong>
+                  {text.walletBalanceAfterLabel}: {projectedBalance} PawSpark
+                </strong>
+              </div>
 
-            <div className={styles.actions}>
-              <Button type="submit" disabled={!canSubmit}>
-                <span>{isSubmitting ? text.walletSaving : text.walletApplyAction}</span>
-              </Button>
+              <p
+                id="wallet-adjustment-feedback"
+                className={styles.validationHint}
+                aria-live="polite"
+                data-tone={visibleWalletValidationMessage ? "warning" : undefined}
+              >
+                {visibleWalletValidationMessage ?? text.walletAdjustmentHint}
+              </p>
+
+              <div className={styles.actions}>
+                <Button type="submit" disabled={!canSubmit}>
+                  <span>{isSubmitting ? text.walletSaving : text.walletApplyAction}</span>
+                </Button>
+              </div>
             </div>
 
             {feedback ? (
@@ -252,47 +623,40 @@ export function UserWalletPanel({
                 tone={feedback.tone}
                 title={feedback.message}
                 className={styles.feedback}
+                action={
+                  feedback.canRetryAdjustment ? (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={isSubmitting}
+                      onClick={retryWalletAdjustment}
+                    >
+                      {text.supportRetryAction}
+                    </Button>
+                  ) : feedback.canRetryRefresh ? (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={isSubmitting}
+                      onClick={() => void retryWalletRefresh()}
+                    >
+                      {text.supportRetryAction}
+                    </Button>
+                  ) : undefined
+                }
               />
             ) : null}
           </form>
         ) : null}
-
-        <section className={styles.ledger}>
-          <div className={styles.sectionHeader}>
-            <h4>{text.userWalletTitle}</h4>
-            <p>{text.userWalletDescription}</p>
-          </div>
-
-          {analytics.recentWalletLedger.length ? (
-            <div className={styles.list}>
-              {analytics.recentWalletLedger.slice(0, LEDGER_ITEMS_LIMIT).map((item) => (
-                <article key={item.entryId} className={styles.card}>
-                  <div className={styles.cardHeader}>
-                    <strong className={item.delta >= 0 ? styles.positive : styles.negative}>
-                      {item.delta >= 0 ? "+" : ""}
-                      {item.delta}
-                    </strong>
-                    <span>{formatDateTime(item.createdAtUtc, locale)}</span>
-                  </div>
-                  <p>{sanitizeSensitiveText(item.reason, 180)}</p>
-                  <div className={styles.meta}>
-                    <span>{sanitizeSensitiveText(item.source, 80)}</span>
-                    <span>
-                      {text.walletBalanceLabel}: {item.balanceAfter}
-                    </span>
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <AdminStateCard tone="info" title={text.userNoWalletActivity} />
-          )}
-        </section>
       </div>
       <ConfirmationDialog
         open={canAdjustWallet && isWalletConfirmationOpen}
         title={text.walletConfirmTitle}
-        description={pendingDescription}
+        description={
+          pendingAdjustment
+            ? `${pendingDescription} ${text.walletBalanceAfterLabel}: ${pendingBalanceAfter} PawSpark.`
+            : pendingDescription
+        }
         confirmLabel={isSubmitting ? text.walletSaving : text.walletApplyAction}
         cancelLabel={text.walletConfirmCancel}
         isSubmitting={isSubmitting}

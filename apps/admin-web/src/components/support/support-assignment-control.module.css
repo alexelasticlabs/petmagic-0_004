@@ -1,0 +1,60 @@
+.root,
+.editor {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.editor {
+  padding: 0.75rem;
+  border: 1px solid var(--border-soft);
+  border-radius: 0.8rem;
+  background: var(--surface-2);
+}
+
+.field {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.reason {
+  width: 100%;
+  min-height: 5rem;
+  resize: vertical;
+  border: 1px solid var(--border-soft);
+  border-radius: 0.68rem;
+  background: var(--surface-1);
+  color: var(--text-strong);
+  padding: 0.65rem 0.72rem;
+  font: inherit;
+}
+
+.reason:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 62%, transparent);
+  outline-offset: 2px;
+}
+
+.error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.78rem;
+}
+
+.hint {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reason {
+    scroll-behavior: auto;
+  }
+}

@@ -44,7 +44,12 @@ describe("templates catalog visual contract", () => {
     expect(letterSpacingRules.every((rule) => rule === "letter-spacing: 0;")).toBe(true);
     expect(cssSource).toContain(".bigMetric {");
     expect(cssSource).toContain("font-size: 1.78rem;");
-    expect(cssSource).toContain(".heroCopy h1 {\n    font-size: 1.65rem;");
+    expect(cssSource).toContain(
+      ".catalogMetricStrip {\n  grid-template-columns: repeat(5, minmax(0, 1fr));"
+    );
+    expect(cssSource).toContain(
+      ".catalogMetricStrip {\n    grid-template-columns: repeat(2, minmax(0, 1fr));"
+    );
     expect(cssSource).toContain(".bigMetric {\n    font-size: 1.56rem;");
     expect(cssSource).not.toMatch(/font-size:\s*[^;]*vw/);
     expect(catalogSource).toContain("CaretDownIcon");
@@ -56,20 +61,17 @@ describe("templates catalog visual contract", () => {
     expect(catalogSource).not.toContain('{">"}');
   });
 
-  it("keeps active catalog tabs and view toggles non-interactive", () => {
+  it("keeps catalog segmented controls accessible and locked during refreshes", () => {
     const catalogSource = readTemplatesCatalogViewLibrarySource();
     const cssSource = readFileSync(catalogCssPath, "utf8");
 
-    expect(catalogSource).toContain(
-      'disabled={archiveFilter === "active" || isCatalogInteractionLocked}'
-    );
-    expect(catalogSource).toContain(
-      'disabled={archiveFilter === "archived" || isCatalogInteractionLocked}'
-    );
-    expect(catalogSource).toContain(
-      'disabled={viewMode === "cards" || isCatalogInteractionLocked}'
-    );
-    expect(catalogSource).toContain('disabled={viewMode === "list" || isCatalogInteractionLocked}');
+    expect(catalogSource).toContain('role="group" aria-label={copy.archiveTabsLabel}');
+    expect(catalogSource).toContain('aria-pressed={archiveFilter === "active"}');
+    expect(catalogSource).toContain('aria-pressed={archiveFilter === "archived"}');
+    expect(catalogSource).toContain('role="group" aria-label={copy.viewToggleLabel}');
+    expect(catalogSource).toContain('aria-pressed={viewMode === "cards"}');
+    expect(catalogSource).toContain('aria-pressed={viewMode === "list"}');
+    expect(catalogSource).toContain("disabled={isCatalogInteractionLocked}");
     expect(cssSource).toContain(".tab:not(:disabled):hover");
     expect(cssSource).toContain(".viewButton:not(:disabled):hover,");
     expect(cssSource).toContain(".viewButtonActive:not(:disabled):hover");
@@ -113,13 +115,20 @@ describe("templates catalog visual contract", () => {
       ".tableActions {\n  justify-content: flex-end;\n  flex-wrap: nowrap;"
     );
     expect(cssSource).toContain(".tableActions .cardActionIconButton {\n  flex: 0 0 1.9rem;");
+    expect(cssSource).toContain("@media (max-width: 760px)");
+    expect(cssSource).toContain(".listTable {\n    min-width: 0;\n    display: block;");
     expect(cssSource).toContain(
-      "@media (max-width: 760px) {\n  .catalogHero {\n    grid-template-columns: 1fr;"
+      ".listTable thead {\n    position: absolute;\n    width: 1px;\n    height: 1px;"
     );
+    expect(cssSource).toContain(".listTable td::before {\n    content: attr(data-label);");
     expect(cssSource).toContain(
       ".tableActions {\n    justify-content: flex-start;\n    flex-wrap: wrap;"
     );
-    expect(cssSource).toContain(".tableActions .cardActionIconButton {\n    flex: 1 1 2.1rem;");
+    expect(cssSource).toContain(".tableActions .cardActionIconButton {\n    flex: 1 1 2.75rem;");
     expect(cssSource).toContain(".tableActionsCell {\n    min-width: 14rem;");
+    expect(catalogSource).toContain("<td data-label={copy.tableTemplate}>");
+    expect(catalogSource).toContain(
+      "<td data-label={text.actionsLabel} className={styles.tableActionsCell}>"
+    );
   });
 });

@@ -17,6 +17,7 @@ import {
   type AdminEconomyPurchase,
   type AdminEconomySubscription,
 } from "@/lib/api-client";
+import { ADMIN_PREMIUM_REVOKE_REASON_MAX_LENGTH } from "@/lib/api-client.economy";
 import { clientLogger } from "@/lib/client-logger";
 
 type FeedbackSetter = (feedback: { tone: "success" | "danger"; message: string } | null) => void;
@@ -44,6 +45,8 @@ export function useEconomySubscriptionPurchaseActions({
 }: UseEconomySubscriptionPurchaseActionsParams) {
   const queryClient = useQueryClient();
   const [cancelTarget, setCancelTarget] = useState<AdminEconomySubscription | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelError, setCancelError] = useState<string | null>(null);
   const [refundTarget, setRefundTarget] = useState<AdminEconomyPurchase | null>(null);
   const [isCancelSubscriptionInFlight, setIsCancelSubscriptionInFlight] = useState(false);
   const [isRefundPurchaseInFlight, setIsRefundPurchaseInFlight] = useState(false);
@@ -64,11 +67,17 @@ export function useEconomySubscriptionPurchaseActions({
         throw new Error(text.cancelSubscriptionError);
       }
 
-      await adminCancelPremiumSubscription(subscription.userId, subscription.provider);
+      await adminCancelPremiumSubscription(
+        subscription.userId,
+        subscription.provider,
+        cancelReason.trim()
+      );
     },
     onSuccess: async (_, subscription) => {
       setFeedback({ tone: "success", message: text.cancelSubscriptionSuccess });
+      setCancelError(null);
       setCancelTarget(null);
+      setCancelReason("");
       await Promise.allSettled([
         queryClient.invalidateQueries({ queryKey: ["admin", "economy", "subscriptions"] }),
         queryClient.invalidateQueries({ queryKey: ["admin", "economy", "subscription-events"] }),
@@ -85,6 +94,7 @@ export function useEconomySubscriptionPurchaseActions({
       ]);
     },
     onError: (error, subscription) => {
+      const message = getAdminErrorMessage(error, text.cancelSubscriptionError);
       clientLogger.error("economy.cancel_subscription_failed", {
         subscriptionId: formatEconomyLogText(subscription?.subscriptionId),
         userId: formatEconomyLogText(subscription?.userId),
@@ -94,8 +104,9 @@ export function useEconomySubscriptionPurchaseActions({
       });
       setFeedback({
         tone: "danger",
-        message: getAdminErrorMessage(error, text.cancelSubscriptionError),
+        message,
       });
+      setCancelError(message);
     },
     onSettled: () => {
       cancelSubscriptionInFlightRef.current = false;
@@ -160,6 +171,8 @@ export function useEconomySubscriptionPurchaseActions({
       return;
     }
 
+    setCancelReason("");
+    setCancelError(null);
     setCancelTarget(subscription);
   }
 
@@ -229,6 +242,7 @@ export function useEconomySubscriptionPurchaseActions({
     queueMicrotask(() => {
       if (isActive) {
         setCancelTarget(null);
+        setCancelError(null);
       }
     });
 
@@ -240,6 +254,8 @@ export function useEconomySubscriptionPurchaseActions({
   function onCancelSubscriptionClose() {
     if (!cancelSubscriptionInFlightRef.current && !cancelSubscriptionMutation.isPending) {
       setCancelTarget(null);
+      setCancelReason("");
+      setCancelError(null);
     }
   }
 
@@ -248,7 +264,8 @@ export function useEconomySubscriptionPurchaseActions({
       return;
     }
 
-    if (cancelTarget && canCancelSubscription(cancelTarget)) {
+    if (cancelTarget && canCancelSubscription(cancelTarget) && cancelReason.trim()) {
+      setCancelError(null);
       cancelSubscriptionInFlightRef.current = true;
       setIsCancelSubscriptionInFlight(true);
       cancelSubscriptionMutation.mutate(cancelTarget);
@@ -275,6 +292,10 @@ export function useEconomySubscriptionPurchaseActions({
 
   return {
     cancelTarget,
+    cancelReason,
+    cancelError,
+    setCancelReason: (value: string) =>
+      setCancelReason(value.slice(0, ADMIN_PREMIUM_REVOKE_REASON_MAX_LENGTH)),
     refundTarget,
     isCancelSubscriptionSubmitting,
     isRefundPurchaseSubmitting,

@@ -4,10 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   SUPPORT_CONVERSATION_MESSAGES_MAX_TAKE,
+  fetchAdminUserSupportTickets,
   fetchSupportConversation,
   fetchSupportInbox,
   fetchSupportInboxMetrics,
   sendSupportMessage,
+  SUPPORT_IDEMPOTENCY_KEY_MAX_LENGTH,
   SUPPORT_INBOX_SEARCH_MAX_LENGTH,
   SUPPORT_MESSAGE_BODY_MAX_LENGTH,
 } from "@/lib/api-client.support";
@@ -88,6 +90,36 @@ describe("api-client.support query normalization", () => {
 
     expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
       "https://api.example.com/api/admin/support/tickets?sort=waiting&queue=waiting_for_support&page=1&pageSize=50"
+    );
+  });
+
+  it("serializes the unread support queue through the backend contract", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json({ items: [], page: 1, pageSize: 50, totalCount: 0, hasMore: false })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchSupportInbox(undefined, "all", {
+      queue: "unread",
+      page: 1,
+      pageSize: 50,
+    });
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+      "https://api.example.com/api/admin/support/tickets?queue=unread&page=1&pageSize=50"
+    );
+  });
+
+  it("normalizes user-scoped support history pagination and encodes the user id", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json({ items: [], page: 2, pageSize: 100, totalCount: 0, hasMore: false })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchAdminUserSupportTickets("user/one two", { page: 2.8, pageSize: 500.4 });
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+      "https://api.example.com/api/admin/users/user%2Fone%20two/support/tickets?page=2&pageSize=100"
     );
   });
 
@@ -206,7 +238,7 @@ describe("api-client.support query normalization", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await fetchSupportConversation("ticket/one two?x", { take: 10 });
-    await sendSupportMessage("ticket/one two?x", "Hello");
+    await sendSupportMessage("ticket/one two?x", "Hello", undefined, "message-intent-1");
 
     expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
       "https://api.example.com/api/admin/support/tickets/ticket%2Fone%20two%3Fx?take=10",
@@ -227,7 +259,12 @@ describe("api-client.support query normalization", () => {
     const overlongBody = "b".repeat(SUPPORT_MESSAGE_BODY_MAX_LENGTH + 20);
     vi.stubGlobal("fetch", fetchMock);
 
-    await sendSupportMessage("ticket-1", ` ${overlongBody} `, " message-parent ");
+    await sendSupportMessage(
+      "ticket-1",
+      ` ${overlongBody} `,
+      " message-parent ",
+      " message-intent-2 "
+    );
 
     const [, init] = fetchMock.mock.calls[0] ?? [];
     expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
@@ -237,6 +274,25 @@ describe("api-client.support query normalization", () => {
       body: "b".repeat(SUPPORT_MESSAGE_BODY_MAX_LENGTH),
       replyToMessageId: "message-parent",
     });
+    expect((init?.headers as Headers).get("Idempotency-Key")).toBe("message-intent-2");
+  });
+
+  it("rejects blank and oversized support message idempotency keys before a request", async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(sendSupportMessage("ticket-1", "Hello", undefined, " ")).rejects.toThrow(
+      "support.idempotency_key_invalid"
+    );
+    await expect(
+      sendSupportMessage(
+        "ticket-1",
+        "Hello",
+        undefined,
+        "x".repeat(SUPPORT_IDEMPOTENCY_KEY_MAX_LENGTH + 1)
+      )
+    ).rejects.toThrow("support.idempotency_key_invalid");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("does not clear unrelated in-flight GET dedupe when support conversations mutate", () => {
@@ -244,7 +300,7 @@ describe("api-client.support query normalization", () => {
     const coreSource = readFileSync(coreClientPath, "utf8");
 
     expect(supportSource).not.toContain("inflightGetRequests.clear()");
-    expect(supportSource).toContain('inflightGetRequests.delete("support-templates")');
+    expect(supportSource).toContain('invalidateCachedGetNamespaces(["support-templates"]);');
     expect(coreSource).not.toContain("cachedSupportConversations");
     expect(coreSource).not.toContain("cachedSupportInbox");
   });

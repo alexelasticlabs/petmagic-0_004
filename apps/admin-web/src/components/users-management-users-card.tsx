@@ -1,128 +1,247 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+
+import { MailIcon } from "@/components/admin/admin-icons";
+import { useSyncToastToAdminNotifications } from "@/components/admin/admin-notifications";
 import { AdminCard, AdminStateCard } from "@/components/admin/admin-primitives";
+import { AdminSelectionTray } from "@/components/admin/admin-selection-tray";
 import { Button } from "@/components/ui/button";
+import { Toast } from "@/components/ui/toast";
+import { UsersBulkEmailDialog } from "@/components/users-bulk-email-dialog";
 import type { UsersManagementPageText } from "@/components/users-management-page.content";
 import styles from "@/components/users-management-page.module.css";
 import type {
-  ActivityFilter,
   PremiumFilter,
-  RangeDays,
   RoleFilter,
   StatusFilter,
   UserSortMode,
 } from "@/components/users-management-page.types";
 import { UsersManagementUsersFilters } from "@/components/users-management-users-card.filters";
 import { UsersManagementUsersTable } from "@/components/users-management-users-card.table";
-import {
-  type AdminEconomyUserSubscriptionSummary,
-  type AdminUserAnalytics,
-  type UserListItem,
-} from "@/lib/api-client";
+import { adminQueryKeys } from "@/lib/admin-query-keys";
+import { updateAdminUrlState } from "@/lib/admin-url-state";
+import { useAuthSession, type UserListItem } from "@/lib/api-client";
 import type { Dictionary, Locale } from "@/lib/i18n";
+import { maskEmail, sanitizeSensitiveText } from "@/lib/sensitive-display";
 
-import type { MutableRefObject } from "react";
+type SelectedUserEntity = {
+  id: string;
+  label: string;
+  eligible: boolean;
+};
+
+const selectionStoragePrefix = "petmagic.admin.users.email-selection:v1";
+const maximumPersistedSelectionCount = 500;
+
+function toSelectedUserEntity(user: UserListItem): SelectedUserEntity {
+  return {
+    id: user.userId,
+    label: sanitizeSensitiveText(user.displayName?.trim() || maskEmail(user.email), 96),
+    eligible: user.isActive && user.emailConfirmed,
+  };
+}
+
+function readPersistedSelection(storageKey: string): Map<string, SelectedUserEntity> {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(storageKey) ?? "[]") as unknown;
+    if (!Array.isArray(parsed)) return new Map();
+    const selected = new Map<string, SelectedUserEntity>();
+    for (const value of parsed.slice(0, maximumPersistedSelectionCount)) {
+      if (!value || typeof value !== "object") continue;
+      const item = value as Partial<SelectedUserEntity>;
+      const id = typeof item.id === "string" ? item.id.trim().slice(0, 100) : "";
+      if (!id) continue;
+      selected.set(id, {
+        id,
+        label: sanitizeSensitiveText(typeof item.label === "string" ? item.label : "—", 96),
+        eligible: item.eligible === true,
+      });
+    }
+    return selected;
+  } catch {
+    return new Map();
+  }
+}
 
 type UsersManagementUsersCardProps = {
-  analyticsByUserId: Map<string, AdminUserAnalytics>;
-  busyUserId: string | null;
-  canManageRoles: boolean;
-  closeActionsMenu: () => void;
   currentPage: number;
   error: string | null;
-  handleToggleActionsMenu: (userId: string) => void;
-  isUserActionLocked: boolean;
   isUsersFetching: boolean;
   isUsersRefreshing: boolean;
   locale: Locale;
-  openActionsUserId: string | null;
-  openWalletDialog: (userId: string, operation: "credit" | "debit") => void;
-  pageSubscriptionsByUserId: Map<string, AdminEconomyUserSubscriptionSummary>;
-  pageUsers: UserListItem[];
-  pagedUsers: UserListItem[];
   premiumFilter: PremiumFilter;
-  rangeDays: RangeDays;
   refreshUsers: () => Promise<void>;
-  requestActiveChange: (user: UserListItem) => void;
-  requestPremiumChange: (user: UserListItem) => void;
   resetAllFilters: () => void;
-  resetUsersSelection: (nextPage?: number) => void;
+  resetUsersPage: (nextPage?: number) => void;
   roleFilter: RoleFilter;
   search: string;
-  setActivityFilter: (value: ActivityFilter) => void;
   setPremiumFilter: (value: PremiumFilter) => void;
-  setRangeDays: (value: RangeDays) => void;
   setRoleFilter: (value: RoleFilter) => void;
   setSearch: (value: string) => void;
-  setSelectedUserId: (userId: string) => void;
   setSortMode: (value: UserSortMode) => void;
   setStatusFilter: (value: StatusFilter) => void;
   sortMode: UserSortMode;
   statusFilter: StatusFilter;
   text: Dictionary;
   totalPages: number;
-  triggerRefs: MutableRefObject<Record<string, HTMLButtonElement | null>>;
   ui: UsersManagementPageText;
+  users: UserListItem[];
   usersPageTotalCount: number;
-  activityFilter: ActivityFilter;
 };
 
 export function UsersManagementUsersCard({
-  activityFilter,
-  analyticsByUserId,
-  busyUserId,
-  canManageRoles,
-  closeActionsMenu,
   currentPage,
   error,
-  handleToggleActionsMenu,
-  isUserActionLocked,
   isUsersFetching,
   isUsersRefreshing,
   locale,
-  openActionsUserId,
-  openWalletDialog,
-  pageSubscriptionsByUserId,
-  pageUsers,
-  pagedUsers,
   premiumFilter,
-  rangeDays,
   refreshUsers,
-  requestActiveChange,
-  requestPremiumChange,
   resetAllFilters,
-  resetUsersSelection,
+  resetUsersPage,
   roleFilter,
   search,
-  setActivityFilter,
   setPremiumFilter,
-  setRangeDays,
   setRoleFilter,
   setSearch,
-  setSelectedUserId,
   setSortMode,
   setStatusFilter,
   sortMode,
   statusFilter,
   text,
   totalPages,
-  triggerRefs,
   ui,
+  users,
   usersPageTotalCount,
 }: UsersManagementUsersCardProps) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
+  const session = useAuthSession();
+  const hasUsers = users.length > 0;
+  const isInitialRefresh = isUsersRefreshing && !hasUsers && !error;
+  const hasRecoverablePagination = usersPageTotalCount > 0 && (totalPages > 1 || currentPage > 1);
+  const selectionStorageKey = session?.user.userId
+    ? `${selectionStoragePrefix}:${session.user.userId}`
+    : null;
+  const [selectedUsers, setSelectedUsers] = useState<ReadonlyMap<string, SelectedUserEntity>>(() =>
+    selectionStorageKey ? readPersistedSelection(selectionStorageKey) : new Map()
+  );
+  const [bulkEmailDialogOpen, setBulkEmailDialogOpen] = useState(false);
+  const [bulkEmailToast, setBulkEmailToast] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+  const selectedUserIds = useMemo(() => new Set(selectedUsers.keys()), [selectedUsers]);
+  const selectedUserList = useMemo(() => {
+    const currentPageUsers = new Map(users.map((user) => [user.userId, user]));
+    return [...selectedUsers.values()].map((item) => {
+      const currentUser = currentPageUsers.get(item.id);
+      return currentUser ? toSelectedUserEntity(currentUser) : item;
+    });
+  }, [selectedUsers, users]);
+  const selectedUserIdList = useMemo(
+    () => selectedUserList.filter((item) => item.eligible).map((item) => item.id),
+    [selectedUserList]
+  );
+
+  useEffect(() => {
+    if (!selectionStorageKey) return;
+    try {
+      window.localStorage.setItem(
+        selectionStorageKey,
+        JSON.stringify(selectedUserList.slice(0, maximumPersistedSelectionCount))
+      );
+    } catch {
+      // Selection persistence is an enhancement; browser storage failures must not block admin work.
+    }
+  }, [selectedUserList, selectionStorageKey]);
+
+  useSyncToastToAdminNotifications(bulkEmailToast, {
+    category: "users",
+    source: "users-bulk-email",
+    title: ui.notificationTitle,
+    href: `/${locale}/users`,
+  });
+
+  useEffect(() => {
+    if (!bulkEmailToast) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setBulkEmailToast(null), 2600);
+    return () => window.clearTimeout(timer);
+  }, [bulkEmailToast]);
+
+  function toggleUserSelection(userId: string, selected: boolean) {
+    setSelectedUsers((current) => {
+      const next = new Map(current);
+      if (selected) {
+        const user = users.find((candidate) => candidate.userId === userId);
+        if (user) next.set(userId, toSelectedUserEntity(user));
+      } else {
+        next.delete(userId);
+      }
+      return next;
+    });
+  }
+
+  function togglePageSelection(userIds: readonly string[], selected: boolean) {
+    setSelectedUsers((current) => {
+      const next = new Map(current);
+      for (const userId of userIds) {
+        if (selected) {
+          const user = users.find((candidate) => candidate.userId === userId);
+          if (user) next.set(userId, toSelectedUserEntity(user));
+        } else {
+          next.delete(userId);
+        }
+      }
+      return next;
+    });
+  }
+
   return (
-    <AdminCard title={text.usersTitle} description={text.usersCardDescription}>
+    <AdminCard
+      title={ui.registryTitle}
+      description={text.usersCardDescription}
+      action={
+        <div className={styles.registryActions}>
+          {selectedUsers.size > 0 ? (
+            <span className={styles.selectedCount} role="status">
+              {ui.bulkEmail.selectedCount(selectedUsers.size)}
+            </span>
+          ) : null}
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => setBulkEmailDialogOpen(true)}
+          >
+            <MailIcon className={styles.bulkEmailIcon} />
+            {ui.bulkEmail.openLabel}
+          </Button>
+          <span
+            className={styles.registryCount}
+            aria-label={`${ui.usersCount}: ${usersPageTotalCount}`}
+          >
+            <strong>{usersPageTotalCount}</strong>
+            <span>{ui.usersCount}</span>
+          </span>
+        </div>
+      }
+    >
       <UsersManagementUsersFilters
-        activityFilter={activityFilter}
         premiumFilter={premiumFilter}
-        rangeDays={rangeDays}
         resetAllFilters={resetAllFilters}
-        resetUsersSelection={resetUsersSelection}
+        resetUsersPage={resetUsersPage}
         roleFilter={roleFilter}
         search={search}
-        setActivityFilter={setActivityFilter}
         setPremiumFilter={setPremiumFilter}
-        setRangeDays={setRangeDays}
         setRoleFilter={setRoleFilter}
         setSearch={setSearch}
         setSortMode={setSortMode}
@@ -151,11 +270,17 @@ export function UsersManagementUsersCard({
         />
       ) : null}
 
-      {isUsersRefreshing ? (
+      {isUsersRefreshing && hasUsers ? (
+        <p className={styles.refreshHint} role="status">
+          {text.loading}
+        </p>
+      ) : null}
+
+      {isInitialRefresh ? (
         <AdminStateCard tone="info" className={styles.emptyState} title={text.loading} />
       ) : null}
 
-      {!isUsersRefreshing && !pageUsers.length ? (
+      {!error && !isUsersRefreshing && !hasUsers ? (
         <AdminStateCard
           tone="info"
           className={styles.emptyState}
@@ -164,32 +289,86 @@ export function UsersManagementUsersCard({
         />
       ) : null}
 
-      {!isUsersRefreshing && !!pageUsers.length && (
+      {hasUsers || hasRecoverablePagination ? (
         <UsersManagementUsersTable
-          analyticsByUserId={analyticsByUserId}
-          busyUserId={busyUserId}
-          canManageRoles={canManageRoles}
-          closeActionsMenu={closeActionsMenu}
           currentPage={currentPage}
-          handleToggleActionsMenu={handleToggleActionsMenu}
-          isUserActionLocked={isUserActionLocked}
           isUsersFetching={isUsersFetching}
           locale={locale}
-          openActionsUserId={openActionsUserId}
-          openWalletDialog={openWalletDialog}
-          pageSubscriptionsByUserId={pageSubscriptionsByUserId}
-          pagedUsers={pagedUsers}
-          requestActiveChange={requestActiveChange}
-          requestPremiumChange={requestPremiumChange}
-          resetUsersSelection={resetUsersSelection}
-          setSelectedUserId={setSelectedUserId}
+          pagedUsers={users}
+          resetUsersPage={resetUsersPage}
+          selectedUserIds={selectedUserIds}
           text={text}
           totalPages={totalPages}
-          triggerRefs={triggerRefs}
           ui={ui}
-          usersPageTotalCount={usersPageTotalCount}
+          onTogglePageSelection={togglePageSelection}
+          onToggleUserSelection={toggleUserSelection}
         />
-      )}
+      ) : null}
+
+      <AdminSelectionTray
+        selectedCount={selectedUsers.size}
+        selectedLabel={ui.bulkEmail.selectedCount(selectedUsers.size)}
+        trayLabel={ui.bulkEmail.selectionTrayLabel}
+        clearLabel={ui.bulkEmail.selectionClear}
+        description={ui.bulkEmail.selectionDescription(
+          selectedUserIdList.length,
+          selectedUsers.size
+        )}
+        items={selectedUserList.map((item) => ({
+          id: item.id,
+          label: item.label,
+          eligible: item.eligible,
+          eligibilityLabel: item.eligible
+            ? ui.bulkEmail.selectionEligible
+            : ui.bulkEmail.selectionIneligible,
+          removeLabel: ui.bulkEmail.selectionRemove,
+        }))}
+        onRemove={(userId) =>
+          setSelectedUsers((current) => {
+            const next = new Map(current);
+            next.delete(userId);
+            return next;
+          })
+        }
+        onClear={() => setSelectedUsers(new Map())}
+      >
+        <Button
+          type="button"
+          variant="primary"
+          size="sm"
+          disabled={selectedUserIdList.length === 0}
+          onClick={() => setBulkEmailDialogOpen(true)}
+        >
+          <MailIcon className={styles.bulkEmailIcon} />
+          {ui.bulkEmail.openLabel}
+        </Button>
+      </AdminSelectionTray>
+
+      {bulkEmailDialogOpen ? (
+        <UsersBulkEmailDialog
+          locale={locale}
+          selectedUserIds={selectedUserIdList}
+          onClose={() => setBulkEmailDialogOpen(false)}
+          onQueued={(broadcast) => {
+            setSelectedUsers(new Map());
+            setBulkEmailToast({
+              type: "success",
+              message: ui.bulkEmail.success,
+            });
+            void queryClient.invalidateQueries({ queryKey: adminQueryKeys.emailBroadcastsRoot });
+            const nextSearchParams = updateAdminUrlState(
+              searchParams,
+              { selected: broadcast.broadcastId, tab: "broadcasts" },
+              { resetPageOnQueryChange: false }
+            );
+            router.replace(`${pathname}?${nextSearchParams.toString()}`, { scroll: false });
+          }}
+        />
+      ) : null}
+
+      {bulkEmailToast ? (
+        <Toast message={bulkEmailToast.message} type={bulkEmailToast.type} />
+      ) : null}
     </AdminCard>
   );
 }

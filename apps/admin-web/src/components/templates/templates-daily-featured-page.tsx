@@ -4,7 +4,6 @@ import { RefreshIcon } from "@/components/admin/admin-icons";
 import {
   AdminBadge,
   AdminPage,
-  AdminPageGrid,
   AdminPageHero,
   AdminStateCard,
 } from "@/components/admin/admin-primitives";
@@ -42,9 +41,16 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
     handleTemplateSelectionChange,
     invalidDateRangeWarning,
     isActionLocked,
+    isAutoPickConfirmationOpen,
     isAutoPickDateMissing,
+    isAutoPickRunAvailable,
     isAutoPickSettingsDirty,
+    isExcludeRecentDaysInvalid,
+    isPriorityInvalid,
     isScheduleLoading,
+    isScheduleNavigationLocked,
+    isSettingsReady,
+    isStartDateMissing,
     isTemplateOptionsLoading,
     loadTemplateOptions,
     previewBadge,
@@ -52,16 +58,24 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
     previewSubtitle,
     previewTitle,
     previewType,
+    notice,
     refreshPageData,
+    requestSchedulePage,
     schedule,
+    scheduleHasMore,
+    schedulePage,
+    schedulePageSize,
+    scheduleTotalCount,
     search,
     selectedTemplateSnapshot,
     setAssignmentPendingDelete,
     setAutoPick,
+    setIsAutoPickConfirmationOpen,
     setSearch,
     setTemplateAccessFilter,
     setTemplateTypeFilter,
     settings,
+    settingsLoadError,
     templateAccessFilter,
     templateOptions,
     templateOptionsError,
@@ -88,7 +102,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
           </Button>
         }
         metaItems={[
-          `${text.schedule}: ${schedule.length} ${text.assignments}`,
+          `${text.schedule}: ${scheduleTotalCount} ${text.assignments}`,
           current
             ? `${text.current}: ${safeDisplayText(current.templateTitle, 120)}`
             : text.noCurrent,
@@ -111,75 +125,93 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
           }
         />
       ) : null}
+      {notice ? <AdminStateCard tone="success" description={notice} /> : null}
       {isScheduleLoading ? <AdminStateCard title={text.loading} /> : null}
 
-      <AdminPageGrid columns="two" className={styles.topGrid}>
-        <CurrentAssignmentCard current={current} text={text} locale={locale} />
-        <AutoPickSettingsCard
-          text={text}
-          autoPick={autoPick}
-          canManageTemplates={canManageTemplates}
-          isActionLocked={isActionLocked}
-          isAutoPickSettingsDirty={isAutoPickSettingsDirty}
-          isAutoPickDateMissing={isAutoPickDateMissing}
-          onAutoModeEnabledChange={(value) =>
-            setAutoPick((state) => ({ ...state, autoModeEnabled: value }))
-          }
-          onAllowedTypesChange={(value) =>
-            setAutoPick((state) => ({ ...state, allowedTypes: value }))
-          }
-          onExcludeRecentDaysChange={(value) =>
-            setAutoPick((state) => ({ ...state, excludeRecentDays: value }))
-          }
-          onDateChange={(value) => setAutoPick((state) => ({ ...state, date: value }))}
-          onSaveSettings={() => void handleSaveSettings()}
-          onRunAutoPick={() => void handleAutoPick()}
-        />
-      </AdminPageGrid>
-
-      <AdminPageGrid columns="two" className={styles.editorGrid}>
-        <TemplateAssignmentEditorCard
-          text={text}
-          canManageTemplates={canManageTemplates}
-          isActionLocked={isActionLocked}
-          search={search}
-          templateTypeFilter={templateTypeFilter}
-          templateAccessFilter={templateAccessFilter}
-          form={form}
-          templateOptions={templateOptions}
-          isTemplateOptionsLoading={isTemplateOptionsLoading}
-          hasTemplateOptions={templates.length > 0}
-          templateOptionsError={templateOptionsError}
-          dateOccupiedWarning={dateOccupiedWarning}
-          invalidDateRangeWarning={invalidDateRangeWarning}
-          onSearchChange={setSearch}
-          onTemplateTypeFilterChange={setTemplateTypeFilter}
-          onTemplateAccessFilterChange={setTemplateAccessFilter}
-          onTemplateChange={handleTemplateSelectionChange}
-          onRetryTemplateOptions={() => void loadTemplateOptions(debouncedSearch)}
-          onFormChange={handleFormChange}
-          onReset={handleResetForm}
-          onSubmit={handleSubmit}
-        />
-        <FeaturedPreviewCard
-          text={text}
-          selectedTemplateSnapshot={selectedTemplateSnapshot}
-          previewTitle={previewTitle}
-          previewSubtitle={previewSubtitle}
-          previewBadge={previewBadge}
-          previewType={previewType}
-          previewMediaUrl={previewMediaUrl}
-        />
-      </AdminPageGrid>
+      <div className={styles.workspace}>
+        <div className={styles.workspaceColumn}>
+          <CurrentAssignmentCard current={current} text={text} locale={locale} />
+          <TemplateAssignmentEditorCard
+            text={text}
+            canManageTemplates={canManageTemplates}
+            isActionLocked={isActionLocked}
+            search={search}
+            templateTypeFilter={templateTypeFilter}
+            templateAccessFilter={templateAccessFilter}
+            form={form}
+            templateOptions={templateOptions}
+            isTemplateOptionsLoading={isTemplateOptionsLoading}
+            hasTemplateOptions={templates.length > 0}
+            templateOptionsError={templateOptionsError}
+            dateOccupiedWarning={dateOccupiedWarning}
+            invalidDateRangeWarning={invalidDateRangeWarning}
+            isStartDateMissing={isStartDateMissing}
+            isPriorityInvalid={isPriorityInvalid}
+            onSearchChange={setSearch}
+            onTemplateTypeFilterChange={setTemplateTypeFilter}
+            onTemplateAccessFilterChange={setTemplateAccessFilter}
+            onTemplateChange={handleTemplateSelectionChange}
+            onRetryTemplateOptions={() => void loadTemplateOptions(debouncedSearch)}
+            onFormChange={handleFormChange}
+            onReset={handleResetForm}
+            onSubmit={handleSubmit}
+          />
+        </div>
+        <div className={styles.workspaceColumn}>
+          <AutoPickSettingsCard
+            text={text}
+            autoPick={autoPick}
+            canManageTemplates={canManageTemplates}
+            isActionLocked={isActionLocked}
+            isSettingsReady={isSettingsReady}
+            settingsLoadError={settingsLoadError}
+            isAutoPickSettingsDirty={isAutoPickSettingsDirty}
+            isExcludeRecentDaysInvalid={isExcludeRecentDaysInvalid}
+            isAutoPickDateMissing={isAutoPickDateMissing}
+            isAutoPickRunAvailable={isAutoPickRunAvailable}
+            onAutoModeEnabledChange={(value) =>
+              setAutoPick((state) => ({ ...state, autoModeEnabled: value }))
+            }
+            onAllowedTypesChange={(value) =>
+              setAutoPick((state) => ({ ...state, allowedTypes: value }))
+            }
+            onExcludeRecentDaysChange={(value) =>
+              setAutoPick((state) => ({ ...state, excludeRecentDays: value }))
+            }
+            onDateChange={(value) => setAutoPick((state) => ({ ...state, date: value }))}
+            onSaveSettings={() => void handleSaveSettings()}
+            onRetrySettings={() => void refreshPageData()}
+            onRunAutoPick={() => setIsAutoPickConfirmationOpen(true)}
+          />
+          <div className={styles.previewPanel}>
+            <FeaturedPreviewCard
+              text={text}
+              selectedTemplateSnapshot={selectedTemplateSnapshot}
+              previewTitle={previewTitle}
+              previewSubtitle={previewSubtitle}
+              previewBadge={previewBadge}
+              previewType={previewType}
+              previewMediaUrl={previewMediaUrl}
+            />
+          </div>
+        </div>
+      </div>
 
       <TemplateScheduleCard
         text={text}
         locale={locale}
         schedule={schedule}
+        schedulePage={schedulePage}
+        schedulePageSize={schedulePageSize}
+        scheduleTotalCount={scheduleTotalCount}
+        scheduleHasMore={scheduleHasMore}
         canManageTemplates={canManageTemplates}
         isActionLocked={isActionLocked}
+        isScheduleNavigationLocked={isScheduleNavigationLocked}
         onEditAssignment={handleEditAssignment}
         onRequestDeleteAssignment={setAssignmentPendingDelete}
+        onPreviousPage={() => requestSchedulePage(schedulePage - 1)}
+        onNextPage={() => requestSchedulePage(schedulePage + 1)}
       />
 
       <ConfirmationDialog
@@ -208,6 +240,26 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
           void handleDelete(assignmentPendingDelete).then((succeeded) => {
             if (succeeded) {
               setAssignmentPendingDelete(null);
+            }
+          });
+        }}
+      />
+      <ConfirmationDialog
+        open={isAutoPickConfirmationOpen}
+        title={text.autoPickConfirmTitle}
+        description={text.autoPickConfirmDescription(autoPick.date)}
+        confirmLabel={text.autoPickRun}
+        cancelLabel={text.cancel}
+        isSubmitting={isAutoPickConfirmationOpen && isActionLocked}
+        onCancel={() => {
+          if (!isActionLocked) {
+            setIsAutoPickConfirmationOpen(false);
+          }
+        }}
+        onConfirm={() => {
+          void handleAutoPick().then((succeeded) => {
+            if (succeeded) {
+              setIsAutoPickConfirmationOpen(false);
             }
           });
         }}

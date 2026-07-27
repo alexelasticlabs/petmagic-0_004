@@ -35,29 +35,32 @@ describe("admin retry hardening", () => {
 
     expect(contentSource).toContain('searchError: "Не удалось выполнить поиск пользователей"');
     expect(source).toContain("const normalizedSearch = debouncedSearch.trim();");
-    expect(source).toContain("const isSearchActive = normalizedSearch.length >= 2;");
+    expect(source).toContain("const isSearchActive = currentSearch.length >= 2;");
+    expect(source).toContain(
+      "const isSearchPending = isSearchActive && currentSearch !== normalizedSearch;"
+    );
     expect(source).toContain(
       "const isSearchRefreshing = searchQuery.isFetching && searchQuery.isPlaceholderData;"
     );
     expect(source).toContain(
-      "const visibleSearchResults = isSearchActive && !isSearchRefreshing ? searchResults : [];"
+      "isSearchActive && !isSearchPending && !isSearchRefreshing ? searchResults : [];"
     );
-    expect(source).toContain("isSearchActive && searchQuery.isError");
+    expect(source).toContain(
+      "const hasSearchError = isSearchActive && !isSearchPending && searchQuery.isError;"
+    );
     expect(source).toContain(
       "description={getAdminErrorMessage(searchQuery.error, text.searchError)}"
     );
     expect(source).toContain("disabled={!canManageRoles || searchQuery.isFetching}");
     expect(source).toContain("void searchQuery.refetch().catch(() => undefined);");
-    expect(source).toContain("isSearchActive && (searchQuery.isLoading || isSearchRefreshing)");
-    expect(source).toContain("isSearchActive &&\n            !searchQuery.isLoading");
-    expect(source).toContain("!isSearchRefreshing &&");
-    expect(source).toContain(
-      "!searchQuery.isError &&\n            visibleSearchResults.length === 0"
-    );
+    expect(source).toContain("const isSearchLoading =");
+    expect(source).toContain("isSearchPending || searchQuery.isLoading || isSearchRefreshing");
+    expect(source).toContain("visibleSearchResultCount > 0");
+    expect(source).toContain("hasSearchError ? (");
     expect(source).toContain("visibleSearchResults.map((user) => {");
     expect(source).toContain("function requestSearchRetry()");
     expect(source).toContain(
-      "if (!canManageRoles || searchQuery.isFetching) {\n      return;\n    }"
+      "if (!canManageRoles || !isSearchActive || isSearchPending || searchQuery.isFetching) {\n      return;\n    }"
     );
     expect(source).toContain("onClick={requestSearchRetry}");
     expect(source).not.toContain("searchResults.map((user) => {");
@@ -93,9 +96,9 @@ describe("admin retry hardening", () => {
     expect(source).toContain("onClick={requestAdminsRetry}");
     expect(source).toContain("void adminsQuery.refetch().catch(() => undefined);");
     expect(source).toContain("title={text.moderatorsError}");
-    expect(source).toContain(
-      "description={getAdminErrorMessage(moderatorsQuery.error, text.moderatorsError)}"
-    );
+    expect(source).toContain("description={getAdminErrorMessage(");
+    expect(source).toContain("moderatorsQuery.error,");
+    expect(source).toContain("text.moderatorsError");
     expect(source).toContain("disabled={!canManageRoles || moderatorsQuery.isFetching}");
     expect(source).toContain("function requestModeratorsRetry()");
     expect(source).toContain(
@@ -115,8 +118,12 @@ describe("admin retry hardening", () => {
     expect(source).toContain(
       "const moderatorsPageData = moderatorsQuery.isPlaceholderData ? undefined : moderatorsQuery.data;"
     );
+    expect(source).toContain(
+      "const searchPageData = searchQuery.isPlaceholderData ? undefined : searchQuery.data;"
+    );
     expect(source).toContain("const admins = adminsPageData?.items ?? [];");
     expect(source).toContain("const moderators = moderatorsPageData?.items ?? [];");
+    expect(source).toContain("const searchResults = searchPageData?.items ?? [];");
     expect(source).toContain(
       "const isAdminsRefreshing = adminsQuery.isFetching && adminsQuery.isPlaceholderData;"
     );
@@ -144,6 +151,7 @@ describe("admin retry hardening", () => {
     );
     expect(source).toContain("function setAdminsPageContext(nextPage: number)");
     expect(source).toContain("function setModeratorsPageContext(nextPage: number)");
+    expect(source).toContain("function setSearchPageContext(nextPage: number)");
     expect(source).toContain(
       "resetPendingRoleAction();\n    setAdminsPage(Math.max(0, nextPage));"
     );
@@ -154,9 +162,12 @@ describe("admin retry hardening", () => {
     expect(source).toContain("onNext={() => setAdminsPageContext(adminsPage + 1)}");
     expect(source).toContain("onPrevious={() => setModeratorsPageContext(moderatorsPage - 1)}");
     expect(source).toContain("onNext={() => setModeratorsPageContext(moderatorsPage + 1)}");
-    expect(source).toContain(
-      "onChange={(event) => {\n                  resetPendingRoleAction();\n                  setSearch(event.target.value.slice(0, USER_SEARCH_MAX_LENGTH));\n                }}"
-    );
+    expect(source).toContain("onPrevious={() => setSearchPageContext(searchPage - 1)}");
+    expect(source).toContain("onNext={() => setSearchPageContext(searchPage + 1)}");
+    expect(source).toContain("onChange={(event) => setSearchContext(event.target.value)}");
+    expect(source).toContain("function setSearchContext(nextSearch: string)");
+    expect(source).toContain("setSearchPage(0);");
+    expect(source).toContain("function clearSearch()");
     expect(source).toContain("const visibleActionUserIdSignature = [");
     expect(source).toContain("...moderators.map((user) => user.userId)");
     expect(source).toContain("...visibleSearchResults.map((user) => user.userId)");

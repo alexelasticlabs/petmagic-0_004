@@ -14,7 +14,7 @@ import {
   getAnalyticsOverviewCacheKey,
   getTemplateListCacheKey,
   getTemplateRecentGenerationsCacheKey,
-  inflightGetRequests,
+  invalidateCachedGetNamespaces,
 } from "./api-client.core";
 
 import type {
@@ -32,6 +32,7 @@ import type {
   AdminModerationQueuePage,
   AdminModerationQueueQuery,
   AdminTemplateGenerationDashboardMetrics,
+  AdminGenerationDetail,
   AdminGamificationLegacyDeliveryResolutionAction,
   AdminGamificationLegacyDeliveryResolutionResponse,
   AdminTemplateGenerationsPage,
@@ -51,6 +52,7 @@ import type {
   TemplateCategoryPayload,
   TemplateOfTheDayAutoPickPayload,
   TemplateOfTheDayPayload,
+  TemplateOfTheDayScheduleQuery,
   TemplateOfTheDaySettingsPayload,
   TemplateStatus,
   TemplateType,
@@ -65,6 +67,8 @@ export const GENERATION_USER_FILTER_MAX_LENGTH = 80;
 export const GENERATION_SEARCH_FILTER_MAX_LENGTH = 80;
 export const TEMPLATE_FEEDBACK_SEARCH_MAX_LENGTH = 120;
 export const TEMPLATE_CATALOG_SEARCH_MAX_LENGTH = 120;
+export const TEMPLATE_ANALYTICS_TEMPLATE_ID_MAX_LENGTH = 80;
+export const TEMPLATE_ANALYTICS_TEMPLATE_IDS_MAX_COUNT = 100;
 
 export type AdminTemplateCatalogQuery = {
   type?: TemplateType;
@@ -72,6 +76,8 @@ export type AdminTemplateCatalogQuery = {
   search?: string;
   category?: string;
   access?: "premium" | "free";
+  visibility?: "public" | "qa_only";
+  readiness?: "ready" | "missing_preview";
   sort?: "newest" | "title" | "tokens";
   skip?: number;
   take?: number;
@@ -81,6 +87,8 @@ const TEMPLATE_TYPES = ["Image", "Video"] as const;
 const TEMPLATE_STATUSES = ["Draft", "Active", "Archived"] as const;
 const TEMPLATE_CATALOG_STATUSES = ["Draft", "Active", "Archived", "not_archived"] as const;
 const TEMPLATE_CATALOG_ACCESS = ["premium", "free"] as const;
+const TEMPLATE_CATALOG_VISIBILITY = ["public", "qa_only"] as const;
+const TEMPLATE_CATALOG_READINESS = ["ready", "missing_preview"] as const;
 const TEMPLATE_CATALOG_SORTS = ["newest", "title", "tokens"] as const;
 const TEMPLATE_FEEDBACK_TYPES = ["complaint", "feedback"] as const;
 const TEMPLATE_ANALYTICS_ACCESS = ["free", "premium"] as const;
@@ -95,6 +103,27 @@ const TEMPLATE_ANALYTICS_SORTS = [
 
 function normalizeTemplateCatalogFilter(value: string | undefined): string | undefined {
   return value?.trim().slice(0, TEMPLATE_CATALOG_SEARCH_MAX_LENGTH) || undefined;
+}
+
+function normalizeAnalyticsTemplateIds(values: string[] | undefined): string[] | undefined {
+  if (!Array.isArray(values)) {
+    return undefined;
+  }
+
+  const normalizedIds = new Set<string>();
+  for (const value of values) {
+    if (typeof value !== "string") {
+      continue;
+    }
+
+    const normalized = value.trim().slice(0, TEMPLATE_ANALYTICS_TEMPLATE_ID_MAX_LENGTH);
+    if (normalized) {
+      normalizedIds.add(normalized);
+    }
+  }
+
+  const result = [...normalizedIds].sort().slice(0, TEMPLATE_ANALYTICS_TEMPLATE_IDS_MAX_COUNT);
+  return result.length > 0 ? result : undefined;
 }
 
 function normalizeTemplateFeedbackFilter(value: string | undefined): string | undefined {
@@ -121,14 +150,6 @@ function normalizeTemplateCatalogTakeValue(value: number | undefined): number | 
     : undefined;
 }
 
-function deleteInflightGetRequestsByPrefix(prefix: string): void {
-  for (const key of inflightGetRequests.keys()) {
-    if (key.startsWith(prefix)) {
-      inflightGetRequests.delete(key);
-    }
-  }
-}
-
 function deleteTemplateRecentGenerationCaches(templateId: string): void {
   const prefix = `admin-template-recent:${templateId}:`;
   for (const key of cachedAdminTemplateRecentGenerations.keys()) {
@@ -136,14 +157,22 @@ function deleteTemplateRecentGenerationCaches(templateId: string): void {
       cachedAdminTemplateRecentGenerations.delete(key);
     }
   }
-  deleteInflightGetRequestsByPrefix(prefix);
 }
 
 function clearAdminTemplateMutationCaches(templateId?: string): void {
+  invalidateCachedGetNamespaces([
+    "templates",
+    "template-categories",
+    "templates-analytics",
+    "admin-template-statistics",
+    "admin-template-trends",
+    "admin-template-recent",
+    "admin-template-failures",
+    "admin-template-events",
+  ]);
   cachedTemplateLists.clear();
+  cachedTemplateCategories.clear();
   cachedTemplatesAnalyticsOverview.clear();
-  deleteInflightGetRequestsByPrefix("templates:");
-  deleteInflightGetRequestsByPrefix("templates-analytics:");
 
   if (!templateId) {
     return;
@@ -158,10 +187,6 @@ function clearAdminTemplateMutationCaches(templateId?: string): void {
   cachedAdminTemplateTrends.delete(trendsKey);
   cachedAdminTemplateFailureBreakdowns.delete(failuresKey);
   cachedAdminTemplateEventAnalytics.delete(eventsKey);
-  inflightGetRequests.delete(statisticsKey);
-  inflightGetRequests.delete(trendsKey);
-  inflightGetRequests.delete(failuresKey);
-  inflightGetRequests.delete(eventsKey);
   deleteTemplateRecentGenerationCaches(templateId);
 }
 
@@ -174,7 +199,18 @@ export function normalizeAdminTemplateCatalogQuery(
     search: normalizeTemplateCatalogFilter(query.search),
     category: normalizeTemplateCatalogFilter(query.category),
     access: normalizeAllowed(query.access, TEMPLATE_CATALOG_ACCESS),
+    visibility: normalizeAllowed(query.visibility, TEMPLATE_CATALOG_VISIBILITY),
+    readiness: normalizeAllowed(query.readiness, TEMPLATE_CATALOG_READINESS),
     sort: normalizeAllowed(query.sort, TEMPLATE_CATALOG_SORTS),
+    skip: normalizeTemplateCatalogPagedValue(query.skip),
+    take: normalizeTemplateCatalogTakeValue(query.take),
+  };
+}
+
+export function normalizeTemplateOfTheDayScheduleQuery(
+  query: TemplateOfTheDayScheduleQuery = {}
+): TemplateOfTheDayScheduleQuery {
+  return {
     skip: normalizeTemplateCatalogPagedValue(query.skip),
     take: normalizeTemplateCatalogTakeValue(query.take),
   };
@@ -194,6 +230,7 @@ export function normalizeAdminTemplatesAnalyticsQuery(
       query.templateType === "All"
         ? undefined
         : normalizeAllowed(query.templateType, TEMPLATE_TYPES),
+    templateIds: normalizeAnalyticsTemplateIds(query.templateIds),
     category: normalizeTemplateCatalogFilter(query.category),
     status: query.status === "All" ? undefined : normalizeAllowed(query.status, TEMPLATE_STATUSES),
     access:
@@ -201,6 +238,7 @@ export function normalizeAdminTemplatesAnalyticsQuery(
         ? undefined
         : normalizeAllowed(query.access, TEMPLATE_ANALYTICS_ACCESS),
     sort: normalizeAllowed(query.sort, TEMPLATE_ANALYTICS_SORTS),
+    skip: normalizeTemplateCatalogPagedValue(query.skip),
     take:
       typeof query.take === "number" && Number.isFinite(query.take) && query.take > 0
         ? Math.min(200, Math.floor(query.take))
@@ -220,6 +258,8 @@ export async function fetchAdminTemplates(
   if (normalizedQuery.search) search.set("search", normalizedQuery.search);
   if (normalizedQuery.category) search.set("category", normalizedQuery.category);
   if (normalizedQuery.access) search.set("access", normalizedQuery.access);
+  if (normalizedQuery.visibility) search.set("visibility", normalizedQuery.visibility);
+  if (normalizedQuery.readiness) search.set("readiness", normalizedQuery.readiness);
   if (normalizedQuery.sort) search.set("sort", normalizedQuery.sort);
   if (normalizedQuery.skip !== undefined) search.set("skip", String(normalizedQuery.skip));
   if (normalizedQuery.take !== undefined) search.set("take", String(normalizedQuery.take));
@@ -257,12 +297,22 @@ export async function fetchAdminTemplateCategories(
 }
 
 export async function fetchTemplateOfTheDaySchedule(
+  query: TemplateOfTheDayScheduleQuery = {},
   signal?: AbortSignal
 ): Promise<AdminTemplateOfTheDaySchedule> {
-  return apiRequest<AdminTemplateOfTheDaySchedule>("/api/admin/template-of-the-day/schedule", {
-    method: "GET",
-    signal,
-  });
+  const normalizedQuery = normalizeTemplateOfTheDayScheduleQuery(query);
+  const params = new URLSearchParams();
+  if (typeof normalizedQuery.skip === "number") params.set("skip", String(normalizedQuery.skip));
+  if (typeof normalizedQuery.take === "number") params.set("take", String(normalizedQuery.take));
+  const suffix = params.size > 0 ? `?${params.toString()}` : "";
+
+  return apiRequest<AdminTemplateOfTheDaySchedule>(
+    `/api/admin/template-of-the-day/schedule${suffix}`,
+    {
+      method: "GET",
+      signal,
+    }
+  );
 }
 
 export async function fetchCurrentTemplateOfTheDay(
@@ -557,7 +607,7 @@ export function normalizeAdminModerationQueueQuery(
 
 export async function decideAdminModerationItem(
   eventId: string,
-  payload: { action: "approve" | "reject"; reason: string }
+  payload: { action: "approve" | "reject"; reason: string; expectedVersion?: number }
 ): Promise<AdminModerationQueueItem> {
   const encodedEventId = encodePathSegment(eventId);
   const normalizedReason = payload.reason.trim().slice(0, MODERATION_DECISION_REASON_MAX_LENGTH);
@@ -570,6 +620,60 @@ export async function decideAdminModerationItem(
   );
 }
 
+export async function claimAdminModerationItem(
+  eventId: string,
+  payload: { expectedVersion: number; leaseMinutes?: number }
+): Promise<AdminModerationQueueItem> {
+  const encodedEventId = encodePathSegment(eventId);
+  return apiRequest<AdminModerationQueueItem>(
+    `/api/admin/templates/moderation/${encodedEventId}/claim`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function releaseAdminModerationItem(
+  eventId: string,
+  payload: { expectedVersion: number; reason: string }
+): Promise<AdminModerationQueueItem> {
+  const encodedEventId = encodePathSegment(eventId);
+  return apiRequest<AdminModerationQueueItem>(
+    `/api/admin/templates/moderation/${encodedEventId}/release`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        expectedVersion: payload.expectedVersion,
+        reason: payload.reason.trim().slice(0, MODERATION_DECISION_REASON_MAX_LENGTH),
+      }),
+    }
+  );
+}
+
+export async function handoffAdminModerationItem(
+  eventId: string,
+  payload: {
+    assigneeUserId: string;
+    expectedVersion: number;
+    reason: string;
+    leaseMinutes?: number;
+  }
+): Promise<AdminModerationQueueItem> {
+  const encodedEventId = encodePathSegment(eventId);
+  return apiRequest<AdminModerationQueueItem>(
+    `/api/admin/templates/moderation/${encodedEventId}/handoff`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...payload,
+        assigneeUserId: payload.assigneeUserId.trim(),
+        reason: payload.reason.trim().slice(0, MODERATION_DECISION_REASON_MAX_LENGTH),
+      }),
+    }
+  );
+}
+
 export async function fetchAdminTemplatesAnalyticsOverview(
   query: AdminTemplatesAnalyticsQuery = {},
   signal?: AbortSignal
@@ -578,10 +682,14 @@ export async function fetchAdminTemplatesAnalyticsOverview(
   const params = new URLSearchParams();
   if (normalizedQuery.periodDays) params.set("periodDays", String(normalizedQuery.periodDays));
   if (normalizedQuery.templateType) params.set("templateType", normalizedQuery.templateType);
+  for (const templateId of normalizedQuery.templateIds ?? []) {
+    params.append("templateIds", templateId);
+  }
   if (normalizedQuery.category) params.set("category", normalizedQuery.category);
   if (normalizedQuery.status) params.set("status", normalizedQuery.status);
   if (normalizedQuery.access) params.set("access", normalizedQuery.access);
   if (normalizedQuery.sort) params.set("sort", normalizedQuery.sort);
+  if (normalizedQuery.skip !== undefined) params.set("skip", String(normalizedQuery.skip));
   if (normalizedQuery.take) params.set("take", String(normalizedQuery.take));
 
   const suffix = params.size > 0 ? `?${params.toString()}` : "";
@@ -607,11 +715,14 @@ export async function fetchAdminTemplateGenerationMetrics(
   );
 }
 
+export const GENERATION_REFUND_RETRY_REASON_MAX_LENGTH = 500;
+
 export function normalizeAdminTemplateGenerationsQuery(
   query: AdminTemplateGenerationsQuery = {}
 ): AdminTemplateGenerationsQuery {
   return {
     status: query.status && query.status !== "All" ? query.status : undefined,
+    refundState: query.refundState && query.refundState !== "all" ? query.refundState : undefined,
     provider: query.provider?.trim().slice(0, GENERATION_PROVIDER_FILTER_MAX_LENGTH) || undefined,
     user: query.user?.trim().slice(0, GENERATION_USER_FILTER_MAX_LENGTH) || undefined,
     search: query.search?.trim().slice(0, GENERATION_SEARCH_FILTER_MAX_LENGTH) || undefined,
@@ -633,6 +744,7 @@ export async function fetchAdminTemplateGenerations(
   const normalizedQuery = normalizeAdminTemplateGenerationsQuery(query);
   const params = new URLSearchParams();
   if (normalizedQuery.status) params.set("status", normalizedQuery.status);
+  if (normalizedQuery.refundState) params.set("refundState", normalizedQuery.refundState);
   if (normalizedQuery.provider) params.set("provider", normalizedQuery.provider);
   if (normalizedQuery.user) params.set("user", normalizedQuery.user);
   if (normalizedQuery.search) params.set("search", normalizedQuery.search);
@@ -644,6 +756,17 @@ export async function fetchAdminTemplateGenerations(
     method: "GET",
     signal,
   });
+}
+
+export async function fetchAdminTemplateGenerationDetail(
+  generationId: string,
+  signal?: AbortSignal
+): Promise<AdminGenerationDetail> {
+  const encodedGenerationId = encodePathSegment(generationId);
+  return apiRequest<AdminGenerationDetail>(
+    `/api/admin/templates/generations/${encodedGenerationId}`,
+    { method: "GET", signal }
+  );
 }
 
 export async function startAdminTemplateTest(
@@ -862,6 +985,24 @@ export async function retryAdminTemplateGeneration(
   return apiRequest<TemplateGenerationResponse>(
     `/api/admin/templates/generations/${encodedGenerationId}/retry`,
     { method: "POST" }
+  );
+}
+
+export async function retryAdminTemplateGenerationRefund(payload: {
+  generationId: string;
+  reason: string;
+  idempotencyKey: string;
+}): Promise<TemplateGenerationResponse> {
+  const encodedGenerationId = encodePathSegment(payload.generationId);
+  const reason = payload.reason.trim().slice(0, GENERATION_REFUND_RETRY_REASON_MAX_LENGTH);
+  const idempotencyKey = payload.idempotencyKey.trim().slice(0, 256);
+  return apiRequest<TemplateGenerationResponse>(
+    `/api/admin/templates/generations/${encodedGenerationId}/retry-refund`,
+    {
+      method: "POST",
+      headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined,
+      body: JSON.stringify({ reason }),
+    }
   );
 }
 

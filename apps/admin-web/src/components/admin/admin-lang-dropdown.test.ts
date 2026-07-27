@@ -14,7 +14,9 @@ describe("admin language dropdown", () => {
     const iconsSource = readFileSync(adminIconsPath, "utf8");
     const stylesSource = readFileSync(adminShellStylesPath, "utf8");
 
-    expect(source).toContain("useEffect, useId, useRef, useState");
+    expect(source).toContain("useCallback");
+    expect(source).toContain("useEffect");
+    expect(source).toContain("type KeyboardEvent as ReactKeyboardEvent");
     expect(source).toContain("const menuId = useId();");
     expect(source).toContain("import { getAdminChromeCopy }");
     expect(source).toContain("const copy = getAdminChromeCopy(locale).langDropdown;");
@@ -28,13 +30,28 @@ describe("admin language dropdown", () => {
     expect(source).toContain("aria-controls={open ? menuId : undefined}");
     expect(source).toContain("aria-label={triggerLabel}");
     expect(source).toContain("title={triggerLabel}");
-    expect(source).toContain(
-      '<ul id={menuId} className={styles.localeMenu} role="listbox" aria-label={languageLabel}>'
-    );
+    expect(source).toContain('aria-haspopup="menu"');
+    expect(source).toContain('role="menu"');
+    expect(source).toContain('role="menuitemradio"');
+    expect(source).toContain("aria-checked={isCurrent}");
+    expect(source).toContain("onKeyDown={handleTriggerKeyDown}");
+    expect(source).toContain("onKeyDown={handleMenuKeyDown}");
+    expect(source).toContain('event.key === "ArrowDown"');
+    expect(source).toContain('event.key === "ArrowUp"');
+    expect(source).toContain('event.key === "Home"');
+    expect(source).toContain('event.key === "End"');
+    expect(source).toContain('event.key === "Escape"');
+    expect(source).toContain('event.key === " " && focusedIndex >= 0');
+    expect(source).toContain("optionRefs.current[focusedIndex]?.click()");
+    expect(source).toContain("triggerRef.current?.focus()");
+    expect(source).not.toContain('role="listbox"');
+    expect(source).not.toContain('role="option"');
+    expect(source).not.toContain("aria-selected=");
     expect(source).toContain("import { CaretDownIcon, CheckIcon, GlobeIcon }");
-    expect(source).toContain("<span className={styles.localeCheck} aria-label={currentLabel}>");
+    expect(source).toContain('<span className={styles.localeCheck} aria-hidden="true">');
     expect(source).toContain("<CheckIcon />");
     expect(source).toContain('document.addEventListener("mousedown", handlePointerDown);');
+    expect(source).toContain('document.addEventListener("focusin", handleFocusIn);');
     expect(source).toContain('window.addEventListener("keydown", handleKeyDown);');
     expect(source).not.toContain('locale === "ru" ? "Язык интерфейса" : "Interface language"');
     expect(source).not.toContain(

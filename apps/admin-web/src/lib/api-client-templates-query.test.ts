@@ -6,17 +6,22 @@ import { readTemplateTestPageLibrarySource } from "@/components/templates/templa
 import { clearAdminListCaches } from "@/lib/api-client.core";
 import {
   cancelAdminTemplateGeneration,
+  claimAdminModerationItem,
   createTemplateOfTheDay,
   decideAdminModerationItem,
   fetchAdminModerationQueue,
   fetchAdminTemplateStatistics,
+  fetchAdminTemplateCategories,
   fetchAdminTemplateGenerationMetrics,
+  fetchAdminTemplateGenerationDetail,
   fetchAdminTemplates,
   fetchAdminTemplatesAnalyticsOverview,
   fetchAdminTemplateFeedback,
   fetchAdminTemplateRecentGenerations,
   fetchAdminTemplateTest,
   fetchAdminTemplateTestHistory,
+  fetchTemplateOfTheDaySchedule,
+  handoffAdminModerationItem,
   GENERATION_PROVIDER_FILTER_MAX_LENGTH,
   GENERATION_SEARCH_FILTER_MAX_LENGTH,
   GENERATION_USER_FILTER_MAX_LENGTH,
@@ -27,8 +32,12 @@ import {
   normalizeAdminModerationQueueQuery,
   normalizeAdminTemplateGenerationsQuery,
   normalizeAdminTemplatesAnalyticsQuery,
+  normalizeTemplateOfTheDayScheduleQuery,
   retryAdminTemplateGeneration,
+  releaseAdminModerationItem,
   resolveAdminLegacyGamificationDelivery,
+  TEMPLATE_ANALYTICS_TEMPLATE_ID_MAX_LENGTH,
+  TEMPLATE_ANALYTICS_TEMPLATE_IDS_MAX_COUNT,
   TEMPLATE_CATALOG_SEARCH_MAX_LENGTH,
   TEMPLATE_FEEDBACK_SEARCH_MAX_LENGTH,
   updateImageTemplate,
@@ -108,6 +117,8 @@ describe("api-client.templates query normalization", () => {
         search: ` ${overlongSearch} `,
         category: " Portrait ",
         access: "premium",
+        visibility: "qa_only",
+        readiness: "missing_preview",
         sort: "title",
         skip: -4.5,
         take: 500.2,
@@ -118,6 +129,8 @@ describe("api-client.templates query normalization", () => {
       search: "t".repeat(TEMPLATE_CATALOG_SEARCH_MAX_LENGTH),
       category: "Portrait",
       access: "premium",
+      visibility: "qa_only",
+      readiness: "missing_preview",
       sort: "title",
       skip: 0,
       take: 100,
@@ -132,6 +145,8 @@ describe("api-client.templates query normalization", () => {
         search: " portrait ",
         category: " Featured ",
         access: "vip" as never,
+        visibility: "private" as never,
+        readiness: "incomplete" as never,
         sort: "random" as never,
         skip: 2.9,
         take: 24.8,
@@ -142,6 +157,8 @@ describe("api-client.templates query normalization", () => {
       search: "portrait",
       category: "Featured",
       access: undefined,
+      visibility: undefined,
+      readiness: undefined,
       sort: undefined,
       skip: 2,
       take: 24,
@@ -155,21 +172,37 @@ describe("api-client.templates query normalization", () => {
       normalizeAdminTemplatesAnalyticsQuery({
         periodDays: 5000.9,
         templateType: "Document" as never,
+        templateIds: [" template-b ", "template-a", "template-b", "", 42 as never],
         category: ` ${overlongCategory} `,
         status: "Deleted" as never,
         access: "vip" as never,
         sort: "random" as never,
+        skip: -10.9,
         take: 500.2,
       })
     ).toEqual({
       periodDays: 3650,
       templateType: undefined,
+      templateIds: ["template-a", "template-b"],
       category: "a".repeat(TEMPLATE_CATALOG_SEARCH_MAX_LENGTH),
       status: undefined,
       access: undefined,
       sort: undefined,
+      skip: 0,
       take: 200,
     });
+
+    const excessiveTemplateIds = Array.from(
+      { length: TEMPLATE_ANALYTICS_TEMPLATE_IDS_MAX_COUNT + 5 },
+      (_, index) => ` ${String(index).padStart(3, "0")}-${"x".repeat(100)} `
+    );
+    const normalizedTemplateIds = normalizeAdminTemplatesAnalyticsQuery({
+      templateIds: excessiveTemplateIds,
+    }).templateIds;
+
+    expect(normalizedTemplateIds).toHaveLength(TEMPLATE_ANALYTICS_TEMPLATE_IDS_MAX_COUNT);
+    expect(normalizedTemplateIds?.[0]).toHaveLength(TEMPLATE_ANALYTICS_TEMPLATE_ID_MAX_LENGTH);
+    expect(normalizedTemplateIds).toEqual(normalizedTemplateIds?.toSorted());
   });
 
   it("normalizes template pagination values to finite integers", () => {
@@ -198,6 +231,33 @@ describe("api-client.templates query normalization", () => {
       skip: undefined,
       take: undefined,
     });
+  });
+
+  it("normalizes and requests Template of the Day schedule pages", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json({
+        items: [],
+        skip: 30,
+        take: 30,
+        totalCount: 61,
+        hasMore: true,
+        generatedAtUtc: "2026-07-25T00:00:00Z",
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect(normalizeTemplateOfTheDayScheduleQuery({ skip: 30.8, take: 200.4 })).toEqual({
+      skip: 30,
+      take: 100,
+    });
+
+    const page = await fetchTemplateOfTheDaySchedule({ skip: 30.8, take: 30.4 });
+
+    expect(page.totalCount).toBe(61);
+    expect(page.hasMore).toBe(true);
+    expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
+      "https://api.example.com/api/admin/template-of-the-day/schedule?skip=30&take=30",
+    ]);
   });
 
   it("normalizes template take-only request URLs", async () => {
@@ -268,13 +328,15 @@ describe("api-client.templates query normalization", () => {
       search: " dance ",
       category: "Fun",
       access: "free",
+      visibility: "public",
+      readiness: "ready",
       sort: "tokens",
       skip: 12.9,
       take: 24.2,
     });
 
     expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
-      "https://api.example.com/api/admin/templates/?type=Video&status=not_archived&search=dance&category=Fun&access=free&sort=tokens&skip=12&take=24",
+      "https://api.example.com/api/admin/templates/?type=Video&status=not_archived&search=dance&category=Fun&access=free&visibility=public&readiness=ready&sort=tokens&skip=12&take=24",
     ]);
   });
 
@@ -287,6 +349,15 @@ describe("api-client.templates query normalization", () => {
         totalCount: 42,
         hasMore: true,
         generatedAtUtc: "2026-06-07T00:00:00Z",
+        summary: {
+          pendingCount: 42,
+          approvedCount: 120,
+          rejectedCount: 8,
+          pendingComplaintsCount: 30,
+          pendingFeedbackCount: 12,
+          oldestPendingAtUtc: "2026-06-01T00:00:00Z",
+          generatedAtUtc: "2026-06-07T00:00:00Z",
+        },
       })
     );
     vi.stubGlobal("fetch", fetchMock);
@@ -294,6 +365,15 @@ describe("api-client.templates query normalization", () => {
     const response = await fetchAdminModerationQueue({ status: "pending", take: 1 });
 
     expect(response.totalCount).toBe(42);
+    expect(response.summary).toEqual({
+      pendingCount: 42,
+      approvedCount: 120,
+      rejectedCount: 8,
+      pendingComplaintsCount: 30,
+      pendingFeedbackCount: 12,
+      oldestPendingAtUtc: "2026-06-01T00:00:00Z",
+      generatedAtUtc: "2026-06-07T00:00:00Z",
+    });
     expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
       "https://api.example.com/api/admin/templates/moderation?status=pending&take=1",
     ]);
@@ -328,6 +408,27 @@ describe("api-client.templates query normalization", () => {
     expect(response.failedJobs).toBe(3);
     const [url, init] = fetchMock.mock.calls[0] ?? [];
     expect(String(url)).toBe("https://api.example.com/api/admin/templates/generations/metrics");
+    expect(init?.method).toBe("GET");
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("requests safe generation detail with abort support and encoded id", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json({
+        generation: { generationId: "generation/id" },
+        generatedAtUtc: "2026-07-27T00:00:00Z",
+      })
+    );
+    const controller = new AbortController();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await fetchAdminTemplateGenerationDetail("generation/id", controller.signal);
+
+    expect(response.generation.generationId).toBe("generation/id");
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(String(url)).toBe(
+      "https://api.example.com/api/admin/templates/generations/generation%2Fid"
+    );
     expect(init?.method).toBe("GET");
     expect(init?.signal).toBeInstanceOf(AbortSignal);
   });
@@ -410,42 +511,86 @@ describe("api-client.templates query normalization", () => {
           totalTokenCost: 0,
           averageTokenCost: 0,
           totalProviderCostUsd: 0,
-          complaintCount: 0,
+          totalComplaints: 0,
         },
-        trend: [],
+        trendPoints: [],
         topTemplates: [],
         categories: [],
         templateTypes: [],
         sources: [],
         devices: [],
         geography: [],
-        feedback: [],
-        funnel: {
+        feedbackItems: [],
+        conversionFunnel: {
           views: 0,
-          starts: 0,
-          completed: 0,
-          failed: 0,
+          generationStarts: 0,
+          completedGenerations: 0,
+          failedGenerations: 0,
           complaints: 0,
         },
         templates: [],
+        skip: 30,
+        take: 200,
+        totalCount: 230,
+        hasMore: true,
         availableCategories: [],
         generatedAtUtc: "2026-06-15T00:00:00.000Z",
       })
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    await fetchAdminTemplatesAnalyticsOverview({
+    const overview = await fetchAdminTemplatesAnalyticsOverview({
       periodDays: 30.8,
       templateType: "Document" as never,
+      templateIds: [" template-b ", "template-a", "template-b"],
       category: " Premium ",
       status: "Deleted" as never,
       access: "vip" as never,
       sort: "random" as never,
+      skip: 30.8,
       take: 250.4,
     });
 
+    expect(overview).toMatchObject({
+      skip: 30,
+      take: 200,
+      totalCount: 230,
+      hasMore: true,
+      summary: { totalComplaints: 0 },
+      conversionFunnel: { generationStarts: 0 },
+    });
     expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
-      "https://api.example.com/api/admin/templates/analytics?periodDays=30&category=Premium&take=200",
+      "https://api.example.com/api/admin/templates/analytics?periodDays=30&templateIds=template-a&templateIds=template-b&category=Premium&skip=30&take=200",
+    ]);
+  });
+
+  it("uses stable and isolated cache entries for template analytics id batches", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => Response.json({}));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchAdminTemplatesAnalyticsOverview({ templateIds: ["template-b", "template-a"] });
+    await fetchAdminTemplatesAnalyticsOverview({
+      templateIds: [" template-a ", "template-b", "template-b"],
+    });
+    await fetchAdminTemplatesAnalyticsOverview({ templateIds: ["template-c"] });
+
+    expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
+      "https://api.example.com/api/admin/templates/analytics?templateIds=template-a&templateIds=template-b",
+      "https://api.example.com/api/admin/templates/analytics?templateIds=template-c",
+    ]);
+  });
+
+  it("keeps paged template analytics responses in separate cache entries", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => Response.json({}));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchAdminTemplatesAnalyticsOverview({ periodDays: 30, skip: 50, take: 50 });
+    await fetchAdminTemplatesAnalyticsOverview({ periodDays: 30, skip: 100, take: 50 });
+    await fetchAdminTemplatesAnalyticsOverview({ periodDays: 30, skip: 50, take: 50 });
+
+    expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
+      "https://api.example.com/api/admin/templates/analytics?periodDays=30&skip=50&take=50",
+      "https://api.example.com/api/admin/templates/analytics?periodDays=30&skip=100&take=50",
     ]);
   });
 
@@ -581,11 +726,54 @@ describe("api-client.templates query normalization", () => {
     });
   });
 
-  it("invalidates cached template analytics after template mutations", async () => {
+  it("sends versioned moderation lease and decision contracts", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => Response.json({}));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await claimAdminModerationItem("event-1", { expectedVersion: 4, leaseMinutes: 15 });
+    await releaseAdminModerationItem("event-1", {
+      expectedVersion: 5,
+      reason: " queue handback ",
+    });
+    await handoffAdminModerationItem("event-1", {
+      assigneeUserId: " moderator-2 ",
+      expectedVersion: 6,
+      reason: " shift change ",
+      leaseMinutes: 20,
+    });
+    await decideAdminModerationItem("event-1", {
+      action: "approve",
+      reason: " no violation ",
+      expectedVersion: 7,
+    });
+
+    expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
+      "https://api.example.com/api/admin/templates/moderation/event-1/claim",
+      "https://api.example.com/api/admin/templates/moderation/event-1/release",
+      "https://api.example.com/api/admin/templates/moderation/event-1/handoff",
+      "https://api.example.com/api/admin/templates/moderation/event-1/decision",
+    ]);
+    expect(fetchMock.mock.calls.map((call) => JSON.parse(String(call[1]?.body)))).toEqual([
+      { expectedVersion: 4, leaseMinutes: 15 },
+      { expectedVersion: 5, reason: "queue handback" },
+      {
+        assigneeUserId: "moderator-2",
+        expectedVersion: 6,
+        reason: "shift change",
+        leaseMinutes: 20,
+      },
+      { action: "approve", reason: "no violation", expectedVersion: 7 },
+    ]);
+  });
+
+  it("invalidates cached template analytics and category summaries after template mutations", async () => {
     const fetchMock = vi.fn<typeof fetch>(async (input) => {
       const url = String(input);
       if (url.endsWith("/api/admin/templates/template-analytics/statistics")) {
         return Response.json({ templateId: "template-analytics", totalRuns: 1 });
+      }
+      if (url.includes("/api/admin/templates/categories/")) {
+        return Response.json([]);
       }
       if (url.endsWith("/api/admin/templates/image/template-analytics")) {
         return Response.json({ templateId: "template-analytics" });
@@ -596,16 +784,23 @@ describe("api-client.templates query normalization", () => {
 
     await fetchAdminTemplateStatistics("template-analytics");
     await fetchAdminTemplateStatistics("template-analytics");
+    await fetchAdminTemplateCategories();
+    await fetchAdminTemplateCategories();
     await updateImageTemplate(
       "template-analytics",
       {} as Parameters<typeof updateImageTemplate>[1]
     );
     await fetchAdminTemplateStatistics("template-analytics");
+    await fetchAdminTemplateCategories();
 
     const statisticsRequests = fetchMock.mock.calls.filter((call) =>
       String(call[0]).endsWith("/api/admin/templates/template-analytics/statistics")
     );
+    const categoryRequests = fetchMock.mock.calls.filter((call) =>
+      String(call[0]).includes("/api/admin/templates/categories/")
+    );
     expect(statisticsRequests).toHaveLength(2);
+    expect(categoryRequests).toHaveLength(2);
   });
 
   it("propagates AbortSignal through template GET helpers", () => {
@@ -650,6 +845,14 @@ describe("api-client.templates query normalization", () => {
     );
     expect(catalogSource).toContain("fetchAdminTemplatesAnalyticsOverview(");
     expect(catalogSource).toContain("signal");
+    expect(catalogSource).toContain("templateIds: visibleTemplateIds");
+    expect(catalogSource).toContain("fetchAdminTemplatesAnalyticsOverview(analyticsQuery, signal)");
+    expect(catalogSource).toContain(
+      'templateCatalogAnalyticsRows(\n      templateType ?? "all",\n      analyticsTemplateIds'
+    );
+    expect(catalogSource).not.toContain("fetchAllAnalyticsRows");
+    expect(catalogSource).not.toContain("ANALYTICS_ROWS_PAGE_SIZE");
+    expect(catalogSource).not.toContain("while (pageCount");
     expect(overviewSource).toContain("queryFn: async ({ signal }) =>");
     expect(overviewSource).toContain("fetchAdminTemplate(templateId, signal)");
     expect(overviewSource).toContain(

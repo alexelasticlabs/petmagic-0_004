@@ -1,12 +1,14 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
   fetchAdminTemplates,
   fetchAdminTemplatesAnalyticsOverview,
   normalizeAdminTemplateCatalogQuery,
+  normalizeAdminTemplatesAnalyticsQuery,
   type AdminTemplateCatalogQuery,
   type AdminTemplatesAnalyticsTemplateRow,
   type TemplateType,
@@ -15,13 +17,30 @@ import {
 type UseAdminTemplateCatalogOptions = {
   enabled?: boolean;
   query: AdminTemplateCatalogQuery;
-  templateType: TemplateType;
+  templateType?: TemplateType;
 };
 
 type AnalyticsRowsMap = Record<string, AdminTemplatesAnalyticsTemplateRow>;
 
+const EMPTY_TEMPLATE_IDS: string[] = [];
+
 function normalizeTemplateId(templateId: string) {
   return templateId.trim().toLowerCase();
+}
+
+function createAnalyticsRowsMap(rows: AdminTemplatesAnalyticsTemplateRow[]): AnalyticsRowsMap {
+  const rowsByTemplateId: AnalyticsRowsMap = {};
+
+  for (const row of rows) {
+    rowsByTemplateId[row.templateId] = row;
+    rowsByTemplateId[normalizeTemplateId(row.templateId)] = row;
+  }
+
+  return rowsByTemplateId;
+}
+
+function areTemplateIdListsEqual(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
 export function useAdminTemplateCatalog({
@@ -35,28 +54,32 @@ export function useAdminTemplateCatalog({
     queryFn: ({ signal }) => fetchAdminTemplates(normalizedQuery, signal),
     enabled,
   });
+  const visibleTemplateIds = useMemo(
+    () => templatesQuery.data?.items.map((template) => template.templateId) ?? EMPTY_TEMPLATE_IDS,
+    [templatesQuery.data?.items]
+  );
+  const analyticsQuery = useMemo(
+    () =>
+      normalizeAdminTemplatesAnalyticsQuery({
+        templateType: templateType ?? "All",
+        templateIds: visibleTemplateIds,
+        sort: "updated",
+        take: visibleTemplateIds.length,
+      }),
+    [templateType, visibleTemplateIds]
+  );
+  const analyticsTemplateIds = analyticsQuery.templateIds ?? EMPTY_TEMPLATE_IDS;
 
   const analyticsRowsQuery = useQuery<AnalyticsRowsMap>({
-    queryKey: adminQueryKeys.templateCatalogAnalyticsRows(templateType),
+    queryKey: adminQueryKeys.templateCatalogAnalyticsRows(
+      templateType ?? "all",
+      analyticsTemplateIds
+    ),
     queryFn: async ({ signal }) => {
-      const response = await fetchAdminTemplatesAnalyticsOverview(
-        {
-          templateType,
-          sort: "updated",
-          take: 500,
-        },
-        signal
-      );
-      const rowsByTemplateId: AnalyticsRowsMap = {};
-
-      for (const row of response.templates) {
-        rowsByTemplateId[row.templateId] = row;
-        rowsByTemplateId[normalizeTemplateId(row.templateId)] = row;
-      }
-
-      return rowsByTemplateId;
+      const response = await fetchAdminTemplatesAnalyticsOverview(analyticsQuery, signal);
+      return createAnalyticsRowsMap(response.templates);
     },
-    enabled: enabled && templatesQuery.isSuccess && (templatesQuery.data?.items.length ?? 0) > 0,
+    enabled: enabled && templatesQuery.isSuccess && analyticsTemplateIds.length > 0,
   });
 
   async function refresh() {
@@ -70,7 +93,13 @@ export function useAdminTemplateCatalog({
       throw templatesResult.error;
     }
 
-    if ((templatesResult.data?.items.length ?? 0) > 0) {
+    const refreshedTemplateIds = normalizeAdminTemplatesAnalyticsQuery({
+      templateIds: templatesResult.data?.items.map((template) => template.templateId),
+    }).templateIds;
+    if (
+      refreshedTemplateIds &&
+      areTemplateIdListsEqual(refreshedTemplateIds, analyticsTemplateIds)
+    ) {
       void analyticsRowsQuery.refetch().catch(() => undefined);
     }
 
@@ -97,6 +126,7 @@ export function useAdminTemplateCatalog({
     hasMore: Boolean(templatesQuery.data?.hasMore),
     pageSkip: templatesQuery.data?.skip ?? normalizedQuery.skip ?? 0,
     pageTake: templatesQuery.data?.take ?? normalizedQuery.take ?? 24,
+    summary: templatesQuery.data?.summary ?? null,
     totalCount: templatesQuery.data?.totalCount ?? 0,
   };
 }

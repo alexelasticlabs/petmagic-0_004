@@ -19,11 +19,16 @@ import type {
 } from "@/components/support/support-conversation-page.types";
 import { getSupportConversationCopy } from "@/components/support/support-conversation.content";
 import sharedStyles from "@/components/support/support-page.module.css";
+import { SupportReplyTemplates } from "@/components/support/support-reply-templates";
 import { SupportSecureMedia } from "@/components/support/support-secure-media";
 import { statusHint, statusLabel } from "@/components/support/support-status-helpers";
 import { SUPPORT_REPLY_MAX_LENGTH } from "@/components/support/use-support-conversation-controller";
 import { Button } from "@/components/ui/button";
-import type { AdminSupportConversation, SupportConversationStatus } from "@/lib/api-client";
+import {
+  SUPPORT_ATTACHMENT_ACCEPT,
+  type AdminSupportConversation,
+  type SupportConversationStatus,
+} from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
 
 import type { ReactNode, RefObject } from "react";
@@ -37,6 +42,8 @@ type SupportConversationChatPaneProps = {
   attachmentInputRef: RefObject<HTMLInputElement | null>;
   attachmentPreviewUrl: string | null;
   canManageSupportWorkspace: boolean;
+  canManageReplyTemplates: boolean;
+  canRetryAttachment: boolean;
   composerPlaceholder: string;
   composerValue: string;
   conversation: AdminSupportConversation;
@@ -46,11 +53,14 @@ type SupportConversationChatPaneProps = {
     waitLabel: string | null;
   };
   copy: ReturnType<typeof getSupportConversationCopy>;
+  detailsAction?: ReactNode;
   groupedConversationFeed: ReturnType<typeof groupSupportConversationFeed>;
   hasComposerAttachment: boolean;
   highlightedMessageId: string | null;
   isComposerBusy: boolean;
   isComposerDisabled: boolean;
+  isAttachmentRetrySubmitting: boolean;
+  isLoadingOlderMessages: boolean;
   isConversationClosed: boolean;
   isConversationReadOnly: boolean;
   isDragging: boolean;
@@ -65,6 +75,7 @@ type SupportConversationChatPaneProps = {
   replyComposerPreview: string;
   replyToMessage: SupportMessage | null;
   replyToPreview: string | null;
+  requestAttachmentRetry: (messageId: string, file: File) => void;
   requestOlderMessagesLoad: () => void;
   requestReopenConversation: () => void;
   reopenStatusAction: { status: SupportConversationStatus; label: string } | null;
@@ -76,19 +87,15 @@ type SupportConversationChatPaneProps = {
   ) => ReactNode;
   renderReplyThumbnail: (attachment: SupportMessageAttachment | null | undefined) => ReactNode;
   resetSelectedAttachment: () => void;
-  searchInputRef: RefObject<HTMLInputElement | null>;
-  searchQuery: string;
   selectedAttachment: File | null;
   selectReplyToMessage: (messageId: string | null) => void;
   setFullscreenImage: (image: FullscreenImage | null) => void;
   setIsDragging: (value: boolean) => void;
   setReply: (value: string) => void;
-  setSearchQuery: (value: string) => void;
   setSelectedAttachment: (file: File | null) => void;
   startReplyToMessage: (message: SupportMessage) => void;
   statusMutationIsPending: boolean;
   submitReply: () => void;
-  supportWorkspaceSubtitle: string;
   text: ReturnType<typeof getDictionary>;
   userDisplayName: string;
   userEmailDisplay: string;
@@ -98,17 +105,22 @@ export function SupportConversationChatPane({
   attachmentInputRef,
   attachmentPreviewUrl,
   canManageSupportWorkspace,
+  canManageReplyTemplates,
+  canRetryAttachment,
   composerPlaceholder,
   composerValue,
   conversation,
   conversationQueryIsFetching,
   conversationSla,
   copy,
+  detailsAction,
   groupedConversationFeed,
   hasComposerAttachment,
   highlightedMessageId,
   isComposerBusy,
   isComposerDisabled,
+  isAttachmentRetrySubmitting,
+  isLoadingOlderMessages,
   isConversationClosed,
   isConversationReadOnly,
   isDragging,
@@ -123,45 +135,44 @@ export function SupportConversationChatPane({
   replyComposerPreview,
   replyToMessage,
   replyToPreview,
+  requestAttachmentRetry,
   requestOlderMessagesLoad,
   requestReopenConversation,
   reopenStatusAction,
   renderAttachmentTile,
   renderReplyThumbnail,
   resetSelectedAttachment,
-  searchInputRef,
-  searchQuery,
   selectedAttachment,
   selectReplyToMessage,
   setFullscreenImage,
   setIsDragging,
   setReply,
-  setSearchQuery,
   setSelectedAttachment,
   startReplyToMessage,
   statusMutationIsPending,
   submitReply,
-  supportWorkspaceSubtitle,
   text,
   userDisplayName,
   userEmailDisplay,
 }: SupportConversationChatPaneProps) {
-  return (
-    <>
-      <SupportConversationChatHeader
-        conversation={conversation}
-        conversationSla={conversationSla}
-        deletedUserEmail={copy.shared.deletedUserEmail}
-        locale={locale}
-        searchInputRef={searchInputRef}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        supportWorkspaceSubtitle={supportWorkspaceSubtitle}
-        text={text}
-        userDisplayName={userDisplayName}
-        userEmailDisplay={userEmailDisplay}
-      />
+  const selectedAttachmentMediaType = selectedAttachment?.type.startsWith("video/")
+    ? "video"
+    : "image";
+  const openSelectedAttachmentPreview = () => {
+    if (!attachmentPreviewUrl || !selectedAttachment) {
+      return;
+    }
 
+    setFullscreenImage({
+      attachmentFileUrl: attachmentPreviewUrl,
+      fileName: selectedAttachment.name,
+      fileSizeBytes: selectedAttachment.size,
+      mediaType: selectedAttachmentMediaType,
+    });
+  };
+
+  return (
+    <div className={styles.chatWorkspacePane} data-testid="support-chat-pane">
       <div
         className={styles.chatPane}
         onDragOver={(event) => {
@@ -188,16 +199,28 @@ export function SupportConversationChatPane({
         }}
       >
         <AdminCard className={`${styles.chatShell} ${isDragging ? styles.chatShellDragging : ""}`}>
+          <SupportConversationChatHeader
+            action={detailsAction}
+            conversation={conversation}
+            conversationSla={conversationSla}
+            deletedUserEmail={copy.shared.deletedUserEmail}
+            locale={locale}
+            text={text}
+            userDisplayName={userDisplayName}
+            userEmailDisplay={userEmailDisplay}
+          />
+
           {isDragging ? (
             <div className={styles.dropOverlay}>
               <div className={styles.dropOverlayContent}>
                 <UploadIcon className={styles.dropOverlayIcon} />
-                <span>{copy.page.dragAndDropImage}</span>
+                <span>{copy.page.dragAndDropAttachment}</span>
               </div>
             </div>
           ) : null}
           <SupportConversationMessages
             canManageSupportWorkspace={canManageSupportWorkspace}
+            canRetryAttachment={canRetryAttachment}
             conversation={conversation}
             conversationQueryIsFetching={conversationQueryIsFetching}
             copy={copy}
@@ -208,8 +231,11 @@ export function SupportConversationChatPane({
             messageLabels={messageLabels}
             messagesById={messagesById}
             messagesEndRef={messagesEndRef}
+            isAttachmentRetrySubmitting={isAttachmentRetrySubmitting}
+            isLoadingOlderMessages={isLoadingOlderMessages}
             renderAttachmentTile={renderAttachmentTile}
             renderReplyThumbnail={renderReplyThumbnail}
+            requestAttachmentRetry={requestAttachmentRetry}
             requestOlderMessagesLoad={requestOlderMessagesLoad}
             startReplyToMessage={startReplyToMessage}
             text={text}
@@ -245,7 +271,7 @@ export function SupportConversationChatPane({
                   ref={attachmentInputRef}
                   type="file"
                   className={styles.hiddenFileInput}
-                  accept="image/jpeg,image/png,image/webp"
+                  accept={SUPPORT_ATTACHMENT_ACCEPT}
                   disabled={isComposerDisabled}
                   onChange={(event) => {
                     if (isComposerDisabled) {
@@ -299,30 +325,36 @@ export function SupportConversationChatPane({
                 {selectedAttachment ? (
                   <div className={styles.attachmentPreviewCard}>
                     {attachmentPreviewUrl ? (
-                      <button
-                        type="button"
-                        className={styles.attachmentPreviewImageButton}
-                        onClick={() =>
-                          setFullscreenImage({
-                            attachmentFileUrl: attachmentPreviewUrl,
-                            fileName: selectedAttachment.name,
-                            fileSizeBytes: selectedAttachment.size,
-                          })
-                        }
-                      >
+                      selectedAttachmentMediaType === "video" ? (
                         <SupportSecureMedia
                           url={attachmentPreviewUrl}
-                          kind="image"
-                          alt={formatSafeSupportDisplay(
-                            selectedAttachment.name,
-                            messageLabels.fileFallback,
-                            120
-                          )}
-                          width={72}
-                          height={72}
+                          kind="video"
                           className={styles.attachmentPreviewImage}
+                          controls
+                          preload="metadata"
+                          playsInline
+                          logContext={{ mimeType: selectedAttachment.type }}
                         />
-                      </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className={styles.attachmentPreviewImageButton}
+                          onClick={openSelectedAttachmentPreview}
+                        >
+                          <SupportSecureMedia
+                            url={attachmentPreviewUrl}
+                            kind="image"
+                            alt={formatSafeSupportDisplay(
+                              selectedAttachment.name,
+                              messageLabels.fileFallback,
+                              120
+                            )}
+                            width={72}
+                            height={72}
+                            className={styles.attachmentPreviewImage}
+                          />
+                        </button>
+                      )
                     ) : (
                       <div className={styles.attachmentPreviewFileIcon}>
                         <FileIcon className={sharedStyles.supportFileIcon} />
@@ -346,13 +378,7 @@ export function SupportConversationChatPane({
                         <button
                           type="button"
                           className={styles.attachmentActionButton}
-                          onClick={() =>
-                            setFullscreenImage({
-                              attachmentFileUrl: attachmentPreviewUrl,
-                              fileName: selectedAttachment.name,
-                              fileSizeBytes: selectedAttachment.size,
-                            })
-                          }
+                          onClick={openSelectedAttachmentPreview}
                         >
                           {text.supportAttachmentOpenAction}
                         </button>
@@ -369,19 +395,29 @@ export function SupportConversationChatPane({
                   </div>
                 ) : null}
 
-                <div className={styles.composerInputBar}>
+                <SupportReplyTemplates
+                  locale={locale}
+                  disabled={isComposerDisabled}
+                  canManageTemplates={canManageReplyTemplates}
+                  setReply={setReply}
+                />
+
+                <div className={styles.composerInputBar} data-testid="support-composer">
                   <button
                     type="button"
                     className={styles.composerIconBtn}
+                    data-testid="support-composer-attachment"
                     onClick={() => attachmentInputRef.current?.click()}
                     disabled={isComposerDisabled}
                     aria-label={messageLabels.attachFile}
                     title={messageLabels.attachFile}
                   >
                     <PaperclipIcon className={styles.composerIconSvg} />
+                    <span className={styles.composerAttachLabel}>{messageLabels.attachFile}</span>
                   </button>
                   <textarea
-                    className={`${sharedStyles.textarea} ${styles.composerTextarea}`}
+                    className={styles.composerTextarea}
+                    data-testid="support-composer-input"
                     value={composerValue}
                     onChange={(event) =>
                       setReply(event.target.value.slice(0, SUPPORT_REPLY_MAX_LENGTH))
@@ -419,6 +455,6 @@ export function SupportConversationChatPane({
           </div>
         </AdminCard>
       </div>
-    </>
+    </div>
   );
 }

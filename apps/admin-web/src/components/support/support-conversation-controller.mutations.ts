@@ -9,28 +9,34 @@ import {
 } from "react";
 
 import {
+  getSupportReplyActor,
+  isSupportReplyActorCurrent,
+  rollbackOptimisticSupportMessage,
+  type SupportReplyActor,
+  type SupportReplySessionIdentity,
   type SendOptimisticContext,
   type ToastState,
 } from "@/components/support/support-conversation-controller.helpers";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
-  assignSupportConversationToMe,
+  isSupportedSupportAttachmentMimeType,
+  retrySupportAttachment,
   sendSupportAttachment,
   sendSupportMessage,
-  unassignSupportConversation,
   updateSupportConversationMetadata,
   updateSupportConversationStatus,
   type AdminSupportConversation,
   type SupportConversationPriority,
   type SupportConversationStatus,
 } from "@/lib/api-client";
+import { getSession } from "@/lib/api-client.core";
 import { maskEmail, sanitizeSensitiveText } from "@/lib/sensitive-display";
-
-type SupportControllerSessionIdentity = {
-  userId?: string | null;
-  displayName?: string | null;
-  email?: string | null;
-};
+import {
+  clearSupportAttachmentIdempotencyKey,
+  clearSupportMessageIdempotencyKey,
+  getOrCreateSupportAttachmentIdempotencyKey,
+  getOrCreateSupportMessageIdempotencyKey,
+} from "@/lib/support-message-idempotency";
 
 type UseSupportConversationMutationsParams = {
   conversationId: string;
@@ -42,13 +48,13 @@ type UseSupportConversationMutationsParams = {
   selectedAttachment: File | null;
   replyToMessageId: string | null;
   replyToPreview: string | null;
-  sessionUser: SupportControllerSessionIdentity | null | undefined;
+  sessionUser: SupportReplySessionIdentity | null | undefined;
   queryClient: QueryClient;
   optimisticAttachmentPreview: (fileName?: string | null) => string;
   operatorLabel: string;
   supportReplySent: string;
+  supportAttachmentRetryRequired: string;
   supportStatusSaved: string;
-  supportAssignmentSaved: string;
   pushSupportNotification: (type: ToastState["type"], message: string) => void;
   pushSupportError: (error: unknown, action?: string) => void;
   setToast: Dispatch<SetStateAction<ToastState | null>>;
@@ -57,6 +63,22 @@ type UseSupportConversationMutationsParams = {
   setReply: Dispatch<SetStateAction<string>>;
   setReplyToMessageId: Dispatch<SetStateAction<string | null>>;
   setReplyToPreview: Dispatch<SetStateAction<string | null>>;
+};
+
+type SendSupportReplyVariables = {
+  actor: SupportReplyActor;
+  body: string;
+  idempotencyKey: string;
+  idempotencyIntent: "attachment" | "text";
+  replyToMessageId: string | null;
+  replyToPreview: string | null;
+  selectedAttachment: File | null;
+};
+
+type PendingSupportReplyIntent = {
+  actorId: string;
+  draftSignature: string;
+  idempotencyKey: string;
 };
 
 export function useSupportConversationMutations({
@@ -74,8 +96,8 @@ export function useSupportConversationMutations({
   optimisticAttachmentPreview,
   operatorLabel,
   supportReplySent,
+  supportAttachmentRetryRequired,
   supportStatusSaved,
-  supportAssignmentSaved,
   pushSupportNotification,
   pushSupportError,
   setToast,
@@ -86,9 +108,29 @@ export function useSupportConversationMutations({
   setReplyToPreview,
 }: UseSupportConversationMutationsParams) {
   const [isSendReplyInFlight, setIsSendReplyInFlight] = useState(false);
+  const [sendReplyActorId, setSendReplyActorId] = useState<string | null>(null);
   const sendReplyInFlightRef = useRef(false);
   const optimisticAttachmentObjectUrlsRef = useRef(new Map<string, string>());
   const optimisticMessageCounterRef = useRef(0);
+  const pendingSupportReplyIntentRef = useRef<PendingSupportReplyIntent | null>(null);
+  const sendReplyActorIdRef = useRef<string | null>(null);
+  const attachmentIntentIdsRef = useRef(new WeakMap<File, string>());
+  const attachmentIntentCounterRef = useRef(0);
+  const sessionActor = getSupportReplyActor(sessionUser);
+  const isReplyActorCurrent = useCallback(
+    (actor: SupportReplyActor) => isSupportReplyActorCurrent(actor, getSession()?.user),
+    []
+  );
+  const releaseSendReply = useCallback((actorId: string) => {
+    if (sendReplyActorIdRef.current !== actorId) {
+      return;
+    }
+
+    sendReplyInFlightRef.current = false;
+    sendReplyActorIdRef.current = null;
+    setSendReplyActorId(null);
+    setIsSendReplyInFlight(false);
+  }, []);
 
   useEffect(
     () => () => {
@@ -101,7 +143,10 @@ export function useSupportConversationMutations({
   );
 
   const sendMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (variables: SendSupportReplyVariables) => {
+      if (!isReplyActorCurrent(variables.actor)) {
+        throw new Error("Support reply actor changed before the request was sent.");
+      }
       if (!assertCanManageSupportWorkspace()) {
         throw new Error(supportActionsForbidden);
       }
@@ -109,16 +154,30 @@ export function useSupportConversationMutations({
         throw new Error(supportOwnershipRequired);
       }
 
-      return selectedAttachment
-        ? sendSupportAttachment(conversationId, selectedAttachment, reply.trim(), replyToMessageId)
-        : sendSupportMessage(conversationId, reply.trim(), replyToMessageId);
+      return variables.selectedAttachment
+        ? sendSupportAttachment(
+            conversationId,
+            variables.selectedAttachment,
+            variables.body,
+            variables.replyToMessageId,
+            variables.idempotencyKey
+          )
+        : sendSupportMessage(
+            conversationId,
+            variables.body,
+            variables.replyToMessageId,
+            variables.idempotencyKey
+          );
     },
-    onMutate: async (): Promise<SendOptimisticContext> => {
-      if (!canMutateConversation) {
+    onMutate: async (variables: SendSupportReplyVariables): Promise<SendOptimisticContext> => {
+      if (!isReplyActorCurrent(variables.actor) || !canMutateConversation) {
         return {};
       }
 
-      const trimmedReply = reply.trim();
+      const trimmedReply = variables.body;
+      const selectedAttachment = variables.selectedAttachment;
+      const replyToMessageId = variables.replyToMessageId;
+      const replyToPreview = variables.replyToPreview;
       const hasAttachment = Boolean(selectedAttachment);
       const canApplyOptimisticMessage = hasAttachment || trimmedReply.length > 0;
       if (!canApplyOptimisticMessage) {
@@ -127,6 +186,9 @@ export function useSupportConversationMutations({
 
       const queryKey = adminQueryKeys.supportConversation(conversationId);
       await queryClient.cancelQueries({ queryKey });
+      if (!isReplyActorCurrent(variables.actor)) {
+        return {};
+      }
       const previousConversation = queryClient.getQueryData<AdminSupportConversation>(queryKey);
       if (!previousConversation) {
         return {};
@@ -154,10 +216,10 @@ export function useSupportConversationMutations({
         const optimisticMessage = {
           messageId: optimisticMessageId,
           conversationId,
-          senderUserId: sessionUser?.userId ?? "admin",
+          senderUserId: variables.actor.userId,
           senderDisplayName:
-            sessionUser?.displayName?.trim() ||
-            (sessionUser?.email ? maskEmail(sessionUser.email) : null) ||
+            variables.actor.displayName?.trim() ||
+            (variables.actor.email ? maskEmail(variables.actor.email) : null) ||
             operatorLabel,
           isFromAdmin: true,
           senderType: "Admin",
@@ -205,7 +267,7 @@ export function useSupportConversationMutations({
           updatedAtUtc: nowUtc,
         });
 
-        return { previousConversation, optimisticMessageId, optimisticAttachmentObjectUrl };
+        return { optimisticMessageId, optimisticAttachmentObjectUrl };
       } catch (error) {
         if (optimisticAttachmentObjectUrl) {
           optimisticAttachmentObjectUrlsRef.current.delete(optimisticMessageId);
@@ -214,7 +276,7 @@ export function useSupportConversationMutations({
         throw error;
       }
     },
-    onSuccess: async (_data, _variables, context) => {
+    onSuccess: async (_data, variables, context) => {
       if (context?.optimisticMessageId) {
         const optimisticObjectUrl = optimisticAttachmentObjectUrlsRef.current.get(
           context.optimisticMessageId
@@ -223,6 +285,29 @@ export function useSupportConversationMutations({
           URL.revokeObjectURL(optimisticObjectUrl);
           optimisticAttachmentObjectUrlsRef.current.delete(context.optimisticMessageId);
         }
+      }
+
+      if (variables.idempotencyIntent === "text") {
+        await clearSupportMessageIdempotencyKey(
+          variables.actor.userId,
+          conversationId,
+          variables.body,
+          variables.replyToMessageId
+        );
+      } else if (variables.selectedAttachment) {
+        await clearSupportAttachmentIdempotencyKey(
+          variables.actor.userId,
+          conversationId,
+          variables.selectedAttachment,
+          variables.body,
+          variables.replyToMessageId
+        );
+      }
+      if (pendingSupportReplyIntentRef.current?.actorId === variables.actor.userId) {
+        pendingSupportReplyIntentRef.current = null;
+      }
+      if (!isReplyActorCurrent(variables.actor)) {
+        return;
       }
 
       const queryKey = adminQueryKeys.supportConversation(conversationId);
@@ -243,11 +328,18 @@ export function useSupportConversationMutations({
       setReplyToMessageId(null);
       setReplyToPreview(null);
       resetSelectedAttachment();
-      setToast({ type: "success", message: supportReplySent });
-      pushSupportNotification("success", supportReplySent);
+      const attachmentUploadFailed =
+        Boolean(variables.selectedAttachment) &&
+        _data.attachmentUploadStatus?.trim().toLowerCase() !== "uploaded";
+      const notificationMessage = attachmentUploadFailed
+        ? supportAttachmentRetryRequired
+        : supportReplySent;
+      const notificationType = attachmentUploadFailed ? "error" : "success";
+      setToast({ type: notificationType, message: notificationMessage });
+      pushSupportNotification(notificationType, notificationMessage);
       await refreshConversationData();
     },
-    onError: (error, _variables, context) => {
+    onError: (error, variables, context) => {
       if (context?.optimisticMessageId) {
         const optimisticObjectUrl = optimisticAttachmentObjectUrlsRef.current.get(
           context.optimisticMessageId
@@ -258,36 +350,134 @@ export function useSupportConversationMutations({
         }
       }
 
-      if (context?.previousConversation) {
-        queryClient.setQueryData(
-          adminQueryKeys.supportConversation(conversationId),
-          context.previousConversation
+      if (!isReplyActorCurrent(variables.actor)) {
+        return;
+      }
+
+      const queryKey = adminQueryKeys.supportConversation(conversationId);
+      const optimisticMessageId = context?.optimisticMessageId;
+      if (optimisticMessageId) {
+        queryClient.setQueryData<AdminSupportConversation>(queryKey, (currentConversation) =>
+          currentConversation
+            ? rollbackOptimisticSupportMessage(currentConversation, optimisticMessageId)
+            : currentConversation
         );
       }
 
+      void queryClient.invalidateQueries({ queryKey });
+
       pushSupportError(error, "send_reply");
     },
-    onSettled: () => {
-      sendReplyInFlightRef.current = false;
-      setIsSendReplyInFlight(false);
+    onSettled: (_data, _error, variables) => {
+      releaseSendReply(variables.actor.userId);
     },
   });
 
   const requestSendReply = useCallback(() => {
+    const actor = sessionActor;
+    const isReplyInFlightForActor = Boolean(
+      actor &&
+      sendReplyActorIdRef.current === actor.userId &&
+      (sendReplyInFlightRef.current || sendMutation.isPending)
+    );
     if (
+      !actor ||
       !canMutateConversation ||
-      sendReplyInFlightRef.current ||
-      sendMutation.isPending ||
+      !isReplyActorCurrent(actor) ||
+      isReplyInFlightForActor ||
       (!reply.trim() && !selectedAttachment)
     ) {
       return false;
     }
 
     sendReplyInFlightRef.current = true;
+    sendReplyActorIdRef.current = actor.userId;
+    setSendReplyActorId(actor.userId);
     setIsSendReplyInFlight(true);
-    sendMutation.mutate();
+    const body = reply.trim();
+    const replyToId = replyToMessageId?.trim() || null;
+    const selectedReplyAttachment = selectedAttachment;
+    const attachmentIntentId = (() => {
+      if (!selectedReplyAttachment) {
+        return "text";
+      }
+
+      const knownId = attachmentIntentIdsRef.current.get(selectedReplyAttachment);
+      if (knownId) {
+        return knownId;
+      }
+
+      attachmentIntentCounterRef.current += 1;
+      const nextId = `attachment-${attachmentIntentCounterRef.current}`;
+      attachmentIntentIdsRef.current.set(selectedReplyAttachment, nextId);
+      return nextId;
+    })();
+    const draftSignature = JSON.stringify({
+      attachmentIntentId,
+      body,
+      replyToMessageId: replyToId,
+    });
+
+    void (async () => {
+      const pendingIntent = pendingSupportReplyIntentRef.current;
+      const idempotencyIntent = selectedReplyAttachment ? "attachment" : "text";
+      const idempotencyKey =
+        pendingIntent?.actorId === actor.userId && pendingIntent.draftSignature === draftSignature
+          ? pendingIntent.idempotencyKey
+          : idempotencyIntent === "text"
+            ? await getOrCreateSupportMessageIdempotencyKey(
+                actor.userId,
+                conversationId,
+                body,
+                replyToId
+              )
+            : await getOrCreateSupportAttachmentIdempotencyKey(
+                actor.userId,
+                conversationId,
+                selectedReplyAttachment!,
+                body,
+                replyToId
+              );
+
+      if (!isReplyActorCurrent(actor)) {
+        releaseSendReply(actor.userId);
+        return;
+      }
+
+      pendingSupportReplyIntentRef.current = {
+        actorId: actor.userId,
+        draftSignature,
+        idempotencyKey,
+      };
+      sendMutation.mutate({
+        actor,
+        body,
+        idempotencyKey,
+        idempotencyIntent,
+        replyToMessageId: replyToId,
+        replyToPreview,
+        selectedAttachment: selectedReplyAttachment,
+      });
+    })().catch((error: unknown) => {
+      releaseSendReply(actor.userId);
+      if (isReplyActorCurrent(actor)) {
+        pushSupportError(error, "send_reply");
+      }
+    });
     return true;
-  }, [canMutateConversation, reply, selectedAttachment, sendMutation]);
+  }, [
+    canMutateConversation,
+    conversationId,
+    isReplyActorCurrent,
+    pushSupportError,
+    reply,
+    replyToMessageId,
+    replyToPreview,
+    releaseSendReply,
+    selectedAttachment,
+    sendMutation,
+    sessionActor,
+  ]);
 
   const statusMutation = useMutation({
     mutationFn: async (status: SupportConversationStatus) => {
@@ -310,25 +500,56 @@ export function useSupportConversationMutations({
     },
   });
 
-  const assignmentMutation = useMutation({
-    mutationFn: async (action: "claim" | "unassign") => {
+  const retryAttachmentMutation = useMutation({
+    mutationFn: async ({ messageId, file }: { messageId: string; file: File }) => {
       if (!assertCanManageSupportWorkspace()) {
         throw new Error(supportActionsForbidden);
       }
+      if (!canMutateConversation) {
+        throw new Error(supportOwnershipRequired);
+      }
 
-      return action === "claim"
-        ? assignSupportConversationToMe(conversationId)
-        : unassignSupportConversation(conversationId);
+      return retrySupportAttachment(conversationId, messageId, file);
     },
-    onSuccess: async () => {
-      setToast({ type: "success", message: supportAssignmentSaved });
-      pushSupportNotification("success", supportAssignmentSaved);
+    onSuccess: async (message) => {
+      const uploadSucceeded = message.attachmentUploadStatus?.trim().toLowerCase() === "uploaded";
+      const notificationMessage = uploadSucceeded
+        ? supportReplySent
+        : supportAttachmentRetryRequired;
+      const notificationType = uploadSucceeded ? "success" : "error";
+      setToast({ type: notificationType, message: notificationMessage });
+      pushSupportNotification(notificationType, notificationMessage);
       await refreshConversationData();
     },
     onError: (error) => {
-      pushSupportError(error, "assign_conversation");
+      pushSupportError(error, "retry_attachment");
     },
   });
+
+  const requestAttachmentRetry = useCallback(
+    (messageId: string, file: File) => {
+      if (
+        !canMutateConversation ||
+        retryAttachmentMutation.isPending ||
+        !isSupportedSupportAttachmentMimeType(file.type)
+      ) {
+        if (!isSupportedSupportAttachmentMimeType(file.type)) {
+          setToast({ type: "error", message: supportAttachmentRetryRequired });
+          pushSupportNotification("error", supportAttachmentRetryRequired);
+        }
+        return;
+      }
+
+      retryAttachmentMutation.mutate({ messageId, file });
+    },
+    [
+      canMutateConversation,
+      pushSupportNotification,
+      retryAttachmentMutation,
+      setToast,
+      supportAttachmentRetryRequired,
+    ]
+  );
 
   const metadataMutation = useMutation({
     mutationFn: async (payload: { priority: SupportConversationPriority; tags: string[] }) => {
@@ -352,9 +573,14 @@ export function useSupportConversationMutations({
   });
 
   return {
-    assignmentMutation,
-    isSendReplySubmitting: isSendReplyInFlight || sendMutation.isPending,
+    isAttachmentRetrySubmitting: retryAttachmentMutation.isPending,
+    isSendReplySubmitting: Boolean(
+      sessionActor &&
+      sendReplyActorId === sessionActor.userId &&
+      (isSendReplyInFlight || sendMutation.isPending)
+    ),
     metadataMutation,
+    requestAttachmentRetry,
     requestSendReply,
     sendMutation,
     statusMutation,

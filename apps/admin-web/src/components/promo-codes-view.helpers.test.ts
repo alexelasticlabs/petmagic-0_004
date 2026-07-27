@@ -193,6 +193,17 @@ describe("promo code numeric form validation", () => {
     ).toThrow(text.promoCodesInvalidNumbers);
   });
 
+  it("preserves historical premium rewards for display but blocks them from write payloads", () => {
+    const text = getDictionary("en");
+    const legacyCode = createRedeemCode({ rewardKind: "premium_days", rewardValue: 7 });
+    const restoredForm = toPromoForm(legacyCode);
+
+    expect(restoredForm.rewardKind).toBe("premium_days");
+    expect(() => toUpdatePayload(restoredForm, legacyCode, text)).toThrow(
+      text.promoCodesRewardUnsupported
+    );
+  });
+
   it("trims and bounds free-text values restored from backend and sent to mutations", () => {
     const text = getDictionary("en");
     const longDescription = ` ${"d".repeat(PROMO_DESCRIPTION_MAX_LENGTH + 20)} `;
@@ -634,6 +645,20 @@ describe("promo code sensitive display", () => {
       isActive: true,
       isPremium: false,
       emailConfirmed: true,
+      termsOfUseAccepted: true,
+      privacyPolicyAccepted: true,
+      marketingEmailsEnabled: false,
+      legalAcceptance: {
+        termsOfUseAccepted: true,
+        termsOfUseAcceptedVersion: "2026-01",
+        termsOfUseAcceptedAtUtc: "2026-06-06T12:00:00Z",
+        privacyPolicyAccepted: true,
+        privacyPolicyAcceptedVersion: "2026-01",
+        privacyPolicyAcceptedAtUtc: "2026-06-06T12:00:00Z",
+        currentTermsOfUseVersion: "2026-01",
+        currentPrivacyPolicyVersion: "2026-01",
+        requiresAcceptance: false,
+      },
       createdAtUtc: "2026-06-06T12:00:00Z",
       avatar: null,
     });
@@ -749,7 +774,7 @@ describe("promo code sensitive display", () => {
     expect(activationsSource).toContain("disabled={activationsIsFetching}");
     expect(activationsSource).toContain("function requestActivationsRetry()");
     expect(activationsSource).toContain("if (activationsIsFetching) {\n      return;\n    }");
-    expect(activationsSource).toContain("void onRefetchActivations();");
+    expect(activationsSource).toContain("void onRefetchActivations().catch(() => undefined);");
     expect(activationsSource).toContain("onClick={requestActivationsRetry}");
   });
 

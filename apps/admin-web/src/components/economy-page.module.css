@@ -1,16 +1,702 @@
 .page {
-  width: 100%;
-  max-width: var(--admin-page-max);
+  width: min(100%, var(--admin-page-max-wide));
+  min-width: 0;
+  max-width: var(--admin-page-max-wide);
   margin: 0 auto;
   display: grid;
   gap: 1.5rem;
+}
+
+.page :where(button, input, select, textarea) {
+  max-width: 100%;
+}
+
+.confirmationContent {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.confirmationError {
+  margin: 0;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--border-soft));
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface));
+  color: var(--danger);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.confirmationReason {
+  display: grid;
+  gap: 0.45rem;
+  color: var(--text-strong);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.confirmationReason textarea {
+  width: 100%;
+  min-height: 6rem;
+  resize: vertical;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.75rem;
+  background: var(--surface);
+  color: var(--text-strong);
+  padding: 0.7rem 0.8rem;
+  line-height: 1.45;
+}
+
+.confirmationReason textarea:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--brand) 30%, transparent);
+  outline-offset: 2px;
+  border-color: var(--brand);
+}
+
+.confirmationReason small {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.page :where(p, span, strong, label, td, th) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.workspaceToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  min-width: 0;
+  gap: 0.75rem;
+}
+
+.workspaceSectionIntro h2 {
+  color: var(--text-strong);
+  font-family: var(--font-heading), sans-serif;
+  font-size: clamp(1.08rem, 1rem + 0.32vw, 1.28rem);
+  line-height: 1.2;
+}
+
+.workspaceSectionIntro p {
+  max-width: 64ch;
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.workspaceNav {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+}
+
+.workspacePanel {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 1.25rem;
+}
+
+.workspaceTab {
+  display: inline-flex;
+  flex: 0 0 auto;
+  min-width: 0;
+  min-height: 2.5rem;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 0.48rem 0.7rem;
+  color: var(--text-muted);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    color 150ms ease,
+    background-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.workspaceTab strong {
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.workspaceTab:hover {
+  border-color: var(--border-strong);
+  color: var(--text-soft);
+  background: var(--surface-hover);
+}
+
+.workspaceTab:focus-visible,
+.currencyTab:focus-visible {
+  outline: none;
+  border-color: var(--border-accent);
+  box-shadow: var(--focus-ring);
+}
+
+.workspaceTab[data-active] {
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--border-soft));
+  color: var(--primary-soft-fg);
+  background: var(--primary-soft-bg);
+  box-shadow: var(--interactive-glow);
+}
+
+.workspaceTab[data-active] strong {
+  color: var(--text-strong);
+}
+
+.workspaceSection {
+  min-width: 0;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.workspaceSectionIntro {
+  min-width: 0;
+  display: grid;
+  gap: 0.25rem;
+  padding: 0 0.1rem;
+}
+
+.overviewSummary {
+  display: grid;
+  grid-template-columns: minmax(13rem, 0.85fr) minmax(0, 2.15fr);
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+  box-shadow: var(--shadow-soft);
+}
+
+.overviewSummaryPrimary {
+  display: grid;
+  align-content: center;
+  min-width: 0;
+  gap: 0.28rem;
+  padding: clamp(1rem, 0.84rem + 0.48vw, 1.35rem);
+  border-right: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--primary-soft-bg) 68%, var(--surface-1));
+}
+
+.overviewSummaryPrimary > span,
+.overviewMetricList dt,
+.reconciliationResult dt {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.overviewSummaryPrimary strong {
+  color: var(--text-strong);
+  font-family: var(--font-heading), sans-serif;
+  font-size: clamp(1.55rem, 1.15rem + 1.4vw, 2.25rem);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+}
+
+.overviewSummaryPrimary small,
+.overviewMetricList span {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.overviewMetricList {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  min-width: 0;
+}
+
+.overviewMetricList > div {
+  display: grid;
+  align-content: center;
+  min-width: 0;
+  gap: 0.28rem;
+  padding: clamp(0.82rem, 0.72rem + 0.32vw, 1.08rem);
+  border-left: 1px solid var(--border-soft);
+}
+
+.overviewMetricList > div:first-child {
+  border-left: 0;
+}
+
+.overviewMetricList dd {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: clamp(1.12rem, 1.02rem + 0.32vw, 1.35rem);
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+  line-height: 1.1;
+}
+
+.overviewQuickActions {
+  display: grid;
+  grid-template-columns: minmax(13rem, 0.75fr) minmax(0, 2.25fr);
+  align-items: center;
+  min-width: 0;
+  gap: 0.85rem 1.1rem;
+  border-block: 1px solid var(--border-soft);
+  padding: 0.9rem 0.1rem;
+}
+
+.overviewQuickActionsCopy {
+  display: grid;
+  min-width: 0;
+  gap: 0.18rem;
+}
+
+.overviewQuickActionsCopy h3 {
+  color: var(--text-strong);
+  font-size: 0.9rem;
+  line-height: 1.25;
+}
+
+.overviewQuickActionsCopy p {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.overviewQuickActionList {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  min-width: 0;
+  gap: 0.45rem;
+}
+
+.quickActionButton {
+  min-height: 2.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.42rem;
+  white-space: nowrap;
+}
+
+.quickActionIcon {
+  width: 0.95rem;
+  height: 0.95rem;
+  flex: 0 0 auto;
+}
+
+.reconciliationResult {
+  grid-column: 2;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  min-width: 0;
+  gap: 0.45rem;
+}
+
+.reconciliationResult > div {
+  min-width: 0;
+  border-left: 1px solid var(--border-soft);
+  padding-left: 0.6rem;
+}
+
+.reconciliationResult dd {
+  margin: 0.12rem 0 0;
+  color: var(--text-strong);
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.overviewDataGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(20rem, 0.85fr);
+  align-items: start;
+  min-width: 0;
+  gap: 0.9rem;
+}
+
+.overviewDataCard {
+  min-width: 0;
+}
+
+.overviewCardActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.38rem;
+  min-width: 0;
+}
+
+.overviewActivityList,
+.overviewPurchaseList {
+  display: grid;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.overviewActivityItem,
+.overviewPurchaseItem {
+  display: grid;
+  min-width: 0;
+  gap: 0.65rem;
+  border-top: 1px solid var(--border-soft);
+  padding: 0.72rem 0;
+}
+
+.overviewActivityItem:first-child,
+.overviewPurchaseItem:first-child {
+  border-top: 0;
+  padding-top: 0.2rem;
+}
+
+.overviewActivityItem {
+  grid-template-columns: minmax(7.4rem, 0.85fr) minmax(0, 1.5fr) auto;
+  align-items: center;
+}
+
+.overviewActivityTime,
+.overviewActivityCopy span,
+.overviewPurchaseCopy span,
+.overviewActivityValue span {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.overviewActivityCopy,
+.overviewPurchaseCopy,
+.overviewActivityValue,
+.overviewPurchaseValue {
+  display: grid;
+  min-width: 0;
+  gap: 0.14rem;
+}
+
+.overviewActivityCopy strong,
+.overviewPurchaseCopy strong,
+.overviewPurchaseValue strong {
+  overflow: hidden;
+  color: var(--text-strong);
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.overviewActivityCopy span,
+.overviewPurchaseCopy span {
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.overviewActivityValue {
+  justify-items: end;
+  text-align: right;
+}
+
+.overviewActivityValue strong {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.86rem;
+}
+
+.overviewPurchaseItem {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+}
+
+.overviewPurchaseValue {
+  justify-items: end;
+  text-align: right;
+}
+
+.validationMessage {
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--danger) 34%, var(--border-soft));
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 0.65rem;
+  color: var(--danger-soft-fg);
+  background: var(--danger-soft-bg);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.catalogToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  min-width: 0;
+  gap: 0.75rem;
+  margin-bottom: 0.8rem;
+}
+
+.catalogToolbar > span {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.currencyTabs {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 0.2rem;
+  background: var(--surface-2);
+}
+
+.currencyTab {
+  min-height: 1.9rem;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius-sm) - 2px);
+  padding: 0.32rem 0.56rem;
+  color: var(--text-muted);
+  background: transparent;
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    color 150ms ease,
+    background-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.currencyTab:hover {
+  color: var(--text-soft);
+  background: var(--surface-hover);
+}
+
+.currencyTab[data-active] {
+  border-color: color-mix(in srgb, var(--accent) 44%, var(--border-soft));
+  color: var(--text-strong);
+  background: var(--primary-soft-bg);
+}
+
+.packState {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  width: fit-content;
+  overflow: hidden;
+  min-height: 1.2rem;
+  border-radius: var(--radius-pill);
+  padding: 0.08rem 0.38rem;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--surface-3) 74%, transparent);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.packState[data-dirty] {
+  color: var(--warning-soft-fg);
+  background: var(--warning-soft-bg);
 }
 
 .metricStrip {
   margin-bottom: 1rem;
 }
 
+.planSummaryList,
+.providerConfigSummaryList {
+  min-width: 0;
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.planSummaryItem,
+.providerConfigSummaryItem {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(12rem, 1.35fr) minmax(8.5rem, 0.7fr) minmax(12rem, 1fr) auto;
+  align-items: center;
+  gap: 0.85rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 0.7rem;
+  background: var(--surface-2);
+}
+
+.planSummaryItem[data-selected],
+.providerConfigSummaryItem[data-selected] {
+  border-color: var(--border-accent);
+  background: color-mix(in srgb, var(--primary-soft-bg) 56%, var(--surface-2));
+}
+
+.planSummaryIdentity,
+.planSummaryValue,
+.providerConfigSummaryIdentity,
+.providerConfigSummaryValue {
+  min-width: 0;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.planSummaryIdentity strong,
+.planSummaryValue strong,
+.providerConfigSummaryIdentity strong,
+.providerConfigSummaryValue strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-strong);
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planSummaryIdentity span,
+.planSummaryValue span,
+.providerConfigSummaryIdentity span,
+.providerConfigSummaryValue span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planSummaryFlags,
+.providerConfigSummaryFlags {
+  align-items: center;
+}
+
+.flagList .planSummaryDirty,
+.flagList .providerConfigSummaryDirty {
+  border-color: color-mix(in srgb, var(--warning) 34%, var(--border-soft));
+  color: var(--warning-soft-fg);
+  background: var(--warning-soft-bg);
+}
+
+.planEditor,
+.providerConfigEditor {
+  min-width: 0;
+  display: grid;
+  gap: 1rem;
+  margin-top: 0.85rem;
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+  background: var(--surface-2);
+}
+
+.planEditorHeader,
+.planEditorActions,
+.planEditorStatus,
+.providerConfigEditorHeader,
+.providerConfigEditorActions,
+.providerConfigEditorFlags {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.planEditorHeader,
+.providerConfigEditorHeader {
+  justify-content: space-between;
+}
+
+.planEditorHeader h3,
+.providerConfigEditorHeader h3 {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-strong);
+  font-size: 0.98rem;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planEditorForm,
+.providerConfigEditorForm {
+  min-width: 0;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.planEditorFields {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.providerConfigEditorRouteFields {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.planEditorProductFields {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.providerConfigEditorDisplayFields {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.planEditorStatus,
+.providerConfigEditorFlags {
+  flex-wrap: wrap;
+}
+
+.planEditorActions,
+.providerConfigEditorActions {
+  justify-content: flex-end;
+}
+
+.providerConfigEditorClone {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.75rem;
+}
+
 .packMeta {
+  min-width: 0;
   display: grid;
   gap: 0.25rem;
 }
@@ -25,7 +711,18 @@
   font-size: 0.82rem;
 }
 
+.incidentPayload {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-soft);
+  font-size: 0.76rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
 .sectionStack {
+  min-width: 0;
   display: grid;
   gap: 0.85rem;
   margin-top: 1rem;
@@ -37,6 +734,8 @@
 
 .input {
   width: 100%;
+  max-width: 100%;
+  min-height: 2.5rem;
   min-width: 7.5rem;
   border: 1px solid var(--border-soft);
   border-radius: 0.75rem;
@@ -44,6 +743,7 @@
   color: var(--text-strong);
   padding: 0.65rem 0.75rem;
   font: inherit;
+  line-height: 1.25;
 }
 
 .input:focus-visible,
@@ -61,12 +761,15 @@
 }
 
 .checkboxField {
+  min-width: 0;
   display: inline-flex;
   gap: 0.5rem;
   align-items: center;
   color: var(--text-strong);
   font-size: 0.86rem;
   font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .checkboxField input {
@@ -83,6 +786,7 @@
 
 .redeemForm,
 .field {
+  min-width: 0;
   display: grid;
   gap: 0.45rem;
 }
@@ -90,6 +794,70 @@
 .redeemForm {
   align-content: start;
   gap: 0.8rem;
+}
+
+.utilityDisclosure {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 0.28rem 0.7rem 0.78rem;
+  background: var(--surface-2);
+}
+
+.utilityDisclosureSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  gap: 0.7rem;
+  padding: 0.5rem 0;
+  color: var(--text-strong);
+  cursor: pointer;
+  list-style: none;
+}
+
+.utilityDisclosureSummary::-webkit-details-marker {
+  display: none;
+}
+
+.utilityDisclosureSummary::after {
+  width: 0.42rem;
+  height: 0.42rem;
+  flex: 0 0 auto;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  content: "";
+  transform: rotate(45deg) translateY(-0.15rem);
+  transition: transform 150ms ease;
+}
+
+.utilityDisclosure[open] .utilityDisclosureSummary::after {
+  transform: rotate(225deg) translate(-0.12rem, -0.12rem);
+}
+
+.utilityDisclosureSummary strong {
+  min-width: 0;
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.utilityDisclosureSummary span {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: right;
+}
+
+.utilityDisclosure:focus-within {
+  border-color: var(--border-accent);
+  box-shadow: var(--focus-ring);
+}
+
+.utilityDisclosureSummary:focus-visible {
+  outline: none;
+  border-radius: var(--radius-xs);
+  box-shadow: var(--focus-ring);
 }
 
 .field span {
@@ -108,6 +876,7 @@
 .statusStack,
 .windowFields,
 .tableActions {
+  min-width: 0;
   display: grid;
   gap: 0.65rem;
   align-content: start;
@@ -120,11 +889,13 @@
 
 .usageList,
 .rewardFields {
+  min-width: 0;
   display: grid;
   gap: 0.55rem;
 }
 
 .usageItem {
+  min-width: 0;
   display: grid;
   gap: 0.2rem;
   padding: 0.55rem 0.65rem;
@@ -159,12 +930,13 @@
 }
 
 .watermarkPreviewCard {
+  min-width: 0;
   display: grid;
   gap: 0.45rem;
-  min-width: 0;
 }
 
 .watermarkPreviewHeader {
+  min-width: 0;
   display: flex;
   justify-content: space-between;
   gap: 0.75rem;
@@ -175,6 +947,10 @@
 .watermarkPreviewHeader strong {
   color: var(--text-strong);
   font-weight: 700;
+}
+
+.watermarkPreviewHeader > * {
+  min-width: 0;
 }
 
 .watermarkPreviewFrame {
@@ -218,7 +994,9 @@
   bottom: 4%;
   display: inline-flex;
   align-items: center;
+  min-width: 0;
   max-width: min(70%, 14rem);
+  overflow: hidden;
   gap: 0.35rem;
   border: 1px solid color-mix(in srgb, var(--border-soft) 66%, transparent);
   border-radius: 0.45rem;
@@ -293,7 +1071,34 @@
   align-items: start;
 }
 
+.tableFilterBar {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  align-items: end;
+  gap: 0.65rem;
+}
+
+.tableFilterBar > * {
+  min-width: 0;
+}
+
+.tableFilterBar > button {
+  align-self: end;
+}
+
+.wideTable {
+  min-width: 58rem;
+  table-layout: fixed;
+}
+
+.wideTable :is(th, td) {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
 .filterField {
+  min-width: 0;
   display: grid;
   gap: 0.35rem;
 }
@@ -306,6 +1111,7 @@
 
 .pager {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
   gap: 0.5rem;
   flex-wrap: wrap;
@@ -314,6 +1120,10 @@
 
 .pagerButton,
 .dangerButton {
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 2rem;
   border: 1px solid var(--border-soft);
   border-radius: 0.68rem;
@@ -322,6 +1132,9 @@
   padding: 0.4rem 0.68rem;
   font: inherit;
   font-size: 0.78rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  text-align: center;
   cursor: pointer;
 }
 
@@ -342,6 +1155,106 @@
   cursor: not-allowed;
 }
 
+.purchaseInspectorStack,
+.purchaseInspectorSection,
+.purchaseEntityLinks {
+  display: grid;
+  min-width: 0;
+}
+
+.purchaseInspectorStack {
+  gap: 0.9rem;
+}
+
+.purchaseInspectorSection {
+  gap: 0.72rem;
+  padding: 0.9rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.purchaseInspectorSection h3,
+.purchaseInspectorProvider {
+  margin: 0;
+}
+
+.purchaseInspectorHeading,
+.purchaseInspectorBadges {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.purchaseInspectorFacts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin: 0;
+}
+
+.purchaseInspectorFacts > div {
+  min-width: 0;
+  display: grid;
+  gap: 0.22rem;
+  padding: 0.68rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+}
+
+.purchaseInspectorFacts dt,
+.purchaseTimeline time,
+.purchaseInspectorProvider {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+}
+
+.purchaseInspectorFacts dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 0.86rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.purchaseTimeline {
+  display: grid;
+  gap: 0.7rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.purchaseTimeline li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.65rem;
+}
+
+.purchaseTimeline li > span {
+  width: 0.62rem;
+  height: 0.62rem;
+  margin-top: 0.28rem;
+  border: 2px solid color-mix(in srgb, var(--brand) 72%, var(--surface-1));
+  border-radius: 999px;
+  background: var(--surface-1);
+}
+
+.purchaseTimeline li > div {
+  display: grid;
+  min-width: 0;
+  gap: 0.18rem;
+}
+
+.purchaseEntityLinks {
+  gap: 0.5rem;
+}
+
 @media (max-width: 640px) {
   .pager {
     justify-content: stretch;
@@ -350,15 +1263,22 @@
   .pagerButton {
     flex: 1 1 8rem;
   }
+
+  .purchaseInspectorFacts {
+    grid-template-columns: 1fr;
+  }
 }
 
 .flagList {
+  min-width: 0;
   display: flex;
   flex-wrap: wrap;
   gap: 0.45rem;
 }
 
 .flagList span {
+  max-width: 100%;
+  overflow-wrap: anywhere;
   padding: 0.28rem 0.5rem;
   border-radius: 999px;
   border: 1px solid var(--border-soft);
@@ -369,7 +1289,8 @@
 }
 
 .compactSelect {
-  min-width: 13rem;
+  min-width: min(100%, 13rem);
+  max-width: 100%;
 }
 
 .positive {
@@ -382,10 +1303,62 @@
   font-weight: 600;
 }
 
+@media (max-width: 1180px) {
+  .overviewSummary {
+    grid-template-columns: minmax(12rem, 0.8fr) minmax(0, 2fr);
+  }
+}
+
 @media (max-width: 980px) {
+  .overviewSummary {
+    grid-template-columns: 1fr;
+  }
+
+  .overviewSummaryPrimary {
+    border-right: 0;
+    border-bottom: 1px solid var(--border-soft);
+  }
+
+  .overviewMetricList {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .overviewMetricList > div:nth-child(odd) {
+    border-left: 0;
+  }
+
+  .overviewMetricList > div:nth-child(n + 3) {
+    border-top: 1px solid var(--border-soft);
+  }
+
+  .overviewQuickActions {
+    grid-template-columns: 1fr;
+  }
+
+  .overviewQuickActionList {
+    justify-content: flex-start;
+  }
+
+  .reconciliationResult {
+    grid-column: 1;
+  }
+
+  .overviewDataGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .catalogToolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .filterRow,
   .compactSelect {
     width: 100%;
+  }
+
+  .tableFilterBar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .redeemGrid,
@@ -393,9 +1366,150 @@
   .filterRow {
     grid-template-columns: 1fr;
   }
+
+  .planSummaryItem,
+  .providerConfigSummaryItem {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .planSummaryValue,
+  .planSummaryFlags,
+  .providerConfigSummaryValue,
+  .providerConfigSummaryFlags {
+    grid-column: 1 / -1;
+  }
+
+  .planEditorFields,
+  .providerConfigEditorRouteFields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .planEditorProductFields,
+  .providerConfigEditorDisplayFields {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {
+  .page {
+    gap: 1rem;
+  }
+
+  .workspaceToolbar {
+    align-items: stretch;
+    padding: 0.7rem 0;
+  }
+
+  .workspaceToolbar[data-has-action] {
+    flex-direction: column;
+  }
+
+  .workspaceToolbar > :last-child {
+    width: 100%;
+  }
+
+  .workspaceNav {
+    scroll-snap-type: x proximity;
+  }
+
+  .workspaceTab {
+    min-height: 2.5rem;
+    flex-basis: min(10rem, 72vw);
+    scroll-snap-align: start;
+  }
+
+  .overviewMetricList {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .overviewMetricList > div {
+    border-top: 1px solid var(--border-soft);
+    border-left: 0;
+  }
+
+  .overviewMetricList > div:nth-child(-n + 2) {
+    border-top: 0;
+  }
+
+  .overviewQuickActionList {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .quickActionButton {
+    width: 100%;
+    min-height: 2.7rem;
+    padding-inline: 0.55rem;
+    white-space: normal;
+  }
+
+  .reconciliationResult {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.7rem 0.45rem;
+  }
+
+  .reconciliationResult > div:nth-child(odd) {
+    border-left: 0;
+    padding-left: 0;
+  }
+
+  .overviewCardActions {
+    justify-content: flex-start;
+  }
+
+  .overviewActivityItem {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .overviewActivityCopy strong,
+  .overviewPurchaseCopy strong,
+  .planSummaryIdentity strong,
+  .planSummaryValue strong,
+  .providerConfigSummaryIdentity strong,
+  .providerConfigSummaryValue strong {
+    display: -webkit-box;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .overviewActivityTime {
+    grid-column: 1 / -1;
+  }
+
+  .overviewActivityValue {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .overviewPurchaseItem {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .overviewPurchaseItem > button {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .catalogToolbar {
+    gap: 0.55rem;
+  }
+
+  .currencyTabs {
+    width: 100%;
+  }
+
+  .currencyTab {
+    flex: 1 1 4rem;
+  }
+
+  .validationMessage {
+    padding: 0.52rem 0.58rem;
+  }
+
   .watermarkPreviewGrid {
     grid-template-columns: 1fr;
   }
@@ -408,6 +1522,75 @@
   .input,
   .compactSelect {
     min-width: 0;
+  }
+
+  .tableFilterBar {
+    grid-template-columns: 1fr;
+  }
+
+  .tableFilterBar > * {
+    width: 100%;
+  }
+
+  .planSummaryItem,
+  .providerConfigSummaryItem {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .planSummaryItem > button,
+  .providerConfigSummaryItem > button {
+    justify-self: start;
+  }
+
+  .planSummaryValue,
+  .planSummaryFlags,
+  .providerConfigSummaryValue,
+  .providerConfigSummaryFlags {
+    grid-column: auto;
+  }
+
+  .planEditor,
+  .providerConfigEditor {
+    gap: 0.85rem;
+    padding: 0.8rem;
+  }
+
+  .planEditorHeader,
+  .planEditorActions,
+  .providerConfigEditorHeader,
+  .providerConfigEditorActions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .planEditorActions > *,
+  .providerConfigEditorActions > * {
+    width: 100%;
+  }
+
+  .planEditorFields,
+  .providerConfigEditorRouteFields,
+  .providerConfigEditorDisplayFields {
+    grid-template-columns: 1fr;
+  }
+
+  .providerConfigEditorClone {
+    grid-template-columns: 1fr;
+  }
+
+  .providerConfigEditorClone > button {
+    width: 100%;
+  }
+
+  .wideTable {
+    min-width: 54rem;
+  }
+
+  .currencyTab,
+  .pagerButton,
+  .dangerButton {
+    min-height: 2.5rem;
   }
 
   .watermarkPreviewBadge {

@@ -16,11 +16,18 @@ const supportInboxPagePath = fileURLToPath(new URL("./support-inbox-page.tsx", i
 const supportStylesPath = fileURLToPath(new URL("./support-page.module.css", import.meta.url));
 const selectPath = fileURLToPath(new URL("../ui/select.tsx", import.meta.url));
 const adminQueryKeysPath = fileURLToPath(new URL("../../lib/admin-query-keys.ts", import.meta.url));
+const supportChatContentPath = fileURLToPath(
+  new URL("./support-conversation-chat-content.tsx", import.meta.url)
+);
+const supportAssignmentControlPath = fileURLToPath(
+  new URL("./support-assignment-control.tsx", import.meta.url)
+);
 
 describe("support conversation controller errors", () => {
   it("uses sanitized backend messages for support mutation failures", () => {
     const controllerSource = readSupportConversationControllerLibrarySource();
     const helpersSource = readFileSync(controllerHelpersPath, "utf8");
+    const assignmentControlSource = readFileSync(supportAssignmentControlPath, "utf8");
 
     expect(controllerSource).toContain("import { getAdminErrorMessage }");
     expect(controllerSource).toContain("const pushSupportError = useCallback(");
@@ -29,7 +36,9 @@ describe("support conversation controller errors", () => {
     expect(controllerSource).toContain("action: formatSupportControllerLogText(action, 40)");
     expect(controllerSource).toContain('pushSupportError(error, "send_reply")');
     expect(controllerSource).toContain('pushSupportError(error, "update_status")');
-    expect(controllerSource).toContain('pushSupportError(error, "assign_conversation")');
+    expect(assignmentControlSource).toContain(
+      "setErrorMessage(getAdminErrorMessage(error, copy.failed))"
+    );
     expect(controllerSource).toContain('pushSupportError(error, "update_metadata")');
     expect(controllerSource).toContain(
       "conversationId: formatSupportControllerLogText(conversationId)"
@@ -99,20 +108,24 @@ describe("support conversation controller errors", () => {
       "!canManageSupportWorkspace ||\n      !conversationQuery.data"
     );
     expect(controllerSource).toContain(
-      "if (!canManageSupportWorkspace) {\n      return;\n    }\n\n    const currentConversation"
+      "if (!canManageSupportWorkspace || loadOlderAbortControllerRef.current) {\n      return;\n    }\n\n    const currentConversation"
     );
     expect(controllerSource).toContain("if (!assertCanManageSupportWorkspace())");
-    expect(controllerSource).toContain("if (!canMutateConversation) {\n        return {};");
+    expect(controllerSource).toContain(
+      "if (!isReplyActorCurrent(variables.actor) || !canMutateConversation) {\n        return {};"
+    );
+    expect(controllerSource).toContain(
+      "if (!canMutateConversation) {\n        throw new Error(supportOwnershipRequired);"
+    );
     expect(controllerSource).toContain("canManageSupportWorkspace,");
-    expect(controllerSource).toContain("canMutateConversation,");
-    expect(controllerSource).toContain("sessionUserRoles,");
+    expect(controllerSource).toContain("canMutateConversation,\n    supportActionsForbidden,");
     expect(controllerSource).toContain("const [isSendReplyInFlight, setIsSendReplyInFlight]");
     expect(controllerSource).toContain("const sendReplyInFlightRef = useRef(false);");
-    expect(controllerSource).toContain(
-      "isSendReplySubmitting: isSendReplyInFlight || sendMutation.isPending,"
-    );
+    expect(controllerSource).toContain("const isReplyInFlightForActor = Boolean(");
+    expect(controllerSource).toContain("sendReplyActorIdRef.current === actor.userId &&");
+    expect(controllerSource).toContain("(sendReplyInFlightRef.current || sendMutation.isPending)");
+    expect(controllerSource).toContain("isSendReplySubmitting: Boolean(");
     expect(controllerSource).toContain("const requestSendReply = useCallback(() => {");
-    expect(controllerSource).toContain("sendReplyInFlightRef.current ||");
     expect(controllerSource).toContain("sendReplyInFlightRef.current = true;");
     expect(controllerSource).toContain("setIsSendReplyInFlight(true);");
     expect(controllerSource).toContain("sendReplyInFlightRef.current = false;");
@@ -144,8 +157,11 @@ describe("support conversation controller errors", () => {
     const pageSource = readSupportConversationPageLibrarySource();
     const supportContentSource = readFileSync(supportContentPath, "utf8");
     const inboxPageSource = readFileSync(supportInboxPagePath, "utf8");
+    const infoPanelSource = readSupportInfoPanelLibrarySource();
 
-    expect(controllerSource).toContain("const [queuePage, setQueuePage] = useState(1);");
+    expect(controllerSource).toContain(
+      "const [queuePage, setQueuePage] = useState(initialQueueState.page);"
+    );
     expect(controllerSource).toContain("setQueuePage(1);");
     expect(controllerSource).toContain("page: queuePage");
     expect(controllerSource).toContain("canGoToNextQueuePage");
@@ -175,10 +191,15 @@ describe("support conversation controller errors", () => {
     expect(pageSource).toContain("title={queueLabels.previousPage}");
     expect(pageSource).toContain("title={queueLabels.nextPage}");
     expect(pageSource).toContain("{queueLabels.title}");
-    expect(pageSource).toContain("{queueLabels.all} {queueCount}");
     expect(pageSource).toContain("{queueLabels.unassigned} {unassignedCount}");
-    expect(pageSource).toContain("{queueLabels.archive} {archiveCount}");
     expect(pageSource).toContain('{ value: "all", label: queueLabels.all }');
+    expect(pageSource).toContain("queueLabels.filtersActive(activeAdvancedFilterCount)");
+    expect(pageSource).toContain("open={activeAdvancedFilterCount > 0 ? true : undefined}");
+    expect(infoPanelSource).toContain('role="tabpanel"');
+    expect([...infoPanelSource.matchAll(/role="tabpanel"/g)]).toHaveLength(1);
+    expect(infoPanelSource).toContain("aria-controls={`support-panel-tabpanel-${tab.value}`}");
+    expect(infoPanelSource).toContain('event.key === "ArrowRight"');
+    expect(infoPanelSource).toContain('event.key === "ArrowLeft"');
     expect(pageSource).toContain("title={queueLabels.newMessagesTitle(incomingMessagesCount)}");
     expect(pageSource).toContain("queueLabels.pageCount(");
     expect(pageSource).not.toContain(
@@ -229,12 +250,14 @@ describe("support conversation controller errors", () => {
     expect(controllerSource).toContain("setReply(value.slice(0, SUPPORT_REPLY_MAX_LENGTH));");
     expect(controllerSource).toContain("setReply: setSupportReply,");
     expect(pageSource).toContain("maxLength={SUPPORT_SEARCH_MAX_LENGTH}");
+    expect(pageSource).toContain("<label className={styles.queueSearchField}>");
+    expect(pageSource).not.toContain("supportPageHeroSearch");
     expect(pageSource).toContain("maxLength={SUPPORT_REPLY_MAX_LENGTH}");
     expect(pageSource).toContain(
-      "setSearchQuery(event.target.value.slice(0, SUPPORT_SEARCH_MAX_LENGTH))"
+      "setSearchQuery={(value) => setSearchQuery(value.slice(0, SUPPORT_SEARCH_MAX_LENGTH))}"
     );
     expect(pageSource).toContain("setReply(event.target.value.slice(0, SUPPORT_REPLY_MAX_LENGTH))");
-    expect(pageSource).not.toContain("onChange={(event) => setSearchQuery(event.target.value)}");
+    expect(pageSource).toContain("onChange={(event) => setSearchQuery(event.target.value)}");
     expect(pageSource).not.toContain("onChange={(event) => setReply(event.target.value)}");
   });
 
@@ -296,23 +319,28 @@ describe("support conversation controller errors", () => {
     );
   });
 
-  it("routes support archive and unassigned subfilters through backend query params", () => {
+  it("routes the minimal support quick filters through backend query params", () => {
     const pageSource = readSupportConversationPageLibrarySource();
 
     expect(pageSource).toContain("setQueueFilter,");
-    expect(pageSource).toContain(
-      'const setQueueSubFilter = (value: "all" | "waiting" | "unassigned" | "archive") => {'
-    );
+    expect(pageSource).toContain("const setQueueSubFilter = (value: SupportQueueSubFilter) => {");
     expect(pageSource).toContain("if (isQueueControlsLocked) {\n      return;\n    }");
     expect(pageSource).toContain('setQueueStatusFilter("all");');
-    expect(pageSource).toContain('setQueueFilter("Closed");');
-    expect(pageSource).toContain('setQueueFilter("unassigned");');
+    expect(pageSource).toContain("setQueueFilter(value);");
     expect(pageSource).toContain('setQueueFilter("all");');
-    expect(pageSource).toContain('onClick={() => setQueueSubFilter("archive")}');
-    expect(pageSource).toContain('onClick={() => setQueueSubFilter("unassigned")}');
+    expect(pageSource).toContain('aria-pressed={subFilter === "unread"}');
+    expect(pageSource).toContain(
+      'onClick={() => setQueueSubFilter(subFilter === "unread" ? "all" : "unread")}'
+    );
+    expect(pageSource).toContain('aria-pressed={subFilter === "unassigned"}');
+    expect(pageSource).toContain(
+      'onClick={() => setQueueSubFilter(subFilter === "unassigned" ? "all" : "unassigned")}'
+    );
     expect(pageSource).toContain("disabled={isQueueControlsLocked}");
     expect(pageSource).toContain("const displayedInboxItems = filteredInboxItems;");
-    expect(pageSource).not.toContain('onClick={() => setSubFilter("archive")}');
+    expect(pageSource).not.toContain('setQueueSubFilter("archive")');
+    expect(pageSource).not.toContain('setQueueSubFilter("waiting")');
+    expect(pageSource).not.toContain('setQueueFilter("Closed")');
     expect(pageSource).not.toContain('onClick={() => setSubFilter("unassigned")}');
     expect(pageSource).not.toContain('const isArchived = item.status === "Closed";');
     expect(pageSource).not.toContain("return !item.assignedAdminId;");
@@ -364,7 +392,6 @@ describe("support conversation controller errors", () => {
     expect(controllerSource).toContain("queryKey: adminQueryKeys.supportInboxMetrics");
     expect(controllerSource).toContain("queryFn: ({ signal }) => fetchSupportInboxMetrics(signal)");
     expect(controllerSource).toContain("inboxMetrics: inboxMetricsQuery.data ?? null");
-    expect(pageSource).toContain("const archiveCount = inboxMetrics?.closedConversations ?? 0;");
     expect(pageSource).toContain("const queueCount = inboxMetrics?.openConversations ?? 0;");
     expect(pageSource).toContain(
       "const incomingMessagesCount = inboxMetrics?.unreadForAdminConversations ?? 0;"
@@ -415,16 +442,16 @@ describe("support conversation controller errors", () => {
     const controllerSource = readSupportConversationControllerLibrarySource();
     const pageSource = readSupportConversationPageLibrarySource();
     const adminQueryKeysSource = readFileSync(adminQueryKeysPath, "utf8");
-    expect(pageSource).toContain('"all" | "waiting" | "unassigned" | "archive"');
-    expect(pageSource).toContain('setQueueSubFilter("waiting")');
-    expect(pageSource).toContain('setQueueFilter("waiting")');
+    expect(pageSource).toContain("SupportQueueSubFilter");
+    expect(pageSource).not.toContain('setQueueSubFilter("waiting")');
+    expect(pageSource).not.toContain('setQueueFilter("waiting")');
     expect(pageSource).not.toContain('item.status === "New" || item.status === "WaitingForUser"');
     expect(pageSource).not.toContain('item.status === "New" || item.status === "InProgress"');
     expect(controllerSource).toContain(
       "const [queuePriorityFilter, setQueuePriorityFilter] = useState<"
     );
     expect(controllerSource).toContain(
-      'const [queueSort, setQueueSort] = useState<SupportInboxSort>("default");'
+      "const [queueSort, setQueueSort] = useState<SupportInboxSort>(initialQueueState.sort);"
     );
     expect(controllerSource).toContain(
       'const effectiveQueuePriority = queuePriorityFilter === "all" ? undefined : queuePriorityFilter;'
@@ -434,7 +461,7 @@ describe("support conversation controller errors", () => {
     expect(controllerSource).toContain("queue: resolvedQueueFilter.queue");
     expect(controllerSource).toContain("setQueuePriorityFilter: setSupportQueuePriorityFilter");
     expect(controllerSource).toContain("setQueueSort: setSupportQueueSort");
-    expect(pageSource).toContain("{queueLabels.waiting}");
+    expect(pageSource).toContain("label: queueLabels.sortWaiting");
     expect(pageSource).toContain("queuePriorityFilter");
     expect(pageSource).toContain("setExactQueuePriorityFilter");
     expect(pageSource).toContain("queueSort");
@@ -488,7 +515,9 @@ describe("support conversation controller errors", () => {
     expect(pageSource).toContain(
       "const supportConversationPathId = encodeURIComponent(item.conversationId);"
     );
-    expect(pageSource).toContain("href={`/${locale}/support/${supportConversationPathId}`}");
+    expect(pageSource).toContain(
+      "href={`/${locale}/support/${supportConversationPathId}${supportConversationSearchSuffix}`}"
+    );
     expect(controllerSource).not.toContain("href: `/${locale}/support/${conversationId}`");
     expect(pageSource).not.toContain("href={`/${locale}/support/${item.conversationId}`}");
   });
@@ -611,6 +640,16 @@ describe("support conversation controller errors", () => {
     expect(supportContentSource).toContain('cancelReply: "Cancel reply"');
     expect(supportContentSource).toContain('attachFile: "Прикрепить файл"');
     expect(supportContentSource).toContain('attachFile: "Attach file"');
+    expect(supportContentSource).toContain(
+      'dragAndDropAttachment: "Перетащите фото или видео сюда"'
+    );
+    expect(supportContentSource).toContain('dragAndDropAttachment: "Drop a photo or video here"');
+    expect(pageSource).toContain("SUPPORT_ATTACHMENT_ACCEPT,");
+    expect(pageSource).toContain("accept={SUPPORT_ATTACHMENT_ACCEPT}");
+    expect(pageSource).toContain(
+      "const selectedAttachmentMediaType = selectedAttachment?.type.startsWith"
+    );
+    expect(pageSource).toContain('kind="video"');
     expect(pageSource).toContain("aria-label={messageLabels.openPhoto}");
     expect(pageSource).toContain("aria-label={messageLabels.openVideo}");
     expect(pageSource).toContain("title={messageLabels.reply}");
@@ -625,6 +664,9 @@ describe("support conversation controller errors", () => {
     expect(pageSource).toContain("{messageLabels.jump}");
     expect(pageSource).toContain("aria-label={messageLabels.cancelReply}");
     expect(pageSource).toContain("aria-label={messageLabels.attachFile}");
+    expect(pageSource).toContain(
+      "<span className={styles.composerAttachLabel}>{messageLabels.attachFile}</span>"
+    );
     expect(pageSource).not.toContain(
       'aria-label={locale === "ru" ? "Открыть фото" : "Open photo"}'
     );
@@ -639,6 +681,26 @@ describe("support conversation controller errors", () => {
     );
   });
 
+  it("keeps failed attachment uploads visible and retryable instead of reporting a false success", () => {
+    const controllerSource = readSupportConversationControllerLibrarySource();
+    const pageSource = readSupportConversationPageLibrarySource();
+
+    expect(controllerSource).toContain("retrySupportAttachment,");
+    expect(controllerSource).toContain("const retryAttachmentMutation = useMutation({");
+    expect(controllerSource).toContain('pushSupportError(error, "retry_attachment")');
+    expect(controllerSource).toContain(
+      'attachmentUploadStatus?.trim().toLowerCase() !== "uploaded"'
+    );
+    expect(controllerSource).toContain("supportAttachmentRetryRequired");
+    expect(controllerSource).toContain("const requestAttachmentRetry = useCallback(");
+    expect(controllerSource).toContain("isSupportedSupportAttachmentMimeType(file.type)");
+    expect(pageSource).toContain("retryAttachmentInputRef");
+    expect(pageSource).toContain("retryAttachmentMessageIdRef");
+    expect(pageSource).toContain("requestAttachmentRetry(messageId, file)");
+    expect(pageSource).toContain("canRetryAttachment={canMutateConversation}");
+    expect(pageSource).toContain("isAttachmentRetrySubmitting={isAttachmentRetrySubmitting}");
+  });
+
   it("does not keep stale support-side subject-user mutation errors", () => {
     const controllerSource = readSupportConversationControllerLibrarySource();
 
@@ -648,9 +710,15 @@ describe("support conversation controller errors", () => {
     expect(controllerSource).not.toContain('throw new Error("support.subject_user_missing")');
   });
 
-  it("does not abort older-message loads or clear optimistic attachment URLs on preview changes", () => {
+  it("guards older-message loads and handles their failures without an unhandled rejection", () => {
     const controllerSource = readSupportConversationControllerLibrarySource();
     const pageSource = readSupportConversationPageLibrarySource();
+    const chatContentSource = readFileSync(supportChatContentPath, "utf8");
+    const loadOlderStart = controllerSource.indexOf(
+      "const loadOlderMessages = useCallback(async () => {"
+    );
+    const loadOlderEnd = controllerSource.indexOf("  useEffect(() => {", loadOlderStart);
+    const loadOlderSource = controllerSource.slice(loadOlderStart, loadOlderEnd);
 
     expect(controllerSource).toContain(
       "const [attachmentPreview, setAttachmentPreview] = useState<"
@@ -662,6 +730,9 @@ describe("support conversation controller errors", () => {
       "const attachmentPreviewUrlRef = useRef<string | null>(null);"
     );
     expect(controllerSource).toContain("const setSupportSelectedAttachment = useCallback(");
+    expect(controllerSource).toContain(
+      'file?.type.startsWith("image/") && !file?.type.startsWith("video/")'
+    );
     expect(controllerSource).toContain("const previewUrl = URL.createObjectURL(file);");
     expect(controllerSource).toContain("attachmentPreviewUrlRef.current = previewUrl;");
     expect(controllerSource).toContain("setAttachmentPreview({ file, url: previewUrl });");
@@ -677,14 +748,27 @@ describe("support conversation controller errors", () => {
       "const attachmentPreviewUrl = useMemo(() => {\n    if (!selectedAttachment"
     );
     expect(controllerSource).toContain("const loadOlderMessages = useCallback(async () => {");
-    expect(controllerSource).toContain("if (!canManageSupportWorkspace) {\n      return;\n    }");
+    expect(controllerSource).toContain(
+      "const [isLoadingOlderMessages, setIsLoadingOlderMessages] = useState(false);"
+    );
+    expect(controllerSource).toContain(
+      "if (!canManageSupportWorkspace || loadOlderAbortControllerRef.current) {\n      return;\n    }"
+    );
+    expect(loadOlderSource).toContain('pushSupportError(error, "support_load_older_messages");');
+    expect(loadOlderSource).not.toContain("throw error;");
+    expect(loadOlderSource).toContain("setIsLoadingOlderMessages(true);");
+    expect(loadOlderSource).toContain("setIsLoadingOlderMessages(false);");
+    expect(controllerSource).toContain("}, [conversationId]);");
     expect(pageSource).toContain("const requestOlderMessagesLoad = () => {");
     expect(pageSource).toContain(
-      "if (!canManageSupportWorkspace || conversationQuery.isFetching) {\n      return;\n    }"
+      "if (!canManageSupportWorkspace || conversationQuery.isFetching || isLoadingOlderMessages) {\n      return;\n    }"
     );
+    expect(pageSource).toContain("isLoadingOlderMessages={isLoadingOlderMessages}");
     expect(pageSource).toContain("onClick={requestOlderMessagesLoad}");
-    expect(pageSource).toContain(
-      "disabled={!canManageSupportWorkspace || conversationQuery.isFetching}"
+    expect(chatContentSource).toContain("isLoadingOlderMessages: boolean;");
+    expect(chatContentSource).toContain("aria-busy={isLoadingOlderMessages || undefined}");
+    expect(chatContentSource).toContain(
+      "isLoadingOlderMessages ? text.loading : copy.page.loadPreviousMessages"
     );
     expect(controllerSource).toContain("if (markReadDebounceRef.current) {");
     expect(controllerSource).toContain("clearTimeout(markReadDebounceRef.current);");

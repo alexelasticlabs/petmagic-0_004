@@ -38,6 +38,7 @@ type ApiError = Error & {
   detail?: string;
   code?: string;
   validationErrors?: string[];
+  retryAfterSeconds?: number;
 };
 type AuthSessionSnapshot = AuthSession | null | undefined;
 type JsonRecord = Record<string, unknown>;
@@ -95,6 +96,8 @@ export const cachedAdminTemplateEventAnalytics = new Map<
   { value: AdminTemplateEventAnalytics; expiresAt: number }
 >();
 export const inflightGetRequests = new Map<string, Promise<unknown>>();
+const cachedGetNamespaceVersions = new Map<string, number>();
+let cachedGetGlobalVersion = 0;
 
 function getAuthStorageErrorDetails(error: unknown): {
   errorName: string;
@@ -151,6 +154,8 @@ function readStoredAuthSessionRaw(storageFailureEvent: string): string | null {
 }
 
 export function clearAdminListCaches(): void {
+  cachedGetGlobalVersion += 1;
+  cachedGetNamespaceVersions.clear();
   cachedUsersLists.clear();
   cachedAdminUserDetails.clear();
   cachedAdminUserAnalytics.clear();
@@ -166,6 +171,35 @@ export function clearAdminListCaches(): void {
   inflightGetRequests.clear();
 }
 
+function getCachedGetNamespace(cacheKey: string): string {
+  const separatorIndex = cacheKey.indexOf(":");
+  return separatorIndex >= 0 ? cacheKey.slice(0, separatorIndex) : cacheKey;
+}
+
+function getCachedGetNamespaceVersion(namespace: string): number {
+  return cachedGetNamespaceVersions.get(namespace) ?? 0;
+}
+
+/**
+ * Prevents a response that started before a mutation from restoring an invalidated cache entry.
+ * The cache maps themselves remain caller-owned so unrelated read models do not get evicted.
+ */
+export function invalidateCachedGetNamespaces(namespaces: readonly string[]): void {
+  for (const namespaceValue of namespaces) {
+    const namespace = namespaceValue.trim();
+    if (!namespace) {
+      continue;
+    }
+
+    cachedGetNamespaceVersions.set(namespace, getCachedGetNamespaceVersion(namespace) + 1);
+    for (const cacheKey of [...inflightGetRequests.keys()]) {
+      if (getCachedGetNamespace(cacheKey) === namespace) {
+        inflightGetRequests.delete(cacheKey);
+      }
+    }
+  }
+}
+
 export function getTemplateListCacheKey(value?: string): string {
   return value ?? "all";
 }
@@ -174,10 +208,12 @@ export function getAnalyticsOverviewCacheKey(query: AdminTemplatesAnalyticsQuery
   return JSON.stringify({
     periodDays: query.periodDays ?? null,
     templateType: query.templateType ?? null,
+    templateIds: query.templateIds ?? null,
     category: query.category ?? null,
     status: query.status ?? null,
     access: query.access ?? null,
     sort: query.sort ?? null,
+    skip: query.skip ?? null,
     take: query.take ?? null,
   });
 }
@@ -262,10 +298,23 @@ export async function cachedGet<TResponse>(
     throw new DOMException("Aborted", "AbortError");
   }
 
+  const cachedGetGlobalVersionAtRequestStart = cachedGetGlobalVersion;
+  const cacheNamespace = getCachedGetNamespace(cacheKey);
+  const cachedGetNamespaceVersionAtRequestStart = getCachedGetNamespaceVersion(cacheNamespace);
+  const cacheResponseIfCurrent = (value: TResponse): TResponse => {
+    if (
+      cachedGetGlobalVersionAtRequestStart === cachedGetGlobalVersion &&
+      cachedGetNamespaceVersionAtRequestStart === getCachedGetNamespaceVersion(cacheNamespace)
+    ) {
+      cache.set(cacheKey, { value, expiresAt: Date.now() + ADMIN_LIST_CACHE_TTL_MS });
+    }
+
+    return value;
+  };
+
   if (signal) {
     const value = await request();
-    cache.set(cacheKey, { value, expiresAt: Date.now() + ADMIN_LIST_CACHE_TTL_MS });
-    return value;
+    return cacheResponseIfCurrent(value);
   }
 
   const inflight = inflightGetRequests.get(cacheKey) as Promise<TResponse> | undefined;
@@ -274,12 +323,11 @@ export async function cachedGet<TResponse>(
   }
 
   const promise = request()
-    .then((value) => {
-      cache.set(cacheKey, { value, expiresAt: Date.now() + ADMIN_LIST_CACHE_TTL_MS });
-      return value;
-    })
+    .then(cacheResponseIfCurrent)
     .finally(() => {
-      inflightGetRequests.delete(cacheKey);
+      if (inflightGetRequests.get(cacheKey) === promise) {
+        inflightGetRequests.delete(cacheKey);
+      }
     });
 
   inflightGetRequests.set(cacheKey, promise);
@@ -432,6 +480,10 @@ function getFallbackApiErrorMessage(status: number): string {
     return "Request validation failed.";
   }
 
+  if (status === 429) {
+    return "Too many requests. Try again shortly.";
+  }
+
   if (status >= 500) {
     return "Server error. Try again later.";
   }
@@ -487,6 +539,26 @@ function getApiPayloadParseErrorDetails(error: unknown): {
 function isJsonResponse(response: Response): boolean {
   const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
   return contentType.includes("application/json") || contentType.includes("+json");
+}
+
+function getRetryAfterSeconds(response: Response): number | undefined {
+  const rawValue = response.headers.get("retry-after")?.trim();
+  if (!rawValue) {
+    return undefined;
+  }
+
+  if (/^\d{1,4}$/.test(rawValue)) {
+    const seconds = Number.parseInt(rawValue, 10);
+    return seconds > 0 && seconds <= 3_600 ? seconds : undefined;
+  }
+
+  const retryAtMs = Date.parse(rawValue);
+  if (Number.isNaN(retryAtMs)) {
+    return undefined;
+  }
+
+  const seconds = Math.ceil((retryAtMs - Date.now()) / 1_000);
+  return seconds > 0 && seconds <= 3_600 ? seconds : undefined;
 }
 
 function createApiError(message: string, code: string, detail?: string): ApiError {
@@ -667,6 +739,7 @@ export async function apiRequest<TResponse>(
     const fallbackMessage = getFallbackApiErrorMessage(response.status);
     const error = new Error(fallbackMessage) as ApiError;
     error.status = response.status;
+    error.retryAfterSeconds = getRetryAfterSeconds(response);
 
     if (isJsonResponse(response)) {
       try {
@@ -841,37 +914,36 @@ export async function logout(): Promise<void> {
 
   clearSession();
 
-  if (accessToken || refreshToken) {
-    const headers = new Headers();
-    const requestBody = refreshToken ? JSON.stringify({ refreshToken }) : undefined;
-    const logoutAbortController = new AbortController();
-    const logoutTimeoutId = globalThis.setTimeout(() => {
-      logoutAbortController.abort();
-    }, LOGOUT_REQUEST_TIMEOUT_MS);
+  const headers = new Headers();
+  const requestBody = refreshToken ? JSON.stringify({ refreshToken }) : undefined;
+  const logoutAbortController = new AbortController();
+  const logoutTimeoutId = globalThis.setTimeout(() => {
+    logoutAbortController.abort();
+  }, LOGOUT_REQUEST_TIMEOUT_MS);
 
-    if (requestBody) {
-      headers.set("Content-Type", "application/json");
-    }
-    headers.set("X-Correlation-ID", createAdminCorrelationId());
-
-    if (accessToken) {
-      headers.set("Authorization", `Bearer ${accessToken}`);
-    }
-
-    void fetch(`${getAdminApiBaseUrl()}/api/auth/logout`, {
-      method: "POST",
-      headers,
-      body: requestBody,
-      credentials: "include",
-      signal: logoutAbortController.signal,
-    })
-      .catch((error: unknown) => {
-        if (!logoutAbortController.signal.aborted) {
-          clientLogger.warn("auth.logout_failed", getAuthStorageErrorDetails(error));
-        }
-      })
-      .finally(() => {
-        globalThis.clearTimeout(logoutTimeoutId);
-      });
+  if (requestBody) {
+    headers.set("Content-Type", "application/json");
   }
+  headers.set("X-Correlation-ID", createAdminCorrelationId());
+  headers.set("X-PetMagic-Logout-Intent", "logout");
+
+  if (accessToken) {
+    headers.set("Authorization", `Bearer ${accessToken}`);
+  }
+
+  void fetch(`${getAdminApiBaseUrl()}/api/auth/logout`, {
+    method: "POST",
+    headers,
+    body: requestBody,
+    credentials: "include",
+    signal: logoutAbortController.signal,
+  })
+    .catch((error: unknown) => {
+      if (!logoutAbortController.signal.aborted) {
+        clientLogger.warn("auth.logout_failed", getAuthStorageErrorDetails(error));
+      }
+    })
+    .finally(() => {
+      globalThis.clearTimeout(logoutTimeoutId);
+    });
 }

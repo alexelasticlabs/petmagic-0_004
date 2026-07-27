@@ -14,9 +14,11 @@ import {
 describe("admin-rbac", () => {
   const localeAppRoot = fileURLToPath(new URL("../app/[locale]", import.meta.url));
   const concreteAdminRoutes = [
+    "/audit",
     "/dashboard",
     "/economy",
     "/feedback",
+    "/gamification",
     "/generations",
     "/image-templates",
     "/moderation",
@@ -48,6 +50,7 @@ describe("admin-rbac", () => {
 
   it("grants admins full access", () => {
     expect(canAccessAdminSection(["Admin"], "users")).toBe(true);
+    expect(canAccessAdminSection(["Admin"], "audit")).toBe(true);
 
     for (const route of concreteAdminRoutes) {
       expect(canAccessAdminPath(["Admin"], route)).toBe(true);
@@ -55,6 +58,7 @@ describe("admin-rbac", () => {
   });
 
   it("limits moderators to permitted operational sections", () => {
+    expect(canAccessAdminSection(["Moderator"], "audit")).toBe(false);
     expect(canAccessAdminPath(["Moderator"], "/support/abc")).toBe(true);
     expect(canAccessAdminPath(["Moderator"], "/feedback")).toBe(true);
     expect(canAccessAdminPath(["Moderator"], "/moderation")).toBe(true);
@@ -69,8 +73,10 @@ describe("admin-rbac", () => {
     expect(canAccessAdminPath(["Moderator"], "/users")).toBe(false);
     expect(canAccessAdminPath(["Moderator"], "/users/user-1")).toBe(false);
     expect(canAccessAdminPath(["Moderator"], "/economy")).toBe(false);
+    expect(canAccessAdminPath(["Moderator"], "/gamification")).toBe(false);
     expect(canAccessAdminPath(["Moderator"], "/generations")).toBe(false);
     expect(canAccessAdminPath(["Moderator"], "/roles")).toBe(false);
+    expect(canAccessAdminPath(["Moderator"], "/audit")).toBe(false);
   });
 
   it("denies protected admin routes when roles are absent or non-admin", () => {

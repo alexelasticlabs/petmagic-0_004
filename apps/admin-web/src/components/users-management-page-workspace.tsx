@@ -1,9 +1,9 @@
 "use client";
 
+import { UsersEmailBroadcastsWorkspace } from "@/components/users-email-broadcasts-workspace";
 import { UsersManagementSummaryGrid } from "@/components/users-management-page.chrome";
 import type { UsersManagementPageText } from "@/components/users-management-page.content";
 import type {
-  ActivityFilter,
   PremiumFilter,
   RangeDays,
   RoleFilter,
@@ -11,53 +11,33 @@ import type {
   UserSortMode,
 } from "@/components/users-management-page.types";
 import { UsersManagementUsersCard } from "@/components/users-management-users-card";
-import type {
-  AdminEconomyUserSubscriptionSummary,
-  AdminUserAnalytics,
-  UserListItem,
-} from "@/lib/api-client";
+import { useAuthSession, type UserListItem } from "@/lib/api-client";
 import type { Dictionary, Locale } from "@/lib/i18n";
-
-import type { MutableRefObject } from "react";
 
 type UsersManagementPageWorkspaceProps = {
   activeUsersValue: string;
-  activityFilter: ActivityFilter;
-  analyticsByUserId: Map<string, AdminUserAnalytics>;
   blockedUsersValue: string;
-  busyUserId: string | null;
-  canManageRoles: boolean;
-  closeActionsMenu: () => void;
   currentPage: number;
   error: string | null;
-  handleToggleActionsMenu: (userId: string) => void;
-  isUserActionLocked: boolean;
+  isMetricsError: boolean;
+  isMetricsFetching: boolean;
   isUsersFetching: boolean;
   isUsersRefreshing: boolean;
   locale: Locale;
   newUsersValue: string;
-  openActionsUserId: string | null;
-  openSupportUserCount: number;
-  openWalletDialog: (userId: string, operation: "credit" | "debit") => void;
-  pageSubscriptionsByUserId: Map<string, AdminEconomyUserSubscriptionSummary>;
-  pageUsers: UserListItem[];
-  pagedUsers: UserListItem[];
   premiumFilter: PremiumFilter;
   premiumUsersValue: string;
+  refreshMetrics: () => Promise<void>;
   rangeDays: RangeDays;
   refreshUsers: () => Promise<void>;
-  requestActiveChange: (user: UserListItem) => void;
-  requestPremiumChange: (user: UserListItem) => void;
   resetAllFilters: () => void;
-  resetUsersSelection: (nextPage?: number) => void;
+  resetUsersPage: (nextPage?: number) => void;
   roleFilter: RoleFilter;
   search: string;
-  setActivityFilter: (value: ActivityFilter) => void;
   setPremiumFilter: (value: PremiumFilter) => void;
   setRangeDays: (value: RangeDays) => void;
   setRoleFilter: (value: RoleFilter) => void;
   setSearch: (value: string) => void;
-  setSelectedUserId: (userId: string) => void;
   setSortMode: (value: UserSortMode) => void;
   setStatusFilter: (value: StatusFilter) => void;
   sortMode: UserSortMode;
@@ -65,49 +45,35 @@ type UsersManagementPageWorkspaceProps = {
   text: Dictionary;
   totalPages: number;
   totalUsersValue: string;
-  triggerRefs: MutableRefObject<Record<string, HTMLButtonElement | null>>;
   ui: UsersManagementPageText;
+  users: UserListItem[];
   usersPageTotalCount: number;
 };
 
 export function UsersManagementPageWorkspace({
   activeUsersValue,
-  activityFilter,
-  analyticsByUserId,
   blockedUsersValue,
-  busyUserId,
-  canManageRoles,
-  closeActionsMenu,
   currentPage,
   error,
-  handleToggleActionsMenu,
-  isUserActionLocked,
+  isMetricsError,
+  isMetricsFetching,
   isUsersFetching,
   isUsersRefreshing,
   locale,
   newUsersValue,
-  openActionsUserId,
-  openSupportUserCount,
-  openWalletDialog,
-  pageSubscriptionsByUserId,
-  pageUsers,
-  pagedUsers,
   premiumFilter,
   premiumUsersValue,
+  refreshMetrics,
   rangeDays,
   refreshUsers,
-  requestActiveChange,
-  requestPremiumChange,
   resetAllFilters,
-  resetUsersSelection,
+  resetUsersPage,
   roleFilter,
   search,
-  setActivityFilter,
   setPremiumFilter,
   setRangeDays,
   setRoleFilter,
   setSearch,
-  setSelectedUserId,
   setSortMode,
   setStatusFilter,
   sortMode,
@@ -115,66 +81,56 @@ export function UsersManagementPageWorkspace({
   text,
   totalPages,
   totalUsersValue,
-  triggerRefs,
   ui,
+  users,
   usersPageTotalCount,
 }: UsersManagementPageWorkspaceProps) {
+  const session = useAuthSession();
+
   return (
     <>
       <UsersManagementSummaryGrid
         activeUsersValue={activeUsersValue}
         blockedUsersValue={blockedUsersValue}
+        isMetricsError={isMetricsError}
+        isMetricsFetching={isMetricsFetching}
         newUsersValue={newUsersValue}
-        openSupportUserCount={openSupportUserCount}
         premiumUsersValue={premiumUsersValue}
+        refreshMetrics={refreshMetrics}
         rangeDays={rangeDays}
+        setRangeDays={setRangeDays}
         totalUsersValue={totalUsersValue}
         ui={ui}
       />
 
       <UsersManagementUsersCard
-        activityFilter={activityFilter}
-        analyticsByUserId={analyticsByUserId}
-        busyUserId={busyUserId}
-        canManageRoles={canManageRoles}
-        closeActionsMenu={closeActionsMenu}
+        key={session?.user.userId ?? "anonymous"}
         currentPage={currentPage}
         error={error}
-        handleToggleActionsMenu={handleToggleActionsMenu}
-        isUserActionLocked={isUserActionLocked}
         isUsersFetching={isUsersFetching}
         isUsersRefreshing={isUsersRefreshing}
         locale={locale}
-        openActionsUserId={openActionsUserId}
-        openWalletDialog={openWalletDialog}
-        pageSubscriptionsByUserId={pageSubscriptionsByUserId}
-        pageUsers={pageUsers}
-        pagedUsers={pagedUsers}
         premiumFilter={premiumFilter}
-        rangeDays={rangeDays}
         refreshUsers={refreshUsers}
-        requestActiveChange={requestActiveChange}
-        requestPremiumChange={requestPremiumChange}
         resetAllFilters={resetAllFilters}
-        resetUsersSelection={resetUsersSelection}
+        resetUsersPage={resetUsersPage}
         roleFilter={roleFilter}
         search={search}
-        setActivityFilter={setActivityFilter}
         setPremiumFilter={setPremiumFilter}
-        setRangeDays={setRangeDays}
         setRoleFilter={setRoleFilter}
         setSearch={setSearch}
-        setSelectedUserId={setSelectedUserId}
         setSortMode={setSortMode}
         setStatusFilter={setStatusFilter}
         sortMode={sortMode}
         statusFilter={statusFilter}
         text={text}
         totalPages={totalPages}
-        triggerRefs={triggerRefs}
         ui={ui}
+        users={users}
         usersPageTotalCount={usersPageTotalCount}
       />
+
+      <UsersEmailBroadcastsWorkspace locale={locale} />
     </>
   );
 }

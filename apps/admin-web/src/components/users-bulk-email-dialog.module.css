@@ -1,0 +1,228 @@
+.dialogBody {
+  display: grid;
+  gap: 0.78rem;
+}
+
+.audienceFieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.audienceFieldset legend,
+.field > span {
+  margin-bottom: 0.38rem;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.audienceGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.audienceCard {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.65rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.audienceCard:hover {
+  border-color: var(--admin-border-strong);
+  background: var(--surface-hover);
+}
+
+.audienceCard:has(input:checked) {
+  border-color: var(--border-accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.audienceCard:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.audienceCard input {
+  flex: 0 0 auto;
+  margin: 0.14rem 0 0;
+  accent-color: var(--accent);
+}
+
+.audienceCard span {
+  min-width: 0;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.audienceCard strong {
+  color: var(--text-strong);
+  font-size: 0.78rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.audienceCard small {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.field {
+  min-width: 0;
+  display: grid;
+}
+
+.field input,
+.field textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-strong);
+  font: inherit;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    background 140ms ease;
+}
+
+.field input {
+  min-height: 2.5rem;
+  padding: 0.58rem 0.68rem;
+}
+
+.field textarea {
+  min-height: 8.5rem;
+  resize: vertical;
+  padding: 0.62rem 0.68rem;
+}
+
+.field input:hover,
+.field textarea:hover {
+  border-color: var(--admin-border-strong);
+}
+
+.field input:focus-visible,
+.field textarea:focus-visible {
+  outline: none;
+  border-color: var(--border-accent);
+  background: var(--surface-1);
+  box-shadow: var(--focus-ring);
+}
+
+.counter {
+  justify-self: end;
+  margin-top: 0.26rem;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.warning {
+  margin: 0;
+  padding: 0.64rem 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, var(--border-soft));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--warning) 8%, var(--surface-2));
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.policyRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.52rem;
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.policyRow input {
+  flex: 0 0 auto;
+  margin: 0.15rem 0 0;
+  accent-color: var(--accent);
+}
+
+.reviewGrid {
+  min-width: 0;
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+}
+
+.reviewRow {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(6rem, 0.36fr) minmax(0, 1fr);
+  gap: 0.65rem;
+  padding: 0.58rem 0.64rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.reviewRow dt {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.reviewRow dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 0.76rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.reviewBody {
+  max-height: 12rem;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
+.error {
+  margin: 0;
+  padding: 0.56rem 0.64rem;
+  border: 1px solid color-mix(in srgb, var(--danger) 38%, var(--border-soft));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface-2));
+  color: color-mix(in srgb, var(--danger) 82%, var(--text-strong));
+  font-size: 0.74rem;
+  line-height: 1.4;
+}
+
+@media (max-width: 680px) {
+  .audienceGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 420px) {
+  .reviewRow {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.24rem;
+  }
+}

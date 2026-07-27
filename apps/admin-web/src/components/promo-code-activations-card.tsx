@@ -65,7 +65,7 @@ export function PromoCodeActivationsCard({
       return;
     }
 
-    void onRefetchActivations();
+    void onRefetchActivations().catch(() => undefined);
   }
 
   return (

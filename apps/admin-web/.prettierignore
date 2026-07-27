@@ -1,7 +1,9 @@
 .next
+artifacts
 coverage
 playwright-report
 test-results
+test-results-*
 node_modules
 out
 build

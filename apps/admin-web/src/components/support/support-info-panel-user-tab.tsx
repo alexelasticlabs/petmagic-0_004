@@ -1,16 +1,13 @@
 "use client";
 
+import { RefreshIcon, TrendUpIcon, UserRegisterIcon } from "@/components/admin/admin-icons";
+import { SupportAssignmentControl } from "@/components/support/support-assignment-control";
 import {
   formatAccountAge,
   formatDateTime,
   formatSafeSupportDisplay,
 } from "@/components/support/support-conversation-helpers";
 import { getSupportConversationCopy } from "@/components/support/support-conversation.content";
-import {
-  SupportInfoPanelAttachmentPreviewSection,
-  type SupportInfoAttachment,
-  type SupportInfoAttachmentEntry,
-} from "@/components/support/support-info-panel-attachments";
 import styles from "@/components/support/support-info-panel.module.css";
 import type {
   SupportConversationController,
@@ -35,38 +32,27 @@ type SupportInfoPanelTabsProps = {
 type SupportInfoPanelUserTabProps = {
   accountCreatedAt: SupportConversationController["accountCreatedAt"];
   analyticsQuery: SupportConversationController["analyticsQuery"];
-  attachmentPreviewEntries: SupportInfoAttachmentEntry[];
   canManageSupportWorkspace: boolean;
   canMutateConversation: boolean;
   canViewSubjectUserContext: boolean;
   confirmPendingStatusChange: () => Promise<void>;
   conversation: NonNullable<SupportConversationController["conversation"]>;
-  assignmentMutation: SupportConversationController["assignmentMutation"];
   isAssignedToCurrentAdmin: boolean;
+  sessionUserId: string | null;
+  sessionUserRoles: string[];
   destructiveStatusAction: SupportConversationController["destructiveStatusAction"];
   handleAddTag: () => void;
   isTagEditorOpen: boolean;
   isUserPremium: boolean;
-  lastActivityAtUtc: SupportConversationController["lastActivityAtUtc"];
   locale: Locale;
-  openAttachmentBlob: (
-    messageId: string,
-    createdAtUtc: string,
-    attachment: SupportInfoAttachment,
-    index: number
-  ) => Promise<void>;
   operatorPriority: SupportConversationController["operatorPriority"];
   operatorTags: SupportConversationController["operatorTags"];
   panelText: SupportInfoPanelCopy;
-  pendingAttachmentOpenKey: string | null;
   pendingStatusConfirm: SupportConversationStatus | null;
   primaryStatusAction: SupportConversationController["primaryStatusAction"];
-  recentAttachments: SupportInfoAttachmentEntry[];
-  remainingAttachmentCount: number;
   removeOperatorTag: SupportConversationController["removeOperatorTag"];
   requestStatusChange: (status: SupportConversationStatus) => void;
   secondaryStatusActions: SupportConversationController["secondaryStatusActions"];
-  setActiveSidePanelTab: SupportConversationController["setActiveSidePanelTab"];
   setIsTagEditorOpen: (value: boolean | ((current: boolean) => boolean)) => void;
   setOperatorPriority: SupportConversationController["setOperatorPriority"];
   setPendingStatusConfirm: (status: SupportConversationStatus | null) => void;
@@ -75,7 +61,6 @@ type SupportInfoPanelUserTabProps = {
   tagInput: string;
   tagInputRef: RefObject<HTMLInputElement | null>;
   text: SupportConversationText;
-  totalPurchases: SupportConversationController["totalPurchases"];
 };
 
 export function SupportInfoPanelTabs({
@@ -85,22 +70,49 @@ export function SupportInfoPanelTabs({
   sidePanelTabs,
 }: SupportInfoPanelTabsProps) {
   return (
-    <div className={styles.infoPanelSection}>
-      <div className={styles.sidePanelTabs} role="tablist" aria-label={panelText.panelTabsLabel}>
-        {sidePanelTabs
-          .filter((tab) => tab.value !== "activity" && tab.value !== "dialog")
-          .map((tab) => (
-            <button
-              key={tab.value}
-              type="button"
-              role="tab"
-              aria-selected={activeSidePanelTab === tab.value}
-              className={`${styles.spTabBtn} ${activeSidePanelTab === tab.value ? styles.spTabBtnActive : ""}`}
-              onClick={() => setActiveSidePanelTab(tab.value)}
-            >
-              {tab.label}
-            </button>
-          ))}
+    <div className={`${styles.infoPanelSection} ${styles.infoPanelTabsSection}`}>
+      <div
+        className={styles.sidePanelTabs}
+        data-testid="support-info-tabs"
+        role="tablist"
+        aria-label={panelText.panelTabsLabel}
+      >
+        {sidePanelTabs.map((tab) => (
+          <button
+            key={tab.value}
+            type="button"
+            role="tab"
+            id={`support-panel-tab-${tab.value}`}
+            aria-controls={`support-panel-tabpanel-${tab.value}`}
+            aria-selected={activeSidePanelTab === tab.value}
+            tabIndex={activeSidePanelTab === tab.value ? 0 : -1}
+            className={`${styles.spTabBtn} ${activeSidePanelTab === tab.value ? styles.spTabBtnActive : ""}`}
+            onClick={() => setActiveSidePanelTab(tab.value)}
+            onKeyDown={(event) => {
+              const currentIndex = sidePanelTabs.findIndex((item) => item.value === tab.value);
+              let nextIndex = currentIndex;
+
+              if (event.key === "ArrowRight") {
+                nextIndex = (currentIndex + 1) % sidePanelTabs.length;
+              } else if (event.key === "ArrowLeft") {
+                nextIndex = (currentIndex - 1 + sidePanelTabs.length) % sidePanelTabs.length;
+              } else if (event.key === "Home") {
+                nextIndex = 0;
+              } else if (event.key === "End") {
+                nextIndex = sidePanelTabs.length - 1;
+              } else {
+                return;
+              }
+
+              event.preventDefault();
+              const nextTab = sidePanelTabs[nextIndex];
+              setActiveSidePanelTab(nextTab.value);
+              document.getElementById(`support-panel-tab-${nextTab.value}`)?.focus();
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -109,33 +121,27 @@ export function SupportInfoPanelTabs({
 export function SupportInfoPanelUserTab({
   accountCreatedAt,
   analyticsQuery,
-  attachmentPreviewEntries,
   canManageSupportWorkspace,
   canMutateConversation,
   canViewSubjectUserContext,
   confirmPendingStatusChange,
   conversation,
-  assignmentMutation,
   isAssignedToCurrentAdmin,
+  sessionUserId,
+  sessionUserRoles,
   destructiveStatusAction,
   handleAddTag,
   isTagEditorOpen,
   isUserPremium,
-  lastActivityAtUtc,
   locale,
-  openAttachmentBlob,
   operatorPriority,
   operatorTags,
   panelText,
-  pendingAttachmentOpenKey,
   pendingStatusConfirm,
   primaryStatusAction,
-  recentAttachments,
-  remainingAttachmentCount,
   removeOperatorTag,
   requestStatusChange,
   secondaryStatusActions,
-  setActiveSidePanelTab,
   setIsTagEditorOpen,
   setOperatorPriority,
   setPendingStatusConfirm,
@@ -144,18 +150,17 @@ export function SupportInfoPanelUserTab({
   tagInput,
   tagInputRef,
   text,
-  totalPurchases,
 }: SupportInfoPanelUserTabProps) {
   return (
     <>
-      <div className={styles.infoPanelSection}>
+      <div className={`${styles.infoPanelSection} ${styles.infoPanelTicketSummary}`}>
         <div className={styles.infoPanelSectionHeader}>
           <span className={styles.infoPanelSectionTitle}>{panelText.ticketInformation}</span>
         </div>
         <div className={styles.infoPanelKvRow}>
           <span className={styles.infoPanelKvLabel}>
             <span className={styles.infoPanelKvIcon} aria-hidden="true">
-              ◉
+              <UserRegisterIcon />
             </span>
             <span>{panelText.assignedOperator}</span>
           </span>
@@ -166,40 +171,31 @@ export function SupportInfoPanelUserTab({
           </strong>
         </div>
         <div className={styles.infoPanelAssignmentActions}>
-          {!conversation.assignedAdminId ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="primary"
-              onClick={() => assignmentMutation.mutate("claim")}
-              disabled={!canManageSupportWorkspace || assignmentMutation.isPending}
-            >
-              {panelText.claimTicket}
-            </Button>
-          ) : isAssignedToCurrentAdmin ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              onClick={() => assignmentMutation.mutate("unassign")}
-              disabled={!canManageSupportWorkspace || assignmentMutation.isPending}
-            >
-              {panelText.unassignTicket}
-            </Button>
-          ) : (
+          <SupportAssignmentControl
+            key={conversation.conversationId}
+            conversation={conversation}
+            canManageSupportWorkspace={canManageSupportWorkspace}
+            sessionUserId={sessionUserId}
+            sessionUserRoles={sessionUserRoles}
+            locale={locale}
+          />
+          {conversation.assignedAdminId &&
+          !isAssignedToCurrentAdmin &&
+          !sessionUserRoles.includes("Admin") ? (
             <span className={styles.subtle}>{panelText.ownedByAnotherOperator}</span>
-          )}
+          ) : null}
         </div>
         <div className={styles.infoPanelKvRow}>
           <span className={styles.infoPanelKvLabel}>
             <span className={styles.infoPanelKvIcon} aria-hidden="true">
-              ⚑
+              <TrendUpIcon />
             </span>
             <span>{text.supportPriorityLabel}</span>
           </span>
           <div className={styles.infoPanelSelectWrap}>
             <Select
               value={operatorPriority}
+              ariaLabel={text.supportPriorityLabel}
               onChange={(value) => setOperatorPriority(value as typeof operatorPriority)}
               disabled={!canMutateConversation}
               showSelectedDescription={false}
@@ -207,6 +203,7 @@ export function SupportInfoPanelUserTab({
                 { value: "Low", label: text.supportPriorityLow },
                 { value: "Normal", label: text.supportPriorityNormal },
                 { value: "High", label: text.supportPriorityHigh },
+                { value: "Urgent", label: text.supportPriorityUrgent },
               ]}
             />
           </div>
@@ -214,7 +211,7 @@ export function SupportInfoPanelUserTab({
         <div className={styles.infoPanelKvRow}>
           <span className={styles.infoPanelKvLabel}>
             <span className={styles.infoPanelKvIcon} aria-hidden="true">
-              ↻
+              <RefreshIcon />
             </span>
             <span>{panelText.updated}</span>
           </span>
@@ -222,11 +219,89 @@ export function SupportInfoPanelUserTab({
         </div>
       </div>
 
-      <div className={styles.infoPanelSection}>
-        <div className={styles.infoPanelSectionHeader}>
-          <span className={styles.infoPanelSectionTitle}>{panelText.feedbackTitle}</span>
+      {conversation.status !== "Closed" &&
+      (primaryStatusAction || secondaryStatusActions.length > 0 || destructiveStatusAction) ? (
+        <div className={styles.infoPanelSection} data-testid="support-ticket-actions">
+          <div className={styles.infoPanelSectionHeader}>
+            <span className={styles.infoPanelSectionTitle}>{panelText.ticketActions}</span>
+          </div>
+
+          <div className={styles.infoPanelActionStack}>
+            {pendingStatusConfirm ? (
+              <div className={styles.spConfirmBox}>
+                <span className={styles.spConfirmText}>{panelText.closeConversationPrompt}</span>
+                <div className={styles.spConfirmActions}>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => void confirmPendingStatusChange()}
+                    disabled={!canMutateConversation || statusMutation.isPending}
+                  >
+                    {panelText.close}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setPendingStatusConfirm(null)}
+                    disabled={statusMutation.isPending}
+                  >
+                    {panelText.cancel}
+                  </Button>
+                </div>
+              </div>
+            ) : primaryStatusAction ? (
+              <button
+                type="button"
+                className={`ui-button ui-button--primary ui-button--md ${styles.actionsPanelBtn}`}
+                onClick={() => requestStatusChange(primaryStatusAction.status)}
+                disabled={
+                  !canMutateConversation ||
+                  statusMutation.isPending ||
+                  conversation.status === primaryStatusAction.status
+                }
+              >
+                {primaryStatusAction.label}
+              </button>
+            ) : null}
+
+            {secondaryStatusActions.map((action) => (
+              <button
+                key={action.status}
+                type="button"
+                className={`ui-button ui-button--secondary ui-button--md ${styles.actionsPanelBtn}`}
+                onClick={() => requestStatusChange(action.status)}
+                disabled={
+                  !canMutateConversation ||
+                  statusMutation.isPending ||
+                  conversation.status === action.status
+                }
+              >
+                {action.label}
+              </button>
+            ))}
+
+            {destructiveStatusAction ? (
+              <Button
+                variant="danger"
+                onClick={() => requestStatusChange(destructiveStatusAction.status)}
+                disabled={
+                  !canMutateConversation ||
+                  statusMutation.isPending ||
+                  conversation.status === destructiveStatusAction.status
+                }
+              >
+                {destructiveStatusAction.label}
+              </Button>
+            ) : null}
+          </div>
         </div>
-        {typeof conversation.feedbackRating === "number" ? (
+      ) : null}
+
+      {typeof conversation.feedbackRating === "number" ? (
+        <div className={styles.infoPanelSection}>
+          <div className={styles.infoPanelSectionHeader}>
+            <span className={styles.infoPanelSectionTitle}>{panelText.feedbackTitle}</span>
+          </div>
           <>
             <div className={styles.infoPanelKvRow}>
               <span>{panelText.feedbackRating(conversation.feedbackRating)}</span>
@@ -236,7 +311,7 @@ export function SupportInfoPanelUserTab({
               </strong>
             </div>
             {conversation.feedbackComment?.trim() ? (
-              <div className={styles.infoPanelKvRow}>
+              <div className={styles.infoPanelFeedbackComment}>
                 <span>{panelText.feedbackComment}</span>
                 <strong>
                   {formatSafeSupportDisplay(conversation.feedbackComment, panelText.noData, 1000)}
@@ -244,22 +319,8 @@ export function SupportInfoPanelUserTab({
               </div>
             ) : null}
           </>
-        ) : (
-          <span className={styles.subtle}>{panelText.feedbackNotSubmitted}</span>
-        )}
-      </div>
-
-      <SupportInfoPanelAttachmentPreviewSection
-        attachmentPreviewEntries={attachmentPreviewEntries}
-        canManageSupportWorkspace={canMutateConversation}
-        locale={locale}
-        openAttachmentBlob={openAttachmentBlob}
-        panelText={panelText}
-        pendingAttachmentOpenKey={pendingAttachmentOpenKey}
-        recentAttachments={recentAttachments}
-        remainingAttachmentCount={remainingAttachmentCount}
-        setActiveSidePanelTab={setActiveSidePanelTab}
-      />
+        </div>
+      ) : null}
 
       <div className={styles.infoPanelSection}>
         <div className={styles.infoPanelSectionHeader}>
@@ -271,11 +332,19 @@ export function SupportInfoPanelUserTab({
               if (!canMutateConversation) {
                 return;
               }
-              setIsTagEditorOpen((current) => !current);
+
+              if (isTagEditorOpen) {
+                setIsTagEditorOpen(false);
+                return;
+              }
+
+              setIsTagEditorOpen(true);
               window.setTimeout(() => tagInputRef.current?.focus(), 0);
             }}
             disabled={!canMutateConversation}
             aria-label={panelText.addTag}
+            aria-controls="support-operator-tag-editor"
+            aria-expanded={isTagEditorOpen}
             title={panelText.addTag}
           >
             +
@@ -298,8 +367,8 @@ export function SupportInfoPanelUserTab({
             ))}
           </div>
         ) : null}
-        {isTagEditorOpen || operatorTags.length === 0 ? (
-          <div className={styles.infoPanelTagInputRow}>
+        {isTagEditorOpen ? (
+          <div id="support-operator-tag-editor" className={styles.infoPanelTagInputRow}>
             <input
               ref={tagInputRef}
               className={styles.infoPanelTagInput}
@@ -334,7 +403,7 @@ export function SupportInfoPanelUserTab({
           <span className={styles.infoPanelSectionTitle}>{panelText.user}</span>
         </div>
         {canViewSubjectUserContext ? (
-          <div className={styles.infoPanelStatsGrid}>
+          <div className={styles.infoPanelStatsGrid} data-testid="support-user-stats">
             <div className={styles.infoPanelStatTile}>
               <span>{text.supportPlanLabel}</span>
               <strong>{isUserPremium ? text.premiumLabel : text.freeLabel}</strong>
@@ -349,103 +418,6 @@ export function SupportInfoPanelUserTab({
             </div>
           </div>
         ) : null}
-        <div className={styles.infoPanelStatsSecondaryGrid}>
-          {canViewSubjectUserContext ? (
-            <button
-              type="button"
-              className={`${styles.infoPanelStatTileFull} ${styles.infoPanelStatTileButton}`}
-              onClick={() => setActiveSidePanelTab("activity")}
-            >
-              <span>{panelText.purchases}</span>
-              <strong>{String(totalPurchases)}</strong>
-            </button>
-          ) : null}
-          <button
-            type="button"
-            className={`${styles.infoPanelStatTileFull} ${styles.infoPanelStatTileButton}`}
-            onClick={() => setActiveSidePanelTab("dialog")}
-          >
-            <span>{text.supportLastSeenLabel}</span>
-            <strong>
-              {lastActivityAtUtc ? formatDateTime(lastActivityAtUtc, locale) : panelText.noData}
-            </strong>
-          </button>
-        </div>
-      </div>
-
-      <div className={styles.infoPanelSection}>
-        <div className={styles.infoPanelSectionHeader}>
-          <span className={styles.infoPanelSectionTitle}>{panelText.ticketActions}</span>
-        </div>
-
-        <div className={styles.infoPanelActionStack}>
-          {pendingStatusConfirm ? (
-            <div className={styles.spConfirmBox}>
-              <span className={styles.spConfirmText}>{panelText.closeConversationPrompt}</span>
-              <div className={styles.spConfirmActions}>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => void confirmPendingStatusChange()}
-                  disabled={!canMutateConversation || statusMutation.isPending}
-                >
-                  {panelText.close}
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setPendingStatusConfirm(null)}
-                  disabled={statusMutation.isPending}
-                >
-                  {panelText.cancel}
-                </Button>
-              </div>
-            </div>
-          ) : primaryStatusAction ? (
-            <button
-              type="button"
-              className={`ui-button ui-button--primary ui-button--md ${styles.actionsPanelBtn}`}
-              onClick={() => requestStatusChange(primaryStatusAction.status)}
-              disabled={
-                !canMutateConversation ||
-                statusMutation.isPending ||
-                conversation.status === primaryStatusAction.status
-              }
-            >
-              {primaryStatusAction.label}
-            </button>
-          ) : null}
-
-          {secondaryStatusActions.map((action) => (
-            <button
-              key={action.status}
-              type="button"
-              className={`ui-button ui-button--secondary ui-button--md ${styles.actionsPanelBtn}`}
-              onClick={() => requestStatusChange(action.status)}
-              disabled={
-                !canMutateConversation ||
-                statusMutation.isPending ||
-                conversation.status === action.status
-              }
-            >
-              {action.label}
-            </button>
-          ))}
-
-          {destructiveStatusAction ? (
-            <Button
-              variant="danger"
-              onClick={() => requestStatusChange(destructiveStatusAction.status)}
-              disabled={
-                !canMutateConversation ||
-                statusMutation.isPending ||
-                conversation.status === destructiveStatusAction.status
-              }
-            >
-              {destructiveStatusAction.label}
-            </Button>
-          ) : null}
-        </div>
       </div>
     </>
   );

@@ -223,7 +223,7 @@ export function TemplateSecureMedia({
         playsInline={playsInline}
         preload={preload}
         aria-hidden={ariaHidden || undefined}
-        aria-label={!ariaHidden ? ariaLabel : undefined}
+        aria-label={!ariaHidden ? (ariaLabel ?? alt) || undefined : undefined}
         onError={markRemoteMediaFailed}
       />
     );

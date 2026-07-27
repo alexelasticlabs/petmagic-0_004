@@ -1,0 +1,157 @@
+.card {
+  min-width: 0;
+}
+
+.workspace {
+  display: grid;
+  min-width: 0;
+  gap: 0.82rem;
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.summary > div {
+  display: grid;
+  gap: 0.18rem;
+  padding: 0.64rem 0.72rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.summary dt,
+.metadata dt {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.summary dd {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 1.08rem;
+  font-weight: 750;
+}
+
+.list {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.session {
+  display: grid;
+  min-width: 0;
+  gap: 0.65rem;
+  padding: 0.76rem 0.82rem;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.session:last-child {
+  border-bottom: 0;
+}
+
+.sessionHeader {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.sessionHeader strong {
+  min-width: 0;
+  color: var(--text-strong);
+  font-size: 0.86rem;
+  overflow-wrap: anywhere;
+}
+
+.metadata {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.55rem 1rem;
+  margin: 0;
+}
+
+.metadata > div {
+  display: grid;
+  gap: 0.16rem;
+}
+
+.metadata dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
+.sessionAction {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.empty {
+  margin: 0;
+  padding: 1.25rem;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.reasonField {
+  display: grid;
+  gap: 0.42rem;
+  color: var(--text-strong);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.reasonField textarea {
+  width: 100%;
+  min-height: 6rem;
+  resize: vertical;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.75rem;
+  background: var(--surface);
+  color: var(--text-strong);
+  padding: 0.7rem 0.8rem;
+  font: inherit;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.reasonField textarea:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--brand) 30%, transparent);
+  outline-offset: 2px;
+  border-color: var(--brand);
+}
+
+.reasonField small {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+@media (max-width: 640px) {
+  .summary,
+  .metadata {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sessionHeader {
+    align-items: flex-start;
+  }
+
+  .sessionAction,
+  .sessionAction > :global(.ui-button) {
+    width: 100%;
+  }
+}

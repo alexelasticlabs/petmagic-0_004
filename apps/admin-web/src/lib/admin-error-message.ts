@@ -6,6 +6,7 @@ type AdminDisplayError = {
   message?: string;
   detail?: string;
   validationErrors?: string[];
+  retryAfterSeconds?: number;
 };
 
 export function getAdminErrorMessage(error: unknown, fallback: string): string {
@@ -14,6 +15,10 @@ export function getAdminErrorMessage(error: unknown, fallback: string): string {
   }
 
   const candidate = error as AdminDisplayError;
+  if (candidate.code === "auth.retry_required_after_refresh") {
+    return fallback;
+  }
+
   if (Array.isArray(candidate.validationErrors) && candidate.validationErrors.length > 0) {
     const validationMessage = candidate.validationErrors
       .map(normalizeErrorText)
@@ -44,6 +49,18 @@ export function getAdminErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+export function getAdminRetryAfterSeconds(error: unknown): number | null {
+  if (!error || typeof error !== "object") {
+    return null;
+  }
+
+  const candidate = error as AdminDisplayError;
+  const value = candidate.retryAfterSeconds;
+  return typeof value === "number" && Number.isInteger(value) && value > 0 && value <= 3_600
+    ? value
+    : null;
+}
+
 function normalizeErrorText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
@@ -56,7 +73,7 @@ function isTechnicalMessage(value: string): boolean {
   const trimmed = value.trim();
   return (
     /^API request failed with status \d+$/i.test(trimmed) ||
-    /^(Request data is invalid|Session expired\. Sign in again|You do not have permission to perform this action|Requested resource was not found|This action conflicts with the current server state|Request validation failed|Server error\. Try again later|Request failed\. Try again)\.$/i.test(
+    /^(Request data is invalid|Session expired\. Sign in again|You do not have permission to perform this action|Requested resource was not found|This action conflicts with the current server state|Request validation failed|Too many requests\. Try again shortly|Server error\. Try again later|Request failed\. Try again)\.$/i.test(
       trimmed
     ) ||
     /^TypeError:/i.test(trimmed) ||

@@ -4,11 +4,13 @@ import { useMemo, useState } from "react";
 
 import {
   AdminCard,
-  AdminSelectField,
+  AdminFilterBar,
   AdminStateCard,
   AdminStatusBadge,
   adminTableStyles,
 } from "@/components/admin/admin-primitives";
+import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
+import { EconomySelectField } from "@/components/economy-page-select-field";
 import {
   incidentActionOptions,
   incidentCategoryOptions,
@@ -17,6 +19,7 @@ import {
 } from "@/components/economy-page.content";
 import styles from "@/components/economy-page.module.css";
 import {
+  humanizeStatus,
   humanizeTokenKind,
   safeText,
   shortGuid,
@@ -24,6 +27,7 @@ import {
 } from "@/components/economy-page.shared";
 import { Button } from "@/components/ui/button";
 import {
+  ECONOMY_INCIDENT_EXTERNAL_REFERENCE_MAX_LENGTH,
   ECONOMY_QUERY_FILTER_MAX_LENGTH,
   ECONOMY_INCIDENT_REASON_MAX_LENGTH,
   type AdminEconomyIncident,
@@ -38,6 +42,7 @@ type EconomyPageIncidentsSectionProps = {
   selectedIncidentId: string | null;
   selectedIncidentDetail: AdminEconomyIncidentDetail | null;
   selectedIncidentLoading: boolean;
+  selectedIncidentError: string | null;
   incidentItems: AdminEconomyIncident[];
   incidentCategory: string;
   incidentStatus: string;
@@ -45,7 +50,6 @@ type EconomyPageIncidentsSectionProps = {
   incidentPage: number;
   incidentsHasMore: boolean;
   incidentsIsFetching: boolean;
-  incidentsIsRefreshing: boolean;
   runReconciliationPending: boolean;
   actionPending: boolean;
   setIncidentCategory: (value: string) => void;
@@ -53,8 +57,9 @@ type EconomyPageIncidentsSectionProps = {
   setIncidentType: (value: string) => void;
   setIncidentPage: (value: number | ((current: number) => number)) => void;
   onSelectIncident: (incident: AdminEconomyIncident) => void;
+  onRetrySelectedIncident: () => void;
   onRunReconciliation: () => void;
-  onResolveIncident: (incident: AdminEconomyIncident) => void;
+  onResolveIncident: (incident: AdminEconomyIncident) => Promise<boolean>;
   onApplyIncidentAction: (payload: {
     incidentId: string;
     action: string;
@@ -70,6 +75,7 @@ export function EconomyPageIncidentsSection({
   selectedIncidentId,
   selectedIncidentDetail,
   selectedIncidentLoading,
+  selectedIncidentError,
   incidentItems,
   incidentCategory,
   incidentStatus,
@@ -77,7 +83,6 @@ export function EconomyPageIncidentsSection({
   incidentPage,
   incidentsHasMore,
   incidentsIsFetching,
-  incidentsIsRefreshing,
   runReconciliationPending,
   actionPending,
   setIncidentCategory,
@@ -85,59 +90,40 @@ export function EconomyPageIncidentsSection({
   setIncidentType,
   setIncidentPage,
   onSelectIncident,
+  onRetrySelectedIncident,
   onRunReconciliation,
   onResolveIncident,
   onApplyIncidentAction,
 }: EconomyPageIncidentsSectionProps) {
-  const [action, setAction] = useState("retry_settlement");
-  const [reason, setReason] = useState("");
-  const [amount, setAmount] = useState("");
-  const [externalReferenceId, setExternalReferenceId] = useState("");
-  const selectedIncident = selectedIncidentDetail?.incident ?? null;
-  const actionOptions = useMemo(() => incidentActionOptions[locale], [locale]);
-
-  const submitAction = () => {
-    if (!selectedIncident || !reason.trim()) {
-      return;
-    }
-
-    const parsedAmount = Number.parseInt(amount.trim(), 10);
-    onApplyIncidentAction({
-      incidentId: selectedIncident.incidentId,
-      action,
-      reason,
-      amount: Number.isFinite(parsedAmount) ? parsedAmount : undefined,
-      externalReferenceId: externalReferenceId.trim() || undefined,
-    });
-  };
+  const [incidentPendingResolve, setIncidentPendingResolve] = useState<AdminEconomyIncident | null>(
+    null
+  );
 
   return (
-    <AdminCard
-      title={text.incidentsTitle}
-      description={text.incidentsDescription}
-      action={
-        <div className={styles.filterRow}>
-          <AdminSelectField
+    <>
+      <AdminCard title={text.incidentsTitle} description={text.incidentsDescription}>
+        <AdminFilterBar className={styles.tableFilterBar}>
+          <EconomySelectField
             label={text.incidentStatusFilterLabel}
             value={incidentStatus}
             onChange={setIncidentStatus}
             options={incidentStatusOptions[locale]}
             className={styles.compactSelect}
-            disabled={incidentsIsFetching || incidentsIsRefreshing}
+            disabled={incidentsIsFetching && incidentItems.length === 0}
           />
-          <AdminSelectField
+          <EconomySelectField
             label={text.incidentCategoryFilterLabel}
             value={incidentCategory}
             onChange={setIncidentCategory}
             options={incidentCategoryOptions[locale]}
             className={styles.compactSelect}
-            disabled={incidentsIsFetching || incidentsIsRefreshing}
+            disabled={incidentsIsFetching && incidentItems.length === 0}
           />
           <label className={styles.filterField}>
             <span>{text.incidentTypeFilterLabel}</span>
             <input
               className={styles.input}
-              disabled={incidentsIsFetching || incidentsIsRefreshing}
+              disabled={incidentsIsFetching && incidentItems.length === 0}
               value={incidentType}
               onChange={(event) =>
                 setIncidentType(event.target.value.slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH))
@@ -154,188 +140,432 @@ export function EconomyPageIncidentsSection({
           >
             {text.runReconciliationAction}
           </Button>
-        </div>
-      }
-    >
-      {incidentsIsRefreshing ? (
-        <AdminStateCard tone="info" title={text.loadingTitle} />
-      ) : incidentItems.length === 0 ? (
-        <AdminStateCard tone="info" title={text.noIncidents} />
-      ) : (
-        <>
-          <div className={adminTableStyles.tableWrap}>
-            <table className={adminTableStyles.table}>
-              <thead>
-                <tr>
-                  <th>{text.timeColumn}</th>
-                  <th>{text.incidentColumn}</th>
-                  <th>{text.categoryColumn}</th>
-                  <th>{text.severityColumn}</th>
-                  <th>{text.providerColumn}</th>
-                  <th>{text.userColumn}</th>
-                  <th>{text.retryColumn}</th>
-                  <th>{text.statusColumn}</th>
-                  <th>{text.actionsColumn}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {incidentItems.map((item) => (
-                  <tr key={item.incidentId}>
-                    <td>{formatDateTime(item.lastDetectedAtUtc, locale)}</td>
-                    <td>
-                      <div className={styles.packMeta}>
-                        <strong>{safeText(item.type, 80)}</strong>
-                        <span>{safeText(item.summary, 180)}</span>
-                        {item.lastError ? <span>{safeText(item.lastError, 96)}</span> : null}
-                      </div>
-                    </td>
-                    <td>{safeText(item.category, 64)}</td>
-                    <td>
-                      <AdminStatusBadge color={severityColor(item.severity)}>
-                        {safeText(item.severity, 32)}
-                      </AdminStatusBadge>
-                    </td>
-                    <td>{safeText(item.provider ?? "-")}</td>
-                    <td className={adminTableStyles.mono}>
-                      {item.userId ? shortGuid(item.userId) : "-"}
-                    </td>
-                    <td>
-                      <div className={styles.packMeta}>
-                        <strong>{String(item.retryCount)}</strong>
-                        <span>
-                          {item.nextRetryAtUtc ? formatDateTime(item.nextRetryAtUtc, locale) : "-"}
-                        </span>
-                      </div>
-                    </td>
-                    <td>
-                      <AdminStatusBadge color={statusColor(item.status)}>
-                        {safeText(item.status, 32)}
-                      </AdminStatusBadge>
-                    </td>
-                    <td>
-                      {item.status.toLowerCase() === "open" ? (
+        </AdminFilterBar>
+        {incidentsIsFetching && incidentItems.length === 0 ? (
+          <AdminStateCard tone="info" title={text.loadingTitle} />
+        ) : incidentItems.length === 0 ? (
+          <AdminStateCard tone="info" title={text.noIncidents} />
+        ) : (
+          <>
+            <div className={adminTableStyles.tableWrap} aria-busy={incidentsIsFetching}>
+              <table className={`${adminTableStyles.table} ${styles.wideTable}`}>
+                <thead>
+                  <tr>
+                    <th scope="col">{text.timeColumn}</th>
+                    <th scope="col">{text.incidentColumn}</th>
+                    <th scope="col">{text.categoryColumn}</th>
+                    <th scope="col">{text.severityColumn}</th>
+                    <th scope="col">{text.providerColumn}</th>
+                    <th scope="col">{text.userColumn}</th>
+                    <th scope="col">{text.retryColumn}</th>
+                    <th scope="col">{text.statusColumn}</th>
+                    <th scope="col">{text.actionsColumn}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {incidentItems.map((item) => (
+                    <tr key={item.incidentId}>
+                      <td>{formatDateTime(item.lastDetectedAtUtc, locale)}</td>
+                      <td>
+                        <div className={styles.packMeta}>
+                          <strong>{safeText(item.type, 80)}</strong>
+                          <span>{safeText(item.summary, 180)}</span>
+                          {item.lastError ? <span>{safeText(item.lastError, 96)}</span> : null}
+                        </div>
+                      </td>
+                      <td>{safeText(item.category, 64)}</td>
+                      <td>
+                        <AdminStatusBadge color={severityColor(item.severity)}>
+                          {safeText(item.severity, 32)}
+                        </AdminStatusBadge>
+                      </td>
+                      <td>{safeText(item.provider ?? "-")}</td>
+                      <td className={adminTableStyles.mono}>
+                        {item.userId ? shortGuid(item.userId) : "-"}
+                      </td>
+                      <td>
+                        <div className={styles.packMeta}>
+                          <strong>{String(item.retryCount)}</strong>
+                          <span>
+                            {item.nextRetryAtUtc
+                              ? formatDateTime(item.nextRetryAtUtc, locale)
+                              : "-"}
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        <AdminStatusBadge color={statusColor(item.status)}>
+                          {humanizeStatus(item.status, locale)}
+                        </AdminStatusBadge>
+                      </td>
+                      <td>
+                        {item.status.toLowerCase() === "open" ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            disabled={actionPending}
+                            aria-label={`${text.resolveIncidentAction}: ${safeText(item.type, 80)}`}
+                            onClick={() => setIncidentPendingResolve(item)}
+                          >
+                            {text.resolveIncidentAction}
+                          </Button>
+                        ) : (
+                          <span className={styles.mutedText}>
+                            {humanizeStatus(item.status, locale)}
+                          </span>
+                        )}
                         <Button
                           type="button"
                           size="sm"
-                          variant="secondary"
-                          disabled={actionPending}
-                          onClick={() => onResolveIncident(item)}
+                          variant="ghost"
+                          disabled={
+                            actionPending ||
+                            (selectedIncidentId === item.incidentId && !selectedIncidentError)
+                          }
+                          aria-label={`${text.viewIncidentAction}: ${safeText(item.type, 80)}`}
+                          onClick={() => {
+                            if (selectedIncidentId === item.incidentId && selectedIncidentError) {
+                              onRetrySelectedIncident();
+                              return;
+                            }
+
+                            onSelectIncident(item);
+                          }}
                         >
-                          {text.resolveIncidentAction}
+                          {text.viewIncidentAction}
                         </Button>
-                      ) : (
-                        <span className={styles.mutedText}>{safeText(item.status, 32)}</span>
-                      )}
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        disabled={selectedIncidentId === item.incidentId}
-                        onClick={() => onSelectIncident(item)}
-                      >
-                        {text.viewIncidentAction}
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className={styles.sectionStack}>
-            {!selectedIncidentId ? (
-              <AdminStateCard tone="info" title={text.incidentNoDetail} />
-            ) : selectedIncidentLoading && !selectedIncidentDetail ? (
-              <AdminStateCard tone="info" title={text.loadingTitle} />
-            ) : selectedIncidentDetail ? (
-              <div className={styles.packMeta}>
-                <h3>{text.incidentDetailTitle}</h3>
-                <div className={styles.filterRow}>
-                  <span className={adminTableStyles.mono}>
-                    {shortGuid(selectedIncidentDetail.incident.incidentId)}
-                  </span>
-                  <AdminStatusBadge color={statusColor(selectedIncidentDetail.incident.status)}>
-                    {safeText(selectedIncidentDetail.incident.status, 32)}
-                  </AdminStatusBadge>
-                  <AdminStatusBadge color={severityColor(selectedIncidentDetail.incident.severity)}>
-                    {safeText(selectedIncidentDetail.incident.severity, 32)}
-                  </AdminStatusBadge>
-                </div>
-                <div className={styles.filterRow}>
-                  <AdminSelectField
-                    label={text.incidentActionLabel}
-                    value={action}
-                    onChange={setAction}
-                    options={actionOptions}
-                    className={styles.compactSelect}
-                    disabled={actionPending}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className={styles.sectionStack}>
+              {!selectedIncidentId ? (
+                <AdminStateCard tone="info" title={text.incidentNoDetail} />
+              ) : selectedIncidentLoading && !selectedIncidentDetail ? (
+                <AdminStateCard tone="info" title={text.loadingTitle} />
+              ) : selectedIncidentError ? (
+                <AdminStateCard
+                  tone="danger"
+                  title={text.incidentDetailLoadError}
+                  description={selectedIncidentError}
+                  action={
+                    <Button type="button" variant="secondary" onClick={onRetrySelectedIncident}>
+                      {text.retry}
+                    </Button>
+                  }
+                />
+              ) : selectedIncidentDetail ? (
+                <div className={styles.packMeta}>
+                  <h3>{text.incidentDetailTitle}</h3>
+                  <div className={styles.filterRow}>
+                    <span className={adminTableStyles.mono}>
+                      {shortGuid(selectedIncidentDetail.incident.incidentId)}
+                    </span>
+                    <AdminStatusBadge color={statusColor(selectedIncidentDetail.incident.status)}>
+                      {humanizeStatus(selectedIncidentDetail.incident.status, locale)}
+                    </AdminStatusBadge>
+                    <AdminStatusBadge
+                      color={severityColor(selectedIncidentDetail.incident.severity)}
+                    >
+                      {safeText(selectedIncidentDetail.incident.severity, 32)}
+                    </AdminStatusBadge>
+                  </div>
+                  <IncidentActionForm
+                    key={selectedIncidentId ?? selectedIncidentDetail.incident.incidentId}
+                    locale={locale}
+                    text={text}
+                    incident={selectedIncidentDetail.incident}
+                    actionPending={actionPending}
+                    onApplyIncidentAction={onApplyIncidentAction}
                   />
-                  <label className={styles.filterField}>
-                    <span>{text.incidentReasonLabel}</span>
-                    <input
-                      className={styles.input}
-                      value={reason}
-                      disabled={actionPending}
-                      maxLength={ECONOMY_INCIDENT_REASON_MAX_LENGTH}
-                      onChange={(event) => setReason(event.target.value)}
-                    />
-                  </label>
-                  <label className={styles.filterField}>
-                    <span>{text.incidentAmountLabel}</span>
-                    <input
-                      className={styles.input}
-                      value={amount}
-                      disabled={actionPending}
-                      onChange={(event) => setAmount(event.target.value.replace(/[^\d-]/g, ""))}
-                    />
-                  </label>
-                  <label className={styles.filterField}>
-                    <span>{text.incidentExternalReferenceLabel}</span>
-                    <input
-                      className={styles.input}
-                      value={externalReferenceId}
-                      disabled={actionPending}
-                      maxLength={ECONOMY_QUERY_FILTER_MAX_LENGTH}
-                      onChange={(event) => setExternalReferenceId(event.target.value)}
-                    />
-                  </label>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    disabled={actionPending || !reason.trim()}
-                    onClick={submitAction}
-                  >
-                    {text.incidentActionSubmit}
-                  </Button>
+                  <IncidentLinks detail={selectedIncidentDetail} text={text} locale={locale} />
                 </div>
-                {!reason.trim() ? (
-                  <span className={styles.mutedText}>{text.incidentReasonRequired}</span>
-                ) : null}
-                <IncidentLinks detail={selectedIncidentDetail} text={text} locale={locale} />
-              </div>
-            ) : null}
-          </div>
-          <div className={styles.pager}>
-            <button
-              type="button"
-              className={styles.pagerButton}
-              disabled={incidentPage === 0 || incidentsIsFetching}
-              onClick={() => setIncidentPage((current) => Math.max(0, current - 1))}
-            >
-              {text.previousPage}
-            </button>
-            <button
-              type="button"
-              className={styles.pagerButton}
-              disabled={!incidentsHasMore || incidentsIsFetching}
-              onClick={() => setIncidentPage((current) => current + 1)}
-            >
-              {text.nextPage}
-            </button>
-          </div>
-        </>
-      )}
-    </AdminCard>
+              ) : null}
+            </div>
+            <div className={styles.pager}>
+              <button
+                type="button"
+                className={styles.pagerButton}
+                disabled={incidentPage === 0 || incidentsIsFetching}
+                aria-label={`${text.incidentsTitle}: ${text.previousPage}`}
+                onClick={() => setIncidentPage((current) => Math.max(0, current - 1))}
+              >
+                {text.previousPage}
+              </button>
+              <button
+                type="button"
+                className={styles.pagerButton}
+                disabled={!incidentsHasMore || incidentsIsFetching}
+                aria-label={`${text.incidentsTitle}: ${text.nextPage}`}
+                onClick={() => setIncidentPage((current) => current + 1)}
+              >
+                {text.nextPage}
+              </button>
+            </div>
+          </>
+        )}
+      </AdminCard>
+      <ConfirmationDialog
+        open={incidentPendingResolve !== null}
+        title={text.resolveIncidentConfirmTitle}
+        description={
+          incidentPendingResolve
+            ? `${text.resolveIncidentConfirmDescription} ${safeText(incidentPendingResolve.type, 80)} · ${shortGuid(incidentPendingResolve.incidentId)}`
+            : text.resolveIncidentConfirmDescription
+        }
+        confirmLabel={text.resolveIncidentAction}
+        cancelLabel={text.confirmationCancel}
+        isSubmitting={actionPending}
+        onCancel={() => {
+          if (!actionPending) {
+            setIncidentPendingResolve(null);
+          }
+        }}
+        onConfirm={() => {
+          if (!incidentPendingResolve || actionPending) {
+            return;
+          }
+
+          void onResolveIncident(incidentPendingResolve).then((succeeded) => {
+            if (succeeded) {
+              setIncidentPendingResolve(null);
+            }
+          });
+        }}
+      />
+    </>
   );
+}
+
+type IncidentActionFormProps = {
+  locale: Locale;
+  text: EconomyPageText;
+  incident: AdminEconomyIncident;
+  actionPending: boolean;
+  onApplyIncidentAction: EconomyPageIncidentsSectionProps["onApplyIncidentAction"];
+};
+
+function IncidentActionForm({
+  locale,
+  text,
+  incident,
+  actionPending,
+  onApplyIncidentAction,
+}: IncidentActionFormProps) {
+  const [action, setAction] = useState("");
+  const [reason, setReason] = useState("");
+  const [amount, setAmount] = useState("");
+  const [externalReferenceId, setExternalReferenceId] = useState("");
+  const [isActionConfirmationOpen, setIsActionConfirmationOpen] = useState(false);
+  const actionOptions = useMemo(
+    () => [{ value: "", label: text.incidentActionLabel }, ...incidentActionOptions[locale]],
+    [locale, text.incidentActionLabel]
+  );
+  const actionRequirements = getIncidentActionRequirements(action);
+  const parsedAmount = parseIncidentActionAmount(amount);
+  const isAmountValid =
+    !actionRequirements.requiresAmount || isIncidentActionAmountValid(action, parsedAmount);
+  const hasExternalReference = Boolean(externalReferenceId.trim());
+  const canSubmitAction =
+    Boolean(action) &&
+    Boolean(reason.trim()) &&
+    isAmountValid &&
+    (!actionRequirements.requiresExternalReference || hasExternalReference);
+
+  const requestActionConfirmation = () => {
+    if (!canSubmitAction) {
+      return;
+    }
+
+    setIsActionConfirmationOpen(true);
+  };
+
+  const submitAction = () => {
+    if (!canSubmitAction) {
+      return;
+    }
+
+    onApplyIncidentAction({
+      incidentId: incident.incidentId,
+      action,
+      reason,
+      amount: actionRequirements.requiresAmount && parsedAmount !== null ? parsedAmount : undefined,
+      externalReferenceId: actionRequirements.requiresExternalReference
+        ? externalReferenceId.trim()
+        : undefined,
+    });
+    setIsActionConfirmationOpen(false);
+  };
+
+  return (
+    <>
+      <div className={styles.filterRow}>
+        <EconomySelectField
+          label={text.incidentActionLabel}
+          value={action}
+          onChange={(nextAction) => {
+            const nextRequirements = getIncidentActionRequirements(nextAction);
+            setAction(nextAction);
+            setAmount((current) => (nextRequirements.requiresAmount ? current : ""));
+            if (!nextRequirements.requiresExternalReference) {
+              setExternalReferenceId("");
+            }
+          }}
+          options={actionOptions}
+          className={styles.compactSelect}
+          disabled={actionPending}
+        />
+        <label className={styles.filterField}>
+          <span>{text.incidentReasonLabel}</span>
+          <input
+            className={styles.input}
+            value={reason}
+            disabled={actionPending}
+            maxLength={ECONOMY_INCIDENT_REASON_MAX_LENGTH}
+            onChange={(event) => setReason(event.target.value)}
+          />
+        </label>
+        {actionRequirements.requiresAmount ? (
+          <label className={styles.filterField}>
+            <span>{text.incidentAmountLabel}</span>
+            <input
+              className={styles.input}
+              value={amount}
+              disabled={actionPending}
+              inputMode="numeric"
+              pattern={actionRequirements.allowsSignedAmount ? "-?[0-9]*" : "[0-9]*"}
+              maxLength={11}
+              aria-required
+              aria-invalid={!isAmountValid || undefined}
+              onChange={(event) => setAmount(event.target.value)}
+            />
+          </label>
+        ) : null}
+        {actionRequirements.requiresExternalReference ? (
+          <label className={styles.filterField}>
+            <span>{text.incidentExternalReferenceLabel}</span>
+            <input
+              className={styles.input}
+              value={externalReferenceId}
+              disabled={actionPending}
+              maxLength={ECONOMY_INCIDENT_EXTERNAL_REFERENCE_MAX_LENGTH}
+              aria-required
+              aria-invalid={!hasExternalReference || undefined}
+              onChange={(event) => setExternalReferenceId(event.target.value)}
+            />
+          </label>
+        ) : null}
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={actionPending || !canSubmitAction}
+          onClick={requestActionConfirmation}
+        >
+          {text.incidentActionSubmit}
+        </Button>
+      </div>
+      {!reason.trim() ? (
+        <span className={styles.mutedText}>{text.incidentReasonRequired}</span>
+      ) : null}
+      {actionRequirements.requiresAmount && !isAmountValid ? (
+        <span className={styles.validationMessage}>{text.incidentAmountRequired}</span>
+      ) : null}
+      {actionRequirements.requiresExternalReference && !hasExternalReference ? (
+        <span className={styles.validationMessage}>{text.incidentExternalReferenceRequired}</span>
+      ) : null}
+      <ConfirmationDialog
+        open={isActionConfirmationOpen}
+        title={text.incidentActionConfirmTitle}
+        description={formatIncidentActionConfirmation(
+          text,
+          actionOptions.find((option) => option.value === action)?.label ?? action,
+          reason,
+          actionRequirements.requiresAmount ? amount : null,
+          actionRequirements.requiresExternalReference ? externalReferenceId : null
+        )}
+        confirmLabel={text.incidentActionSubmit}
+        cancelLabel={text.confirmationCancel}
+        isSubmitting={actionPending}
+        onCancel={() => setIsActionConfirmationOpen(false)}
+        onConfirm={submitAction}
+      />
+    </>
+  );
+}
+
+type IncidentActionRequirements = {
+  requiresAmount: boolean;
+  allowsSignedAmount: boolean;
+  requiresExternalReference: boolean;
+};
+
+const INCIDENT_ACTION_AMOUNT_MIN = -2_147_483_648;
+const INCIDENT_ACTION_AMOUNT_MAX = 2_147_483_647;
+
+export function getIncidentActionRequirements(action: string): IncidentActionRequirements {
+  const normalizedAction = action.trim().toLowerCase();
+  const allowsSignedAmount = normalizedAction === "manual_wallet_correction";
+
+  return {
+    requiresAmount:
+      normalizedAction === "manual_bonus_grant" ||
+      normalizedAction === "manual_revoke" ||
+      allowsSignedAmount,
+    allowsSignedAmount,
+    requiresExternalReference: normalizedAction === "manual_refund_mark",
+  };
+}
+
+export function parseIncidentActionAmount(value: string): number | null {
+  const normalizedValue = value.trim();
+  if (!/^-?\d+$/.test(normalizedValue)) {
+    return null;
+  }
+
+  const parsedAmount = Number(normalizedValue);
+  return Number.isInteger(parsedAmount) &&
+    parsedAmount >= INCIDENT_ACTION_AMOUNT_MIN &&
+    parsedAmount <= INCIDENT_ACTION_AMOUNT_MAX
+    ? parsedAmount
+    : null;
+}
+
+export function isIncidentActionAmountValid(action: string, amount: number | null): boolean {
+  const normalizedAction = action.trim().toLowerCase();
+  if (normalizedAction === "manual_bonus_grant" || normalizedAction === "manual_revoke") {
+    return amount !== null && amount > 0;
+  }
+
+  if (normalizedAction === "manual_wallet_correction") {
+    return amount !== null && amount !== 0;
+  }
+
+  return true;
+}
+
+function formatIncidentActionConfirmation(
+  text: EconomyPageText,
+  actionLabel: string,
+  reason: string,
+  amount: string | null,
+  externalReferenceId: string | null
+) {
+  const details = [
+    actionLabel,
+    `${text.incidentReasonLabel}: ${safeText(reason, ECONOMY_INCIDENT_REASON_MAX_LENGTH)}`,
+    amount ? `${text.incidentAmountLabel}: ${amount}` : null,
+    externalReferenceId
+      ? `${text.incidentExternalReferenceLabel}: ${safeText(
+          externalReferenceId,
+          ECONOMY_INCIDENT_EXTERNAL_REFERENCE_MAX_LENGTH
+        )}`
+      : null,
+  ].filter(Boolean);
+
+  return `${text.incidentActionConfirmDescription} ${details.join(" · ")}`;
 }
 
 function severityColor(value: string) {
@@ -410,12 +640,12 @@ function IncidentLinks({
           <table className={adminTableStyles.table}>
             <thead>
               <tr>
-                <th>{text.timeColumn}</th>
-                <th>{text.sourceColumn}</th>
-                <th>{text.tokenKindColumn}</th>
-                <th>{text.deltaColumn}</th>
-                <th>{text.balanceColumn}</th>
-                <th>{text.reasonColumn}</th>
+                <th scope="col">{text.timeColumn}</th>
+                <th scope="col">{text.sourceColumn}</th>
+                <th scope="col">{text.tokenKindColumn}</th>
+                <th scope="col">{text.deltaColumn}</th>
+                <th scope="col">{text.balanceColumn}</th>
+                <th scope="col">{text.reasonColumn}</th>
               </tr>
             </thead>
             <tbody>
@@ -443,12 +673,12 @@ function IncidentLinks({
               {safeText(event.provider, 32)} / {safeText(event.eventType, 80)}
             </strong>
             <span>
-              {safeText(event.status, 32)} ·{" "}
+              {humanizeStatus(event.status, locale)} ·{" "}
               {event.externalEventId ? safeText(event.externalEventId, 120) : "-"} ·{" "}
               {formatDateTime(event.createdAtUtc, locale)}
             </span>
             {event.payloadSnapshotJson ? (
-              <code>
+              <code className={styles.incidentPayload}>
                 {text.incidentSafePayloadLabel}: {safeText(event.payloadSnapshotJson, 500)}
               </code>
             ) : null}

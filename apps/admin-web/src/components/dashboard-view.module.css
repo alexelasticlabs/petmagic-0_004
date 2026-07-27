@@ -12,6 +12,232 @@
   gap: clamp(0.62rem, 0.54rem + 0.24vw, 0.78rem);
 }
 
+.statsSection {
+  min-width: 0;
+  display: grid;
+  gap: 0.56rem;
+}
+
+.attentionSection {
+  min-width: 0;
+  display: grid;
+  gap: 0.68rem;
+  padding: clamp(0.78rem, 0.7rem + 0.24vw, 0.94rem) 0;
+  border-block: 1px solid var(--border-soft);
+}
+
+.systemStatusSection {
+  min-width: 0;
+  display: grid;
+  gap: 0.68rem;
+}
+
+.systemStatusCard {
+  min-width: 0;
+}
+
+.systemStatusGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.58rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.systemStatusCheck {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 0.38rem;
+  padding: 0.66rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.systemStatusCheckHeader {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.45rem;
+}
+
+.systemStatusCheckHeader strong {
+  min-width: 0;
+  color: var(--text-strong);
+  font-size: 0.8rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.systemStatusCheck p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.73rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.sectionNotice {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.62rem;
+  padding: 0.66rem 0.72rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.sectionNoticeInfo {
+  border-color: color-mix(in srgb, var(--info) 34%, var(--border-soft));
+  background: color-mix(in srgb, var(--info) 7%, var(--surface-2));
+}
+
+.sectionNoticeWarning {
+  border-color: color-mix(in srgb, var(--warning) 42%, var(--border-soft));
+  background: color-mix(in srgb, var(--warning) 8%, var(--surface-2));
+}
+
+.sectionNoticeSuccess {
+  border-color: color-mix(in srgb, var(--success) 38%, var(--border-soft));
+  background: color-mix(in srgb, var(--success) 7%, var(--surface-2));
+}
+
+.sectionNoticeIcon {
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  color: var(--success);
+}
+
+.sectionNoticeIcon svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.sectionNoticeCopy {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.sectionNoticeTitle {
+  display: block;
+  color: var(--text-strong);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.sectionNoticeDescription {
+  margin: 0.18rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.sectionNoticeAction {
+  flex: 0 0 auto;
+}
+
+.attentionList {
+  min-width: 0;
+  display: grid;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--border-soft);
+  list-style: none;
+}
+
+.attentionItem {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 0.72rem;
+  align-items: center;
+  padding: 0.68rem 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.attentionItem:last-child {
+  border-bottom: 0;
+}
+
+.attentionIndicator {
+  width: 0.26rem;
+  height: 2.1rem;
+  border-radius: var(--radius-xs);
+}
+
+.attentionIndicatorWarning {
+  background: var(--warning);
+}
+
+.attentionIndicatorDanger {
+  background: var(--danger);
+}
+
+.attentionItemCopy {
+  min-width: 0;
+  display: grid;
+  gap: 0.16rem;
+}
+
+.attentionItemTitle {
+  color: var(--text-strong);
+  font-size: 0.82rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.attentionItemDescription {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.attentionValue {
+  min-width: 2rem;
+  color: var(--text-strong);
+  font-size: 0.9rem;
+  text-align: right;
+}
+
+.attentionLink {
+  min-height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.34rem 0.52rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  color: var(--info);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.attentionLink:hover {
+  border-color: color-mix(in srgb, var(--info) 48%, var(--border-soft));
+  color: var(--accent-strong);
+}
+
+.attentionLink:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--brand) 64%, transparent);
+  outline-offset: 2px;
+}
+
+.sectionNotice + .attentionList,
+.sectionNotice + .activityList {
+  margin-top: 0.68rem;
+}
+
 .contentGrid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(18rem, 0.68fr);
@@ -39,7 +265,8 @@
 
 .cardTitleIcon,
 .cardActionIcon,
-.toolbarIcon {
+.toolbarIcon,
+.refreshActionIcon {
   width: 0.88rem;
   height: 0.88rem;
   flex: 0 0 auto;
@@ -65,13 +292,96 @@
   color: var(--accent-strong);
 }
 
+.entityLink {
+  color: var(--info);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.entityLink:hover {
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 0.18rem;
+}
+
+.entityLink:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--brand) 64%, transparent);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
 .chartToolbar {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 0.28rem;
 }
 
 .chartToolbar svg {
   width: 0.65rem;
   height: 0.65rem;
+}
+
+.periodLabel {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.periodSelector {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.16rem;
+  padding: 0.16rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.periodButton,
+.periodButtonActive {
+  min-height: 1.75rem;
+  padding: 0.22rem 0.46rem;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius-sm) - 0.12rem);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.periodButton:hover:not(:disabled),
+.periodButton:focus-visible {
+  border-color: color-mix(in srgb, var(--brand) 42%, var(--border-soft));
+  color: var(--text-strong);
+}
+
+.periodButton:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--brand) 64%, transparent);
+  outline-offset: 2px;
+}
+
+.periodButtonActive {
+  border-color: color-mix(in srgb, var(--brand) 52%, var(--border-soft));
+  background: color-mix(in srgb, var(--brand) 14%, var(--surface-1));
+  color: var(--text-strong);
+  cursor: default;
+}
+
+.periodButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.periodBadge {
+  flex: 0 0 auto;
 }
 
 .chartSvg {
@@ -169,10 +479,6 @@
   list-style: none;
 }
 
-.feedWarning {
-  margin-bottom: 0.7rem;
-}
-
 .activityItem {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -219,6 +525,17 @@
 
 .activityBody {
   min-width: 0;
+  border-radius: var(--radius-xs);
+  text-decoration: none;
+}
+
+.activityBody:hover .activityText {
+  color: var(--text-strong);
+}
+
+.activityBody:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--brand) 64%, transparent);
+  outline-offset: 3px;
 }
 
 .activityText {
@@ -244,6 +561,10 @@
   .contentGrid {
     grid-template-columns: 1fr;
   }
+
+  .systemStatusGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 1440px) {
@@ -261,12 +582,50 @@
     grid-template-columns: 1fr;
   }
 
+  .systemStatusGrid {
+    grid-template-columns: 1fr;
+  }
+
   .chartSvg {
     height: 11.5rem;
   }
 
+  .chartToolbar {
+    justify-content: flex-start;
+  }
+
+  .periodLabel {
+    width: 100%;
+  }
+
+  .periodBadge {
+    display: none;
+  }
+
   .cardActionLink {
     text-align: left;
+  }
+
+  .attentionItem {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: start;
+  }
+
+  .attentionValue {
+    padding-top: 0.06rem;
+  }
+
+  .attentionLink {
+    grid-column: 2 / 4;
+    justify-self: start;
+  }
+
+  .sectionNotice {
+    flex-wrap: wrap;
+  }
+
+  .sectionNoticeAction {
+    width: 100%;
   }
 
   .donutLayout {

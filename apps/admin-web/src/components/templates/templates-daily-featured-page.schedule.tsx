@@ -1,6 +1,11 @@
 "use client";
 
-import { AdminBadge, AdminCard, adminTableStyles } from "@/components/admin/admin-primitives";
+import {
+  AdminBadge,
+  AdminCard,
+  AdminStateCard,
+  adminTableStyles,
+} from "@/components/admin/admin-primitives";
 import {
   formatDateRange,
   safeDisplayText,
@@ -18,14 +23,70 @@ export function TemplateScheduleCard({
   text,
   locale,
   schedule,
+  schedulePage,
+  schedulePageSize,
+  scheduleTotalCount,
+  scheduleHasMore,
   canManageTemplates,
   isActionLocked,
+  isScheduleNavigationLocked,
   onEditAssignment,
   onRequestDeleteAssignment,
+  onPreviousPage,
+  onNextPage,
 }: TemplateScheduleCardProps) {
+  const totalSchedulePages = Math.max(
+    1,
+    Math.ceil(scheduleTotalCount / Math.max(schedulePageSize, 1))
+  );
+  const visibleSchedulePage = Math.min(schedulePage + 1, totalSchedulePages);
+  const showSchedulePager = scheduleTotalCount > schedulePageSize;
+
   return (
-    <AdminCard title={text.schedule}>
-      {schedule.length === 0 ? null : (
+    <AdminCard
+      title={text.schedule}
+      description={text.scheduleCount(scheduleTotalCount)}
+      action={
+        showSchedulePager ? (
+          <div className={styles.schedulePager} aria-label={text.schedulePaginationLabel}>
+            <span className={styles.schedulePageInfo} aria-live="polite">
+              {text.schedulePage(visibleSchedulePage, totalSchedulePages)}
+            </span>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={
+                !canManageTemplates ||
+                isActionLocked ||
+                isScheduleNavigationLocked ||
+                schedulePage === 0
+              }
+              onClick={onPreviousPage}
+            >
+              {text.previousPage}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={
+                !canManageTemplates ||
+                isActionLocked ||
+                isScheduleNavigationLocked ||
+                !scheduleHasMore
+              }
+              onClick={onNextPage}
+            >
+              {text.nextPage}
+            </Button>
+          </div>
+        ) : undefined
+      }
+    >
+      {schedule.length === 0 ? (
+        <AdminStateCard tone="info" description={text.noSchedule} />
+      ) : (
         <div className={adminTableStyles.tableWrap}>
           <table className={`${adminTableStyles.table} ${styles.scheduleTable}`}>
             <thead>
@@ -51,15 +112,17 @@ export function TemplateScheduleCard({
                       {assignment.isPremium ? text.premium : text.free}
                     </span>
                   </td>
-                  <td>{formatDateRange(assignment, locale)}</td>
-                  <td>
+                  <td data-label={text.date}>{formatDateRange(assignment, locale)}</td>
+                  <td data-label={text.mode}>
                     <AdminBadge tone={statusTone(assignment)}>
                       {assignment.isManual ? text.manual : text.auto}
                     </AdminBadge>
                   </td>
-                  <td>{assignment.isActive ? text.active : text.inactive}</td>
-                  <td>{assignment.priority}</td>
-                  <td>
+                  <td data-label={text.status}>
+                    {assignment.isActive ? text.active : text.inactive}
+                  </td>
+                  <td data-label={text.priority}>{assignment.priority}</td>
+                  <td data-label={text.actions}>
                     <div className={styles.tableActions}>
                       <Button
                         type="button"

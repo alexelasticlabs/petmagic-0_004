@@ -5,9 +5,11 @@ import { type Locale, getDictionary } from "@/lib/i18n";
 export type AdminSectionKey =
   | "dashboard"
   | "economy"
+  | "gamification"
   | "promo-codes"
   | "support"
   | "moderation"
+  | "audit"
   | "users"
   | "generations"
   | "feedback"
@@ -35,6 +37,9 @@ export type AdminNavGroup = {
 };
 
 export type AdminNavEntry = AdminNavLink | AdminNavGroup;
+export type AdminCommandItem = AdminNavLink & {
+  groupLabel?: string;
+};
 
 type AdminPageMeta = {
   title: string;
@@ -50,9 +55,16 @@ export function stripLocalePrefix(pathname?: string | null) {
   return normalized.startsWith("/") ? normalized : `/${normalized}`;
 }
 
-export function buildLocaleSwitchPath(targetLocale: Locale, pathname?: string | null) {
+export function buildLocaleSwitchPath(
+  targetLocale: Locale,
+  pathname?: string | null,
+  search?: string | null
+) {
   const currentPath = stripLocalePrefix(pathname);
-  return currentPath === "/" ? `/${targetLocale}` : `/${targetLocale}${currentPath}`;
+  const targetPath = currentPath === "/" ? `/${targetLocale}` : `/${targetLocale}${currentPath}`;
+  const normalizedSearch = search?.replace(/^\?/, "") ?? "";
+
+  return normalizedSearch ? `${targetPath}?${normalizedSearch}` : targetPath;
 }
 
 export function matchesAdminPath(currentPath: string, targetPath: string) {
@@ -68,9 +80,16 @@ export function getAdminNavItems(
   const allItems: AdminNavEntry[] = [
     { type: "link", key: "dashboard", href: `/${locale}/dashboard`, label: text.navDashboard },
     { type: "link", key: "economy", href: `/${locale}/economy`, label: text.navEconomy },
+    {
+      type: "link",
+      key: "gamification",
+      href: `/${locale}/gamification`,
+      label: text.navGamification,
+    },
     { type: "link", key: "promo-codes", href: `/${locale}/promo-codes`, label: text.navPromoCodes },
     { type: "link", key: "support", href: `/${locale}/support`, label: text.navSupport },
     { type: "link", key: "moderation", href: `/${locale}/moderation`, label: text.navModeration },
+    { type: "link", key: "audit", href: `/${locale}/audit`, label: text.navAudit },
     { type: "link", key: "users", href: `/${locale}/users`, label: text.navUsers },
     {
       type: "link",
@@ -93,7 +112,7 @@ export function getAdminNavItems(
     {
       type: "group",
       key: "templates",
-      href: `/${locale}/templates/video`,
+      href: `/${locale}/templates`,
       label: text.navTemplates,
       items: [
         {
@@ -146,6 +165,36 @@ export function getAdminNavItems(
     .filter((entry): entry is AdminNavEntry => entry !== null);
 }
 
+export function getAdminCommandItems(
+  locale: Locale,
+  roles?: readonly string[] | null
+): AdminCommandItem[] {
+  return getAdminNavItems(locale, roles).flatMap((entry) => {
+    if (entry.type === "link") {
+      return [entry];
+    }
+
+    return entry.items.map((item) => ({
+      ...item,
+      groupLabel: entry.label,
+    }));
+  });
+}
+
+export function filterAdminCommandItems(
+  items: readonly AdminCommandItem[],
+  query: string
+): AdminCommandItem[] {
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  if (!normalizedQuery) {
+    return [...items];
+  }
+
+  return items.filter((item) =>
+    `${item.label} ${item.groupLabel ?? ""}`.toLocaleLowerCase().includes(normalizedQuery)
+  );
+}
+
 function matchesAnyAdminPath(currentPath: string, ...targetPaths: string[]) {
   return targetPaths.some((targetPath) => matchesAdminPath(currentPath, targetPath));
 }
@@ -173,8 +222,16 @@ export function getAdminPageMeta(
     return copy.economy;
   }
 
+  if (matchesAdminPath(currentPath, "/gamification")) {
+    return copy.gamification;
+  }
+
   if (matchesAdminPath(currentPath, "/promo-codes")) {
     return copy.promoCodes;
+  }
+
+  if (currentPath.startsWith("/users/")) {
+    return copy.userProfile;
   }
 
   if (matchesAdminPath(currentPath, "/users")) {
@@ -199,6 +256,10 @@ export function getAdminPageMeta(
 
   if (matchesAdminPath(currentPath, "/moderation")) {
     return copy.moderation;
+  }
+
+  if (matchesAdminPath(currentPath, "/audit")) {
+    return copy.audit;
   }
 
   if (matchesAnyAdminPath(currentPath, "/templates/image", "/image-templates")) {

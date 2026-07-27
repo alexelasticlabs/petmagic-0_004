@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -10,7 +9,6 @@ import {
   AdminPage,
   AdminPageGrid,
   AdminStateCard,
-  AdminToolbar,
 } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import { getTemplateStatusLabel } from "@/components/templates/template-admin-shared";
@@ -18,6 +16,10 @@ import { TemplateCatalogCard } from "@/components/templates/templates-catalog-vi
 import { getTemplatesCatalogViewText } from "@/components/templates/templates-catalog-view.content";
 import { TemplatesCatalogDialogs } from "@/components/templates/templates-catalog-view.dialogs";
 import { TemplatesCatalogListTable } from "@/components/templates/templates-catalog-view.list";
+import {
+  TemplatesCatalogRail,
+  TemplatesCatalogWorkspaceHeader,
+} from "@/components/templates/templates-catalog-workspace";
 import styles from "@/components/templates/templates-catalog.module.css";
 import { useAdminTemplateCatalog } from "@/components/templates/use-admin-template-catalog";
 import { useAdminTemplateCategories } from "@/components/templates/use-admin-template-categories";
@@ -37,13 +39,15 @@ import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 type TemplatesCatalogViewProps = {
   locale: Locale;
-  templateType: TemplateType;
+  templateType?: TemplateType;
   initialCategory?: string;
 };
 
 type ViewMode = "cards" | "list";
 type ArchiveFilter = "active" | "archived";
 type AccessFilter = "all" | "premium" | "free";
+type VisibilityFilter = "all" | "public" | "qa_only";
+type ReadinessFilter = "all" | "ready" | "missing_preview";
 type SortMode = "newest" | "title" | "tokens";
 
 const TEMPLATE_CATALOG_SEARCH_MAX_LENGTH = 120;
@@ -92,8 +96,11 @@ export function TemplatesCatalogView({
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState(initialCategory?.trim() || "all");
   const [accessFilter, setAccessFilter] = useState<AccessFilter>("all");
+  const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>("all");
+  const [readinessFilter, setReadinessFilter] = useState<ReadinessFilter>("all");
   const [statusFilter, setStatusFilter] = useState<TemplateStatus | "all">("all");
   const [sortMode, setSortMode] = useState<SortMode>("newest");
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [page, setPage] = useState(1);
   const debouncedSearch = useDebouncedValue(search, 300);
   const effectiveStatusFilter =
@@ -110,6 +117,8 @@ export function TemplatesCatalogView({
       search: debouncedSearch,
       category: categoryFilter === "all" ? undefined : categoryFilter,
       access: accessFilter === "all" ? undefined : accessFilter,
+      visibility: visibilityFilter === "all" ? undefined : visibilityFilter,
+      readiness: readinessFilter === "all" ? undefined : readinessFilter,
       sort: sortMode,
       skip: (page - 1) * TEMPLATE_CATALOG_PAGE_SIZE,
       take: TEMPLATE_CATALOG_PAGE_SIZE,
@@ -121,8 +130,10 @@ export function TemplatesCatalogView({
       debouncedSearch,
       effectiveStatusFilter,
       page,
+      readinessFilter,
       sortMode,
       templateType,
+      visibilityFilter,
     ]
   );
   const {
@@ -136,6 +147,7 @@ export function TemplatesCatalogView({
     pageSkip,
     pageTake,
     refresh,
+    summary,
     templates,
     totalCount,
   } = useAdminTemplateCatalog({
@@ -257,10 +269,6 @@ export function TemplatesCatalogView({
     }
   }
 
-  const editorBasePath = `/${locale}/templates/${templateType === "Video" ? "video" : "image"}/editor`;
-  const testBasePath = `/${locale}/templates/${templateType === "Video" ? "video" : "image"}/test`;
-  const analyticsBasePath = `/${locale}/templates/${templateType === "Video" ? "video" : "image"}/analytics`;
-  const categoriesPath = `/${locale}/templates/categories`;
   const categoryOptions: SelectOption[] = useMemo(
     () => [
       { value: "all", label: copy.allCategories, tone: "neutral" },
@@ -276,6 +284,16 @@ export function TemplatesCatalogView({
     { value: "all", label: copy.allAccess, tone: "neutral" },
     { value: "premium", label: text.premiumLabel, tone: "premium" },
     { value: "free", label: text.freeLabel, tone: "recommended" },
+  ];
+  const visibilityOptions: SelectOption[] = [
+    { value: "all", label: copy.allVisibility, tone: "neutral" },
+    { value: "public", label: copy.publicVisibility, tone: "recommended" },
+    { value: "qa_only", label: copy.qaVisibility, tone: "fast" },
+  ];
+  const readinessOptions: SelectOption[] = [
+    { value: "all", label: copy.allReadiness, tone: "neutral" },
+    { value: "ready", label: copy.readyReadiness, tone: "recommended" },
+    { value: "missing_preview", label: copy.missingPreviewReadiness, tone: "fast" },
   ];
   const statusOptions: SelectOption[] = useMemo(
     () =>
@@ -341,6 +359,81 @@ export function TemplatesCatalogView({
     },
     [resetPendingTemplateAction]
   );
+  const activeFilterCount = useMemo(
+    () =>
+      [
+        search.trim().length > 0,
+        categoryFilter !== "all",
+        accessFilter !== "all",
+        visibilityFilter !== "all",
+        readinessFilter !== "all",
+        statusFilter !== "all",
+        archiveFilter === "archived",
+      ].filter(Boolean).length,
+    [
+      accessFilter,
+      archiveFilter,
+      categoryFilter,
+      readinessFilter,
+      search,
+      statusFilter,
+      visibilityFilter,
+    ]
+  );
+  const hasCatalogFilters = activeFilterCount > 0;
+
+  function resetCatalogFilters() {
+    if (isCatalogInteractionLocked) {
+      return;
+    }
+
+    setActionError(null);
+    setSearch("");
+    setCategoryFilter("all");
+    setAccessFilter("all");
+    setVisibilityFilter("all");
+    setReadinessFilter("all");
+    setStatusFilter("all");
+    setArchiveFilter("active");
+    setSortMode("newest");
+    resetCatalogContext();
+  }
+
+  function showDraftTemplates() {
+    if (isCatalogInteractionLocked) {
+      return;
+    }
+
+    setArchiveFilter("active");
+    setStatusFilter("Draft");
+    setReadinessFilter("all");
+    setVisibilityFilter("all");
+    resetCatalogContext();
+  }
+
+  function showTemplatesMissingPreview() {
+    if (isCatalogInteractionLocked) {
+      return;
+    }
+
+    setArchiveFilter("active");
+    setStatusFilter("all");
+    setReadinessFilter("missing_preview");
+    setVisibilityFilter("all");
+    resetCatalogContext();
+  }
+
+  function showQaOnlyTemplates() {
+    if (isCatalogInteractionLocked) {
+      return;
+    }
+
+    setArchiveFilter("active");
+    setStatusFilter("all");
+    setReadinessFilter("all");
+    setVisibilityFilter("qa_only");
+    resetCatalogContext();
+  }
   useEffect(() => {
     let isActive = true;
     if (!isFetching && currentPage > totalPages) {
@@ -398,6 +491,7 @@ export function TemplatesCatalogView({
       return;
     }
 
+    setActionError(null);
     void refresh().catch(() => undefined);
   }
 
@@ -410,6 +504,13 @@ export function TemplatesCatalogView({
   if (!canViewTemplates || isLoading) {
     return (
       <AdminPage className={styles.catalogPage}>
+        <TemplatesCatalogWorkspaceHeader
+          canManageTemplates={false}
+          copy={copy}
+          locale={locale}
+          summary={null}
+          templateType={templateType}
+        />
         <AdminPageGrid
           columns="four"
           className={styles.loadingGrid}
@@ -426,24 +527,20 @@ export function TemplatesCatalogView({
 
   return (
     <AdminPage className={styles.catalogPage}>
-      <AdminToolbar className={styles.catalogActions}>
-        {canManageTemplates ? (
-          <Link href={categoriesPath} className={styles.secondaryLink}>
-            {copy.manageCategories}
-          </Link>
-        ) : null}
-        {canManageTemplates ? (
-          <Link href={editorBasePath} className={styles.primaryLink}>
-            {copy.createTemplate}
-          </Link>
-        ) : null}
-      </AdminToolbar>
+      <TemplatesCatalogWorkspaceHeader
+        canManageTemplates={canManageTemplates}
+        copy={copy}
+        locale={locale}
+        summary={summary}
+        templateType={templateType}
+      />
 
-      <div className={styles.tabRow} role="tablist" aria-label={copy.archiveTabsLabel}>
+      <div className={styles.tabRow} role="group" aria-label={copy.archiveTabsLabel}>
         <button
           type="button"
           className={archiveFilter === "active" ? styles.tabActive : styles.tab}
-          disabled={archiveFilter === "active" || isCatalogInteractionLocked}
+          aria-pressed={archiveFilter === "active"}
+          disabled={isCatalogInteractionLocked}
           onClick={() => {
             setArchiveFilter("active");
             setStatusFilter("all");
@@ -455,7 +552,8 @@ export function TemplatesCatalogView({
         <button
           type="button"
           className={archiveFilter === "archived" ? styles.tabActive : styles.tab}
-          disabled={archiveFilter === "archived" || isCatalogInteractionLocked}
+          aria-pressed={archiveFilter === "archived"}
+          disabled={isCatalogInteractionLocked}
           onClick={() => {
             setArchiveFilter("archived");
             setStatusFilter("all");
@@ -505,125 +603,202 @@ export function TemplatesCatalogView({
 
       <div className={styles.catalogShell}>
         <div className={styles.catalogMain}>
-          <AdminFilterBar className={styles.filtersBar}>
-            <label className={styles.searchField}>
-              <span className={styles.visuallyHidden}>{copy.searchLabel}</span>
-              <input
-                value={search}
-                onChange={(event) => {
-                  setSearch(event.target.value.slice(0, TEMPLATE_CATALOG_SEARCH_MAX_LENGTH));
-                  resetCatalogContext();
-                }}
-                maxLength={TEMPLATE_CATALOG_SEARCH_MAX_LENGTH}
-                placeholder={copy.searchPlaceholder}
-                disabled={isCatalogInteractionLocked}
-              />
-            </label>
+          <div className={styles.filtersDock} aria-label={copy.filtersLabel}>
+            <div className={styles.filterLeadRow}>
+              <label className={styles.searchField}>
+                <span className={styles.visuallyHidden}>{copy.searchLabel}</span>
+                <input
+                  value={search}
+                  onChange={(event) => {
+                    setActionError(null);
+                    setSearch(event.target.value.slice(0, TEMPLATE_CATALOG_SEARCH_MAX_LENGTH));
+                    resetCatalogContext();
+                  }}
+                  maxLength={TEMPLATE_CATALOG_SEARCH_MAX_LENGTH}
+                  placeholder={copy.searchPlaceholder}
+                  disabled={isCatalogInteractionLocked}
+                />
+              </label>
 
-            <label className={styles.selectField}>
-              <span>{text.categoryLabel}</span>
-              <Select
-                value={categoryFilter}
-                options={categoryOptions}
-                ariaLabel={text.categoryLabel}
-                disabled={isCatalogInteractionLocked}
-                onChange={(value) => {
-                  setCategoryFilter(value);
-                  resetCatalogContext();
-                }}
-              />
-            </label>
-
-            <label className={styles.selectField}>
-              <span>{copy.accessLabel}</span>
-              <Select
-                value={accessFilter}
-                options={accessOptions}
-                ariaLabel={copy.accessLabel}
-                disabled={isCatalogInteractionLocked}
-                onChange={(value) => {
-                  setAccessFilter(value as AccessFilter);
-                  resetCatalogContext();
-                }}
-              />
-            </label>
-
-            <label className={styles.selectField}>
-              <span>{text.statusLabel}</span>
-              <Select
-                value={statusFilter}
-                options={statusOptions}
-                ariaLabel={text.statusLabel}
-                disabled={isCatalogInteractionLocked}
-                onChange={(value) => {
-                  setStatusFilter(value as TemplateStatus | "all");
-                  resetCatalogContext();
-                }}
-              />
-            </label>
-
-            <label className={styles.selectField}>
-              <span>{copy.sortLabel}</span>
-              <Select
-                value={sortMode}
-                options={sortOptions}
-                ariaLabel={copy.sortLabel}
-                showSelectedDescription={false}
-                disabled={isCatalogInteractionLocked}
-                onChange={(value) => {
-                  setSortMode(value as SortMode);
-                  resetCatalogContext();
-                }}
-              />
-            </label>
-
-            <div className={styles.viewToggleShell}>
-              <span className={styles.viewToggleCaption}>{copy.viewToggleLabel}</span>
-              <div className={styles.viewToggle} role="group" aria-label={copy.viewToggleLabel}>
-                <button
+              <div className={styles.filterUtilities}>
+                <Button
                   type="button"
-                  className={viewMode === "cards" ? styles.viewButtonActive : styles.viewButton}
-                  aria-pressed={viewMode === "cards"}
-                  disabled={viewMode === "cards" || isCatalogInteractionLocked}
-                  onClick={() => setViewMode("cards")}
+                  variant="secondary"
+                  className={styles.mobileFiltersToggle}
+                  aria-expanded={filtersExpanded}
+                  aria-controls="template-catalog-advanced-filters"
+                  disabled={isCatalogInteractionLocked}
+                  onClick={() => setFiltersExpanded((current) => !current)}
                 >
-                  <span
-                    className={`${styles.viewButtonGlyph} ${styles.viewButtonGlyphCards}`}
-                    aria-hidden="true"
-                  >
-                    <span />
-                    <span />
-                    <span />
-                    <span />
-                  </span>
-                  <span>{copy.cardsView}</span>
-                </button>
-                <button
+                  {filtersExpanded ? copy.hideFilters : copy.showFilters}
+                  {activeFilterCount > 0 ? (
+                    <span
+                      className={styles.activeFilterCount}
+                      aria-label={copy.activeFilters(activeFilterCount)}
+                    >
+                      {activeFilterCount}
+                    </span>
+                  ) : null}
+                </Button>
+                <Button
                   type="button"
-                  className={viewMode === "list" ? styles.viewButtonActive : styles.viewButton}
-                  aria-pressed={viewMode === "list"}
-                  disabled={viewMode === "list" || isCatalogInteractionLocked}
-                  onClick={() => setViewMode("list")}
+                  variant="secondary"
+                  disabled={!hasCatalogFilters || isCatalogInteractionLocked}
+                  onClick={resetCatalogFilters}
                 >
-                  <span
-                    className={`${styles.viewButtonGlyph} ${styles.viewButtonGlyphList}`}
-                    aria-hidden="true"
+                  {copy.resetFilters}
+                </Button>
+                <div className={styles.viewToggle} role="group" aria-label={copy.viewToggleLabel}>
+                  <button
+                    type="button"
+                    className={viewMode === "cards" ? styles.viewButtonActive : styles.viewButton}
+                    aria-pressed={viewMode === "cards"}
+                    disabled={isCatalogInteractionLocked}
+                    onClick={() => setViewMode("cards")}
                   >
-                    <span />
-                    <span />
-                    <span />
-                  </span>
-                  <span>{copy.listView}</span>
-                </button>
+                    <span
+                      className={`${styles.viewButtonGlyph} ${styles.viewButtonGlyphCards}`}
+                      aria-hidden="true"
+                    >
+                      <span />
+                      <span />
+                      <span />
+                      <span />
+                    </span>
+                    <span>{copy.cardsView}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={viewMode === "list" ? styles.viewButtonActive : styles.viewButton}
+                    aria-pressed={viewMode === "list"}
+                    disabled={isCatalogInteractionLocked}
+                    onClick={() => setViewMode("list")}
+                  >
+                    <span
+                      className={`${styles.viewButtonGlyph} ${styles.viewButtonGlyphList}`}
+                      aria-hidden="true"
+                    >
+                      <span />
+                      <span />
+                      <span />
+                    </span>
+                    <span>{copy.listView}</span>
+                  </button>
+                </div>
               </div>
             </div>
-          </AdminFilterBar>
+
+            <AdminFilterBar
+              className={`${styles.filtersBar}${filtersExpanded ? ` ${styles.filtersBarExpanded}` : ""}`}
+            >
+              <div id="template-catalog-advanced-filters" className={styles.advancedFilters}>
+                <label className={styles.selectField}>
+                  <span>{text.statusLabel}</span>
+                  <Select
+                    value={statusFilter}
+                    options={statusOptions}
+                    ariaLabel={text.statusLabel}
+                    disabled={isCatalogInteractionLocked}
+                    onChange={(value) => {
+                      setStatusFilter(value as TemplateStatus | "all");
+                      resetCatalogContext();
+                    }}
+                  />
+                </label>
+
+                <label className={styles.selectField}>
+                  <span>{text.categoryLabel}</span>
+                  <Select
+                    value={categoryFilter}
+                    options={categoryOptions}
+                    ariaLabel={text.categoryLabel}
+                    disabled={isCatalogInteractionLocked}
+                    onChange={(value) => {
+                      setCategoryFilter(value);
+                      resetCatalogContext();
+                    }}
+                  />
+                </label>
+
+                <label className={styles.selectField}>
+                  <span>{copy.accessLabel}</span>
+                  <Select
+                    value={accessFilter}
+                    options={accessOptions}
+                    ariaLabel={copy.accessLabel}
+                    disabled={isCatalogInteractionLocked}
+                    onChange={(value) => {
+                      setAccessFilter(value as AccessFilter);
+                      resetCatalogContext();
+                    }}
+                  />
+                </label>
+
+                <label className={styles.selectField}>
+                  <span>{copy.visibilityLabel}</span>
+                  <Select
+                    value={visibilityFilter}
+                    options={visibilityOptions}
+                    ariaLabel={copy.visibilityLabel}
+                    disabled={isCatalogInteractionLocked}
+                    onChange={(value) => {
+                      setVisibilityFilter(value as VisibilityFilter);
+                      resetCatalogContext();
+                    }}
+                  />
+                </label>
+
+                <label className={styles.selectField}>
+                  <span>{copy.readinessLabel}</span>
+                  <Select
+                    value={readinessFilter}
+                    options={readinessOptions}
+                    ariaLabel={copy.readinessLabel}
+                    disabled={isCatalogInteractionLocked}
+                    onChange={(value) => {
+                      setReadinessFilter(value as ReadinessFilter);
+                      resetCatalogContext();
+                    }}
+                  />
+                </label>
+
+                <label className={styles.selectField}>
+                  <span>{copy.sortLabel}</span>
+                  <Select
+                    value={sortMode}
+                    options={sortOptions}
+                    ariaLabel={copy.sortLabel}
+                    showSelectedDescription={false}
+                    disabled={isCatalogInteractionLocked}
+                    onChange={(value) => {
+                      setSortMode(value as SortMode);
+                      resetCatalogContext();
+                    }}
+                  />
+                </label>
+              </div>
+            </AdminFilterBar>
+          </div>
           {isCatalogRefreshing ? (
             <AdminStateCard tone="info" className={styles.empty} title={text.loading} />
-          ) : !templates.length ? (
-            <AdminStateCard tone="info" className={styles.empty} title={text.noTemplates} />
+          ) : hasError && !templates.length ? null : !templates.length ? (
+            <AdminStateCard
+              tone="info"
+              className={styles.empty}
+              title={hasCatalogFilters ? copy.filteredEmptyTitle : copy.catalogEmptyTitle}
+              description={
+                hasCatalogFilters ? copy.filteredEmptyDescription : copy.catalogEmptyDescription
+              }
+              action={
+                hasCatalogFilters ? (
+                  <Button type="button" variant="secondary" onClick={resetCatalogFilters}>
+                    {copy.resetFilters}
+                  </Button>
+                ) : undefined
+              }
+            />
           ) : viewMode === "cards" ? (
-            <div className={styles.cardGrid} aria-busy={isFetching ? "true" : undefined}>
+            <div className={styles.cardGrid} aria-busy={isCatalogFetching ? "true" : undefined}>
               {templates.map((template) => (
                 <TemplateCatalogCard
                   key={template.templateId}
@@ -631,9 +806,6 @@ export function TemplatesCatalogView({
                   copy={copy}
                   template={template}
                   analytics={getAnalyticsRow(template.templateId)}
-                  editorBasePath={editorBasePath}
-                  analyticsBasePath={analyticsBasePath}
-                  testBasePath={testBasePath}
                   busyTemplateId={
                     isCatalogInteractionLocked ? (busyTemplateId ?? "__refresh__") : null
                   }
@@ -645,18 +817,15 @@ export function TemplatesCatalogView({
             </div>
           ) : (
             <TemplatesCatalogListTable
-              analyticsBasePath={analyticsBasePath}
               canManageTemplates={canManageTemplates}
               copy={copy}
-              editorBasePath={editorBasePath}
               getAnalyticsRow={getAnalyticsRow}
               isCatalogInteractionLocked={isCatalogInteractionLocked}
-              isFetching={isFetching}
+              isFetching={isCatalogFetching}
               locale={locale}
               onDeleteTemplate={requestDeleteTemplate}
               onStatusChange={requestStatusChange}
               templates={templates}
-              testBasePath={testBasePath}
               text={text}
             />
           )}
@@ -668,7 +837,7 @@ export function TemplatesCatalogView({
                   type="button"
                   variant="secondary"
                   size="sm"
-                  disabled={currentPage <= 1 || isFetching}
+                  disabled={currentPage <= 1 || isCatalogFetching}
                   aria-label={copy.previousPageLabel}
                   title={copy.previousPageLabel}
                   onClick={() => resetCatalogContext(Math.max(1, currentPage - 1))}
@@ -681,7 +850,8 @@ export function TemplatesCatalogView({
                     type="button"
                     variant={pageNumber === currentPage ? "primary" : "secondary"}
                     size="sm"
-                    disabled={isFetching}
+                    disabled={isCatalogFetching}
+                    aria-current={pageNumber === currentPage ? "page" : undefined}
                     onClick={() => resetCatalogContext(pageNumber)}
                   >
                     {pageNumber}
@@ -691,7 +861,7 @@ export function TemplatesCatalogView({
                   type="button"
                   variant="secondary"
                   size="sm"
-                  disabled={currentPage >= totalPages || !hasMore || isFetching}
+                  disabled={currentPage >= totalPages || !hasMore || isCatalogFetching}
                   aria-label={copy.nextPageLabel}
                   title={copy.nextPageLabel}
                   onClick={() => resetCatalogContext(currentPage + 1)}
@@ -702,6 +872,14 @@ export function TemplatesCatalogView({
             </div>
           ) : null}
         </div>
+        <TemplatesCatalogRail
+          copy={copy}
+          locale={locale}
+          summary={summary}
+          onShowDrafts={showDraftTemplates}
+          onShowMissingPreview={showTemplatesMissingPreview}
+          onShowQaOnly={showQaOnlyTemplates}
+        />
       </div>
       <TemplatesCatalogDialogs
         copy={copy}

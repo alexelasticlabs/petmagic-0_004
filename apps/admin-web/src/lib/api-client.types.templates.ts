@@ -14,6 +14,8 @@ export type TemplateGenerationJobStatus =
 export type AdminGenerationStatus =
   "Pending" | "Running" | "Completed" | "Failed" | "Cancelled" | "Retrying" | "Cancelling";
 
+export type AdminGenerationRefundState = "not_applicable" | "pending" | "exhausted" | "refunded";
+
 export type TemplateGenerationResponse = {
   generationId: string;
 
@@ -132,6 +134,28 @@ export type AdminTemplateCatalogPage = {
   totalCount: number;
 
   hasMore: boolean;
+
+  summary: AdminTemplateCatalogSummary;
+};
+
+export type AdminTemplateCatalogSummary = {
+  totalTemplates: number;
+
+  imageTemplates: number;
+
+  videoTemplates: number;
+
+  activeTemplates: number;
+
+  draftTemplates: number;
+
+  archivedTemplates: number;
+
+  premiumTemplates: number;
+
+  qaOnlyTemplates: number;
+
+  missingPreviewTemplates: number;
 };
 
 export type AdminTemplateOfTheDay = {
@@ -182,6 +206,16 @@ export type AdminTemplateOfTheDaySchedule = {
   take: number;
 
   totalCount: number;
+
+  hasMore: boolean;
+
+  generatedAtUtc: string;
+};
+
+export type TemplateOfTheDayScheduleQuery = {
+  skip?: number;
+
+  take?: number;
 };
 
 export type AdminTemplateOfTheDaySettings = {
@@ -190,6 +224,8 @@ export type AdminTemplateOfTheDaySettings = {
   allowedTypes: "both" | "image" | "video";
 
   excludeRecentDays: number;
+
+  businessDate?: string;
 
   updatedAtUtc: string;
 
@@ -506,6 +542,30 @@ export type AdminModerationQueueItem = {
   createdAtUtc: string;
 
   moderatedAtUtc?: string | null;
+
+  leaseOwnerUserId?: string | null;
+
+  leaseClaimedAtUtc?: string | null;
+
+  leaseExpiresAtUtc?: string | null;
+
+  version?: number;
+};
+
+export type AdminModerationQueueSummary = {
+  pendingCount: number;
+
+  approvedCount: number;
+
+  rejectedCount: number;
+
+  pendingComplaintsCount: number;
+
+  pendingFeedbackCount: number;
+
+  oldestPendingAtUtc?: string | null;
+
+  generatedAtUtc: string;
 };
 
 export type AdminModerationQueuePage = {
@@ -520,6 +580,8 @@ export type AdminModerationQueuePage = {
   hasMore: boolean;
 
   generatedAtUtc: string;
+
+  summary?: AdminModerationQueueSummary | null;
 };
 
 export type AdminModerationQueueQuery = {
@@ -571,6 +633,8 @@ export type AdminTemplatesAnalyticsQuery = {
 
   templateType?: TemplateType | "All";
 
+  templateIds?: string[];
+
   category?: string;
 
   status?: TemplateStatus | "All";
@@ -578,6 +642,8 @@ export type AdminTemplatesAnalyticsQuery = {
   access?: "all" | "free" | "premium";
 
   sort?: "views" | "starts" | "conversion" | "cost" | "tokens" | "updated";
+
+  skip?: number;
 
   take?: number;
 };
@@ -717,6 +783,14 @@ export type AdminTemplatesAnalyticsOverview = {
 
   templates: AdminTemplatesAnalyticsTemplateRow[];
 
+  skip: number;
+
+  take: number;
+
+  totalCount: number;
+
+  hasMore: boolean;
+
   availableCategories: string[];
 
   generatedAtUtc: string;
@@ -750,6 +824,10 @@ export type AdminTemplateGenerationDashboardMetrics = {
   cancellingJobs: number;
 
   retryingJobs: number;
+
+  pendingRefunds: number;
+
+  exhaustedRefunds: number;
 
   generatedAtUtc: string;
 };
@@ -790,6 +868,20 @@ export type AdminTemplateGenerationListItem = {
   completedAtUtc?: string | null;
 
   refundedAtUtc?: string | null;
+
+  chargedAtUtc?: string | null;
+
+  refundState: AdminGenerationRefundState;
+
+  refundAttemptCount: number;
+
+  refundAttemptLimit: number;
+
+  refundLastAttemptedAtUtc?: string | null;
+
+  refundLastErrorCode?: string | null;
+
+  canRetryRefund: boolean;
 
   isWatermarkRequired: boolean;
 
@@ -865,6 +957,8 @@ export type AdminGamificationLegacyDeliveryResolutionResponse = {
 export type AdminTemplateGenerationsQuery = {
   status?: AdminGenerationStatus | "All";
 
+  refundState?: AdminGenerationRefundState | "all";
+
   provider?: string;
 
   user?: string;
@@ -886,6 +980,12 @@ export type AdminTemplateGenerationsPage = {
   take: number;
 
   hasMore: boolean;
+
+  generatedAtUtc: string;
+};
+
+export type AdminGenerationDetail = {
+  generation: AdminTemplateGenerationListItem;
 
   generatedAtUtc: string;
 };
