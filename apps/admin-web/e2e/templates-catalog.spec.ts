@@ -373,6 +373,32 @@ function validateBearer(route: Route, state: CatalogApiState) {
 }
 
 async function installStrictCatalogMocks(page: Page, state: CatalogApiState) {
+  await page.route(`${apiOrigin}/api/admin/support/tickets/metrics`, async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const method = request.method();
+
+    if (method === "OPTIONS") {
+      await fulfillPreflight(route);
+      return;
+    }
+
+    validateBearer(route, state);
+    if (method !== "GET") {
+      state.unexpectedRequests.push(`${method} ${url.pathname}${url.search}`);
+      await fulfillJson(route, { code: "e2e.unexpected_support_metrics_request" }, 501);
+      return;
+    }
+
+    await fulfillJson(route, {
+      totalConversations: 0,
+      openConversations: 0,
+      closedConversations: 0,
+      unassignedConversations: 0,
+      unreadForAdminConversations: 0,
+    });
+  });
+
   await page.route(`${apiOrigin}/api/admin/templates/**`, async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -384,6 +410,57 @@ async function installStrictCatalogMocks(page: Page, state: CatalogApiState) {
     }
 
     validateBearer(route, state);
+
+    if (url.pathname === "/api/admin/templates/moderation" && method === "GET") {
+      validateQueryKeys(url, ["status", "take"], state);
+      if (url.searchParams.get("status") !== "pending" || url.searchParams.get("take") !== "1") {
+        state.contractViolations.push(
+          `${url.pathname}${url.search} used an unexpected shell moderation query.`
+        );
+      }
+      await fulfillJson(route, {
+        items: [],
+        skip: 0,
+        take: 1,
+        totalCount: 0,
+        hasMore: false,
+        generatedAtUtc: "2026-07-27T00:00:00Z",
+        summary: {
+          pendingCount: 0,
+          approvedCount: 0,
+          rejectedCount: 0,
+          pendingComplaintsCount: 0,
+          pendingFeedbackCount: 0,
+          oldestPendingAtUtc: null,
+          generatedAtUtc: "2026-07-27T00:00:00Z",
+        },
+      });
+      return;
+    }
+
+    if (url.pathname === "/api/admin/templates/generations/metrics" && method === "GET") {
+      validateQueryKeys(url, [], state);
+      await fulfillJson(route, {
+        totalJobs: 0,
+        generationsToday: 0,
+        generationsThisWeek: 0,
+        generationsThisMonth: 0,
+        failedGenerationsToday: 0,
+        failedGenerationsThisWeek: 0,
+        failedGenerationsThisMonth: 0,
+        pendingJobs: 0,
+        runningJobs: 0,
+        completedJobs: 0,
+        failedJobs: 0,
+        cancelledJobs: 0,
+        cancellingJobs: 0,
+        retryingJobs: 0,
+        pendingRefunds: 0,
+        exhaustedRefunds: 0,
+        generatedAtUtc: "2026-07-27T00:00:00Z",
+      });
+      return;
+    }
 
     if (url.pathname === "/api/admin/templates/categories/" && method === "GET") {
       validateQueryKeys(url, ["includeArchived"], state);
