@@ -102,6 +102,18 @@ describe("generation control response parser", () => {
     expect(parsed).not.toHaveProperty("secret");
   });
 
+  it("accepts an unconfigured fal.ai concurrency limit so an admin can configure it", () => {
+    const snapshot = createSnapshot();
+    snapshot.settings.falConfiguredConcurrency = 0;
+    snapshot.fal.configuredConcurrency = 0;
+    snapshot.fal.usableConcurrency = 0;
+
+    const parsed = parseAdminGenerationControlSnapshot(snapshot);
+
+    expect(parsed.settings.falConfiguredConcurrency).toBe(0);
+    expect(parsed.fal.configuredConcurrency).toBe(0);
+  });
+
   it("rejects malformed nested data instead of rendering an unsafe partial model", () => {
     const snapshot = createSnapshot();
     snapshot.settings.globalMaxConcurrent = Number.NaN;

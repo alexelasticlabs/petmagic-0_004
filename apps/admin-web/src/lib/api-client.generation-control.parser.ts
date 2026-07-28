@@ -94,7 +94,7 @@ function settings(value: unknown): AdminGenerationControlSettings {
     falConfiguredConcurrency: number(
       item.falConfiguredConcurrency,
       "settings.falConfiguredConcurrency",
-      { integer: true, min: 1 }
+      { integer: true, min: 0 }
     ),
     falReservedConcurrency: number(item.falReservedConcurrency, "settings.falReservedConcurrency", {
       integer: true,
@@ -150,7 +150,7 @@ function fal(value: unknown): AdminFalGenerationCapacity {
   return {
     configuredConcurrency: number(item.configuredConcurrency, "fal.configuredConcurrency", {
       integer: true,
-      min: 1,
+      min: 0,
     }),
     reservedConcurrency: number(item.reservedConcurrency, "fal.reservedConcurrency", {
       integer: true,
