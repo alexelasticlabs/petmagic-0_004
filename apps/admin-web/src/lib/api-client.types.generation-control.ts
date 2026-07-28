@@ -37,6 +37,12 @@ export type AdminGenerationControlStatus = {
 };
 
 export type AdminFalGenerationCapacity = {
+  configuredProvider?: string;
+  isEnabled?: boolean;
+  billingAdminKeyConfigured?: boolean | null;
+  lastErrorCode?: string | null;
+  consecutiveFailures?: number;
+  lastAttemptSucceeded?: boolean | null;
   configuredConcurrency: number;
   reservedConcurrency: number;
   usableConcurrency: number;

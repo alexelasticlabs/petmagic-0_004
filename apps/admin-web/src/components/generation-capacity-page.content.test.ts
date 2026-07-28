@@ -27,6 +27,16 @@ describe("generation capacity copy", () => {
       expect(copy.settings.groups).toHaveProperty("balance");
       expect(copy.settings.presetValues).toContain("Global 8");
       expect(copy.settings.presetValues).toContain("fal.ai 10−2");
+      expect(copy.settings.edit).toEqual(expect.any(String));
+      expect(copy.fal.verificationChecks).toHaveLength(3);
+      expect(copy.fal.verificationDescription).toMatch(/5 seconds|5 секунд/iu);
+      expect(copy.fal.topUpBalance).toEqual(expect.any(String));
+      expect(copy.fal.lastConfirmedBalance).toEqual(expect.any(String));
+      expect(copy.fal.lastAttemptStale).toEqual(expect.any(String));
+      expect(copy.fal.diagnostics.admin_scope_required).toMatchObject({
+        title: expect.any(String),
+        description: expect.any(String),
+      });
       expect(copy.render.setupVariables).toContain("RENDER_API_KEY");
     }
   });

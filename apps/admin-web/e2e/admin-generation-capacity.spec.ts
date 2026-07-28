@@ -61,6 +61,12 @@ function snapshot(): AdminGenerationControlSnapshot {
       health: "healthy",
     },
     fal: {
+      configuredProvider: "Fal",
+      isEnabled: true,
+      billingAdminKeyConfigured: true,
+      lastErrorCode: null,
+      consecutiveFailures: 0,
+      lastAttemptSucceeded: true,
       configuredConcurrency: 10,
       reservedConcurrency: 2,
       usableConcurrency: 8,
@@ -143,6 +149,12 @@ function degradedSetupSnapshot(): AdminGenerationControlSnapshot {
     health: "critical",
   };
   state.fal = {
+    configuredProvider: "Fal",
+    isEnabled: true,
+    billingAdminKeyConfigured: true,
+    lastErrorCode: "admin_scope_required",
+    consecutiveFailures: 3,
+    lastAttemptSucceeded: false,
     configuredConcurrency: 0,
     reservedConcurrency: 1,
     usableConcurrency: 0,
@@ -219,6 +231,44 @@ function degradedSetupSnapshot(): AdminGenerationControlSnapshot {
   return state;
 }
 
+function fakeProviderSnapshot(): AdminGenerationControlSnapshot {
+  const state = snapshot();
+  state.fal = {
+    ...state.fal,
+    configuredProvider: "Fake",
+    isEnabled: false,
+    billingAdminKeyConfigured: false,
+    configuredConcurrency: 0,
+    usableConcurrency: 0,
+    inflightRequests: 0,
+    balanceUsd: null,
+    balanceStatus: "unknown",
+    checkedAtUtc: null,
+    lastSuccessAtUtc: null,
+    isStale: false,
+    providerSubmissionsAllowed: true,
+    submissionBlockReason: null,
+    lastErrorCode: null,
+    consecutiveFailures: 0,
+    lastAttemptSucceeded: false,
+  };
+  state.workers = Array.from({ length: 4 }, (_, index) => ({
+    instanceId: `fake-worker-${index + 1}`,
+    lastSeenAtUtc: "2026-07-28T10:01:00Z",
+    heartbeatAgeSeconds: 2,
+    appliedSettingsVersion: 3,
+    configuredLoops: 2,
+    isStale: false,
+    isConfigCurrent: true,
+    isDraining: false,
+  }));
+  state.render = state.render
+    ? { ...state.render, desiredInstances: 4, activeInstances: 4 }
+    : state.render;
+  state.alerts = [];
+  return state;
+}
+
 function cors(route: Route) {
   return {
     "Access-Control-Allow-Origin": route.request().headers().origin ?? "http://127.0.0.1",
@@ -244,6 +294,7 @@ async function installMocks(
     roles?: string[];
     scaleConflictOnce?: boolean;
     settingsConflictOnce?: boolean;
+    providerRefreshFailure?: boolean;
     initialState?: AdminGenerationControlSnapshot;
   } = {}
 ) {
@@ -275,7 +326,38 @@ async function installMocks(
       return;
     }
     if (url.pathname.endsWith("/provider/refresh")) {
-      state = { ...state, fal: { ...state.fal, balanceUsd: 19.5 } };
+      if (options.providerRefreshFailure) {
+        state = {
+          ...state,
+          fal: {
+            ...state.fal,
+            balanceStatus: "unknown",
+            checkedAtUtc: "2026-07-28T10:04:00Z",
+            isStale: true,
+            providerSubmissionsAllowed: false,
+            submissionBlockReason: "balance_unknown",
+            lastErrorCode: "admin_scope_required",
+            consecutiveFailures: 1,
+            lastAttemptSucceeded: false,
+          },
+        };
+        await json(route, state);
+        return;
+      }
+      state = {
+        ...state,
+        fal: {
+          ...state.fal,
+          balanceUsd: 19.5,
+          balanceStatus: "healthy",
+          checkedAtUtc: "2026-07-28T10:02:00Z",
+          lastSuccessAtUtc: "2026-07-28T10:02:00Z",
+          isStale: false,
+          lastErrorCode: null,
+          consecutiveFailures: 0,
+          lastAttemptSucceeded: true,
+        },
+      };
       await json(route, state);
       return;
     }
@@ -418,12 +500,28 @@ test("admin reviews versioned runtime settings and acknowledges a persistent ale
   await expect(
     page.getByRole("heading", { name: "Generation capacity", exact: true })
   ).toBeVisible();
+  await page.getByRole("tab", { name: "fal.ai", exact: true }).click();
+  await expect(page).toHaveURL(/section=fal/);
+  await page.reload();
+  await expect(page.getByRole("tab", { name: "fal.ai", exact: true })).toHaveAttribute(
+    "aria-selected",
+    "true"
+  );
+  await page.getByRole("tab", { name: "fal.ai", exact: true }).focus();
+  await page.keyboard.press("Home");
+  await expect(page.getByRole("tab", { name: "Overview", exact: true })).toHaveAttribute(
+    "aria-selected",
+    "true"
+  );
+  await page.keyboard.press("End");
+  await expect(page.getByRole("tab", { name: /Alerts/ })).toHaveAttribute("aria-selected", "true");
+  await page.getByRole("tab", { name: "fal.ai", exact: true }).click();
   await expect(page.getByText("$20.00", { exact: true })).toBeVisible();
-  await page
-    .locator("#generation-fal")
-    .getByRole("button", { name: "Check balance", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Check connection and balance", exact: true }).click();
   await expect(page.getByText("$19.50", { exact: true })).toBeVisible();
+  await expect(page.getByText("Last check succeeded", { exact: true })).toBeVisible();
+  await page.getByRole("tab", { name: "Limits", exact: true }).click();
+  await page.getByRole("button", { name: "Edit limits", exact: true }).click();
   await page.getByRole("spinbutton", { name: "Global limit" }).fill("7");
   await page.getByRole("button", { name: "Review changes" }).click();
   const dialog = page.getByRole("dialog", { name: "Confirm runtime settings" });
@@ -437,6 +535,7 @@ test("admin reviews versioned runtime settings and acknowledges a persistent ale
     expectedVersion: 3,
     globalMaxConcurrent: 7,
   });
+  await page.getByRole("tab", { name: /Alerts/ }).click();
   await page
     .getByRole("button", { name: /^Mark as read:/ })
     .last()
@@ -444,11 +543,69 @@ test("admin reviews versioned runtime settings and acknowledges a persistent ale
   await expect(page.getByText("Read", { exact: true })).toBeVisible();
 });
 
+test("failed billing refresh keeps the old amount explicitly historical", async ({ page }) => {
+  await installMocks(page, { providerRefreshFailure: true });
+  await page.setViewportSize({ width: 1440, height: 960 });
+  await login(page, "ru");
+  await page.goto("/ru/generations/capacity?section=fal");
+
+  await page.getByRole("button", { name: "Проверить подключение и баланс", exact: true }).click();
+
+  await expect(page.getByText("Последняя проверка не прошла", { exact: true })).toBeVisible();
+  await expect(page.getByText("Ключ не имеет ADMIN scope", { exact: true })).toBeVisible();
+  await expect(page.getByText("Последний подтверждённый баланс", { exact: true })).toBeVisible();
+  await expect(page.getByText("$20.00", { exact: true })).toBeVisible();
+});
+
+test("critical balance offers a direct top-up action and keeps diagnostics available", async ({
+  page,
+}) => {
+  const criticalBalance = snapshot();
+  criticalBalance.fal = {
+    ...criticalBalance.fal,
+    balanceUsd: 4,
+    balanceStatus: "critical",
+    providerSubmissionsAllowed: false,
+    submissionBlockReason: "balance_critical",
+  };
+  await installMocks(page, { initialState: criticalBalance });
+  await login(page);
+  await page.goto("/ru/generations/capacity");
+
+  await expect(page.getByRole("link", { name: "Пополнить баланс", exact: true })).toHaveAttribute(
+    "href",
+    "https://fal.ai/dashboard/usage-billing/credits"
+  );
+  await expect(
+    page.getByRole("button", { name: "Открыть диагностику fal.ai", exact: true })
+  ).toBeVisible();
+});
+
+test("Fake provider removes fal.ai from effective capacity and next steps", async ({ page }) => {
+  await installMocks(page, { initialState: fakeProviderSnapshot() });
+  await page.setViewportSize({ width: 1440, height: 960 });
+  await login(page);
+  await page.goto("/en/generations/capacity");
+
+  const overview = page.locator("#generation-overview");
+  await expect(overview.getByText("Generations are operational", { exact: true })).toBeVisible();
+  await expect(overview.getByText("Effective capacity", { exact: true })).toBeVisible();
+  await expect(overview.getByText("fal.ai", { exact: true })).toHaveCount(0);
+  await expect(overview.getByText("fal.ai balance", { exact: true })).toHaveCount(0);
+  await page.getByRole("tab", { name: "fal.ai", exact: true }).click();
+  await expect(
+    page.getByText("The Fake provider is selected locally", { exact: false })
+  ).toBeVisible();
+  await expect(page.getByText("No check has run yet", { exact: true })).toBeVisible();
+});
+
 test("settings conflict keeps stale values blocked until the admin reloads", async ({ page }) => {
   const api = await installMocks(page, { settingsConflictOnce: true });
   await page.setViewportSize({ width: 1440, height: 960 });
   await login(page);
   await page.goto("/en/generations/capacity");
+  await page.getByRole("tab", { name: "Limits", exact: true }).click();
+  await page.getByRole("button", { name: "Edit limits", exact: true }).click();
   const globalMax = page.getByRole("spinbutton", { name: "Global limit" });
   await globalMax.fill("7");
   await page.getByRole("button", { name: "Review changes" }).click();
@@ -492,21 +649,6 @@ test("RU degraded setup explains the fal.ai gate, collapses stale workers, and p
   const primaryActionBox = await primaryAction.boundingBox();
   expect(primaryActionBox?.y ?? 961).toBeLessThan(960);
 
-  const staleHistory = page.locator("details").filter({
-    hasText: "Устаревшие heartbeats: 18",
-  });
-  await expect(staleHistory.locator("summary")).toBeVisible();
-  expect(await staleHistory.getAttribute("open")).toBeNull();
-  await expect(staleHistory.locator("li").first()).toBeHidden();
-  await staleHistory.locator("summary").click();
-  await expect(staleHistory.locator("li")).toHaveCount(18);
-  await expect(staleHistory.locator("li").first()).toBeVisible();
-
-  await expect(
-    page.getByText("Как включить ручное масштабирование", { exact: true })
-  ).toBeVisible();
-  await expect(page.getByText(/RENDER_API_KEY/).last()).toBeVisible();
-
   await primaryAction.click();
   await expect(
     page.getByRole("status").filter({
@@ -520,6 +662,29 @@ test("RU degraded setup explains the fal.ai gate, collapses stale workers, and p
   );
   await expect(page.getByRole("button", { name: "Проверить изменения" })).toBeEnabled();
   expect(api.getSettingsRequests()).toHaveLength(0);
+
+  await page.getByRole("tab", { name: "Workers и Render", exact: true }).click();
+  const staleHistory = page.locator("details").filter({
+    hasText: "Устаревшие heartbeats: 18",
+  });
+  await expect(staleHistory.locator("summary")).toBeVisible();
+  expect(await staleHistory.getAttribute("open")).toBeNull();
+  await expect(staleHistory.locator("li").first()).toBeHidden();
+  await staleHistory.locator("summary").click();
+  await expect(staleHistory.locator("li")).toHaveCount(18);
+  await expect(staleHistory.locator("li").first()).toBeVisible();
+
+  const renderSetup = page.locator("details").filter({
+    hasText: "Как включить ручное масштабирование",
+  });
+  await expect(renderSetup.locator("summary")).toBeVisible();
+  expect(await renderSetup.getAttribute("open")).toBeNull();
+
+  await page.getByRole("tab", { name: "fal.ai", exact: true }).click();
+  await expect(page.getByText("Ключ не имеет ADMIN scope", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Кнопка не запускает генерацию, не пополняет баланс", { exact: false })
+  ).toBeVisible();
 });
 
 for (const width of [390, 320]) {
@@ -533,13 +698,21 @@ for (const width of [390, 320]) {
       page.getByRole("heading", { name: "Отправка в fal.ai приостановлена", exact: true })
     ).toBeVisible();
     await expect(
-      page.getByRole("navigation", { name: "Разделы управления мощностью", exact: true })
+      page.getByRole("tablist", { name: "Разделы управления мощностью", exact: true })
     ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Настроить безопасный старт", exact: true })
     ).toBeVisible();
 
-    await page.locator("#generation-limits").scrollIntoViewIfNeeded();
+    await page.getByRole("button", { name: "Настроить безопасный старт", exact: true }).click();
+    const selectedTab = page.getByRole("tab", { name: "Лимиты", exact: true });
+    await expect(selectedTab).toHaveAttribute("aria-selected", "true");
+    const selectedTabBox = await selectedTab.boundingBox();
+    expect(selectedTabBox).not.toBeNull();
+    expect(selectedTabBox?.x ?? -1).toBeGreaterThanOrEqual(0);
+    expect((selectedTabBox?.x ?? 0) + (selectedTabBox?.width ?? width + 1)).toBeLessThanOrEqual(
+      width
+    );
     const globalLimit = page.getByRole("spinbutton", { name: "Общий лимит" });
     await expect(globalLimit).toBeVisible();
     const inputBox = await globalLimit.boundingBox();
@@ -575,6 +748,7 @@ test("Render conflict blocks retry until live topology is reloaded and reviewed"
   await page.setViewportSize({ width: 1440, height: 960 });
   await login(page);
   await page.goto("/en/generations/capacity");
+  await page.getByRole("tab", { name: "Workers & Render", exact: true }).click();
   await page.getByRole("button", { name: "Change instances" }).click();
   const dialog = page.getByRole("dialog", { name: "Confirm Render scaling" });
   await dialog.getByRole("combobox", { name: "Target instances" }).selectOption("4");
@@ -600,6 +774,7 @@ for (const width of [390, 320]) {
     await page.setViewportSize({ width, height: 844 });
     await login(page);
     await page.goto("/en/generations/capacity");
+    await page.getByRole("tab", { name: "Workers & Render", exact: true }).click();
     await page.getByRole("button", { name: "Change instances" }).click();
     const dialog = page.getByRole("dialog", { name: "Confirm Render scaling" });
     await dialog.getByRole("combobox", { name: "Target instances" }).selectOption("4");

@@ -209,6 +209,25 @@ function fal(value: unknown): AdminFalGenerationCapacity {
   }
 
   return {
+    configuredProvider:
+      typeof item.configuredProvider === "undefined"
+        ? "fal-ai"
+        : string(item.configuredProvider, "fal.configuredProvider"),
+    isEnabled:
+      typeof item.isEnabled === "undefined" ? true : boolean(item.isEnabled, "fal.isEnabled"),
+    billingAdminKeyConfigured:
+      typeof item.billingAdminKeyConfigured === "undefined"
+        ? null
+        : boolean(item.billingAdminKeyConfigured, "fal.billingAdminKeyConfigured"),
+    lastErrorCode: nullableString(item.lastErrorCode, "fal.lastErrorCode"),
+    consecutiveFailures:
+      typeof item.consecutiveFailures === "undefined"
+        ? 0
+        : number(item.consecutiveFailures, "fal.consecutiveFailures", { integer: true, min: 0 }),
+    lastAttemptSucceeded:
+      typeof item.lastAttemptSucceeded === "undefined"
+        ? null
+        : boolean(item.lastAttemptSucceeded, "fal.lastAttemptSucceeded"),
     configuredConcurrency,
     reservedConcurrency,
     usableConcurrency,

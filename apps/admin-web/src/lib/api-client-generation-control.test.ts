@@ -36,6 +36,12 @@ function createSnapshot() {
       health: "healthy",
     },
     fal: {
+      configuredProvider: "Fal",
+      isEnabled: true,
+      billingAdminKeyConfigured: true,
+      lastErrorCode: null as string | null,
+      consecutiveFailures: 0,
+      lastAttemptSucceeded: true,
       configuredConcurrency: 10,
       reservedConcurrency: 2,
       usableConcurrency: 8,
@@ -99,6 +105,14 @@ describe("generation control response parser", () => {
 
     expect(parsed.settings.globalMaxConcurrent).toBe(8);
     expect(parsed.fal.usableConcurrency).toBe(8);
+    expect(parsed.fal).toMatchObject({
+      configuredProvider: "Fal",
+      isEnabled: true,
+      billingAdminKeyConfigured: true,
+      lastErrorCode: null,
+      consecutiveFailures: 0,
+      lastAttemptSucceeded: true,
+    });
     expect(parsed.fal.providerSubmissionsAllowed).toBe(true);
     expect(parsed.fal.submissionBlockReason).toBeNull();
     expect(parsed.render?.serviceName).toBe("petmagic-production-generation-worker");
@@ -126,11 +140,39 @@ describe("generation control response parser", () => {
     const legacySnapshot = createSnapshot();
     delete (legacySnapshot.fal as Partial<typeof legacySnapshot.fal>).providerSubmissionsAllowed;
     delete (legacySnapshot.fal as Partial<typeof legacySnapshot.fal>).submissionBlockReason;
+    delete (legacySnapshot.fal as Partial<typeof legacySnapshot.fal>).configuredProvider;
+    delete (legacySnapshot.fal as Partial<typeof legacySnapshot.fal>).isEnabled;
+    delete (legacySnapshot.fal as Partial<typeof legacySnapshot.fal>).billingAdminKeyConfigured;
+    delete (legacySnapshot.fal as Partial<typeof legacySnapshot.fal>).lastErrorCode;
+    delete (legacySnapshot.fal as Partial<typeof legacySnapshot.fal>).consecutiveFailures;
+    delete (legacySnapshot.fal as Partial<typeof legacySnapshot.fal>).lastAttemptSucceeded;
 
     const parsed = parseAdminGenerationControlSnapshot(legacySnapshot);
 
     expect(parsed.fal.providerSubmissionsAllowed).toBe(true);
     expect(parsed.fal.submissionBlockReason).toBeNull();
+    expect(parsed.fal).toMatchObject({
+      configuredProvider: "fal-ai",
+      isEnabled: true,
+      billingAdminKeyConfigured: null,
+      lastErrorCode: null,
+      consecutiveFailures: 0,
+      lastAttemptSucceeded: null,
+    });
+  });
+
+  it("keeps new provider diagnostic codes forward-compatible and secret-free", () => {
+    const snapshot = createSnapshot();
+    snapshot.fal.lastErrorCode = "future_safe_code";
+    snapshot.fal.consecutiveFailures = 4;
+    snapshot.fal.lastAttemptSucceeded = false;
+
+    const parsed = parseAdminGenerationControlSnapshot(snapshot);
+
+    expect(parsed.fal.lastErrorCode).toBe("future_safe_code");
+    expect(parsed.fal.consecutiveFailures).toBe(4);
+    expect(parsed.fal.lastAttemptSucceeded).toBe(false);
+    expect(parsed.fal).not.toHaveProperty("apiKey");
   });
 
   it("rejects a partial provider gate and unstable block reasons", () => {

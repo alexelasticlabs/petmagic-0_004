@@ -62,6 +62,7 @@ export type GenerationCapacityCopy = {
     title: string;
     description: string;
     ready: string;
+    primaryShown: string;
     attention: string;
     falLimit: string;
     falLimitReady: string;
@@ -91,6 +92,7 @@ export type GenerationCapacityCopy = {
     title: string;
     description: string;
     balance: string;
+    lastConfirmedBalance: string;
     usable: string;
     configured: string;
     inflight: string;
@@ -103,6 +105,20 @@ export type GenerationCapacityCopy = {
     refreshing: string;
     keyNotice: string;
     openDashboard: string;
+    topUpBalance: string;
+    verificationTitle: string;
+    verificationDescription: string;
+    verificationChecks: readonly string[];
+    verificationDoesNotCheck: string;
+    lastAttemptSuccess: string;
+    lastAttemptFailed: string;
+    lastAttemptWaiting: string;
+    lastAttemptStale: string;
+    billingKeyReady: string;
+    billingKeyMissing: string;
+    providerNotUsed: string;
+    diagnosticReason: string;
+    diagnostics: Record<string, { title: string; description: string }>;
   };
   workers: {
     title: string;
@@ -139,6 +155,10 @@ export type GenerationCapacityCopy = {
     presetValues: string;
     applyPreset: string;
     presetDoesNotSave: string;
+    summaryTitle: string;
+    summaryDescription: string;
+    edit: string;
+    discardDraft: string;
     saveReview: string;
     saving: string;
     noChanges: string;
@@ -470,7 +490,7 @@ const copy: Record<Locale, GenerationCapacityCopy> = {
       effectiveCapacity: "Доступно одновременно",
       configureSafeStart: "Настроить безопасный старт",
       presetApplied: "Рекомендуемые значения подставлены в черновик. Проверьте их ниже.",
-      checkBalance: "Проверить баланс",
+      checkBalance: "Открыть диагностику fal.ai",
       queueContinues: "Очередь продолжает принимать задания; provider submission будет повторён.",
     },
     capacity: {
@@ -493,6 +513,8 @@ const copy: Record<Locale, GenerationCapacityCopy> = {
       title: "Что нужно сделать",
       description: "Шаги расположены по влиянию на новые генерации.",
       ready: "Готово",
+      primaryShown:
+        "Главный следующий шаг показан слева. После него диагностика обновится автоматически.",
       attention: "Требует внимания",
       falLimit: "Лимит fal.ai",
       falLimitReady: "Подтверждён вручную",
@@ -523,6 +545,7 @@ const copy: Record<Locale, GenerationCapacityCopy> = {
       title: "fal.ai: аккаунт и provider gate",
       description: "Баланс читает backend; API key и secrets никогда не передаются в браузер.",
       balance: "Баланс",
+      lastConfirmedBalance: "Последний подтверждённый баланс",
       usable: "Доступная concurrency",
       configured: "Подтверждённый лимит",
       inflight: "Сейчас в fal.ai",
@@ -532,10 +555,78 @@ const copy: Record<Locale, GenerationCapacityCopy> = {
       stale: "Данные устарели: новые отправки provider должны оставаться отложенными.",
       manualLimit:
         "Лимит аккаунта сверяется вручную в fal.ai Dashboard и вводится в разделе «Лимиты».",
-      refresh: "Проверить баланс",
+      refresh: "Проверить подключение и баланс",
       refreshing: "Проверяем…",
-      keyNotice: "FAL_AI_API_KEY настраивается только в Render Environment API service.",
+      keyNotice:
+        "Ключ генераций остаётся у worker, а отдельный Admin billing credential хранится только в API service.",
       openDashboard: "Открыть fal.ai Dashboard",
+      topUpBalance: "Пополнить баланс",
+      verificationTitle: "Что именно проверит backend",
+      verificationDescription:
+        "API service запрашивает fal.ai Account Billing server-to-server. Повторный клик в течение 5 секунд безопасно использует только что сохранённый snapshot; браузер не получает ни один ключ.",
+      verificationChecks: [
+        "Настроен ли отдельный Admin API key для billing.",
+        "Есть ли у ключа ADMIN scope и относится ли ответ к ожидаемому аккаунту.",
+        "Вернул ли fal.ai актуальный USD balance, который можно сохранить как свежий snapshot.",
+      ],
+      verificationDoesNotCheck:
+        "Кнопка не запускает генерацию, не пополняет баланс и не читает concurrency limit — лимит 10 подтверждается вручную в fal.ai Dashboard.",
+      lastAttemptSuccess: "Последняя проверка успешна",
+      lastAttemptFailed: "Последняя проверка не прошла",
+      lastAttemptWaiting: "Проверка ещё не выполнялась",
+      lastAttemptStale: "Последний успешный ответ устарел",
+      billingKeyReady: "Admin billing key настроен",
+      billingKeyMissing: "Admin billing key не настроен",
+      providerNotUsed: "Локально выбран Fake provider — fal.ai в этом окружении не используется.",
+      diagnosticReason: "Причина",
+      diagnostics: {
+        admin_api_key_missing: {
+          title: "Не задан Admin API key для billing",
+          description:
+            "Создайте в fal.ai отдельный ключ с ADMIN scope и добавьте его как server-side billing credential только в Render API service.",
+        },
+        authentication_failed: {
+          title: "fal.ai отклонил ключ",
+          description: "Проверьте, что Admin API key актуален и скопирован полностью.",
+        },
+        admin_scope_required: {
+          title: "Ключ не имеет ADMIN scope",
+          description:
+            "Обычный API key подходит для генераций, но Account Billing возвращает 403. Создайте отдельный ADMIN key; не заменяйте им ключ worker.",
+        },
+        rate_limited: {
+          title: "fal.ai временно ограничил запросы",
+          description:
+            "Подождите и повторите проверку. Фоновая проверка выполняется не чаще раза в минуту.",
+        },
+        provider_unavailable: {
+          title: "Billing API fal.ai временно недоступен",
+          description:
+            "Свежий баланс не подтверждён. Повторите проверку после восстановления fal.ai.",
+        },
+        account_mismatch: {
+          title: "Ответ получен не от ожидаемого fal.ai аккаунта",
+          description:
+            "Проверьте server-side account pin и аккаунт, в котором создан Admin API key.",
+        },
+        unsupported_currency: {
+          title: "fal.ai вернул неподдерживаемую валюту",
+          description:
+            "PetMagic ожидает balance в USD и не будет интерпретировать другую валюту как доллары.",
+        },
+        invalid_response: {
+          title: "Ответ fal.ai имеет неожиданный формат",
+          description: "Баланс не обновлён, чтобы не принять неверное значение.",
+        },
+        request_timeout: {
+          title: "fal.ai не ответил вовремя",
+          description: "Проверьте соединение позже; предыдущий баланс не считается свежим.",
+        },
+        request_failed: {
+          title: "Не удалось связаться с fal.ai",
+          description: "Проверьте сетевое соединение API service и повторите запрос.",
+        },
+      },
     },
     workers: {
       title: "Workers и Render",
@@ -578,6 +669,11 @@ const copy: Record<Locale, GenerationCapacityCopy> = {
       applyPreset: "Подставить значения",
       presetDoesNotSave:
         "Кнопка меняет только черновик. Сохранение и Render scaling подтверждаются отдельно.",
+      summaryTitle: "Текущий профиль",
+      summaryDescription:
+        "Сначала проверьте итоговую ёмкость. Поля появятся только после явного перехода в редактирование.",
+      edit: "Изменить лимиты",
+      discardDraft: "Отменить черновик",
       saveReview: "Проверить изменения",
       saving: "Сохраняем…",
       noChanges: "Изменений нет.",
@@ -743,7 +839,7 @@ const copy: Record<Locale, GenerationCapacityCopy> = {
       effectiveCapacity: "Effective concurrency",
       configureSafeStart: "Configure safe start",
       presetApplied: "Recommended values were placed in the draft. Review them below.",
-      checkBalance: "Check balance",
+      checkBalance: "Open fal.ai diagnostics",
       queueContinues: "The queue keeps accepting jobs; provider submission will be retried.",
     },
     capacity: {
@@ -766,6 +862,8 @@ const copy: Record<Locale, GenerationCapacityCopy> = {
       title: "What needs attention",
       description: "Steps are ordered by impact on new generations.",
       ready: "Ready",
+      primaryShown:
+        "The primary next step is shown on the left. Diagnostics refresh automatically afterward.",
       attention: "Needs attention",
       falLimit: "fal.ai limit",
       falLimitReady: "Manually confirmed",
@@ -792,6 +890,7 @@ const copy: Record<Locale, GenerationCapacityCopy> = {
       title: "fal.ai account and provider gate",
       description: "The backend reads balance; API keys and secrets never reach the browser.",
       balance: "Balance",
+      lastConfirmedBalance: "Last confirmed balance",
       usable: "Usable concurrency",
       configured: "Confirmed limit",
       inflight: "Currently in fal.ai",
@@ -800,10 +899,77 @@ const copy: Record<Locale, GenerationCapacityCopy> = {
       lastSuccess: "Last successful response",
       stale: "Data is stale: new provider submissions must remain deferred.",
       manualLimit: "Verify the account limit in fal.ai Dashboard and enter it under Limits.",
-      refresh: "Check balance",
+      refresh: "Check connection and balance",
       refreshing: "Checking…",
-      keyNotice: "FAL_AI_API_KEY is configured only in the Render API service environment.",
+      keyNotice:
+        "The generation key stays on the worker. A separate Admin billing credential is stored only on the API service.",
       openDashboard: "Open fal.ai Dashboard",
+      topUpBalance: "Add credits",
+      verificationTitle: "What the backend will verify",
+      verificationDescription:
+        "The API service calls fal.ai Account Billing server-to-server. A repeated click within 5 seconds safely reuses the just-saved snapshot; no key reaches the browser.",
+      verificationChecks: [
+        "A dedicated Admin API key is configured for billing.",
+        "The key has ADMIN scope and the response belongs to the expected account.",
+        "fal.ai returned a current USD balance that can be stored as a fresh snapshot.",
+      ],
+      verificationDoesNotCheck:
+        "This does not start a generation, add credits, or read the concurrency limit. Confirm limit 10 manually in fal.ai Dashboard.",
+      lastAttemptSuccess: "Last check succeeded",
+      lastAttemptFailed: "Last check failed",
+      lastAttemptWaiting: "No check has run yet",
+      lastAttemptStale: "The last successful response is stale",
+      billingKeyReady: "Admin billing key is configured",
+      billingKeyMissing: "Admin billing key is not configured",
+      providerNotUsed:
+        "The Fake provider is selected locally, so this environment does not use fal.ai.",
+      diagnosticReason: "Reason",
+      diagnostics: {
+        admin_api_key_missing: {
+          title: "Billing Admin API key is missing",
+          description:
+            "Create a separate fal.ai key with ADMIN scope and add it as a server-side billing credential only to the Render API service.",
+        },
+        authentication_failed: {
+          title: "fal.ai rejected the key",
+          description: "Verify that the Admin API key is active and was copied completely.",
+        },
+        admin_scope_required: {
+          title: "The key does not have ADMIN scope",
+          description:
+            "A regular API key can generate, but Account Billing returns 403. Create a separate ADMIN key; do not replace the worker key.",
+        },
+        rate_limited: {
+          title: "fal.ai temporarily rate-limited the check",
+          description: "Wait and retry. Background billing checks run at most once per minute.",
+        },
+        provider_unavailable: {
+          title: "fal.ai Billing API is temporarily unavailable",
+          description: "No fresh balance was confirmed. Retry after fal.ai recovers.",
+        },
+        account_mismatch: {
+          title: "The response belongs to a different fal.ai account",
+          description:
+            "Check the server-side account pin and the account that owns the Admin API key.",
+        },
+        unsupported_currency: {
+          title: "fal.ai returned an unsupported currency",
+          description: "PetMagic expects USD and will not interpret another currency as dollars.",
+        },
+        invalid_response: {
+          title: "fal.ai returned an unexpected response",
+          description:
+            "The balance was not updated, preventing an invalid value from being accepted.",
+        },
+        request_timeout: {
+          title: "fal.ai did not respond in time",
+          description: "Retry later; the previous balance is not considered fresh.",
+        },
+        request_failed: {
+          title: "Could not connect to fal.ai",
+          description: "Check the API service network connection and retry.",
+        },
+      },
     },
     workers: {
       title: "Workers & Render",
@@ -843,6 +1009,11 @@ const copy: Record<Locale, GenerationCapacityCopy> = {
       applyPreset: "Use these values",
       presetDoesNotSave:
         "This only changes the draft. Settings and Render scaling are confirmed separately.",
+      summaryTitle: "Current profile",
+      summaryDescription:
+        "Review effective capacity first. The editable fields appear only after you explicitly enter edit mode.",
+      edit: "Edit limits",
+      discardDraft: "Discard draft",
       saveReview: "Review changes",
       saving: "Saving…",
       noChanges: "There are no changes.",

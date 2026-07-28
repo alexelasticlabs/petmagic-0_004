@@ -32,9 +32,12 @@ export function createGenerationCapacityViewModel(
   snapshot: AdminGenerationControlSnapshot,
   observedWorkerLoops: number
 ): GenerationCapacityViewModel {
-  const providerCapacity = snapshot.fal.providerSubmissionsAllowed
-    ? snapshot.fal.usableConcurrency
-    : 0;
+  const falEnabled = snapshot.fal.isEnabled ?? true;
+  const providerCapacity = falEnabled
+    ? snapshot.fal.providerSubmissionsAllowed
+      ? snapshot.fal.usableConcurrency
+      : 0
+    : snapshot.settings.globalMaxConcurrent;
   const effectiveCapacity = Math.max(
     0,
     Math.min(snapshot.settings.globalMaxConcurrent, observedWorkerLoops, providerCapacity)
@@ -45,13 +48,16 @@ export function createGenerationCapacityViewModel(
   );
 
   let bottleneck: GenerationCapacityLayer = "petmagic";
-  if (!snapshot.fal.providerSubmissionsAllowed || providerCapacity <= effectiveCapacity) {
+  if (
+    falEnabled &&
+    (!snapshot.fal.providerSubmissionsAllowed || providerCapacity <= effectiveCapacity)
+  ) {
     bottleneck = "fal";
   } else if (observedWorkerLoops <= effectiveCapacity) {
     bottleneck = "workers";
   }
 
-  if (!snapshot.fal.providerSubmissionsAllowed) {
+  if (falEnabled && !snapshot.fal.providerSubmissionsAllowed) {
     return {
       state: "provider_blocked",
       tone: "danger",

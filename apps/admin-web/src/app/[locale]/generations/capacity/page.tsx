@@ -3,10 +3,19 @@ import { notFound } from "next/navigation";
 import { GenerationCapacityPage } from "@/components/generation-capacity-page";
 import { type Locale, isLocale } from "@/lib/i18n";
 
-type Props = { params: Promise<{ locale: string }> };
+type Props = {
+  params: Promise<{ locale: string }>;
+  searchParams: Promise<{ section?: string | string[] }>;
+};
 
-export default async function AdminGenerationCapacityRoute({ params }: Props) {
+export default async function AdminGenerationCapacityRoute({ params, searchParams }: Props) {
   const { locale } = await params;
+  const { section } = await searchParams;
   if (!isLocale(locale)) notFound();
-  return <GenerationCapacityPage locale={locale as Locale} />;
+  return (
+    <GenerationCapacityPage
+      locale={locale as Locale}
+      initialSection={typeof section === "string" ? section : undefined}
+    />
+  );
 }

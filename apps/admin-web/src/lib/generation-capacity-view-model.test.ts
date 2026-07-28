@@ -101,6 +101,26 @@ describe("generation capacity view model", () => {
     });
   });
 
+  it("ignores fal.ai capacity when the Fake provider is selected", () => {
+    const snapshot = createSnapshot();
+    snapshot.fal.isEnabled = false;
+    snapshot.fal.configuredProvider = "Fake";
+    snapshot.fal.configuredConcurrency = 0;
+    snapshot.fal.usableConcurrency = 0;
+    snapshot.fal.providerSubmissionsAllowed = true;
+    snapshot.fal.balanceUsd = null;
+    snapshot.fal.balanceStatus = "unknown";
+
+    const result = createGenerationCapacityViewModel(snapshot, 8);
+
+    expect(result).toMatchObject({
+      state: "ready",
+      tone: "success",
+      effectiveCapacity: 8,
+      bottleneck: "workers",
+    });
+  });
+
   it("applies the safe-start profile to a copy and leaves the original draft unchanged", () => {
     const draft = {
       ...generationCapacitySafeStartPreset,

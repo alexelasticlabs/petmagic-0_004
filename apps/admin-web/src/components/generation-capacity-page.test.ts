@@ -129,6 +129,34 @@ describe("generation capacity admin workflow", () => {
     expect(component).toContain("aria-label={text.nav.label}");
     expect(component).toContain("applyGenerationCapacityPreset(values)");
     expect(component).toContain('aria-live="polite"');
+    expect(component).toContain('role="tablist"');
+    expect(component).toContain('role="tab"');
+    expect(component).toContain('role="tabpanel"');
+    expect(component).toContain('activeSection === "overview"');
+    expect(component).toContain('activeSection === "limits"');
+    expect(component).toContain('activeSection === "fal"');
+    expect(component).toContain('activeSection === "workers"');
+    expect(component).toContain('activeSection === "alerts"');
+    expect(component).toContain("handleSectionKeyDown");
+    expect(component).toContain("aria-controls={activeSection === section ?");
+    expect(component).toContain('scrollIntoView({ block: "nearest", inline: "nearest" })');
+  });
+
+  it("keeps settings progressive and renders safe server-side fal diagnostics", () => {
+    expect(component).toContain("settingsEditing");
+    expect(component).toContain("text.settings.summaryTitle");
+    expect(component).toContain("text.settings.edit");
+    expect(component).toContain("text.fal.verificationChecks.map");
+    expect(component).toContain("snapshot.fal.lastErrorCode");
+    expect(component).toContain("snapshot.fal.billingAdminKeyConfigured");
+    expect(component).toContain("text.fal.lastConfirmedBalance");
+    expect(component).toContain('falAttemptState === "stale"');
+    expect(component).toContain("queryClient.cancelQueries");
+    expect(component).toContain("queryClient.invalidateQueries");
+    expect(component).toContain("function MetricStrip");
+    expect(component).not.toContain("AdminMetricStrip");
+    expect(component).not.toContain("FAL_ACCOUNT_BILLING_ADMIN_KEY");
+    expect(component).not.toContain("FAL_EXPECTED_ACCOUNT_USERNAME");
   });
 
   it("keeps stale workers collapsed and numeric settings accessible", () => {
