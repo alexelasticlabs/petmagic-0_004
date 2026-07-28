@@ -86,6 +86,10 @@ export function canAccessAdminPath(
     return canAccessAdminSection(roles, "users");
   }
 
+  if (matchesAdminPath(currentPath, "/generations/capacity")) {
+    return canAccessAdminSection(roles, "generation-capacity");
+  }
+
   if (matchesAdminPath(currentPath, "/generations")) {
     return canAccessAdminSection(roles, "generations");
   }

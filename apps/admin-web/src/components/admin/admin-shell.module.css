@@ -714,6 +714,16 @@
   padding-right: 0.15rem;
 }
 
+.notificationAlertError {
+  padding: 0.68rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--danger) 42%, var(--admin-border));
+  border-radius: 0.72rem;
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface-2));
+  color: var(--danger);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
 .notificationGroupSection {
   display: grid;
   gap: 0.5rem;
@@ -866,6 +876,18 @@
   line-height: 1.5;
   color: var(--text-soft);
   overflow-wrap: anywhere;
+}
+
+.notificationPersistentLink {
+  display: grid;
+  gap: 0.28rem;
+  min-width: 0;
+  border-radius: var(--radius-xs);
+}
+
+.notificationPersistentLink:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .notificationEmptyState {

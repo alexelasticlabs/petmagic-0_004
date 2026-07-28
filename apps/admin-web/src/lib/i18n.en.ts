@@ -148,6 +148,7 @@ export const enDictionary: Dictionary = {
   navAudit: "Audit trail",
   navUsers: "Users",
   navGenerations: "Generations",
+  navGenerationCapacity: "Generation capacity",
   navFeedback: "Feedback",
   navRoleManagement: "Role Management",
   navTemplates: "Templates",

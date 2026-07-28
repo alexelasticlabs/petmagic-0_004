@@ -112,6 +112,9 @@ export const adminQueryKeys = {
   templateGenerations: (query: unknown) => ["admin", "templates", "generations", query] as const,
   templateGenerationDetail: (generationId: string) =>
     ["admin", "templates", "generations", generationId, "detail"] as const,
+  generationControl: ["admin", "templates", "generation-control"] as const,
+  generationRenderOperation: (operationId: string) =>
+    ["admin", "templates", "generation-control", "render", "operations", operationId] as const,
   templateWatermarkSettings: ["admin", "templates", "monetization", "watermark"] as const,
   moderationQueue: (query: unknown) => ["admin", "moderation", query] as const,
   feedback: (query: unknown) => ["admin", "feedback", query] as const,

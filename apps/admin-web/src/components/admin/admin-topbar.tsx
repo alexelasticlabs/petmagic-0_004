@@ -17,6 +17,7 @@ import {
   useAdminNotifications,
 } from "@/components/admin/admin-notifications";
 import styles from "@/components/admin/admin-shell.module.css";
+import { type AdminGenerationControlAlert } from "@/lib/api-client";
 import { type Locale } from "@/lib/i18n";
 import { type AdminTheme } from "@/lib/theme";
 
@@ -34,6 +35,10 @@ type AdminTopbarProps = {
   pageTitle: string;
   pageDescription: string;
   supportUnreadCount: number;
+  persistentGenerationAlerts: readonly AdminGenerationControlAlert[];
+  persistentGenerationAlertError: string | null;
+  acknowledgingPersistentAlertId: string | null;
+  onAcknowledgePersistentAlert: (alertId: string) => void;
   theme: AdminTheme;
   userName: string;
   userRole: string;
@@ -55,6 +60,10 @@ export function AdminTopbar({
   pageTitle,
   pageDescription,
   supportUnreadCount,
+  persistentGenerationAlerts,
+  persistentGenerationAlertError,
+  acknowledgingPersistentAlertId,
+  onAcknowledgePersistentAlert,
   theme,
   userName,
   userRole,
@@ -88,9 +97,13 @@ export function AdminTopbar({
     (item) => item.category === "support" && !item.read
   ).length;
   const unreadNonSupportNotificationCount = unreadCount - unreadSupportNotificationCount;
+  const unreadPersistentAlertCount = persistentGenerationAlerts.filter(
+    (alert) => alert.isActive && !alert.isAcknowledged
+  ).length;
   const totalAttentionCount =
     unreadNonSupportNotificationCount +
-    Math.max(unreadSupportNotificationCount, supportUnreadCount);
+    Math.max(unreadSupportNotificationCount, supportUnreadCount) +
+    unreadPersistentAlertCount;
   const filterOptions = useMemo(
     () => [
       { value: "all" as const, label: copy.topbar.filterLabels.all },
@@ -130,6 +143,19 @@ export function AdminTopbar({
       ),
     [filteredNotifications, locale]
   );
+  const filteredPersistentAlerts = useMemo(() => {
+    if (
+      notificationFilter !== "all" &&
+      notificationFilter !== "unread" &&
+      notificationFilter !== "system"
+    ) {
+      return [];
+    }
+
+    return persistentGenerationAlerts.filter(
+      (alert) => alert.isActive && (notificationFilter !== "unread" || !alert.isAcknowledged)
+    );
+  }, [notificationFilter, persistentGenerationAlerts]);
 
   const shouldShowSupportSummary =
     supportUnreadCount > 0 &&
@@ -138,7 +164,9 @@ export function AdminTopbar({
       notificationFilter === "support");
 
   const isNotificationsOpen = notificationPanelPathname === pathname;
-  const notificationTriggerLabel = copy.topbar.notificationTriggerLabel(isNotificationsOpen);
+  const notificationTriggerLabel = `${copy.topbar.notificationTriggerLabel(isNotificationsOpen)}${
+    totalAttentionCount > 0 ? ` (${totalAttentionCount})` : ""
+  }`;
 
   const closeNotificationPanel = useCallback((options?: { restoreFocus?: boolean }) => {
     setNotificationPanelPathname(null);
@@ -306,15 +334,23 @@ export function AdminTopbar({
                     {copy.topbar.centerTitle}
                   </strong>
                   <p className={styles.notificationSummary}>
-                    {copy.topbar.summary(unreadCount, supportUnreadCount)}
+                    {copy.topbar.summary(
+                      unreadCount + unreadPersistentAlertCount,
+                      supportUnreadCount
+                    )}
                   </p>
                 </div>
                 <div className={styles.notificationHeaderActions}>
                   <button
                     type="button"
                     className={styles.notificationTextButton}
-                    onClick={markAllAsRead}
-                    disabled={unreadCount === 0}
+                    onClick={() => {
+                      markAllAsRead();
+                      persistentGenerationAlerts
+                        .filter((alert) => alert.isActive && !alert.isAcknowledged)
+                        .forEach((alert) => onAcknowledgePersistentAlert(alert.id));
+                    }}
+                    disabled={unreadCount === 0 && unreadPersistentAlertCount === 0}
                   >
                     {copy.topbar.markAllRead}
                   </button>
@@ -348,6 +384,11 @@ export function AdminTopbar({
               </div>
 
               <div className={styles.notificationList}>
+                {persistentGenerationAlertError ? (
+                  <div className={styles.notificationAlertError} role="alert">
+                    {persistentGenerationAlertError}
+                  </div>
+                ) : null}
                 {shouldShowSupportSummary ? (
                   <Link
                     href={`/${locale}/support`}
@@ -374,6 +415,70 @@ export function AdminTopbar({
                       {copy.topbar.supportSummaryMessage}
                     </p>
                   </Link>
+                ) : null}
+
+                {filteredPersistentAlerts.length > 0 ? (
+                  <section className={styles.notificationGroupSection}>
+                    <div className={styles.notificationGroupHeader}>
+                      <span className={styles.notificationGroupTitle}>
+                        {copy.topbar.categoryLabels.system}
+                      </span>
+                    </div>
+                    <div className={styles.notificationGroupItems}>
+                      {filteredPersistentAlerts.map((alert) => (
+                        <article
+                          key={alert.id}
+                          className={`${styles.notificationCard} ${alert.severity === "critical" ? styles.notificationCardPinned : ""} ${!alert.isAcknowledged ? styles.notificationCardUnread : ""}`}
+                        >
+                          <div className={styles.notificationCardMeta}>
+                            <div className={styles.notificationCardMetaLead}>
+                              {alert.severity === "critical" ? (
+                                <span className={styles.notificationPinnedMark}>
+                                  {copy.topbar.critical}
+                                </span>
+                              ) : null}
+                              <span
+                                className={`${styles.notificationCategoryPill} ${styles.notificationCategorySystem}`}
+                              >
+                                {copy.topbar.categoryLabels.system}
+                              </span>
+                            </div>
+                            <span className={styles.notificationTime}>
+                              {formatRelativeNotificationTime(alert.activatedAtUtc, locale)}
+                            </span>
+                          </div>
+                          <Link
+                            href={`/${locale}/generations/capacity`}
+                            className={styles.notificationPersistentLink}
+                            onClick={() => closeNotificationPanel()}
+                          >
+                            <strong className={styles.notificationCardTitle}>
+                              {sanitizeAdminNotificationText(
+                                alert.title,
+                                NOTIFICATION_RENDER_TITLE_MAX_LENGTH
+                              )}
+                            </strong>
+                            <p className={styles.notificationCardMessage}>
+                              {sanitizeAdminNotificationText(
+                                alert.message,
+                                NOTIFICATION_RENDER_MESSAGE_MAX_LENGTH
+                              )}
+                            </p>
+                          </Link>
+                          {!alert.isAcknowledged ? (
+                            <button
+                              type="button"
+                              className={styles.notificationTextButton}
+                              disabled={acknowledgingPersistentAlertId === alert.id}
+                              onClick={() => onAcknowledgePersistentAlert(alert.id)}
+                            >
+                              {locale === "ru" ? "Ознакомлен" : "Acknowledge"}
+                            </button>
+                          ) : null}
+                        </article>
+                      ))}
+                    </div>
+                  </section>
                 ) : null}
 
                 {pinnedNotifications.length > 0 ? (
@@ -523,7 +628,8 @@ export function AdminTopbar({
 
                 {!shouldShowSupportSummary &&
                 pinnedNotifications.length === 0 &&
-                groupedNotifications.length === 0 ? (
+                groupedNotifications.length === 0 &&
+                filteredPersistentAlerts.length === 0 ? (
                   <div className={styles.notificationEmptyState}>
                     <strong>{copy.topbar.emptyTitle}</strong>
                     <p>{copy.topbar.emptyMessage}</p>

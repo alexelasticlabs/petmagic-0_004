@@ -20,6 +20,7 @@ describe("admin-rbac", () => {
     "/feedback",
     "/gamification",
     "/generations",
+    "/generations/capacity",
     "/image-templates",
     "/moderation",
     "/promo-codes",
@@ -75,6 +76,7 @@ describe("admin-rbac", () => {
     expect(canAccessAdminPath(["Moderator"], "/economy")).toBe(false);
     expect(canAccessAdminPath(["Moderator"], "/gamification")).toBe(false);
     expect(canAccessAdminPath(["Moderator"], "/generations")).toBe(false);
+    expect(canAccessAdminPath(["Moderator"], "/generations/capacity")).toBe(false);
     expect(canAccessAdminPath(["Moderator"], "/roles")).toBe(false);
     expect(canAccessAdminPath(["Moderator"], "/audit")).toBe(false);
   });

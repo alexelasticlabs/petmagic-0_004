@@ -11,3 +11,4 @@ export * from "./api-client.gamification";
 export * from "./api-client.audit";
 export * from "./api-client.system-status";
 export * from "./api-client.template-category-diagnostics";
+export * from "./api-client.generation-control";

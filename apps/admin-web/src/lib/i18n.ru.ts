@@ -150,6 +150,7 @@ export const ruDictionary: Dictionary = {
   navAudit: "Журнал действий",
   navUsers: "Пользователи",
   navGenerations: "Генерации",
+  navGenerationCapacity: "Мощность генераций",
   navFeedback: "Обратная связь",
   navRoleManagement: "Роли",
   navTemplates: "Шаблоны",

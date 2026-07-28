@@ -9,6 +9,7 @@ type AdminPageMetaCopy = {
   users: { title: string; description: string };
   userProfile: { title: string; description: string };
   generations: { title: string; description: string };
+  generationCapacity: { title: string; description: string };
   feedback: { title: string; description: string };
   roleManagement: { title: string; description: string };
   support: { title: string; description: string };
@@ -55,6 +56,10 @@ const adminPageMetaCopy: Record<Locale, AdminPageMetaCopy> = {
       title: "Генерации",
       description:
         "Очередь и история генераций с фильтрами по статусу, провайдеру, пользователю и ID задания.",
+    },
+    generationCapacity: {
+      title: "Мощность генераций",
+      description: "Очередь, баланс fal.ai, worker topology и безопасное масштабирование Render.",
     },
     feedback: {
       title: "Фидбек",
@@ -138,6 +143,10 @@ const adminPageMetaCopy: Record<Locale, AdminPageMetaCopy> = {
     generations: {
       title: "Generations",
       description: "Generation queue and history with status, provider, user, and job id filters.",
+    },
+    generationCapacity: {
+      title: "Generation capacity",
+      description: "Queue limits, fal.ai balance, worker topology, and guarded Render scaling.",
     },
     feedback: {
       title: "Feedback",

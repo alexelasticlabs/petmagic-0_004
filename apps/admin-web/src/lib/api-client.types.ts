@@ -9,3 +9,4 @@ export * from "./api-client.types.gamification";
 export * from "./api-client.types.audit";
 export * from "./api-client.types.system-status";
 export * from "./api-client.types.template-category-diagnostics";
+export * from "./api-client.types.generation-control";

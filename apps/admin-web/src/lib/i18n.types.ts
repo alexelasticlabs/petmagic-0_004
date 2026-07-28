@@ -143,6 +143,7 @@ export type Dictionary = {
   navAudit: string;
   navUsers: string;
   navGenerations: string;
+  navGenerationCapacity: string;
   navFeedback: string;
   navRoleManagement: string;
   navTemplates: string;

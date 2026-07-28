@@ -12,6 +12,7 @@ export type AdminSectionKey =
   | "audit"
   | "users"
   | "generations"
+  | "generation-capacity"
   | "feedback"
   | "role-management"
   | "templates"
@@ -96,6 +97,12 @@ export function getAdminNavItems(
       key: "generations",
       href: `/${locale}/generations`,
       label: text.navGenerations,
+    },
+    {
+      type: "link",
+      key: "generation-capacity",
+      href: `/${locale}/generations/capacity`,
+      label: text.navGenerationCapacity,
     },
     {
       type: "link",
@@ -236,6 +243,10 @@ export function getAdminPageMeta(
 
   if (matchesAdminPath(currentPath, "/users")) {
     return copy.users;
+  }
+
+  if (matchesAdminPath(currentPath, "/generations/capacity")) {
+    return copy.generationCapacity;
   }
 
   if (matchesAdminPath(currentPath, "/generations")) {

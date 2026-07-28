@@ -1,6 +1,7 @@
 "use client";
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -562,6 +563,11 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
           title={text.title}
           description={text.description}
           badge={<AdminBadge tone="danger">{text.adminOnly}</AdminBadge>}
+          actions={
+            <Link className={styles.button} href={`/${locale}/generations/capacity`}>
+              {locale === "ru" ? "Мощность и fal.ai" : "Capacity and fal.ai"}
+            </Link>
+          }
         />
         <AdminStateCard tone="info" title={text.loadingTitle} />
       </section>
@@ -576,6 +582,11 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
           title={text.title}
           description={text.description}
           badge={<AdminBadge tone="danger">{text.adminOnly}</AdminBadge>}
+          actions={
+            <Link className={styles.button} href={`/${locale}/generations/capacity`}>
+              {locale === "ru" ? "Мощность и fal.ai" : "Capacity and fal.ai"}
+            </Link>
+          }
         />
 
         <div className={styles.kpiGrid}>

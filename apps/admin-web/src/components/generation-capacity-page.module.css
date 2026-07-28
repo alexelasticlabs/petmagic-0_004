@@ -1,0 +1,308 @@
+.page {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.overviewGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(20rem, 0.75fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.factGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin: 0 0 0.9rem;
+}
+
+.factGrid > div {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--border-soft);
+  border-radius: 0.8rem;
+  background: color-mix(in srgb, var(--surface-2) 72%, transparent);
+}
+
+.factGrid dt {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.factGrid dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 1.05rem;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+}
+
+.factWide {
+  grid-column: 1 / -1;
+}
+
+.helperText {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.settingsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.field,
+.dialogField {
+  display: grid;
+  gap: 0.38rem;
+  min-width: 0;
+}
+
+.label,
+.dialogField > span {
+  color: var(--text-strong);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.field small,
+.dialogField small {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.input,
+.dialogField input,
+.dialogField select,
+.dialogField textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.7rem;
+  background: var(--surface-2);
+  color: var(--text-strong);
+  font: inherit;
+  outline: none;
+}
+
+.input,
+.dialogField input,
+.dialogField select {
+  min-height: 2.65rem;
+  padding: 0.55rem 0.7rem;
+}
+
+.dialogField textarea {
+  min-height: 7rem;
+  padding: 0.7rem;
+  resize: vertical;
+}
+
+.input:focus-visible,
+.dialogField input:focus-visible,
+.dialogField select:focus-visible,
+.dialogField textarea:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.cardActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+
+.errorList {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0.4rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.alertList {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.alertCard {
+  --alert-color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--alert-color) 34%, var(--border-soft));
+  border-left: 4px solid var(--alert-color);
+  border-radius: 0.85rem;
+  background: color-mix(in srgb, var(--alert-color) 7%, var(--surface-2));
+}
+
+.alert_warning {
+  --alert-color: var(--warning);
+}
+
+.alert_critical {
+  --alert-color: var(--danger);
+}
+
+.alertBody {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.alertBody h3,
+.alertBody p {
+  margin: 0;
+}
+
+.alertBody h3 {
+  font-size: 0.95rem;
+}
+
+.alertBody p {
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.alertMeta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.operationCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.85rem;
+  background: var(--surface-2);
+}
+
+.operationCard > div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.operationCard span,
+.operationCard small {
+  color: var(--text-muted);
+}
+
+.reviewChanges {
+  display: grid;
+  gap: 0.55rem;
+  margin-bottom: 1rem;
+}
+
+.reviewChanges > div {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1fr) auto auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border-soft);
+  border-radius: 0.7rem;
+}
+
+.reviewChanges span {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.confirmCheck {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin-top: 0.85rem;
+  color: var(--text-strong);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.confirmCheck input {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-top: 0.08rem;
+  accent-color: var(--accent);
+}
+
+@media (max-width: 1100px) {
+  .overviewGrid,
+  .settingsGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .overviewGrid > :first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 720px) {
+  .overviewGrid,
+  .settingsGrid,
+  .kpiGrid,
+  .factGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .overviewGrid > :first-child,
+  .factWide {
+    grid-column: auto;
+  }
+
+  .cardActions,
+  .alertCard,
+  .operationCard {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .cardActions button,
+  .alertCard button,
+  .operationCard button {
+    width: 100%;
+  }
+
+  .reviewChanges > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.25rem;
+  }
+}
+
+@media (max-width: 390px) {
+  .page {
+    gap: 0.75rem;
+  }
+
+  .settingsGrid {
+    gap: 0.7rem;
+  }
+}

@@ -48,6 +48,7 @@ const iconMap = {
   audit: ClockIcon,
   users: UsersIcon,
   generations: ChartIcon,
+  "generation-capacity": ChartIcon,
   feedback: SupportIcon,
   "role-management": UsersIcon,
   templates: TemplatesIcon,

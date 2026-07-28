@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   type ReactNode,
@@ -19,6 +19,7 @@ import styles from "@/components/admin/admin-shell.module.css";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { AdminTopbar } from "@/components/admin/admin-topbar";
 import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
+import { getAdminErrorMessage } from "@/lib/admin-error-message";
 import { buildLocaleSwitchPath, getAdminPageMeta, stripLocalePrefix } from "@/lib/admin-navigation";
 import { shouldCreateSupportRealtimeNotification } from "@/lib/admin-notification-policy";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
@@ -30,6 +31,8 @@ import {
 } from "@/lib/admin-rbac";
 import {
   fetchSupportInboxMetrics,
+  fetchAdminGenerationControl,
+  acknowledgeAdminGenerationAlert,
   isAuthSessionExpired,
   logout,
   restoreSession,
@@ -135,6 +138,32 @@ export function AdminShell({ locale, children }: AdminShellProps) {
     });
   });
   const supportUnreadCount = getSupportUnreadCount(inboxMetricsQuery.data);
+  const generationControlQuery = useQuery({
+    queryKey: adminQueryKeys.generationControl,
+    queryFn: ({ signal }) => fetchAdminGenerationControl(signal),
+    enabled: hasFreshAccessToken && sessionRoles.includes("Admin") && !isLoginPage,
+    staleTime: 10_000,
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
+    retry: false,
+  });
+  const acknowledgeGenerationAlertMutation = useMutation({
+    mutationFn: acknowledgeAdminGenerationAlert,
+    onSuccess: (acknowledged) => {
+      queryClient.setQueryData(
+        adminQueryKeys.generationControl,
+        (current: typeof generationControlQuery.data) =>
+          current
+            ? {
+                ...current,
+                alerts: current.alerts.map((item) =>
+                  item.id === acknowledged.id ? acknowledged : item
+                ),
+              }
+            : current
+      );
+    },
+  });
 
   /* Admin panel state */
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -479,6 +508,27 @@ export function AdminShell({ locale, children }: AdminShellProps) {
           pageTitle={pageMeta.title}
           pageDescription={pageMeta.description}
           supportUnreadCount={supportUnreadCount}
+          persistentGenerationAlerts={
+            generationControlQuery.data?.alerts.filter((alert) => alert.isActive) ?? []
+          }
+          persistentGenerationAlertError={
+            acknowledgeGenerationAlertMutation.isError
+              ? getAdminErrorMessage(
+                  acknowledgeGenerationAlertMutation.error,
+                  locale === "ru"
+                    ? "Не удалось подтвердить generation alert."
+                    : "Could not acknowledge the generation alert."
+                )
+              : null
+          }
+          acknowledgingPersistentAlertId={
+            acknowledgeGenerationAlertMutation.isPending
+              ? acknowledgeGenerationAlertMutation.variables
+              : null
+          }
+          onAcknowledgePersistentAlert={(alertId) =>
+            acknowledgeGenerationAlertMutation.mutate(alertId)
+          }
           theme={theme}
           userName={userBadgeName}
           userRole={userRole}
