@@ -269,7 +269,7 @@ services:
     dockerfilePath: ./Dockerfile.generation-worker
     dockerContext: .
     maxShutdownDelaySeconds: 300
-    numInstances: 4
+    numInstances: 1
     buildFilter:
       paths:
         - global.json
