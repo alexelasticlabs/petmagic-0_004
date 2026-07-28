@@ -209,6 +209,10 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         ValidateQueueConfiguration(options);
         ValidateProductionProviderConfiguration(options, services, environment, configuredStorageProvider, configuredAiProvider);
         var resolvedSchedulerComponent = ResolveSchedulerComponent(schedulerComponent, options);
+        var isApiSchedulerComponent = string.Equals(
+            resolvedSchedulerComponent,
+            TemplateSchedulerConfigFingerprint.ApiComponent,
+            StringComparison.Ordinal);
 
         services.AddSingleton(options);
         services.AddSingleton(mediaReadUrlSigningOptions);
@@ -253,10 +257,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         services.AddSingleton<FalAccountBillingClient>();
         services.AddSingleton<FalProviderHealthMonitor>();
         services.AddScoped<GenerationOperationalAlertService>();
-        if (string.Equals(
-                resolvedSchedulerComponent,
-                TemplateSchedulerConfigFingerprint.ApiComponent,
-                StringComparison.Ordinal))
+        if (isApiSchedulerComponent)
         {
             services.AddHostedService(serviceProvider =>
                 serviceProvider.GetRequiredService<FalProviderHealthMonitor>());
@@ -277,11 +278,14 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             serviceProvider.GetRequiredService<FcmTemplateGenerationPushNotificationSender>());
         services.AddScoped<ITemplateGenerationPushNotificationSender, TemplateGenerationPushNotificationOutbox>();
         services.AddScoped<TemplatePushOutboxProcessor>();
-        services.AddScoped<TemplateAdminAuditOutboxProcessor>();
         services.AddScoped<ITemplateMediaLifecycleService, TemplateMediaLifecycleService>();
         services.AddScoped<ITemplateVisibilityPolicy, TemplateVisibilityPolicy>();
         services.AddScoped<ITemplatesService, TemplatesService>();
-        services.AddScoped<IAdminGenerationControlService, AdminGenerationControlService>();
+        if (isApiSchedulerComponent)
+        {
+            services.AddScoped<TemplateAdminAuditOutboxProcessor>();
+            services.AddScoped<IAdminGenerationControlService, AdminGenerationControlService>();
+        }
         services.AddScoped<IPetsService, PetsService>();
         services.AddScoped<IFeedbackService, FeedbackService>();
         services.AddScoped<IAdminUserTemplateAnalyticsReader, AdminUserTemplateAnalyticsReader>();
@@ -310,10 +314,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             services.AddHostedService<TemplatePushOutboxWorker>();
         }
 
-        if (string.Equals(
-                resolvedSchedulerComponent,
-                TemplateSchedulerConfigFingerprint.ApiComponent,
-                StringComparison.Ordinal)
+        if (isApiSchedulerComponent
             && services.Any(descriptor => descriptor.ServiceType == typeof(IAdminAuditLog)))
         {
             services.AddHostedService<TemplateAdminAuditOutboxWorker>();

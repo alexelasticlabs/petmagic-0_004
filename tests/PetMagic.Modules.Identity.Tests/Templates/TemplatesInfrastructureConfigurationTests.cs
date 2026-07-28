@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Infrastructure;
@@ -149,6 +150,49 @@ public sealed class TemplatesInfrastructureConfigurationTests
 
         var component = provider.GetRequiredService<TemplateSchedulerConfigComponent>();
         Assert.Equal(TemplateSchedulerConfigFingerprint.ApiComponent, component.Value);
+    }
+
+    [Fact]
+    public void AddTemplatesInfrastructure_ShouldExcludeAdminOnlyServices_FromGenerationWorker()
+    {
+        var services = CreateServices();
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["Templates:GenerationWorkerEnabled"] = "true"
+        });
+
+        services.AddTemplatesInfrastructure(
+            configuration,
+            schedulerComponent: TemplateSchedulerConfigFingerprint.GenerationWorkerComponent);
+
+        Assert.DoesNotContain(
+            services,
+            descriptor => descriptor.ServiceType == typeof(IAdminGenerationControlService));
+        Assert.DoesNotContain(
+            services,
+            descriptor => descriptor.ImplementationType == typeof(TemplateAdminAuditOutboxProcessor));
+    }
+
+    [Fact]
+    public void AddTemplatesInfrastructure_ShouldRegisterAdminOnlyServices_ForApi()
+    {
+        var services = CreateServices();
+        services.AddSingleton<IAdminAuditLog, NoOpAdminAuditLog>();
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["Templates:GenerationWorkerEnabled"] = "false"
+        });
+
+        services.AddTemplatesInfrastructure(
+            configuration,
+            schedulerComponent: TemplateSchedulerConfigFingerprint.ApiComponent);
+
+        Assert.Contains(
+            services,
+            descriptor => descriptor.ServiceType == typeof(IAdminGenerationControlService));
+        Assert.Contains(
+            services,
+            descriptor => descriptor.ImplementationType == typeof(TemplateAdminAuditOutboxProcessor));
     }
 
     [Fact]
@@ -1173,6 +1217,12 @@ public sealed class TemplatesInfrastructureConfigurationTests
         services.AddLogging();
         services.AddSingleton<IHostEnvironment>(new TestHostEnvironment(Directory.GetCurrentDirectory()));
         return services;
+    }
+
+    private sealed class NoOpAdminAuditLog : IAdminAuditLog
+    {
+        public Task WriteAsync(AdminAuditEntry entry, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
     }
 
     private static string FindRepositoryRoot()
