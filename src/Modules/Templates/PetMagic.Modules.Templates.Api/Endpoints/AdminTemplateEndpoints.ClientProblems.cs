@@ -50,7 +50,15 @@ public static partial class AdminTemplateEndpoints
                 or "templates.moderation_lease_not_owned"
                 or "templates.moderation_item_not_pending"
                 or "templates.template_of_the_day_date_occupied"
-                or "templates.template_of_the_day_auto_mode_disabled" => StatusCodes.Status409Conflict,
+                or "templates.template_of_the_day_auto_mode_disabled"
+                or "templates.generation_control_version_conflict"
+                or "templates.render.scale_idempotency_conflict"
+                or "templates.render.scale_operation_in_progress"
+                or "templates.render.scale_current_instances_changed"
+                or "templates.render.scale_cancellation_not_allowed"
+                or "templates.render.autoscaling_enabled"
+                or "templates.render.target_mismatch" => StatusCodes.Status409Conflict,
+            "templates.render.scale_operation_not_found" => StatusCodes.Status404NotFound,
             "ACTIVE_GENERATION_LIMIT_REACHED" => StatusCodes.Status429TooManyRequests,
             "templates.media_storage_failed"
                 or "templates.media_metadata_failed"
@@ -59,6 +67,11 @@ public static partial class AdminTemplateEndpoints
                 or "templates.ai_provider_failed"
                 or "templates.ai_provider_transient"
                 or "templates.ai_provider_timed_out"
+                or "templates.render.not_configured"
+                or "templates.render.auth_failed"
+                or "templates.render.permission_denied"
+                or "templates.render.rate_limited"
+                or "templates.render.upstream_unavailable"
                 or "templates.generation_attempts_exceeded"
                 or "PROVIDER_CAPACITY_UNAVAILABLE"
                 or "GENERATION_QUEUE_OVERLOADED"

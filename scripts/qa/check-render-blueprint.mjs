@@ -145,6 +145,25 @@ if (api) {
     'EMAIL_FROM_ADDRESS',
     'OTEL_EXPORTER_OTLP_ENDPOINT'
   ]);
+
+  if (environment === 'production') {
+    requireSecretKeys(api, [
+      'RENDER_API_KEY',
+      'RENDER_GENERATION_WORKER_SERVICE_ID',
+      'RENDER_GENERATION_WORKER_EXPECTED_OWNER_ID'
+    ]);
+    requireEnvValue(
+      api,
+      'RENDER_GENERATION_WORKER_EXPECTED_NAME',
+      'petmagic-production-generation-worker'
+    );
+    requireEnvValue(api, 'RENDER_GENERATION_WORKER_EXPECTED_TYPE', 'background_worker');
+    requireEnvValue(
+      api,
+      'RENDER_GENERATION_WORKER_EXPECTED_REPOSITORY',
+      'https://github.com/alexelasticlabs/petmagic-0_004'
+    );
+  }
 }
 
 if (worker) {
@@ -161,7 +180,13 @@ if (worker) {
   requireEnvValue(worker, 'Templates__GenerationWorkerEnabled', 'true');
   requireEnvValue(worker, 'Templates__MediaCleanupWorkerEnabled', 'false');
   requireEnvValue(worker, 'Templates__TemplateOfTheDayAutoPickWorkerEnabled', 'false');
-  requireEnvValue(worker, 'Templates__MaxConcurrentJobsPerWorker', '2');
+  if (environment === 'production') {
+    if (findEnv(worker.envVars, 'Templates__MaxConcurrentJobsPerWorker')) {
+      fail(`${worker.name} must not define Templates__MaxConcurrentJobsPerWorker; configure it in the shared env group.`);
+    }
+  } else {
+    requireEnvValue(worker, 'Templates__MaxConcurrentJobsPerWorker', '2');
+  }
   requireDatabaseBinding(worker, 'ConnectionStrings__DefaultConnection', `${prefix}-db`);
   requireSecretKeys(worker, [
     'Jwt__SigningKey',
@@ -190,6 +215,21 @@ if (worker) {
     'FIREBASE_SERVICE_ACCOUNT_JSON',
     'OTEL_EXPORTER_OTLP_ENDPOINT'
   ]);
+
+  if (environment === 'production') {
+    if (worker.numInstances !== undefined) {
+      fail(`${prefix}-generation-worker must omit numInstances so API-managed scaling survives Blueprint sync.`);
+    }
+
+    rejectEnvKeys(worker, [
+      'RENDER_API_KEY',
+      'RENDER_GENERATION_WORKER_SERVICE_ID',
+      'RENDER_GENERATION_WORKER_EXPECTED_OWNER_ID',
+      'RENDER_GENERATION_WORKER_EXPECTED_NAME',
+      'RENDER_GENERATION_WORKER_EXPECTED_TYPE',
+      'RENDER_GENERATION_WORKER_EXPECTED_REPOSITORY'
+    ]);
+  }
 }
 
 if (admin) {
@@ -270,6 +310,7 @@ function requireEnvGroup(name) {
     requireGroupValue(group, 'Templates__FalProviderReservedConcurrency', '2');
     requireGroupValue(group, 'Templates__FalProviderBalanceLowThresholdUsd', '10');
     requireGroupValue(group, 'Templates__FalProviderBalanceCriticalThresholdUsd', '5');
+    requireGroupValue(group, 'Templates__MaxConcurrentJobsPerWorker', '2');
   }
 }
 
@@ -474,6 +515,14 @@ function rejectPublicSecrets(service) {
 
   for (const entry of publicSecrets) {
     fail(`${service.name} exposes suspicious browser env ${entry.key}.`);
+  }
+}
+
+function rejectEnvKeys(service, keys) {
+  for (const key of keys) {
+    if (findEnv(service.envVars, key)) {
+      fail(`${service.name} must not receive API-only env ${key}.`);
+    }
   }
 }
 

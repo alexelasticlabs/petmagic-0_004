@@ -38,20 +38,27 @@ internal sealed partial class TemplateGenerationJobProcessor(
     ITemplateWatermarkRenderer? watermarkRenderer = null,
     TemplateWatermarkSettingsStore? watermarkSettings = null,
     IGamificationService? gamificationService = null,
-    IEconomyService? economyService = null)
+    IEconomyService? economyService = null,
+    ITemplateGenerationRuntimeSettingsProvider? runtimeSettings = null,
+    ITemplateAiProviderHealthService? aiProviderHealthService = null)
 {
     private const string NpgsqlProviderName = "Npgsql.EntityFrameworkCore.PostgreSQL";
     private const int GlobalGenerationAdvisoryLockKey = 0x506D4745;
     private const int ImageGenerationAdvisoryLockKey = 0x506D4749;
     private const int VideoGenerationAdvisoryLockKey = 0x506D4756;
     private const int BorrowedVideoGenerationAdvisoryLockKey = 0x506D4742;
+    private const int SchedulerClaimAdvisoryLockSlot = 0;
     private const string GamificationSyncFailedCode = "templates.gamification_sync_failed";
     private static readonly string WorkerInstanceId = $"{Environment.MachineName}:{Guid.NewGuid():N}";
     private static readonly object LocalConcurrencyLock = new();
+    private static readonly SemaphoreSlim LocalSchedulerClaimGate = new(1, 1);
     private static readonly HashSet<int> LocalConcurrencySlots = [];
     private static readonly HashSet<int> LocalImageConcurrencySlots = [];
     private static readonly HashSet<int> LocalVideoConcurrencySlots = [];
     private static readonly HashSet<int> LocalBorrowedVideoConcurrencySlots = [];
+
+    private TemplateGenerationRuntimeSnapshot RuntimeSettings => runtimeSettings?.Current
+        ?? TemplateGenerationRuntimeSettingsProvider.BuildFallback(options);
 
     public TemplateGenerationJobProcessor(
         TemplatesDbContext dbContext,
@@ -106,6 +113,20 @@ internal sealed partial class TemplateGenerationJobProcessor(
             return true;
         }
 
+        if (RuntimeSettings.NewClaimsPaused)
+        {
+            TemplateGenerationMetrics.RecordSchedulerNoSlotSkip("draining");
+            return failedOrphanQueuedJob || recoveredStaleJob;
+        }
+
+        // Provider reconciliation above must continue while billing health is stale,
+        // but no queued job may be claimed if it would result in a new submission.
+        if (!await CanSubmitToProviderAsync("mixed", "worker", cancellationToken))
+        {
+            TemplateGenerationMetrics.RecordSchedulerNoSlotSkip("provider_capacity");
+            return failedOrphanQueuedJob || recoveredStaleJob;
+        }
+
         await using var concurrencyLease = await TryAcquireGlobalConcurrencyLeaseAsync(cancellationToken);
         if (concurrencyLease is null)
         {
@@ -113,9 +134,11 @@ internal sealed partial class TemplateGenerationJobProcessor(
             return failedOrphanQueuedJob || recoveredStaleJob;
         }
 
+        await using var claimGate = await AcquireSchedulerClaimGateAsync(cancellationToken);
         await using var mediaLeases = await TryAcquireMediaConcurrencyLeasesAsync(cancellationToken);
         if (!mediaLeases.HasAny)
         {
+            await claimGate.CompleteAsync(cancellationToken);
             TemplateGenerationMetrics.RecordSchedulerNoSlotSkip("media");
             return failedOrphanQueuedJob || recoveredStaleJob;
         }
@@ -126,6 +149,7 @@ internal sealed partial class TemplateGenerationJobProcessor(
             mediaLeases.AllowNativeVideo,
             mediaLeases.AllowBorrowedVideo,
             cancellationToken);
+        await claimGate.CompleteAsync(cancellationToken);
         var usedBorrowedVideoSlot = mediaLeases.UsesBorrowedVideoFor(job);
         mediaLeases.ReleaseUnusedFor(job);
 

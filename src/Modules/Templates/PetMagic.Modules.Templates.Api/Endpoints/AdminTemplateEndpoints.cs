@@ -48,6 +48,25 @@ public static partial class AdminTemplateEndpoints
             .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateSmallJsonRequestBodyBytes));
         group.MapGet("/generations/metrics", GetGenerationDashboardMetricsAsync)
             .RequireAuthorization("AdminOnly");
+        group.MapGet("/generation-control", GetGenerationControlAsync)
+            .RequireAuthorization("AdminOnly");
+        group.MapPut("/generation-control", UpdateGenerationControlAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateSmallJsonRequestBodyBytes))
+            .RequireAuthorization("AdminOnly");
+        group.MapPost("/generation-control/provider/refresh", RefreshGenerationProviderAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateSmallJsonRequestBodyBytes))
+            .RequireAuthorization("AdminOnly");
+        group.MapPost("/generation-control/alerts/{alertId:guid}/acknowledge", AcknowledgeGenerationAlertAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateSmallJsonRequestBodyBytes))
+            .RequireAuthorization("AdminOnly");
+        group.MapPost("/generation-control/render/scale", RequestGenerationWorkerScaleAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateSmallJsonRequestBodyBytes))
+            .RequireAuthorization("AdminOnly");
+        group.MapGet("/generation-control/render/operations/{operationId:guid}", GetGenerationWorkerScaleOperationAsync)
+            .RequireAuthorization("AdminOnly");
+        group.MapPost("/generation-control/render/operations/{operationId:guid}/cancel", CancelGenerationWorkerScaleOperationAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateSmallJsonRequestBodyBytes))
+            .RequireAuthorization("AdminOnly");
         group.MapGet("/generations", ListGenerationsAsync)
             .RequireAuthorization("AdminOnly");
         group.MapGet("/generations/{generationId:guid}", GetGenerationAsync)

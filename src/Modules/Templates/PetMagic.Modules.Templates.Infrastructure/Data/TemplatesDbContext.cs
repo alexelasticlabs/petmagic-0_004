@@ -53,6 +53,16 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
 
     public DbSet<TemplateRuntimeConfigFingerprint> TemplateRuntimeConfigFingerprints => Set<TemplateRuntimeConfigFingerprint>();
 
+    public DbSet<TemplateGenerationRuntimeSettings> TemplateGenerationRuntimeSettings => Set<TemplateGenerationRuntimeSettings>();
+
+    public DbSet<TemplateFalProviderHealthSnapshot> TemplateFalProviderHealthSnapshots => Set<TemplateFalProviderHealthSnapshot>();
+
+    public DbSet<TemplateGenerationOperationalAlert> TemplateGenerationOperationalAlerts => Set<TemplateGenerationOperationalAlert>();
+
+    public DbSet<TemplateGenerationOperationalAlertAcknowledgement> TemplateGenerationOperationalAlertAcknowledgements => Set<TemplateGenerationOperationalAlertAcknowledgement>();
+
+    public DbSet<TemplateRenderScaleOperation> TemplateRenderScaleOperations => Set<TemplateRenderScaleOperation>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         ConfigurePushOutbox(builder, "templates_push_outbox");
@@ -437,6 +447,73 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
                 .HasDatabaseName("IX_trcf_Component_ProfileName_StartedAtUtc");
             entity.HasIndex(x => new { x.ProfileName, x.Checksum, x.StartedAtUtc })
                 .HasDatabaseName("IX_trcf_ProfileName_Checksum_StartedAtUtc");
+        });
+
+        builder.Entity<TemplateGenerationRuntimeSettings>(entity =>
+        {
+            entity.ToTable("templates_generation_runtime_settings");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Version).IsConcurrencyToken();
+            entity.Property(x => x.FalBalanceLowThresholdUsd).HasPrecision(18, 4);
+            entity.Property(x => x.FalBalanceCriticalThresholdUsd).HasPrecision(18, 4);
+            entity.Property(x => x.LastChangeReason).HasMaxLength(500);
+            entity.HasIndex(x => x.UpdatedAtUtc);
+        });
+
+        builder.Entity<TemplateFalProviderHealthSnapshot>(entity =>
+        {
+            entity.ToTable("templates_fal_provider_health");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.BalanceUsd).HasPrecision(18, 4);
+            entity.Property(x => x.Status).HasMaxLength(24).IsRequired();
+            entity.Property(x => x.LastErrorCode).HasMaxLength(128);
+            entity.HasIndex(x => x.UpdatedAtUtc);
+        });
+
+        builder.Entity<TemplateGenerationOperationalAlert>(entity =>
+        {
+            entity.ToTable("templates_generation_operational_alerts");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Code).HasMaxLength(96).IsRequired();
+            entity.Property(x => x.Severity).HasMaxLength(24).IsRequired();
+            entity.Property(x => x.Title).HasMaxLength(160).IsRequired();
+            entity.Property(x => x.Message).HasMaxLength(1000).IsRequired();
+            entity.HasIndex(x => x.Code).IsUnique();
+            entity.HasIndex(x => new { x.ResolvedAtUtc, x.UpdatedAtUtc })
+                .HasDatabaseName("IX_tgoa_ResolvedAtUtc_UpdatedAtUtc");
+        });
+
+        builder.Entity<TemplateGenerationOperationalAlertAcknowledgement>(entity =>
+        {
+            entity.ToTable("templates_generation_operational_alert_acknowledgements");
+            entity.HasKey(x => new { x.AlertId, x.AdminUserId });
+            entity.HasIndex(x => new { x.AdminUserId, x.AcknowledgedAtUtc })
+                .HasDatabaseName("IX_tgoaa_AdminUserId_AcknowledgedAtUtc");
+            entity.HasOne(x => x.Alert)
+                .WithMany(x => x.Acknowledgements)
+                .HasForeignKey(x => x.AlertId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<TemplateRenderScaleOperation>(entity =>
+        {
+            entity.ToTable("templates_render_scale_operations");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.IdempotencyKey).HasMaxLength(256).IsRequired();
+            entity.Property(x => x.RequestHash).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.Status).HasMaxLength(32).IsRequired();
+            entity.Property(x => x.Reason).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.CorrelationId).HasMaxLength(128).IsRequired();
+            entity.Property(x => x.ErrorCode).HasMaxLength(128);
+            entity.Property(x => x.ErrorMessage).HasMaxLength(1000);
+            entity.Property(x => x.Version).IsConcurrencyToken();
+            entity.HasIndex(x => new { x.ActorUserId, x.IdempotencyKey })
+                .IsUnique()
+                .HasDatabaseName("UX_trso_ActorUserId_IdempotencyKey");
+            entity.HasIndex(x => new { x.Status, x.NextAttemptAtUtc })
+                .HasDatabaseName("IX_trso_Status_NextAttemptAtUtc");
+            entity.HasIndex(x => x.LockExpiresAtUtc)
+                .HasDatabaseName("IX_trso_LockExpiresAtUtc");
         });
 
         builder.Entity<TemplateGenerationFeedback>(entity =>

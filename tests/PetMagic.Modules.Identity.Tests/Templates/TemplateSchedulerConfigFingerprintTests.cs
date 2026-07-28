@@ -139,6 +139,9 @@ public sealed class TemplateSchedulerConfigFingerprintTests
             .OrderByDescending(x => x.StartedAtUtc)
             .FirstAsync();
         Assert.False(latestApi.MismatchDetected);
+        Assert.Equal(0, latestApi.ConfiguredLoops);
+        Assert.True(latestApi.NewClaimsPaused);
+        Assert.True(latestApi.LastSeenAtUtc <= DateTime.UtcNow.AddMinutes(-2));
     }
 
     [Fact]

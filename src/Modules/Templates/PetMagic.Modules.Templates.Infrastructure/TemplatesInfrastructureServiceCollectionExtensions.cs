@@ -215,6 +215,13 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         services.AddSingleton<ITemplateMediaReadUrlSigner, TemplateMediaReadUrlSigner>();
         services.AddSingleton(new TemplateSchedulerConfigComponent(resolvedSchedulerComponent));
         services.AddSingleton<TemplateSchedulerConfigRuntimeState>();
+        services.AddSingleton<TemplateGenerationRuntimeSettingsProvider>();
+        services.AddSingleton<ITemplateGenerationRuntimeSettingsProvider>(serviceProvider =>
+            serviceProvider.GetRequiredService<TemplateGenerationRuntimeSettingsProvider>());
+        services.AddSingleton<ITemplateGenerationDrainController>(serviceProvider =>
+            serviceProvider.GetRequiredService<TemplateGenerationRuntimeSettingsProvider>());
+        services.AddHostedService(serviceProvider =>
+            serviceProvider.GetRequiredService<TemplateGenerationRuntimeSettingsProvider>());
         services.AddHostedService<TemplateSchedulerConfigStartupService>();
         services.AddSingleton<TemplateWatermarkSettingsStore>();
         services.AddDbContextPool<TemplatesDbContext>(dbOptions =>
@@ -238,11 +245,22 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             });
         services.AddHttpClient(HttpGeneratedMediaImporter.HttpClientName, ConfigureExternalHttpClient)
             .ConfigurePrimaryHttpMessageHandler(GeneratedMediaHttpMessageHandler.Create);
-        services.AddHttpClient(FalProviderHealthService.HttpClientName, ConfigureExternalHttpClient)
+        services.AddHttpClient(FalAccountBillingClient.HttpClientName, ConfigureExternalHttpClient)
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
             {
                 AllowAutoRedirect = false
             });
+        services.AddSingleton<FalAccountBillingClient>();
+        services.AddSingleton<FalProviderHealthMonitor>();
+        services.AddScoped<GenerationOperationalAlertService>();
+        if (string.Equals(
+                resolvedSchedulerComponent,
+                TemplateSchedulerConfigFingerprint.ApiComponent,
+                StringComparison.Ordinal))
+        {
+            services.AddHostedService(serviceProvider =>
+                serviceProvider.GetRequiredService<FalProviderHealthMonitor>());
+        }
         services.AddScoped<ITemplateAiProviderHealthService, FalProviderHealthService>();
         services.AddScoped<ITemplatePushTokenService, TemplatePushTokenService>();
         services.AddHttpClient(TemplateLocalizationTranslator.HttpClientName, ConfigureExternalHttpClient)
@@ -263,6 +281,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         services.AddScoped<ITemplateMediaLifecycleService, TemplateMediaLifecycleService>();
         services.AddScoped<ITemplateVisibilityPolicy, TemplateVisibilityPolicy>();
         services.AddScoped<ITemplatesService, TemplatesService>();
+        services.AddScoped<IAdminGenerationControlService, AdminGenerationControlService>();
         services.AddScoped<IPetsService, PetsService>();
         services.AddScoped<IFeedbackService, FeedbackService>();
         services.AddScoped<IAdminUserTemplateAnalyticsReader, AdminUserTemplateAnalyticsReader>();
@@ -349,12 +368,67 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         var httpClientFactory = scope.ServiceProvider.GetRequiredService<IHttpClientFactory>();
 
         await dbContext.Database.MigrateAsync();
+        await EnsureGenerationRuntimeSettingsAsync(dbContext, options, cancellationToken: default);
+        await scope.ServiceProvider.GetRequiredService<ITemplateGenerationRuntimeSettingsProvider>()
+            .RefreshAsync(cancellationToken: default);
         await SyncWatermarkSettingsStoreAsync(scope.ServiceProvider, dbContext, options, cancellationToken: default);
         await BackfillTemplateLocalizationsAsync(dbContext, options, httpClientFactory, cancellationToken: default);
 
         if (options.SeedSampleTemplates)
         {
             throw new InvalidOperationException("Sample template seed data has been removed. Create template catalog entries through the admin API.");
+        }
+    }
+
+    private static async Task EnsureGenerationRuntimeSettingsAsync(
+        TemplatesDbContext dbContext,
+        TemplatesOptions options,
+        CancellationToken cancellationToken)
+    {
+        if (await dbContext.TemplateGenerationRuntimeSettings
+            .AsNoTracking()
+            .AnyAsync(x => x.Id == TemplateGenerationRuntimeSettingsProvider.SettingsId, cancellationToken))
+        {
+            return;
+        }
+
+        var fallback = TemplateGenerationRuntimeSettingsProvider.BuildFallback(options);
+        var now = DateTime.UtcNow;
+        dbContext.TemplateGenerationRuntimeSettings.Add(new TemplateGenerationRuntimeSettings
+        {
+            Id = TemplateGenerationRuntimeSettingsProvider.SettingsId,
+            Version = 1,
+            GlobalMaxConcurrent = fallback.GlobalMaxConcurrent,
+            ImageMaxConcurrent = fallback.ImageMaxConcurrent,
+            ImageProtectedConcurrent = fallback.ImageProtectedConcurrent,
+            VideoGuaranteedConcurrent = fallback.VideoGuaranteedConcurrent,
+            VideoMaxConcurrent = fallback.VideoMaxConcurrent,
+            VideoBorrowMaxConcurrent = fallback.VideoBorrowMaxConcurrent,
+            WorkerLoopsPerInstance = fallback.WorkerLoopsPerInstance,
+            FalConfiguredConcurrency = fallback.FalConfiguredConcurrency,
+            FalReservedConcurrency = fallback.FalReservedConcurrency,
+            FalBalanceLowThresholdUsd = fallback.FalBalanceLowThresholdUsd,
+            FalBalanceCriticalThresholdUsd = fallback.FalBalanceCriticalThresholdUsd,
+            NewClaimsPaused = false,
+            DrainOperationId = null,
+            LastChangeReason = "seeded_from_host_configuration",
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        });
+
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            dbContext.ChangeTracker.Clear();
+            if (!await dbContext.TemplateGenerationRuntimeSettings
+                .AsNoTracking()
+                .AnyAsync(x => x.Id == TemplateGenerationRuntimeSettingsProvider.SettingsId, cancellationToken))
+            {
+                throw;
+            }
         }
     }
 

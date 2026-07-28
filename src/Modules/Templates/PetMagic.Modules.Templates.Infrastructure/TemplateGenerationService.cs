@@ -32,13 +32,16 @@ internal sealed partial class TemplateGenerationService(
     IDataProtectionProvider? dataProtectionProvider = null,
     IAdminAuditLog? adminAuditLog = null,
     FalQueueClient? falQueueClient = null,
-    IHttpContextAccessor? httpContextAccessor = null) : ITemplateGenerationService, ITemplateGenerationGamificationReconciliationService
+    IHttpContextAccessor? httpContextAccessor = null,
+    ITemplateGenerationRuntimeSettingsProvider? generationRuntimeSettings = null) : ITemplateGenerationService, ITemplateGenerationGamificationReconciliationService
 {
     private readonly ITemplateVisibilityPolicy _visibilityPolicy =
         visibilityPolicy ?? new TemplateVisibilityPolicy();
     private readonly IDataProtector _generationShareProtector =
         (dataProtectionProvider ?? new EphemeralDataProtectionProvider())
             .CreateProtector("PetMagic.Templates.GenerationShare.v1");
+    private TemplateGenerationRuntimeSnapshot RuntimeSettings => generationRuntimeSettings?.Current
+        ?? TemplateGenerationRuntimeSettingsProvider.BuildFallback(options);
 
     internal static readonly Guid AdminTestUserId = Guid.Empty;
 

@@ -9,6 +9,8 @@ using Microsoft.Extensions.Logging;
 using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Domain.Enums;
+using PetMagic.Modules.Templates.Application.Abstractions;
+using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Infrastructure.Data;
 using PetMagic.Modules.Templates.Infrastructure.Options;
 
@@ -19,9 +21,10 @@ internal sealed class FalProviderHealthService(
     IHttpClientFactory httpClientFactory,
     IMemoryCache memoryCache,
     TemplatesOptions options,
-    ILogger<FalProviderHealthService> logger) : ITemplateAiProviderHealthService
+    ILogger<FalProviderHealthService> logger,
+    ITemplateGenerationRuntimeSettingsProvider? runtimeSettings = null) : ITemplateAiProviderHealthService
 {
-    public const string HttpClientName = "FalPlatformApi";
+    public const string HttpClientName = FalAccountBillingClient.HttpClientName;
 
     private const string BalanceCacheKey = "templates:fal:provider-balance";
     private const int BalanceResponseMaxChars = 16 * 1024;
@@ -37,34 +40,51 @@ internal sealed class FalProviderHealthService(
             return Result.Success();
         }
 
-        var configuredConcurrency = options.FalProviderConcurrencyLimit;
+        var settings = runtimeSettings?.Current
+            ?? TemplateGenerationRuntimeSettingsProvider.BuildFallback(options);
+        var configuredConcurrency = settings.FalConfiguredConcurrency;
         var inflightRequests = await CountInflightProviderRequestsAsync(cancellationToken);
         if (configuredConcurrency <= 0)
         {
-            RecordSnapshot(configuredConcurrency, inflightRequests, balanceUsd: null);
+            RecordSnapshot(settings, inflightRequests, balanceUsd: null);
             return Reject("concurrency_unknown", mediaType, tier);
         }
 
-        var usableConcurrency = configuredConcurrency - options.FalProviderReservedConcurrency;
+        var usableConcurrency = settings.FalUsableConcurrency;
         if (usableConcurrency <= 0 || inflightRequests >= usableConcurrency)
         {
-            RecordSnapshot(configuredConcurrency, inflightRequests, balanceUsd: null);
+            RecordSnapshot(settings, inflightRequests, balanceUsd: null);
             return Reject("concurrency_exhausted", mediaType, tier);
         }
 
-        var balance = await GetCurrentBalanceUsdAsync(cancellationToken);
-        RecordSnapshot(configuredConcurrency, inflightRequests, balance);
+        var balance = runtimeSettings is null
+            ? await GetCurrentBalanceUsdAsync(cancellationToken)
+            : await GetPersistedCurrentBalanceUsdAsync(cancellationToken);
+        RecordSnapshot(settings, inflightRequests, balance);
         if (balance is null)
         {
             return Reject("balance_unknown", mediaType, tier);
         }
 
-        if (balance.Value <= options.FalProviderBalanceCriticalThresholdUsd)
+        if (balance.Value <= settings.FalBalanceCriticalThresholdUsd)
         {
             return Reject("balance_critical", mediaType, tier);
         }
 
         return Result.Success();
+    }
+
+    private async Task<decimal?> GetPersistedCurrentBalanceUsdAsync(CancellationToken cancellationToken)
+    {
+        var snapshot = await dbContext.TemplateFalProviderHealthSnapshots
+            .AsNoTracking()
+            .OrderByDescending(x => x.UpdatedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+        return snapshot is not null
+            && FalProviderHealthPolicy.IsSnapshotCurrent(snapshot.LastSuccessAtUtc, DateTime.UtcNow)
+            && snapshot.BalanceUsd is not null
+                ? snapshot.BalanceUsd
+                : null;
     }
 
     private bool IsFalProvider()
@@ -80,7 +100,9 @@ internal sealed class FalProviderHealthService(
                     || x.Status == TemplateGenerationStatus.ProviderQueued
                     || x.Status == TemplateGenerationStatus.ProviderProcessing)
                 && x.ProviderCompletedAtUtc == null
-                && (x.PreprocessingProviderRequestId != null || x.MotionProviderRequestId != null),
+                && (x.Status == TemplateGenerationStatus.SubmittingToProvider
+                    || x.PreprocessingProviderRequestId != null
+                    || x.MotionProviderRequestId != null),
                 cancellationToken);
     }
 
@@ -164,14 +186,17 @@ internal sealed class FalProviderHealthService(
         };
     }
 
-    private void RecordSnapshot(int configuredConcurrency, long inflightRequests, decimal? balanceUsd)
+    private void RecordSnapshot(
+        TemplateGenerationRuntimeSnapshot settings,
+        long inflightRequests,
+        decimal? balanceUsd)
     {
         TemplateGenerationMetrics.RecordFalProviderCapacitySnapshot(
-            configuredConcurrency,
+            settings.FalConfiguredConcurrency,
             inflightRequests,
             balanceUsd,
-            options.FalProviderBalanceLowThresholdUsd,
-            options.FalProviderBalanceCriticalThresholdUsd);
+            settings.FalBalanceLowThresholdUsd,
+            settings.FalBalanceCriticalThresholdUsd);
     }
 
     private static Result Reject(string reason, string mediaType, string tier)

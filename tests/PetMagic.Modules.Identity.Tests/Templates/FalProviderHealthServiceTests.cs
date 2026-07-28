@@ -5,7 +5,10 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 
 using PetMagic.Modules.Templates.Infrastructure;
+using PetMagic.Modules.Templates.Application.Abstractions;
+using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Infrastructure.Data;
+using PetMagic.Modules.Templates.Infrastructure.Entities;
 using PetMagic.Modules.Templates.Infrastructure.Options;
 
 namespace PetMagic.Modules.Identity.Tests.Templates;
@@ -57,17 +60,104 @@ public sealed class FalProviderHealthServiceTests
         Assert.True(result.IsSuccess);
     }
 
+    [Fact]
+    public async Task EnsureCanAcceptGenerationAsync_ShouldCountSubmittingReservations_WithoutProviderRequestIds()
+    {
+        await using var dbContext = CreateDbContext();
+        var options = CreateOptions(falProviderConcurrencyLimit: 9, criticalBalanceUsd: 5);
+        var now = DateTime.UtcNow;
+        dbContext.TemplateGenerationJobs.AddRange(Enumerable.Range(0, 8).Select(_ =>
+            new TemplateGenerationJob
+            {
+                Id = Guid.NewGuid(),
+                Status = PetMagic.Modules.Templates.Domain.Enums.TemplateGenerationStatus.SubmittingToProvider,
+                ProviderCompletedAtUtc = null,
+                CreatedAtUtc = now,
+                QueuedAtUtc = now,
+                UpdatedAtUtc = now
+            }));
+        await dbContext.SaveChangesAsync();
+        var service = CreateService(
+            dbContext,
+            options,
+            """{"credits":{"current_balance":250.00}}""");
+
+        var result = await service.EnsureCanAcceptGenerationAsync("video", "premium", CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("concurrency_exhausted", result.Error.Metadata!["reason"]);
+    }
+
+    [Fact]
+    public async Task EnsureCanAcceptGenerationAsync_ShouldRejectPersistedBalance_WhenLastSuccessIsStale()
+    {
+        await using var dbContext = CreateDbContext();
+        var options = CreateOptions(falProviderConcurrencyLimit: 10, criticalBalanceUsd: 5);
+        var now = DateTime.UtcNow;
+        dbContext.TemplateFalProviderHealthSnapshots.Add(new TemplateFalProviderHealthSnapshot
+        {
+            Id = Guid.NewGuid(),
+            BalanceUsd = 100,
+            Status = "healthy",
+            CheckedAtUtc = now,
+            LastSuccessAtUtc = now.AddSeconds(-181),
+            UpdatedAtUtc = now
+        });
+        await dbContext.SaveChangesAsync();
+        var service = CreateService(
+            dbContext,
+            options,
+            billingJson: null,
+            runtimeSettings: new StaticRuntimeSettingsProvider(
+                TemplateGenerationRuntimeSettingsProvider.BuildFallback(options)));
+
+        var result = await service.EnsureCanAcceptGenerationAsync("image", "premium", CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("balance_unknown", result.Error.Metadata!["reason"]);
+    }
+
+    [Fact]
+    public async Task EnsureCanAcceptGenerationAsync_ShouldAcceptRecentPersistedBalance()
+    {
+        await using var dbContext = CreateDbContext();
+        var options = CreateOptions(falProviderConcurrencyLimit: 10, criticalBalanceUsd: 5);
+        var now = DateTime.UtcNow;
+        dbContext.TemplateFalProviderHealthSnapshots.Add(new TemplateFalProviderHealthSnapshot
+        {
+            Id = Guid.NewGuid(),
+            BalanceUsd = 100,
+            Status = "healthy",
+            CheckedAtUtc = now,
+            LastSuccessAtUtc = now.AddSeconds(-179),
+            UpdatedAtUtc = now
+        });
+        await dbContext.SaveChangesAsync();
+        var service = CreateService(
+            dbContext,
+            options,
+            billingJson: null,
+            runtimeSettings: new StaticRuntimeSettingsProvider(
+                TemplateGenerationRuntimeSettingsProvider.BuildFallback(options)));
+
+        var result = await service.EnsureCanAcceptGenerationAsync("video", "premium", CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
+
     private static FalProviderHealthService CreateService(
         TemplatesDbContext dbContext,
         TemplatesOptions options,
-        string? billingJson)
+        string? billingJson,
+        ITemplateGenerationRuntimeSettingsProvider? runtimeSettings = null)
     {
         return new FalProviderHealthService(
             dbContext,
             new StaticHttpClientFactory(FalProviderHealthService.HttpClientName, billingJson),
             new MemoryCache(new MemoryCacheOptions()),
             options,
-            NullLogger<FalProviderHealthService>.Instance);
+            NullLogger<FalProviderHealthService>.Instance,
+            runtimeSettings);
     }
 
     private static TemplatesOptions CreateOptions(
@@ -129,5 +219,13 @@ public sealed class FalProviderHealthServiceTests
                 Content = new StringContent(billingJson)
             });
         }
+    }
+
+    private sealed class StaticRuntimeSettingsProvider(TemplateGenerationRuntimeSnapshot current)
+        : ITemplateGenerationRuntimeSettingsProvider
+    {
+        public TemplateGenerationRuntimeSnapshot Current { get; } = current;
+
+        public Task RefreshAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

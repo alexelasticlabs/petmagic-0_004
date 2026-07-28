@@ -18,6 +18,7 @@ try {
   requireCheckerPass(resolve(repoRoot, 'render.production.yaml'), 'production');
 
   const stagingBlueprint = readFileSync(resolve(repoRoot, 'render.yaml'), 'utf8');
+  const productionBlueprint = readFileSync(resolve(repoRoot, 'render.production.yaml'), 'utf8');
 
   const missingSharedPath = writeFixture(
     'render-missing-shared.yaml',
@@ -61,6 +62,63 @@ try {
     publicDatabaseAllowListPath,
     'staging',
     'petmagic-staging-db must define an empty ipAllowList to block public database access.'
+  );
+
+  const productionFixedWorkerCountPath = writeFixture(
+    'render-production-fixed-worker-count.yaml',
+    replaceRequired(
+      productionBlueprint,
+      '    maxShutdownDelaySeconds: 300\n    buildFilter:',
+      '    maxShutdownDelaySeconds: 300\n    numInstances: 1\n    buildFilter:'
+    )
+  );
+  requireCheckerFailure(
+    productionFixedWorkerCountPath,
+    'production',
+    'petmagic-production-generation-worker must omit numInstances so API-managed scaling survives Blueprint sync.'
+  );
+
+  const productionWorkerLocalLoopCountPath = writeFixture(
+    'render-production-worker-local-loop-count.yaml',
+    replaceRequired(
+      productionBlueprint,
+      '      - key: Templates__GenerationWorkerEnabled\n        value: "true"\n',
+      '      - key: Templates__GenerationWorkerEnabled\n        value: "true"\n' +
+        '      - key: Templates__MaxConcurrentJobsPerWorker\n        value: "2"\n'
+    )
+  );
+  requireCheckerFailure(
+    productionWorkerLocalLoopCountPath,
+    'production',
+    'petmagic-production-generation-worker must not define Templates__MaxConcurrentJobsPerWorker; configure it in the shared env group.'
+  );
+
+  const productionMissingSharedLoopCountPath = writeFixture(
+    'render-production-missing-shared-loop-count.yaml',
+    replaceRequired(
+      productionBlueprint,
+      '      - key: Templates__MaxConcurrentJobsPerWorker\n        value: "2"\n',
+      ''
+    )
+  );
+  requireCheckerFailure(
+    productionMissingSharedLoopCountPath,
+    'production',
+    'Env group petmagic-production-shared is missing Templates__MaxConcurrentJobsPerWorker.'
+  );
+
+  const productionMissingRenderApiKeyPath = writeFixture(
+    'render-production-missing-render-api-key.yaml',
+    replaceRequired(
+      productionBlueprint,
+      '      - key: RENDER_API_KEY\n        sync: false\n',
+      ''
+    )
+  );
+  requireCheckerFailure(
+    productionMissingRenderApiKeyPath,
+    'production',
+    'petmagic-production-api is missing secret RENDER_API_KEY.'
   );
 
   console.log('Render Blueprint contract tests passed.');

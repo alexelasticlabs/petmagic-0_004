@@ -426,16 +426,7 @@ public sealed class TemplateGenerationSchedulerSimulationTests
             }
 
             var queuedImage = queued.Count(x => x.MediaType == TemplateGenerationQueue.MediaTypeImage);
-            if (queuedImage == 0)
-            {
-                return options.AllowVideoBorrowWhenImageQueueEmpty;
-            }
-
-            var protectedSlots = Math.Max(1, ResolveImageProtectedConcurrency());
-            var imageEstimatedWait = (int)Math.Ceiling(Math.Max(0, activeImage + queuedImage - protectedSlots)
-                * Math.Max(1, options.EstimatedImageGenerationSeconds)
-                / (double)protectedSlots);
-            return imageEstimatedWait <= options.AllowVideoBorrowWhenImageEstimatedWaitBelowSeconds;
+            return queuedImage == 0 && options.AllowVideoBorrowWhenImageQueueEmpty;
         }
 
         private int ResolveImageProtectedConcurrency()

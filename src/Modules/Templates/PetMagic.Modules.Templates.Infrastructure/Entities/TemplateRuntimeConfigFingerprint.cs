@@ -16,6 +16,12 @@ public sealed class TemplateRuntimeConfigFingerprint
 
     public DateTime LastSeenAtUtc { get; set; }
 
+    public long AppliedSettingsVersion { get; set; }
+
+    public int ConfiguredLoops { get; set; }
+
+    public bool NewClaimsPaused { get; set; }
+
     public bool MismatchDetected { get; set; }
 
     public string? MismatchDetails { get; set; }

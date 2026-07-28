@@ -68,6 +68,8 @@ envVarGroups:
         value: "10"
       - key: Templates__FalProviderBalanceCriticalThresholdUsd
         value: "5"
+      - key: Templates__MaxConcurrentJobsPerWorker
+        value: "2"
       - key: Templates__QueueMaxSize
         value: "1000"
       - key: Templates__EstimatedImageGenerationSeconds
@@ -172,6 +174,18 @@ services:
           property: connectionString
       - key: Jwt__SigningKey
         sync: false
+      - key: RENDER_API_KEY
+        sync: false
+      - key: RENDER_GENERATION_WORKER_SERVICE_ID
+        sync: false
+      - key: RENDER_GENERATION_WORKER_EXPECTED_OWNER_ID
+        sync: false
+      - key: RENDER_GENERATION_WORKER_EXPECTED_NAME
+        value: petmagic-production-generation-worker
+      - key: RENDER_GENERATION_WORKER_EXPECTED_TYPE
+        value: background_worker
+      - key: RENDER_GENERATION_WORKER_EXPECTED_REPOSITORY
+        value: https://github.com/alexelasticlabs/petmagic-0_004
       - key: Templates__FalProviderSpendDailyLimitUsd
         sync: false
       - key: FAL_AI_API_KEY
@@ -269,7 +283,6 @@ services:
     dockerfilePath: ./Dockerfile.generation-worker
     dockerContext: .
     maxShutdownDelaySeconds: 300
-    numInstances: 1
     buildFilter:
       paths:
         - global.json
@@ -290,8 +303,6 @@ services:
         value: "false"
       - key: Templates__TemplateOfTheDayAutoPickWorkerEnabled
         value: "false"
-      - key: Templates__MaxConcurrentJobsPerWorker
-        value: "2"
       - key: ECONOMY_RECONCILIATION_ENABLED
         value: "false"
       - key: ECONOMY_PUSH_OUTBOX_DISPATCHER_ENABLED

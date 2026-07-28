@@ -307,7 +307,14 @@ internal sealed partial class TemplateGenerationService
                 && x.QueueMediaType == TemplateGenerationQueue.MediaTypeImage,
                 cancellationToken);
 
-        return new QueueCapacityContext(activeImage, activeVideo, queuedImage);
+        var queuedVideo = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .LongCountAsync(x => x.Status == TemplateGenerationStatus.Queued
+                && (x.ChargedAtUtc != null || x.UserId == AdminTestUserId)
+                && x.QueueMediaType == TemplateGenerationQueue.MediaTypeVideo,
+                cancellationToken);
+
+        return new QueueCapacityContext(activeImage, activeVideo, queuedImage, queuedVideo);
     }
 
     private int ResolveEffectiveSlotsForEstimate(string normalizedMediaType, QueueCapacityContext? capacityContext)
@@ -321,92 +328,65 @@ internal sealed partial class TemplateGenerationService
             }
 
             return Math.Max(1, Math.Min(
-                options.VideoMaxConcurrentGenerations,
+                RuntimeSettings.VideoMaxConcurrent,
                 reserved + ResolveVideoBorrowMaxConcurrency()));
         }
 
         if (capacityContext is null)
         {
-            return Math.Max(1, options.ImageMaxConcurrentGenerations);
+            return Math.Max(1, RuntimeSettings.ImageMaxConcurrent);
         }
 
         var context = capacityContext.Value;
-        var borrowedVideo = Math.Max(0, context.ActiveVideo - ResolveVideoReservedConcurrency());
-        var globalSlotsAvailableAfterBorrowedVideo = Math.Max(
-            ResolveImageProtectedConcurrency(),
-            options.GlobalMaxConcurrentGenerations - (int)borrowedVideo);
-        return Math.Max(1, Math.Min(options.ImageMaxConcurrentGenerations, globalSlotsAvailableAfterBorrowedVideo));
+        return Math.Max(1, TemplateGenerationCapacityPolicy.ResolveEffectiveImageMax(
+            RuntimeSettings,
+            context.ActiveVideo,
+            context.QueuedVideo));
     }
 
     private bool CanEstimateVideoBorrow(QueueCapacityContext? capacityContext)
     {
-        if (!options.EnableElasticLaneBorrowing || ResolveVideoBorrowMaxConcurrency() <= 0)
-        {
-            return false;
-        }
-
         if (capacityContext is null)
         {
             return false;
         }
 
         var context = capacityContext.Value;
-        if (context.ActiveVideo >= options.VideoMaxConcurrentGenerations)
-        {
-            return false;
-        }
-
-        if (Math.Max(0, context.ActiveVideo - ResolveVideoReservedConcurrency()) >= ResolveVideoBorrowMaxConcurrency())
-        {
-            return false;
-        }
-
-        if (context.ActiveImage + ResolveImageProtectedConcurrency() > options.ImageMaxConcurrentGenerations)
-        {
-            return false;
-        }
-
-        if (context.QueuedImage == 0)
-        {
-            return options.AllowVideoBorrowWhenImageQueueEmpty;
-        }
-
-        var protectedSlots = Math.Max(1, ResolveImageProtectedConcurrency());
-        var backlogUnits = Math.Max(0, context.ActiveImage + context.QueuedImage - protectedSlots);
-        var imageEstimatedWaitSeconds = (int)Math.Ceiling(backlogUnits * Math.Max(1, options.EstimatedImageGenerationSeconds) / (double)protectedSlots);
-        return imageEstimatedWaitSeconds <= options.AllowVideoBorrowWhenImageEstimatedWaitBelowSeconds;
+        return TemplateGenerationCapacityPolicy.CanBorrowVideo(
+            RuntimeSettings,
+            options.EnableElasticLaneBorrowing,
+            options.AllowVideoBorrowWhenImageQueueEmpty,
+            context.ActiveImage,
+            context.ActiveVideo,
+            context.QueuedImage,
+            out _);
     }
 
     private int ResolveImageProtectedConcurrency()
     {
-        return options.ImageProtectedConcurrentGenerations > 0
-            ? options.ImageProtectedConcurrentGenerations
-            : ResolveImageReservedConcurrency();
+        return RuntimeSettings.ImageProtectedConcurrent;
     }
 
     private int ResolveImageReservedConcurrency()
     {
-        return options.ImageReservedConcurrentGenerations > 0
-            ? options.ImageReservedConcurrentGenerations
-            : options.ImageMaxConcurrentGenerations;
+        return RuntimeSettings.ImageProtectedConcurrent;
     }
 
     private int ResolveVideoReservedConcurrency()
     {
-        return options.VideoReservedConcurrentGenerations > 0
-            ? options.VideoReservedConcurrentGenerations
-            : options.VideoMaxConcurrentGenerations;
+        return RuntimeSettings.VideoGuaranteedConcurrent;
     }
 
     private int ResolveVideoBorrowMaxConcurrency()
     {
-        return Math.Max(0, options.VideoBorrowMaxConcurrentGenerations);
+        return Math.Max(0, RuntimeSettings.VideoBorrowMaxConcurrent);
     }
 
     private readonly record struct QueueCapacityContext(
         long ActiveImage,
         long ActiveVideo,
-        long QueuedImage);
+        long QueuedImage,
+        long QueuedVideo);
 
     private static bool IsClaimableQueuedJob(TemplateGenerationJob job)
     {

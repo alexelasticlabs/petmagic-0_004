@@ -27,7 +27,7 @@ using PetMagic.Modules.Templates.Infrastructure.Options;
 namespace PetMagic.Modules.Identity.Tests.Templates;
 
 [Collection(TemplateGenerationLocalConcurrencyCollection.Name)]
-public sealed class TemplateGenerationJobProcessorTests
+public sealed partial class TemplateGenerationJobProcessorTests
 {
     [Fact]
     public async Task ProcessNextAsync_ShouldSanitizeDurableBillingFailureDiagnostics()
@@ -993,6 +993,73 @@ public sealed class TemplateGenerationJobProcessorTests
     }
 
     [Fact]
+    public async Task ProcessNextAsync_ShouldBlockNewClaim_WhenProviderCapacityIsUnavailable()
+    {
+        await using var dbContext = CreateDbContext();
+        var template = CreateReadyImageTemplate();
+        var job = CreateGenerationJob(template, TemplateGenerationStatus.Queued, DateTime.UtcNow);
+        job.AttemptCount = 0;
+        var providerHealth = new StubProviderHealthService(Result.Failure(
+            TemplatesErrors.ProviderCapacityUnavailable));
+
+        dbContext.TemplateItems.Add(template);
+        dbContext.TemplateGenerationJobs.Add(job);
+        await dbContext.SaveChangesAsync();
+
+        var processed = await CreateProcessor(dbContext, providerHealth: providerHealth)
+            .ProcessNextAsync(CancellationToken.None);
+        var persisted = await dbContext.TemplateGenerationJobs.SingleAsync(item => item.Id == job.Id);
+
+        Assert.False(processed);
+        Assert.Equal(1, providerHealth.CheckCount);
+        Assert.Equal(TemplateGenerationStatus.Queued, persisted.Status);
+        Assert.Equal(0, persisted.AttemptCount);
+        Assert.Null(persisted.ProviderSubmittedAtUtc);
+    }
+
+    [Fact]
+    public async Task ProcessNextAsync_ShouldContinueProviderReconciliation_WhenNewSubmissionsAreBlocked()
+    {
+        await using var dbContext = CreateDbContext();
+        var template = CreateReadyImageTemplate();
+        var now = DateTime.UtcNow;
+        var providerJob = CreateGenerationJob(template, TemplateGenerationStatus.ProviderQueued, now);
+        providerJob.PreprocessingProviderRequestId = "image-provider-request-reconcile";
+        providerJob.PreprocessingProviderStatusUrl = "https://queue.fal.test/status/image-provider-request-reconcile";
+        providerJob.PreprocessingProviderResponseUrl = "https://queue.fal.test/response/image-provider-request-reconcile";
+        providerJob.CurrentProviderStage = "image_generation";
+        providerJob.ProviderStatus = "IN_QUEUE";
+        providerJob.ProviderStatusCheckedAtUtc = now.AddMinutes(-1);
+        providerJob.UsedPreprocessingModel = template.ImageModel;
+        var queuedJob = CreateGenerationJob(template, TemplateGenerationStatus.Queued, now.AddSeconds(1));
+        var providerHealth = new StubProviderHealthService(Result.Failure(
+            TemplatesErrors.ProviderCapacityUnavailable));
+        var falHandler = new CompletedFalQueueHandler();
+
+        dbContext.TemplateItems.Add(template);
+        dbContext.TemplateGenerationJobs.AddRange(providerJob, queuedJob);
+        await dbContext.SaveChangesAsync();
+
+        var processed = await CreateProcessor(
+                dbContext,
+                imageGenerator: new AsyncSubmittingImageGenerator(),
+                falQueueClient: CreateFalQueueClient(dbContext, falHandler),
+                providerHealth: providerHealth)
+            .ProcessNextAsync(CancellationToken.None);
+        var persistedProviderJob = await dbContext.TemplateGenerationJobs
+            .SingleAsync(item => item.Id == providerJob.Id);
+        var persistedQueuedJob = await dbContext.TemplateGenerationJobs
+            .SingleAsync(item => item.Id == queuedJob.Id);
+
+        Assert.True(processed);
+        Assert.Equal(0, providerHealth.CheckCount);
+        Assert.Equal(TemplateGenerationStatus.ImportingMedia, persistedProviderJob.Status);
+        Assert.Equal(TemplateGenerationStatus.Queued, persistedQueuedJob.Status);
+        Assert.Equal(1, falHandler.StatusCount);
+        Assert.Equal(1, falHandler.ResponseCount);
+    }
+
+    [Fact]
     public async Task ProcessNextAsync_ShouldRefundOnceWhenStagedImportFails()
     {
         await using var dbContext = CreateDbContext();
@@ -1119,7 +1186,7 @@ public sealed class TemplateGenerationJobProcessorTests
         await using (var setup = CreateDbContext(databaseName, root))
         {
             setup.TemplateItems.AddRange(imageTemplate, videoTemplate);
-            setup.TemplateGenerationJobs.AddRange(imageJob, videoJob);
+            setup.TemplateGenerationJobs.Add(imageJob);
             await setup.SaveChangesAsync();
         }
 
@@ -1130,6 +1197,12 @@ public sealed class TemplateGenerationJobProcessorTests
         var imageTask = CreateProcessor(imageContext, imageGenerator: blockingImage, options: options)
             .ProcessNextAsync(CancellationToken.None);
         await blockingImage.Started.Task.WaitAsync(TimeSpan.FromSeconds(3));
+
+        await using (var enqueueVideoContext = CreateDbContext(databaseName, root))
+        {
+            enqueueVideoContext.TemplateGenerationJobs.Add(videoJob);
+            await enqueueVideoContext.SaveChangesAsync();
+        }
 
         var secondProcessed = await CreateProcessor(videoContext, options: options)
             .ProcessNextAsync(CancellationToken.None);
@@ -1797,7 +1870,9 @@ public sealed class TemplateGenerationJobProcessorTests
         IEconomyService? economyService = null,
         FalQueueClient? falQueueClient = null,
         ILogger<TemplateGenerationJobProcessor>? logger = null,
-        ITemplateWatermarkRenderer? watermarkRenderer = null)
+        ITemplateWatermarkRenderer? watermarkRenderer = null,
+        ITemplateAiProviderHealthService? providerHealth = null,
+        ITemplateGenerationRuntimeSettingsProvider? runtimeSettings = null)
     {
         return new TemplateGenerationJobProcessor(
             dbContext,
@@ -1817,7 +1892,9 @@ public sealed class TemplateGenerationJobProcessorTests
             falQueueClient: falQueueClient,
             watermarkRenderer: watermarkRenderer ?? new PassthroughWatermarkRenderer(),
             gamificationService: gamificationService,
-            economyService: economyService);
+            economyService: economyService,
+            runtimeSettings: runtimeSettings,
+            aiProviderHealthService: providerHealth);
     }
 
     private static FalQueueClient CreateFalQueueClient(
@@ -2597,6 +2674,20 @@ public sealed class TemplateGenerationJobProcessorTests
                 "https://fal.example.test/generated-image.png",
                 "image-request-blocking",
                 1.5));
+        }
+    }
+
+    private sealed class StubProviderHealthService(Result result) : ITemplateAiProviderHealthService
+    {
+        public int CheckCount { get; private set; }
+
+        public Task<Result> EnsureCanAcceptGenerationAsync(
+            string mediaType,
+            string tier,
+            CancellationToken cancellationToken)
+        {
+            CheckCount++;
+            return Task.FromResult(result);
         }
     }
 

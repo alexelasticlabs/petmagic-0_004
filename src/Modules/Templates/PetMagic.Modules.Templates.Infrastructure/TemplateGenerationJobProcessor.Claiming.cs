@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
 
 using PetMagic.BuildingBlocks.Observability;
@@ -10,6 +11,29 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 
 internal sealed partial class TemplateGenerationJobProcessor
 {
+    private async Task<SchedulerClaimGate> AcquireSchedulerClaimGateAsync(CancellationToken cancellationToken)
+    {
+        if (!string.Equals(dbContext.Database.ProviderName, NpgsqlProviderName, StringComparison.Ordinal))
+        {
+            await LocalSchedulerClaimGate.WaitAsync(cancellationToken);
+            return new SchedulerClaimGate(LocalSchedulerClaimGate);
+        }
+
+        var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            await dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock({GlobalGenerationAdvisoryLockKey}, {SchedulerClaimAdvisoryLockSlot})",
+                cancellationToken);
+            return new SchedulerClaimGate(transaction);
+        }
+        catch
+        {
+            await transaction.DisposeAsync();
+            throw;
+        }
+    }
+
     private async Task<bool> RecoverNextStaleProcessingJobAsync(CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
@@ -450,7 +474,7 @@ internal sealed partial class TemplateGenerationJobProcessor
 
     private async Task<GlobalConcurrencyLease?> TryAcquireGlobalConcurrencyLeaseAsync(CancellationToken cancellationToken)
     {
-        var maxConcurrentGenerations = options.GlobalMaxConcurrentGenerations;
+        var maxConcurrentGenerations = RuntimeSettings.GlobalMaxConcurrent;
         if (maxConcurrentGenerations <= 0)
         {
             return GlobalConcurrencyLease.Noop;
@@ -507,19 +531,24 @@ internal sealed partial class TemplateGenerationJobProcessor
     private async Task<MediaConcurrencyLeases> TryAcquireMediaConcurrencyLeasesAsync(CancellationToken cancellationToken)
     {
         var snapshot = await BuildSchedulerCapacitySnapshotAsync(cancellationToken);
+        var settings = RuntimeSettings;
         TemplateGenerationMetrics.RecordSchedulerCapacitySnapshot(
             snapshot.ActiveImage,
             snapshot.ActiveVideo,
             ResolveVideoReservedConcurrency(),
             ResolveImageProtectedConcurrency());
 
-        if (snapshot.ActiveGlobal >= options.GlobalMaxConcurrentGenerations)
+        if (settings.NewClaimsPaused || snapshot.ActiveGlobal >= settings.GlobalMaxConcurrent)
         {
             TemplateGenerationMetrics.RecordSchedulerNoSlotSkip("active_global");
             return MediaConcurrencyLeases.Empty;
         }
 
-        var allowImage = snapshot.ActiveImage < options.ImageMaxConcurrentGenerations;
+        var effectiveImageMax = TemplateGenerationCapacityPolicy.ResolveEffectiveImageMax(
+            settings,
+            snapshot.ActiveVideo,
+            snapshot.QueuedVideo);
+        var allowImage = snapshot.ActiveImage < effectiveImageMax;
         var allowNativeVideo = snapshot.ActiveVideo < ResolveVideoReservedConcurrency();
         string? borrowDeniedReason = null;
         var allowBorrowedVideo = !allowNativeVideo && CanBorrowVideoCapacity(snapshot, out borrowDeniedReason);
@@ -530,12 +559,22 @@ internal sealed partial class TemplateGenerationJobProcessor
         }
 
         return string.Equals(dbContext.Database.ProviderName, NpgsqlProviderName, StringComparison.Ordinal)
-            ? await TryAcquirePostgresMediaConcurrencyLeasesAsync(allowImage, allowNativeVideo, allowBorrowedVideo, cancellationToken)
-            : TryAcquireLocalMediaConcurrencyLeases(allowImage, allowNativeVideo, allowBorrowedVideo);
+            ? await TryAcquirePostgresMediaConcurrencyLeasesAsync(
+                allowImage,
+                effectiveImageMax,
+                allowNativeVideo,
+                allowBorrowedVideo,
+                cancellationToken)
+            : TryAcquireLocalMediaConcurrencyLeases(
+                allowImage,
+                effectiveImageMax,
+                allowNativeVideo,
+                allowBorrowedVideo);
     }
 
     private async Task<MediaConcurrencyLeases> TryAcquirePostgresMediaConcurrencyLeasesAsync(
         bool allowImage,
+        int effectiveImageMax,
         bool allowNativeVideo,
         bool allowBorrowedVideo,
         CancellationToken cancellationToken)
@@ -543,7 +582,7 @@ internal sealed partial class TemplateGenerationJobProcessor
         var imageSlot = allowImage
             ? await TryAcquirePostgresMediaSlotAsync(
                 ImageGenerationAdvisoryLockKey,
-                Math.Max(1, options.ImageMaxConcurrentGenerations),
+                Math.Max(1, effectiveImageMax),
                 cancellationToken)
             : null;
         var videoSlot = allowNativeVideo
@@ -591,13 +630,14 @@ internal sealed partial class TemplateGenerationJobProcessor
 
     private MediaConcurrencyLeases TryAcquireLocalMediaConcurrencyLeases(
         bool allowImage,
+        int effectiveImageMax,
         bool allowNativeVideo,
         bool allowBorrowedVideo)
     {
         lock (LocalConcurrencyLock)
         {
             var imageSlot = allowImage
-                ? TryAcquireLocalMediaSlot(LocalImageConcurrencySlots, Math.Max(1, options.ImageMaxConcurrentGenerations))
+                ? TryAcquireLocalMediaSlot(LocalImageConcurrencySlots, Math.Max(1, effectiveImageMax))
                 : null;
             var videoSlot = allowNativeVideo
                 ? TryAcquireLocalMediaSlot(LocalVideoConcurrencySlots, Math.Max(1, ResolveVideoReservedConcurrency()))
@@ -683,6 +723,51 @@ internal sealed partial class TemplateGenerationJobProcessor
         }
     }
 
+    private sealed class SchedulerClaimGate : IAsyncDisposable
+    {
+        private IDbContextTransaction? transaction;
+        private SemaphoreSlim? semaphore;
+
+        public SchedulerClaimGate(IDbContextTransaction transaction)
+        {
+            this.transaction = transaction;
+        }
+
+        public SchedulerClaimGate(SemaphoreSlim semaphore)
+        {
+            this.semaphore = semaphore;
+        }
+
+        public async Task CompleteAsync(CancellationToken cancellationToken)
+        {
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+
+            await ReleaseAsync();
+        }
+
+        public ValueTask DisposeAsync() => ReleaseAsync();
+
+        private async ValueTask ReleaseAsync()
+        {
+            if (transaction is not null)
+            {
+                var current = transaction;
+                transaction = null;
+                await current.DisposeAsync();
+            }
+
+            if (semaphore is not null)
+            {
+                var current = semaphore;
+                semaphore = null;
+                current.Release();
+            }
+        }
+    }
+
     private async Task<SchedulerCapacitySnapshot> BuildSchedulerCapacitySnapshotAsync(CancellationToken cancellationToken)
     {
         var activeCounts = await dbContext.TemplateGenerationJobs
@@ -705,88 +790,47 @@ internal sealed partial class TemplateGenerationJobProcessor
                 && x.QueueMediaType == TemplateGenerationQueue.MediaTypeImage,
                 cancellationToken);
 
-        return new SchedulerCapacitySnapshot(activeImage, activeVideo, queuedImage);
+        var queuedVideo = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .LongCountAsync(x => x.Status == TemplateGenerationStatus.Queued
+                && (x.ChargedAtUtc != null || x.UserId == TemplateGenerationService.AdminTestUserId)
+                && x.QueueMediaType == TemplateGenerationQueue.MediaTypeVideo,
+                cancellationToken);
+
+        return new SchedulerCapacitySnapshot(activeImage, activeVideo, queuedImage, queuedVideo);
     }
 
     private bool CanBorrowVideoCapacity(SchedulerCapacitySnapshot snapshot, out string? deniedReason)
     {
-        deniedReason = null;
-        if (!options.EnableElasticLaneBorrowing)
-        {
-            return false;
-        }
-
-        if (snapshot.ActiveVideo >= options.VideoMaxConcurrentGenerations)
-        {
-            deniedReason = "video_max";
-            return false;
-        }
-
-        var borrowedVideo = Math.Max(0, snapshot.ActiveVideo - ResolveVideoReservedConcurrency());
-        if (borrowedVideo >= ResolveVideoBorrowMaxConcurrency())
-        {
-            deniedReason = "borrow_max";
-            return false;
-        }
-
-        if (snapshot.ActiveImage + ResolveImageProtectedConcurrency() > options.ImageMaxConcurrentGenerations)
-        {
-            deniedReason = "image_protected";
-            return false;
-        }
-
-        if (snapshot.QueuedImage == 0)
-        {
-            if (options.AllowVideoBorrowWhenImageQueueEmpty)
-            {
-                return true;
-            }
-
-            deniedReason = "image_queue_empty_disabled";
-            return false;
-        }
-
-        var imageEstimatedWaitSeconds = EstimateImageWaitSeconds(snapshot);
-        if (imageEstimatedWaitSeconds <= options.AllowVideoBorrowWhenImageEstimatedWaitBelowSeconds)
-        {
-            return true;
-        }
-
-        deniedReason = "image_backlog";
-        return false;
-    }
-
-    private int EstimateImageWaitSeconds(SchedulerCapacitySnapshot snapshot)
-    {
-        var protectedSlots = Math.Max(1, ResolveImageProtectedConcurrency());
-        var backlogUnits = Math.Max(0, snapshot.ActiveImage + snapshot.QueuedImage - protectedSlots);
-        return (int)Math.Ceiling(backlogUnits * Math.Max(1, options.EstimatedImageGenerationSeconds) / (double)protectedSlots);
+        var settings = RuntimeSettings;
+        return TemplateGenerationCapacityPolicy.CanBorrowVideo(
+            settings,
+            options.EnableElasticLaneBorrowing,
+            options.AllowVideoBorrowWhenImageQueueEmpty,
+            snapshot.ActiveImage,
+            snapshot.ActiveVideo,
+            snapshot.QueuedImage,
+            out deniedReason);
     }
 
     private int ResolveImageProtectedConcurrency()
     {
-        return options.ImageProtectedConcurrentGenerations > 0
-            ? options.ImageProtectedConcurrentGenerations
-            : ResolveImageReservedConcurrency();
+        return RuntimeSettings.ImageProtectedConcurrent;
     }
 
     private int ResolveImageReservedConcurrency()
     {
-        return options.ImageReservedConcurrentGenerations > 0
-            ? options.ImageReservedConcurrentGenerations
-            : options.ImageMaxConcurrentGenerations;
+        return RuntimeSettings.ImageProtectedConcurrent;
     }
 
     private int ResolveVideoReservedConcurrency()
     {
-        return options.VideoReservedConcurrentGenerations > 0
-            ? options.VideoReservedConcurrentGenerations
-            : options.VideoMaxConcurrentGenerations;
+        return RuntimeSettings.VideoGuaranteedConcurrent;
     }
 
     private int ResolveVideoBorrowMaxConcurrency()
     {
-        return Math.Max(0, options.VideoBorrowMaxConcurrentGenerations);
+        return Math.Max(0, RuntimeSettings.VideoBorrowMaxConcurrent);
     }
 
     private bool IsBorrowingTierAllowed(string queueTier)
@@ -801,7 +845,8 @@ internal sealed partial class TemplateGenerationJobProcessor
     private readonly record struct SchedulerCapacitySnapshot(
         long ActiveImage,
         long ActiveVideo,
-        long QueuedImage)
+        long QueuedImage,
+        long QueuedVideo)
     {
         public long ActiveGlobal => ActiveImage + ActiveVideo;
     }

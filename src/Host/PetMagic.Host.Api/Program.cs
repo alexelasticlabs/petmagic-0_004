@@ -325,6 +325,7 @@ try
             builder.Configuration,
             builder.Environment,
             TemplateSchedulerConfigFingerprint.ApiComponent)
+        .AddRenderGenerationWorkerControl(builder.Configuration)
         .AddTemplatesApiModule()
         .AddGamificationInfrastructure(builder.Configuration)
         .AddGamificationApiModule();

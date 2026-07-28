@@ -98,17 +98,30 @@ internal sealed partial class TemplateGenerationJobProcessor
             return true;
         }
 
+        await using var providerReservationGate = await AcquireSchedulerClaimGateAsync(cancellationToken);
+        if (!await CanSubmitToProviderAsync(
+                TemplateGenerationQueue.MediaTypeImage,
+                job.QueueTier,
+                cancellationToken))
+        {
+            await DeferProviderSubmissionForCapacityAsync(job, cancellationToken);
+            await providerReservationGate.CompleteAsync(cancellationToken);
+            return true;
+        }
+
         var submittedAt = DateTime.UtcNow;
         job.Status = TemplateGenerationStatus.SubmittingToProvider;
         job.CurrentProviderStage = ProviderStageImageGeneration;
         job.ProviderStatus = "SUBMITTING";
         job.ProviderSubmittedAtUtc = submittedAt;
+        job.NextAttemptEarliestAtUtc = null;
         job.UpdatedAtUtc = submittedAt;
         job.UsedPreprocessingModel = model;
         if (!await SaveClaimedChangesAsync(job, cancellationToken))
         {
             return true;
         }
+        await providerReservationGate.CompleteAsync(cancellationToken);
 
         var submission = await asyncImageGenerator.SubmitAsync(
             sourceImageUrl,
@@ -150,17 +163,30 @@ internal sealed partial class TemplateGenerationJobProcessor
             return true;
         }
 
+        await using var providerReservationGate = await AcquireSchedulerClaimGateAsync(cancellationToken);
+        if (!await CanSubmitToProviderAsync(
+                TemplateGenerationQueue.MediaTypeVideo,
+                job.QueueTier,
+                cancellationToken))
+        {
+            await DeferProviderSubmissionForCapacityAsync(job, cancellationToken);
+            await providerReservationGate.CompleteAsync(cancellationToken);
+            return true;
+        }
+
         var submittedAt = DateTime.UtcNow;
         job.Status = TemplateGenerationStatus.SubmittingToProvider;
         job.CurrentProviderStage = ProviderStageVideoPreprocessing;
         job.ProviderStatus = "SUBMITTING";
         job.ProviderSubmittedAtUtc = submittedAt;
+        job.NextAttemptEarliestAtUtc = null;
         job.UpdatedAtUtc = submittedAt;
         job.UsedPreprocessingModel = model;
         if (!await SaveClaimedChangesAsync(job, cancellationToken))
         {
             return true;
         }
+        await providerReservationGate.CompleteAsync(cancellationToken);
 
         var submission = await asyncImagePreprocessor.SubmitAsync(
             sourceImageUrl,
@@ -193,6 +219,17 @@ internal sealed partial class TemplateGenerationJobProcessor
             return false;
         }
 
+        await using var providerReservationGate = await AcquireSchedulerClaimGateAsync(cancellationToken);
+        if (!await CanSubmitToProviderAsync(
+                TemplateGenerationQueue.MediaTypeVideo,
+                job.QueueTier,
+                cancellationToken))
+        {
+            await DeferProviderSubmissionForCapacityAsync(job, cancellationToken);
+            await providerReservationGate.CompleteAsync(cancellationToken);
+            return true;
+        }
+
         var referenceMotion = TemplateGenerationService.GetAsset(job.Template, TemplateAssetKind.ReferenceMotion)!;
         var motionModel = job.Template.KlingModel!;
         var motionPrompt = PreparePrompt(job, TemplateGenerationService.ResolvePrompt(job.Template.KlingPrompt, options.DefaultKlingPrompt));
@@ -201,12 +238,14 @@ internal sealed partial class TemplateGenerationJobProcessor
         job.CurrentProviderStage = ProviderStageVideoGeneration;
         job.ProviderStatus = "SUBMITTING";
         job.ProviderSubmittedAtUtc = submittedAt;
+        job.NextAttemptEarliestAtUtc = null;
         job.UpdatedAtUtc = submittedAt;
         job.UsedKlingModel = motionModel;
         if (!await SaveClaimedChangesAsync(job, cancellationToken))
         {
             return true;
         }
+        await providerReservationGate.CompleteAsync(cancellationToken);
 
         var submission = await asyncVideoMotionGenerator.SubmitAsync(
             job.NormalizedImageUrl!,
@@ -315,6 +354,42 @@ internal sealed partial class TemplateGenerationJobProcessor
             await MarkFailedAsync(job, TemplatesErrors.AiProviderFailed, CancellationToken.None);
             return true;
         }
+    }
+
+    private async Task<bool> CanSubmitToProviderAsync(
+        string mediaType,
+        string tier,
+        CancellationToken cancellationToken)
+    {
+        if (aiProviderHealthService is null)
+        {
+            return true;
+        }
+
+        var health = await aiProviderHealthService.EnsureCanAcceptGenerationAsync(
+            mediaType,
+            tier,
+            cancellationToken);
+        return health.IsSuccess;
+    }
+
+    private async Task DeferProviderSubmissionForCapacityAsync(
+        TemplateGenerationJob job,
+        CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        if (job.Status == TemplateGenerationStatus.Processing)
+        {
+            job.Status = TemplateGenerationStatus.Queued;
+            job.AttemptCount = Math.Max(0, job.AttemptCount - 1);
+        }
+
+        job.NextAttemptEarliestAtUtc = now.AddSeconds(5);
+        job.ProviderStatusCheckedAtUtc = now;
+        job.UpdatedAtUtc = now;
+        await SaveClaimedChangesAsync(job, cancellationToken, releaseLock: true);
+        TemplateGenerationMetrics.RecordSchedulerNoSlotSkip("provider_capacity");
+        await PublishStatusChangedAsync(job, cancellationToken);
     }
 
     private async Task<TemplateGenerationJob?> ClaimNextProviderJobAsync(

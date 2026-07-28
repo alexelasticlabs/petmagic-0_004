@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 using PetMagic.BuildingBlocks.Observability;
+using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Infrastructure.Options;
 
 namespace PetMagic.Modules.Templates.Infrastructure;
@@ -10,7 +11,8 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 internal sealed class TemplateGenerationWorker(
     IServiceScopeFactory scopeFactory,
     TemplatesOptions options,
-    ILogger<TemplateGenerationWorker> logger) : BackgroundService
+    ILogger<TemplateGenerationWorker> logger,
+    ITemplateGenerationRuntimeSettingsProvider? runtimeSettings = null) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -19,14 +21,7 @@ internal sealed class TemplateGenerationWorker(
             return;
         }
 
-        var loopCount = Math.Max(1, options.MaxConcurrentJobsPerWorker);
-        if (loopCount > 1)
-        {
-            await Task.WhenAll(Enumerable.Range(0, loopCount).Select(loopIndex => RunProcessingLoopAsync(loopIndex, stoppingToken)));
-            return;
-        }
-
-        await RunProcessingLoopAsync(0, stoppingToken);
+        await Task.WhenAll(Enumerable.Range(0, 2).Select(loopIndex => RunProcessingLoopAsync(loopIndex, stoppingToken)));
     }
 
     private async Task RunProcessingLoopAsync(int loopIndex, CancellationToken stoppingToken)
@@ -34,6 +29,14 @@ internal sealed class TemplateGenerationWorker(
         var consecutiveFailures = 0;
         while (!stoppingToken.IsCancellationRequested)
         {
+            var configuredLoops = runtimeSettings?.Current.WorkerLoopsPerInstance
+                ?? Math.Clamp(options.MaxConcurrentJobsPerWorker, 1, 2);
+            if (loopIndex >= configuredLoops)
+            {
+                await Task.Delay(Math.Max(500, options.GenerationWorkerPollIntervalMilliseconds), stoppingToken);
+                continue;
+            }
+
             var startedAt = System.Diagnostics.Stopwatch.GetTimestamp();
             try
             {

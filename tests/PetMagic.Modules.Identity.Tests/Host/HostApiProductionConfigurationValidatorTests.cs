@@ -390,6 +390,7 @@ public sealed class HostApiProductionConfigurationValidatorTests
     [InlineData("NEXT_PUBLIC_STRIPE_SECRET_KEY")]
     [InlineData("NEXT_PUBLIC_STRIPE_WEBHOOK_SECRET")]
     [InlineData("NEXT_PUBLIC_FAL_AI_API_KEY")]
+    [InlineData("NEXT_PUBLIC_RENDER_API_KEY")]
     [InlineData("NEXT_PUBLIC_R2_ACCESS_KEY")]
     [InlineData("NEXT_PUBLIC_R2_SECRET_KEY")]
     [InlineData("NEXT_PUBLIC_GOOGLE_CLIENT_SECRET")]

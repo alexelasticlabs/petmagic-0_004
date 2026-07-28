@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 using PetMagic.BuildingBlocks.Observability;
+using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Infrastructure.Data;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
 using PetMagic.Modules.Templates.Infrastructure.Options;
@@ -16,7 +17,8 @@ internal sealed class TemplateSchedulerConfigStartupService(
     TemplateSchedulerConfigComponent componentConfig,
     IHostEnvironment environment,
     TemplateSchedulerConfigRuntimeState runtimeState,
-    ILogger<TemplateSchedulerConfigStartupService> logger) : IHostedService
+    ILogger<TemplateSchedulerConfigStartupService> logger,
+    ITemplateGenerationRuntimeSettingsProvider? generationRuntimeSettings = null) : IHostedService
 {
     private static readonly TimeSpan ActiveFingerprintMaxAge = TimeSpan.FromMinutes(2);
     private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(30);
@@ -25,6 +27,7 @@ internal sealed class TemplateSchedulerConfigStartupService(
 
     private CancellationTokenSource? heartbeatCancellationTokenSource;
     private Task? heartbeatTask;
+    private Guid? activeFingerprintId;
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -123,6 +126,7 @@ internal sealed class TemplateSchedulerConfigStartupService(
             : null;
 
         var currentFingerprintId = Guid.NewGuid();
+        var runtimeSnapshot = generationRuntimeSettings?.Current;
         dbContext.TemplateRuntimeConfigFingerprints.Add(new TemplateRuntimeConfigFingerprint
         {
             Id = currentFingerprintId,
@@ -132,6 +136,10 @@ internal sealed class TemplateSchedulerConfigStartupService(
             ConfigJson = fingerprint.SanitizedDumpJson,
             StartedAtUtc = now,
             LastSeenAtUtc = now,
+            AppliedSettingsVersion = runtimeSnapshot?.Version ?? 0,
+            ConfiguredLoops = runtimeSnapshot?.WorkerLoopsPerInstance
+                ?? Math.Clamp(options.MaxConcurrentJobsPerWorker, 1, 2),
+            NewClaimsPaused = runtimeSnapshot?.NewClaimsPaused ?? false,
             MismatchDetected = isMismatch,
             MismatchDetails = mismatchDetails
         });
@@ -184,12 +192,52 @@ internal sealed class TemplateSchedulerConfigStartupService(
             heartbeatCancellationTokenSource = null;
             heartbeatTask = null;
         }
+
+        await MarkFingerprintStoppedAsync(cancellationToken);
     }
 
     private void StartHeartbeat(Guid fingerprintId)
     {
+        activeFingerprintId = fingerprintId;
         heartbeatCancellationTokenSource = new CancellationTokenSource();
         heartbeatTask = RunHeartbeatAsync(fingerprintId, heartbeatCancellationTokenSource.Token);
+    }
+
+    private async Task MarkFingerprintStoppedAsync(CancellationToken cancellationToken)
+    {
+        if (activeFingerprintId is not { } fingerprintId)
+        {
+            return;
+        }
+
+        activeFingerprintId = null;
+        try
+        {
+            using var scope = scopeFactory.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+            var fingerprint = await dbContext.TemplateRuntimeConfigFingerprints
+                .SingleOrDefaultAsync(x => x.Id == fingerprintId, cancellationToken);
+            if (fingerprint is null)
+            {
+                return;
+            }
+
+            fingerprint.ConfiguredLoops = 0;
+            fingerprint.NewClaimsPaused = true;
+            fingerprint.LastSeenAtUtc = DateTime.UtcNow.Subtract(ActiveFingerprintMaxAge);
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(
+                "Template scheduler config fingerprint could not be marked as stopped. FingerprintId={FingerprintId} ExceptionType={ExceptionType}",
+                fingerprintId,
+                SafeLogValues.ExceptionType(exception));
+        }
     }
 
     private async Task RunHeartbeatAsync(Guid fingerprintId, CancellationToken cancellationToken)
@@ -200,28 +248,40 @@ internal sealed class TemplateSchedulerConfigStartupService(
         {
             while (await timer.WaitForNextTickAsync(cancellationToken))
             {
-                using var scope = scopeFactory.CreateScope();
-                var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
-                var fingerprint = await dbContext.TemplateRuntimeConfigFingerprints
-                    .FirstOrDefaultAsync(x => x.Id == fingerprintId, cancellationToken);
-                if (fingerprint is null)
+                try
                 {
-                    return;
-                }
+                    using var scope = scopeFactory.CreateScope();
+                    var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+                    var fingerprint = await dbContext.TemplateRuntimeConfigFingerprints
+                        .FirstOrDefaultAsync(x => x.Id == fingerprintId, cancellationToken);
+                    if (fingerprint is null)
+                    {
+                        return;
+                    }
 
-                fingerprint.LastSeenAtUtc = DateTime.UtcNow;
-                await dbContext.SaveChangesAsync(cancellationToken);
+                    fingerprint.LastSeenAtUtc = DateTime.UtcNow;
+                    var runtimeSnapshot = generationRuntimeSettings?.Current;
+                    fingerprint.AppliedSettingsVersion = runtimeSnapshot?.Version ?? 0;
+                    fingerprint.ConfiguredLoops = runtimeSnapshot?.WorkerLoopsPerInstance
+                        ?? Math.Clamp(options.MaxConcurrentJobsPerWorker, 1, 2);
+                    fingerprint.NewClaimsPaused = runtimeSnapshot?.NewClaimsPaused ?? false;
+                    await dbContext.SaveChangesAsync(cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    logger.LogWarning(
+                        "Template scheduler config heartbeat failed; the next heartbeat will retry. FingerprintId={FingerprintId} ExceptionType={ExceptionType}",
+                        fingerprintId,
+                        SafeLogValues.ExceptionType(exception));
+                }
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-        }
-        catch (Exception exception)
-        {
-            logger.LogWarning(
-                "Template scheduler config heartbeat failed. FingerprintId={FingerprintId} ExceptionType={ExceptionType}",
-                fingerprintId,
-                SafeLogValues.ExceptionType(exception));
         }
     }
 
