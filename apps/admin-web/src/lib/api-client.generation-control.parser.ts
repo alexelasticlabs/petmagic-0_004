@@ -1,6 +1,7 @@
 import type {
   AdminFalBalanceStatus,
   AdminFalGenerationCapacity,
+  AdminFalSubmissionBlockReason,
   AdminGenerationAlertSeverity,
   AdminGenerationCapacityHealth,
   AdminGenerationControlAlert,
@@ -54,6 +55,15 @@ function boolean(value: unknown, path: string): boolean {
 function enumValue<T extends string>(value: unknown, values: readonly T[], path: string): T {
   if (typeof value !== "string" || !values.includes(value as T)) invalid(path);
   return value as T;
+}
+
+function nullableEnumValue<T extends string>(
+  value: unknown,
+  values: readonly T[],
+  path: string
+): T | null {
+  if (value === null) return null;
+  return enumValue(value, values, path);
 }
 
 function settings(value: unknown): AdminGenerationControlSettings {
@@ -142,33 +152,74 @@ function status(value: unknown): AdminGenerationControlStatus {
 
 function fal(value: unknown): AdminFalGenerationCapacity {
   const item = record(value, "fal");
+  const configuredConcurrency = number(item.configuredConcurrency, "fal.configuredConcurrency", {
+    integer: true,
+    min: 0,
+  });
+  const reservedConcurrency = number(item.reservedConcurrency, "fal.reservedConcurrency", {
+    integer: true,
+    min: 0,
+  });
+  const usableConcurrency = number(item.usableConcurrency, "fal.usableConcurrency", {
+    integer: true,
+    min: 0,
+  });
+  const inflightRequests = number(item.inflightRequests, "fal.inflightRequests", {
+    integer: true,
+    min: 0,
+  });
+  const balanceUsd = nullableNumber(item.balanceUsd, "fal.balanceUsd");
   const balanceStatus = enumValue<AdminFalBalanceStatus>(
     item.balanceStatus,
     ["healthy", "low", "critical", "unknown"],
     "fal.balanceStatus"
   );
+  const isStale = boolean(item.isStale, "fal.isStale");
+  const hasProviderGate = "providerSubmissionsAllowed" in item;
+  const hasBlockReason = "submissionBlockReason" in item;
+  if (hasProviderGate !== hasBlockReason) invalid("fal.providerGate");
+
+  let submissionBlockReason: AdminFalSubmissionBlockReason | null;
+  let providerSubmissionsAllowed: boolean;
+  if (hasProviderGate) {
+    submissionBlockReason = nullableEnumValue<AdminFalSubmissionBlockReason>(
+      item.submissionBlockReason,
+      ["concurrency_unknown", "concurrency_exhausted", "balance_unknown", "balance_critical"],
+      "fal.submissionBlockReason"
+    );
+    providerSubmissionsAllowed = boolean(
+      item.providerSubmissionsAllowed,
+      "fal.providerSubmissionsAllowed"
+    );
+    if (providerSubmissionsAllowed === (submissionBlockReason !== null)) {
+      invalid("fal.providerGate");
+    }
+  } else {
+    submissionBlockReason =
+      configuredConcurrency <= 0
+        ? "concurrency_unknown"
+        : usableConcurrency <= 0 || inflightRequests >= usableConcurrency
+          ? "concurrency_exhausted"
+          : isStale || balanceUsd === null || balanceStatus === "unknown"
+            ? "balance_unknown"
+            : balanceStatus === "critical"
+              ? "balance_critical"
+              : null;
+    providerSubmissionsAllowed = submissionBlockReason === null;
+  }
+
   return {
-    configuredConcurrency: number(item.configuredConcurrency, "fal.configuredConcurrency", {
-      integer: true,
-      min: 0,
-    }),
-    reservedConcurrency: number(item.reservedConcurrency, "fal.reservedConcurrency", {
-      integer: true,
-      min: 0,
-    }),
-    usableConcurrency: number(item.usableConcurrency, "fal.usableConcurrency", {
-      integer: true,
-      min: 0,
-    }),
-    inflightRequests: number(item.inflightRequests, "fal.inflightRequests", {
-      integer: true,
-      min: 0,
-    }),
-    balanceUsd: nullableNumber(item.balanceUsd, "fal.balanceUsd"),
+    configuredConcurrency,
+    reservedConcurrency,
+    usableConcurrency,
+    inflightRequests,
+    balanceUsd,
     balanceStatus,
     checkedAtUtc: nullableString(item.checkedAtUtc, "fal.checkedAtUtc"),
     lastSuccessAtUtc: nullableString(item.lastSuccessAtUtc, "fal.lastSuccessAtUtc"),
-    isStale: boolean(item.isStale, "fal.isStale"),
+    isStale,
+    providerSubmissionsAllowed,
+    submissionBlockReason,
   };
 }
 

@@ -37,7 +37,9 @@ public sealed record AdminFalProviderStatusResponse(
     string BalanceStatus,
     DateTime? CheckedAtUtc,
     DateTime? LastSuccessAtUtc,
-    bool IsStale);
+    bool IsStale,
+    bool ProviderSubmissionsAllowed,
+    string? SubmissionBlockReason);
 
 public sealed record AdminGenerationWorkerResponse(
     string InstanceId,

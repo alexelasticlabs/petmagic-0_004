@@ -281,11 +281,16 @@ internal sealed class AdminGenerationControlService(
             .OrderByDescending(x => x.UpdatedAtUtc)
             .FirstOrDefaultAsync(cancellationToken);
         var providerStale = !FalProviderHealthPolicy.IsSnapshotCurrent(provider?.LastSuccessAtUtc, now);
-        var inflight = queueCounts
-            .Where(x => x.Status is TemplateGenerationStatus.SubmittingToProvider
-                or TemplateGenerationStatus.ProviderQueued
-                or TemplateGenerationStatus.ProviderProcessing)
-            .Sum(x => x.Count);
+        var inflight = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .LongCountAsync(x => (x.Status == TemplateGenerationStatus.SubmittingToProvider
+                    || x.Status == TemplateGenerationStatus.ProviderQueued
+                    || x.Status == TemplateGenerationStatus.ProviderProcessing)
+                && x.ProviderCompletedAtUtc == null
+                && (x.Status == TemplateGenerationStatus.SubmittingToProvider
+                    || x.PreprocessingProviderRequestId != null
+                    || x.MotionProviderRequestId != null),
+                cancellationToken);
         var balanceStatus = providerStale || provider?.BalanceUsd is null
             ? "unknown"
             : provider.BalanceUsd <= current.FalBalanceCriticalThresholdUsd
@@ -293,6 +298,11 @@ internal sealed class AdminGenerationControlService(
                 : provider.BalanceUsd <= current.FalBalanceLowThresholdUsd
                     ? "low"
                     : "healthy";
+        var (providerSubmissionsAllowed, submissionBlockReason) = ResolveProviderSubmissionGate(
+            current,
+            inflight,
+            providerStale,
+            provider?.BalanceUsd);
 
         var alerts = await dbContext.TemplateGenerationOperationalAlerts
             .AsNoTracking()
@@ -346,7 +356,9 @@ internal sealed class AdminGenerationControlService(
                 balanceStatus,
                 provider?.CheckedAtUtc,
                 provider?.LastSuccessAtUtc,
-                providerStale),
+                providerStale,
+                providerSubmissionsAllowed,
+                submissionBlockReason),
             workers,
             render,
             alerts.Select(x =>
@@ -358,6 +370,35 @@ internal sealed class AdminGenerationControlService(
                         ? acknowledgement.AcknowledgedAtUtc
                         : null);
             }).ToArray()));
+    }
+
+    private static (bool Allowed, string? BlockReason) ResolveProviderSubmissionGate(
+        TemplateGenerationRuntimeSnapshot settings,
+        long inflightRequests,
+        bool providerSnapshotStale,
+        decimal? balanceUsd)
+    {
+        if (settings.FalConfiguredConcurrency <= 0)
+        {
+            return (false, "concurrency_unknown");
+        }
+
+        if (settings.FalUsableConcurrency <= 0 || inflightRequests >= settings.FalUsableConcurrency)
+        {
+            return (false, "concurrency_exhausted");
+        }
+
+        if (providerSnapshotStale || balanceUsd is null)
+        {
+            return (false, "balance_unknown");
+        }
+
+        if (balanceUsd.Value <= settings.FalBalanceCriticalThresholdUsd)
+        {
+            return (false, "balance_critical");
+        }
+
+        return (true, null);
     }
 
     private async Task<AdminGenerationRenderStatusResponse?> BuildRenderStatusAsync(

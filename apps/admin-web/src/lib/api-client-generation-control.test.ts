@@ -45,6 +45,8 @@ function createSnapshot() {
       checkedAtUtc: "2026-07-28T10:01:00Z",
       lastSuccessAtUtc: "2026-07-28T10:01:00Z",
       isStale: false,
+      providerSubmissionsAllowed: true,
+      submissionBlockReason: null as string | null,
     },
     workers: [
       {
@@ -97,6 +99,8 @@ describe("generation control response parser", () => {
 
     expect(parsed.settings.globalMaxConcurrent).toBe(8);
     expect(parsed.fal.usableConcurrency).toBe(8);
+    expect(parsed.fal.providerSubmissionsAllowed).toBe(true);
+    expect(parsed.fal.submissionBlockReason).toBeNull();
     expect(parsed.render?.serviceName).toBe("petmagic-production-generation-worker");
     expect(parsed.alerts[0]).toMatchObject({ code: "fal_balance_low", isAcknowledged: false });
     expect(parsed).not.toHaveProperty("secret");
@@ -107,11 +111,38 @@ describe("generation control response parser", () => {
     snapshot.settings.falConfiguredConcurrency = 0;
     snapshot.fal.configuredConcurrency = 0;
     snapshot.fal.usableConcurrency = 0;
+    snapshot.fal.providerSubmissionsAllowed = false;
+    snapshot.fal.submissionBlockReason = "concurrency_unknown";
 
     const parsed = parseAdminGenerationControlSnapshot(snapshot);
 
     expect(parsed.settings.falConfiguredConcurrency).toBe(0);
     expect(parsed.fal.configuredConcurrency).toBe(0);
+    expect(parsed.fal.providerSubmissionsAllowed).toBe(false);
+    expect(parsed.fal.submissionBlockReason).toBe("concurrency_unknown");
+  });
+
+  it("derives the gate for a rolling deploy from the legacy fal payload", () => {
+    const legacySnapshot = createSnapshot();
+    delete (legacySnapshot.fal as Partial<typeof legacySnapshot.fal>).providerSubmissionsAllowed;
+    delete (legacySnapshot.fal as Partial<typeof legacySnapshot.fal>).submissionBlockReason;
+
+    const parsed = parseAdminGenerationControlSnapshot(legacySnapshot);
+
+    expect(parsed.fal.providerSubmissionsAllowed).toBe(true);
+    expect(parsed.fal.submissionBlockReason).toBeNull();
+  });
+
+  it("rejects a partial provider gate and unstable block reasons", () => {
+    const partialGate = createSnapshot();
+    delete (partialGate.fal as Partial<typeof partialGate.fal>).providerSubmissionsAllowed;
+    expect(() => parseAdminGenerationControlSnapshot(partialGate)).toThrow("fal.providerGate");
+
+    const unknownReason = createSnapshot();
+    unknownReason.fal.submissionBlockReason = "provider_paused";
+    expect(() => parseAdminGenerationControlSnapshot(unknownReason)).toThrow(
+      "fal.submissionBlockReason"
+    );
   });
 
   it("rejects malformed nested data instead of rendering an unsafe partial model", () => {

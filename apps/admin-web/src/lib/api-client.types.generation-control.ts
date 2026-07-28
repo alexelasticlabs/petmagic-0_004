@@ -1,5 +1,7 @@
 export type AdminGenerationCapacityHealth = "healthy" | "degraded" | "critical" | "unknown";
 export type AdminFalBalanceStatus = "healthy" | "low" | "critical" | "unknown";
+export type AdminFalSubmissionBlockReason =
+  "concurrency_unknown" | "concurrency_exhausted" | "balance_unknown" | "balance_critical";
 export type AdminGenerationAlertSeverity = "info" | "warning" | "critical";
 export type AdminRenderScaleOperationStatus =
   "requested" | "draining" | "scaling" | "verifying" | "completed" | "failed" | "cancelled";
@@ -44,6 +46,8 @@ export type AdminFalGenerationCapacity = {
   checkedAtUtc: string | null;
   lastSuccessAtUtc: string | null;
   isStale: boolean;
+  providerSubmissionsAllowed: boolean;
+  submissionBlockReason: AdminFalSubmissionBlockReason | null;
 };
 
 export type AdminGenerationWorkerState = {

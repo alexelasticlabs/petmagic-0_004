@@ -178,6 +178,34 @@ public sealed class AdminGenerationControlServiceTests
     }
 
     [Fact]
+    public async Task GetAsync_WithHealthyFalCapacity_ShouldAllowProviderSubmissions()
+    {
+        await using var fixture = await ControlFixture.CreateAsync();
+
+        var result = await fixture.Service.GetAsync(Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value.Fal.ProviderSubmissionsAllowed);
+        Assert.Null(result.Value.Fal.SubmissionBlockReason);
+    }
+
+    [Fact]
+    public async Task GetAsync_WithUnconfiguredFalConcurrency_ShouldExposeConcurrencyUnknownBlock()
+    {
+        await using var fixture = await ControlFixture.CreateAsync();
+        var settings = await fixture.DbContext.TemplateGenerationRuntimeSettings.SingleAsync();
+        settings.FalConfiguredConcurrency = 0;
+        await fixture.DbContext.SaveChangesAsync();
+        fixture.DbContext.ChangeTracker.Clear();
+
+        var result = await fixture.Service.GetAsync(Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value.Fal.ProviderSubmissionsAllowed);
+        Assert.Equal("concurrency_unknown", result.Value.Fal.SubmissionBlockReason);
+    }
+
+    [Fact]
     public async Task AcknowledgeAlertAsync_WhenAlertWasReactivated_ShouldReplaceStaleAcknowledgement()
     {
         await using var fixture = await ControlFixture.CreateAsync();
