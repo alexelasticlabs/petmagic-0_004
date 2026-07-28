@@ -25,7 +25,7 @@ const adminNavigationAreaDefinitions: readonly AdminNavigationAreaDefinition[] =
   { key: "customers-access", itemKeys: ["users", "role-management"] },
   {
     key: "operations-desk",
-    itemKeys: ["generations", "feedback", "support", "moderation", "audit"],
+    itemKeys: ["generations", "generation-capacity", "feedback", "support", "moderation", "audit"],
   },
   { key: "content-studio", itemKeys: ["templates"] },
   { key: "revenue-risk", itemKeys: ["economy"] },

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { getAdminNavItems } from "./admin-navigation";
 import { getAdminNavigationAreas } from "./admin-navigation-areas";
 
 describe("admin navigation areas", () => {
@@ -24,12 +25,17 @@ describe("admin navigation areas", () => {
       { area: "customers-access", items: ["users", "role-management"] },
       {
         area: "operations-desk",
-        items: ["generations", "feedback", "support", "moderation", "audit"],
+        items: ["generations", "generation-capacity", "feedback", "support", "moderation", "audit"],
       },
       { area: "content-studio", items: ["templates"] },
       { area: "revenue-risk", items: ["economy"] },
       { area: "growth-rewards", items: ["promo-codes", "gamification"] },
     ]);
+    expect(areas.flatMap((area) => area.items.map((item) => item.key)).sort()).toEqual(
+      getAdminNavItems("en", ["Admin"])
+        .map((item) => item.key)
+        .sort()
+    );
     expect(areas.flatMap((area) => area.items).find((item) => item.key === "dashboard")?.href).toBe(
       "/en/dashboard"
     );
