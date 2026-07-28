@@ -222,6 +222,7 @@ public sealed class GenerationOperationalAlertPostgresRaceTests
             runtimeSettings,
             providerMonitor: null!,
             alertService: null!,
+            options: CreateTemplatesOptions(),
             adminAuditLog: null,
             logger: NullLogger<AdminGenerationControlService>.Instance);
 
@@ -266,7 +267,12 @@ public sealed class GenerationOperationalAlertPostgresRaceTests
         AllowedPreprocessingModels = ["openai/gpt-image-2/edit"],
         AllowedKlingModels = ["fal-ai/kling-video/v3/pro/motion-control"],
         SupportedLocalizationLocales = ["ru"],
-        Fal = new FalAiOptions { ApiKey = "test-fal-key" }
+        Fal = new FalAiOptions
+        {
+            ApiKey = "test-fal-generation-key",
+            AdminApiKey = "test-fal-admin-key",
+            ExpectedAccountUsername = "petmagic"
+        }
     };
 
     private sealed class StaticRuntimeSettingsProvider(TemplateGenerationRuntimeSnapshot current)
@@ -328,7 +334,8 @@ public sealed class GenerationOperationalAlertPostgresRaceTests
             await release.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent("""{"credits":{"current_balance":20.00}}""")
+                Content = new StringContent(
+                    """{"username":"petmagic","credits":{"current_balance":20.00,"currency":"USD"}}""")
             };
         }
     }
@@ -359,7 +366,10 @@ public sealed class GenerationOperationalAlertPostgresRaceTests
             var balance = requestNumber == 1 ? "10.00" : "30.00";
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent("{\"credits\":{\"current_balance\":" + balance + "}}")
+                Content = new StringContent(
+                    "{\"username\":\"petmagic\",\"credits\":{\"current_balance\":"
+                    + balance
+                    + ",\"currency\":\"USD\"}}")
             };
         }
     }

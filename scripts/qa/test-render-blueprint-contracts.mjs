@@ -121,6 +121,64 @@ try {
     'petmagic-production-api is missing secret RENDER_API_KEY.'
   );
 
+  const productionMissingFalBillingAdminKeyPath = writeFixture(
+    'render-production-missing-fal-billing-admin-key.yaml',
+    replaceRequired(
+      productionBlueprint,
+      '      - key: FAL_ACCOUNT_BILLING_ADMIN_KEY\n        sync: false\n',
+      ''
+    )
+  );
+  requireCheckerFailure(
+    productionMissingFalBillingAdminKeyPath,
+    'production',
+    'petmagic-production-api is missing secret FAL_ACCOUNT_BILLING_ADMIN_KEY.'
+  );
+
+  const productionMissingFalExpectedAccountPath = writeFixture(
+    'render-production-missing-fal-expected-account.yaml',
+    replaceRequired(
+      productionBlueprint,
+      '      - key: FAL_EXPECTED_ACCOUNT_USERNAME\n        sync: false\n',
+      ''
+    )
+  );
+  requireCheckerFailure(
+    productionMissingFalExpectedAccountPath,
+    'production',
+    'petmagic-production-api is missing deferred env FAL_EXPECTED_ACCOUNT_USERNAME.'
+  );
+
+  const productionWorkerWithFalBillingAdminKeyPath = writeFixture(
+    'render-production-worker-with-fal-billing-admin-key.yaml',
+    replaceRequired(
+      productionBlueprint,
+      '      - key: Templates__GenerationWorkerEnabled\n        value: "true"\n',
+      '      - key: Templates__GenerationWorkerEnabled\n        value: "true"\n' +
+        '      - key: FAL_ACCOUNT_BILLING_ADMIN_KEY\n        sync: false\n'
+    )
+  );
+  requireCheckerFailure(
+    productionWorkerWithFalBillingAdminKeyPath,
+    'production',
+    'petmagic-production-generation-worker must not receive API-only env FAL_ACCOUNT_BILLING_ADMIN_KEY.'
+  );
+
+  const productionWorkerWithFalExpectedAccountPath = writeFixture(
+    'render-production-worker-with-fal-expected-account.yaml',
+    replaceRequired(
+      productionBlueprint,
+      '      - key: Templates__GenerationWorkerEnabled\n        value: "true"\n',
+      '      - key: Templates__GenerationWorkerEnabled\n        value: "true"\n' +
+        '      - key: FAL_EXPECTED_ACCOUNT_USERNAME\n        sync: false\n'
+    )
+  );
+  requireCheckerFailure(
+    productionWorkerWithFalExpectedAccountPath,
+    'production',
+    'petmagic-production-generation-worker must not receive API-only env FAL_EXPECTED_ACCOUNT_USERNAME.'
+  );
+
   console.log('Render Blueprint contract tests passed.');
 } finally {
   const fixtureRelativePath = relative(tempBase, fixtureRoot);

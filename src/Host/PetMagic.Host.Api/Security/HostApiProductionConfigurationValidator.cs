@@ -16,6 +16,8 @@ public static class HostApiProductionConfigurationValidator
         "STRIPE_TEST_WEBHOOK_SECRET",
         "STRIPE_LIVE_WEBHOOK_SECRET",
         "FAL_AI_API_KEY",
+        "FAL_ACCOUNT_BILLING_ADMIN_KEY",
+        "FAL_EXPECTED_ACCOUNT_USERNAME",
         "RENDER_API_KEY",
         "R2_ACCESS_KEY",
         "R2_ACCESS_KEY_ID",

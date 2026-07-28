@@ -1,7 +1,6 @@
 using System.Net;
 
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 
 using PetMagic.Modules.Templates.Infrastructure;
@@ -36,7 +35,7 @@ public sealed class FalProviderHealthServiceTests
         var service = CreateService(
             dbContext,
             CreateOptions(falProviderConcurrencyLimit: 10, criticalBalanceUsd: 25),
-            """{"credits":{"current_balance":12.50}}""");
+            BillingPayload(12.50m));
 
         var result = await service.EnsureCanAcceptGenerationAsync("image", "free", CancellationToken.None);
 
@@ -53,7 +52,7 @@ public sealed class FalProviderHealthServiceTests
         var service = CreateService(
             dbContext,
             CreateOptions(falProviderConcurrencyLimit: 10, criticalBalanceUsd: 25),
-            """{"credits":{"current_balance":250.00}}""");
+            BillingPayload(250.00m));
 
         var result = await service.EnsureCanAcceptGenerationAsync("image", "premium", CancellationToken.None);
 
@@ -80,7 +79,7 @@ public sealed class FalProviderHealthServiceTests
         var service = CreateService(
             dbContext,
             options,
-            """{"credits":{"current_balance":250.00}}""");
+            BillingPayload(250.00m));
 
         var result = await service.EnsureCanAcceptGenerationAsync("video", "premium", CancellationToken.None);
 
@@ -145,28 +144,50 @@ public sealed class FalProviderHealthServiceTests
         Assert.True(result.IsSuccess);
     }
 
+    [Fact]
+    public async Task EnsureCanAcceptGenerationAsync_ShouldNotApplyFalGate_WhenProviderIsFake()
+    {
+        await using var dbContext = CreateDbContext();
+        var options = CreateOptions(
+            falProviderConcurrencyLimit: 0,
+            aiProvider: TemplateAiProviders.Fake,
+            includeFalKeys: false);
+        var service = CreateService(dbContext, options, billingJson: null);
+
+        var result = await service.EnsureCanAcceptGenerationAsync(
+            "image",
+            "free",
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
+
     private static FalProviderHealthService CreateService(
         TemplatesDbContext dbContext,
         TemplatesOptions options,
         string? billingJson,
         ITemplateGenerationRuntimeSettingsProvider? runtimeSettings = null)
     {
+        var billingClient = new FalAccountBillingClient(
+            new StaticHttpClientFactory(FalProviderHealthService.HttpClientName, billingJson),
+            options,
+            NullLogger<FalAccountBillingClient>.Instance);
         return new FalProviderHealthService(
             dbContext,
-            new StaticHttpClientFactory(FalProviderHealthService.HttpClientName, billingJson),
-            new MemoryCache(new MemoryCacheOptions()),
+            billingClient,
             options,
-            NullLogger<FalProviderHealthService>.Instance,
             runtimeSettings);
     }
 
     private static TemplatesOptions CreateOptions(
         int falProviderConcurrencyLimit,
-        decimal criticalBalanceUsd = 25)
+        decimal criticalBalanceUsd = 25,
+        string aiProvider = TemplateAiProviders.Fal,
+        bool includeFalKeys = true)
     {
         return new TemplatesOptions
         {
-            AiProvider = TemplateAiProviders.Fal,
+            AiProvider = aiProvider,
             PublicBaseUrl = "http://localhost:5000",
             LocalMediaRootPath = "wwwroot/templates-media",
             DefaultImagePrompt = "Create a themed pet portrait.",
@@ -182,10 +203,17 @@ public sealed class FalProviderHealthServiceTests
             FalProviderBalanceCriticalThresholdUsd = criticalBalanceUsd,
             Fal = new FalAiOptions
             {
-                ApiKey = "test-fal-key"
+                ApiKey = includeFalKeys ? "test-fal-generation-key" : string.Empty,
+                AdminApiKey = includeFalKeys ? "test-fal-admin-key" : string.Empty,
+                ExpectedAccountUsername = "petmagic"
             }
         };
     }
+
+    private static string BillingPayload(decimal balance) =>
+        "{\"username\":\"petmagic\",\"credits\":{\"current_balance\":"
+        + balance.ToString(System.Globalization.CultureInfo.InvariantCulture)
+        + ",\"currency\":\"USD\"}}";
 
     private static TemplatesDbContext CreateDbContext()
     {

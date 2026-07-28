@@ -1,12 +1,5 @@
-using System.Net;
-using System.Net.Http.Headers;
-using System.Text.Json;
-
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Logging;
 
-using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Domain.Enums;
 using PetMagic.Modules.Templates.Application.Abstractions;
@@ -18,17 +11,11 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 
 internal sealed class FalProviderHealthService(
     TemplatesDbContext dbContext,
-    IHttpClientFactory httpClientFactory,
-    IMemoryCache memoryCache,
+    FalAccountBillingClient billingClient,
     TemplatesOptions options,
-    ILogger<FalProviderHealthService> logger,
     ITemplateGenerationRuntimeSettingsProvider? runtimeSettings = null) : ITemplateAiProviderHealthService
 {
     public const string HttpClientName = FalAccountBillingClient.HttpClientName;
-
-    private const string BalanceCacheKey = "templates:fal:provider-balance";
-    private const int BalanceResponseMaxChars = 16 * 1024;
-    private static readonly TimeSpan BalanceCacheTtl = TimeSpan.FromSeconds(60);
 
     public async Task<Result> EnsureCanAcceptGenerationAsync(
         string mediaType,
@@ -108,82 +95,8 @@ internal sealed class FalProviderHealthService(
 
     private async Task<decimal?> GetCurrentBalanceUsdAsync(CancellationToken cancellationToken)
     {
-        if (memoryCache.TryGetValue<decimal?>(BalanceCacheKey, out var cached))
-        {
-            return cached;
-        }
-
-        if (string.IsNullOrWhiteSpace(options.Fal.ApiKey))
-        {
-            return null;
-        }
-
-        try
-        {
-            using var request = new HttpRequestMessage(
-                HttpMethod.Get,
-                "https://api.fal.ai/v1/account/billing?expand=credits");
-            request.Headers.Authorization = new AuthenticationHeaderValue("Key", options.Fal.ApiKey);
-
-            using var response = await httpClientFactory
-                .CreateClient(HttpClientName)
-                .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-            if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
-            {
-                logger.LogWarning("fal account billing API rejected the configured API key. StatusCode={StatusCode}", response.StatusCode);
-                memoryCache.Set<decimal?>(BalanceCacheKey, null, TimeSpan.FromSeconds(15));
-                return null;
-            }
-
-            if (!response.IsSuccessStatusCode)
-            {
-                logger.LogWarning("fal account billing API check failed. StatusCode={StatusCode}", response.StatusCode);
-                memoryCache.Set<decimal?>(BalanceCacheKey, null, TimeSpan.FromSeconds(15));
-                return null;
-            }
-
-            var body = await SafeHttpContentReader.ReadRawStringPrefixAsync(
-                response.Content,
-                cancellationToken,
-                BalanceResponseMaxChars);
-            using var document = JsonDocument.Parse(body);
-            var balance = ReadBalanceUsd(document.RootElement);
-            memoryCache.Set(BalanceCacheKey, balance, BalanceCacheTtl);
-            return balance;
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception exception)
-        {
-            logger.LogWarning(
-                "fal account billing API check failed. ExceptionType={ExceptionType}",
-                SafeLogValues.ExceptionType(exception));
-            memoryCache.Set<decimal?>(BalanceCacheKey, null, TimeSpan.FromSeconds(15));
-            return null;
-        }
-    }
-
-    private static decimal? ReadBalanceUsd(JsonElement root)
-    {
-        if (!root.TryGetProperty("credits", out var credits)
-            || credits.ValueKind != JsonValueKind.Object
-            || !credits.TryGetProperty("current_balance", out var balanceElement))
-        {
-            return null;
-        }
-
-        return balanceElement.ValueKind switch
-        {
-            JsonValueKind.Number when balanceElement.TryGetDecimal(out var numeric) => numeric,
-            JsonValueKind.String when decimal.TryParse(
-                balanceElement.GetString(),
-                System.Globalization.NumberStyles.Number,
-                System.Globalization.CultureInfo.InvariantCulture,
-                out var parsed) => parsed,
-            _ => null
-        };
+        var result = await billingClient.GetCurrentBalanceAsync(cancellationToken);
+        return result.IsSuccess ? result.BalanceUsd : null;
     }
 
     private void RecordSnapshot(

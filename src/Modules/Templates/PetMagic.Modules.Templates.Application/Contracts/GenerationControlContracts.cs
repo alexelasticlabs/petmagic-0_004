@@ -39,7 +39,13 @@ public sealed record AdminFalProviderStatusResponse(
     DateTime? LastSuccessAtUtc,
     bool IsStale,
     bool ProviderSubmissionsAllowed,
-    string? SubmissionBlockReason);
+    string? SubmissionBlockReason,
+    string ConfiguredProvider,
+    bool IsEnabled,
+    bool BillingAdminKeyConfigured,
+    string? LastErrorCode,
+    int ConsecutiveFailures,
+    bool LastAttemptSucceeded);
 
 public sealed record AdminGenerationWorkerResponse(
     string InstanceId,

@@ -18,9 +18,11 @@ for (const [label, pattern] of [
 }
 
 for (const required of [
-  'api.petmagic.app',
-  'admin.petmagic.app',
+  'api.petgpt.app',
+  'admin.petgpt.app',
   'STRIPE_LIVE_SECRET_KEY',
+  'FAL_ACCOUNT_BILLING_ADMIN_KEY',
+  'FAL_EXPECTED_ACCOUNT_USERNAME',
   'GOOGLE_PLAY_PACKAGE_NAME',
   'APP_STORE_BUNDLE_ID',
   'GOOGLE_PLAY_PREMIUM_MONTHLY_PRODUCT_ID',

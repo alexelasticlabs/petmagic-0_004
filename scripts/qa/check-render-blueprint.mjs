@@ -113,6 +113,7 @@ if (api) {
       ? 'Templates__FalProviderSpendDailyLimitUsd'
       : 'FAL_PROVIDER_SPEND_DAILY_LIMIT_USD',
     'FAL_AI_API_KEY',
+    'FAL_ACCOUNT_BILLING_ADMIN_KEY',
     'R2_ACCOUNT_ID',
     'R2_ACCESS_KEY',
     'R2_SECRET_KEY',
@@ -145,6 +146,7 @@ if (api) {
     'EMAIL_FROM_ADDRESS',
     'OTEL_EXPORTER_OTLP_ENDPOINT'
   ]);
+  requireDeferredEnvValue(api, 'FAL_EXPECTED_ACCOUNT_USERNAME');
 
   if (environment === 'production') {
     requireSecretKeys(api, [
@@ -214,6 +216,10 @@ if (worker) {
     'FIREBASE_PROJECT_ID',
     'FIREBASE_SERVICE_ACCOUNT_JSON',
     'OTEL_EXPORTER_OTLP_ENDPOINT'
+  ]);
+  rejectEnvKeys(worker, [
+    'FAL_ACCOUNT_BILLING_ADMIN_KEY',
+    'FAL_EXPECTED_ACCOUNT_USERNAME'
   ]);
 
   if (environment === 'production') {

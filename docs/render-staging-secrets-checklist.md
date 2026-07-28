@@ -20,6 +20,8 @@ assistant chats.
 | `Jwt__SigningKey` | API, worker | Generate a new 64+ character secret in a password manager or secret generator. | API and worker start outside Development; signed media URLs and JWT validation work. |
 | `FAL_PROVIDER_SPEND_DAILY_LIMIT_USD` | API, worker | Product/operator budget decision for staging fal.ai spend. | Generation rejects or alerts according to configured budget; value is not `0` unless staging generation is intentionally blocked. |
 | `FAL_AI_API_KEY` | API, worker | fal.ai dashboard API key for staging. | Image/video generation can submit to fal.ai; webhook callbacks reach API. |
+| `FAL_ACCOUNT_BILLING_ADMIN_KEY` | API only | fal.ai Admin API key for Account Billing. | Admin generation diagnostics can refresh the current USD balance without exposing the key to workers or browsers. |
+| `FAL_EXPECTED_ACCOUNT_USERNAME` | API only | Exact fal.ai account username expected for this environment. | Billing responses for another fal.ai account are rejected. |
 | `R2_ACCOUNT_ID` | API, worker | Cloudflare account dashboard. | R2 storage initialization succeeds. |
 | `R2_ACCESS_KEY` | API, worker | Cloudflare R2 API token/access key with bucket-scoped permissions. | Upload/read smoke passes for generated media. |
 | `R2_SECRET_KEY` | API, worker | Cloudflare R2 secret access key paired with `R2_ACCESS_KEY`. | Upload/read smoke passes for generated media. |

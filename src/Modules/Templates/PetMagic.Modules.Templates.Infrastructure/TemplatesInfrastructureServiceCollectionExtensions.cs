@@ -172,6 +172,11 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             Fal = new FalAiOptions
             {
                 ApiKey = ReadValue(falSection, "ApiKey", "FAL_AI_API_KEY") ?? string.Empty,
+                AdminApiKey = ReadValue(falSection, "AdminApiKey", "FAL_ACCOUNT_BILLING_ADMIN_KEY") ?? string.Empty,
+                ExpectedAccountUsername = ReadValue(
+                    falSection,
+                    "ExpectedAccountUsername",
+                    "FAL_EXPECTED_ACCOUNT_USERNAME") ?? string.Empty,
                 QueueBaseUrl = falSection["QueueBaseUrl"] ?? "https://queue.fal.run",
                 WebhookUrl = ReadValue(falSection, "WebhookUrl", "FAL_WEBHOOK_URL") ?? string.Empty,
                 WebhookJwksUrl = falSection["WebhookJwksUrl"] ?? "https://rest.fal.ai/.well-known/jwks.json",
@@ -213,6 +218,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             resolvedSchedulerComponent,
             TemplateSchedulerConfigFingerprint.ApiComponent,
             StringComparison.Ordinal);
+        ValidateProductionFalBillingConfiguration(options, environment, isApiSchedulerComponent);
 
         services.AddSingleton(options);
         services.AddSingleton(mediaReadUrlSigningOptions);
@@ -257,7 +263,8 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         services.AddSingleton<FalAccountBillingClient>();
         services.AddSingleton<FalProviderHealthMonitor>();
         services.AddScoped<GenerationOperationalAlertService>();
-        if (isApiSchedulerComponent)
+        if (isApiSchedulerComponent
+            && IsProvider(options.AiProvider, TemplateAiProviders.Fal))
         {
             services.AddHostedService(serviceProvider =>
                 serviceProvider.GetRequiredService<FalProviderHealthMonitor>());
@@ -726,6 +733,32 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         if (!services.Any(descriptor => descriptor.ServiceType == typeof(IEconomyService)))
         {
             throw new InvalidOperationException("Economy-backed template generation billing must be registered in Production.");
+        }
+    }
+
+    private static void ValidateProductionFalBillingConfiguration(
+        TemplatesOptions options,
+        IHostEnvironment? environment,
+        bool isApiSchedulerComponent)
+    {
+        if (environment is null
+            || !environment.IsProduction()
+            || !isApiSchedulerComponent
+            || !IsProvider(options.AiProvider, TemplateAiProviders.Fal))
+        {
+            return;
+        }
+
+        if (!options.Fal.IsBillingAdminKeyConfigured)
+        {
+            throw new InvalidOperationException(
+                "FAL AI provider is selected for the Production API component but FAL_ACCOUNT_BILLING_ADMIN_KEY is missing.");
+        }
+
+        if (string.IsNullOrWhiteSpace(options.Fal.ExpectedAccountUsername))
+        {
+            throw new InvalidOperationException(
+                "FAL AI provider is selected for the Production API component but FAL_EXPECTED_ACCOUNT_USERNAME is missing.");
         }
     }
 

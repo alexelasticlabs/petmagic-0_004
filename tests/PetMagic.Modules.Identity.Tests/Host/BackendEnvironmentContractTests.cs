@@ -101,6 +101,32 @@ public sealed class BackendEnvironmentContractTests
     }
 
     [Fact]
+    public void FalBillingDiagnostics_ShouldBeConfiguredOnlyOnApiServices()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var envExample = File.ReadAllText(Path.Combine(repositoryRoot, ".env.example"));
+        var dockerCompose = File.ReadAllText(Path.Combine(repositoryRoot, "docker-compose.yml"));
+        var backendEnvironment = ExtractBackendEnvironmentBlock(dockerCompose);
+        var workerEnvironment = ExtractServiceEnvironmentBlock(dockerCompose, "generation-worker");
+
+        Assert.Contains("FAL_ACCOUNT_BILLING_ADMIN_KEY=", envExample, StringComparison.Ordinal);
+        Assert.Contains("FAL_EXPECTED_ACCOUNT_USERNAME=", envExample, StringComparison.Ordinal);
+        Assert.Contains("FAL_ACCOUNT_BILLING_ADMIN_KEY:", backendEnvironment, StringComparison.Ordinal);
+        Assert.Contains("FAL_EXPECTED_ACCOUNT_USERNAME:", backendEnvironment, StringComparison.Ordinal);
+        Assert.DoesNotContain("FAL_ACCOUNT_BILLING_ADMIN_KEY:", workerEnvironment, StringComparison.Ordinal);
+        Assert.DoesNotContain("FAL_EXPECTED_ACCOUNT_USERNAME:", workerEnvironment, StringComparison.Ordinal);
+
+        AssertFalBillingDiagnosticsAreApiOnly(
+            File.ReadAllText(Path.Combine(repositoryRoot, "render.yaml")),
+            "petmagic-staging-api",
+            "petmagic-staging-generation-worker");
+        AssertFalBillingDiagnosticsAreApiOnly(
+            File.ReadAllText(Path.Combine(repositoryRoot, "render.production.yaml")),
+            "petmagic-production-api",
+            "petmagic-production-generation-worker");
+    }
+
+    [Fact]
     public void DockerComposeBackend_ShouldRequireExplicitEnvironmentAppropriateAllowedHosts()
     {
         var repositoryRoot = FindRepositoryRoot();
@@ -493,6 +519,26 @@ public sealed class BackendEnvironmentContractTests
         Assert.True(match.Success, $"Could not locate {serviceName} service in docker-compose.yml.");
 
         return match.Groups["service"].Value;
+    }
+
+    private static void AssertFalBillingDiagnosticsAreApiOnly(
+        string renderBlueprint,
+        string apiServiceName,
+        string workerServiceName)
+    {
+        var apiStart = renderBlueprint.IndexOf($"    name: {apiServiceName}", StringComparison.Ordinal);
+        var workerStart = renderBlueprint.IndexOf($"    name: {workerServiceName}", StringComparison.Ordinal);
+
+        Assert.True(apiStart >= 0, $"Could not locate {apiServiceName} in Render Blueprint.");
+        Assert.True(workerStart > apiStart, $"Could not locate {workerServiceName} after {apiServiceName} in Render Blueprint.");
+
+        var apiBlock = renderBlueprint[apiStart..workerStart];
+        var workerBlock = renderBlueprint[workerStart..];
+
+        Assert.Contains("- key: FAL_ACCOUNT_BILLING_ADMIN_KEY", apiBlock, StringComparison.Ordinal);
+        Assert.Contains("- key: FAL_EXPECTED_ACCOUNT_USERNAME", apiBlock, StringComparison.Ordinal);
+        Assert.DoesNotContain("- key: FAL_ACCOUNT_BILLING_ADMIN_KEY", workerBlock, StringComparison.Ordinal);
+        Assert.DoesNotContain("- key: FAL_EXPECTED_ACCOUNT_USERNAME", workerBlock, StringComparison.Ordinal);
     }
 
     private static int ReadComposeFallbackInt(string dockerCompose, string key)

@@ -60,6 +60,9 @@ public sealed class TemplatesInfrastructureConfigurationTests
         Assert.Equal(100m, options.FalProviderBalanceLowThresholdUsd);
         Assert.Equal(25m, options.FalProviderBalanceCriticalThresholdUsd);
         Assert.Equal(0m, options.FalProviderSpendDailyLimitUsd);
+        Assert.Equal(string.Empty, options.Fal.AdminApiKey);
+        Assert.Equal(string.Empty, options.Fal.ExpectedAccountUsername);
+        Assert.False(options.Fal.IsBillingAdminKeyConfigured);
         Assert.Equal(60, options.MaxAiProviderRequestsPerMinute);
         Assert.Equal(900_000, options.JobLockTimeoutMilliseconds);
         Assert.Equal(1_000, options.QueueMaxSize);
@@ -193,6 +196,33 @@ public sealed class TemplatesInfrastructureConfigurationTests
         Assert.Contains(
             services,
             descriptor => descriptor.ImplementationType == typeof(TemplateAdminAuditOutboxProcessor));
+        using var provider = services.BuildServiceProvider();
+        Assert.DoesNotContain(
+            provider.GetServices<IHostedService>(),
+            service => service.GetType() == typeof(FalProviderHealthMonitor));
+    }
+
+    [Fact]
+    public void AddTemplatesInfrastructure_ShouldHostFalBillingMonitor_OnlyForFalApiComponent()
+    {
+        var services = CreateServices();
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["Templates:AiProvider"] = TemplateAiProviders.Fal,
+            ["Templates:Fal:ApiKey"] = "generation-key",
+            ["Templates:Fal:AdminApiKey"] = "billing-admin-key",
+            ["Templates:Fal:ExpectedAccountUsername"] = "petmagic",
+            ["Templates:GenerationWorkerEnabled"] = "false"
+        });
+
+        services.AddTemplatesInfrastructure(
+            configuration,
+            schedulerComponent: TemplateSchedulerConfigFingerprint.ApiComponent);
+
+        using var provider = services.BuildServiceProvider();
+        Assert.Contains(
+            provider.GetServices<IHostedService>(),
+            service => service.GetType() == typeof(FalProviderHealthMonitor));
     }
 
     [Fact]
@@ -210,6 +240,8 @@ public sealed class TemplatesInfrastructureConfigurationTests
             ["Templates:R2:PublicBaseUrl"] = "https://cdn.example.test",
             ["Templates:R2:ObjectKeyPrefix"] = "templates-media-test",
             ["Templates:Fal:ApiKey"] = "test-fal-key",
+            ["Templates:Fal:AdminApiKey"] = "test-fal-admin-key",
+            ["Templates:Fal:ExpectedAccountUsername"] = "petmagic",
             ["Templates:Fal:QueueBaseUrl"] = "https://queue.fal.run",
             ["Templates:Fal:ImageMaxPollingAttempts"] = "90",
             ["Templates:Fal:ImagePreprocessingMaxPollingAttempts"] = "100",
@@ -288,6 +320,9 @@ public sealed class TemplatesInfrastructureConfigurationTests
         Assert.Equal(TemplateAiProviders.Fal, options.AiProvider);
         Assert.Equal("petmagic-test", options.R2.BucketName);
         Assert.Equal("test-fal-key", options.Fal.ApiKey);
+        Assert.Equal("test-fal-admin-key", options.Fal.AdminApiKey);
+        Assert.Equal("petmagic", options.Fal.ExpectedAccountUsername);
+        Assert.True(options.Fal.IsBillingAdminKeyConfigured);
         Assert.Equal(90, options.Fal.ImageMaxPollingAttempts);
         Assert.Equal(100, options.Fal.ImagePreprocessingMaxPollingAttempts);
         Assert.Equal(360, options.Fal.VideoMaxPollingAttempts);
@@ -465,7 +500,7 @@ public sealed class TemplatesInfrastructureConfigurationTests
         foreach (var relativePath in new[]
         {
             Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Api", "FalWebhookSignatureVerifier.cs"),
-            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "FalProviderHealthService.cs"),
+            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "FalAccountBillingClient.cs"),
             Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "TemplateFeedRealtimeService.cs"),
             Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "TemplateGenerationJobProcessor.ProviderPipeline.cs"),
             Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "TemplateMediaCleanupWorker.cs")
@@ -506,7 +541,7 @@ public sealed class TemplatesInfrastructureConfigurationTests
         foreach (var relativePath in new[]
         {
             Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Api", "FalWebhookSignatureVerifier.cs"),
-            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "FalProviderHealthService.cs"),
+            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "FalAccountBillingClient.cs"),
             Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "TemplateLocalizationTranslator.cs")
         })
         {
@@ -873,6 +908,100 @@ public sealed class TemplatesInfrastructureConfigurationTests
         var exception = Assert.Throws<InvalidOperationException>(() => services.AddTemplatesInfrastructure(configuration, environment));
 
         Assert.Contains("Economy-backed template generation billing", exception.Message);
+    }
+
+    [Fact]
+    public void AddTemplatesInfrastructure_ShouldRequireBillingAdminKey_ForProductionFalApi()
+    {
+        var services = CreateServices();
+        services.AddScoped<IEconomyService>(_ => throw new NotSupportedException("Test stub"));
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["Templates:PublicBaseUrl"] = "https://cdn.petmagic.app/templates",
+            ["Templates:StorageProvider"] = TemplateStorageProviders.R2,
+            ["Templates:AiProvider"] = TemplateAiProviders.Fal,
+            ["Templates:GenerationWorkerEnabled"] = "false",
+            ["Templates:R2:AccountId"] = "test-account",
+            ["Templates:R2:AccessKey"] = "test-access-key",
+            ["Templates:R2:SecretKey"] = "test-secret-key",
+            ["Templates:R2:BucketName"] = "petmagic-test",
+            ["Templates:R2:PublicBaseUrl"] = "https://cdn.petmagic.app/r2",
+            ["Templates:Fal:ApiKey"] = "test-fal-generation-key"
+        });
+        var environment = new TestHostEnvironment(Directory.GetCurrentDirectory())
+        {
+            EnvironmentName = Environments.Production
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            services.AddTemplatesInfrastructure(
+                configuration,
+                environment,
+                TemplateSchedulerConfigFingerprint.ApiComponent));
+
+        Assert.Contains("FAL_ACCOUNT_BILLING_ADMIN_KEY", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AddTemplatesInfrastructure_ShouldNotRequireBillingAdminKey_ForProductionFalWorker()
+    {
+        var services = CreateServices();
+        services.AddScoped<IEconomyService>(_ => throw new NotSupportedException("Test stub"));
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["Templates:PublicBaseUrl"] = "https://cdn.petmagic.app/templates",
+            ["Templates:StorageProvider"] = TemplateStorageProviders.R2,
+            ["Templates:AiProvider"] = TemplateAiProviders.Fal,
+            ["Templates:GenerationWorkerEnabled"] = "true",
+            ["Templates:R2:AccountId"] = "test-account",
+            ["Templates:R2:AccessKey"] = "test-access-key",
+            ["Templates:R2:SecretKey"] = "test-secret-key",
+            ["Templates:R2:BucketName"] = "petmagic-test",
+            ["Templates:R2:PublicBaseUrl"] = "https://cdn.petmagic.app/r2",
+            ["Templates:Fal:ApiKey"] = "test-fal-generation-key"
+        });
+        var environment = new TestHostEnvironment(Directory.GetCurrentDirectory())
+        {
+            EnvironmentName = Environments.Production
+        };
+
+        services.AddTemplatesInfrastructure(
+            configuration,
+            environment,
+            TemplateSchedulerConfigFingerprint.GenerationWorkerComponent);
+    }
+
+    [Fact]
+    public void AddTemplatesInfrastructure_ShouldRequireExpectedAccountUsername_ForProductionFalApi()
+    {
+        var services = CreateServices();
+        services.AddScoped<IEconomyService>(_ => throw new NotSupportedException("Test stub"));
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["Templates:PublicBaseUrl"] = "https://cdn.petmagic.app/templates",
+            ["Templates:StorageProvider"] = TemplateStorageProviders.R2,
+            ["Templates:AiProvider"] = TemplateAiProviders.Fal,
+            ["Templates:GenerationWorkerEnabled"] = "false",
+            ["Templates:R2:AccountId"] = "test-account",
+            ["Templates:R2:AccessKey"] = "test-access-key",
+            ["Templates:R2:SecretKey"] = "test-secret-key",
+            ["Templates:R2:BucketName"] = "petmagic-test",
+            ["Templates:R2:PublicBaseUrl"] = "https://cdn.petmagic.app/r2",
+            ["Templates:Fal:ApiKey"] = "test-fal-generation-key",
+            ["Templates:Fal:AdminApiKey"] = "test-fal-admin-key"
+        });
+        var environment = new TestHostEnvironment(Directory.GetCurrentDirectory())
+        {
+            EnvironmentName = Environments.Production
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            services.AddTemplatesInfrastructure(
+                configuration,
+                environment,
+                TemplateSchedulerConfigFingerprint.ApiComponent));
+
+        Assert.Contains("FAL_EXPECTED_ACCOUNT_USERNAME", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]

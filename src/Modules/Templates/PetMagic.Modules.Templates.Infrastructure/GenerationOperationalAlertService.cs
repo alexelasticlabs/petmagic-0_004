@@ -6,13 +6,15 @@ using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
 using PetMagic.Modules.Templates.Infrastructure.Data;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
+using PetMagic.Modules.Templates.Infrastructure.Options;
 
 namespace PetMagic.Modules.Templates.Infrastructure;
 
 internal sealed class GenerationOperationalAlertService(
     TemplatesDbContext dbContext,
     ITemplateGenerationRuntimeSettingsProvider runtimeSettings,
-    IRenderGenerationWorkerClient? renderClient = null)
+    IRenderGenerationWorkerClient? renderClient = null,
+    TemplatesOptions? options = null)
 {
     internal static readonly TimeSpan ProviderStaleAfter = TimeSpan.FromSeconds(180);
     internal static readonly TimeSpan WorkerStaleAfter = TimeSpan.FromMinutes(2);
@@ -73,51 +75,76 @@ internal sealed class GenerationOperationalAlertService(
     {
         var now = DateTime.UtcNow;
         var settings = runtimeSettings.Current;
-        var provider = await dbContext.TemplateFalProviderHealthSnapshots
-            .AsNoTracking()
-            .OrderByDescending(x => x.UpdatedAtUtc)
-            .FirstOrDefaultAsync(cancellationToken);
-        var providerStale = !FalProviderHealthPolicy.IsSnapshotCurrent(provider?.LastSuccessAtUtc, now);
-        var balance = provider?.BalanceUsd;
+        var falEnabled = options is null
+            || string.Equals(options.AiProvider, TemplateAiProviders.Fal, StringComparison.OrdinalIgnoreCase);
+        if (falEnabled)
+        {
+            var provider = await dbContext.TemplateFalProviderHealthSnapshots
+                .AsNoTracking()
+                .OrderByDescending(x => x.UpdatedAtUtc)
+                .FirstOrDefaultAsync(cancellationToken);
+            var providerStale = !FalProviderHealthPolicy.IsSnapshotCurrent(provider?.LastSuccessAtUtc, now);
+            var balance = provider?.BalanceUsd;
 
-        await SetStateAsync(
-            "fal_balance_critical",
-            balance is not null && !providerStale && balance <= settings.FalBalanceCriticalThresholdUsd,
-            "critical",
-            "fal.ai balance is critical",
-            balance is null ? "fal.ai balance is unavailable." : $"fal.ai balance is ${balance.Value:0.00}.",
-            now,
-            cancellationToken);
-        await SetStateAsync(
-            "fal_balance_low",
-            balance is not null
-                && !providerStale
-                && balance > settings.FalBalanceCriticalThresholdUsd
-                && balance <= settings.FalBalanceLowThresholdUsd,
-            "warning",
-            "fal.ai balance is low",
-            balance is null ? "fal.ai balance is unavailable." : $"fal.ai balance is ${balance.Value:0.00}.",
-            now,
-            cancellationToken);
-        await SetStateAsync(
-            "fal_balance_unknown",
-            providerStale || balance is null,
-            "critical",
-            "fal.ai balance is unknown",
-            "No recent successful fal.ai billing snapshot is available. New provider submissions are blocked.",
-            now,
-            cancellationToken);
+            await SetStateAsync(
+                "fal_balance_critical",
+                balance is not null && !providerStale && balance <= settings.FalBalanceCriticalThresholdUsd,
+                "critical",
+                "fal.ai balance is critical",
+                balance is null ? "fal.ai balance is unavailable." : $"fal.ai balance is ${balance.Value:0.00}.",
+                now,
+                cancellationToken);
+            await SetStateAsync(
+                "fal_balance_low",
+                balance is not null
+                    && !providerStale
+                    && balance > settings.FalBalanceCriticalThresholdUsd
+                    && balance <= settings.FalBalanceLowThresholdUsd,
+                "warning",
+                "fal.ai balance is low",
+                balance is null ? "fal.ai balance is unavailable." : $"fal.ai balance is ${balance.Value:0.00}.",
+                now,
+                cancellationToken);
+            await SetStateAsync(
+                "fal_balance_unknown",
+                providerStale || balance is null,
+                "critical",
+                "fal.ai balance is unknown",
+                "No recent successful fal.ai billing snapshot is available. New provider submissions are blocked.",
+                now,
+                cancellationToken);
 
-        var inflight = await CountInflightProviderRequestsAsync(cancellationToken);
-        var usableConcurrency = settings.FalUsableConcurrency;
-        await SetStateAsync(
-            "fal_capacity_near_usable_limit",
-            usableConcurrency > 0 && inflight >= Math.Max(1, usableConcurrency - 1),
-            "warning",
-            "fal.ai usable capacity is nearly exhausted",
-            $"{inflight} of {usableConcurrency} usable provider slots are occupied.",
-            now,
-            cancellationToken);
+            var inflight = await CountInflightProviderRequestsAsync(cancellationToken);
+            var usableConcurrency = settings.FalUsableConcurrency;
+            await SetStateAsync(
+                "fal_capacity_near_usable_limit",
+                usableConcurrency > 0 && inflight >= Math.Max(1, usableConcurrency - 1),
+                "warning",
+                "fal.ai usable capacity is nearly exhausted",
+                $"{inflight} of {usableConcurrency} usable provider slots are occupied.",
+                now,
+                cancellationToken);
+        }
+        else
+        {
+            foreach (var code in new[]
+            {
+                "fal_balance_critical",
+                "fal_balance_low",
+                "fal_balance_unknown",
+                "fal_capacity_near_usable_limit"
+            })
+            {
+                await SetStateAsync(
+                    code,
+                    active: false,
+                    severity: "warning",
+                    title: string.Empty,
+                    message: string.Empty,
+                    now,
+                    cancellationToken);
+            }
+        }
 
         var freshWorkers = await dbContext.TemplateRuntimeConfigFingerprints
             .AsNoTracking()

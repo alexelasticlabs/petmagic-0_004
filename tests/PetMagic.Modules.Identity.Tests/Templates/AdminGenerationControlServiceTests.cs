@@ -11,6 +11,7 @@ using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Infrastructure;
 using PetMagic.Modules.Templates.Infrastructure.Data;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
+using PetMagic.Modules.Templates.Infrastructure.Options;
 
 namespace PetMagic.Modules.Identity.Tests.Templates;
 
@@ -187,6 +188,91 @@ public sealed class AdminGenerationControlServiceTests
         Assert.True(result.IsSuccess);
         Assert.True(result.Value.Fal.ProviderSubmissionsAllowed);
         Assert.Null(result.Value.Fal.SubmissionBlockReason);
+        Assert.Equal(TemplateAiProviders.Fal, result.Value.Fal.ConfiguredProvider);
+        Assert.True(result.Value.Fal.IsEnabled);
+        Assert.True(result.Value.Fal.BillingAdminKeyConfigured);
+        Assert.Null(result.Value.Fal.LastErrorCode);
+        Assert.Equal(0, result.Value.Fal.ConsecutiveFailures);
+        Assert.True(result.Value.Fal.LastAttemptSucceeded);
+    }
+
+    [Fact]
+    public async Task RefreshProviderAsync_WhenProviderIsFake_ShouldSkipMonitorAndFalGate()
+    {
+        await using var fixture = await ControlFixture.CreateAsync(
+            aiProvider: TemplateAiProviders.Fake);
+
+        var result = await fixture.Service.RefreshProviderAsync(
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(TemplateAiProviders.Fake, result.Value.Fal.ConfiguredProvider);
+        Assert.False(result.Value.Fal.IsEnabled);
+        Assert.True(result.Value.Fal.ProviderSubmissionsAllowed);
+        Assert.Null(result.Value.Fal.SubmissionBlockReason);
+        Assert.Null(result.Value.Fal.BalanceUsd);
+        Assert.Equal(0, result.Value.Fal.InflightRequests);
+        Assert.False(result.Value.Fal.IsStale);
+        Assert.Null(result.Value.Fal.LastErrorCode);
+        Assert.Equal(0, result.Value.Fal.ConsecutiveFailures);
+        Assert.False(result.Value.Fal.LastAttemptSucceeded);
+    }
+
+    [Fact]
+    public async Task EvaluateAlerts_WhenProviderIsFake_ShouldResolveFalAlertsAndKeepWorkerAlerts()
+    {
+        await using var fixture = await ControlFixture.CreateAsync(
+            aiProvider: TemplateAiProviders.Fake);
+        var now = DateTime.UtcNow;
+        fixture.DbContext.TemplateGenerationOperationalAlerts.Add(
+            new TemplateGenerationOperationalAlert
+            {
+                Id = Guid.NewGuid(),
+                Code = "fal_balance_unknown",
+                Severity = "critical",
+                Title = "fal.ai balance is unknown",
+                Message = "stale",
+                ActivatedAtUtc = now.AddMinutes(-1),
+                LastObservedAtUtc = now.AddMinutes(-1),
+                UpdatedAtUtc = now.AddMinutes(-1)
+            });
+        await fixture.DbContext.SaveChangesAsync();
+
+        await fixture.AlertService.EvaluateAsync(CancellationToken.None);
+
+        var alerts = await fixture.DbContext.TemplateGenerationOperationalAlerts
+            .AsNoTracking()
+            .ToArrayAsync();
+        Assert.NotNull(Assert.Single(alerts, item => item.Code == "fal_balance_unknown").ResolvedAtUtc);
+        Assert.DoesNotContain(
+            alerts,
+            item => item.Code.StartsWith("fal_", StringComparison.Ordinal) && item.ResolvedAtUtc is null);
+        Assert.Contains(
+            alerts,
+            item => item.Code == "worker_capacity_insufficient" && item.ResolvedAtUtc is null);
+    }
+
+    [Fact]
+    public async Task GetAsync_ShouldExposeOnlyStableFalBillingFailureDiagnostics()
+    {
+        await using var fixture = await ControlFixture.CreateAsync();
+        var snapshot = await fixture.DbContext.TemplateFalProviderHealthSnapshots.SingleAsync();
+        snapshot.BalanceUsd = null;
+        snapshot.Status = "unknown";
+        snapshot.LastErrorCode = "provider raw failure detail must not escape";
+        snapshot.ConsecutiveFailures = 3;
+        snapshot.LastSuccessAtUtc = null;
+        snapshot.UpdatedAtUtc = DateTime.UtcNow;
+        await fixture.DbContext.SaveChangesAsync();
+        fixture.DbContext.ChangeTracker.Clear();
+
+        var result = await fixture.Service.GetAsync(Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("request_failed", result.Value.Fal.LastErrorCode);
+        Assert.Equal(3, result.Value.Fal.ConsecutiveFailures);
+        Assert.False(result.Value.Fal.LastAttemptSucceeded);
     }
 
     [Fact]
@@ -318,6 +404,7 @@ public sealed class AdminGenerationControlServiceTests
             TemplatesDbContext dbContext,
             DatabaseRuntimeSettingsProvider runtimeSettings,
             GenerationOperationalAlertService alertService,
+            TemplatesOptions templatesOptions,
             IRenderGenerationWorkerClient? renderClient)
         {
             Connection = connection;
@@ -327,9 +414,10 @@ public sealed class AdminGenerationControlServiceTests
             Service = new AdminGenerationControlService(
                 dbContext,
                 runtimeSettings,
-                providerMonitor: null!,
+                null!,
                 alertService,
-                adminAuditLog: null,
+                templatesOptions,
+                null,
                 NullLogger<AdminGenerationControlService>.Instance,
                 renderClient);
         }
@@ -345,7 +433,8 @@ public sealed class AdminGenerationControlServiceTests
         public AdminGenerationControlService Service { get; }
 
         public static async Task<ControlFixture> CreateAsync(
-            IRenderGenerationWorkerClient? renderClient = null)
+            IRenderGenerationWorkerClient? renderClient = null,
+            string aiProvider = TemplateAiProviders.Fal)
         {
             var connection = new SqliteConnection("Data Source=:memory:");
             await connection.OpenAsync();
@@ -388,8 +477,37 @@ public sealed class AdminGenerationControlServiceTests
 
             var runtimeSettings = new DatabaseRuntimeSettingsProvider(dbContext);
             await runtimeSettings.RefreshAsync(CancellationToken.None);
-            var alertService = new GenerationOperationalAlertService(dbContext, runtimeSettings, renderClient);
-            return new ControlFixture(connection, dbContext, runtimeSettings, alertService, renderClient);
+            var templatesOptions = new TemplatesOptions
+            {
+                AiProvider = aiProvider,
+                PublicBaseUrl = "http://localhost:5000",
+                LocalMediaRootPath = "wwwroot/templates-media",
+                DefaultImagePrompt = "Create a themed pet portrait.",
+                DefaultPreprocessingPrompt = "Keep the same pet.",
+                DefaultKlingPrompt = "Funny dance.",
+                AllowedImageModels = ["openai/gpt-image-2/edit"],
+                AllowedPreprocessingModels = ["openai/gpt-image-2/edit"],
+                AllowedKlingModels = ["fal-ai/kling-video/v3/pro/motion-control"],
+                SupportedLocalizationLocales = ["ru"],
+                Fal = new FalAiOptions
+                {
+                    ApiKey = "generation-key",
+                    AdminApiKey = "billing-admin-key",
+                    ExpectedAccountUsername = "petmagic"
+                }
+            };
+            var alertService = new GenerationOperationalAlertService(
+                dbContext,
+                runtimeSettings,
+                renderClient,
+                templatesOptions);
+            return new ControlFixture(
+                connection,
+                dbContext,
+                runtimeSettings,
+                alertService,
+                templatesOptions,
+                renderClient);
         }
 
         public async ValueTask DisposeAsync()

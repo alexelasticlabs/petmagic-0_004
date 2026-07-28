@@ -227,6 +227,10 @@ public sealed class FalAiOptions
 {
     public string ApiKey { get; init; } = string.Empty;
 
+    public string AdminApiKey { get; init; } = string.Empty;
+
+    public string ExpectedAccountUsername { get; init; } = string.Empty;
+
     public string QueueBaseUrl { get; init; } = "https://queue.fal.run";
 
     public string WebhookUrl { get; init; } = string.Empty;
@@ -246,6 +250,8 @@ public sealed class FalAiOptions
     public int VideoMaxPollingAttempts { get; init; } = 300;
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(ApiKey);
+
+    public bool IsBillingAdminKeyConfigured => !string.IsNullOrWhiteSpace(AdminApiKey);
 }
 
 public sealed class FirebasePushOptions

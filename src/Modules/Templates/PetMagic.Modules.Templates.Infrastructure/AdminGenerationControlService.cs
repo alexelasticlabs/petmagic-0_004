@@ -10,6 +10,7 @@ using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
 using PetMagic.Modules.Templates.Infrastructure.Data;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
+using PetMagic.Modules.Templates.Infrastructure.Options;
 
 namespace PetMagic.Modules.Templates.Infrastructure;
 
@@ -18,6 +19,7 @@ internal sealed class AdminGenerationControlService(
     ITemplateGenerationRuntimeSettingsProvider runtimeSettings,
     FalProviderHealthMonitor providerMonitor,
     GenerationOperationalAlertService alertService,
+    TemplatesOptions options,
     IAdminAuditLog? adminAuditLog,
     ILogger<AdminGenerationControlService> logger,
     IRenderGenerationWorkerClient? renderClient = null) : IAdminGenerationControlService
@@ -125,6 +127,11 @@ internal sealed class AdminGenerationControlService(
         Guid adminUserId,
         CancellationToken cancellationToken)
     {
+        if (!IsFalProvider())
+        {
+            return await BuildResponseAsync(adminUserId, cancellationToken);
+        }
+
         var lastCheckedAt = await dbContext.TemplateFalProviderHealthSnapshots
             .AsNoTracking()
             .MaxAsync(x => (DateTime?)x.CheckedAtUtc, cancellationToken);
@@ -280,7 +287,9 @@ internal sealed class AdminGenerationControlService(
             .AsNoTracking()
             .OrderByDescending(x => x.UpdatedAtUtc)
             .FirstOrDefaultAsync(cancellationToken);
-        var providerStale = !FalProviderHealthPolicy.IsSnapshotCurrent(provider?.LastSuccessAtUtc, now);
+        var falEnabled = IsFalProvider();
+        var providerStale = falEnabled
+            && !FalProviderHealthPolicy.IsSnapshotCurrent(provider?.LastSuccessAtUtc, now);
         var inflight = await dbContext.TemplateGenerationJobs
             .AsNoTracking()
             .LongCountAsync(x => (x.Status == TemplateGenerationStatus.SubmittingToProvider
@@ -291,26 +300,35 @@ internal sealed class AdminGenerationControlService(
                     || x.PreprocessingProviderRequestId != null
                     || x.MotionProviderRequestId != null),
                 cancellationToken);
-        var balanceStatus = providerStale || provider?.BalanceUsd is null
+        var providerBalance = falEnabled ? provider?.BalanceUsd : null;
+        var providerInflight = falEnabled ? inflight : 0;
+        var balanceStatus = !falEnabled || providerStale || providerBalance is null
             ? "unknown"
-            : provider.BalanceUsd <= current.FalBalanceCriticalThresholdUsd
+            : providerBalance.Value <= current.FalBalanceCriticalThresholdUsd
                 ? "critical"
-                : provider.BalanceUsd <= current.FalBalanceLowThresholdUsd
+                : providerBalance.Value <= current.FalBalanceLowThresholdUsd
                     ? "low"
                     : "healthy";
-        var (providerSubmissionsAllowed, submissionBlockReason) = ResolveProviderSubmissionGate(
-            current,
-            inflight,
-            providerStale,
-            provider?.BalanceUsd);
+        var (providerSubmissionsAllowed, submissionBlockReason) = falEnabled
+            ? ResolveProviderSubmissionGate(
+                current,
+                providerInflight,
+                providerStale,
+                providerBalance)
+            : (true, null);
 
-        var alerts = await dbContext.TemplateGenerationOperationalAlerts
+        var alertRows = await dbContext.TemplateGenerationOperationalAlerts
             .AsNoTracking()
             .Where(x => x.ResolvedAtUtc == null || x.ResolvedAtUtc >= now.AddDays(-7))
             .OrderBy(x => x.ResolvedAtUtc != null)
             .ThenByDescending(x => x.UpdatedAtUtc)
             .Take(100)
             .ToArrayAsync(cancellationToken);
+        var alerts = falEnabled
+            ? alertRows
+            : alertRows
+                .Where(x => !x.Code.StartsWith("fal_", StringComparison.Ordinal))
+                .ToArray();
         var alertIds = alerts.Select(x => x.Id).ToArray();
         var acknowledgements = await dbContext.TemplateGenerationOperationalAlertAcknowledgements
             .AsNoTracking()
@@ -323,7 +341,7 @@ internal sealed class AdminGenerationControlService(
             ? activeInstances * current.WorkerLoopsPerInstance
             : int.MaxValue;
         var freshLoopCount = Math.Min(reportedFreshLoopCount, renderLoopCeiling);
-        var health = balanceStatus is "critical" or "unknown"
+        var health = falEnabled && balanceStatus is "critical" or "unknown"
             ? "critical"
             : isDraining
                 || freshLoopCount < current.GlobalMaxConcurrent
@@ -351,14 +369,20 @@ internal sealed class AdminGenerationControlService(
                 current.FalConfiguredConcurrency,
                 current.FalReservedConcurrency,
                 current.FalUsableConcurrency,
-                inflight,
-                provider?.BalanceUsd,
+                providerInflight,
+                providerBalance,
                 balanceStatus,
-                provider?.CheckedAtUtc,
-                provider?.LastSuccessAtUtc,
+                falEnabled ? provider?.CheckedAtUtc : null,
+                falEnabled ? provider?.LastSuccessAtUtc : null,
                 providerStale,
                 providerSubmissionsAllowed,
-                submissionBlockReason),
+                submissionBlockReason,
+                options.AiProvider,
+                falEnabled,
+                options.Fal.IsBillingAdminKeyConfigured,
+                falEnabled ? FalAccountBillingClient.NormalizeErrorCode(provider?.LastErrorCode) : null,
+                falEnabled ? provider?.ConsecutiveFailures ?? 0 : 0,
+                falEnabled && string.Equals(provider?.Status, "healthy", StringComparison.OrdinalIgnoreCase)),
             workers,
             render,
             alerts.Select(x =>
@@ -371,6 +395,11 @@ internal sealed class AdminGenerationControlService(
                         : null);
             }).ToArray()));
     }
+
+    private bool IsFalProvider() => string.Equals(
+        options.AiProvider,
+        TemplateAiProviders.Fal,
+        StringComparison.OrdinalIgnoreCase);
 
     private static (bool Allowed, string? BlockReason) ResolveProviderSubmissionGate(
         TemplateGenerationRuntimeSnapshot settings,
