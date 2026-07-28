@@ -19,7 +19,7 @@ envVarGroups:
       - key: DOTNET_ENVIRONMENT
         value: Production
       - key: BACKEND_PUBLIC_BASE_URL
-        value: https://api.petmagic.app
+        value: https://api.petgpt.app
       - key: TEMPLATES_STORAGE_PROVIDER
         value: R2
       - key: TEMPLATES_AI_PROVIDER
@@ -59,7 +59,7 @@ services:
     dockerContext: .
     healthCheckPath: /health
     domains:
-      - api.petmagic.app
+      - api.petgpt.app
     disk:
       name: petmagic-production-api-data
       mountPath: /var/petmagic
@@ -95,15 +95,15 @@ services:
       - key: StaticFiles__ExtraWebRootPath
         value: /var/petmagic/wwwroot
       - key: Identity__AvatarStorage__PublicBaseUrl
-        value: https://api.petmagic.app
+        value: https://api.petgpt.app
       - key: Identity__AvatarStorage__LocalMediaRootPath
         value: /var/petmagic/wwwroot/user-avatars
       - key: SupportChat__AttachmentStorage__PublicBaseUrl
-        value: https://api.petmagic.app
+        value: https://api.petgpt.app
       - key: SupportChat__AttachmentStorage__LocalMediaRootPath
         value: /var/petmagic/wwwroot/support-attachments
       - key: Templates__PublicBaseUrl
-        value: https://api.petmagic.app
+        value: https://api.petgpt.app
       - key: Templates__LocalMediaRootPath
         value: /var/petmagic/wwwroot/templates-media
       - key: Templates__GenerationWorkerEnabled
@@ -111,9 +111,9 @@ services:
       - key: Templates__TemplateOfTheDayAutoPickWorkerEnabled
         value: "true"
       - key: AllowedHosts
-        value: api.petmagic.app;petmagic-production-api.onrender.com
+        value: api.petgpt.app;petmagic-production-api.onrender.com
       - key: Cors__AllowedOrigins__0
-        value: https://admin.petmagic.app
+        value: https://admin.petgpt.app
       - key: ConnectionStrings__DefaultConnection
         fromDatabase:
           name: petmagic-production-db
@@ -125,7 +125,7 @@ services:
       - key: FAL_AI_API_KEY
         sync: false
       - key: FAL_WEBHOOK_URL
-        value: https://api.petmagic.app/api/templates/generations/fal/webhook
+        value: https://api.petgpt.app/api/templates/generations/fal/webhook
       - key: R2_ACCOUNT_ID
         sync: false
       - key: R2_ACCESS_KEY
@@ -143,11 +143,11 @@ services:
       - key: STRIPE_LIVE_WEBHOOK_SECRET
         sync: false
       - key: STRIPE_CHECKOUT_SUCCESS_URL
-        value: https://admin.petmagic.app/payments/success?session_id={CHECKOUT_SESSION_ID}
+        value: https://admin.petgpt.app/payments/success?session_id={CHECKOUT_SESSION_ID}
       - key: STRIPE_CHECKOUT_CANCEL_URL
-        value: https://admin.petmagic.app/payments/cancel
+        value: https://admin.petgpt.app/payments/cancel
       - key: STRIPE_BILLING_PORTAL_RETURN_URL
-        value: https://admin.petmagic.app/payments/return
+        value: https://admin.petgpt.app/payments/return
       - key: GOOGLE_PLAY_PACKAGE_NAME
         value: com.petmagic.app
       - key: GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL
@@ -255,7 +255,7 @@ services:
       - key: FAL_AI_API_KEY
         sync: false
       - key: FAL_WEBHOOK_URL
-        value: https://api.petmagic.app/api/templates/generations/fal/webhook
+        value: https://api.petgpt.app/api/templates/generations/fal/webhook
       - key: R2_ACCOUNT_ID
         sync: false
       - key: R2_ACCESS_KEY
@@ -317,7 +317,7 @@ services:
     healthCheckPath: /ru
     maxShutdownDelaySeconds: 60
     domains:
-      - admin.petmagic.app
+      - admin.petgpt.app
     buildFilter:
       paths:
         - apps/admin-web/**
@@ -328,9 +328,9 @@ services:
       - key: NODE_ENV
         value: production
       - key: NEXT_PUBLIC_API_BASE_URL
-        value: https://api.petmagic.app
+        value: https://api.petgpt.app
       - key: INTERNAL_API_BASE_URL
-        value: https://api.petmagic.app
+        value: https://api.petgpt.app
       - key: ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION
         value: "false"
       - key: NEXT_PUBLIC_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION
