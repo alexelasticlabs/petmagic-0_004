@@ -1,5 +1,10 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
+import type {
+  AdminFalSubmissionBlockReason,
+  AdminGenerationControlSnapshot,
+} from "../src/lib/api-client.types.generation-control";
+
 const apiOrigin = "https://api.petmagic.test";
 
 function session(roles: string[] = ["Admin"]) {
@@ -25,7 +30,7 @@ function session(roles: string[] = ["Admin"]) {
   };
 }
 
-function snapshot() {
+function snapshot(): AdminGenerationControlSnapshot {
   return {
     settings: {
       version: 3,
@@ -65,6 +70,8 @@ function snapshot() {
       checkedAtUtc: "2026-07-28T10:01:00Z",
       lastSuccessAtUtc: "2026-07-28T10:01:00Z",
       isStale: false,
+      providerSubmissionsAllowed: true,
+      submissionBlockReason: null as AdminFalSubmissionBlockReason | null,
     },
     workers: [
       {
@@ -108,6 +115,110 @@ function snapshot() {
   };
 }
 
+function degradedSetupSnapshot(): AdminGenerationControlSnapshot {
+  const state = snapshot();
+  state.settings = {
+    ...state.settings,
+    version: 1,
+    globalMaxConcurrent: 3,
+    imageMaxConcurrent: 2,
+    imageProtectedConcurrent: 2,
+    videoGuaranteedConcurrent: 1,
+    videoMaxConcurrent: 1,
+    videoBorrowMaxConcurrent: 0,
+    workerLoopsPerInstance: 1,
+    falConfiguredConcurrency: 0,
+    falReservedConcurrency: 1,
+    falBalanceLowThresholdUsd: 100,
+    falBalanceCriticalThresholdUsd: 25,
+  };
+  state.status = {
+    ...state.status,
+    activeGlobal: 0,
+    activeImage: 0,
+    activeVideo: 0,
+    queuedImage: 2,
+    queuedVideo: 1,
+    effectiveImageMaxConcurrent: 2,
+    health: "critical",
+  };
+  state.fal = {
+    configuredConcurrency: 0,
+    reservedConcurrency: 1,
+    usableConcurrency: 0,
+    inflightRequests: 0,
+    balanceUsd: null,
+    balanceStatus: "unknown",
+    checkedAtUtc: "2026-07-28T10:01:00Z",
+    lastSuccessAtUtc: null,
+    isStale: true,
+    providerSubmissionsAllowed: false,
+    submissionBlockReason: "concurrency_unknown",
+  };
+  state.workers = [
+    {
+      instanceId: "worker-frankfurt-current",
+      lastSeenAtUtc: "2026-07-28T10:01:00Z",
+      heartbeatAgeSeconds: 2,
+      appliedSettingsVersion: 1,
+      configuredLoops: 1,
+      isStale: false,
+      isConfigCurrent: true,
+      isDraining: false,
+    },
+    ...Array.from({ length: 18 }, (_, index) => ({
+      instanceId: `worker-stale-${String(index + 1).padStart(2, "0")}`,
+      lastSeenAtUtc: "2026-07-20T10:01:00Z",
+      heartbeatAgeSeconds: 691_200 + index,
+      appliedSettingsVersion: 0,
+      configuredLoops: 0,
+      isStale: true,
+      isConfigCurrent: false,
+      isDraining: false,
+    })),
+  ];
+  state.render = {
+    isConfigured: false,
+    serviceId: null,
+    serviceName: null,
+    serviceType: null,
+    plan: null,
+    region: null,
+    desiredInstances: null,
+    activeInstances: null,
+    autoscalingEnabled: false,
+    configurationError: "templates.render.not_configured",
+    operation: null,
+  };
+  state.alerts = [
+    {
+      id: "alert-balance-unknown",
+      code: "fal_balance_unknown",
+      severity: "critical",
+      title: "fal.ai balance is unknown",
+      message: "No recent billing snapshot is available.",
+      activatedAtUtc: "2026-07-28T10:00:00Z",
+      resolvedAtUtc: null,
+      acknowledgedAtUtc: null,
+      isActive: true,
+      isAcknowledged: false,
+    },
+    {
+      id: "alert-worker-capacity",
+      code: "worker_capacity_insufficient",
+      severity: "warning",
+      title: "Generation worker capacity is below the global limit",
+      message: "Fresh workers expose one loop for a global limit of three.",
+      activatedAtUtc: "2026-07-28T10:00:00Z",
+      resolvedAtUtc: null,
+      acknowledgedAtUtc: null,
+      isActive: true,
+      isAcknowledged: false,
+    },
+  ];
+  return state;
+}
+
 function cors(route: Route) {
   return {
     "Access-Control-Allow-Origin": route.request().headers().origin ?? "http://127.0.0.1",
@@ -129,9 +240,14 @@ async function json(route: Route, body: unknown, status = 200) {
 
 async function installMocks(
   page: Page,
-  options: { roles?: string[]; scaleConflictOnce?: boolean; settingsConflictOnce?: boolean } = {}
+  options: {
+    roles?: string[];
+    scaleConflictOnce?: boolean;
+    settingsConflictOnce?: boolean;
+    initialState?: AdminGenerationControlSnapshot;
+  } = {}
 ) {
-  let state = snapshot();
+  let state = options.initialState ?? snapshot();
   const settingsRequests: unknown[] = [];
   const scaleRequests: Array<{ body: unknown; idempotencyKey: string | null }> = [];
   let operationReads = 0;
@@ -179,9 +295,13 @@ async function installMocks(
       });
       if (options.scaleConflictOnce && !scaleConflictReturned) {
         scaleConflictReturned = true;
+        if (!state.render) {
+          throw new Error("Render capacity fixture is required for the scale-conflict scenario.");
+        }
+        const currentRender = state.render;
         state = {
           ...state,
-          render: { ...state.render, desiredInstances: 2, activeInstances: 2 },
+          render: { ...currentRender, desiredInstances: 2, activeInstances: 2 },
         };
         await json(
           route,
@@ -280,12 +400,12 @@ async function installMocks(
   };
 }
 
-async function login(page: Page) {
-  await page.goto("/en");
+async function login(page: Page, locale: "en" | "ru" = "en") {
+  await page.goto(`/${locale}`);
   await page.locator("#login-email").fill("capacity.admin@petmagic.test");
   await page.locator("#login-password").fill("production-ready-password");
   await page.locator('form button[type="submit"]').click();
-  await expect(page).toHaveURL(/\/en\/dashboard$/);
+  await expect(page).toHaveURL(new RegExp(`/${locale}/dashboard$`));
 }
 
 test("admin reviews versioned runtime settings and acknowledges a persistent alert", async ({
@@ -299,7 +419,12 @@ test("admin reviews versioned runtime settings and acknowledges a persistent ale
     page.getByRole("heading", { name: "Generation capacity", exact: true })
   ).toBeVisible();
   await expect(page.getByText("$20.00", { exact: true })).toBeVisible();
-  await page.getByRole("spinbutton", { name: "Global max" }).fill("7");
+  await page
+    .locator("#generation-fal")
+    .getByRole("button", { name: "Check balance", exact: true })
+    .click();
+  await expect(page.getByText("$19.50", { exact: true })).toBeVisible();
+  await page.getByRole("spinbutton", { name: "Global limit" }).fill("7");
   await page.getByRole("button", { name: "Review changes" }).click();
   const dialog = page.getByRole("dialog", { name: "Confirm runtime settings" });
   await expect(dialog.getByRole("button", { name: "Apply settings" })).toBeDisabled();
@@ -312,8 +437,11 @@ test("admin reviews versioned runtime settings and acknowledges a persistent ale
     expectedVersion: 3,
     globalMaxConcurrent: 7,
   });
-  await page.getByRole("button", { name: "Acknowledge", exact: true }).last().click();
-  await expect(page.getByText("Acknowledged", { exact: true })).toBeVisible();
+  await page
+    .getByRole("button", { name: /^Mark as read:/ })
+    .last()
+    .click();
+  await expect(page.getByText("Read", { exact: true })).toBeVisible();
 });
 
 test("settings conflict keeps stale values blocked until the admin reloads", async ({ page }) => {
@@ -321,7 +449,7 @@ test("settings conflict keeps stale values blocked until the admin reloads", asy
   await page.setViewportSize({ width: 1440, height: 960 });
   await login(page);
   await page.goto("/en/generations/capacity");
-  const globalMax = page.getByRole("spinbutton", { name: "Global max" });
+  const globalMax = page.getByRole("spinbutton", { name: "Global limit" });
   await globalMax.fill("7");
   await page.getByRole("button", { name: "Review changes" }).click();
   const dialog = page.getByRole("dialog", { name: "Confirm runtime settings" });
@@ -335,6 +463,97 @@ test("settings conflict keeps stale values blocked until the admin reloads", asy
   await expect(globalMax).toHaveValue("6");
   expect(api.getSettingsRequests()).toHaveLength(1);
 });
+
+test("RU degraded setup explains the fal.ai gate, collapses stale workers, and previews the safe preset", async ({
+  page,
+}) => {
+  const api = await installMocks(page, { initialState: degradedSetupSnapshot() });
+  await page.setViewportSize({ width: 1440, height: 960 });
+  await login(page, "ru");
+  await page.goto("/ru/generations/capacity");
+
+  await expect(page.getByRole("heading", { name: "Мощность генераций", exact: true })).toHaveCount(
+    1
+  );
+  await expect(
+    page.getByRole("heading", { name: "Отправка в fal.ai приостановлена", exact: true })
+  ).toBeVisible();
+  const readiness = page.locator("#generation-overview");
+  await expect(
+    readiness.getByText("Лимит concurrency fal.ai не указан", { exact: true })
+  ).toBeVisible();
+  await expect(readiness.getByText("Фактически доступно", { exact: true })).toBeVisible();
+
+  const primaryAction = page.getByRole("button", {
+    name: "Настроить безопасный старт",
+    exact: true,
+  });
+  await expect(primaryAction).toBeVisible();
+  const primaryActionBox = await primaryAction.boundingBox();
+  expect(primaryActionBox?.y ?? 961).toBeLessThan(960);
+
+  const staleHistory = page.locator("details").filter({
+    hasText: "Устаревшие heartbeats: 18",
+  });
+  await expect(staleHistory.locator("summary")).toBeVisible();
+  expect(await staleHistory.getAttribute("open")).toBeNull();
+  await expect(staleHistory.locator("li").first()).toBeHidden();
+  await staleHistory.locator("summary").click();
+  await expect(staleHistory.locator("li")).toHaveCount(18);
+  await expect(staleHistory.locator("li").first()).toBeVisible();
+
+  await expect(
+    page.getByText("Как включить ручное масштабирование", { exact: true })
+  ).toBeVisible();
+  await expect(page.getByText(/RENDER_API_KEY/).last()).toBeVisible();
+
+  await primaryAction.click();
+  await expect(
+    page.getByRole("status").filter({
+      hasText: "Рекомендуемые значения подставлены в черновик. Проверьте их ниже.",
+    })
+  ).toBeVisible();
+  await expect(page.getByRole("spinbutton", { name: "Общий лимит" })).toHaveValue("8");
+  await expect(page.getByRole("spinbutton", { name: "Loops на worker" })).toHaveValue("2");
+  await expect(page.getByRole("spinbutton", { name: "Подтверждённый лимит fal.ai" })).toHaveValue(
+    "10"
+  );
+  await expect(page.getByRole("button", { name: "Проверить изменения" })).toBeEnabled();
+  expect(api.getSettingsRequests()).toHaveLength(0);
+});
+
+for (const width of [390, 320]) {
+  test(`RU degraded capacity workspace stays usable at ${width}px`, async ({ page }) => {
+    await installMocks(page, { initialState: degradedSetupSnapshot() });
+    await page.setViewportSize({ width, height: 844 });
+    await login(page, "ru");
+    await page.goto("/ru/generations/capacity");
+
+    await expect(
+      page.getByRole("heading", { name: "Отправка в fal.ai приостановлена", exact: true })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("navigation", { name: "Разделы управления мощностью", exact: true })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Настроить безопасный старт", exact: true })
+    ).toBeVisible();
+
+    await page.locator("#generation-limits").scrollIntoViewIfNeeded();
+    const globalLimit = page.getByRole("spinbutton", { name: "Общий лимит" });
+    await expect(globalLimit).toBeVisible();
+    const inputBox = await globalLimit.boundingBox();
+    expect(inputBox).not.toBeNull();
+    expect(inputBox?.x ?? -1).toBeGreaterThanOrEqual(0);
+    expect((inputBox?.x ?? 0) + (inputBox?.width ?? width + 1)).toBeLessThanOrEqual(width);
+
+    const dimensions = await page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+    }));
+    expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
+  });
+}
 
 test("Moderator cannot open or query the Admin-only capacity route", async ({ page }) => {
   const api = await installMocks(page, { roles: ["Moderator"] });

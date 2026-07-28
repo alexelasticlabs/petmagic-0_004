@@ -42,9 +42,9 @@ describe("generation capacity admin workflow", () => {
     expect(component).toContain("settingsReason.trim().length < 3");
     expect(component).toContain("scaleCostConfirmed");
     expect(component).toContain("scaleReviewBaseline.instances");
-    expect(component).toContain(
-      "setScaleReviewBaseline({ instances: currentInstances, plan: currentPlan })"
-    );
+    expect(component).toContain("setScaleReviewBaseline({");
+    expect(component).toContain("instances: currentInstances");
+    expect(component).toContain("plan: currentPlan");
     expect(component).toContain('title={`${scaleReviewBaseline?.plan ?? "Render"} ×');
     expect(component).toContain("scaleConflict ||");
     expect(component).toContain("!snapshot.status.isDraining");
@@ -118,9 +118,36 @@ describe("generation capacity admin workflow", () => {
     expect(topbar).toContain("totalAttentionCount > 0");
   });
 
-  it("uses responsive grids and mobile-safe dialogs", () => {
-    expect(styles).toContain("@media (max-width: 720px)");
+  it("renders the compact operator workflow instead of a duplicate page hero", () => {
+    expect(component).not.toContain("AdminPageHero");
+    expect(component).toContain("createGenerationCapacityViewModel(snapshot, observedLoops)");
+    expect(component).toContain('id="generation-overview"');
+    expect(component).toContain('id="generation-limits"');
+    expect(component).toContain('id="generation-fal"');
+    expect(component).toContain('id="generation-workers"');
+    expect(component).toContain('id="generation-alerts"');
+    expect(component).toContain("aria-label={text.nav.label}");
+    expect(component).toContain("applyGenerationCapacityPreset(values)");
+    expect(component).toContain('aria-live="polite"');
+  });
+
+  it("keeps stale workers collapsed and numeric settings accessible", () => {
+    expect(component).toContain("const staleWorkers = snapshot.workers.filter");
+    expect(component).toContain("<details className={styles.staleWorkers}>");
+    expect(component).toContain("text.workers.staleHistory(staleWorkers.length)");
+    expect(component).not.toContain("snapshot.workers.map((worker)");
+    expect(component).toContain("htmlFor={inputId}");
+    expect(component).toContain("aria-describedby=");
+    expect(component).toContain("aria-invalid={fieldIssues.length > 0}");
+  });
+
+  it("uses shell-aligned breakpoints and mobile-safe layouts", () => {
+    expect(styles).toContain("@media (max-width: 1080px)");
+    expect(styles).toContain("@media (max-width: 860px)");
+    expect(styles).toContain("@media (max-width: 640px)");
+    expect(styles).toContain("@media (max-width: 420px)");
     expect(styles).toContain("grid-template-columns: minmax(0, 1fr)");
     expect(styles).toContain("overflow-wrap: anywhere");
+    expect(styles).toContain("overflow-x: auto");
   });
 });
