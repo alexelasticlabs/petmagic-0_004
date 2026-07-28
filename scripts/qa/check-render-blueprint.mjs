@@ -16,8 +16,8 @@ if (!['staging', 'production'].includes(environment)) {
   throw new Error('--environment must be staging or production.');
 }
 const prefix = `petmagic-${environment}`;
-const apiDomain = environment === 'production' ? 'api.petmagic.app' : 'api.staging.petmagic.app';
-const adminDomain = environment === 'production' ? 'admin.petmagic.app' : 'admin.staging.petmagic.app';
+const apiDomain = environment === 'production' ? 'api.petgpt.app' : 'api.staging.petmagic.app';
+const adminDomain = environment === 'production' ? 'admin.petgpt.app' : 'admin.staging.petmagic.app';
 
 if (args.has('--help') || args.has('-h')) {
   printUsage();
@@ -109,7 +109,9 @@ if (api) {
   requireDatabaseBinding(api, 'ConnectionStrings__DefaultConnection', `${prefix}-db`);
   requireSecretKeys(api, [
     'Jwt__SigningKey',
-    'FAL_PROVIDER_SPEND_DAILY_LIMIT_USD',
+    environment === 'production'
+      ? 'Templates__FalProviderSpendDailyLimitUsd'
+      : 'FAL_PROVIDER_SPEND_DAILY_LIMIT_USD',
     'FAL_AI_API_KEY',
     'R2_ACCOUNT_ID',
     'R2_ACCESS_KEY',
@@ -163,7 +165,9 @@ if (worker) {
   requireDatabaseBinding(worker, 'ConnectionStrings__DefaultConnection', `${prefix}-db`);
   requireSecretKeys(worker, [
     'Jwt__SigningKey',
-    'FAL_PROVIDER_SPEND_DAILY_LIMIT_USD',
+    environment === 'production'
+      ? 'Templates__FalProviderSpendDailyLimitUsd'
+      : 'FAL_PROVIDER_SPEND_DAILY_LIMIT_USD',
     'FAL_AI_API_KEY',
     'R2_ACCOUNT_ID',
     'R2_ACCESS_KEY',
@@ -257,6 +261,16 @@ function requireEnvGroup(name) {
   requireGroupValue(group, 'DOTNET_ENVIRONMENT', expectedEnvironment);
   requireGroupValue(group, 'TEMPLATES_STORAGE_PROVIDER', 'R2');
   requireGroupValue(group, 'TEMPLATES_AI_PROVIDER', 'Fal');
+
+  if (environment === 'production') {
+    requireGroupValue(group, 'Templates__GlobalMaxConcurrentGenerations', '8');
+    requireGroupValue(group, 'Templates__ImageProtectedConcurrentGenerations', '3');
+    requireGroupValue(group, 'Templates__VideoBorrowMaxConcurrentGenerations', '2');
+    requireGroupValue(group, 'Templates__FalProviderConcurrencyLimit', '10');
+    requireGroupValue(group, 'Templates__FalProviderReservedConcurrency', '2');
+    requireGroupValue(group, 'Templates__FalProviderBalanceLowThresholdUsd', '10');
+    requireGroupValue(group, 'Templates__FalProviderBalanceCriticalThresholdUsd', '5');
+  }
 }
 
 function requireGroupValue(group, key, expectedValue) {

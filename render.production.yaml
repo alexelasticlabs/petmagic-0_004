@@ -32,19 +32,71 @@ envVarGroups:
         value: "false"
       - key: STORE_ACCOUNT_BINDING_MODE
         value: compatibility
-      - key: GENERATION_GLOBAL_MAX_CONCURRENT
+      - key: Templates__GlobalMaxConcurrentGenerations
         value: "8"
-      - key: GENERATION_IMAGE_RESERVED_CONCURRENT
+      - key: Templates__ImageReservedConcurrentGenerations
         value: "3"
-      - key: GENERATION_IMAGE_MAX_CONCURRENT
+      - key: Templates__ImageProtectedConcurrentGenerations
+        value: "3"
+      - key: Templates__ImageMaxConcurrentGenerations
         value: "7"
-      - key: GENERATION_VIDEO_RESERVED_CONCURRENT
+      - key: Templates__VideoReservedConcurrentGenerations
         value: "2"
-      - key: GENERATION_VIDEO_MAX_CONCURRENT
+      - key: Templates__VideoMaxConcurrentGenerations
         value: "4"
-      - key: GENERATION_QUEUE_MAX_SIZE
+      - key: Templates__VideoBorrowMaxConcurrentGenerations
+        value: "2"
+      - key: Templates__EnableElasticLaneBorrowing
+        value: "true"
+      - key: Templates__AllowVideoBorrowWhenImageQueueEmpty
+        value: "true"
+      - key: Templates__AllowVideoBorrowWhenImageEstimatedWaitBelowSeconds
+        value: "120"
+      - key: Templates__VideoBorrowReleaseMode
+        value: natural_completion
+      - key: Templates__BorrowedVideoMaxAgeSeconds
+        value: "0"
+      - key: Templates__BorrowingPriorityTiers
+        value: premium,privileged,admin,free
+      - key: Templates__VideoPreprocessingMaxConcurrentGenerations
+        value: "1"
+      - key: Templates__FalProviderConcurrencyLimit
+        value: "10"
+      - key: Templates__FalProviderReservedConcurrency
+        value: "2"
+      - key: Templates__FalProviderBalanceLowThresholdUsd
+        value: "10"
+      - key: Templates__FalProviderBalanceCriticalThresholdUsd
+        value: "5"
+      - key: Templates__QueueMaxSize
         value: "1000"
-      - key: GENERATION_MAX_ATTEMPTS
+      - key: Templates__EstimatedImageGenerationSeconds
+        value: "90"
+      - key: Templates__EstimatedVideoGenerationSeconds
+        value: "420"
+      - key: Templates__EstimatedVideoPreprocessingSeconds
+        value: "90"
+      - key: Templates__FreeImageMaxEstimatedWaitSeconds
+        value: "1800"
+      - key: Templates__PremiumImageMaxEstimatedWaitSeconds
+        value: "900"
+      - key: Templates__PrivilegedImageMaxEstimatedWaitSeconds
+        value: "900"
+      - key: Templates__FreeVideoMaxEstimatedWaitSeconds
+        value: "3600"
+      - key: Templates__PremiumVideoMaxEstimatedWaitSeconds
+        value: "1800"
+      - key: Templates__PrivilegedVideoMaxEstimatedWaitSeconds
+        value: "1800"
+      - key: Templates__QueuePriorityAgingIntervalSeconds
+        value: "60"
+      - key: Templates__QueuePriorityAgingBoost
+        value: "500"
+      - key: Templates__CancelQueuedGenerationEnabled
+        value: "true"
+      - key: Templates__MaxAiProviderRequestsPerMinute
+        value: "60"
+      - key: Templates__MaxGenerationAttempts
         value: "3"
 
 services:
@@ -120,7 +172,7 @@ services:
           property: connectionString
       - key: Jwt__SigningKey
         sync: false
-      - key: FAL_PROVIDER_SPEND_DAILY_LIMIT_USD
+      - key: Templates__FalProviderSpendDailyLimitUsd
         sync: false
       - key: FAL_AI_API_KEY
         sync: false
@@ -250,7 +302,7 @@ services:
           property: connectionString
       - key: Jwt__SigningKey
         sync: false
-      - key: FAL_PROVIDER_SPEND_DAILY_LIMIT_USD
+      - key: Templates__FalProviderSpendDailyLimitUsd
         sync: false
       - key: FAL_AI_API_KEY
         sync: false
