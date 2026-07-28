@@ -98,6 +98,10 @@ envVarGroups:
         value: "60"
       - key: Templates__MaxGenerationAttempts
         value: "3"
+      - key: Templates__MaxConcurrentJobsPerWorker
+        value: "2"
+      - key: Templates__GenerationWorkerPollIntervalMilliseconds
+        value: "500"
 
 services:
   - type: web
@@ -105,6 +109,7 @@ services:
     runtime: docker
     region: frankfurt
     plan: standard
+    numInstances: 1
     branch: master
     autoDeployTrigger: off
     dockerfilePath: ./Dockerfile.api
@@ -290,8 +295,6 @@ services:
         value: "false"
       - key: Templates__TemplateOfTheDayAutoPickWorkerEnabled
         value: "false"
-      - key: Templates__MaxConcurrentJobsPerWorker
-        value: "2"
       - key: ECONOMY_RECONCILIATION_ENABLED
         value: "false"
       - key: ECONOMY_PUSH_OUTBOX_DISPATCHER_ENABLED
@@ -362,6 +365,7 @@ services:
     runtime: docker
     region: frankfurt
     plan: starter
+    numInstances: 1
     branch: master
     autoDeployTrigger: off
     dockerfilePath: ./apps/admin-web/Dockerfile

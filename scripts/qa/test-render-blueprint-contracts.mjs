@@ -63,6 +63,137 @@ try {
     'petmagic-staging-db must define an empty ipAllowList to block public database access.'
   );
 
+  const scaledWorkerPath = writeFixture(
+    'render-scaled-worker.yaml',
+    replaceOccurrenceRequired(stagingBlueprint, '    numInstances: 1', '    numInstances: 2', 2)
+  );
+  requireCheckerFailure(
+    scaledWorkerPath,
+    'staging',
+    'petmagic-staging-generation-worker numInstances must be 1, found 2.'
+  );
+
+  const wrongWorkerPlanPath = writeFixture(
+    'render-wrong-worker-plan.yaml',
+    replaceOccurrenceRequired(stagingBlueprint, '    plan: standard', '    plan: starter', 2)
+  );
+  requireCheckerFailure(
+    wrongWorkerPlanPath,
+    'staging',
+    'petmagic-staging-generation-worker plan must be standard, found starter.'
+  );
+
+  const shortWorkerShutdownPath = writeFixture(
+    'render-short-worker-shutdown.yaml',
+    replaceRequired(stagingBlueprint, '    maxShutdownDelaySeconds: 300', '    maxShutdownDelaySeconds: 60')
+  );
+  requireCheckerFailure(
+    shortWorkerShutdownPath,
+    'staging',
+    'petmagic-staging-generation-worker maxShutdownDelaySeconds must be 300, found 60.'
+  );
+
+  const publicWorkerPath = writeFixture(
+    'render-public-worker.yaml',
+    replaceRequired(
+      stagingBlueprint,
+      '    maxShutdownDelaySeconds: 300\n',
+      '    maxShutdownDelaySeconds: 300\n    domains:\n      - worker.staging.petmagic.app\n'
+    )
+  );
+  requireCheckerFailure(
+    publicWorkerPath,
+    'staging',
+    'petmagic-staging-generation-worker must not define domains.'
+  );
+
+  const healthCheckedWorkerPath = writeFixture(
+    'render-health-checked-worker.yaml',
+    replaceOccurrenceRequired(
+      stagingBlueprint,
+      '    dockerContext: .\n',
+      '    dockerContext: .\n    healthCheckPath: /health\n',
+      2
+    )
+  );
+  requireCheckerFailure(
+    healthCheckedWorkerPath,
+    'staging',
+    'petmagic-staging-generation-worker must not define healthCheckPath.'
+  );
+
+  const diskBackedWorkerPath = writeFixture(
+    'render-disk-backed-worker.yaml',
+    replaceRequired(
+      stagingBlueprint,
+      '    maxShutdownDelaySeconds: 300\n',
+      '    maxShutdownDelaySeconds: 300\n    disk:\n      name: unexpected-worker-disk\n      mountPath: /var/petmagic\n      sizeGB: 10\n'
+    )
+  );
+  requireCheckerFailure(
+    diskBackedWorkerPath,
+    'staging',
+    'petmagic-staging-generation-worker must not define disk.'
+  );
+
+  const autoscaledApiPath = writeFixture(
+    'render-autoscaled-api.yaml',
+    replaceRequired(
+      stagingBlueprint,
+      '    numInstances: 1\n    branch: master',
+      '    numInstances: 1\n    scaling:\n      minInstances: 1\n      maxInstances: 2\n    branch: master'
+    )
+  );
+  requireCheckerFailure(
+    autoscaledApiPath,
+    'staging',
+    'petmagic-staging-api must not define Render autoscaling; use fixed numInstances: 1.'
+  );
+
+  const workerSchedulerOverridePath = writeFixture(
+    'render-worker-scheduler-override.yaml',
+    replaceOccurrenceRequired(
+      stagingBlueprint,
+      '      - fromGroup: petmagic-staging-shared\n',
+      '      - fromGroup: petmagic-staging-shared\n      - key: Templates__QueueMaxSize\n        value: "999"\n',
+      2
+    )
+  );
+  requireCheckerFailure(
+    workerSchedulerOverridePath,
+    'staging',
+    'Scheduler fingerprint mismatch for admission.queueMaxSize'
+  );
+
+  const localWorkerLoopOverridePath = writeFixture(
+    'render-local-worker-loop-override.yaml',
+    replaceOccurrenceRequired(
+      stagingBlueprint,
+      '      - fromGroup: petmagic-staging-shared\n',
+      '      - fromGroup: petmagic-staging-shared\n      - key: Templates__MaxConcurrentJobsPerWorker\n        value: "2"\n',
+      2
+    )
+  );
+  requireCheckerFailure(
+    localWorkerLoopOverridePath,
+    'staging',
+    'must inherit Templates__MaxConcurrentJobsPerWorker from petmagic-staging-shared'
+  );
+
+  const inertLegacySchedulerKeyPath = writeFixture(
+    'render-inert-legacy-scheduler-key.yaml',
+    replaceRequired(
+      stagingBlueprint,
+      '      - key: Templates__GlobalMaxConcurrentGenerations',
+      '      - key: GENERATION_GLOBAL_MAX_CONCURRENT'
+    )
+  );
+  requireCheckerFailure(
+    inertLegacySchedulerKeyPath,
+    'staging',
+    'uses inert legacy scheduler key GENERATION_GLOBAL_MAX_CONCURRENT'
+  );
+
   console.log('Render Blueprint contract tests passed.');
 } finally {
   const fixtureRelativePath = relative(tempBase, fixtureRoot);

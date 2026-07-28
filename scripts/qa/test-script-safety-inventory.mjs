@@ -534,8 +534,19 @@ assert(
   'Render post-deploy smoke must keep help text for operator use',
 );
 assert(
-  renderPostdeploySmoke.includes('The smoke is read-only: it checks API /health and admin /ru'),
+  renderPostdeploySmoke.includes('The smoke is read-only: it checks API /health, admin /ru, scheduler fingerprint'),
   'Render post-deploy smoke must document its read-only scope',
+);
+assert(
+  renderPostdeploySmoke.includes('/api/admin/system/operations')
+    && renderPostdeploySmoke.includes('generation_worker_heartbeat_fresh')
+    && renderPostdeploySmoke.includes('scheduler_fingerprint_mismatch_absent'),
+  'Render post-deploy smoke must gate on scheduler fingerprint health and a fresh generation-worker heartbeat',
+);
+assert(
+  renderPostdeploySmoke.includes("'https://api.petgpt.app'")
+    && renderPostdeploySmoke.includes("'https://admin.petgpt.app'"),
+  'Render post-deploy smoke production defaults must match the production Blueprint domains',
 );
 
 const renderPredeployGate = read('scripts/qa/run-render-predeploy-gate.mjs');

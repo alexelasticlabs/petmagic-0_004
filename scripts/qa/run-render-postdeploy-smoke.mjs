@@ -20,6 +20,7 @@ let runId;
 let artifactDir;
 let apiBaseUrl;
 let adminBaseUrl;
+let adminAuthToken;
 let timeoutMs;
 let environment;
 
@@ -30,6 +31,7 @@ try {
   }
   envFilePath = getOptionValue('--env-file')
     ?? process.env.PETMAGIC_ENV_FILE
+    ?? (environment === 'staging' ? process.env.STAGING_ENV_FILE : process.env.PRODUCTION_ENV_FILE)
     ?? (environment === 'staging' ? '.env.staging.local' : '.env.production.local');
   loadLocalEnvFile(envFilePath);
 
@@ -39,11 +41,18 @@ try {
   apiBaseUrl = normalizeBaseUrl(
     getOptionValue('--api-base-url')
     ?? process.env.PETMAGIC_API_BASE_URL
-    ?? (environment === 'staging' ? 'https://api.staging.petmagic.app' : 'https://api.petmagic.app'));
+    ?? (environment === 'staging' ? process.env.STAGING_API_BASE_URL : process.env.PRODUCTION_API_BASE_URL)
+    ?? (environment === 'staging' ? 'https://api.staging.petmagic.app' : 'https://api.petgpt.app'));
   adminBaseUrl = normalizeBaseUrl(
     getOptionValue('--admin-base-url')
     ?? process.env.PETMAGIC_ADMIN_BASE_URL
-    ?? (environment === 'staging' ? 'https://admin.staging.petmagic.app' : 'https://admin.petmagic.app'));
+    ?? (environment === 'staging' ? process.env.STAGING_ADMIN_BASE_URL : process.env.PRODUCTION_ADMIN_BASE_URL)
+    ?? (environment === 'staging' ? 'https://admin.staging.petmagic.app' : 'https://admin.petgpt.app'));
+  adminAuthToken = process.env.PETMAGIC_ADMIN_AUTH_TOKEN
+    ?? (environment === 'staging'
+      ? process.env.STAGING_ADMIN_AUTH_TOKEN
+      : process.env.PRODUCTION_ADMIN_AUTH_TOKEN)
+    ?? '';
   timeoutMs = positiveIntegerOption('--timeout-ms', 15_000);
 
   mkdirSync(artifactDir, { recursive: true });
@@ -59,6 +68,7 @@ const evidence = {
   envFileLoaded: existsSync(envFilePath),
   apiBaseUrl: anonymizeUrl(apiBaseUrl),
   adminBaseUrl: anonymizeUrl(adminBaseUrl),
+  adminAuthTokenProvided: Boolean(adminAuthToken),
   timeoutMs,
   environment,
   checks
@@ -75,6 +85,7 @@ async function main() {
 
   await checkApiHealth();
   await checkAdminRoute();
+  await checkGenerationWorkerRuntime();
 
   finish(hasFailedChecks() ? 1 : 0);
 }
@@ -106,6 +117,25 @@ async function checkApiHealth() {
     'api.health.checks_present',
     Array.isArray(checksValue) && checksValue.length > 0,
     `checks=${Array.isArray(checksValue) ? checksValue.length : 'missing'}`);
+
+  const schedulerCheck = Array.isArray(checksValue)
+    ? checksValue.find((check) => readCaseInsensitive(check, 'name') === 'templates_scheduler_config')
+    : null;
+  const schedulerStatus = readCaseInsensitive(schedulerCheck, 'status');
+  const schedulerConfig = readCaseInsensitive(payload, 'schedulerConfig');
+  const schedulerMismatchDetected = readCaseInsensitive(schedulerConfig, 'isMismatchDetected');
+  record(
+    'api.health.scheduler_fingerprint_present',
+    Boolean(schedulerCheck),
+    schedulerCheck ? `status=${schedulerStatus ?? 'missing'}` : 'templates_scheduler_config missing');
+  record(
+    'api.health.scheduler_fingerprint_healthy',
+    schedulerStatus === 'Healthy',
+    `status=${schedulerStatus ?? 'missing'}`);
+  record(
+    'api.health.scheduler_fingerprint_mismatch_absent',
+    schedulerMismatchDetected === false,
+    `isMismatchDetected=${schedulerMismatchDetected ?? 'missing'}`);
 }
 
 async function checkAdminRoute() {
@@ -118,16 +148,70 @@ async function checkAdminRoute() {
     `bodyLength=${response.text.length}`);
 }
 
-async function fetchWithTimeout(url) {
+async function checkGenerationWorkerRuntime() {
+  record(
+    'input.admin_auth_token_present',
+    Boolean(adminAuthToken),
+    adminAuthToken ? 'provided' : 'missing; set STAGING_ADMIN_AUTH_TOKEN, PRODUCTION_ADMIN_AUTH_TOKEN, or PETMAGIC_ADMIN_AUTH_TOKEN');
+  if (!adminAuthToken) {
+    return;
+  }
+
+  const response = await fetchWithTimeout(`${apiBaseUrl}/api/admin/system/operations`, {
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${adminAuthToken}`
+    }
+  });
+  let payload = null;
+  try {
+    payload = response.text ? JSON.parse(response.text) : null;
+  } catch {
+    // Recorded below.
+  }
+
+  const workers = readCaseInsensitive(payload, 'workers');
+  const workerStatus = readCaseInsensitive(workers, 'status');
+  const heartbeatAtUtc = readCaseInsensitive(workers, 'generationWorkerHeartbeatAtUtc');
+  const heartbeatAgeSeconds = readCaseInsensitive(workers, 'generationWorkerHeartbeatAgeSeconds');
+  const unavailableSources = readCaseInsensitive(payload, 'unavailableSources');
+  evidence.operations = {
+    response: summarizeResponse(response),
+    overallStatus: readCaseInsensitive(payload, 'overallStatus') ?? null,
+    workerStatus: workerStatus ?? null,
+    generationWorkerHeartbeatAtUtc: heartbeatAtUtc ?? null,
+    generationWorkerHeartbeatAgeSeconds: heartbeatAgeSeconds ?? null,
+    unavailableSources: Array.isArray(unavailableSources) ? unavailableSources.slice(0, 4) : null
+  };
+
+  record('api.operations.http_200', response.status === 200, `HTTP ${response.status}`);
+  record('api.operations.json', Boolean(payload && typeof payload === 'object'), payload ? 'valid JSON' : 'missing or invalid JSON');
+  record(
+    'api.operations.templates_source_available',
+    Array.isArray(unavailableSources) && !unavailableSources.includes('templates'),
+    `unavailableSources=${Array.isArray(unavailableSources) ? unavailableSources.join(',') || 'none' : 'missing'}`);
+  record(
+    'api.operations.generation_worker_heartbeat_present',
+    Boolean(heartbeatAtUtc),
+    `heartbeatAtUtc=${heartbeatAtUtc ?? 'missing'}`);
+  record(
+    'api.operations.generation_worker_heartbeat_fresh',
+    Number.isFinite(heartbeatAgeSeconds) && heartbeatAgeSeconds <= 75 && workerStatus === 'healthy',
+    `status=${workerStatus ?? 'missing'}, ageSeconds=${heartbeatAgeSeconds ?? 'missing'}`);
+}
+
+async function fetchWithTimeout(url, options = {}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(url, {
+      ...options,
       redirect: 'follow',
       signal: controller.signal,
       headers: {
         Accept: 'text/html,application/json;q=0.9,*/*;q=0.8',
-        'User-Agent': 'petmagic-render-postdeploy-smoke'
+        'User-Agent': 'petmagic-render-postdeploy-smoke',
+        ...(options.headers ?? {})
       }
     });
     const text = await response.text();
@@ -164,6 +248,7 @@ function sanitizeHealthPayload(payload) {
   }
 
   const build = readCaseInsensitive(payload, 'build');
+  const schedulerConfig = readCaseInsensitive(payload, 'schedulerConfig');
   const checksValue = readCaseInsensitive(payload, 'checks');
   return {
     status: readCaseInsensitive(payload, 'status') ?? null,
@@ -172,6 +257,12 @@ function sanitizeHealthPayload(payload) {
         application: readCaseInsensitive(build, 'application') ?? null,
         environment: readCaseInsensitive(build, 'environment') ?? null,
         version: readCaseInsensitive(build, 'version') ?? null
+      }
+      : null,
+    schedulerConfig: schedulerConfig && typeof schedulerConfig === 'object'
+      ? {
+        initialized: readCaseInsensitive(schedulerConfig, 'initialized') ?? null,
+        isMismatchDetected: readCaseInsensitive(schedulerConfig, 'isMismatchDetected') ?? null
       }
       : null,
     checks: Array.isArray(checksValue)
@@ -361,7 +452,8 @@ Options:
   --artifact-dir <dir>    Evidence output directory.
   --help, -h              Print this help.
 
-The smoke is read-only: it checks API /health and admin /ru without creating
-users, jobs, payments, or provider callbacks.
+The smoke is read-only: it checks API /health, admin /ru, scheduler fingerprint
+health, and the authenticated generation-worker heartbeat without creating users,
+jobs, payments, or provider callbacks. An admin token is required for a passing gate.
 `.trim());
 }

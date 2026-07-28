@@ -43,6 +43,60 @@ if (!blueprint || typeof blueprint !== 'object') {
 const services = Array.isArray(blueprint.services) ? blueprint.services : [];
 const databases = Array.isArray(blueprint.databases) ? blueprint.databases : [];
 const envVarGroups = Array.isArray(blueprint.envVarGroups) ? blueprint.envVarGroups : [];
+const schedulerFingerprintFields = [
+  schedulerField('admission.cancelQueuedGenerationEnabled', 'CancelQueuedGenerationEnabled', 'bool', true),
+  schedulerField('admission.freeUserMaxActiveGenerations', 'FreeUserMaxActiveGenerations', 'positiveInt', 1),
+  schedulerField('admission.premiumUserMaxActiveGenerations', 'PremiumUserMaxActiveGenerations', 'positiveInt', 3),
+  schedulerField('admission.privilegedUserMaxActiveGenerations', 'PrivilegedUserMaxActiveGenerations', 'positiveInt', 10),
+  schedulerField('admission.queueMaxSize', 'QueueMaxSize', 'nonNegativeInt', 1_000),
+  schedulerField('concurrency.falProviderConcurrencyLimit', 'FalProviderConcurrencyLimit', 'nonNegativeInt', 0),
+  schedulerField('concurrency.falProviderReservedConcurrency', 'FalProviderReservedConcurrency', 'nonNegativeInt', 1),
+  schedulerField('concurrency.globalMaxConcurrentGenerations', 'GlobalMaxConcurrentGenerations', 'positiveInt', 3),
+  schedulerField('concurrency.imageMaxConcurrentGenerations', 'ImageMaxConcurrentGenerations', 'positiveInt', 2),
+  schedulerField('concurrency.imageProtectedConcurrentGenerations', 'ImageProtectedConcurrentGenerations', 'nonNegativeInt', 0),
+  schedulerField('concurrency.imageReservedConcurrentGenerations', 'ImageReservedConcurrentGenerations', 'nonNegativeInt', 0),
+  schedulerField('concurrency.maxAiProviderRequestsPerMinute', 'MaxAiProviderRequestsPerMinute', 'nonNegativeInt', 60),
+  schedulerField('concurrency.maxConcurrentJobsPerWorker', 'MaxConcurrentJobsPerWorker', 'positiveInt', 1),
+  schedulerField('concurrency.videoMaxConcurrentGenerations', 'VideoMaxConcurrentGenerations', 'positiveInt', 1),
+  schedulerField('concurrency.videoPreprocessingMaxConcurrentGenerations', 'VideoPreprocessingMaxConcurrentGenerations', 'positiveInt', 1),
+  schedulerField('concurrency.videoReservedConcurrentGenerations', 'VideoReservedConcurrentGenerations', 'nonNegativeInt', 0),
+  schedulerField('elasticBorrowing.allowVideoBorrowWhenImageEstimatedWaitBelowSeconds', 'AllowVideoBorrowWhenImageEstimatedWaitBelowSeconds', 'positiveInt', 120),
+  schedulerField('elasticBorrowing.allowVideoBorrowWhenImageQueueEmpty', 'AllowVideoBorrowWhenImageQueueEmpty', 'bool', true),
+  schedulerField('elasticBorrowing.borrowedVideoMaxAgeSeconds', 'BorrowedVideoMaxAgeSeconds', 'nonNegativeInt', 0),
+  schedulerField('elasticBorrowing.borrowingPriorityTiers', 'BorrowingPriorityTiers', 'csv', 'premium,privileged,admin,free'),
+  schedulerField('elasticBorrowing.enableElasticLaneBorrowing', 'EnableElasticLaneBorrowing', 'bool', false),
+  schedulerField('elasticBorrowing.videoBorrowMaxConcurrentGenerations', 'VideoBorrowMaxConcurrentGenerations', 'nonNegativeInt', 0),
+  schedulerField('elasticBorrowing.videoBorrowReleaseMode', 'VideoBorrowReleaseMode', 'text', 'natural_completion'),
+  schedulerField('estimates.estimatedImageGenerationSeconds', 'EstimatedImageGenerationSeconds', 'positiveInt', 90),
+  schedulerField('estimates.estimatedVideoGenerationSeconds', 'EstimatedVideoGenerationSeconds', 'positiveInt', 420),
+  schedulerField('estimates.estimatedVideoPreprocessingSeconds', 'EstimatedVideoPreprocessingSeconds', 'positiveInt', 90),
+  schedulerField('provider.aiProvider', 'AiProvider', 'text', 'Fake'),
+  schedulerField('provider.falImageMaxPollingAttempts', 'Fal.ImageMaxPollingAttempts', 'positiveInt', 180),
+  schedulerField('provider.falImagePreprocessingMaxPollingAttempts', 'Fal.ImagePreprocessingMaxPollingAttempts', 'positiveInt', 180),
+  schedulerField('provider.falMaxPollingAttempts', 'Fal.MaxPollingAttempts', 'int', 180),
+  schedulerField('provider.falPollIntervalMilliseconds', 'Fal.PollIntervalMilliseconds', 'int', 2_000),
+  schedulerField('provider.falStartTimeoutSeconds', 'Fal.StartTimeoutSeconds', 'int', 120),
+  schedulerField('provider.falVideoMaxPollingAttempts', 'Fal.VideoMaxPollingAttempts', 'positiveInt', 300),
+  schedulerField('queuePriority.adminQueuePriorityScore', 'AdminQueuePriorityScore', 'positiveInt', 10_000),
+  schedulerField('queuePriority.freeQueuePriorityScore', 'FreeQueuePriorityScore', 'positiveInt', 1_000),
+  schedulerField('queuePriority.premiumQueuePriorityScore', 'PremiumQueuePriorityScore', 'positiveInt', 4_000),
+  schedulerField('queuePriority.privilegedQueuePriorityScore', 'PrivilegedQueuePriorityScore', 'positiveInt', 8_000),
+  schedulerField('queuePriority.queuePriorityAgingBoost', 'QueuePriorityAgingBoost', 'nonNegativeInt', 500),
+  schedulerField('queuePriority.queuePriorityAgingIntervalSeconds', 'QueuePriorityAgingIntervalSeconds', 'positiveInt', 60),
+  schedulerField('recovery.jobLockTimeoutMilliseconds', 'JobLockTimeoutMilliseconds', 'positiveInt', 900_000, 'StaleProcessingRecoveryDelayMilliseconds'),
+  schedulerField('recovery.maxGenerationAttempts', 'MaxGenerationAttempts', 'positiveInt', 3),
+  schedulerField('recovery.maxRefundAttempts', 'MaxRefundAttempts', 'positiveInt', 5),
+  schedulerField('recovery.orphanQueuedJobTimeoutMilliseconds', 'OrphanQueuedJobTimeoutMilliseconds', 'positiveInt', 120_000),
+  schedulerField('recovery.refundRetryDelayMilliseconds', 'RefundRetryDelayMilliseconds', 'nonNegativeInt', 30_000),
+  schedulerField('recovery.staleProcessingRecoveryDelayMilliseconds', 'StaleProcessingRecoveryDelayMilliseconds', 'positiveInt', 900_000),
+  schedulerField('worker.generationWorkerPollIntervalMilliseconds', 'GenerationWorkerPollIntervalMilliseconds', 'int', 1_000),
+  schedulerField('waitThresholds.freeImageMaxEstimatedWaitSeconds', 'FreeImageMaxEstimatedWaitSeconds', 'positiveInt', 1_800),
+  schedulerField('waitThresholds.freeVideoMaxEstimatedWaitSeconds', 'FreeVideoMaxEstimatedWaitSeconds', 'positiveInt', 3_600),
+  schedulerField('waitThresholds.premiumImageMaxEstimatedWaitSeconds', 'PremiumImageMaxEstimatedWaitSeconds', 'positiveInt', 600),
+  schedulerField('waitThresholds.premiumVideoMaxEstimatedWaitSeconds', 'PremiumVideoMaxEstimatedWaitSeconds', 'positiveInt', 1_800),
+  schedulerField('waitThresholds.privilegedImageMaxEstimatedWaitSeconds', 'PrivilegedImageMaxEstimatedWaitSeconds', 'positiveInt', 600),
+  schedulerField('waitThresholds.privilegedVideoMaxEstimatedWaitSeconds', 'PrivilegedVideoMaxEstimatedWaitSeconds', 'positiveInt', 1_800)
+];
 
 requireServiceCount(3);
 requireDatabase(`${prefix}-db`, 'basic-1gb');
@@ -51,6 +105,8 @@ requireEnvGroup(`${prefix}-shared`);
 const api = requireService(`${prefix}-api`, {
   type: 'web',
   runtime: 'docker',
+  plan: 'standard',
+  numInstances: 1,
   dockerfilePath: './Dockerfile.api',
   dockerContext: '.',
   healthCheckPath: '/health'
@@ -59,6 +115,9 @@ const api = requireService(`${prefix}-api`, {
 const worker = requireService(`${prefix}-generation-worker`, {
   type: 'worker',
   runtime: 'docker',
+  plan: 'standard',
+  numInstances: 1,
+  maxShutdownDelaySeconds: 300,
   dockerfilePath: './Dockerfile.generation-worker',
   dockerContext: '.'
 });
@@ -66,6 +125,8 @@ const worker = requireService(`${prefix}-generation-worker`, {
 const admin = requireService(`${prefix}-admin-web`, {
   type: 'web',
   runtime: 'docker',
+  plan: 'starter',
+  numInstances: 1,
   dockerfilePath: './apps/admin-web/Dockerfile',
   dockerContext: './apps/admin-web',
   healthCheckPath: '/ru'
@@ -154,14 +215,11 @@ if (worker) {
   });
   requireBuildFilterPath(worker, 'global.json');
   requireBuildFilterPath(worker, 'shared/**');
-  if (Array.isArray(worker.domains) && worker.domains.length > 0) {
-    fail(`${prefix}-generation-worker must not define public domains.`);
-  }
+  requireWorkerIsPrivateAndEphemeral(worker);
 
   requireEnvValue(worker, 'Templates__GenerationWorkerEnabled', 'true');
   requireEnvValue(worker, 'Templates__MediaCleanupWorkerEnabled', 'false');
   requireEnvValue(worker, 'Templates__TemplateOfTheDayAutoPickWorkerEnabled', 'false');
-  requireEnvValue(worker, 'Templates__MaxConcurrentJobsPerWorker', '2');
   requireDatabaseBinding(worker, 'ConnectionStrings__DefaultConnection', `${prefix}-db`);
   requireSecretKeys(worker, [
     'Jwt__SigningKey',
@@ -190,6 +248,11 @@ if (worker) {
     'FIREBASE_SERVICE_ACCOUNT_JSON',
     'OTEL_EXPORTER_OTLP_ENDPOINT'
   ]);
+}
+
+if (api && worker) {
+  requireSharedSchedulerRuntimeSettings(api, worker);
+  requireSchedulerFingerprintParity(api, worker);
 }
 
 if (admin) {
@@ -261,15 +324,43 @@ function requireEnvGroup(name) {
   requireGroupValue(group, 'DOTNET_ENVIRONMENT', expectedEnvironment);
   requireGroupValue(group, 'TEMPLATES_STORAGE_PROVIDER', 'R2');
   requireGroupValue(group, 'TEMPLATES_AI_PROVIDER', 'Fal');
+  requireGroupValue(group, 'Templates__MaxConcurrentJobsPerWorker', '2');
+  requireGroupValue(group, 'Templates__GenerationWorkerPollIntervalMilliseconds', '500');
+
+  const expectedSchedulerValues = {
+    Templates__GlobalMaxConcurrentGenerations: '8',
+    Templates__ImageReservedConcurrentGenerations: '3',
+    Templates__ImageProtectedConcurrentGenerations: '3',
+    Templates__ImageMaxConcurrentGenerations: '7',
+    Templates__VideoReservedConcurrentGenerations: '2',
+    Templates__VideoMaxConcurrentGenerations: '4',
+    Templates__VideoBorrowMaxConcurrentGenerations: '2',
+    Templates__EnableElasticLaneBorrowing: 'true',
+    Templates__VideoPreprocessingMaxConcurrentGenerations: '1',
+    Templates__FalProviderConcurrencyLimit: '10',
+    Templates__FalProviderReservedConcurrency: '2',
+    Templates__QueueMaxSize: '1000',
+    Templates__EstimatedImageGenerationSeconds: '90',
+    Templates__EstimatedVideoGenerationSeconds: '420',
+    Templates__EstimatedVideoPreprocessingSeconds: '90',
+    Templates__FreeImageMaxEstimatedWaitSeconds: '1800',
+    Templates__PremiumImageMaxEstimatedWaitSeconds: '900',
+    Templates__PrivilegedImageMaxEstimatedWaitSeconds: '900',
+    Templates__FreeVideoMaxEstimatedWaitSeconds: '3600',
+    Templates__PremiumVideoMaxEstimatedWaitSeconds: '1800',
+    Templates__PrivilegedVideoMaxEstimatedWaitSeconds: '1800'
+  };
+  for (const [key, value] of Object.entries(expectedSchedulerValues)) {
+    requireGroupValue(group, key, value);
+  }
 
   if (environment === 'production') {
-    requireGroupValue(group, 'Templates__GlobalMaxConcurrentGenerations', '8');
-    requireGroupValue(group, 'Templates__ImageProtectedConcurrentGenerations', '3');
-    requireGroupValue(group, 'Templates__VideoBorrowMaxConcurrentGenerations', '2');
-    requireGroupValue(group, 'Templates__FalProviderConcurrencyLimit', '10');
-    requireGroupValue(group, 'Templates__FalProviderReservedConcurrency', '2');
     requireGroupValue(group, 'Templates__FalProviderBalanceLowThresholdUsd', '10');
     requireGroupValue(group, 'Templates__FalProviderBalanceCriticalThresholdUsd', '5');
+  } else {
+    requireGroupValue(group, 'Templates__FalProviderBalanceLowThresholdUsd', '100');
+    requireGroupValue(group, 'Templates__FalProviderBalanceCriticalThresholdUsd', '25');
+    rejectLegacySchedulerGroupKeys(group);
   }
 }
 
@@ -283,6 +374,214 @@ function requireGroupValue(group, key, expectedValue) {
   if (entry.value !== expectedValue) {
     fail(`Env group ${group.name} ${key} must be ${expectedValue}, found ${entry.value ?? '<missing>'}.`);
   }
+}
+
+function rejectLegacySchedulerGroupKeys(group) {
+  const legacyPrefixes = [
+    'GENERATION_',
+    'FAL_PROVIDER_',
+    'TEMPLATES_REALTIME_'
+  ];
+  for (const entry of Array.isArray(group.envVars) ? group.envVars : []) {
+    if (legacyPrefixes.some((prefix) => String(entry.key ?? '').startsWith(prefix))) {
+      fail(`Env group ${group.name} uses inert legacy scheduler key ${entry.key}; use Templates__ configuration keys.`);
+    }
+  }
+}
+
+function requireSharedSchedulerRuntimeSettings(apiService, workerService) {
+  const sharedKeys = [
+    'Templates__MaxConcurrentJobsPerWorker',
+    'Templates__GenerationWorkerPollIntervalMilliseconds'
+  ];
+  for (const service of [apiService, workerService]) {
+    for (const key of sharedKeys) {
+      if (findEnv(service.envVars, key)) {
+        fail(`${service.name} must inherit ${key} from ${prefix}-shared without a service-local override.`);
+      }
+    }
+  }
+}
+
+function requireSchedulerFingerprintParity(apiService, workerService) {
+  requireSchedulerFingerprintFieldCoverage();
+  const apiConfig = loadEffectiveSchedulerConfig(apiService, 'PetMagic.Host.Api');
+  const workerConfig = loadEffectiveSchedulerConfig(workerService, 'PetMagic.Host.GenerationWorker');
+
+  for (const field of schedulerFingerprintFields) {
+    const apiValue = resolveSchedulerField(apiConfig, field);
+    const workerValue = resolveSchedulerField(workerConfig, field);
+    if (JSON.stringify(apiValue) !== JSON.stringify(workerValue)) {
+      fail(
+        `Scheduler fingerprint mismatch for ${field.name}: `
+        + `${apiService.name}=${JSON.stringify(apiValue)}, ${workerService.name}=${JSON.stringify(workerValue)}.`
+      );
+    }
+  }
+}
+
+function requireSchedulerFingerprintFieldCoverage() {
+  const fingerprintPath = resolve(
+    repoRoot,
+    'src/Modules/Templates/PetMagic.Modules.Templates.Infrastructure/TemplateSchedulerConfigFingerprint.cs'
+  );
+  if (!existsSync(fingerprintPath)) {
+    fail('TemplateSchedulerConfigFingerprint.cs is missing; Blueprint parity cannot be verified.');
+    return;
+  }
+
+  const source = readFileSync(fingerprintPath, 'utf8');
+  const implementationFields = new Set(
+    [...source.matchAll(/options\.(Fal\.)?([A-Za-z][A-Za-z0-9]*)/g)]
+      .map((match) => `${match[1] ?? ''}${match[2]}`)
+  );
+  const checkerFields = new Set(schedulerFingerprintFields.map((field) => field.path.join('.')));
+
+  for (const path of implementationFields) {
+    if (!checkerFields.has(path)) {
+      fail(`Blueprint checker is missing scheduler fingerprint field Templates:${path.replaceAll('.', ':')}.`);
+    }
+  }
+  for (const path of checkerFields) {
+    if (!implementationFields.has(path)) {
+      fail(`Blueprint checker has stale scheduler fingerprint field Templates:${path.replaceAll('.', ':')}.`);
+    }
+  }
+}
+
+function loadEffectiveSchedulerConfig(service, hostName) {
+  const hostDir = resolve(repoRoot, 'src', 'Host', hostName);
+  const basePath = resolve(hostDir, 'appsettings.json');
+  const environmentPath = resolve(
+    hostDir,
+    `appsettings.${environment === 'production' ? 'Production' : 'Staging'}.json`
+  );
+  if (!existsSync(basePath)) {
+    fail(`${service.name} base appsettings file is missing: ${relative(repoRoot, basePath)}.`);
+    return {};
+  }
+
+  let config = JSON.parse(readFileSync(basePath, 'utf8'));
+  if (existsSync(environmentPath)) {
+    config = deepMerge(config, JSON.parse(readFileSync(environmentPath, 'utf8')));
+  }
+
+  const templates = structuredClone(config.Templates ?? {});
+  const group = envVarGroups.find((candidate) => candidate.name === `${prefix}-shared`);
+  applyTemplatesEnvironment(templates, group?.envVars);
+  applyTemplatesEnvironment(templates, service.envVars);
+  return templates;
+}
+
+function applyTemplatesEnvironment(templates, envVars) {
+  for (const entry of Array.isArray(envVars) ? envVars : []) {
+    if (entry.value === undefined) {
+      continue;
+    }
+
+    if (entry.key === 'TEMPLATES_AI_PROVIDER') {
+      setNestedValue(templates, ['AiProvider'], entry.value);
+      continue;
+    }
+
+    if (!String(entry.key ?? '').startsWith('Templates__')) {
+      continue;
+    }
+
+    const path = entry.key.slice('Templates__'.length).split('__').filter(Boolean);
+    if (path.length > 0) {
+      setNestedValue(templates, path, entry.value);
+    }
+  }
+}
+
+function resolveSchedulerField(config, field) {
+  let raw = getNestedValue(config, field.path);
+  if ((raw === undefined || raw === null) && field.alternatePath) {
+    raw = getNestedValue(config, field.alternatePath);
+  }
+  return normalizeSchedulerValue(raw, field.kind, field.fallback);
+}
+
+function normalizeSchedulerValue(raw, kind, fallback) {
+  if (raw === undefined || raw === null || raw === '') {
+    raw = fallback;
+  }
+
+  if (kind === 'bool') {
+    if (typeof raw === 'boolean') return raw;
+    if (/^true$/i.test(String(raw))) return true;
+    if (/^false$/i.test(String(raw))) return false;
+    return Boolean(fallback);
+  }
+
+  if (kind === 'text') {
+    return String(raw).trim().toLowerCase();
+  }
+
+  if (kind === 'csv') {
+    return [...new Set(String(raw)
+      .split(',')
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean))]
+      .sort();
+  }
+
+  const text = String(raw).trim();
+  const parsed = /^[+-]?\d+$/.test(text) ? Number.parseInt(text, 10) : Number.NaN;
+  if (!Number.isFinite(parsed)) return fallback;
+  if (kind === 'positiveInt' && parsed <= 0) return fallback;
+  if (kind === 'nonNegativeInt' && parsed < 0) return fallback;
+  return parsed;
+}
+
+function schedulerField(name, path, kind, fallback, alternatePath) {
+  return {
+    name,
+    path: path.split('.'),
+    kind,
+    fallback,
+    alternatePath: alternatePath?.split('.')
+  };
+}
+
+function getNestedValue(value, path) {
+  let current = value;
+  for (const segment of path) {
+    if (!current || typeof current !== 'object') return undefined;
+    const key = Object.keys(current).find((candidate) => candidate.toLowerCase() === segment.toLowerCase());
+    if (!key) return undefined;
+    current = current[key];
+  }
+  return current;
+}
+
+function setNestedValue(target, path, value) {
+  let current = target;
+  for (const segment of path.slice(0, -1)) {
+    const existingKey = Object.keys(current).find((candidate) => candidate.toLowerCase() === segment.toLowerCase());
+    const key = existingKey ?? segment;
+    if (!current[key] || typeof current[key] !== 'object' || Array.isArray(current[key])) {
+      current[key] = {};
+    }
+    current = current[key];
+  }
+  const lastSegment = path.at(-1);
+  const existingKey = Object.keys(current).find((candidate) => candidate.toLowerCase() === lastSegment.toLowerCase());
+  current[existingKey ?? lastSegment] = value;
+}
+
+function deepMerge(base, overlay) {
+  const result = structuredClone(base);
+  for (const [key, value] of Object.entries(overlay ?? {})) {
+    if (value && typeof value === 'object' && !Array.isArray(value)
+        && result[key] && typeof result[key] === 'object' && !Array.isArray(result[key])) {
+      result[key] = deepMerge(result[key], value);
+    } else {
+      result[key] = structuredClone(value);
+    }
+  }
+  return result;
 }
 
 function requireService(name, expected) {
@@ -307,7 +606,19 @@ function requireService(name, expected) {
     fail(`${name} must include env group ${prefix}-shared.`);
   }
 
+  if (Object.hasOwn(service, 'scaling')) {
+    fail(`${name} must not define Render autoscaling; use fixed numInstances: 1.`);
+  }
+
   return service;
+}
+
+function requireWorkerIsPrivateAndEphemeral(service) {
+  for (const key of ['domains', 'disk', 'healthCheckPath']) {
+    if (Object.hasOwn(service, key)) {
+      fail(`${service.name} must not define ${key}.`);
+    }
+  }
 }
 
 function requireDomain(service, domain) {

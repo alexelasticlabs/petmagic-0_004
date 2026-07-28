@@ -35,84 +35,88 @@ envVarGroups:
         value: "false"
       - key: STORE_ACCOUNT_BINDING_MODE
         value: compatibility
-      - key: GENERATION_GLOBAL_MAX_CONCURRENT
+      - key: Templates__GlobalMaxConcurrentGenerations
         value: "8"
-      - key: GENERATION_IMAGE_RESERVED_CONCURRENT
+      - key: Templates__ImageReservedConcurrentGenerations
         value: "3"
-      - key: GENERATION_IMAGE_PROTECTED_CONCURRENT
+      - key: Templates__ImageProtectedConcurrentGenerations
         value: "3"
-      - key: GENERATION_IMAGE_MAX_CONCURRENT
+      - key: Templates__ImageMaxConcurrentGenerations
         value: "7"
-      - key: GENERATION_VIDEO_RESERVED_CONCURRENT
+      - key: Templates__VideoReservedConcurrentGenerations
         value: "2"
-      - key: GENERATION_VIDEO_MAX_CONCURRENT
+      - key: Templates__VideoMaxConcurrentGenerations
         value: "4"
-      - key: GENERATION_VIDEO_BORROW_MAX_CONCURRENT
+      - key: Templates__VideoBorrowMaxConcurrentGenerations
         value: "2"
-      - key: GENERATION_ENABLE_ELASTIC_LANE_BORROWING
+      - key: Templates__EnableElasticLaneBorrowing
         value: "true"
-      - key: GENERATION_ALLOW_VIDEO_BORROW_WHEN_IMAGE_QUEUE_EMPTY
+      - key: Templates__AllowVideoBorrowWhenImageQueueEmpty
         value: "true"
-      - key: GENERATION_ALLOW_VIDEO_BORROW_IMAGE_WAIT_BELOW_SECONDS
+      - key: Templates__AllowVideoBorrowWhenImageEstimatedWaitBelowSeconds
         value: "120"
-      - key: GENERATION_VIDEO_BORROW_RELEASE_MODE
+      - key: Templates__VideoBorrowReleaseMode
         value: natural_completion
-      - key: GENERATION_BORROWED_VIDEO_MAX_AGE_SECONDS
+      - key: Templates__BorrowedVideoMaxAgeSeconds
         value: "0"
-      - key: GENERATION_BORROWING_PRIORITY_TIERS
+      - key: Templates__BorrowingPriorityTiers
         value: premium,privileged,admin,free
-      - key: GENERATION_VIDEO_PREPROCESSING_MAX_CONCURRENT
+      - key: Templates__VideoPreprocessingMaxConcurrentGenerations
         value: "1"
-      - key: GENERATION_QUEUE_MAX_SIZE
+      - key: Templates__QueueMaxSize
         value: "1000"
-      - key: GENERATION_ESTIMATED_IMAGE_SECONDS
+      - key: Templates__EstimatedImageGenerationSeconds
         value: "90"
-      - key: GENERATION_ESTIMATED_VIDEO_SECONDS
+      - key: Templates__EstimatedVideoGenerationSeconds
         value: "420"
-      - key: GENERATION_ESTIMATED_VIDEO_PREPROCESSING_SECONDS
+      - key: Templates__EstimatedVideoPreprocessingSeconds
         value: "90"
-      - key: GENERATION_FREE_IMAGE_MAX_WAIT_SECONDS
+      - key: Templates__FreeImageMaxEstimatedWaitSeconds
         value: "1800"
-      - key: GENERATION_PREMIUM_IMAGE_MAX_WAIT_SECONDS
+      - key: Templates__PremiumImageMaxEstimatedWaitSeconds
         value: "900"
-      - key: GENERATION_PRIVILEGED_IMAGE_MAX_WAIT_SECONDS
+      - key: Templates__PrivilegedImageMaxEstimatedWaitSeconds
         value: "900"
-      - key: GENERATION_FREE_VIDEO_MAX_WAIT_SECONDS
+      - key: Templates__FreeVideoMaxEstimatedWaitSeconds
         value: "3600"
-      - key: GENERATION_PREMIUM_VIDEO_MAX_WAIT_SECONDS
+      - key: Templates__PremiumVideoMaxEstimatedWaitSeconds
         value: "1800"
-      - key: GENERATION_PRIVILEGED_VIDEO_MAX_WAIT_SECONDS
+      - key: Templates__PrivilegedVideoMaxEstimatedWaitSeconds
         value: "1800"
-      - key: GENERATION_PRIORITY_AGING_INTERVAL_SECONDS
+      - key: Templates__QueuePriorityAgingIntervalSeconds
         value: "60"
-      - key: GENERATION_PRIORITY_AGING_BOOST
+      - key: Templates__QueuePriorityAgingBoost
         value: "500"
-      - key: GENERATION_CANCEL_QUEUED_ENABLED
+      - key: Templates__CancelQueuedGenerationEnabled
         value: "true"
-      - key: TEMPLATES_REALTIME_EVENT_RETENTION_MINUTES
+      - key: Templates__RealtimeEventRetentionMinutes
         value: "60"
-      - key: TEMPLATES_REALTIME_EVENT_CLEANUP_INTERVAL_MINUTES
+      - key: Templates__RealtimeEventCleanupIntervalMinutes
         value: "10"
-      - key: TEMPLATES_REALTIME_EVENT_CLEANUP_BATCH_SIZE
+      - key: Templates__RealtimeEventCleanupBatchSize
         value: "1000"
-      - key: FAL_PROVIDER_CONCURRENCY_LIMIT
+      - key: Templates__FalProviderConcurrencyLimit
         value: "10"
-      - key: FAL_PROVIDER_RESERVED_CONCURRENCY
+      - key: Templates__FalProviderReservedConcurrency
         value: "2"
-      - key: FAL_PROVIDER_BALANCE_LOW_THRESHOLD_USD
+      - key: Templates__FalProviderBalanceLowThresholdUsd
         value: "100"
-      - key: FAL_PROVIDER_BALANCE_CRITICAL_THRESHOLD_USD
+      - key: Templates__FalProviderBalanceCriticalThresholdUsd
         value: "25"
-      - key: GENERATION_PROVIDER_MAX_RPM
+      - key: Templates__MaxAiProviderRequestsPerMinute
         value: "60"
-      - key: GENERATION_MAX_ATTEMPTS
+      - key: Templates__MaxGenerationAttempts
         value: "3"
-      - key: GENERATION_JOB_LOCK_TIMEOUT_MS
+      - key: Templates__JobLockTimeoutMilliseconds
         value: "900000"
-      - key: GENERATION_ORPHAN_QUEUED_TIMEOUT_MS
+      - key: Templates__OrphanQueuedJobTimeoutMilliseconds
         value: "120000"
-      - key: GENERATION_REFUND_RETRY_DELAY_MS
+      - key: Templates__RefundRetryDelayMilliseconds
         value: "30000"
+      - key: Templates__MaxConcurrentJobsPerWorker
+        value: "2"
+      - key: Templates__GenerationWorkerPollIntervalMilliseconds
+        value: "500"
       - key: Templates__MaxRefundAttempts
         value: "5"
       - key: Templates__Fal__StartTimeoutSeconds
@@ -130,6 +134,7 @@ services:
     runtime: docker
     region: frankfurt
     plan: standard
+    numInstances: 1
     branch: master
     autoDeployTrigger: checksPass
     dockerfilePath: ./Dockerfile.api
@@ -298,7 +303,7 @@ services:
     dockerfilePath: ./Dockerfile.generation-worker
     dockerContext: .
     maxShutdownDelaySeconds: 300
-    numInstances: 4
+    numInstances: 1
     buildFilter:
       paths:
         - global.json
@@ -323,10 +328,6 @@ services:
         value: "false"
       - key: Templates__TemplateOfTheDayAutoPickWorkerEnabled
         value: "false"
-      - key: Templates__MaxConcurrentJobsPerWorker
-        value: "2"
-      - key: Templates__GenerationWorkerPollIntervalMilliseconds
-        value: "500"
       - key: ConnectionStrings__DefaultConnection
         fromDatabase:
           name: petmagic-staging-db
@@ -399,6 +400,7 @@ services:
     runtime: docker
     region: frankfurt
     plan: starter
+    numInstances: 1
     branch: master
     autoDeployTrigger: checksPass
     dockerfilePath: ./apps/admin-web/Dockerfile
