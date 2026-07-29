@@ -87,6 +87,27 @@ Before applying this migration to production:
 - run clean-database migration tests and an existing-database upgrade/backfill test;
 - keep the schema after rollback. Roll back the application and policy, not this additive migration.
 
+Create the production backup with the fail-closed helper. It accepts only a non-loopback
+`*.render.com` PostgreSQL URL, keeps the URL out of process arguments and generated artifacts,
+verifies the custom dump with `pg_restore --list`, and publishes the dump only after writing its
+SHA256 manifest:
+
+```powershell
+$env:RENDER_POSTGRES_DATABASE_URL = Read-Host -MaskInput "Paste the Render external database URL"
+try {
+    .\scripts\backup-render-postgres.ps1 -OutputDir "backups/render"
+}
+finally {
+    Remove-Item Env:RENDER_POSTGRES_DATABASE_URL -ErrorAction SilentlyContinue
+}
+```
+
+Store the resulting `.custom.dump`, `.restore-list.txt`, and `.manifest.json` outside the checkout
+after verifying that the manifest hash matches the dump. `backups/` is gitignored, but a local file
+is not a disaster-recovery copy. Before production promotion, perform a real restore rehearsal into
+an isolated PostgreSQL database and attach the command output to the release evidence. Running the
+helper alone does not prove restoreability.
+
 ## Staging rollout gate
 
 Use a production-like PostgreSQL copy and run migrations with the same application startup flow used

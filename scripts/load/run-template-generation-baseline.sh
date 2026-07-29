@@ -13,12 +13,17 @@ VUS="${VUS:-50}"
 ITERATIONS="${ITERATIONS:-100}"
 DURATION="${DURATION:-2m}"
 RATE="${RATE:-100}"
-WORKER_COUNT="${WORKER_COUNT:-3}"
+WORKER_COUNT="${WORKER_COUNT:-1}"
 POSTGRES_SERVICE="${POSTGRES_SERVICE:-postgres}"
 POSTGRES_USER="${POSTGRES_USER:-petmagic_user}"
 POSTGRES_DB="${POSTGRES_DB:-petmagic_db}"
 K6_IMAGE="${K6_IMAGE:-grafana/k6:0.49.0}"
 K6_DOCKER_NETWORK="${K6_DOCKER_NETWORK:-}"
+
+if [[ "$WORKER_COUNT" != "1" ]]; then
+  echo "Scheduler V2 production-topology load evidence requires WORKER_COUNT=1; received $WORKER_COUNT." >&2
+  exit 2
+fi
 
 require_env() {
   local name="$1"

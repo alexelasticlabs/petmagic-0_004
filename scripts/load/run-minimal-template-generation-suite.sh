@@ -5,6 +5,12 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SUITE_ID="${SUITE_ID:-minimal-$(date -u +%Y%m%dT%H%M%SZ)}"
 ARTIFACT_ROOT="${ARTIFACT_ROOT:-$ROOT_DIR/artifacts/load}"
 SUITE_DIR="$ARTIFACT_ROOT/$SUITE_ID"
+WORKER_COUNT="${WORKER_COUNT:-1}"
+
+if [[ "$WORKER_COUNT" != "1" ]]; then
+  echo "Scheduler V2 production-topology load evidence requires WORKER_COUNT=1; received $WORKER_COUNT." >&2
+  exit 2
+fi
 
 mkdir -p "$SUITE_DIR"
 
@@ -20,6 +26,7 @@ run_profile() {
   echo "Running $name: PROFILE=$profile MODE=$mode VUS=$vus ITERATIONS=$iterations DURATION=${duration:-default} RATE=${rate:-default}"
 
   RUN_ID="$SUITE_ID/$name" \
+    WORKER_COUNT="$WORKER_COUNT" \
     MODE="$mode" \
     PROFILE="$profile" \
     VUS="$vus" \
@@ -34,7 +41,7 @@ SUITE_ID=$SUITE_ID
 BASE_URL=${BASE_URL:-http://host.docker.internal:5001}
 TEMPLATE_ID=${TEMPLATE_ID:-}
 MODE=${MODE:-user}
-WORKER_COUNT=${WORKER_COUNT:-3}
+WORKER_COUNT=$WORKER_COUNT
 EOF
 
 # Minimal production-readiness suite:
@@ -53,7 +60,7 @@ run_profile "05-overload-10" "overload" "10" "10" "${OVERLOAD_DURATION:-2m}" "${
   echo "- Target: ${BASE_URL:-http://host.docker.internal:5001}"
   echo "- Template: ${TEMPLATE_ID:-unset}"
   echo "- Mode: ${MODE:-user}"
-  echo "- Workers: ${WORKER_COUNT:-3}"
+  echo "- Workers: $WORKER_COUNT"
   echo
   echo "## Runs"
   echo

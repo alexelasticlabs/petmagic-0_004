@@ -112,10 +112,10 @@ This builds the same API, worker, and admin Dockerfiles/contexts declared in
 5. Review the planned resources before applying.
 6. Do not create a second Blueprint for the same services.
 
-The staging Blueprint uses `autoDeployTrigger: checksPass`. Render will deploy
-after GitHub Actions pass for the linked branch. If CI is not available or is
-temporarily red, switch the service to manual deploy in Render rather than
-lowering production-like safety in the repo.
+The staging Blueprint uses `autoDeployTrigger: off`. Deploy it only with a
+manual Blueprint sync after the local predeploy gate has passed and the exact
+commit SHA has been recorded. This is intentional: a missing or unpaid
+GitHub-hosted CI run must never become an implicit deployment approval.
 
 ## Secrets to fill in Render
 

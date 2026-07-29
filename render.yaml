@@ -138,7 +138,7 @@ services:
     plan: standard
     numInstances: 1
     branch: master
-    autoDeployTrigger: checksPass
+    autoDeployTrigger: off
     dockerfilePath: ./Dockerfile.api
     dockerContext: .
     healthCheckPath: /health
@@ -301,7 +301,7 @@ services:
     region: frankfurt
     plan: standard
     branch: master
-    autoDeployTrigger: checksPass
+    autoDeployTrigger: off
     dockerfilePath: ./Dockerfile.generation-worker
     dockerContext: .
     maxShutdownDelaySeconds: 300
@@ -366,7 +366,7 @@ services:
     plan: starter
     numInstances: 1
     branch: master
-    autoDeployTrigger: checksPass
+    autoDeployTrigger: off
     dockerfilePath: ./apps/admin-web/Dockerfile
     dockerContext: ./apps/admin-web
     healthCheckPath: /ru

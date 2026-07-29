@@ -59,6 +59,9 @@ const minExistingGenerations = intEnv('STAGING_MIN_EXISTING_GENERATIONS', smokeM
 const submitConcurrency = intEnv('STAGING_SUBMIT_CONCURRENCY', 8);
 const pollAttempts = intEnv('STAGING_POLL_ATTEMPTS', 60);
 const pollDelayMs = intEnv('STAGING_POLL_DELAY_MS', 1000);
+const runtimeConvergenceAttempts = positiveIntEnv('STAGING_RUNTIME_CONVERGENCE_ATTEMPTS', 30);
+const runtimeConvergenceDelayMs = positiveIntEnv('STAGING_RUNTIME_CONVERGENCE_DELAY_MS', 5000);
+const runtimeHeartbeatMaxAgeSeconds = positiveIntEnv('STAGING_RUNTIME_HEARTBEAT_MAX_AGE_SECONDS', 120);
 const expectFailedStatus = boolEnv('STAGING_EXPECT_FAILED_STATUS', false);
 const requireFailedStatus = expectFailedStatus || Boolean(failingTemplateId);
 const allowIncomplete = boolEnv('STAGING_ALLOW_INCOMPLETE', false);
@@ -139,6 +142,9 @@ const evidence = {
   submitConcurrency,
   pollAttempts,
   pollDelayMs,
+  runtimeConvergenceAttempts,
+  runtimeConvergenceDelayMs,
+  runtimeHeartbeatMaxAgeSeconds,
   checks,
   createdGenerations,
   rejectedResponses,
@@ -205,6 +211,7 @@ async function main() {
   const after = collectDatabaseSnapshot('after');
   evidence.sql.after = after;
   verifyDatabaseOutcomes(before, after, waitTooLongProbe, cancelProbe, failingProbe, sseProbe);
+  await verifyWorkerProgressEvidence();
 
   await queryPrometheus();
 
@@ -265,7 +272,7 @@ async function runPreflightChecks() {
     existingGenerations >= minExistingGenerations,
     `existing=${existingGenerations}, minimum=${minExistingGenerations}`);
 
-  verifyRuntimeConfigFingerprintEvidence();
+  await verifyRuntimeConfigFingerprintEvidence();
   verifyMigrationLogEvidence();
 }
 
@@ -332,7 +339,10 @@ function verifyMigrationsAndConcurrentIndexes() {
     WHERE "MigrationId" IN (
       '20260630230458_AddTemplateRealtimeEvents',
       '20260630234809_AddGenerationSchedulerQueueFields',
-      '20260630230638_AddGenerationRefundLedgerIdempotencyIndex'
+      '20260630230638_AddGenerationRefundLedgerIdempotencyIndex',
+      '20260728231704_AddGenerationControlFoundation',
+      '20260729153000_AddGenerationSchedulerHotPathIndexes',
+      '20260729184500_EnforceGenerationResultMediaIdentity'
     )
     ORDER BY "MigrationId";
   `).flat();
@@ -341,7 +351,10 @@ function verifyMigrationsAndConcurrentIndexes() {
     'migrations.required_scheduler_migrations_applied',
     migrationRows.includes('20260630230458_AddTemplateRealtimeEvents')
       && migrationRows.includes('20260630234809_AddGenerationSchedulerQueueFields')
-      && migrationRows.includes('20260630230638_AddGenerationRefundLedgerIdempotencyIndex'),
+      && migrationRows.includes('20260630230638_AddGenerationRefundLedgerIdempotencyIndex')
+      && migrationRows.includes('20260728231704_AddGenerationControlFoundation')
+      && migrationRows.includes('20260729153000_AddGenerationSchedulerHotPathIndexes')
+      && migrationRows.includes('20260729184500_EnforceGenerationResultMediaIdentity'),
     migrationRows.join(', '));
 
   const indexRows = queryRows(`
@@ -350,28 +363,60 @@ function verifyMigrationsAndConcurrentIndexes() {
     JOIN pg_index i ON i.indexrelid = c.oid
     WHERE c.relname IN (
       'IX_tgj_Status_QueueMediaType_QueueTier_QueuedAtUtc',
-      'IX_tgj_Status_QueueMediaType_StartedAtUtc'
+      'IX_tgj_Status_QueueMediaType_StartedAtUtc',
+      'IX_tgj_ImportingMedia_NextAttempt',
+      'IX_tgpa_Completed_Stage_ProviderCompletedAtUtc',
+      'IX_tgj_Completed_MediaType_ImportCompletedAtUtc',
+      'IX_tgj_UserId_QueueTier_LastAttemptAtUtc',
+      'IX_tpwbi_Processing_LockedAtUtc_NextAttemptAtUtc',
+      'UX_tmr_GenerationResult_GenerationId_MediaType'
     )
     ORDER BY c.relname;
   `).map(row => ({ name: row[0], valid: parsePgBool(row[1]), ready: parsePgBool(row[2]) }));
   evidence.sql.concurrentIndexes = indexRows;
   addCheck(
     'migrations.concurrent_indexes_exist_and_are_valid',
-    indexRows.length === 2 && indexRows.every(index => index.valid && index.ready),
+    indexRows.length === 8 && indexRows.every(index => index.valid && index.ready),
     JSON.stringify(indexRows));
 }
 
 function verifyConcurrentMigrationSource() {
-  const migrationSource = readFileSync(
-    'src/Modules/Templates/PetMagic.Modules.Templates.Infrastructure/Data/Migrations/20260630234809_AddGenerationSchedulerQueueFields.cs',
-    'utf8');
-  const concurrentlyCount = (migrationSource.match(/CONCURRENTLY/g) || []).length;
-  const suppressCount = (migrationSource.match(/suppressTransaction:\s*true/g) || []).length;
-  evidence.concurrentMigrationSource = { concurrentlyCount, suppressCount };
-  addCheck(
-    'migrations.concurrent_index_sql_suppresses_transaction',
-    concurrentlyCount >= 4 && suppressCount >= 4,
-    `CONCURRENTLY=${concurrentlyCount}, suppressTransaction=${suppressCount}`);
+  const migrations = [
+    {
+      file: '20260630234809_AddGenerationSchedulerQueueFields.cs',
+      expectedConcurrentStatements: 4
+    },
+    {
+      file: '20260728231704_AddGenerationControlFoundation.cs',
+      expectedConcurrentStatements: 2
+    },
+    {
+      file: '20260729153000_AddGenerationSchedulerHotPathIndexes.cs',
+      expectedConcurrentStatements: 8
+    },
+    {
+      file: '20260729184500_EnforceGenerationResultMediaIdentity.cs',
+      expectedConcurrentStatements: 3
+    }
+  ];
+  evidence.concurrentMigrationSource = [];
+  for (const migration of migrations) {
+    const migrationSource = readFileSync(
+      `src/Modules/Templates/PetMagic.Modules.Templates.Infrastructure/Data/Migrations/${migration.file}`,
+      'utf8');
+    const concurrentlyCount = (migrationSource.match(/CONCURRENTLY/g) || []).length;
+    const suppressCount = (migrationSource.match(/suppressTransaction:\s*true/g) || []).length;
+    evidence.concurrentMigrationSource.push({
+      file: migration.file,
+      concurrentlyCount,
+      suppressCount
+    });
+    addCheck(
+      `migrations.${migration.file}.concurrent_index_sql_suppresses_transaction`,
+      concurrentlyCount === migration.expectedConcurrentStatements
+        && suppressCount === migration.expectedConcurrentStatements,
+      `CONCURRENTLY=${concurrentlyCount}, suppressTransaction=${suppressCount}`);
+  }
 }
 
 async function tryProduceWaitTooLong(before) {
@@ -1325,6 +1370,30 @@ function parsePgBool(value) {
   return value === 't' || value === 'true' || value === '1';
 }
 
+function parseNullablePgBool(value) {
+  return value === null || value === undefined || value === ''
+    ? null
+    : parsePgBool(value);
+}
+
+function parseNullableInteger(value) {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) ? parsed : null;
+}
+
+function parseNullableNumber(value) {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function queryRows(sql) {
   if (psqlCommand === 'docker-compose-psql') {
     if (smokeMode !== 'local') {
@@ -1633,9 +1702,11 @@ function verifyMigrationLogEvidence() {
   const content = readFileSync(logPath, 'utf8');
   const transactionBlockErrorAbsent = !/CREATE INDEX CONCURRENTLY cannot run inside a transaction block/i.test(content);
   const schedulerMigrationMentioned = /AddGenerationSchedulerQueueFields|20260630234809/i.test(content);
+  const mediaIdentityMigrationMentioned = /EnforceGenerationResultMediaIdentity|20260729184500/i.test(content);
   evidence.migrationLog = {
     provided: true,
     schedulerMigrationMentioned,
+    mediaIdentityMigrationMentioned,
     transactionBlockErrorAbsent
   };
   addCheck(
@@ -1643,68 +1714,252 @@ function verifyMigrationLogEvidence() {
     schedulerMigrationMentioned,
     `log=${anonymize(logPath)}`);
   addCheck(
+    'migrations.deployment_log_mentions_generation_result_media_identity_migration',
+    mediaIdentityMigrationMentioned,
+    `log=${anonymize(logPath)}`);
+  addCheck(
     'migrations.deployment_log_has_no_concurrent_index_transaction_error',
     transactionBlockErrorAbsent,
     `log=${anonymize(logPath)}`);
 }
 
-function verifyRuntimeConfigFingerprintEvidence() {
+async function verifyRuntimeConfigFingerprintEvidence() {
+  let snapshot;
+  let attempt = 0;
+  for (; attempt < runtimeConvergenceAttempts; attempt += 1) {
+    snapshot = collectRuntimeConfigFingerprintSnapshot();
+    if (isRuntimeConfigConverged(snapshot)) {
+      break;
+    }
+
+    if (attempt + 1 < runtimeConvergenceAttempts) {
+      await delay(runtimeConvergenceDelayMs);
+    }
+  }
+
+  evidence.sql.runtimeConfigFingerprints = snapshot.rows;
+  evidence.runtimeConfigConvergence = {
+    attempts: attempt + 1,
+    currentPolicyRevision: snapshot.currentPolicyRevision,
+    activeWorkerCount: snapshot.activeWorkerCount
+  };
+  const runtimeDetail = JSON.stringify({
+    attempts: attempt + 1,
+    currentPolicyRevision: snapshot.currentPolicyRevision,
+    activeWorkerCount: snapshot.activeWorkerCount,
+    api: summarizeRuntimeFingerprint(snapshot.api),
+    worker: summarizeRuntimeFingerprint(snapshot.worker)
+  });
+
+  addCheck(
+    'runtime_config.api_worker_scheduler_fingerprints_match',
+    schedulerFingerprintsMatch(snapshot),
+    runtimeDetail);
+  addCheck(
+    'runtime_config.single_active_generation_worker',
+    snapshot.activeWorkerCount === 1,
+    `activeWorkerCount=${snapshot.activeWorkerCount}`);
+  addCheck(
+    'runtime_config.scheduler_v2_enabled',
+    snapshot.worker?.schedulerV2Enabled === true,
+    `mode=${smokeMode}, enabled=${snapshot.worker?.schedulerV2Enabled ?? 'missing'}`);
+  addCheck(
+    'runtime_config.policy_revision_applied',
+    Number.isInteger(snapshot.currentPolicyRevision)
+      && snapshot.worker?.appliedPolicyRevision === snapshot.currentPolicyRevision,
+    `current=${snapshot.currentPolicyRevision ?? 'missing'}, applied=${snapshot.worker?.appliedPolicyRevision ?? 'missing'}`);
+  addCheck(
+    'runtime_config.worker_lanes_4_4_1_1',
+    workerLanesMatch(snapshot.worker),
+    `dispatch=${snapshot.worker?.dispatchConcurrency ?? 'missing'}, reconciliation=${snapshot.worker?.reconciliationConcurrency ?? 'missing'}, import=${snapshot.worker?.mediaImportConcurrency ?? 'missing'}, maintenance=${snapshot.worker?.maintenanceConcurrency ?? 'missing'}`);
+  addCheck(
+    'runtime_config.api_heartbeat_fresh',
+    runtimeHeartbeatIsFresh(snapshot.api),
+    `lastSeenAtUtc=${snapshot.api?.lastSeenAtUtc ?? 'missing'}, ageSeconds=${snapshot.api?.heartbeatAgeSeconds ?? 'missing'}, maximum=${runtimeHeartbeatMaxAgeSeconds}`);
+  addCheck(
+    'runtime_config.worker_heartbeat_fresh',
+    workerHeartbeatIsFresh(snapshot.worker),
+    `lastSeenAtUtc=${snapshot.worker?.lastSeenAtUtc ?? 'missing'}, ageSeconds=${snapshot.worker?.heartbeatAgeSeconds ?? 'missing'}, maximum=${runtimeHeartbeatMaxAgeSeconds}`);
+  addCheck(
+    'runtime_config.converged_within_budget',
+    isRuntimeConfigConverged(snapshot),
+    runtimeDetail);
+}
+
+async function verifyWorkerProgressEvidence() {
+  let snapshot;
+  let attempt = 0;
+  for (; attempt < runtimeConvergenceAttempts; attempt += 1) {
+    snapshot = collectRuntimeConfigFingerprintSnapshot();
+    if (workerProgressedDuringSmoke(snapshot.worker) && workerHeartbeatIsFresh(snapshot.worker)) {
+      break;
+    }
+
+    if (attempt + 1 < runtimeConvergenceAttempts) {
+      await delay(runtimeConvergenceDelayMs);
+    }
+  }
+
+  evidence.sql.runtimeConfigFingerprintsAfterWorkload = snapshot.rows;
+  evidence.workerProgressConvergence = {
+    attempts: attempt + 1,
+    worker: summarizeRuntimeFingerprint(snapshot.worker)
+  };
+  addCheck(
+    'runtime_config.worker_progress_after_smoke_started',
+    workerProgressedDuringSmoke(snapshot.worker),
+    `smokeStartedAtUtc=${startedAt.toISOString()}, lastProgressAtUtc=${snapshot.worker?.lastProgressAtUtc ?? 'missing'}`);
+  addCheck(
+    'runtime_config.worker_heartbeat_fresh_after_workload',
+    workerHeartbeatIsFresh(snapshot.worker),
+    `lastSeenAtUtc=${snapshot.worker?.lastSeenAtUtc ?? 'missing'}, ageSeconds=${snapshot.worker?.heartbeatAgeSeconds ?? 'missing'}, maximum=${runtimeHeartbeatMaxAgeSeconds}`);
+}
+
+function collectRuntimeConfigFingerprintSnapshot() {
   const rows = queryRows(`
     WITH ranked AS (
       SELECT "Component",
              "ProfileName",
              "Checksum",
              "StartedAtUtc",
+             "LastSeenAtUtc",
              "MismatchDetected",
              "MismatchDetails",
+             "AppliedPolicyRevision",
+             "LastProgressAtUtc",
+             "GenerationSchedulerV2Enabled",
+             "GenerationDispatchConcurrency",
+             "ProviderReconciliationConcurrency",
+             "MediaImportConcurrency",
+             "GenerationMaintenanceConcurrency",
              row_number() OVER (
-               PARTITION BY "Component", "ProfileName"
-               ORDER BY "StartedAtUtc" DESC, "Id" DESC
+               PARTITION BY "Component"
+               ORDER BY "LastSeenAtUtc" DESC, "StartedAtUtc" DESC, "Id" DESC
              ) AS rn
       FROM templates_runtime_config_fingerprints
     )
     SELECT "Component",
            "ProfileName",
            "Checksum",
-           COALESCE(to_char("StartedAtUtc", 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'), ''),
+           COALESCE(to_char("StartedAtUtc" AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'), ''),
+           COALESCE(to_char("LastSeenAtUtc" AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'), ''),
+           EXTRACT(EPOCH FROM (NOW() - "LastSeenAtUtc"))::text,
            "MismatchDetected"::text,
-           COALESCE("MismatchDetails", '')
+           COALESCE("MismatchDetails", ''),
+           COALESCE("AppliedPolicyRevision"::text, ''),
+           COALESCE(to_char("LastProgressAtUtc" AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'), ''),
+           COALESCE(EXTRACT(EPOCH FROM (NOW() - "LastProgressAtUtc"))::text, ''),
+           COALESCE("GenerationSchedulerV2Enabled"::text, ''),
+           COALESCE("GenerationDispatchConcurrency"::text, ''),
+           COALESCE("ProviderReconciliationConcurrency"::text, ''),
+           COALESCE("MediaImportConcurrency"::text, ''),
+           COALESCE("GenerationMaintenanceConcurrency"::text, '')
     FROM ranked
     WHERE rn = 1
-    ORDER BY "ProfileName", "Component";
+    ORDER BY "Component";
   `).map(row => ({
     component: row[0],
     profileName: row[1],
     checksum: row[2],
     startedAtUtc: row[3],
-    mismatchDetected: parsePgBool(row[4]),
-    mismatchDetails: row[5]
+    lastSeenAtUtc: row[4],
+    heartbeatAgeSeconds: parseNullableNumber(row[5]),
+    mismatchDetected: parsePgBool(row[6]),
+    mismatchDetails: row[7],
+    appliedPolicyRevision: parseNullableInteger(row[8]),
+    lastProgressAtUtc: row[9] || null,
+    lastProgressAgeSeconds: parseNullableNumber(row[10]),
+    schedulerV2Enabled: parseNullablePgBool(row[11]),
+    dispatchConcurrency: parseNullableInteger(row[12]),
+    reconciliationConcurrency: parseNullableInteger(row[13]),
+    mediaImportConcurrency: parseNullableInteger(row[14]),
+    maintenanceConcurrency: parseNullableInteger(row[15])
   }));
+  const currentPolicyRevision = parseNullableInteger(queryScalar(`
+    SELECT "Revision"::text
+    FROM templates_generation_control_policy
+    ORDER BY "Revision" DESC
+    LIMIT 1;
+  `));
+  const activeWorkerCount = Number(queryScalar(`
+    SELECT count(*)::text
+    FROM templates_runtime_config_fingerprints
+    WHERE "Component" = 'generation-worker'
+      AND "LastSeenAtUtc" >= NOW() - make_interval(secs => ${runtimeHeartbeatMaxAgeSeconds});
+  `));
 
-  evidence.sql.runtimeConfigFingerprints = rows;
-  const apiRows = rows.filter(row => row.component === 'api');
-  const workerRows = rows.filter(row => row.component === 'generation-worker');
-  const matchingPairs = [];
-  for (const api of apiRows) {
-    const worker = workerRows.find(candidate => candidate.profileName === api.profileName);
-    if (worker) {
-      matchingPairs.push({ api, worker });
-    }
+  return {
+    rows,
+    api: rows.find(row => row.component === 'api') ?? null,
+    worker: rows.find(row => row.component === 'generation-worker') ?? null,
+    currentPolicyRevision,
+    activeWorkerCount
+  };
+}
+
+function isRuntimeConfigConverged(snapshot) {
+  return schedulerFingerprintsMatch(snapshot)
+    && snapshot.activeWorkerCount === 1
+    && snapshot.worker?.schedulerV2Enabled === true
+    && Number.isInteger(snapshot.currentPolicyRevision)
+    && snapshot.worker?.appliedPolicyRevision === snapshot.currentPolicyRevision
+    && workerLanesMatch(snapshot.worker)
+    && runtimeHeartbeatIsFresh(snapshot.api)
+    && workerHeartbeatIsFresh(snapshot.worker);
+}
+
+function schedulerFingerprintsMatch(snapshot) {
+  return Boolean(
+    snapshot.api
+      && snapshot.worker
+      && snapshot.api.profileName === snapshot.worker.profileName
+      && snapshot.api.checksum === snapshot.worker.checksum
+      && !snapshot.api.mismatchDetected
+      && !snapshot.worker.mismatchDetected);
+}
+
+function workerLanesMatch(worker) {
+  return worker?.dispatchConcurrency === 4
+    && worker.reconciliationConcurrency === 4
+    && worker.mediaImportConcurrency === 1
+    && worker.maintenanceConcurrency === 1;
+}
+
+function workerHeartbeatIsFresh(worker) {
+  return Number.isFinite(worker?.heartbeatAgeSeconds)
+    && worker.heartbeatAgeSeconds >= -30
+    && worker.heartbeatAgeSeconds <= runtimeHeartbeatMaxAgeSeconds;
+}
+
+function workerProgressedDuringSmoke(worker) {
+  const lastProgressAt = Date.parse(worker?.lastProgressAtUtc ?? '');
+  return Number.isFinite(lastProgressAt)
+    && lastProgressAt >= startedAt.getTime()
+    && lastProgressAt <= Date.now() + 30000;
+}
+
+function summarizeRuntimeFingerprint(row) {
+  if (!row) {
+    return null;
   }
 
-  const matched = matchingPairs.find(pair =>
-    pair.api.checksum === pair.worker.checksum
-    && !pair.api.mismatchDetected
-    && !pair.worker.mismatchDetected);
-  addCheck(
-    'runtime_config.api_worker_scheduler_fingerprints_match',
-    Boolean(matched),
-    JSON.stringify(rows.map(row => ({
-      component: row.component,
-      profileName: row.profileName,
-      checksum: row.checksum,
-      mismatchDetected: row.mismatchDetected
-    }))));
+  return {
+    component: row.component,
+    profileName: row.profileName,
+    checksum: row.checksum,
+    mismatchDetected: row.mismatchDetected,
+    lastSeenAtUtc: row.lastSeenAtUtc,
+    heartbeatAgeSeconds: row.heartbeatAgeSeconds,
+    appliedPolicyRevision: row.appliedPolicyRevision,
+    lastProgressAtUtc: row.lastProgressAtUtc,
+    schedulerV2Enabled: row.schedulerV2Enabled,
+    lanes: {
+      dispatch: row.dispatchConcurrency,
+      reconciliation: row.reconciliationConcurrency,
+      mediaImport: row.mediaImportConcurrency,
+      maintenance: row.maintenanceConcurrency
+    }
+  };
 }
 
 function hasAnyStagingProcessEnv() {
@@ -1787,6 +2042,20 @@ function intEnv(name, fallback) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function positiveIntEnv(name, fallback) {
+  const raw = process.env[name];
+  if (!raw) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error(`${name} must be a positive integer.`);
+  }
+
+  return parsed;
+}
+
 function boolEnv(name, fallback) {
   const raw = process.env[name];
   if (!raw) {
@@ -1839,6 +2108,9 @@ Optional environment:
   STAGING_ADMIN_AUTH_TOKEN              admin JWT for privileged probes
   STAGING_SMOKE_TOTAL                   50-100 generation attempts, default 60
   STAGING_SUBMIT_CONCURRENCY            default 8
+  STAGING_RUNTIME_CONVERGENCE_ATTEMPTS  worker runtime convergence polls, default 30
+  STAGING_RUNTIME_CONVERGENCE_DELAY_MS  delay between runtime polls, default 5000
+  STAGING_RUNTIME_HEARTBEAT_MAX_AGE_SECONDS  maximum worker heartbeat age, default 120
   STAGING_EXPECT_FAILED_STATUS          require failed DB status evidence, default false
   STAGING_ALLOW_INCOMPLETE              diagnostic-only; write evidence but exit 0 on failed checks, not release evidence
   STAGING_USE_QA_FIXTURES               use deterministic local/staging QA fixtures, default false

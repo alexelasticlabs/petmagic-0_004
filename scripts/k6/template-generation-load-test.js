@@ -15,21 +15,42 @@ const overloadRate = new Rate('generation_queue_overloaded');
 const activeLimitRate = new Rate('generation_active_limit_reached');
 const createFailures = new Counter('generation_create_failures');
 const pollFailures = new Counter('generation_poll_failures');
+const mixedSubmissions = new Counter('generation_mixed_submissions');
+const mixedImageSubmissions = new Counter('generation_mixed_image_submissions');
+const mixedVideoSubmissions = new Counter('generation_mixed_video_submissions');
 
 export const options = {
     scenarios: buildScenarios(profile),
-    thresholds: {
+    thresholds: buildThresholds(profile)
+};
+
+function buildThresholds(selectedProfile) {
+    const thresholds = {
         http_req_failed: ['rate<0.10'],
         http_req_duration: ['p(95)<1500', 'p(99)<3000'],
         generation_create_latency: ['p(95)<1500', 'p(99)<3000'],
         generation_poll_latency: ['p(95)<750', 'p(99)<1500']
+    };
+    if (selectedProfile === 'mixed-acceptance') {
+        thresholds.generation_mixed_submissions = ['count==200'];
+        thresholds.generation_mixed_image_submissions = ['count==100'];
+        thresholds.generation_mixed_video_submissions = ['count==100'];
+        thresholds.generation_create_accepted = ['rate>0.999'];
     }
-};
+
+    return thresholds;
+}
 
 export function setup() {
     const baseUrl = (__ENV.BASE_URL || 'http://localhost:5001').replace(/\/$/, '');
-    const templateId = __ENV.TEMPLATE_ID;
-    if (!templateId) {
+    const isMixedAcceptance = profile === 'mixed-acceptance';
+    const templateId = __ENV.TEMPLATE_ID || '';
+    const imageTemplateId = __ENV.IMAGE_TEMPLATE_ID || '';
+    const videoTemplateId = __ENV.VIDEO_TEMPLATE_ID || '';
+    if (isMixedAcceptance && (!imageTemplateId || !videoTemplateId)) {
+        fail('IMAGE_TEMPLATE_ID and VIDEO_TEMPLATE_ID are required for mixed-acceptance.');
+    }
+    if (!isMixedAcceptance && !templateId) {
         fail('TEMPLATE_ID is required.');
     }
 
@@ -41,7 +62,10 @@ export function setup() {
     return {
         baseUrl,
         templateId,
+        imageTemplateId,
+        videoTemplateId,
         tokens,
+        idempotencyPrefix: (__ENV.IDEMPOTENCY_PREFIX || profile).replace(/[^A-Za-z0-9._-]/g, '-').slice(0, 80),
         mode: (__ENV.MODE || 'user').toLowerCase(),
         pollAttempts: intEnv('POLL_ATTEMPTS', 10),
         pollSleepSeconds: numberEnv('POLL_SLEEP_SECONDS', 1),
@@ -50,12 +74,31 @@ export function setup() {
 }
 
 export function createGeneration(data) {
-    const response = submitGeneration(data, uniqueIdempotencyKey());
+    const response = submitGeneration(data, uniqueIdempotencyKey('generation', data.idempotencyPrefix));
+    recordCreateResult(response);
+}
+
+export function createMixedGeneration(data) {
+    const isVideo = __ITER % 2 === 1;
+    const mediaType = isVideo ? 'video' : 'image';
+    const templateId = isVideo ? data.videoTemplateId : data.imageTemplateId;
+    mixedSubmissions.add(1);
+    if (isVideo) {
+        mixedVideoSubmissions.add(1);
+    } else {
+        mixedImageSubmissions.add(1);
+    }
+
+    const response = submitGeneration(
+        data,
+        uniqueIdempotencyKey(mediaType, data.idempotencyPrefix),
+        templateId,
+        mediaType);
     recordCreateResult(response);
 }
 
 export function createAndPoll(data) {
-    const response = submitGeneration(data, uniqueIdempotencyKey());
+    const response = submitGeneration(data, uniqueIdempotencyKey('generation', data.idempotencyPrefix));
     recordCreateResult(response);
     if (response.status !== 202) {
         return;
@@ -96,10 +139,10 @@ export function duplicateIdempotency(data) {
     });
 }
 
-function submitGeneration(data, idempotencyKey) {
+function submitGeneration(data, idempotencyKey, templateId = data.templateId, mediaType = 'unspecified') {
     const url = data.mode === 'admin-test'
-        ? `${data.baseUrl}/api/admin/templates/${data.templateId}/test`
-        : `${data.baseUrl}/api/templates/${data.templateId}/generations`;
+        ? `${data.baseUrl}/api/admin/templates/${templateId}/test`
+        : `${data.baseUrl}/api/templates/${templateId}/generations`;
     const token = tokenForVu(data.tokens);
     const response = http.post(
         url,
@@ -112,6 +155,7 @@ function submitGeneration(data, idempotencyKey) {
                 'Idempotency-Key': idempotencyKey
             },
             tags: {
+                media_type: mediaType,
                 name: data.mode === 'admin-test'
                     ? 'POST /api/admin/templates/{templateId}/test'
                     : 'POST /api/templates/{templateId}/generations'
@@ -221,6 +265,22 @@ function buildScenarios(selectedProfile) {
     const iterations = intEnv('ITERATIONS', 100);
     const duration = __ENV.DURATION || '2m';
 
+    if (selectedProfile === 'mixed-acceptance') {
+        if (vus !== 50 || iterations !== 200) {
+            throw new Error('mixed-acceptance requires exactly VUS=50 and ITERATIONS=200.');
+        }
+
+        return {
+            mixed_generation_acceptance: {
+                executor: 'per-vu-iterations',
+                vus,
+                iterations: iterations / vus,
+                maxDuration: __ENV.ACCEPTANCE_MAX_DURATION || '10m',
+                exec: 'createMixedGeneration'
+            }
+        };
+    }
+
     if (selectedProfile === 'polling') {
         if (__ENV.POLLING_EXECUTOR === 'constant-vus') {
             return {
@@ -304,8 +364,8 @@ function tokenForVu(tokens) {
     return tokens[(__VU - 1) % tokens.length];
 }
 
-function uniqueIdempotencyKey() {
-    return `${profile}-${__VU}-${__ITER}-${Date.now()}`;
+function uniqueIdempotencyKey(label = 'generation', prefix = profile) {
+    return `${prefix}-${label}-${__VU}-${__ITER}-${Date.now()}`;
 }
 
 function intEnv(name, fallback) {
@@ -355,6 +415,9 @@ function renderSummary(data) {
     const createAccepted = metric('generation_create_accepted');
     const overloaded = metric('generation_queue_overloaded');
     const activeLimited = metric('generation_active_limit_reached');
+    const mixed = metric('generation_mixed_submissions');
+    const mixedImages = metric('generation_mixed_image_submissions');
+    const mixedVideos = metric('generation_mixed_video_submissions');
 
     return [
         '# PetMagic Template Generation Load Test',
@@ -377,6 +440,9 @@ function renderSummary(data) {
         `| Generation accepted rate | ${formatRate(createAccepted.rate)} |`,
         `| Queue overloaded rate | ${formatRate(overloaded.rate)} |`,
         `| Active limit rate | ${formatRate(activeLimited.rate)} |`,
+        `| Mixed submissions | ${formatCount(mixed.count)} |`,
+        `| Mixed image submissions | ${formatCount(mixedImages.count)} |`,
+        `| Mixed video submissions | ${formatCount(mixedVideos.count)} |`,
         '',
         'Capture host baseline next to this file:',
         '',
@@ -402,4 +468,8 @@ function formatRate(value) {
 
 function formatNumber(value) {
     return value === undefined ? 'n/a' : Number(value).toFixed(2);
+}
+
+function formatCount(value) {
+    return value === undefined ? 'n/a' : String(Number(value));
 }

@@ -638,7 +638,7 @@ function requireService(name, expected) {
     }
   }
 
-  const expectedAutoDeploy = environment === 'production' ? 'off' : 'checksPass';
+  const expectedAutoDeploy = 'off';
   if (service.autoDeployTrigger !== expectedAutoDeploy) {
     fail(`${name} must use autoDeployTrigger: ${expectedAutoDeploy}.`);
   }

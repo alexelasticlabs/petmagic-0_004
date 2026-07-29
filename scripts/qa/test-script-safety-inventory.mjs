@@ -13,14 +13,18 @@ const scriptExtensions = new Set(['.cmd', '.js', '.mjs', '.ps1', '.py', '.sh', '
 const expectedScriptFiles = [
   'scripts/audit_mobile_release_size.ps1',
   'scripts/backup-postgres.ps1',
+  'scripts/backup-render-postgres.ps1',
   'scripts/db/capture-hot-query-plans.sh',
   'scripts/docker/compose-up-portfree.ps1',
   'scripts/docker/run-dotnet-app.cmd',
   'scripts/docker/run-dotnet-app.sh',
   'scripts/generate-brand-icons.ps1',
   'scripts/k6/template-generation-load-test.js',
+  'scripts/load/run-generation-scheduler-v2-acceptance.sh',
   'scripts/load/run-minimal-template-generation-suite.sh',
   'scripts/load/run-template-generation-baseline.sh',
+  'scripts/load/validate-generation-load-auth-subjects.mjs',
+  'scripts/load/verify-generation-scheduler-v2-acceptance.mjs',
   'scripts/qa/audit-android-kotlin-legacy.ps1',
   'scripts/qa/check-markdown-local-links.mjs',
   'scripts/qa/check-production-release-config.mjs',
@@ -55,6 +59,7 @@ const expectedScriptFiles = [
   'scripts/qa/template-feed-metrics-summary.py',
   'scripts/qa/template-feed-video-log-summary.py',
   'scripts/qa/test-markdown-local-links.mjs',
+  'scripts/qa/test-generation-rollout-tooling.mjs',
   'scripts/qa/test-render-blueprint-contracts.mjs',
   'scripts/qa/test-render-postdeploy-contracts.mjs',
   'scripts/qa/test-script-safety-inventory.mjs',
@@ -155,6 +160,15 @@ const allowedRmRf = new Map([
 ]);
 const allowedRemoveItem = new Map([
   ['scripts/generate-brand-icons.ps1', ['Remove-Item $temporaryPng -ErrorAction SilentlyContinue']],
+  [
+    'scripts/backup-render-postgres.ps1',
+    [
+      'Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue',
+      'Remove-Item -LiteralPath $finalListPath -Force -ErrorAction SilentlyContinue',
+      'Remove-Item -LiteralPath $finalManifestPath -Force -ErrorAction SilentlyContinue',
+      'Remove-Item Env:PGDATABASE -ErrorAction SilentlyContinue',
+    ],
+  ],
 ]);
 const allowedDeleteFrom = new Map([
   [
@@ -485,6 +499,79 @@ assert(
   'watermark seed SQL must remain explicitly local-only',
 );
 
+const generationLoadBaseline = read('scripts/load/run-template-generation-baseline.sh');
+const generationLoadSuite = read('scripts/load/run-minimal-template-generation-suite.sh');
+for (const [label, script] of [
+  ['generation load baseline', generationLoadBaseline],
+  ['minimal generation load suite', generationLoadSuite],
+]) {
+  assert(
+    script.includes('WORKER_COUNT="${WORKER_COUNT:-1}"')
+      && script.includes('if [[ "$WORKER_COUNT" != "1" ]]')
+      && script.includes('production-topology load evidence requires WORKER_COUNT=1'),
+    `${label} must default to one worker and reject non-production topology evidence`,
+  );
+}
+assert(
+  generationLoadSuite.includes('WORKER_COUNT="$WORKER_COUNT"'),
+  'minimal generation load suite must propagate the validated one-worker topology to every profile',
+);
+
+const generationAcceptance = read('scripts/load/run-generation-scheduler-v2-acceptance.sh');
+const generationAcceptanceVerifier = read('scripts/load/verify-generation-scheduler-v2-acceptance.mjs');
+const generationLoadAuthSubjects = read('scripts/load/validate-generation-load-auth-subjects.mjs');
+assert(
+  generationAcceptance.includes('[[ "$WORKER_COUNT" == "1" ]]')
+    && generationAcceptance.includes('[[ "$VUS" == "50" ]]')
+    && generationAcceptance.includes('[[ "$ITERATIONS" == "200" ]]')
+    && generationAcceptance.includes('IMAGE_TEMPLATE_ID')
+    && generationAcceptance.includes('VIDEO_TEMPLATE_ID')
+    && generationAcceptance.includes('[[ "$template_role_counts" == "1,1" ]]')
+    && generationAcceptance.includes('[[ "$AUTH_SUBJECT_COUNT" == "50" ]]')
+    && generationLoadAuthSubjects.includes('payload.sub')
+    && generationLoadAuthSubjects.includes('subjects.has(canonicalSubject)'),
+  'Scheduler V2 acceptance wrapper must fail closed on one worker and exactly 50 VUs / 200 mixed jobs',
+);
+assert(
+  generationAcceptance.includes('runtime-series.csv')
+    && generationAcceptance.includes('templates_generation_provider_attempts')
+    && generationAcceptance.includes('pg_stat_activity')
+    && generationAcceptance.includes('"GenerationSchedulerV2Enabled"')
+    && generationAcceptance.includes('"GenerationDispatchConcurrency"')
+    && generationAcceptance.includes('"LastProgressAtUtc"')
+    && generationAcceptanceVerifier.includes('runtime.provider_saturated_38')
+    && generationAcceptanceVerifier.includes('runtime.effective_global_exact_38')
+    && generationAcceptanceVerifier.includes('runtime.worker_lanes_4_4_1_1')
+    && generationAcceptanceVerifier.includes("scope: 'core_load_only'")
+    && generationAcceptanceVerifier.includes('fullAcceptance: false')
+    && generationAcceptanceVerifier.includes("'CORE_LOAD_PASS'")
+    && generationAcceptanceVerifier.includes("'CORE_LOAD_FAIL'"),
+  'Scheduler V2 core-load tooling must prove scoped provider saturation, V2 lanes, progress, and PostgreSQL runtime bounds without claiming full acceptance',
+);
+assert(
+  !generationAcceptance.includes('-e AUTH_TOKENS="$AUTH_TOKENS"')
+    && !generationAcceptance.includes('export AUTH_TOKENS')
+    && generationAcceptance.includes('AUTH_TOKENS="$AUTH_TOKENS" docker run'),
+  'Scheduler V2 acceptance wrapper must scope JWTs to the k6 process environment and keep them out of docker command arguments',
+);
+
+const renderPostgresBackup = read('scripts/backup-render-postgres.ps1');
+assert(
+  renderPostgresBackup.includes('$env:RENDER_POSTGRES_DATABASE_URL')
+    && renderPostgresBackup.includes('$env:PGDATABASE = $databaseUrl')
+    && !renderPostgresBackup.includes('[string]$DatabaseUrl')
+    && !renderPostgresBackup.includes('--dbname'),
+  'Render PostgreSQL backup must receive its URL only through the process environment',
+);
+assert(
+  renderPostgresBackup.includes('--format=custom')
+    && renderPostgresBackup.includes('--list')
+    && renderPostgresBackup.includes('.partial')
+    && renderPostgresBackup.includes('Get-FileHash -LiteralPath $partialBackupPath -Algorithm SHA256')
+    && renderPostgresBackup.includes('Move-Item -LiteralPath $partialBackupPath -Destination $finalBackupPath'),
+  'Render PostgreSQL backup must verify custom format and atomically promote a SHA256-manifested artifact',
+);
+
 const stagingSmoke = read('scripts/qa/run-staging-generation-scheduler-smoke.mjs');
 assert(
   stagingSmoke.includes("throw new Error('docker-compose-psql is only allowed for local smoke mode.');"),
@@ -501,6 +588,43 @@ assert(
 assert(
   !stagingSmoke.includes("normalized.includes('/petmagic_db')"),
   'staging scheduler smoke must not reject Render staging solely because the database name is petmagic_db',
+);
+assert(
+  stagingSmoke.includes('"GenerationSchedulerV2Enabled"')
+    && stagingSmoke.includes('"AppliedPolicyRevision"')
+    && stagingSmoke.includes('"GenerationDispatchConcurrency"')
+    && stagingSmoke.includes('"ProviderReconciliationConcurrency"')
+    && stagingSmoke.includes('"MediaImportConcurrency"')
+    && stagingSmoke.includes('"GenerationMaintenanceConcurrency"'),
+  'staging scheduler smoke must query the deployed Scheduler V2 policy and bounded lane configuration',
+);
+assert(
+  stagingSmoke.includes('runtime_config.scheduler_v2_enabled')
+    && stagingSmoke.includes('runtime_config.policy_revision_applied')
+    && stagingSmoke.includes('runtime_config.worker_lanes_4_4_1_1')
+    && stagingSmoke.includes('runtime_config.api_heartbeat_fresh')
+    && stagingSmoke.includes('runtime_config.worker_heartbeat_fresh')
+    && stagingSmoke.includes('runtime_config.worker_progress_after_smoke_started'),
+  'staging scheduler smoke must fail closed on Scheduler V2 mode, policy, lanes, heartbeat, and progress',
+);
+assert(
+  stagingSmoke.includes("snapshot.worker?.schedulerV2Enabled === true")
+    && !stagingSmoke.includes("smokeMode === 'local' || snapshot.worker?.schedulerV2Enabled === true"),
+  'local diagnostic mode must not bypass the Scheduler V2 enabled gate',
+);
+assert(
+  stagingSmoke.includes('runtimeConvergenceAttempts')
+    && stagingSmoke.includes('runtimeConvergenceDelayMs')
+    && stagingSmoke.includes('runtime_config.converged_within_budget'),
+  'staging scheduler smoke must wait for bounded API/worker rollout convergence',
+);
+assert(
+  stagingSmoke.includes('20260729184500_EnforceGenerationResultMediaIdentity')
+    && stagingSmoke.includes('UX_tmr_GenerationResult_GenerationId_MediaType')
+    && stagingSmoke.includes('indexRows.length === 8')
+    && stagingSmoke.includes("file: '20260729184500_EnforceGenerationResultMediaIdentity.cs'")
+    && stagingSmoke.includes('expectedConcurrentStatements: 3'),
+  'staging scheduler smoke must gate on the generation-result media identity migration and its valid ready concurrent index',
 );
 
 const stagingEnvReadiness = read('scripts/qa/check-staging-env-readiness.mjs');

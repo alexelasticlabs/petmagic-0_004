@@ -71,6 +71,30 @@ This is not production proof until the report contains the actual policy revisio
 configuration, provider-attempt counts, queue/stage ages, CPU/RAM samples, DB connections, and
 restart timestamps. A fake-provider pass does not prove real fal callbacks, limits, or billing.
 
+The repository includes a fail-closed core-load runner for the first part of this matrix:
+
+```bash
+IMAGE_TEMPLATE_ID=<active-image-template-uuid> \
+VIDEO_TEMPLATE_ID=<active-video-template-uuid> \
+AUTH_TOKENS=<exactly-50-jwts-with-unique-uuid-sub-claims> \
+WORKER_COUNT=1 \
+bash scripts/load/run-generation-scheduler-v2-acceptance.sh
+```
+
+It requires exactly 50 JWTs with 50 unique UUID `sub` claims and submits exactly 200 jobs split
+100/100 between verified Image and Video templates. Its runtime series is scoped to the current run's
+idempotency prefix and requires one fresh Scheduler V2 worker, lanes `4/4/1/1`, effective global
+capacity exactly `38`, actual provider-attempt saturation at `38`, worker progress after the run
+started, and fewer than 70 PostgreSQL connections. Zero worker work, duplicate JWT subjects, stale or
+V1 fingerprints, wrong lanes, and a wrong effective limit fail closed.
+
+The verdict JSON always declares `scope: "core_load_only"`, `fullAcceptance: false`, and uses the
+scoped statuses `CORE_LOAD_PASS` / `CORE_LOAD_FAIL` instead of generic PASS/FAIL. A passing core-load
+verdict is therefore **not** complete Scheduler V2 acceptance. Run the strict global-8
+video-reserve, blocked import/FFmpeg progress, restart-under-120-seconds, CPU/RAM, and exactly-once
+provider/billing/storage scenarios separately and attach their artifacts before checking the full
+list above.
+
 For a Compose-only backend that is reachable from other containers but not from the host:
 
 ```bash
