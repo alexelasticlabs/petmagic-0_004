@@ -109,7 +109,7 @@ function createControl(overrides: Partial<Record<string, unknown>> = {}) {
         message: "Top up the provider balance before the advertising launch.",
       },
     ],
-    generatedAtUtc: "2026-07-29T10:05:00Z",
+    generatedAtUtc: new Date().toISOString(),
     ...overrides,
   };
 }
@@ -133,8 +133,13 @@ async function fulfillJson(route: Route, body: unknown, status = 200) {
   });
 }
 
-async function installMocks(page: Page, initialControl = createControl()) {
+async function installMocks(
+  page: Page,
+  initialControl = createControl(),
+  options: { policyConflictsBeforeSuccess?: number } = {}
+) {
   let control = initialControl;
+  let policyConflictsRemaining = options.policyConflictsBeforeSuccess ?? 0;
   const policyRequests: Array<{ body: Record<string, unknown>; idempotencyKey: string | null }> =
     [];
 
@@ -158,19 +163,33 @@ async function installMocks(page: Page, initialControl = createControl()) {
         body,
         idempotencyKey: request.headers()["idempotency-key"] ?? null,
       });
+      if (policyConflictsRemaining > 0) {
+        policyConflictsRemaining -= 1;
+        const nextRevision = Number(control.revision) + 1;
+        control = createControl({
+          ...control,
+          revision: nextRevision,
+          worker: { ...control.worker, appliedPolicyRevision: nextRevision },
+          generatedAtUtc: new Date().toISOString(),
+        });
+        await fulfillJson(route, { title: "Generation control policy conflict", status: 409 }, 409);
+        return;
+      }
+
       const nextLimit = Number(body.confirmedFalConcurrencyLimit);
       const nextReserve = Number(body.reservedHeadroom);
       const nextCeiling = Number(body.applicationHardCeiling);
       const nextGlobal = Math.min(nextCeiling, nextLimit - nextReserve);
+      const nextRevision = Number(control.revision) + 1;
       control = createControl({
-        revision: 5,
+        revision: nextRevision,
         admissionEnabled: Boolean(body.admissionEnabled),
         confirmedFalConcurrencyLimit: nextLimit,
         reservedHeadroom: nextReserve,
         applicationHardCeiling: nextCeiling,
         effectiveGlobalLimit: nextGlobal,
         effectiveProfile: profile(nextGlobal),
-        worker: { ...control.worker, appliedPolicyRevision: 5 },
+        worker: { ...control.worker, appliedPolicyRevision: nextRevision },
       });
       await fulfillJson(route, control);
       return;
@@ -186,6 +205,7 @@ async function installMocks(page: Page, initialControl = createControl()) {
           checkedAtUtc: "2026-07-29T10:10:00Z",
         },
         alerts: [],
+        generatedAtUtc: new Date().toISOString(),
       });
       await fulfillJson(route, control);
       return;
@@ -262,14 +282,37 @@ test("generation capacity previews and saves a scale-up with optimistic concurre
   await page.getByRole("button", { name: "Configure", exact: true }).click();
 
   const dialog = page.getByRole("dialog", { name: "Configure generation capacity", exact: true });
-  await dialog.getByRole("textbox", { name: "Confirmed fal.ai concurrency limit" }).fill("40");
-  await dialog
-    .getByRole("textbox", { name: "Change reason" })
-    .fill("Verified the new concurrency limit in the fal.ai Dashboard.");
+  const confirmedLimit = dialog.getByRole("textbox", {
+    name: "Confirmed fal.ai concurrency limit",
+  });
+  const reserve = dialog.getByRole("textbox", { name: "Capacity reserved outside PetMagic" });
+  const reason = dialog.getByRole("textbox", { name: "Change reason" });
+  const save = dialog.getByRole("button", { name: "Save policy", exact: true });
+
+  await reason.fill("ab");
+  await expect(reason).toHaveAttribute("aria-invalid", "true");
+  await expect(reason).toHaveAttribute(
+    "aria-describedby",
+    "generation-capacity-policy-reason-error"
+  );
+  await expect(save).toBeDisabled();
+  await reason.fill("Verified the new concurrency limit in the fal.ai Dashboard.");
+  await expect(reason).toHaveAttribute("aria-invalid", "false");
+
+  await confirmedLimit.fill("40");
+  await reserve.fill("40");
+  await expect(reserve).toHaveAttribute("aria-invalid", "true");
+  await expect(reserve).toHaveAttribute(
+    "aria-describedby",
+    "generation-capacity-policy-limits-error"
+  );
+  await expect(save).toBeDisabled();
+  await reserve.fill("2");
+  await expect(reserve).toHaveAttribute("aria-invalid", "false");
   const preview = dialog.getByRole("region", { name: "Balanced profile preview" });
   await expect(preview.getByText("38", { exact: true }).first()).toBeVisible();
   await expect(preview.getByText("10", { exact: true }).first()).toBeVisible();
-  await dialog.getByRole("button", { name: "Save policy", exact: true }).click();
+  await save.click();
 
   await expect(dialog).toBeHidden();
   await expect.poll(() => api.getPolicyRequests().length).toBe(1);
@@ -283,6 +326,64 @@ test("generation capacity previews and saves a scale-up with optimistic concurre
     },
   });
   expect(api.getPolicyRequests()[0]?.idempotencyKey).toMatch(/^generation-policy:/);
+});
+
+test("preserves the draft and rotates concurrency metadata after a 409 conflict", async ({
+  page,
+}) => {
+  const api = await installMocks(page, createControl(), { policyConflictsBeforeSuccess: 1 });
+  await loginAsAdmin(page);
+  await page.goto("/en/generations");
+  await page.getByRole("button", { name: "Configure", exact: true }).click();
+
+  const dialog = page.getByRole("dialog", {
+    name: "Configure generation capacity",
+    exact: true,
+  });
+  const confirmedLimit = dialog.getByRole("textbox", {
+    name: "Confirmed fal.ai concurrency limit",
+  });
+  const reason = dialog.getByRole("textbox", { name: "Change reason" });
+  const save = dialog.getByRole("button", { name: "Save policy", exact: true });
+  const preservedReason = "Verified the desired capacity after reviewing the live queue.";
+
+  await confirmedLimit.fill("40");
+  await reason.fill(preservedReason);
+  await save.click();
+
+  await expect(dialog.getByText(/latest revision was loaded/i)).toBeVisible();
+  await expect(confirmedLimit).toHaveValue("40");
+  await expect(reason).toHaveValue(preservedReason);
+  await expect.poll(() => api.getPolicyRequests().length).toBe(1);
+  expect(api.getPolicyRequests()[0]?.body.expectedRevision).toBe(4);
+  const firstIdempotencyKey = api.getPolicyRequests()[0]?.idempotencyKey;
+
+  await expect(save).toBeEnabled();
+  await save.click();
+  await expect(dialog).toBeHidden();
+  await expect.poll(() => api.getPolicyRequests().length).toBe(2);
+  expect(api.getPolicyRequests()[1]?.body.expectedRevision).toBe(5);
+  expect(api.getPolicyRequests()[1]?.body.reason).toBe(preservedReason);
+  expect(api.getPolicyRequests()[1]?.idempotencyKey).toMatch(/^generation-policy:/);
+  expect(api.getPolicyRequests()[1]?.idempotencyKey).not.toBe(firstIdempotencyKey);
+});
+
+test("blocks policy mutations while a server snapshot is too old", async ({ page }) => {
+  await installMocks(page, createControl({ generatedAtUtc: "2000-01-01T00:00:00Z" }));
+  await loginAsAdmin(page);
+  await page.goto("/en/generations");
+
+  await expect(
+    page.getByText("Generation capacity snapshot is stale", { exact: true })
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Configure", exact: true })).toBeDisabled();
+  const refresh = page.getByRole("button", { name: "Refresh balance", exact: true });
+  await expect(refresh).toBeEnabled();
+  await refresh.click();
+  await expect(
+    page.getByText("Generation capacity snapshot is stale", { exact: true })
+  ).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Configure", exact: true })).toBeEnabled();
 });
 
 test("pausing admission requires explicit acknowledgement and fits a 390px viewport", async ({

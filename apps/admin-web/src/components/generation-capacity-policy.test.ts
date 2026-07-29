@@ -5,15 +5,36 @@ import {
   calculateBalancedGenerationProfile,
   calculateEffectiveGlobalLimit,
   getGenerationCapacityAlertTransitionsStorageKey,
+  isGenerationCapacitySnapshotTooOld,
   isGenerationCapacityDecrease,
   parseGenerationCapacityAlertTransitions,
   retainRecentGenerationCapacityAlertTransitions,
+  selectNewestGenerationCapacitySnapshot,
 } from "@/components/generation-capacity-policy";
+import type {
+  AdminTemplateGenerationCapacityProfile,
+  AdminTemplateGenerationControl,
+} from "@/lib/api-client";
+
+const baseProfile: AdminTemplateGenerationCapacityProfile = {
+  globalMaxConcurrentGenerations: 8,
+  imageReservedConcurrentGenerations: 3,
+  imageProtectedConcurrentGenerations: 3,
+  imageMaxConcurrentGenerations: 7,
+  videoReservedConcurrentGenerations: 2,
+  videoMaxConcurrentGenerations: 4,
+  videoBorrowMaxConcurrentGenerations: 2,
+  videoPreprocessingMaxConcurrentGenerations: 1,
+};
+
+function controlSnapshot(revision: number, generatedAtUtc: string): AdminTemplateGenerationControl {
+  return { revision, generatedAtUtc } as AdminTemplateGenerationControl;
+}
 
 describe("generation capacity policy", () => {
   it("keeps two provider slots in reserve at the initial fal limit", () => {
     expect(calculateEffectiveGlobalLimit(10, 2, 38)).toBe(8);
-    expect(calculateBalancedGenerationProfile(10, 2, 38)).toEqual({
+    expect(calculateBalancedGenerationProfile(10, 2, 38, baseProfile)).toEqual({
       globalMaxConcurrentGenerations: 8,
       imageReservedConcurrentGenerations: 3,
       imageProtectedConcurrentGenerations: 3,
@@ -26,7 +47,7 @@ describe("generation capacity policy", () => {
   });
 
   it("scales the balanced profile to the application ceiling", () => {
-    expect(calculateBalancedGenerationProfile(40, 2, 38)).toEqual({
+    expect(calculateBalancedGenerationProfile(40, 2, 38, baseProfile)).toEqual({
       globalMaxConcurrentGenerations: 38,
       imageReservedConcurrentGenerations: 14,
       imageProtectedConcurrentGenerations: 14,
@@ -39,12 +60,62 @@ describe("generation capacity policy", () => {
   });
 
   it("marks only a lower effective limit as a capacity decrease", () => {
-    expect(isGenerationCapacityDecrease(8, calculateBalancedGenerationProfile(8, 2, 38))).toBe(
-      true
+    expect(
+      isGenerationCapacityDecrease(8, calculateBalancedGenerationProfile(8, 2, 38, baseProfile))
+    ).toBe(true);
+    expect(
+      isGenerationCapacityDecrease(8, calculateBalancedGenerationProfile(10, 2, 38, baseProfile))
+    ).toBe(false);
+  });
+
+  it("scales the preview from the base profile returned by the server", () => {
+    const serverProfile: AdminTemplateGenerationCapacityProfile = {
+      globalMaxConcurrentGenerations: 10,
+      imageReservedConcurrentGenerations: 2,
+      imageProtectedConcurrentGenerations: 4,
+      imageMaxConcurrentGenerations: 8,
+      videoReservedConcurrentGenerations: 3,
+      videoMaxConcurrentGenerations: 6,
+      videoBorrowMaxConcurrentGenerations: 1,
+      videoPreprocessingMaxConcurrentGenerations: 2,
+    };
+
+    expect(calculateBalancedGenerationProfile(22, 2, 20, serverProfile)).toEqual({
+      globalMaxConcurrentGenerations: 20,
+      imageReservedConcurrentGenerations: 4,
+      imageProtectedConcurrentGenerations: 8,
+      imageMaxConcurrentGenerations: 16,
+      videoReservedConcurrentGenerations: 6,
+      videoMaxConcurrentGenerations: 12,
+      videoBorrowMaxConcurrentGenerations: 2,
+      videoPreprocessingMaxConcurrentGenerations: 4,
+    });
+  });
+
+  it("never lets an older response overwrite a newer cached policy or snapshot", () => {
+    const revisionFive = controlSnapshot(5, "2026-07-29T10:05:00Z");
+    const lateRevisionFour = controlSnapshot(4, "2026-07-29T10:06:00Z");
+    const olderSameRevision = controlSnapshot(5, "2026-07-29T10:04:00Z");
+    const newerSameRevision = controlSnapshot(5, "2026-07-29T10:06:00Z");
+
+    expect(selectNewestGenerationCapacitySnapshot(revisionFive, lateRevisionFour)).toBe(
+      revisionFive
     );
-    expect(isGenerationCapacityDecrease(8, calculateBalancedGenerationProfile(10, 2, 38))).toBe(
-      false
+    expect(selectNewestGenerationCapacitySnapshot(revisionFive, olderSameRevision)).toBe(
+      revisionFive
     );
+    expect(selectNewestGenerationCapacitySnapshot(revisionFive, newerSameRevision)).toBe(
+      newerSameRevision
+    );
+  });
+
+  it("fails closed when the control snapshot is missing, malformed, or too old", () => {
+    const now = Date.parse("2026-07-29T10:02:00Z");
+
+    expect(isGenerationCapacitySnapshotTooOld("2026-07-29T10:01:00Z", now)).toBe(false);
+    expect(isGenerationCapacitySnapshotTooOld("2026-07-29T10:00:29Z", now)).toBe(true);
+    expect(isGenerationCapacitySnapshotTooOld("not-a-date", now)).toBe(true);
+    expect(isGenerationCapacitySnapshotTooOld(null, now)).toBe(true);
   });
 
   it("deduplicates alerts by the stable transition identity only", () => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useAdminNotifications } from "@/components/admin/admin-notifications";
 import {
@@ -21,9 +21,11 @@ import {
   buildGenerationCapacityAlertTransitionKey,
   calculateBalancedGenerationProfile,
   getGenerationCapacityAlertTransitionsStorageKey,
+  isGenerationCapacitySnapshotTooOld,
   isGenerationCapacityDecrease,
   parseGenerationCapacityAlertTransitions,
   retainRecentGenerationCapacityAlertTransitions,
+  selectNewestGenerationCapacitySnapshot,
 } from "@/components/generation-capacity-policy";
 import { createAdminCorrelationId } from "@/lib/admin-correlation-id";
 import { getAdminErrorMessage } from "@/lib/admin-error-message";
@@ -58,6 +60,10 @@ type PolicyDraft = {
 };
 
 const POLICY_LIMIT_MAX = 1_000;
+const POLICY_REASON_MIN_LENGTH = 3;
+const SNAPSHOT_FRESHNESS_TICK_MS = 10_000;
+const POLICY_LIMITS_ERROR_ID = "generation-capacity-policy-limits-error";
+const POLICY_REASON_ERROR_ID = "generation-capacity-policy-reason-error";
 
 function createPolicyIdempotencyKey(): string {
   return `generation-policy:${createAdminCorrelationId()}`;
@@ -146,6 +152,7 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
   const [draft, setDraft] = useState<PolicyDraft | null>(null);
   const [editorError, setEditorError] = useState<string | null>(null);
   const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [freshnessNowMs, setFreshnessNowMs] = useState(() => Date.now());
   const firstEditorFieldRef = useRef<HTMLInputElement>(null);
   const observedAlertTransitionsRef = useRef(new Set<string>());
   const observedAlertTransitionsStorageKeyRef = useRef<string | null>(null);
@@ -155,7 +162,13 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
 
   const capacityQuery = useQuery({
     queryKey: adminQueryKeys.templateGenerationControl,
-    queryFn: ({ signal }) => fetchAdminTemplateGenerationControl(signal),
+    queryFn: async ({ signal }) => {
+      const incoming = await fetchAdminTemplateGenerationControl(signal);
+      const current = queryClient.getQueryData<AdminTemplateGenerationControl>(
+        adminQueryKeys.templateGenerationControl
+      );
+      return selectNewestGenerationCapacitySnapshot(current, incoming);
+    },
     enabled,
     staleTime: 10_000,
     refetchInterval: 25_000,
@@ -163,16 +176,30 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
   });
 
   const control = capacityQuery.data;
+  const snapshotTooOld = Boolean(
+    control && isGenerationCapacitySnapshotTooOld(control.generatedAtUtc, freshnessNowMs)
+  );
   const confirmedLimit = draft ? parseWholeNumber(draft.confirmedFalConcurrencyLimit, 1) : null;
   const reservedHeadroom = draft ? parseWholeNumber(draft.reservedHeadroom, 0) : null;
   const hardCeiling = draft ? parseWholeNumber(draft.applicationHardCeiling, 1) : null;
-  const previewProfile = useMemo(
-    () =>
-      confirmedLimit !== null && reservedHeadroom !== null && hardCeiling !== null
-        ? calculateBalancedGenerationProfile(confirmedLimit, reservedHeadroom, hardCeiling)
-        : null,
-    [confirmedLimit, hardCeiling, reservedHeadroom]
-  );
+  const previewProfile =
+    control && confirmedLimit !== null && reservedHeadroom !== null && hardCeiling !== null
+      ? calculateBalancedGenerationProfile(
+          confirmedLimit,
+          reservedHeadroom,
+          hardCeiling,
+          control.policy
+        )
+      : null;
+  const reasonLength = draft?.reason.trim().length ?? 0;
+  const isReasonValid =
+    reasonLength >= POLICY_REASON_MIN_LENGTH &&
+    reasonLength <= GENERATION_CONTROL_REASON_MAX_LENGTH;
+  const confirmedLimitInvalid = draft !== null && confirmedLimit === null;
+  const reservedHeadroomInvalid =
+    draft !== null &&
+    (reservedHeadroom === null || (confirmedLimit !== null && reservedHeadroom >= confirmedLimit));
+  const hardCeilingInvalid = draft !== null && hardCeiling === null;
   const isPolicyShapeValid =
     confirmedLimit !== null &&
     reservedHeadroom !== null &&
@@ -189,9 +216,22 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
     draft &&
     previewProfile &&
     isPolicyShapeValid &&
-    draft.reason.trim() &&
+    isReasonValid &&
+    !snapshotTooOld &&
     (!requiresRiskAcknowledgement || draft.riskAcknowledged)
   );
+
+  useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
+    const interval = window.setInterval(
+      () => setFreshnessNowMs(Date.now()),
+      SNAPSHOT_FRESHNESS_TICK_MS
+    );
+    return () => window.clearInterval(interval);
+  }, [enabled]);
 
   useEffect(() => {
     if (!alertTransitionsStorageKey) {
@@ -262,8 +302,18 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
 
   const policyMutation = useMutation({
     mutationFn: updateAdminTemplateGenerationControlPolicy,
+    onMutate: async () => {
+      setEditorError(null);
+      await queryClient.cancelQueries({
+        queryKey: adminQueryKeys.templateGenerationControl,
+        exact: true,
+      });
+    },
     onSuccess: (updated) => {
-      queryClient.setQueryData(adminQueryKeys.templateGenerationControl, updated);
+      const accepted = queryClient.setQueryData<AdminTemplateGenerationControl>(
+        adminQueryKeys.templateGenerationControl,
+        (current) => selectNewestGenerationCapacitySnapshot(current, updated)
+      );
       setIsEditorOpen(false);
       setDraft(null);
       setEditorError(null);
@@ -274,15 +324,26 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
         source: text.notificationSource,
         tone: "success",
         href: `/${locale}/generations`,
-        dedupeKey: `generation-policy-saved:${updated.revision}`,
+        dedupeKey: `generation-policy-saved:${accepted?.revision ?? updated.revision}`,
+      });
+      void queryClient.invalidateQueries({
+        queryKey: adminQueryKeys.templateGenerationControl,
+        exact: true,
       });
     },
     onError: async (error) => {
       if (getErrorStatus(error) === 409) {
         const refreshed = await capacityQuery.refetch();
-        if (refreshed.data) {
-          setDraft(createPolicyDraft(refreshed.data));
-        }
+        setDraft((current) =>
+          current
+            ? {
+                ...current,
+                expectedRevision: refreshed.data?.revision ?? current.expectedRevision,
+                idempotencyKey: createPolicyIdempotencyKey(),
+                riskAcknowledged: false,
+              }
+            : current
+        );
         setEditorError(text.staleConflict);
         return;
       }
@@ -293,9 +354,18 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
 
   const refreshMutation = useMutation({
     mutationFn: refreshAdminTemplateGenerationProvider,
-    onMutate: () => setRefreshError(null),
+    onMutate: async () => {
+      setRefreshError(null);
+      await queryClient.cancelQueries({
+        queryKey: adminQueryKeys.templateGenerationControl,
+        exact: true,
+      });
+    },
     onSuccess: (updated) => {
-      queryClient.setQueryData(adminQueryKeys.templateGenerationControl, updated);
+      const accepted = queryClient.setQueryData<AdminTemplateGenerationControl>(
+        adminQueryKeys.templateGenerationControl,
+        (current) => selectNewestGenerationCapacitySnapshot(current, updated)
+      );
       addNotification({
         title: text.title,
         message: text.refreshed,
@@ -303,14 +373,18 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
         source: text.notificationSource,
         tone: "success",
         href: `/${locale}/generations`,
-        dedupeKey: `generation-provider-refresh:${updated.balance.checkedAtUtc ?? updated.revision}`,
+        dedupeKey: `generation-provider-refresh:${accepted?.balance.checkedAtUtc ?? updated.revision}`,
+      });
+      void queryClient.invalidateQueries({
+        queryKey: adminQueryKeys.templateGenerationControl,
+        exact: true,
       });
     },
     onError: (error) => setRefreshError(getAdminErrorMessage(error, text.refreshError)),
   });
 
   function openEditor() {
-    if (!control) return;
+    if (!control || snapshotTooOld) return;
     setEditorError(null);
     setDraft(createPolicyDraft(control));
     setIsEditorOpen(true);
@@ -338,6 +412,11 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
   }
 
   function savePolicy() {
+    if (snapshotTooOld) {
+      setEditorError(text.snapshotTooOldDescription);
+      return;
+    }
+
     if (
       !draft ||
       !canSavePolicy ||
@@ -351,7 +430,7 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
     setEditorError(null);
     policyMutation.mutate({
       expectedRevision: draft.expectedRevision,
-      reason: draft.reason,
+      reason: draft.reason.trim(),
       admissionEnabled: draft.admissionEnabled,
       confirmedFalConcurrencyLimit: confirmedLimit,
       reservedHeadroom,
@@ -411,7 +490,12 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
             >
               {refreshMutation.isPending ? text.refreshingProvider : text.refreshProvider}
             </button>
-            <button className={styles.primaryButton} type="button" onClick={openEditor}>
+            <button
+              className={styles.primaryButton}
+              type="button"
+              disabled={snapshotTooOld}
+              onClick={openEditor}
+            >
               {text.editPolicy}
             </button>
           </div>
@@ -474,6 +558,27 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
           <span style={{ width: `${usagePercent}%` }} />
         </div>
 
+        {capacityQuery.isRefetchError || snapshotTooOld ? (
+          <AdminStateCard
+            title={snapshotTooOld ? text.snapshotTooOldTitle : text.snapshotRefreshFailedTitle}
+            description={
+              snapshotTooOld
+                ? text.snapshotTooOldDescription
+                : getAdminErrorMessage(capacityQuery.error, text.snapshotRefreshFailedDescription)
+            }
+            tone="warning"
+            action={
+              <button
+                className={styles.button}
+                type="button"
+                disabled={capacityQuery.isFetching}
+                onClick={() => void capacityQuery.refetch().catch(() => undefined)}
+              >
+                {text.retry}
+              </button>
+            }
+          />
+        ) : null}
         {refreshError ? <AdminStateCard title={refreshError} tone="warning" /> : null}
         {control.alerts.length > 0 ? (
           <section className={styles.alerts} aria-label={text.alerts}>
@@ -618,6 +723,13 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
         {draft ? (
           <div className={styles.editor}>
             {editorError ? <AdminStateCard title={editorError} tone="warning" /> : null}
+            {snapshotTooOld ? (
+              <AdminStateCard
+                title={text.snapshotTooOldTitle}
+                description={text.snapshotTooOldDescription}
+                tone="warning"
+              />
+            ) : null}
             <label className={styles.toggleField}>
               <input
                 type="checkbox"
@@ -635,6 +747,8 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
                   ref={firstEditorFieldRef}
                   inputMode="numeric"
                   value={draft.confirmedFalConcurrencyLimit}
+                  aria-invalid={confirmedLimitInvalid}
+                  aria-describedby={confirmedLimitInvalid ? POLICY_LIMITS_ERROR_ID : undefined}
                   disabled={policyMutation.isPending}
                   onChange={(event) =>
                     updateDraft({ confirmedFalConcurrencyLimit: event.target.value })
@@ -646,6 +760,8 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
                 <input
                   inputMode="numeric"
                   value={draft.reservedHeadroom}
+                  aria-invalid={reservedHeadroomInvalid}
+                  aria-describedby={reservedHeadroomInvalid ? POLICY_LIMITS_ERROR_ID : undefined}
                   disabled={policyMutation.isPending}
                   onChange={(event) => updateDraft({ reservedHeadroom: event.target.value })}
                 />
@@ -655,12 +771,18 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
                 <input
                   inputMode="numeric"
                   value={draft.applicationHardCeiling}
+                  aria-invalid={hardCeilingInvalid}
+                  aria-describedby={hardCeilingInvalid ? POLICY_LIMITS_ERROR_ID : undefined}
                   disabled={policyMutation.isPending}
                   onChange={(event) => updateDraft({ applicationHardCeiling: event.target.value })}
                 />
               </label>
             </div>
-            {!isPolicyShapeValid ? <p className={styles.validation}>{text.invalidPolicy}</p> : null}
+            {!isPolicyShapeValid ? (
+              <p id={POLICY_LIMITS_ERROR_ID} className={styles.validation} role="alert">
+                {text.invalidPolicy}
+              </p>
+            ) : null}
 
             <section className={styles.preview} aria-label={text.previewTitle}>
               <header>
@@ -701,12 +823,19 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
               <span>{text.reasonLabel}</span>
               <textarea
                 value={draft.reason}
+                minLength={POLICY_REASON_MIN_LENGTH}
                 maxLength={GENERATION_CONTROL_REASON_MAX_LENGTH}
+                aria-invalid={!isReasonValid}
+                aria-describedby={!isReasonValid ? POLICY_REASON_ERROR_ID : undefined}
                 disabled={policyMutation.isPending}
                 placeholder={text.reasonPlaceholder}
                 onChange={(event) => updateDraft({ reason: event.target.value })}
               />
-              {!draft.reason.trim() ? <small>{text.reasonRequired}</small> : null}
+              {!isReasonValid ? (
+                <small id={POLICY_REASON_ERROR_ID} role="alert">
+                  {text.reasonRequired}
+                </small>
+              ) : null}
             </label>
           </div>
         ) : null}

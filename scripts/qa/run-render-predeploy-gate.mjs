@@ -62,6 +62,11 @@ const steps = [
     required: true
   },
   {
+    name: 'render_postdeploy_contract_tests',
+    command: ['node', ['scripts/qa/test-render-postdeploy-contracts.mjs']],
+    required: true
+  },
+  {
     name: 'environment_release_configuration',
     command: environment === 'production'
       ? ['node', ['scripts/qa/check-production-release-config.mjs', '--blueprint', blueprint]]

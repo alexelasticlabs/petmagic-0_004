@@ -85,6 +85,10 @@ export type GenerationCapacityPanelText = {
   saved: string;
   saveError: string;
   staleConflict: string;
+  snapshotRefreshFailedTitle: string;
+  snapshotRefreshFailedDescription: string;
+  snapshotTooOldTitle: string;
+  snapshotTooOldDescription: string;
   refreshError: string;
   refreshed: string;
   notificationSource: string;
@@ -156,7 +160,7 @@ const capacityPanelText: Record<Locale, GenerationCapacityPanelText> = {
     admissionLabel: "Принимать новые генерации",
     reasonLabel: "Причина изменения",
     reasonPlaceholder: "Что проверено и почему меняется capacity",
-    reasonRequired: "Укажите проверенную причину изменения.",
+    reasonRequired: "Укажите причину изменения длиной не менее 3 символов.",
     invalidPolicy: "Лимиты должны быть целыми числами; reserve должен быть меньше fal.ai limit.",
     previewTitle: "Предпросмотр Balanced profile",
     previewDescription: "Активные задания не отменяются при уменьшении capacity.",
@@ -169,7 +173,13 @@ const capacityPanelText: Record<Locale, GenerationCapacityPanelText> = {
     saved: "Generation capacity обновлена.",
     saveError: "Не удалось обновить generation capacity.",
     staleConflict:
-      "Policy уже изменена другим администратором. Значения обновлены — проверьте их снова.",
+      "Policy уже изменена другим администратором. Загружена новая revision; ваши значения и причина сохранены — проверьте их снова.",
+    snapshotRefreshFailedTitle: "Не удалось обновить состояние generation capacity",
+    snapshotRefreshFailedDescription:
+      "Показан последний успешный снимок. Повторите загрузку перед изменением policy.",
+    snapshotTooOldTitle: "Снимок generation capacity устарел",
+    snapshotTooOldDescription:
+      "Изменение policy заблокировано до успешного обновления состояния очереди и worker.",
     refreshError: "Не удалось обновить состояние fal.ai.",
     refreshed: "Состояние fal.ai обновлено.",
     notificationSource: "Generation capacity",
@@ -245,7 +255,7 @@ const capacityPanelText: Record<Locale, GenerationCapacityPanelText> = {
     admissionLabel: "Accept new generations",
     reasonLabel: "Change reason",
     reasonPlaceholder: "What was verified and why capacity is changing",
-    reasonRequired: "Provide a verified reason for this change.",
+    reasonRequired: "Provide a change reason of at least 3 characters.",
     invalidPolicy: "Limits must be whole numbers and reserve must be lower than the fal.ai limit.",
     previewTitle: "Balanced profile preview",
     previewDescription: "Lowering capacity never cancels active jobs.",
@@ -259,7 +269,13 @@ const capacityPanelText: Record<Locale, GenerationCapacityPanelText> = {
     saved: "Generation capacity was updated.",
     saveError: "Failed to update generation capacity.",
     staleConflict:
-      "Another administrator changed this policy. Values were refreshed; review them again.",
+      "Another administrator changed this policy. The latest revision was loaded; your values and reason were preserved for review.",
+    snapshotRefreshFailedTitle: "Generation capacity refresh failed",
+    snapshotRefreshFailedDescription:
+      "The last successful snapshot is shown. Refresh it before changing the policy.",
+    snapshotTooOldTitle: "Generation capacity snapshot is stale",
+    snapshotTooOldDescription:
+      "Policy changes are blocked until the queue and worker state refresh successfully.",
     refreshError: "Failed to refresh the fal.ai state.",
     refreshed: "fal.ai state was refreshed.",
     notificationSource: "Generation capacity",

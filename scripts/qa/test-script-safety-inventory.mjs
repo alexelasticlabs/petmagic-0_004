@@ -56,6 +56,7 @@ const expectedScriptFiles = [
   'scripts/qa/template-feed-video-log-summary.py',
   'scripts/qa/test-markdown-local-links.mjs',
   'scripts/qa/test-render-blueprint-contracts.mjs',
+  'scripts/qa/test-render-postdeploy-contracts.mjs',
   'scripts/qa/test-script-safety-inventory.mjs',
   'scripts/qa/test-template-feed-admin-qa-report-draft.mjs',
   'scripts/qa/test-template-feed-load-probe.mjs',
@@ -529,6 +530,7 @@ assert(
 );
 
 const renderPostdeploySmoke = read('scripts/qa/run-render-postdeploy-smoke.mjs');
+const renderPostdeployContracts = read('scripts/qa/test-render-postdeploy-contracts.mjs');
 assert(
   renderPostdeploySmoke.includes('Render post-deploy smoke.'),
   'Render post-deploy smoke must keep help text for operator use',
@@ -544,9 +546,29 @@ assert(
   'Render post-deploy smoke must gate on scheduler fingerprint health and a fresh generation-worker heartbeat',
 );
 assert(
+  renderPostdeploySmoke.includes('/api/admin/templates/generation-control')
+    && renderPostdeploySmoke.includes('api.generation_control.single_worker')
+    && renderPostdeploySmoke.includes('api.generation_control.policy_revision_applied')
+    && renderPostdeploySmoke.includes('api.generation_control.lanes')
+    && renderPostdeploySmoke.includes('api.generation_control.no_critical_alerts'),
+  'Render post-deploy smoke must gate on generation worker topology, lanes, policy revision, and critical alerts',
+);
+assert(
+  renderPostdeploySmoke.includes("const validProtocol = url.protocol === 'https:'")
+    && renderPostdeploySmoke.includes("redirect: 'manual'")
+    && renderPostdeploySmoke.includes('recordAuthenticatedResponseSafety'),
+  'Render post-deploy smoke must never send an admin token over HTTP or follow authenticated redirects',
+);
+assert(
   renderPostdeploySmoke.includes("'https://api.petgpt.app'")
     && renderPostdeploySmoke.includes("'https://admin.petgpt.app'"),
   'Render post-deploy smoke production defaults must match the production Blueprint domains',
+);
+assert(
+  renderPostdeployContracts.includes('absolute_https_url')
+    && renderPostdeployContracts.includes('clean_authority')
+    && renderPostdeployContracts.includes('must stop before any remote request is attempted'),
+  'Render post-deploy contracts must execute the fail-closed URL validation boundary',
 );
 
 const renderPredeployGate = read('scripts/qa/run-render-predeploy-gate.mjs');

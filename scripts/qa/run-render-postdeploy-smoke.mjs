@@ -23,6 +23,7 @@ let adminBaseUrl;
 let adminAuthToken;
 let timeoutMs;
 let environment;
+let expectedSchedulerV2Enabled;
 
 try {
   environment = (getOptionValue('--environment') ?? 'staging').toLowerCase();
@@ -54,6 +55,10 @@ try {
       : process.env.PRODUCTION_ADMIN_AUTH_TOKEN)
     ?? '';
   timeoutMs = positiveIntegerOption('--timeout-ms', 15_000);
+  expectedSchedulerV2Enabled = booleanOption(
+    '--expected-scheduler-v2-enabled',
+    process.env.PETMAGIC_EXPECTED_GENERATION_SCHEDULER_V2_ENABLED,
+    false);
 
   mkdirSync(artifactDir, { recursive: true });
 } catch (error) {
@@ -71,6 +76,7 @@ const evidence = {
   adminAuthTokenProvided: Boolean(adminAuthToken),
   timeoutMs,
   environment,
+  expectedSchedulerV2Enabled,
   checks
 };
 
@@ -80,8 +86,12 @@ main().catch((error) => {
 });
 
 async function main() {
-  validateRemoteHttpUrl('apiBaseUrl', apiBaseUrl);
-  validateRemoteHttpUrl('adminBaseUrl', adminBaseUrl);
+  const apiUrlValid = validateRemoteHttpsUrl('apiBaseUrl', apiBaseUrl);
+  const adminUrlValid = validateRemoteHttpsUrl('adminBaseUrl', adminBaseUrl);
+  if (!apiUrlValid || !adminUrlValid) {
+    finish(1);
+    return;
+  }
 
   await checkApiHealth();
   await checkAdminRoute();
@@ -158,6 +168,7 @@ async function checkGenerationWorkerRuntime() {
   }
 
   const response = await fetchWithTimeout(`${apiBaseUrl}/api/admin/system/operations`, {
+    redirect: 'manual',
     headers: {
       Accept: 'application/json',
       Authorization: `Bearer ${adminAuthToken}`
@@ -185,6 +196,7 @@ async function checkGenerationWorkerRuntime() {
   };
 
   record('api.operations.http_200', response.status === 200, `HTTP ${response.status}`);
+  recordAuthenticatedResponseSafety('api.operations', response, apiBaseUrl);
   record('api.operations.json', Boolean(payload && typeof payload === 'object'), payload ? 'valid JSON' : 'missing or invalid JSON');
   record(
     'api.operations.templates_source_available',
@@ -198,6 +210,84 @@ async function checkGenerationWorkerRuntime() {
     'api.operations.generation_worker_heartbeat_fresh',
     Number.isFinite(heartbeatAgeSeconds) && heartbeatAgeSeconds <= 75 && workerStatus === 'healthy',
     `status=${workerStatus ?? 'missing'}, ageSeconds=${heartbeatAgeSeconds ?? 'missing'}`);
+
+  const controlResponse = await fetchWithTimeout(`${apiBaseUrl}/api/admin/templates/generation-control`, {
+    redirect: 'manual',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${adminAuthToken}`
+    }
+  });
+  let control = null;
+  try {
+    control = controlResponse.text ? JSON.parse(controlResponse.text) : null;
+  } catch {
+    // Recorded below.
+  }
+
+  const worker = readCaseInsensitive(control, 'worker');
+  const revision = readCaseInsensitive(control, 'revision');
+  const instanceCount = readCaseInsensitive(worker, 'instanceCount');
+  const appliedPolicyRevision = readCaseInsensitive(worker, 'appliedPolicyRevision');
+  const schedulerV2Enabled = readCaseInsensitive(worker, 'schedulerV2Enabled');
+  const dispatchConcurrency = readCaseInsensitive(worker, 'dispatchConcurrency');
+  const reconciliationConcurrency = readCaseInsensitive(worker, 'reconciliationConcurrency');
+  const mediaImportConcurrency = readCaseInsensitive(worker, 'mediaImportConcurrency');
+  const maintenanceConcurrency = readCaseInsensitive(worker, 'maintenanceConcurrency');
+  const alerts = readCaseInsensitive(control, 'alerts');
+  const criticalAlerts = Array.isArray(alerts)
+    ? alerts.filter((alert) => String(readCaseInsensitive(alert, 'severity')).toLowerCase() === 'critical')
+    : null;
+  evidence.generationControl = {
+    response: summarizeResponse(controlResponse),
+    revision: revision ?? null,
+    worker: worker && typeof worker === 'object'
+      ? {
+        instanceCount: instanceCount ?? null,
+        appliedPolicyRevision: appliedPolicyRevision ?? null,
+        schedulerV2Enabled: schedulerV2Enabled ?? null,
+        dispatchConcurrency: dispatchConcurrency ?? null,
+        reconciliationConcurrency: reconciliationConcurrency ?? null,
+        mediaImportConcurrency: mediaImportConcurrency ?? null,
+        maintenanceConcurrency: maintenanceConcurrency ?? null
+      }
+      : null,
+    alertIds: Array.isArray(alerts)
+      ? alerts.map((alert) => readCaseInsensitive(alert, 'alertId')).filter(Boolean)
+      : null
+  };
+
+  record('api.generation_control.http_200', controlResponse.status === 200, `HTTP ${controlResponse.status}`);
+  recordAuthenticatedResponseSafety('api.generation_control', controlResponse, apiBaseUrl);
+  record(
+    'api.generation_control.json',
+    Boolean(control && typeof control === 'object'),
+    control ? 'valid JSON' : 'missing or invalid JSON');
+  record(
+    'api.generation_control.single_worker',
+    instanceCount === 1,
+    `instanceCount=${instanceCount ?? 'missing'}`);
+  record(
+    'api.generation_control.policy_revision_applied',
+    Number.isInteger(revision) && appliedPolicyRevision === revision,
+    `revision=${revision ?? 'missing'}, applied=${appliedPolicyRevision ?? 'missing'}`);
+  record(
+    'api.generation_control.scheduler_v2_mode',
+    schedulerV2Enabled === expectedSchedulerV2Enabled,
+    `expected=${expectedSchedulerV2Enabled}, actual=${schedulerV2Enabled ?? 'missing'}`);
+  record(
+    'api.generation_control.lanes',
+    dispatchConcurrency === 4
+      && reconciliationConcurrency === 4
+      && mediaImportConcurrency === 1
+      && maintenanceConcurrency === 1,
+    `dispatch=${dispatchConcurrency ?? 'missing'}, reconciliation=${reconciliationConcurrency ?? 'missing'}, import=${mediaImportConcurrency ?? 'missing'}, maintenance=${maintenanceConcurrency ?? 'missing'}`);
+  record(
+    'api.generation_control.no_critical_alerts',
+    Array.isArray(criticalAlerts) && criticalAlerts.length === 0,
+    `criticalAlerts=${Array.isArray(criticalAlerts)
+      ? criticalAlerts.map((alert) => readCaseInsensitive(alert, 'alertId')).join(',') || 'none'
+      : 'missing'}`);
 }
 
 async function fetchWithTimeout(url, options = {}) {
@@ -206,7 +296,7 @@ async function fetchWithTimeout(url, options = {}) {
   try {
     const response = await fetch(url, {
       ...options,
-      redirect: 'follow',
+      redirect: options.redirect ?? 'follow',
       signal: controller.signal,
       headers: {
         Accept: 'text/html,application/json;q=0.9,*/*;q=0.8',
@@ -274,18 +364,38 @@ function sanitizeHealthPayload(payload) {
   };
 }
 
-function validateRemoteHttpUrl(name, value) {
+function validateRemoteHttpsUrl(name, value) {
   let url;
   try {
     url = new URL(value);
   } catch {
-    record(`input.${name}.absolute_http_url`, false, `${name} must be an absolute URL`);
-    return;
+    record(`input.${name}.absolute_https_url`, false, `${name} must be an absolute HTTPS URL`);
+    return false;
   }
 
-  const validProtocol = url.protocol === 'https:' || url.protocol === 'http:';
-  record(`input.${name}.absolute_http_url`, validProtocol, `${url.protocol}//${url.hostname}`);
-  record(`input.${name}.not_localhost`, validProtocol && !isLocalHost(url.hostname), url.hostname);
+  const validProtocol = url.protocol === 'https:';
+  const hasCleanAuthority = !url.username && !url.password && !url.search && !url.hash;
+  const remoteHost = !isLocalHost(url.hostname);
+  record(`input.${name}.absolute_https_url`, validProtocol, `${url.protocol}//${url.hostname}`);
+  record(
+    `input.${name}.clean_authority`,
+    hasCleanAuthority,
+    hasCleanAuthority ? 'no userinfo, query, or fragment' : 'userinfo, query, or fragment is not allowed');
+  record(`input.${name}.not_localhost`, validProtocol && remoteHost, url.hostname);
+  return validProtocol && hasCleanAuthority && remoteHost;
+}
+
+function recordAuthenticatedResponseSafety(prefix, response, expectedBaseUrl) {
+  const redirectStatus = response.status >= 300 && response.status < 400;
+  let sameOrigin = false;
+  try {
+    sameOrigin = new URL(response.url).origin === new URL(expectedBaseUrl).origin;
+  } catch {
+    // Recorded as false below.
+  }
+
+  record(`${prefix}.redirect_absent`, !redirectStatus, `HTTP ${response.status}`);
+  record(`${prefix}.same_origin`, sameOrigin, anonymizeUrl(response.url));
 }
 
 function normalizeBaseUrl(value) {
@@ -414,6 +524,24 @@ function positiveIntegerOption(name, fallback) {
   return parsed;
 }
 
+function booleanOption(name, environmentValue, fallback) {
+  const raw = getOptionValue(name) ?? environmentValue;
+  if (raw === undefined || raw === null || String(raw).trim() === '') {
+    return fallback;
+  }
+
+  const normalized = String(raw).trim().toLowerCase();
+  if (normalized === 'true' || normalized === '1') {
+    return true;
+  }
+
+  if (normalized === 'false' || normalized === '0') {
+    return false;
+  }
+
+  throw new Error(`${name} must be true or false.`);
+}
+
 function getOptionValue(name) {
   const prefix = `${name}=`;
   for (let index = 0; index < rawArgs.length; index += 1) {
@@ -448,12 +576,16 @@ Options:
   --env-file <path>       Optional env file. Defaults to STAGING_ENV_FILE or .env.staging.local.
   --environment <value>  staging or production. Defaults to staging.
   --timeout-ms <ms>       Per-request timeout. Defaults to 15000.
+  --expected-scheduler-v2-enabled <bool>
+                          Expected generation-worker rollout mode. Defaults to false.
   --run-id <id>           Artifact run id.
   --artifact-dir <dir>    Evidence output directory.
   --help, -h              Print this help.
 
-The smoke is read-only: it checks API /health, admin /ru, scheduler fingerprint
-health, and the authenticated generation-worker heartbeat without creating users,
-jobs, payments, or provider callbacks. An admin token is required for a passing gate.
+The smoke is read-only: it checks API /health, admin /ru, scheduler fingerprint,
+the authenticated generation-worker heartbeat, one-worker topology, policy revision,
+lane concurrency, and critical generation-control alerts without creating users,
+jobs, payments, or provider callbacks. HTTPS is mandatory for authenticated checks.
+An admin token is required for a passing gate.
 `.trim());
 }
