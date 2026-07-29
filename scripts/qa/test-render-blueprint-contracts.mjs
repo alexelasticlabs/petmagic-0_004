@@ -19,6 +19,30 @@ try {
 
   const stagingBlueprint = readFileSync(resolve(repoRoot, 'render.yaml'), 'utf8');
 
+  const schedulerV2EnabledPath = writeFixture(
+    'render-scheduler-v2-enabled.yaml',
+    replaceRequired(
+      stagingBlueprint,
+      '      - key: Templates__GenerationSchedulerV2Enabled\n        value: "false"',
+      '      - key: Templates__GenerationSchedulerV2Enabled\n        value: "true"'
+    )
+  );
+  requireCheckerPass(schedulerV2EnabledPath, 'staging');
+
+  const invalidSchedulerV2FlagPath = writeFixture(
+    'render-invalid-scheduler-v2-flag.yaml',
+    replaceRequired(
+      stagingBlueprint,
+      '      - key: Templates__GenerationSchedulerV2Enabled\n        value: "false"',
+      '      - key: Templates__GenerationSchedulerV2Enabled\n        value: "yes"'
+    )
+  );
+  requireCheckerFailure(
+    invalidSchedulerV2FlagPath,
+    'staging',
+    'Env group petmagic-staging-shared Templates__GenerationSchedulerV2Enabled must be true or false, found yes.'
+  );
+
   const missingSharedPath = writeFixture(
     'render-missing-shared.yaml',
     replaceOccurrenceRequired(stagingBlueprint, '        - shared/**', '', 1)
@@ -81,6 +105,20 @@ try {
     wrongWorkerPlanPath,
     'staging',
     'petmagic-staging-generation-worker plan must be standard, found starter.'
+  );
+
+  const wrongFalWebhookPath = writeFixture(
+    'render-wrong-fal-webhook.yaml',
+    replaceRequired(
+      stagingBlueprint,
+      '        value: https://api.staging.petmagic.app/api/templates/provider/fal/webhook',
+      '        value: https://api.staging.petmagic.app/api/templates/generations/fal/webhook'
+    )
+  );
+  requireCheckerFailure(
+    wrongFalWebhookPath,
+    'staging',
+    'petmagic-staging-api FAL_WEBHOOK_URL must be https://api.staging.petmagic.app/api/templates/provider/fal/webhook'
   );
 
   const shortWorkerShutdownPath = writeFixture(
@@ -165,19 +203,47 @@ try {
     'Scheduler fingerprint mismatch for admission.queueMaxSize'
   );
 
-  const localWorkerLoopOverridePath = writeFixture(
-    'render-local-worker-loop-override.yaml',
+  const apiWorkerLaneOverridePath = writeFixture(
+    'render-api-worker-lane-override.yaml',
     replaceOccurrenceRequired(
       stagingBlueprint,
       '      - fromGroup: petmagic-staging-shared\n',
-      '      - fromGroup: petmagic-staging-shared\n      - key: Templates__MaxConcurrentJobsPerWorker\n        value: "2"\n',
-      2
+      '      - fromGroup: petmagic-staging-shared\n      - key: Templates__GenerationDispatchConcurrency\n        value: "4"\n',
+      1
     )
   );
   requireCheckerFailure(
-    localWorkerLoopOverridePath,
+    apiWorkerLaneOverridePath,
     'staging',
-    'must inherit Templates__MaxConcurrentJobsPerWorker from petmagic-staging-shared'
+    'petmagic-staging-api must not define worker-only setting Templates__GenerationDispatchConcurrency.'
+  );
+
+  const sharedWorkerLanePath = writeFixture(
+    'render-shared-worker-lane.yaml',
+    replaceRequired(
+      stagingBlueprint,
+      '      - key: Templates__FalProviderSpendDailyLimitUsd',
+      '      - key: Templates__GenerationDispatchConcurrency\n        value: "4"\n      - key: Templates__FalProviderSpendDailyLimitUsd'
+    )
+  );
+  requireCheckerFailure(
+    sharedWorkerLanePath,
+    'staging',
+    'Env group petmagic-staging-shared must not define worker-only setting Templates__GenerationDispatchConcurrency.'
+  );
+
+  const obsoleteWorkerCountPath = writeFixture(
+    'render-obsolete-worker-count.yaml',
+    replaceRequired(
+      stagingBlueprint,
+      '      - key: Templates__FalProviderSpendDailyLimitUsd',
+      '      - key: Templates__MaxConcurrentJobsPerWorker\n        value: "2"\n      - key: Templates__FalProviderSpendDailyLimitUsd'
+    )
+  );
+  requireCheckerFailure(
+    obsoleteWorkerCountPath,
+    'staging',
+    'uses obsolete scheduler setting Templates__MaxConcurrentJobsPerWorker'
   );
 
   const inertLegacySchedulerKeyPath = writeFixture(

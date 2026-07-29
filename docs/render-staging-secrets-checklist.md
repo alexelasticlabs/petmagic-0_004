@@ -18,8 +18,7 @@ assistant chats.
 | Key | Render services | Source | Validation after fill |
 | --- | --- | --- | --- |
 | `Jwt__SigningKey` | API, worker | Generate a new 64+ character secret in a password manager or secret generator. | API and worker start outside Development; signed media URLs and JWT validation work. |
-| `FAL_PROVIDER_SPEND_DAILY_LIMIT_USD` | API, worker | Product/operator budget decision for staging fal.ai spend. | Generation rejects or alerts according to configured budget; value is not `0` unless staging generation is intentionally blocked. |
-| `FAL_AI_API_KEY` | API, worker | fal.ai dashboard API key for staging. | Image/video generation can submit to fal.ai; webhook callbacks reach API. |
+| `FAL_AI_API_KEY` | API, worker | Backend-only fal.ai staging key with the Admin permission required by Account Billing API. Keep using this existing server secret; do not create an admin-web/mobile key. | Image/video submission works, signed callbacks reach API, and the generation Capacity panel shows a fresh balance after provider refresh. |
 | `R2_ACCOUNT_ID` | API, worker | Cloudflare account dashboard. | R2 storage initialization succeeds. |
 | `R2_ACCESS_KEY` | API, worker | Cloudflare R2 API token/access key with bucket-scoped permissions. | Upload/read smoke passes for generated media. |
 | `R2_SECRET_KEY` | API, worker | Cloudflare R2 secret access key paired with `R2_ACCESS_KEY`. | Upload/read smoke passes for generated media. |
@@ -64,6 +63,14 @@ worker:
 The `petmagic-staging-admin-web` service must not receive server-only provider
 secrets. Its safe public/runtime values are already explicit in `render.yaml`.
 
+`Templates__FalProviderSpendDailyLimitUsd=0` in the shared Blueprint is an intentionally unused
+compatibility setting, not a secret to fill and not a daily budget control. Scheduler V2 uses the
+`$10` low and `$5` critical balance thresholds plus operator/provider billing controls.
+
+`Templates__GenerationSchedulerV2Enabled=false` is also intentional for the first additive-schema
+deploy. After migration/backfill inspection and the compatibility-loop canary, change it to `true`
+and use Blueprint Manual Sync/redeploy. It is a rollout flag, not a secret.
+
 ## Post-fill checks
 
 Run local preflight before triggering deploy:
@@ -78,3 +85,9 @@ After deploy, fill local `.env.staging.local` with runner-only values and run:
 node scripts\qa\check-staging-env-readiness.mjs
 node scripts\qa\run-render-postdeploy-smoke.mjs
 ```
+
+Do not stop at a green public `/health`. The postdeploy evidence must also show one fresh
+generation-worker heartbeat, recent progress when work exists, matching API/worker static
+fingerprints, the current `AppliedPolicyRevision`, and no fingerprint-mismatch marker. In Render
+Dashboard, manually confirm worker autoscaling is disabled; Blueprint `numInstances: 1` does not
+remove an existing scaling override.

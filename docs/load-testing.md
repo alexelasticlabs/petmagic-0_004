@@ -8,7 +8,9 @@ PetMagic generation load tests use k6 and write summaries to `artifacts/load/`, 
 - Backend reachable through `BASE_URL`. When the backend is not published on the host, run Docker k6 on the Compose network with `K6_DOCKER_NETWORK=<project>_petmagic-network` and `BASE_URL=http://backend:5000`.
 - At least one active template id.
 - One or more bearer tokens through `AUTH_TOKEN` or comma-separated `AUTH_TOKENS`, or `LOGIN_EMAIL` and `LOGIN_PASSWORD`.
-- Generation workers running separately from the backend. In Docker Compose, scale with `docker compose up --scale generation-worker=3`.
+- One generation worker running separately from the backend with Scheduler V2 bounded lanes
+  `4/4/1/1` and `Templates__GenerationSchedulerV2Enabled=true`. Multi-worker tests are separate HA
+  experiments, not the production capacity baseline.
 - PostgreSQL access for query-plan captures, either through Docker Compose service `postgres` or `POSTGRES_HOST`.
 
 ## Baseline Wrapper
@@ -16,7 +18,7 @@ PetMagic generation load tests use k6 and write summaries to `artifacts/load/`, 
 Use the wrapper for baseline captures. It runs Docker k6 and stores k6 output, Docker stats, Compose state, PostgreSQL connection count, and queue depth before and after the test in one timestamped directory.
 
 ```bash
-docker compose up -d --scale generation-worker=3
+docker compose up -d generation-worker
 
 BASE_URL=http://host.docker.internal:5001 \
 TEMPLATE_ID=<template-id> \
@@ -24,19 +26,19 @@ AUTH_TOKENS=<token1,token2> \
 PROFILE=generation \
 VUS=100 \
 ITERATIONS=100 \
-WORKER_COUNT=3 \
+WORKER_COUNT=1 \
 bash scripts/load/run-template-generation-baseline.sh
 ```
 
 Use the minimal readiness suite to run the required 100/100/100/10/10 profile set as one command:
 
 ```bash
-docker compose up -d --scale generation-worker=3
+docker compose up -d generation-worker
 
 BASE_URL=http://host.docker.internal:5001 \
 TEMPLATE_ID=<template-id> \
 AUTH_TOKENS=<token1,token2> \
-WORKER_COUNT=3 \
+WORKER_COUNT=1 \
 bash scripts/load/run-minimal-template-generation-suite.sh
 ```
 
@@ -50,10 +52,29 @@ The suite runs:
 
 It writes `minimal-suite-report.md` plus one baseline artifact directory per profile under `artifacts/load/<suite-id>/`.
 
+## Scheduler V2 acceptance profile
+
+Run this against a disposable PostgreSQL database and fake fal provider with exactly one worker:
+
+- 50 distinct users and 200 mixed image/video jobs;
+- policy effective global `38` for saturation, plus a separate global `8` strict-video-reserve run;
+- active durable provider attempts never exceed the effective global limit;
+- at global `8`, at least two slots remain available to video while image backlog is continuous;
+- media import concurrency stays `1` and dispatch/reconciliation/cancel progress during a blocked or
+  failing FFmpeg/import operation;
+- no duplicate provider submission, PawSpark charge, refund, R2 object, or media row;
+- restart recovery is under 120 seconds;
+- Standard-equivalent worker RAM p95 is below 70%, peak below 85%, sustained CPU below 80%;
+- total PostgreSQL connections stay below 70.
+
+This is not production proof until the report contains the actual policy revision, worker lane
+configuration, provider-attempt counts, queue/stage ages, CPU/RAM samples, DB connections, and
+restart timestamps. A fake-provider pass does not prove real fal callbacks, limits, or billing.
+
 For a Compose-only backend that is reachable from other containers but not from the host:
 
 ```bash
-docker compose up -d --scale generation-worker=3
+docker compose up -d generation-worker
 
 BASE_URL=http://backend:5000 \
 K6_DOCKER_NETWORK=petmagic-0_004_petmagic-network \
@@ -62,14 +83,14 @@ AUTH_TOKENS=<token1,token2> \
 PROFILE=generation \
 VUS=100 \
 ITERATIONS=100 \
-WORKER_COUNT=3 \
+WORKER_COUNT=1 \
 bash scripts/load/run-template-generation-baseline.sh
 ```
 
 For worker recovery, set a short lock timeout when starting the stack, run `PROFILE=create-and-poll`, stop one `generation-worker` container while jobs are processing, then rerun the wrapper or capture queue state after restart:
 
 ```bash
-Templates__JobLockTimeoutMilliseconds=5000 docker compose up -d --scale generation-worker=3
+Templates__JobLockTimeoutMilliseconds=5000 docker compose up -d generation-worker
 PROFILE=create-and-poll bash scripts/load/run-template-generation-baseline.sh
 ```
 
@@ -137,11 +158,13 @@ Use `MODE=admin-test` to exercise admin test generation endpoints. This still go
 
 ## Worker Crash And Recovery
 
-1. Start backend, PostgreSQL, and at least one generation worker.
+1. Start backend, PostgreSQL, and exactly one generation worker for the production-topology test.
 2. Run `PROFILE=create-and-poll` with enough jobs to keep a worker busy.
-3. Stop one worker container while a job is `Processing`.
-4. Restart workers after `Templates__JobLockTimeoutMilliseconds` has elapsed.
-5. Verify the stale job is either requeued and completed, or failed after `Templates__MaxGenerationAttempts` with refund handling.
+3. Stop the worker at each submit/reconciliation/import boundary, including after fal accepted a
+   request but before its response was persisted.
+4. Restart the worker after the applicable lock timeout.
+5. Verify durable attempts are reclaimed, `SubmissionUnknown` is reconciled without blind resubmit,
+   media checkpoints resume deterministically, and any terminal refund remains exactly once.
 
 Useful checks:
 
@@ -178,7 +201,9 @@ For each run, keep the generated markdown summary and record:
 - CPU/RAM from `docker stats --no-stream`;
 - PostgreSQL connection count from `pg_stat_activity`;
 - queue growth by status before and after the run;
-- minimum worker count that keeps queue growth stable for the tested rate.
+- oldest actionable dispatch/reconciliation/import age while provider capacity is free;
+- whether one worker meets the limits above. A second worker is justified only for HA or if
+  actionable backlog grows despite free fal capacity.
 
 The wrapper writes the required artifacts under `artifacts/load/<run-id>/`:
 

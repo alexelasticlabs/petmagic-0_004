@@ -64,6 +64,8 @@ Required inputs:
 - API and Worker scheduler fingerprints must match in
   `templates_runtime_config_fingerprints`. The public `/health` response remains part of the gate,
   but detailed scheduler diagnostics are exposed only to authenticated admin requests.
+- The latest worker fingerprint must have a fresh heartbeat, recent `LastProgressAtUtc` when work is
+  actionable, and `AppliedPolicyRevision` equal to the current generation-control policy revision.
 
 The smoke runner blocks staging rollout when:
 
@@ -71,6 +73,8 @@ The smoke runner blocks staging rollout when:
 - Required generation metric names are missing from Prometheus.
 - Core PromQL queries fail.
 - API and Worker scheduler fingerprints do not match.
+- Worker heartbeat is stale, progress is stale while actionable work exists, or the applied policy
+  revision is behind.
 - `GENERATION_WAIT_TOO_LONG` is not observed when overload is intentionally produced.
 - Cancel refund evidence is missing or duplicated.
 - Webhook/SSE/provider pipeline evidence is missing.
@@ -102,12 +106,14 @@ Production rollout is blocked if any of these are true:
   confirm critical gauge returns to `0`.
 
 `PetMagicFalProviderCapacityRejected`
-- Check `fal_provider_configured_concurrency`, `fal_provider_inflight_requests`, balance gauges, and
-  API admission settings. Confirm users were rejected before charge.
+- Check policy admission state/effective capacity and balance freshness. A full provider capacity by
+  itself must leave an SLA-eligible job in PostgreSQL; this rejection metric is expected only for
+  paused/zero policy or critical/unknown provider health, and must remain pre-charge.
 
 `PetMagicFalProviderInflightNearLimit`
-- Check worker replica count, `FAL_PROVIDER_CONCURRENCY_LIMIT`, reserved concurrency, and queue wait.
-  Reduce admission or raise provider capacity before scaling traffic.
+- Check confirmed policy revision, reserved headroom, durable active attempts, and queue wait. Reduce
+  admission or confirm higher provider capacity before scaling traffic; do not add Render workers to
+  manufacture fal capacity.
 
 `PetMagicFalProviderSubmitFailures`
 - Inspect tags `stage`, `model`, and `status_code`. Check fal.ai dashboard, API key, queue endpoint,
@@ -118,8 +124,8 @@ Production rollout is blocked if any of these are true:
   Tighten max-wait thresholds if user wait time is rising.
 
 `PetMagicFalProviderRateLimitErrors`
-- Compare configured concurrency with fal.ai dashboard. Lower worker concurrency or request a provider
-  limit increase.
+- Compare the policy-confirmed concurrency with the fal.ai dashboard. Lower the runtime policy or
+  request a provider limit increase; worker lane counts do not represent fal concurrency.
 
 `PetMagicFalWebhookDeliveryFailures`
 - Check public webhook URL routing, gateway logs, callback HTTP status, payload shape, and request-id
@@ -130,8 +136,9 @@ Production rollout is blocked if any of these are true:
   the endpoint.
 
 `PetMagicGenerationQueueBacklog` / `PetMagicGenerationSchedulerQueueDepthHigh`
-- Compare queue depth by lane, active image/video slots, worker count, provider in-flight requests, and
-  admission thresholds. Do not increase admission until provider capacity is proven.
+- Compare queue depth by stage, active image/video attempts, worker lane progress/heartbeat, provider
+  in-flight requests, and SLA thresholds. Do not increase admission until provider capacity is
+  proven.
 
 `PetMagicGenerationOldestQueuedAgeHigh`
 - Find oldest queued rows by lane. Check whether the worker is claiming jobs and whether max-wait
@@ -168,7 +175,8 @@ Production rollout is blocked if any of these are true:
 
 `PetMagicGenerationRetryRateHigh`
 - Inspect retry reasons and recent worker logs. If retries correlate with provider failures, reduce
-  admission before adding worker replicas.
+  admission. Add a second worker only for HA or measured orchestration backlog while fal slots remain
+  free.
 
 `PetMagicGenerationRetriesExhausted`
 - Treat as release blocker. Inspect the exact generation rows and refund status. Do not delete failed

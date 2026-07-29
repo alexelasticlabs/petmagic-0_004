@@ -44,28 +44,18 @@ const services = Array.isArray(blueprint.services) ? blueprint.services : [];
 const databases = Array.isArray(blueprint.databases) ? blueprint.databases : [];
 const envVarGroups = Array.isArray(blueprint.envVarGroups) ? blueprint.envVarGroups : [];
 const schedulerFingerprintFields = [
+  schedulerField('schedulerV2.enabled', 'GenerationSchedulerV2Enabled', 'bool', false),
   schedulerField('admission.cancelQueuedGenerationEnabled', 'CancelQueuedGenerationEnabled', 'bool', true),
   schedulerField('admission.freeUserMaxActiveGenerations', 'FreeUserMaxActiveGenerations', 'positiveInt', 1),
   schedulerField('admission.premiumUserMaxActiveGenerations', 'PremiumUserMaxActiveGenerations', 'positiveInt', 3),
   schedulerField('admission.privilegedUserMaxActiveGenerations', 'PrivilegedUserMaxActiveGenerations', 'positiveInt', 10),
   schedulerField('admission.queueMaxSize', 'QueueMaxSize', 'nonNegativeInt', 1_000),
-  schedulerField('concurrency.falProviderConcurrencyLimit', 'FalProviderConcurrencyLimit', 'nonNegativeInt', 0),
-  schedulerField('concurrency.falProviderReservedConcurrency', 'FalProviderReservedConcurrency', 'nonNegativeInt', 1),
-  schedulerField('concurrency.globalMaxConcurrentGenerations', 'GlobalMaxConcurrentGenerations', 'positiveInt', 3),
-  schedulerField('concurrency.imageMaxConcurrentGenerations', 'ImageMaxConcurrentGenerations', 'positiveInt', 2),
-  schedulerField('concurrency.imageProtectedConcurrentGenerations', 'ImageProtectedConcurrentGenerations', 'nonNegativeInt', 0),
-  schedulerField('concurrency.imageReservedConcurrentGenerations', 'ImageReservedConcurrentGenerations', 'nonNegativeInt', 0),
   schedulerField('concurrency.maxAiProviderRequestsPerMinute', 'MaxAiProviderRequestsPerMinute', 'nonNegativeInt', 60),
-  schedulerField('concurrency.maxConcurrentJobsPerWorker', 'MaxConcurrentJobsPerWorker', 'positiveInt', 1),
-  schedulerField('concurrency.videoMaxConcurrentGenerations', 'VideoMaxConcurrentGenerations', 'positiveInt', 1),
-  schedulerField('concurrency.videoPreprocessingMaxConcurrentGenerations', 'VideoPreprocessingMaxConcurrentGenerations', 'positiveInt', 1),
-  schedulerField('concurrency.videoReservedConcurrentGenerations', 'VideoReservedConcurrentGenerations', 'nonNegativeInt', 0),
   schedulerField('elasticBorrowing.allowVideoBorrowWhenImageEstimatedWaitBelowSeconds', 'AllowVideoBorrowWhenImageEstimatedWaitBelowSeconds', 'positiveInt', 120),
   schedulerField('elasticBorrowing.allowVideoBorrowWhenImageQueueEmpty', 'AllowVideoBorrowWhenImageQueueEmpty', 'bool', true),
   schedulerField('elasticBorrowing.borrowedVideoMaxAgeSeconds', 'BorrowedVideoMaxAgeSeconds', 'nonNegativeInt', 0),
   schedulerField('elasticBorrowing.borrowingPriorityTiers', 'BorrowingPriorityTiers', 'csv', 'premium,privileged,admin,free'),
   schedulerField('elasticBorrowing.enableElasticLaneBorrowing', 'EnableElasticLaneBorrowing', 'bool', false),
-  schedulerField('elasticBorrowing.videoBorrowMaxConcurrentGenerations', 'VideoBorrowMaxConcurrentGenerations', 'nonNegativeInt', 0),
   schedulerField('elasticBorrowing.videoBorrowReleaseMode', 'VideoBorrowReleaseMode', 'text', 'natural_completion'),
   schedulerField('estimates.estimatedImageGenerationSeconds', 'EstimatedImageGenerationSeconds', 'positiveInt', 90),
   schedulerField('estimates.estimatedVideoGenerationSeconds', 'EstimatedVideoGenerationSeconds', 'positiveInt', 420),
@@ -84,17 +74,17 @@ const schedulerFingerprintFields = [
   schedulerField('queuePriority.queuePriorityAgingBoost', 'QueuePriorityAgingBoost', 'nonNegativeInt', 500),
   schedulerField('queuePriority.queuePriorityAgingIntervalSeconds', 'QueuePriorityAgingIntervalSeconds', 'positiveInt', 60),
   schedulerField('recovery.jobLockTimeoutMilliseconds', 'JobLockTimeoutMilliseconds', 'positiveInt', 900_000, 'StaleProcessingRecoveryDelayMilliseconds'),
+  schedulerField('recovery.providerReconciliationClaimLeaseMilliseconds', 'ProviderReconciliationClaimLeaseMilliseconds', 'positiveInt', 90_000),
   schedulerField('recovery.maxGenerationAttempts', 'MaxGenerationAttempts', 'positiveInt', 3),
   schedulerField('recovery.maxRefundAttempts', 'MaxRefundAttempts', 'positiveInt', 5),
   schedulerField('recovery.orphanQueuedJobTimeoutMilliseconds', 'OrphanQueuedJobTimeoutMilliseconds', 'positiveInt', 120_000),
   schedulerField('recovery.refundRetryDelayMilliseconds', 'RefundRetryDelayMilliseconds', 'nonNegativeInt', 30_000),
   schedulerField('recovery.staleProcessingRecoveryDelayMilliseconds', 'StaleProcessingRecoveryDelayMilliseconds', 'positiveInt', 900_000),
-  schedulerField('worker.generationWorkerPollIntervalMilliseconds', 'GenerationWorkerPollIntervalMilliseconds', 'int', 1_000),
   schedulerField('waitThresholds.freeImageMaxEstimatedWaitSeconds', 'FreeImageMaxEstimatedWaitSeconds', 'positiveInt', 1_800),
   schedulerField('waitThresholds.freeVideoMaxEstimatedWaitSeconds', 'FreeVideoMaxEstimatedWaitSeconds', 'positiveInt', 3_600),
-  schedulerField('waitThresholds.premiumImageMaxEstimatedWaitSeconds', 'PremiumImageMaxEstimatedWaitSeconds', 'positiveInt', 600),
+  schedulerField('waitThresholds.premiumImageMaxEstimatedWaitSeconds', 'PremiumImageMaxEstimatedWaitSeconds', 'positiveInt', 900),
   schedulerField('waitThresholds.premiumVideoMaxEstimatedWaitSeconds', 'PremiumVideoMaxEstimatedWaitSeconds', 'positiveInt', 1_800),
-  schedulerField('waitThresholds.privilegedImageMaxEstimatedWaitSeconds', 'PrivilegedImageMaxEstimatedWaitSeconds', 'positiveInt', 600),
+  schedulerField('waitThresholds.privilegedImageMaxEstimatedWaitSeconds', 'PrivilegedImageMaxEstimatedWaitSeconds', 'positiveInt', 900),
   schedulerField('waitThresholds.privilegedVideoMaxEstimatedWaitSeconds', 'PrivilegedVideoMaxEstimatedWaitSeconds', 'positiveInt', 1_800)
 ];
 
@@ -150,6 +140,7 @@ if (api) {
     environment === 'production' ? 'petmagic' : 'petmagic-staging'
   );
   requireEnvValue(api, 'Templates__GenerationWorkerEnabled', 'false');
+  requireEnvValue(api, 'FAL_WEBHOOK_URL', `https://${apiDomain}/api/templates/provider/fal/webhook`);
   requireEnvValue(api, 'Templates__TemplateOfTheDayAutoPickWorkerEnabled', 'true');
   requireEnvValue(api, 'APP_VOLUME_DIRS', '/var/petmagic');
   requireEnvValue(api, 'DataProtection__KeysPath', '/var/petmagic/DataProtection-Keys');
@@ -170,9 +161,6 @@ if (api) {
   requireDatabaseBinding(api, 'ConnectionStrings__DefaultConnection', `${prefix}-db`);
   requireSecretKeys(api, [
     'Jwt__SigningKey',
-    environment === 'production'
-      ? 'Templates__FalProviderSpendDailyLimitUsd'
-      : 'FAL_PROVIDER_SPEND_DAILY_LIMIT_USD',
     'FAL_AI_API_KEY',
     'R2_ACCOUNT_ID',
     'R2_ACCESS_KEY',
@@ -218,14 +206,17 @@ if (worker) {
   requireWorkerIsPrivateAndEphemeral(worker);
 
   requireEnvValue(worker, 'Templates__GenerationWorkerEnabled', 'true');
+  requireEnvValue(worker, 'FAL_WEBHOOK_URL', `https://${apiDomain}/api/templates/provider/fal/webhook`);
+  requireEnvValue(worker, 'Templates__GenerationWorkerPollIntervalMilliseconds', '500');
+  requireEnvValue(worker, 'Templates__GenerationDispatchConcurrency', '4');
+  requireEnvValue(worker, 'Templates__ProviderReconciliationConcurrency', '4');
+  requireEnvValue(worker, 'Templates__MediaImportConcurrency', '1');
+  requireEnvValue(worker, 'Templates__GenerationMaintenanceConcurrency', '1');
   requireEnvValue(worker, 'Templates__MediaCleanupWorkerEnabled', 'false');
   requireEnvValue(worker, 'Templates__TemplateOfTheDayAutoPickWorkerEnabled', 'false');
   requireDatabaseBinding(worker, 'ConnectionStrings__DefaultConnection', `${prefix}-db`);
   requireSecretKeys(worker, [
     'Jwt__SigningKey',
-    environment === 'production'
-      ? 'Templates__FalProviderSpendDailyLimitUsd'
-      : 'FAL_PROVIDER_SPEND_DAILY_LIMIT_USD',
     'FAL_AI_API_KEY',
     'R2_ACCOUNT_ID',
     'R2_ACCESS_KEY',
@@ -251,7 +242,7 @@ if (worker) {
 }
 
 if (api && worker) {
-  requireSharedSchedulerRuntimeSettings(api, worker);
+  requireWorkerOnlyLaneSettings(api, worker);
   requireSchedulerFingerprintParity(api, worker);
 }
 
@@ -324,8 +315,11 @@ function requireEnvGroup(name) {
   requireGroupValue(group, 'DOTNET_ENVIRONMENT', expectedEnvironment);
   requireGroupValue(group, 'TEMPLATES_STORAGE_PROVIDER', 'R2');
   requireGroupValue(group, 'TEMPLATES_AI_PROVIDER', 'Fal');
-  requireGroupValue(group, 'Templates__MaxConcurrentJobsPerWorker', '2');
-  requireGroupValue(group, 'Templates__GenerationWorkerPollIntervalMilliseconds', '500');
+  requireGroupBoolean(group, 'Templates__GenerationSchedulerV2Enabled');
+  if (findEnv(group.envVars, 'Templates__MaxConcurrentJobsPerWorker')) {
+    fail(`Env group ${group.name} uses obsolete scheduler setting Templates__MaxConcurrentJobsPerWorker.`);
+  }
+  requireGroupValue(group, 'Templates__FalProviderSpendDailyLimitUsd', '0');
 
   const expectedSchedulerValues = {
     Templates__GlobalMaxConcurrentGenerations: '8',
@@ -354,12 +348,9 @@ function requireEnvGroup(name) {
     requireGroupValue(group, key, value);
   }
 
-  if (environment === 'production') {
-    requireGroupValue(group, 'Templates__FalProviderBalanceLowThresholdUsd', '10');
-    requireGroupValue(group, 'Templates__FalProviderBalanceCriticalThresholdUsd', '5');
-  } else {
-    requireGroupValue(group, 'Templates__FalProviderBalanceLowThresholdUsd', '100');
-    requireGroupValue(group, 'Templates__FalProviderBalanceCriticalThresholdUsd', '25');
+  requireGroupValue(group, 'Templates__FalProviderBalanceLowThresholdUsd', '10');
+  requireGroupValue(group, 'Templates__FalProviderBalanceCriticalThresholdUsd', '5');
+  if (environment !== 'production') {
     rejectLegacySchedulerGroupKeys(group);
   }
 }
@@ -376,6 +367,18 @@ function requireGroupValue(group, key, expectedValue) {
   }
 }
 
+function requireGroupBoolean(group, key) {
+  const entry = findEnv(group.envVars, key);
+  if (!entry) {
+    fail(`Env group ${group.name} is missing ${key}.`);
+    return;
+  }
+
+  if (entry.value !== 'true' && entry.value !== 'false') {
+    fail(`Env group ${group.name} ${key} must be true or false, found ${entry.value ?? '<missing>'}.`);
+  }
+}
+
 function rejectLegacySchedulerGroupKeys(group) {
   const legacyPrefixes = [
     'GENERATION_',
@@ -389,16 +392,24 @@ function rejectLegacySchedulerGroupKeys(group) {
   }
 }
 
-function requireSharedSchedulerRuntimeSettings(apiService, workerService) {
-  const sharedKeys = [
-    'Templates__MaxConcurrentJobsPerWorker',
-    'Templates__GenerationWorkerPollIntervalMilliseconds'
+function requireWorkerOnlyLaneSettings(apiService, workerService) {
+  const workerOnlyKeys = [
+    'Templates__GenerationWorkerPollIntervalMilliseconds',
+    'Templates__GenerationDispatchConcurrency',
+    'Templates__ProviderReconciliationConcurrency',
+    'Templates__MediaImportConcurrency',
+    'Templates__GenerationMaintenanceConcurrency'
   ];
-  for (const service of [apiService, workerService]) {
-    for (const key of sharedKeys) {
-      if (findEnv(service.envVars, key)) {
-        fail(`${service.name} must inherit ${key} from ${prefix}-shared without a service-local override.`);
-      }
+  const group = envVarGroups.find((candidate) => candidate.name === `${prefix}-shared`);
+  for (const key of workerOnlyKeys) {
+    if (findEnv(group?.envVars, key)) {
+      fail(`Env group ${prefix}-shared must not define worker-only setting ${key}.`);
+    }
+    if (findEnv(apiService.envVars, key)) {
+      fail(`${apiService.name} must not define worker-only setting ${key}.`);
+    }
+    if (!findEnv(workerService.envVars, key)) {
+      fail(`${workerService.name} must define worker-only setting ${key}.`);
     }
   }
 }

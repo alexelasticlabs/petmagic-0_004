@@ -32,6 +32,13 @@ operator machine for smoke and QA scripts.
 `render.yaml` also creates `petmagic-staging-db` as managed PostgreSQL and a
 shared env group for non-secret staging defaults.
 
+The generation topology is exactly one `Standard` worker with worker-only bounded lanes
+`Dispatch=4`, `ProviderReconciliation=4`, `MediaImport=1`, and `Maintenance=1`. Provider capacity is
+the revisioned PostgreSQL policy, not the number of Render instances. API, worker, and admin all
+declare `numInstances: 1`; Dashboard autoscaling must also be checked manually and disabled. The
+Blueprint intentionally starts `Templates__GenerationSchedulerV2Enabled=false`; enable it only after
+the additive migration/backfill and compatibility-loop canary are verified.
+
 The services reference the database through:
 
 ```yaml
@@ -117,7 +124,6 @@ in the Render dashboard or a managed secret workflow:
 
 ```text
 Jwt__SigningKey
-FAL_PROVIDER_SPEND_DAILY_LIMIT_USD
 FAL_AI_API_KEY
 R2_ACCOUNT_ID
 R2_ACCESS_KEY
@@ -155,6 +161,10 @@ OTEL_EXPORTER_OTLP_ENDPOINT
 
 Use a generated 64+ character `Jwt__SigningKey`. Keep live production Stripe and
 store credentials out of staging until staging test mode is proven.
+`FAL_AI_API_KEY` must remain backend-only and must have the fal Admin permission needed by the
+Account Billing API as well as access to configured generation models. No separate browser/mobile
+fal key is used. `Templates__FalProviderSpendDailyLimitUsd=0` is an unused compatibility value in
+the shared Blueprint, not a secret or automatic daily-spend limit.
 Use [render-staging-secrets-checklist.md](render-staging-secrets-checklist.md)
 as the source-by-source fill checklist.
 
@@ -198,15 +208,27 @@ TEMPLATES_AI_PROVIDER=Fal
 
 1. Provision the Blueprint.
 2. Fill all required secrets before starting the services.
-3. Deploy `petmagic-staging-api`.
-4. Wait for `/health` to return healthy.
-5. Confirm migrations/seeds completed in API logs.
-6. Deploy `petmagic-staging-generation-worker`.
-7. Deploy `petmagic-staging-admin-web`.
-8. Configure provider callbacks to the staging API.
-9. Run the read-only post-deploy smoke.
-10. Run staging smoke checks.
-11. Lock down public Postgres access after operator DB access is no longer
+3. In Dashboard, disable autoscaling and verify one instance for API, worker, and admin.
+4. Keep `Templates__GenerationSchedulerV2Enabled=false` and close generation traffic for the first
+   migration/deploy window. If the policy already exists, pause admission before the deploy.
+5. Deploy `petmagic-staging-api`.
+6. Confirm migrations/seeds completed, inspect the Scheduler V2 policy/legacy-attempt backfill, and
+   verify a newly bootstrapped policy has `AdmissionEnabled=true` so the schema deploy did not stop
+   V1 unexpectedly. Then explicitly pause through the revisioned Admin API with a reason and verify
+   `AdmissionEnabled=false` before drain and the compatibility deploy.
+7. Wait for `/health` to return healthy.
+8. Deploy the single `petmagic-staging-generation-worker` in V1 compatibility mode and run a canary.
+9. Create a reviewed commit changing the shared Blueprint value to
+   `Templates__GenerationSchedulerV2Enabled=true`, run `node scripts/qa/check-render-blueprint.mjs
+   --file render.yaml --environment staging`, push it, then use Blueprint Manual Sync/redeploy so API
+   and worker receive the same rollout flag. Do not use a Dashboard-only override: a later sync would
+   restore the committed value.
+10. Require a fresh worker heartbeat, matching static fingerprint, current applied policy revision,
+    lane-start log, and no `fingerprint mismatch` before enabling admission.
+11. Deploy `petmagic-staging-admin-web`.
+12. Configure provider callbacks to the staging API.
+13. Run the read-only post-deploy smoke and the staging generation smoke.
+14. Lock down public Postgres access after operator DB access is no longer
     needed.
 
 Do not enable real production provider callbacks before staging callbacks are
@@ -239,7 +261,10 @@ Use `.env.staging.local` only on the runner machine. Never commit it.
 - Production should either keep a deliberate single API instance with this disk
   trade-off or move avatar/support storage and DataProtection keys to external
   durable storage before scaling API replicas.
-- The worker is scaled to 4 instances for the FalConcurrency10 profile. Lower
-  this in Render if fal.ai limits or budget are not ready.
+- The worker intentionally remains one `Standard` instance for all fal capacity policies. A second
+  instance requires HA or measured actionable orchestration backlog while fal slots are free; user
+  count and provider in-flight count alone are not scaling signals.
+- Render Blueprint `numInstances: 1` does not guarantee an old Dashboard autoscaling override is
+  removed. The operator must verify it after every Blueprint adoption/sync.
 - `admin-web` has `NEXT_PUBLIC_API_BASE_URL` baked into the build, so staging
   and production admin services must be built with separate environment values.

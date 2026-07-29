@@ -30,6 +30,8 @@ envVarGroups:
         value: "false"
       - key: PETMAGIC_LOCAL_SMOKE_FAST_FAKE_COMPLETION
         value: "false"
+      - key: Templates__GenerationSchedulerV2Enabled
+        value: "false"
       - key: STORE_ACCOUNT_BINDING_MODE
         value: compatibility
       - key: Templates__GlobalMaxConcurrentGenerations
@@ -68,6 +70,8 @@ envVarGroups:
         value: "10"
       - key: Templates__FalProviderBalanceCriticalThresholdUsd
         value: "5"
+      - key: Templates__FalProviderSpendDailyLimitUsd
+        value: "0"
       - key: Templates__QueueMaxSize
         value: "1000"
       - key: Templates__EstimatedImageGenerationSeconds
@@ -98,10 +102,10 @@ envVarGroups:
         value: "60"
       - key: Templates__MaxGenerationAttempts
         value: "3"
-      - key: Templates__MaxConcurrentJobsPerWorker
-        value: "2"
-      - key: Templates__GenerationWorkerPollIntervalMilliseconds
-        value: "500"
+      - key: Templates__JobLockTimeoutMilliseconds
+        value: "900000"
+      - key: Templates__ProviderReconciliationClaimLeaseMilliseconds
+        value: "90000"
 
 services:
   - type: web
@@ -177,12 +181,10 @@ services:
           property: connectionString
       - key: Jwt__SigningKey
         sync: false
-      - key: Templates__FalProviderSpendDailyLimitUsd
-        sync: false
       - key: FAL_AI_API_KEY
         sync: false
       - key: FAL_WEBHOOK_URL
-        value: https://api.petgpt.app/api/templates/generations/fal/webhook
+        value: https://api.petgpt.app/api/templates/provider/fal/webhook
       - key: R2_ACCOUNT_ID
         sync: false
       - key: R2_ACCESS_KEY
@@ -289,6 +291,16 @@ services:
       - fromGroup: petmagic-production-shared
       - key: APP_VOLUME_DIRS
         value: /var/petmagic
+      - key: Templates__GenerationWorkerPollIntervalMilliseconds
+        value: "500"
+      - key: Templates__GenerationDispatchConcurrency
+        value: "4"
+      - key: Templates__ProviderReconciliationConcurrency
+        value: "4"
+      - key: Templates__MediaImportConcurrency
+        value: "1"
+      - key: Templates__GenerationMaintenanceConcurrency
+        value: "1"
       - key: Templates__GenerationWorkerEnabled
         value: "true"
       - key: Templates__MediaCleanupWorkerEnabled
@@ -305,12 +317,10 @@ services:
           property: connectionString
       - key: Jwt__SigningKey
         sync: false
-      - key: Templates__FalProviderSpendDailyLimitUsd
-        sync: false
       - key: FAL_AI_API_KEY
         sync: false
       - key: FAL_WEBHOOK_URL
-        value: https://api.petgpt.app/api/templates/generations/fal/webhook
+        value: https://api.petgpt.app/api/templates/provider/fal/webhook
       - key: R2_ACCOUNT_ID
         sync: false
       - key: R2_ACCESS_KEY

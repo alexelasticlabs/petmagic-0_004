@@ -6,14 +6,17 @@ settings plus the fal.ai dashboard check recorded on 2026-07-01.
 
 ## Selected Profile
 
-- Profile: `FalConcurrency10`.
+- Profile: Scheduler V2 Balanced bootstrap.
 - fal.ai account concurrency confirmed for staging: `10`.
-- API and GenerationWorker staging environment overrides are pinned to the same scheduler values.
-- Worker layout: exactly `4` GenerationWorker replicas with `2` loops each.
-- Capacity formula: `4 * 2 = 8` worker loops, matching `GENERATION_GLOBAL_MAX_CONCURRENT=8`.
+- Runtime policy: confirmed `10`, reserved headroom `2`, hard ceiling `38`, effective global `8`.
+- Worker layout: exactly one `Standard` GenerationWorker instance with bounded lanes `4/4/1/1`.
+- PostgreSQL provider attempts occupy effective capacity; Render process loops do not define it.
+- Rollout flag: `Templates__GenerationSchedulerV2Enabled=false` for the first migration/backfill
+  deploy, then `true` only after compatibility-loop canary and explicit Manual Sync/redeploy.
 
-Do not move to `FalConcurrency30` or `FalConcurrency40` until the fal.ai dashboard explicitly shows
-that account concurrency. Purchase amount alone is not evidence.
+Do not increase the confirmed policy until the fal.ai dashboard explicitly shows the new account
+concurrency. Purchase amount alone is not evidence. Apply increases in effective steps
+`8 -> 16 -> 24 -> 38` with observation between steps.
 
 ## API Env Pack
 
@@ -23,6 +26,7 @@ Set these in the staging API environment:
 ASPNETCORE_ENVIRONMENT=Staging
 DOTNET_ENVIRONMENT=Staging
 Templates__GenerationWorkerEnabled=false
+Templates__GenerationSchedulerV2Enabled=false
 TEMPLATES_AI_PROVIDER=Fal
 TEMPLATES_WATERMARK_ENABLED=true
 GENERATION_GLOBAL_MAX_CONCURRENT=8
@@ -58,8 +62,8 @@ TEMPLATES_REALTIME_EVENT_CLEANUP_BATCH_SIZE=1000
 FAL_WEBHOOK_URL=https://<staging-api-host>/api/templates/provider/fal/webhook
 FAL_PROVIDER_CONCURRENCY_LIMIT=10
 FAL_PROVIDER_RESERVED_CONCURRENCY=2
-FAL_PROVIDER_BALANCE_LOW_THRESHOLD_USD=100
-FAL_PROVIDER_BALANCE_CRITICAL_THRESHOLD_USD=25
+FAL_PROVIDER_BALANCE_LOW_THRESHOLD_USD=10
+FAL_PROVIDER_BALANCE_CRITICAL_THRESHOLD_USD=5
 FAL_PROVIDER_SPEND_DAILY_LIMIT_USD=0
 ```
 
@@ -71,22 +75,28 @@ API role check:
   cancellation creates one refund ledger row.
 
 - `Templates:GenerationWorkerEnabled=false` for the API process.
-- API must have the same scheduler, provider guardrail, webhook, and balance values as workers.
+- API and worker must have matching shared static fingerprints. Runtime capacity comes from the same
+  revisioned PostgreSQL policy; worker-only lane settings are intentionally excluded from parity.
+- `FAL_PROVIDER_SPEND_DAILY_LIMIT_USD=0` is retained compatibility configuration and has no Scheduler
+  V2 enforcement behavior.
 
 ## Worker Env Pack
 
-Set these in every GenerationWorker replica:
+Set these on the single GenerationWorker instance:
 
 ```env
 ASPNETCORE_ENVIRONMENT=Staging
 DOTNET_ENVIRONMENT=Staging
 Templates__GenerationWorkerEnabled=true
+Templates__GenerationSchedulerV2Enabled=false
 Templates__MediaCleanupWorkerEnabled=false
 Templates__TemplateOfTheDayAutoPickWorkerEnabled=false
 TEMPLATES_AI_PROVIDER=Fal
 TEMPLATES_WATERMARK_ENABLED=true
-GENERATION_WORKER_REPLICAS=4
-GENERATION_WORKER_MAX_CONCURRENT_JOBS=2
+GENERATION_DISPATCH_CONCURRENCY=4
+GENERATION_PROVIDER_RECONCILIATION_CONCURRENCY=4
+GENERATION_MEDIA_IMPORT_CONCURRENCY=1
+GENERATION_MAINTENANCE_CONCURRENCY=1
 GENERATION_GLOBAL_MAX_CONCURRENT=8
 GENERATION_IMAGE_RESERVED_CONCURRENT=3
 GENERATION_IMAGE_PROTECTED_CONCURRENT=3
@@ -117,8 +127,8 @@ GENERATION_CANCEL_QUEUED_ENABLED=true
 FAL_WEBHOOK_URL=https://<staging-api-host>/api/templates/provider/fal/webhook
 FAL_PROVIDER_CONCURRENCY_LIMIT=10
 FAL_PROVIDER_RESERVED_CONCURRENCY=2
-FAL_PROVIDER_BALANCE_LOW_THRESHOLD_USD=100
-FAL_PROVIDER_BALANCE_CRITICAL_THRESHOLD_USD=25
+FAL_PROVIDER_BALANCE_LOW_THRESHOLD_USD=10
+FAL_PROVIDER_BALANCE_CRITICAL_THRESHOLD_USD=5
 FAL_PROVIDER_SPEND_DAILY_LIMIT_USD=0
 GENERATION_PROVIDER_MAX_RPM=60
 GENERATION_MAX_ATTEMPTS=3
@@ -137,24 +147,54 @@ Worker role check:
 - `Templates:GenerationWorkerEnabled=true` for GenerationWorker.
 - `Templates:MediaCleanupWorkerEnabled=false` and `Templates:TemplateOfTheDayAutoPickWorkerEnabled=false`
   in the dedicated generation worker unless those jobs are intentionally deployed elsewhere.
+- Verify `numInstances: 1`, `plan: standard`, `maxShutdownDelaySeconds: 300`, no worker disk/domain,
+  and Dashboard autoscaling disabled.
 
-## Replica Matrix
+## Runtime capacity matrix
 
-| Profile | fal.ai limit | Worker replicas | Jobs per worker | Total worker loops |
-| --- | ---: | ---: | ---: | ---: |
-| `FalConcurrency10` | 10 | 4 | 2 | 8 |
-| `FalConcurrency30` | 30 | 6 | 4 | 24 |
-| `FalConcurrency40` | 40 | 8 | 4 | 32 |
+| Confirmed fal limit | Effective global | Image reserved/protected/max | Video guaranteed/max/borrow | Preprocessing max | Worker |
+| ---: | ---: | ---: | ---: | ---: | --- |
+| 10 | 8 | 3 / 3 / 7 | 2 / 4 / 2 | 1 | `1 x Standard` |
+| 18 | 16 | 6 / 6 / 14 | 4 / 8 / 4 | 2 | `1 x Standard` |
+| 26 | 24 | 9 / 9 / 21 | 6 / 12 / 6 | 3 | `1 x Standard` |
+| 40 | 38 | 14 / 14 / 33 | 10 / 19 / 10 | 5 | `1 x Standard` |
 
-Only `FalConcurrency10` is selected for this staging rollout.
+Only effective global `8` is selected for the initial staging rollout. The other rows are runtime
+policy steps, not Render replica changes.
+
+## Runtime control checks
+
+Use the AdminOnly endpoints, or the Capacity panel on `/generations`:
+
+- `GET /api/admin/templates/generation-control`;
+- `PUT /api/admin/templates/generation-control/policy`;
+- `POST /api/admin/templates/generation-control/provider/refresh`.
+
+For `PUT`, send the displayed `expectedRevision`, a 3-500 character `reason`, and a unique
+`Idempotency-Key`. Confirm stale revision returns `409`, exact replay is idempotent, and the same key
+with a different payload conflicts. Lowering capacity must stop new provider reservations until
+natural drain; it must not cancel active fal attempts.
+
+The panel must show balance freshness, confirmed/effective fal limits, image/video/stage queue depth,
+native/borrowed/reserved slots, lane counts, worker heartbeat/progress/applied revision, and stable
+alerts. Verify both desktop and 390 px layout. DTOs/logs must not contain the fal key or provider
+secrets.
+
+Rollout sequence: deploy the additive migration with the flag `false`, inspect migration/backfill,
+and verify the bootstrap preserves `AdmissionEnabled=true` for the legacy V1 queue. Before the
+maintenance window, explicitly pause admission through the Admin API with a reason, verify
+`AdmissionEnabled=false`, drain, and canary the compatibility loop. Then change the shared Render
+value to `true`, Manual Sync/redeploy, and require the bounded-lane start log before enabling
+admission/reopening traffic. Rollback sets the flag back to `false` and Manual Sync/redeploys; the
+additive schema stays in place.
 
 ## DB Pool Check
 
 For the selected profile, plan for at least:
 
 ```text
-worker_loop_connections = 4 replicas * 2 loops = 8
-provider_polling_and_import_margin = 4 replicas
+short_lived_worker_lane_operations = 4 dispatch + 4 reconciliation + 1 import + 1 maintenance
+provider_attempts_do_not_hold_db_connections_while_fal_runs = true
 api_margin = current API replica count * expected concurrent request DB usage
 migration_or_admin_margin = 5
 ```
@@ -171,8 +211,9 @@ ORDER BY count(*) DESC;
 ```
 
 Block staging rollout if `max_connections - active_connections` is less than
-`worker_loop_connections + provider_polling_and_import_margin + migration_or_admin_margin` after API
-traffic is present. If the DB is small, set explicit per-process `Max Pool Size` in
+the measured peak API/worker/migration demand with safety headroom after API traffic is present. The
+acceptance target is fewer than `70` PostgreSQL connections under the 50-user/200-job fake-provider
+run. If the DB is small, set explicit per-process `Max Pool Size` in
 `ConnectionStrings__DefaultConnection` instead of relying on the Npgsql default.
 
 ## Migration Order Check
@@ -189,6 +230,11 @@ rg -n "CONCURRENTLY|suppressTransaction" src\Modules\Templates\PetMagic.Modules.
 
 Expected result: every `CONCURRENTLY` SQL call has `suppressTransaction: true`.
 
+Scheduler V2 additionally requires additive migration
+`20260728231704_AddGenerationControlFoundation`. It creates provider attempts, webhook inbox,
+runtime policy/snapshot, control receipts, media-import checkpoints, and worker heartbeat revision
+fields. Inspect its bootstrap rows and active legacy-job backfill before starting the V2 worker.
+
 Staging DB check:
 
 ```sql
@@ -197,13 +243,15 @@ FROM "__EFMigrationsHistory"
 WHERE "MigrationId" IN (
   '20260630234809_AddGenerationSchedulerQueueFields',
   '20260701093000_AddAsyncGenerationProviderPipeline',
-  '20260702234729_AddGenerationBillingReconciliationIndexes'
+  '20260702234729_AddGenerationBillingReconciliationIndexes',
+  '20260728231704_AddGenerationControlFoundation'
 )
 ORDER BY "MigrationId";
 ```
 
-All three migration IDs must be present before smoke when this release includes the generation
-billing reconciliation hardening.
+All four migration IDs must be present before Scheduler V2 smoke. Test both a clean database and an
+existing database with active legacy provider jobs. Keep the additive V2 schema during application
+rollback.
 
 ## Secrets To Fill Manually
 
@@ -211,7 +259,8 @@ Do not commit or paste these values:
 
 - `ConnectionStrings__DefaultConnection` / `STAGING_DATABASE_URL`.
 - `POSTGRES_PASSWORD` when running the Docker Compose staging profile.
-- `FAL_AI_API_KEY`.
+- `FAL_AI_API_KEY`: backend-only fal key with Admin permission for Account Billing API; do not expose
+  it to admin-web/mobile.
 - `FAL_WEBHOOK_URL` after replacing the host with the real public staging API URL.
 - `R2_ACCOUNT_ID`, `R2_ACCESS_KEY`, `R2_SECRET_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL`.
 - `BACKEND_PUBLIC_BASE_URL`.
@@ -307,15 +356,21 @@ runbook source. Staging evidence must include:
 
 ## Blockers Before Production
 
-- fal.ai dashboard does not show concurrency `10` or the selected profile is changed without updating
-  API env, Worker env, and worker replica count together.
-- Staging API and Worker use different scheduler or provider guardrail values.
+- fal.ai dashboard does not show the concurrency stored in the current DB policy, or confirmation is
+  older than seven days.
+- Render generation worker is not exactly one `Standard` instance, Dashboard autoscaling remains
+  enabled, or the worker lanes are not `4/4/1/1`.
+- Scheduler V2 rollout flag was enabled before migration/backfill/canary validation, or remains
+  disabled when claiming V2 staging evidence.
+- Staging API and Worker static fingerprints differ, or worker `AppliedPolicyRevision` is behind the
+  current DB policy.
 - `FAL_WEBHOOK_URL` is not the public HTTPS staging API callback URL.
-- Provider balance cannot be read, is at or below critical threshold, or fal.ai credits are not
-  topped up for launch traffic.
-- DB connection headroom is not proven for the selected worker loop count.
+- Provider balance cannot be read with the Admin-capable backend key, is older than the five-minute
+  last-known-good window, is at or below `$5`, or credits are not topped up for launch traffic.
+- DB connection headroom is not proven for the bounded worker lanes and API traffic.
 - Required migrations are missing, or any external migration wrapper forces `CONCURRENTLY` indexes
   inside a transaction.
+- Scheduler V2 bootstrap/backfill has not been inspected on an existing database.
 - Prometheus queries for scheduler and fal provider metrics do not return live data.
 - Required generation metric names are missing from Prometheus, or generation alert rules are not
   loaded.

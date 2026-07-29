@@ -1,5 +1,41 @@
 # Generation Scheduler Rollout
 
+## Scheduler V2 runtime model
+
+Scheduler V2 separates cheap provider orchestration from Render process scaling. Production and
+staging run exactly one `Standard` generation worker (`numInstances: 1`). The committed Blueprints
+start with `Templates__GenerationSchedulerV2Enabled=false`; while false, the worker uses the V1
+compatibility loop so migration/backfill/canary can complete safely. When the flag is enabled and the
+worker redeployed, that process starts four independent bounded lanes:
+
+| Lane | Concurrency | Responsibility |
+| --- | ---: | --- |
+| Dispatch | 4 | Reserve durable provider capacity and submit the next image/preprocessing/motion stage. |
+| Provider reconciliation | 4 | Drain the verified webhook inbox and poll only attempts whose `NextPollAtUtc` is due. |
+| Media import | 1 | Import provider output, R2 objects, watermark and preview without blocking dispatch/polling. |
+| Maintenance | 1 | Cancellation, refund, stale-lock recovery and cleanup. |
+
+`templates_generation_jobs`, `templates_generation_provider_attempts`, and
+`templates_provider_webhook_inbox` in PostgreSQL are the durable source of truth. Process-local
+signals may wake a lane, but they must never own queue state. The public generation endpoints,
+`TemplateGenerationStatus` wire values, and mobile/admin generation DTOs remain compatible.
+
+The video pipeline remains stage-safe:
+
+```text
+source photo -> video_preprocessing -> NormalizedImageUrl -> video_generation
+             -> media import -> watermark/thumbnail -> Completed
+```
+
+Finishing preprocessing does not authorize motion submit after a cancellation. A cancellation in
+that inter-stage window completes locally. Provider submit reservations are created before the fal
+HTTP request; a lost submit response becomes `SubmissionUnknown` and must be reconciled instead of
+being blindly submitted again.
+
+The one-worker topology is a cost and orchestration choice, not a fal concurrency limit. Add a
+second Render worker only for HA or after evidence shows actionable dispatch/reconciliation backlog
+while fal capacity is still free. Do not add Render replicas merely because more users are queued.
+
 ## Migration lock strategy
 
 Migration `20260630234809_AddGenerationSchedulerQueueFields` adds queue snapshot columns to
@@ -27,6 +63,30 @@ Operational notes:
 - There are no new unique indexes in this scheduler migration, so duplicate legacy values do not
   block rollout.
 
+Migration `20260728231704_AddGenerationControlFoundation` is additive and introduces the V2 durable
+control plane:
+
+- `templates_generation_provider_attempts` with unique stage attempt, provider request id, and
+  submission token constraints;
+- `templates_provider_webhook_inbox` for verified, idempotent, deferred callback processing;
+- `templates_generation_control_policy` plus idempotent admin command receipts;
+- `templates_provider_runtime_snapshots` for fal balance state and refresh leasing;
+- media-import retry/checkpoint columns on `templates_generation_jobs`;
+- `AppliedPolicyRevision` and `LastProgressAtUtc` on worker runtime fingerprints.
+
+The migration bootstraps policy revision `1` with confirmed fal limit `10`, headroom `2`, hard
+ceiling `38`, and the base Balanced profile `8/3/3/7/2/4/2/1`. It also backfills legacy jobs in
+`SubmittingToProvider`, `ProviderQueued`, and `ProviderProcessing` into provider attempts without
+deleting the legacy provider fields. Scheduler V2 continues dual-writing those fields so the
+previous worker build can consume the queue during rollback.
+
+Before applying this migration to production:
+
+- take and verify a PostgreSQL backup;
+- inspect active legacy provider jobs and record their counts by status/stage;
+- run clean-database migration tests and an existing-database upgrade/backfill test;
+- keep the schema after rollback. Roll back the application and policy, not this additive migration.
+
 ## Staging rollout gate
 
 Use a production-like PostgreSQL copy and run migrations with the same application startup flow used
@@ -37,9 +97,21 @@ will use that same file.
 Before traffic:
 
 - Confirm the staging database is a restored production-like copy, not an empty development schema.
-- Confirm API and generation worker use the same image/video/global caps:
-  `GlobalMaxConcurrentGenerations=3`, `ImageMaxConcurrentGenerations=2`,
-  `VideoMaxConcurrentGenerations=1`.
+- Confirm the first additive-schema deploy keeps `Templates__GenerationSchedulerV2Enabled=false`.
+  Enable it only through a reviewed Blueprint commit that changes the shared value to `true` after
+  migration/backfill inspection and a compatibility-loop canary; run the Blueprint gate, push the
+  commit, then Manual Sync/redeploy. A Dashboard-only override is not a rollout mechanism because a
+  later Blueprint sync restores the committed value.
+- Confirm `20260728231704_AddGenerationControlFoundation` is applied and its legacy active-job
+  backfill was inspected before the new worker is started.
+- Confirm the runtime policy row has the operator-confirmed fal limit, `ReservedHeadroom=2`,
+  `ApplicationHardCeiling=38`, and an expected revision. API admission and worker dispatch read this
+  shared PostgreSQL policy; they do not infer capacity from Render instance count.
+- Confirm Render has one `Standard` generation-worker instance and Dashboard autoscaling is disabled.
+  `numInstances: 1` in the Blueprint does not prove that an existing Dashboard scaling override is
+  off.
+- Confirm the worker-only static lane settings are `Dispatch=4`, `ProviderReconciliation=4`,
+  `MediaImport=1`, and `Maintenance=1`.
 - Confirm wait thresholds are fixed for staging:
   `FreeImageMaxEstimatedWaitSeconds=1800`, `PremiumImageMaxEstimatedWaitSeconds=900`,
   `FreeVideoMaxEstimatedWaitSeconds=3600`, `PremiumVideoMaxEstimatedWaitSeconds=1800`.
@@ -80,13 +152,19 @@ Expected evidence: both concurrent index commands and both rollback commands inc
 `suppressTransaction: true`; deployment logs do not contain PostgreSQL errors saying
 `CREATE INDEX CONCURRENTLY cannot run inside a transaction block`.
 
-Dangerous scheduler mismatches are any API/worker difference in the normalized fingerprint: global,
-image, video, preprocessing, reserved, protected, or provider concurrency; elastic lane borrowing;
-max-wait thresholds; queue priority and aging; queue size and active-generation admission limits;
-provider timeout and polling settings; worker polling; retry, stale-lock, orphan-queue, and refund
-retry settings. The API reports these through degraded/unhealthy health evidence. The generation
-worker treats a mismatch against the latest API fingerprint as fatal and fails startup, because the
-worker is the component that actually consumes the queue.
+Dangerous static mismatches are API/worker differences in the normalized shared fingerprint: queue
+admission limits, elastic borrowing behavior, SLA thresholds, queue priority/aging, provider
+timeouts/polling, and retry/recovery settings. Runtime capacity itself is versioned in
+`templates_generation_control_policy`; the worker reports `AppliedPolicyRevision` in its heartbeat.
+Worker lane concurrency and poll-loop cadence are intentionally worker-only and are not part of
+cross-role fingerprint parity. The API reports static mismatch through degraded/unhealthy evidence;
+the generation worker treats a current API fingerprint mismatch as fatal.
+
+Render deploys the API and generation worker sequentially. During that rolling window the newly
+started API may initially observe the previous worker fingerprint and remain degraded. Its heartbeat
+must keep re-evaluating the latest active worker fingerprint and clear the mismatch only after the
+matching worker revision has started. The postdeploy gate must wait for this convergence; a healthy
+API `/health` response by itself is not sufficient release evidence.
 
 ## Staging smoke matrix
 
@@ -390,57 +468,67 @@ If the failing template is created manually outside the smoke script, set
 
 ## Queue capacity configuration
 
-`GlobalMaxConcurrentGenerations` is the hard upper bound for active provider/in-flight generation
-jobs. `ImageMaxConcurrentGenerations` and `VideoMaxConcurrentGenerations` are hard lane caps.
-`ImageReservedConcurrentGenerations`, `ImageProtectedConcurrentGenerations`,
-`VideoReservedConcurrentGenerations`, and `VideoBorrowMaxConcurrentGenerations` control elastic
-lane borrowing.
+The authoritative capacity is the revisioned row in `templates_generation_control_policy`, not a
+Render replica/loop formula and not the fal credit balance:
 
-Startup validation rejects either media lane cap when it is greater than the global cap. A sum such
-as `ImageMaxConcurrentGenerations + VideoMaxConcurrentGenerations > GlobalMaxConcurrentGenerations`
-is allowed: it means both lanes can compete for the shared global pool, but the global cap still
-limits total processing jobs.
+```text
+effectiveGlobal = min(ApplicationHardCeiling,
+                      ConfirmedFalConcurrencyLimit - ReservedHeadroom)
+```
 
-When `EnableElasticLaneBorrowing=true`, video always consumes `VideoReservedConcurrentGenerations`
-first. It can borrow up to `VideoBorrowMaxConcurrentGenerations` additional slots only while global
-capacity is free, active video is below `VideoMaxConcurrentGenerations`, and the image lane is either
-empty or its estimated wait is at or below
-`AllowVideoBorrowWhenImageEstimatedWaitBelowSeconds`. Running borrowed video is released by natural
-completion; new borrowed video stops when an image backlog appears.
+The operator enters the concurrency displayed in the fal dashboard and reconfirms it after account
+changes. A warning becomes active after seven days without confirmation. The default hard ceiling is
+`38`, and two provider slots stay outside PetMagic. A confirmed fal limit of `10` therefore yields
+`8`; a confirmed limit of `40` yields `38`.
 
-Pre-production defaults intentionally reject Free video work earlier than image work during overload:
+The Balanced profile scales each base value with
+`roundAwayFromZero(baseValue * effectiveGlobal / 8)`, applies the defined minimums, and validates the
+global/lane invariants:
 
+| Parameter | Effective global 8 | Effective global 38 |
+| --- | ---: | ---: |
+| Image reserved/protected | 3 | 14 |
+| Image opportunistic max | 7 | 33 |
+| Video guaranteed | 2 | 10 |
+| Video max | 4 | 19 |
+| Video borrow max | 2 | 10 |
+| Video preprocessing max | 1 | 5 |
+
+When video backlog exists, dispatch does not start a new image attempt if doing so would leave less
+than the guaranteed video capacity. Existing image work is never cancelled. Without video backlog,
+image can use opportunistic capacity. Tier priority, aging, and per-tier user round-robin are applied
+after these capacity rules.
+
+When all effective fal slots are occupied, admission is not rejected merely because the provider is
+full. The job stays durably queued in PostgreSQL and dispatch waits for a slot. Pre-charge admission
+still rejects a full local queue, a per-user quota breach, a stage-aware ETA outside SLA, missing
+provider configuration, paused admission, or critical/unknown balance.
+
+The supported SLA thresholds are:
+
+- `FreeImageMaxEstimatedWaitSeconds = 1800`
+- `PremiumImageMaxEstimatedWaitSeconds = 900`
+- `PrivilegedImageMaxEstimatedWaitSeconds = 900`
 - `FreeVideoMaxEstimatedWaitSeconds = 3600`
 - `PremiumVideoMaxEstimatedWaitSeconds = 1800`
 - `PrivilegedVideoMaxEstimatedWaitSeconds = 1800`
 - `QueuePriorityAgingBoost = 500`
 
-This preserves Premium advantage while avoiding very long Free video queues that would be accepted
-but wait for hours under sustained video overload. With the default priority gap, Free jobs gain
-enough aging priority to compete with new Premium jobs after roughly six minutes instead of roughly
-thirty minutes.
+ETA includes the remaining pipeline stages. Image fallback is `90 + 30` seconds; video fallback is
+`90 + 420 + 120` seconds. Rolling p90 completion history replaces the fallback after enough recent
+samples. Admission rejects outside the SLA before PawSpark charge.
 
-## fal.ai concurrency profiles
+## Scheduler V2 capacity profiles
 
-fal.ai dashboard evidence for launch planning:
+The current bootstrap assumption is a dashboard-confirmed fal concurrency of `10`, but that value is
+operator-owned and can change. Purchase or balance amounts are not valid evidence of the limit. Use
+`PUT /api/admin/templates/generation-control/policy` with `expectedRevision`, a non-empty operational
+`reason`, and `Idempotency-Key` to confirm a new value. The update and admin audit outbox are atomic;
+a stale revision returns `409`, and reusing a key for a different payload is a conflict.
 
-- Current account limit: 10 concurrent requests.
-- With roughly $500 purchased credits in the last four weeks, expected limit can be 30.
-- With roughly $1000+ purchased credits in the last four weeks, expected limit can be 40.
-
-The scheduler must not consume the entire fal.ai limit. Keep headroom for retries, admin tests,
-manual operations, and provider-side variance. Configure API and GenerationWorker with the same
-queue and wait values. Host role flags such as `Templates:GenerationWorkerEnabled`,
-`Templates:MediaCleanupWorkerEnabled`, and `Templates:TemplateOfTheDayAutoPickWorkerEnabled` may
-differ by process role to keep background job ownership single-writer.
-
-Current selected staging profile after the 2026-07-01 fal.ai dashboard check:
-
-- Dashboard concurrency limit: 10.
-- Selected profile: `FalConcurrency10`.
-- Staging API and GenerationWorker environment overrides must be pinned to the same scheduler values.
-- Production must still set the same values explicitly in the production secret/env store before
-  rollout; do not rely on local docker defaults for production.
+Shared Render environment values remain a bootstrap/fallback contract for API and worker. Runtime
+capacity changes are applied through the PostgreSQL policy revision; they do not require more Render
+worker instances. Host role flags may differ to keep background ownership single-writer.
 
 | Setting | Staging API env value | Staging worker env value | Docker/env override | Effective staging value |
 | --- | ---: | ---: | --- | ---: |
@@ -454,7 +542,6 @@ Current selected staging profile after the 2026-07-01 fal.ai dashboard check:
 | `EnableElasticLaneBorrowing` | true | true | `GENERATION_ENABLE_ELASTIC_LANE_BORROWING=true` | true |
 | `AllowVideoBorrowWhenImageQueueEmpty` | true | true | `GENERATION_ALLOW_VIDEO_BORROW_WHEN_IMAGE_QUEUE_EMPTY=true` | true |
 | `AllowVideoBorrowWhenImageEstimatedWaitBelowSeconds` | 120 | 120 | `GENERATION_ALLOW_VIDEO_BORROW_IMAGE_WAIT_BELOW_SECONDS=120` | 120 |
-| `MaxConcurrentJobsPerWorker` | 2 | 2 | `GENERATION_WORKER_MAX_CONCURRENT_JOBS=2` | 2 |
 | `FalProviderConcurrencyLimit` | 10 | 10 | `FAL_PROVIDER_CONCURRENCY_LIMIT=10` | 10 |
 | `FalProviderReservedConcurrency` | 2 | 2 | `FAL_PROVIDER_RESERVED_CONCURRENCY=2` | 2 |
 | `QueueMaxSize` | 1000 | 1000 | `GENERATION_QUEUE_MAX_SIZE:-1000` | 1000 |
@@ -466,43 +553,44 @@ Current selected staging profile after the 2026-07-01 fal.ai dashboard check:
 | `PremiumVideoMaxEstimatedWaitSeconds` | 1800 | 1800 | `GENERATION_PREMIUM_VIDEO_MAX_WAIT_SECONDS:-1800` | 1800 |
 | `QueuePriorityAgingBoost` | 500 | 500 | `GENERATION_PRIORITY_AGING_BOOST:-500` | 500 |
 
-Local docker-compose defaults intentionally remain conservative (`3/2/1`) unless these env vars are
-set. Staging and production deployments must set the selected profile explicitly.
+`MaxConcurrentJobsPerWorker` and `GENERATION_WORKER_MAX_CONCURRENT_JOBS` are Scheduler V1 sizing
+settings. They no longer determine provider capacity and must not be reintroduced into the shared
+API/worker fingerprint. Worker-only V2 lane concurrency is `4/4/1/1`.
 
-Production-like deployment profiles with elastic video borrowing:
+Local docker-compose defaults may remain conservative unless overrides are set. Staging and
+production bootstrap values must remain explicit, but the applied runtime revision is authoritative.
 
-| Profile | fal.ai limit | Global cap | Image reserved/protected/max | Video reserved/max/borrow | Worker loops target | Recommended worker layout |
-| --- | ---: | ---: | ---: | ---: | ---: | --- |
-| `FalConcurrency10` | 10 | 8 | 3 / 3 / 7 | 2 / 4 / 2 | >= 8 | 4 replicas x 2 loops |
-| `FalConcurrency30` | 30 | 24 | 8 / 6 / 21 | 5 / 14 / 9 | >= 24 | 6 replicas x 4 loops |
-| `FalConcurrency40` | 40 | 32 | 12 / 8 / 28 | 8 / 20 / 12 | >= 32 | 8 replicas x 4 loops |
+Scaled Balanced profiles (all use one Render worker):
 
-Worker capacity rule:
+| Confirmed fal limit | Effective global | Image reserved/protected/max | Video guaranteed/max/borrow | Video preprocessing | Render worker |
+| ---: | ---: | ---: | ---: | ---: | --- |
+| 10 | 8 | 3 / 3 / 7 | 2 / 4 / 2 | 1 | `1 x Standard` |
+| 18 | 16 | 6 / 6 / 14 | 4 / 8 / 4 | 2 | `1 x Standard` |
+| 26 | 24 | 9 / 9 / 21 | 6 / 12 / 6 | 3 | `1 x Standard` |
+| 40 | 38 | 14 / 14 / 33 | 10 / 19 / 10 | 5 | `1 x Standard` |
 
-```text
-total_worker_loops = worker_replicas * MaxConcurrentJobsPerWorker
-total_worker_loops >= GlobalMaxConcurrentGenerations
-```
+Provider capacity is occupied by durable active attempts, not by long-running local loops. Dispatch
+submits asynchronously and releases its local lane; reconciliation and import proceed independently.
+Before adding a second worker for HA, verify DB connection pool headroom and prove that one worker
+cannot drain actionable orchestration backlog while fal capacity is free.
 
-Before increasing worker replicas, verify DB connection pool headroom. PostgreSQL advisory locks
-and `FOR UPDATE SKIP LOCKED` make multi-worker claiming safe, but each loop can hold a database
-connection while processing or checking provider state. In the async provider pipeline, local
-generation slots are released after fal submit, but provider in-flight jobs still count as active
-for ETA/backpressure.
+Supported max-wait thresholds do not expand when fal capacity increases:
 
-Recommended max-wait thresholds:
-
-| Profile | Free image | Premium image | Free video | Premium video |
-| --- | ---: | ---: | ---: | ---: |
-| `FalConcurrency10` | 1800s | 900s | 3600s | 1800s |
-| `FalConcurrency20` | 1800s | 900s | 3600s | 1800s |
-| `FalConcurrency30` | 2700s | 1200s | 5400s | 2700s |
-| `FalConcurrency40` | 3600s | 1500s | 7200s | 3600s |
+| Tier | Image | Video |
+| --- | ---: | ---: |
+| Free | 1800s | 3600s |
+| Premium | 900s | 1800s |
+| Privileged | 900s | 1800s |
 
 Set privileged waits equal to Premium or lower; startup validation requires
 `Privileged <= Premium <= Free` for each media type.
 
-Simulation assumptions:
+The following simulation tables are retained only as historical Scheduler V1 evidence. Their old
+`FalConcurrency20/30/40` caps and replica assumptions are not deployment instructions and must not be
+used to configure Scheduler V2. Rerun the load model against the V2 durable-attempt implementation
+before replacing them with current acceptance evidence.
+
+Historical simulation assumptions:
 
 - simultaneous arrivals;
 - `image avg = 90 seconds`;
@@ -548,135 +636,102 @@ Mixed and starvation checks:
 
 Operational recommendation:
 
-- Current verified limit 10: use `FalConcurrency10` for staging and controlled production rollout.
-- $500 deposit / expected limit 30: use `FalConcurrency30`.
-- $1000+ deposit / expected limit 40: use `FalConcurrency40`, with explicit monitoring on fal
-  timeout rate, provider queue time, refunds, rejected jobs, and old queued age.
-
-Example environment for current limit `10` / `FalConcurrency10`:
-
-```env
-GENERATION_GLOBAL_MAX_CONCURRENT=8
-GENERATION_IMAGE_MAX_CONCURRENT=7
-GENERATION_VIDEO_MAX_CONCURRENT=4
-GENERATION_WORKER_MAX_CONCURRENT_JOBS=2
-GENERATION_FREE_IMAGE_MAX_WAIT_SECONDS=1800
-GENERATION_PREMIUM_IMAGE_MAX_WAIT_SECONDS=900
-GENERATION_PRIVILEGED_IMAGE_MAX_WAIT_SECONDS=900
-GENERATION_FREE_VIDEO_MAX_WAIT_SECONDS=3600
-GENERATION_PREMIUM_VIDEO_MAX_WAIT_SECONDS=1800
-GENERATION_PRIVILEGED_VIDEO_MAX_WAIT_SECONDS=1800
-FAL_PROVIDER_CONCURRENCY_LIMIT=10
-FAL_PROVIDER_RESERVED_CONCURRENCY=2
-```
-
-Run exactly 4 generation-worker replicas for this profile.
-
-Example environment for `$500` / `FalConcurrency30`:
-
-```env
-GENERATION_GLOBAL_MAX_CONCURRENT=24
-GENERATION_IMAGE_MAX_CONCURRENT=21
-GENERATION_VIDEO_MAX_CONCURRENT=14
-GENERATION_WORKER_MAX_CONCURRENT_JOBS=4
-GENERATION_FREE_IMAGE_MAX_WAIT_SECONDS=2700
-GENERATION_PREMIUM_IMAGE_MAX_WAIT_SECONDS=1200
-GENERATION_PRIVILEGED_IMAGE_MAX_WAIT_SECONDS=1200
-GENERATION_FREE_VIDEO_MAX_WAIT_SECONDS=5400
-GENERATION_PREMIUM_VIDEO_MAX_WAIT_SECONDS=2700
-GENERATION_PRIVILEGED_VIDEO_MAX_WAIT_SECONDS=2700
-```
-
-Run at least 6 worker replicas for this profile.
-
-Example environment for `$1000+` / `FalConcurrency40`:
-
-```env
-GENERATION_GLOBAL_MAX_CONCURRENT=32
-GENERATION_IMAGE_MAX_CONCURRENT=28
-GENERATION_VIDEO_MAX_CONCURRENT=20
-GENERATION_WORKER_MAX_CONCURRENT_JOBS=4
-GENERATION_FREE_IMAGE_MAX_WAIT_SECONDS=3600
-GENERATION_PREMIUM_IMAGE_MAX_WAIT_SECONDS=1500
-GENERATION_PRIVILEGED_IMAGE_MAX_WAIT_SECONDS=1500
-GENERATION_FREE_VIDEO_MAX_WAIT_SECONDS=7200
-GENERATION_PREMIUM_VIDEO_MAX_WAIT_SECONDS=3600
-GENERATION_PRIVILEGED_VIDEO_MAX_WAIT_SECONDS=3600
-```
-
-Run at least 8 worker replicas for this profile.
-
-Do not set `GlobalMaxConcurrentGenerations` equal to the full fal.ai account limit. Keep the
-remaining provider capacity for retries, admin tests, manual jobs, and provider-side bursts. Free
-video should still reject earlier than image during overload; accepting video work with 5-10 hour
-waits is worse than a clear pre-charge rejection.
+- Start staging and production canary with confirmed fal limit `10`, effective global `8`, and one
+  `Standard` Render worker.
+- If the dashboard later confirms `40`, increase the policy in observed steps `8 -> 16 -> 24 -> 38`.
+  Check queue age, media-import age, worker CPU/RAM, errors, and DB connections between steps.
+- Decreasing the policy does not cancel active provider work. New reservations stop until natural
+  drain brings in-flight attempts below the new effective limit.
+- Keep `ReservedHeadroom=2`; do not infer or auto-increase concurrency from credits purchased.
 
 ## fal.ai operational guardrails
 
-Official fal.ai automation coverage:
+PetMagic refreshes `GET https://api.fal.ai/v1/account/billing?expand=credits` independently every
+60 seconds. fal requires an Admin-capable backend key for account billing. Keep using the existing
+server-only `FAL_AI_API_KEY` secret, but ensure that key has the required fal account permission; do
+not add a second client-visible key and never expose it to admin-web or mobile.
 
-- Balance/credits: available through `GET https://api.fal.ai/v1/account/billing?expand=credits`.
-  PetMagic reads `credits.current_balance` with a backend-only fal API key.
-- Concurrency: fal.ai documents the account concurrency model, but there is no documented endpoint
-  in the public docs for reading the current account concurrency limit at runtime. Keep this as an
-  operator-supplied deployment value until fal exposes a current-limit API.
-- Queue behavior: fal.ai queues requests above the account limit instead of rejecting them. PetMagic
-  must therefore apply its own pre-charge backpressure and provider guardrails.
+Balance states and effects:
 
-Provider capacity settings:
+| State | Rule | New admission/submission |
+| --- | --- | --- |
+| `fresh` | Balance is at least `$10` | Allowed subject to queue/SLA/policy. |
+| `low` | Balance is below `$10` and above `$5` | Allowed with warning. |
+| `critical` | Balance is at or below `$5` | Stopped; active fal work is not cancelled. |
+| `stale` | Refresh failed, last success is no older than five minutes | Last-known-good continues with warning. |
+| `unknown` | No usable success or older than five minutes | Stopped; queued jobs stay cancellable/refundable. |
+
+Account concurrency still has no runtime discovery path in this integration. The admin confirms the
+dashboard value and timestamp. PetMagic applies:
 
 ```text
-FalProviderConcurrencyLimit          # operator-entered fal.ai account limit
-FalProviderReservedConcurrency       # headroom for retries, admin tests, manual runs
-FalProviderBalanceLowThresholdUsd    # alert threshold, does not block admission
-FalProviderBalanceCriticalThresholdUsd # hard pre-charge rejection threshold
-FalProviderSpendDailyLimitUsd        # manual budget guard until daily spend API is wired
+ConfirmedFalConcurrencyLimit = operator-confirmed dashboard value
+ReservedHeadroom = 2
+ApplicationHardCeiling = 38
+FalProviderBalanceLowThresholdUsd = 10
+FalProviderBalanceCriticalThresholdUsd = 5
+FalProviderSpendDailyLimitUsd = 0  # retained compatibility option, intentionally unused
 ```
 
-Admission behavior for `AiProvider=Fal`:
+`FalProviderSpendDailyLimitUsd` is not a Scheduler V2 control and is excluded from the scheduler
+fingerprint. There is no automatic daily-spend cap in this release. Use balance thresholds, provider
+dashboard billing controls, and operator alerts instead.
 
-- if `FalProviderConcurrencyLimit` is missing or `0`, reject before charge with
-  `PROVIDER_CAPACITY_UNAVAILABLE`;
-- if PetMagic provider in-flight requests are at or above
-  `FalProviderConcurrencyLimit - FalProviderReservedConcurrency`, reject before charge;
-- if balance cannot be read from fal.ai Account Billing API, reject before charge;
-- if balance is at or below `FalProviderBalanceCriticalThresholdUsd`, reject before charge;
-- if balance is below `FalProviderBalanceLowThresholdUsd` but above critical, keep accepting and alert.
+Provider attempt safety rules:
 
-Required launch values:
-
-```env
-FAL_PROVIDER_CONCURRENCY_LIMIT=30
-FAL_PROVIDER_RESERVED_CONCURRENCY=2
-FAL_PROVIDER_BALANCE_LOW_THRESHOLD_USD=150
-FAL_PROVIDER_BALANCE_CRITICAL_THRESHOLD_USD=50
-FAL_PROVIDER_SPEND_DAILY_LIMIT_USD=150
-```
-
-For a `$500` pre-launch top-up, start with `FAL_PROVIDER_CONCURRENCY_LIMIT=30` only after the fal.ai
-dashboard shows the increased concurrency. For `$1000+`, use `40` only after the dashboard confirms
-the account limit. Do not infer the limit from purchase amount alone.
+- a scheduler advisory lock and transaction reserve `SubmitReserved` before fal HTTP submit;
+- the external request runs outside the DB transaction;
+- request id/status/response/cancel URLs are persisted after acceptance and dual-written to legacy
+  job fields;
+- a lost response becomes `SubmissionUnknown`; no blind resubmit or refund occurs while paid remote
+  work might still be running;
+- verified callbacks are deduplicated into `templates_provider_webhook_inbox` and reconciled later;
+- polling runs only when `NextPollAtUtc` is due, with queue/progress backoff and jitter;
+- before a stage timeout, perform final reconciliation and validated provider cancellation;
+- duplicate/out-of-order webhook and webhook/poll races cannot overwrite a terminal attempt.
 
 Low-balance runbook:
 
-1. Check `fal_provider_balance_usd`, `fal_provider_balance_low`, and `fal_provider_balance_critical`.
-2. Open the fal.ai dashboard and confirm the displayed balance and account concurrency.
-3. If balance is critical, top up before re-enabling generation admission. PetMagic should already
-   be rejecting new generation requests before charge.
-4. After top-up, wait for `fal_provider_balance_usd` to update or restart API pods to clear the
-   short balance cache if needed.
-5. Confirm `fal_provider_rejected_due_to_capacity` stops increasing and no new charged jobs are
-   stuck without provider request ids.
-6. If concurrency dropped, lower `GlobalMaxConcurrentGenerations`, media caps, and
-   `FAL_PROVIDER_CONCURRENCY_LIMIT` together before accepting more traffic.
+1. Open `/generations` in admin and inspect balance freshness, effective limit, in-flight attempts,
+   queue stages, heartbeat, applied policy revision, and active alerts.
+2. Use `POST /api/admin/templates/generation-control/provider/refresh` after fixing key/balance; do
+   not repeatedly call fal billing from user requests.
+3. If `critical` or `unknown`, keep admission paused, top up/fix the Admin-capable key, and verify a
+   fresh snapshot before resuming.
+4. Confirm existing provider attempts reconcile and queued cancellation still produces exactly one
+   generation-scoped refund.
+5. If the dashboard concurrency changed, update the policy with revision/idempotency controls and
+   observe natural drain. Do not change Render worker instance count.
 
-Manual daily ops checklist until daily spend automation is wired:
+## Rollout and rollback
 
-- record fal.ai dashboard balance at start/end of day;
-- record dashboard concurrency limit;
-- compare daily spend against `FAL_PROVIDER_SPEND_DAILY_LIMIT_USD`;
-- check `fal_provider_queue_wait_seconds` p95 and `generation_jobs_rejected_total`;
-- confirm no unexpected spike in `fal_provider_submit_failures` or `fal_provider_rate_limit_errors`.
+1. Before the first V2 deploy, inspect the currently failed Render worker logs. The repository does
+   not contain live Render log/metric proof.
+2. Run the Blueprint/predeploy gates, then manually verify autoscaling is disabled for API, worker,
+   and admin. Blueprint `numInstances: 1` does not clear an existing Dashboard override.
+3. Apply the additive migration and inspect bootstrap/backfill rows. The bootstrap preserves
+   `AdmissionEnabled=true` so a schema-only deploy cannot unexpectedly stop the legacy V1 queue.
+   Before the planned maintenance window, explicitly pause admission through the revisioned Admin
+   API with a recorded reason and verify `AdmissionEnabled=false` before draining.
+4. Start the API, then the one worker with `Templates__GenerationSchedulerV2Enabled=false`. Let
+   legacy active jobs drain/reconcile while admission remains explicitly paused, then run the
+   compatibility-loop canary.
+5. Create and review a rollout commit changing the shared Blueprint value to `true`, run the
+   Blueprint gate, push it, and Manual Sync/redeploy. Then require fresh worker heartbeat, recent
+   `LastProgressAtUtc`, matching static fingerprints, and
+   `AppliedPolicyRevision` equal to the current DB revision.
+6. In staging, run fake-provider image/video/crash/race tests first. A real fal canary is separate and
+   remains blocked until credits and production provider configuration exist.
+7. Enable admission at effective global `8`, verify image plus every video-template flow, and only
+   then use the stepped `8 -> 16 -> 24 -> 38` policy rollout when fal confirms higher capacity.
+8. Run for one production-observation week before opening advertising traffic.
+
+Rollback pauses admission, uses a reviewed Blueprint commit to set
+`Templates__GenerationSchedulerV2Enabled=false`, runs the gate, then Manual Sync/redeploys the
+compatibility worker and restores the bootstrap policy profile. Do not roll back
+the additive schema. Dual-written provider fields let the previous worker continue existing jobs.
+Do not cancel active remote work or refund it until reconciliation/cancel proves it can no longer
+incur provider cost.
 
 ## `GENERATION_WAIT_TOO_LONG` API contract
 

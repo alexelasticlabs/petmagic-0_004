@@ -31,6 +31,8 @@ envVarGroups:
         value: "true"
       - key: PETMAGIC_LOCAL_SMOKE_FAST_FAKE_COMPLETION
         value: "false"
+      - key: Templates__GenerationSchedulerV2Enabled
+        value: "false"
       - key: PETMAGIC_QA_FIXTURES_ENABLED
         value: "false"
       - key: STORE_ACCOUNT_BINDING_MODE
@@ -100,23 +102,23 @@ envVarGroups:
       - key: Templates__FalProviderReservedConcurrency
         value: "2"
       - key: Templates__FalProviderBalanceLowThresholdUsd
-        value: "100"
+        value: "10"
       - key: Templates__FalProviderBalanceCriticalThresholdUsd
-        value: "25"
+        value: "5"
+      - key: Templates__FalProviderSpendDailyLimitUsd
+        value: "0"
       - key: Templates__MaxAiProviderRequestsPerMinute
         value: "60"
       - key: Templates__MaxGenerationAttempts
         value: "3"
       - key: Templates__JobLockTimeoutMilliseconds
         value: "900000"
+      - key: Templates__ProviderReconciliationClaimLeaseMilliseconds
+        value: "90000"
       - key: Templates__OrphanQueuedJobTimeoutMilliseconds
         value: "120000"
       - key: Templates__RefundRetryDelayMilliseconds
         value: "30000"
-      - key: Templates__MaxConcurrentJobsPerWorker
-        value: "2"
-      - key: Templates__GenerationWorkerPollIntervalMilliseconds
-        value: "500"
       - key: Templates__MaxRefundAttempts
         value: "5"
       - key: Templates__Fal__StartTimeoutSeconds
@@ -202,12 +204,10 @@ services:
           property: connectionString
       - key: Jwt__SigningKey
         sync: false
-      - key: FAL_PROVIDER_SPEND_DAILY_LIMIT_USD
-        sync: false
       - key: FAL_AI_API_KEY
         sync: false
       - key: FAL_WEBHOOK_URL
-        value: https://api.staging.petmagic.app/api/templates/generations/fal/webhook
+        value: https://api.staging.petmagic.app/api/templates/provider/fal/webhook
       - key: R2_ACCOUNT_ID
         sync: false
       - key: R2_ACCESS_KEY
@@ -318,6 +318,16 @@ services:
       - fromGroup: petmagic-staging-shared
       - key: APP_VOLUME_DIRS
         value: /var/petmagic
+      - key: Templates__GenerationWorkerPollIntervalMilliseconds
+        value: "500"
+      - key: Templates__GenerationDispatchConcurrency
+        value: "4"
+      - key: Templates__ProviderReconciliationConcurrency
+        value: "4"
+      - key: Templates__MediaImportConcurrency
+        value: "1"
+      - key: Templates__GenerationMaintenanceConcurrency
+        value: "1"
       - key: Templates__GenerationWorkerEnabled
         value: "true"
       - key: ECONOMY_RECONCILIATION_ENABLED
@@ -334,12 +344,10 @@ services:
           property: connectionString
       - key: Jwt__SigningKey
         sync: false
-      - key: FAL_PROVIDER_SPEND_DAILY_LIMIT_USD
-        sync: false
       - key: FAL_AI_API_KEY
         sync: false
       - key: FAL_WEBHOOK_URL
-        value: https://api.staging.petmagic.app/api/templates/generations/fal/webhook
+        value: https://api.staging.petmagic.app/api/templates/provider/fal/webhook
       - key: R2_ACCOUNT_ID
         sync: false
       - key: R2_ACCESS_KEY

@@ -48,9 +48,9 @@ never promote staging by copying local `.env` files.
    - Required staging DNS:
      - `api.staging.petmagic.app`;
      - `admin.staging.petmagic.app`.
-   - Later production DNS:
-     - `api.petmagic.app`;
-     - `admin.petmagic.app`;
+   - Production DNS:
+     - `api.petgpt.app`;
+     - `admin.petgpt.app`;
      - app store website/support/privacy domains as required.
 
 4. Cloudflare R2
@@ -62,7 +62,10 @@ never promote staging by copying local `.env` files.
 5. fal.ai
    - Create an account and API key.
    - Add prepaid credits.
-   - Set a real daily cap through `FAL_PROVIDER_SPEND_DAILY_LIMIT_USD`.
+   - Use one backend-only key with the fal Admin permission required for Account Billing API; never
+     expose it to admin-web or mobile.
+   - Confirm account concurrency manually in the fal dashboard. PetMagic does not infer it from the
+     amount of credits purchased.
 
 6. Email provider
    - Recommended first option: Resend.
@@ -226,6 +229,12 @@ Expected staging resources:
 - `petmagic-staging-db`;
 - `petmagic-staging-shared`.
 
+The worker is one `Standard` instance. Its four dispatch lanes, four reconciliation lanes, one media
+import lane, and one maintenance lane orchestrate fal asynchronously; they are not Render replicas.
+Before applying the Blueprint, and again after sync, manually verify Dashboard autoscaling is off.
+Keep the committed `Templates__GenerationSchedulerV2Enabled=false` during the first
+migration/backfill deploy.
+
 ### 5. Configure domains
 
 In Render service settings:
@@ -246,17 +255,23 @@ Important rules:
 - `sync: false` values must be filled in Render dashboard/secret workflow.
 - Use staging/test credentials first.
 - Generate `Jwt__SigningKey` as a new long random secret.
-- Keep `FAL_PROVIDER_SPEND_DAILY_LIMIT_USD` low until generation is proven.
+- Ensure `FAL_AI_API_KEY` is server-only and can read the fal billing balance. Scheduler V2 does not
+  implement an application daily-spend cap; the retained spend-limit option stays `0` and unused.
 
 ### 7. Deploy order
 
 1. Deploy `petmagic-staging-api`.
 2. Wait for `/health`.
 3. Confirm startup migrations/seeds in logs.
-4. Deploy `petmagic-staging-generation-worker`.
-5. Deploy `petmagic-staging-admin-web`.
-6. Configure provider callbacks.
-7. Run post-deploy smoke.
+4. Deploy `petmagic-staging-generation-worker` in V1 compatibility mode and run the canary.
+5. After migration/backfill inspection, create a reviewed Blueprint commit changing the shared
+   `Templates__GenerationSchedulerV2Enabled` value to `true`, run the Blueprint gate, push it, and
+   Manual Sync/redeploy. Do not rely on a Dashboard-only override because Blueprint sync replaces it.
+6. Require bounded-lane start, fresh worker heartbeat/progress, matching fingerprint, and current
+   applied policy revision.
+7. Deploy `petmagic-staging-admin-web`.
+8. Configure provider callbacks.
+9. Run post-deploy smoke.
 
 ### 8. Post-deploy smoke
 
@@ -329,9 +344,11 @@ use staging API/DB/worker/provider configuration.
 
 - API key.
 - Prepaid credits.
-- Daily spending cap in app config.
+- Admin-capable permission on the existing backend-only key so Account Billing balance refresh works.
+- Provider/dashboard billing controls and alerts; there is no Scheduler V2 daily-spend cap.
+- Operator-confirmed concurrency stored in the revisioned generation-control policy.
 - Callback URL:
-  `https://api.staging.petmagic.app/api/templates/generations/fal/webhook`.
+  `https://api.staging.petmagic.app/api/templates/provider/fal/webhook`.
 
 ### Firebase
 
@@ -377,7 +394,8 @@ Do not promote staging to production until these are true:
 - Production domains are configured.
 - Android/iOS release signing is configured outside Git.
 - Error monitoring and alerting are enabled.
-- Budget caps are set for fal.ai and other variable-cost services.
+- fal.ai balance thresholds/alerts and provider-side billing controls are verified; the confirmed
+  concurrency timestamp is current.
 
 ## Day-one operating rules
 

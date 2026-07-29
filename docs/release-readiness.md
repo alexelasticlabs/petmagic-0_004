@@ -71,6 +71,15 @@ do not append command transcripts to this file.
   active configs, signing keys, database dumps, or test artifacts.
 - Keep `Templates__GenerationWorkerEnabled=false` on the API and `true` on the
   generation worker.
+- Keep exactly one `Standard` generation-worker instance with `4/4/1/1` bounded lanes for the first
+  production rollout, and manually verify Render Dashboard autoscaling is disabled. Provider
+  capacity is controlled by the revisioned PostgreSQL policy, not Render replicas.
+- Keep `Templates__GenerationSchedulerV2Enabled=false` through additive migration/backfill and the
+  compatibility canary; enable it with Manual Sync/redeploy only for V2 acceptance. Rollback returns
+  the flag to `false` without removing the additive schema.
+- Require fresh fal balance from the backend-only Admin-capable `FAL_AI_API_KEY`, a current manually
+  confirmed fal concurrency limit, fresh worker heartbeat/progress, and matching applied policy
+  revision before enabling generation admission.
 - Preserve `/api/economy/...` as the billing contract; do not reintroduce the
   removed `/api/payments/stripe/*` surface.
 - A green local build does not waive provider, device, migration, backup, or
