@@ -14,11 +14,11 @@ import {
   TrendUpIcon,
 } from "@/components/admin/admin-icons";
 import {
+  AdminContextBar,
   AdminFilterBar,
   AdminKpiCard,
   AdminMetricStrip,
   AdminPage,
-  AdminPageHero,
   AdminStateCard,
   AdminToolbar,
 } from "@/components/admin/admin-primitives";
@@ -335,10 +335,7 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
 
   return (
     <AdminPage className={styles.page}>
-      <AdminPageHero
-        eyebrow={text.eyebrow}
-        title={text.title}
-        description={text.description}
+      <AdminContextBar
         actions={
           <div className={styles.heroActions}>
             <Link href={`/${locale}/templates`} className={styles.secondaryLink}>

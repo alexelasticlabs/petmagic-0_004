@@ -262,6 +262,16 @@ export function getAdminPageMeta(
     return copy.audit;
   }
 
+  if (matchesAdminPath(currentPath, "/notifications")) {
+    return copy.notifications;
+  }
+
+  if (
+    matchesAnyAdminPath(currentPath, "/templates/image/analytics", "/templates/video/analytics")
+  ) {
+    return copy.templateAnalytics;
+  }
+
   if (matchesAnyAdminPath(currentPath, "/templates/image", "/image-templates")) {
     return copy.imageTemplates;
   }

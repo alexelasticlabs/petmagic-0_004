@@ -3,7 +3,7 @@
 import Link from "next/link";
 
 import { getAdminRouteFallbackText } from "@/app/admin-route-fallback.content";
-import { AdminPage, AdminPageHero, AdminStateCard } from "@/components/admin/admin-primitives";
+import { AdminPage, AdminStateCard } from "@/components/admin/admin-primitives";
 import { getDefaultAdminPath } from "@/lib/admin-rbac";
 import { useAuthSession } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
@@ -25,15 +25,10 @@ export function AdminNotFoundPage({ locale }: AdminNotFoundPageProps) {
 
   return (
     <AdminPage>
-      <AdminPageHero
-        eyebrow="404"
-        title={fallbackText.notFoundTitle}
-        description={fallbackText.notFoundDescription}
-      />
       <AdminStateCard
         tone="info"
-        title={fallbackText.adminNotFoundActionTitle}
-        description={fallbackText.adminNotFoundActionDescription}
+        title={fallbackText.notFoundTitle}
+        description={fallbackText.notFoundDescription}
         action={
           <Link href={fallbackHref} className="ui-button ui-button--primary ui-button--md">
             {fallbackLabel}

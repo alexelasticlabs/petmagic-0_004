@@ -28,6 +28,9 @@ const subscriptionsSectionPath = fileURLToPath(
 const ledgerPurchasesSectionPath = fileURLToPath(
   new URL("./economy-page-ledger-purchases-section.tsx", import.meta.url)
 );
+const overviewActionsPath = fileURLToPath(
+  new URL("./economy-page-overview-actions.tsx", import.meta.url)
+);
 const incidentsSectionPath = fileURLToPath(
   new URL("./economy-page-incidents-section.tsx", import.meta.url)
 );
@@ -93,6 +96,7 @@ describe("economy-page content", () => {
     expect(ruText.subscriptionEventsDescription).toContain("магазинов приложений");
     expect(ruText.incidentsDescription).toContain("вебхук-событий");
     expect(ruText.incidentWebhookTitle).toBe("Снимок вебхука");
+    expect(ruText.incidentDiagnosticLabel).toBe("Техническая диагностика");
     expect(ruText.incidentSafePayloadLabel).toBe("Безопасный снимок полезной нагрузки");
     expect(ruText.purchaseSearchPlaceholder).toBe("ID заказа, ID пользователя или пакет");
     expect(ruText.subscriptionSearchPlaceholder).toBe("ID подписки, ID пользователя или план");
@@ -834,10 +838,88 @@ describe("economy-page content", () => {
     expect(stylesSource).not.toContain("color: #f87171;");
   });
 
+  it("composes the economy overview from compact shared operations primitives", () => {
+    const pageSource = readFileSync(economyPagePath, "utf8");
+    const purchasesSource = readFileSync(ledgerPurchasesSectionPath, "utf8");
+    const actionsSource = readFileSync(overviewActionsPath, "utf8");
+    const stylesSource = readFileSync(economyStylesPath, "utf8");
+
+    expect(pageSource).toContain(
+      '<AdminSectionHeader title={text.overviewTitle} titleId="economy-overview-title" />'
+    );
+    expect(pageSource).toContain("<AdminMetricStrip");
+    expect(pageSource).toContain("const workspaceNavRef = useRef<HTMLDivElement | null>(null);");
+    expect(pageSource).toContain('window.addEventListener("resize", keepActiveWorkspaceVisible);');
+    expect(pageSource).toContain("ref={workspaceNavRef}");
+    expect(pageSource).toContain("tone: metrics.failedPaymentsThisWeek > 0");
+    expect(pageSource).toContain("<AdminSummaryChips");
+    expect(purchasesSource).toContain("<AdminDataSurface");
+    expect(purchasesSource).not.toContain("<AdminCard");
+    expect(actionsSource).toContain("<AdminContextBar");
+    expect(actionsSource).toContain("<AdminSummaryChips");
+    expect(stylesSource).not.toContain(".overviewSummary {");
+    expect(stylesSource).not.toContain(".overviewMetricList {");
+    expect(stylesSource).not.toContain(".overviewQuickActions {");
+  });
+
+  it("uses task-oriented mobile cards for actionable economy entities", () => {
+    const packsSource = readFileSync(packsSectionPath, "utf8");
+    const purchasesSource = readFileSync(ledgerPurchasesSectionPath, "utf8");
+    const subscriptionsSource = readFileSync(subscriptionsSectionPath, "utf8");
+    const incidentsSource = readFileSync(incidentsSectionPath, "utf8");
+    const stylesSource = readFileSync(economyStylesPath, "utf8");
+
+    expect(packsSource).toContain("styles.entityTableWrap");
+    expect(packsSource).toContain("styles.entityTable");
+    expect(packsSource).toContain("data-label={text.packColumn}");
+    expect(packsSource).toContain("data-label={text.actionsColumn}");
+    expect(purchasesSource).toContain("styles.entityTableWrap");
+    expect(purchasesSource).toContain("styles.entityTable");
+    expect(purchasesSource).toContain("data-label={text.timeColumn}");
+    expect(purchasesSource).toContain("data-label={text.actionsColumn}");
+
+    expect(
+      subscriptionsSource.match(/className=\{styles\.economyDesktopTable\}/g) ?? []
+    ).toHaveLength(2);
+    expect(
+      subscriptionsSource.match(/className=\{styles\.economyMobileList\}/g) ?? []
+    ).toHaveLength(2);
+    expect(subscriptionsSource).toContain("<AdminDataSurface");
+    expect(subscriptionsSource).not.toContain("<AdminCard");
+    expect(subscriptionsSource).toContain("disabled={cancelSubscriptionPending ||");
+    expect(subscriptionsSource).toContain("onClick={() => onCancelSubscription(item)}");
+
+    expect(incidentsSource).toContain("className={styles.economyDesktopTable}");
+    expect(incidentsSource).toContain("className={styles.economyMobileList}");
+    expect(incidentsSource).toContain("<AdminDataSurface");
+    expect(incidentsSource).not.toContain("<AdminCard");
+    expect(incidentsSource.match(/<IncidentRowActions/g) ?? []).toHaveLength(2);
+    expect(incidentsSource).toContain("<details className={styles.economyMobileDiagnostic}>");
+    expect(incidentsSource).toContain("<summary>{text.incidentDiagnosticLabel}</summary>");
+    expect(
+      incidentsSource.slice(
+        incidentsSource.indexOf("className={`${adminTableStyles.table}"),
+        incidentsSource.indexOf("className={styles.economyMobileList}")
+      )
+    ).not.toContain("item.lastError");
+
+    expect(stylesSource).toContain(".economyMobileList {\n  display: none;");
+    expect(stylesSource).toContain(
+      ".economyDesktopTable {\n    display: none;\n  }\n\n  .economyMobileList {\n    display: grid;"
+    );
+    expect(stylesSource).toContain(".economyMobileFacts {\n    grid-template-columns: 1fr;\n  }");
+    expect(stylesSource).toContain(".entityTableWrap {\n    overflow: visible;");
+    expect(stylesSource).toContain(".entityTable tr {\n    min-width: 0;\n    display: grid;");
+    expect(stylesSource).toContain(".entityTable td::before {\n    content: attr(data-label);");
+  });
+
   it("keeps economy form fields and watermark previews usable on phone screens", () => {
     const stylesSource = readFileSync(economyStylesPath, "utf8");
 
     expect(stylesSource).toContain("@media (max-width: 640px)");
+    expect(stylesSource).toContain(
+      ".workspaceNav {\n    width: 100%;\n    max-width: 100%;\n    display: grid;\n    grid-template-columns: repeat(2, minmax(0, 1fr));"
+    );
     expect(stylesSource).toContain(".watermarkPreviewGrid {\n    grid-template-columns: 1fr;");
     expect(stylesSource).toContain(".windowFields,\n  .tableActions");
     expect(stylesSource).toContain("min-width: 0;");

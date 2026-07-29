@@ -11,6 +11,9 @@ const adminChromeContentPath = fileURLToPath(
 const adminShellStylesPath = fileURLToPath(
   new URL("./admin/admin-shell.module.css", import.meta.url)
 );
+const commandPaletteStylesPath = fileURLToPath(
+  new URL("./admin/admin-command-palette.module.css", import.meta.url)
+);
 
 describe("admin shell localization", () => {
   it("keeps the document language synchronized with the active locale route", () => {
@@ -37,6 +40,17 @@ describe("admin shell localization", () => {
 
     expect(styles).toMatch(/\.brandCaption\s*\{[\s\S]*?color:\s*var\(--text-muted\);/);
     expect(styles).toMatch(/\.userRole\s*\{[\s\S]*?color:\s*var\(--text-muted\);/);
+  });
+
+  it("reserves readable page identity space in the ultra-narrow topbar", () => {
+    const shellStyles = readFileSync(adminShellStylesPath, "utf8");
+    const commandPaletteStyles = readFileSync(commandPaletteStylesPath, "utf8");
+
+    expect(shellStyles).toContain("@media (max-width: 360px)");
+    expect(shellStyles).toContain(".topbarHeading {\n    min-width: 4.5rem;");
+    expect(shellStyles).toContain("width: var(--control-height-sm);");
+    expect(commandPaletteStyles).toContain("@media (max-width: 360px)");
+    expect(commandPaletteStyles).toContain("min-width: var(--control-height-sm);");
   });
 
   it("provides a keyboard bypass and a modal mobile navigation focus boundary", () => {

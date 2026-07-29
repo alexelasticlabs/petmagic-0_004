@@ -4,6 +4,19 @@ import { describe, expect, it } from "vitest";
 
 const primitivesCssPath = fileURLToPath(new URL("./admin-primitives.module.css", import.meta.url));
 const primitivesSourcePath = fileURLToPath(new URL("./admin-primitives.tsx", import.meta.url));
+const authenticatedRouteSurfacePaths = [
+  "../audit-events-page.tsx",
+  "../dashboard-view.tsx",
+  "../generations-page.tsx",
+  "../moderation-page.tsx",
+  "../templates/templates-analytics-hub-page.tsx",
+  "../templates/templates-catalog-workspace.tsx",
+  "../templates/templates-categories-view.tsx",
+  "../templates/templates-daily-featured-page.tsx",
+  "../../app/[locale]/loading.tsx",
+  "../../app/[locale]/error.tsx",
+  "./admin-not-found-page.tsx",
+].map((path) => fileURLToPath(new URL(path, import.meta.url)));
 
 describe("admin primitives responsive layout", () => {
   it("lets composed screens size status badges without CSS module hash selectors", () => {
@@ -42,6 +55,37 @@ describe("admin primitives responsive layout", () => {
 
     expect(source).toContain("<h2 className={styles.pageTitle}>{title}</h2>");
     expect(source).not.toContain("<h1 className={styles.pageTitle}>{title}</h1>");
+  });
+
+  it("keeps authenticated route identity exclusively in the shell topbar", () => {
+    const routeSources = authenticatedRouteSurfacePaths.map((path) => readFileSync(path, "utf8"));
+
+    for (const source of routeSources) {
+      expect(source).not.toContain("AdminPageHero");
+      expect(source).not.toContain("<h1");
+    }
+
+    expect(routeSources.join("\n")).toContain("AdminContextBar");
+  });
+
+  it("keeps compact metric context and semantic accents in the shared primitive", () => {
+    const source = readFileSync(primitivesSourcePath, "utf8");
+    const css = readFileSync(primitivesCssPath, "utf8");
+
+    expect(source).toContain("hint?: ReactNode;");
+    expect(source).toContain("tone?: AdminTone;");
+    expect(source).toContain('data-tone={item.tone && item.tone !== "neutral"');
+    expect(source).toContain("styles.metricChipHint");
+    expect(css).toContain('.metricChip[data-tone="success"]');
+    expect(css).toContain('.metricChip[data-tone="danger"]');
+    expect(css).toContain("box-shadow: inset 0 2px 0 var(--metric-accent);");
+    expect(css).toContain(".metricChipHint {");
+  });
+
+  it("lets composed sections bind shared headings to aria-labelledby", () => {
+    const source = readFileSync(primitivesSourcePath, "utf8");
+
+    expect(source).toContain("<h2 id={titleId} className={styles.sectionHeading}>");
   });
 
   it("keeps shared primitive typography and surfaces on theme tokens", () => {

@@ -173,6 +173,20 @@ describe("admin-navigation", () => {
     expect(getAdminPageMeta("ru", "/templates/daily-featured", "Admin").description).toBe(
       "Ручные назначения и автоматический выбор шаблона дня."
     );
+    expect(
+      getAdminPageMeta(
+        "ru",
+        "/templates/image/analytics/11111111-1111-4111-8111-111111111111",
+        "Admin"
+      ).title
+    ).toBe("Аналитика шаблонов");
+    expect(
+      getAdminPageMeta(
+        "en",
+        "/templates/video/analytics/11111111-1111-4111-8111-111111111111",
+        "Admin"
+      ).title
+    ).toBe("Template analytics");
   });
 
   it("sources admin page meta copy from a centralized content module", () => {

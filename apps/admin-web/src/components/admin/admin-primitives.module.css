@@ -45,6 +45,26 @@
   padding: clamp(0.86rem, 0.74rem + 0.22vw, 1rem);
 }
 
+.filterToolbar,
+.dataSurface {
+  min-width: 0;
+}
+
+.filterToolbar {
+  background: color-mix(in srgb, var(--surface-1) 94%, var(--primary) 6%);
+}
+
+.filterToolbarControls {
+  min-width: 0;
+}
+
+.filterToolbarActive {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
 .cardPaddingLg {
   padding: clamp(0.96rem, 0.8rem + 0.28vw, 1.18rem);
 }
@@ -235,6 +255,36 @@
   overflow-wrap: anywhere;
 }
 
+.contextBar {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+  padding: 0.28rem 0 0.5rem;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.contextBarLead,
+.contextBarActions {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.42rem;
+}
+
+.contextBarActions {
+  justify-content: flex-end;
+}
+
+.contextBarLabel {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-weight: 650;
+}
+
 .sectionHeader {
   display: flex;
   flex-wrap: wrap;
@@ -294,16 +344,50 @@
 }
 
 .metricChip {
+  --metric-accent: transparent;
+  --metric-accent-soft: transparent;
+
   min-width: 0;
   display: grid;
   gap: 0.125rem;
   padding: 0.64rem 0.72rem;
   border-right: 1px solid var(--border-soft);
-  background: transparent;
+  background: var(--metric-accent-soft);
+  box-shadow: inset 0 2px 0 var(--metric-accent);
   transition:
     border-color 140ms ease,
     background-color 140ms ease,
     box-shadow 140ms ease;
+}
+
+.metricChip[data-tone="primary"] {
+  --metric-accent: var(--accent);
+  --metric-accent-soft: color-mix(in srgb, var(--primary-soft-bg) 38%, transparent);
+}
+
+.metricChip[data-tone="info"] {
+  --metric-accent: var(--info);
+  --metric-accent-soft: color-mix(in srgb, var(--info) 6%, transparent);
+}
+
+.metricChip[data-tone="success"] {
+  --metric-accent: var(--success);
+  --metric-accent-soft: color-mix(in srgb, var(--success) 6%, transparent);
+}
+
+.metricChip[data-tone="warning"] {
+  --metric-accent: var(--warning);
+  --metric-accent-soft: color-mix(in srgb, var(--warning) 7%, transparent);
+}
+
+.metricChip[data-tone="danger"] {
+  --metric-accent: var(--danger);
+  --metric-accent-soft: color-mix(in srgb, var(--danger) 6%, transparent);
+}
+
+.metricChip[data-tone="magenta"] {
+  --metric-accent: var(--magenta);
+  --metric-accent-soft: color-mix(in srgb, var(--magenta) 6%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -327,6 +411,16 @@
   font-size: 1.04rem;
   font-weight: 650;
   line-height: 1.1;
+}
+
+.metricChipHint {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 0.6875rem;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .statContent {
@@ -786,6 +880,14 @@
 }
 
 @media (max-width: 640px) {
+  .contextBar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .contextBarActions {
+    justify-content: flex-start;
+  }
   .cardPaddingLg,
   .cardPaddingMd,
   .statCard {

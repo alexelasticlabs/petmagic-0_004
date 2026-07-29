@@ -6,10 +6,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useSyncToastToAdminNotifications } from "@/components/admin/admin-notifications";
 import {
   AdminCard,
+  AdminContextBar,
   AdminKpiCard,
   AdminPage,
   AdminPageGrid,
-  AdminPageHero,
   AdminStateCard,
 } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
@@ -447,10 +447,7 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
 
   return (
     <AdminPage className={styles.catalogPage}>
-      <AdminPageHero
-        eyebrow={categoryText.heroEyebrow}
-        title={categoryText.heroTitle}
-        description={categoryText.heroDescription}
+      <AdminContextBar
         badge={canManageCategories ? categoryText.crudEnabled : categoryText.readOnly}
         actions={
           <div className={styles.catalogActions}>

@@ -7,6 +7,13 @@ describe("admin-query-keys", () => {
     expect(adminQueryKeys.systemStatus).toEqual(["admin", "system", "status"]);
   });
 
+  it("keeps notification filters under one invalidation root", () => {
+    const query = { state: "unread", priority: "critical", take: 24 };
+
+    expect(adminQueryKeys.notificationsRoot).toEqual(["admin", "notifications"]);
+    expect(adminQueryKeys.notifications(query)).toEqual(["admin", "notifications", query]);
+  });
+
   it("provides a stable template category diagnostics key", () => {
     expect(adminQueryKeys.templateCategoryDiagnostics).toEqual([
       "admin",

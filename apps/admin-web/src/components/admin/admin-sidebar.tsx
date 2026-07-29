@@ -28,6 +28,7 @@ type AdminSidebarProps = {
   currentPath: string;
   isOpen: boolean;
   isDrawerMode: boolean;
+  isCollapsed: boolean;
   sidebarRef: RefObject<HTMLElement | null>;
   onClose: () => void;
   onNavigate: () => void;
@@ -72,6 +73,7 @@ export function AdminSidebar({
   currentPath,
   isOpen,
   isDrawerMode,
+  isCollapsed,
   sidebarRef,
   onClose,
   onNavigate,
@@ -105,6 +107,7 @@ export function AdminSidebar({
             className={`${styles.navItem}${groupSelected ? ` ${styles.navItemActive}` : ""}`}
             aria-current={groupCurrent ? "page" : undefined}
             onClick={onNavigate}
+            title={isCollapsed ? item.label : undefined}
           >
             <Icon className={styles.navIcon} />
             <span className={styles.navLabel}>{item.label}</span>
@@ -144,6 +147,7 @@ export function AdminSidebar({
         className={`${styles.navItem}${active ? ` ${styles.navItemActive}` : ""}`}
         aria-current={active ? "page" : undefined}
         onClick={onNavigate}
+        title={isCollapsed ? item.label : undefined}
       >
         <Icon className={styles.navIcon} />
         <span className={styles.navLabel}>{item.label}</span>
@@ -163,7 +167,7 @@ export function AdminSidebar({
     <aside
       ref={sidebarRef}
       id="admin-sidebar"
-      className={`${styles.sidebar}${isOpen ? ` ${styles.sidebarOpen}` : ""}`}
+      className={`${styles.sidebar}${isOpen ? ` ${styles.sidebarOpen}` : ""}${isCollapsed ? ` ${styles.sidebarCollapsed}` : ""}`}
       role={isDrawerDialog ? "dialog" : undefined}
       aria-modal={isDrawerDialog ? "true" : undefined}
       aria-label={navigationLabel}

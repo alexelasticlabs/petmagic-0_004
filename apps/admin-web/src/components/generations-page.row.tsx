@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
 
 import {
   AdminBadge,
@@ -140,6 +141,58 @@ export function formatInputSourceType(
   return text.inputSourceTypeLabels.user_upload;
 }
 
+function TechnicalId({ value, text }: { value: string; text: GenerationsPageText }) {
+  const safeValue = sanitizeSensitiveText(value, 160);
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
+  const resetTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (resetTimerRef.current !== null) {
+        window.clearTimeout(resetTimerRef.current);
+      }
+    };
+  }, []);
+
+  async function copyFullId() {
+    try {
+      await navigator.clipboard.writeText(safeValue);
+      setCopyState("copied");
+    } catch {
+      setCopyState("failed");
+    }
+
+    if (resetTimerRef.current !== null) {
+      window.clearTimeout(resetTimerRef.current);
+    }
+    resetTimerRef.current = window.setTimeout(() => setCopyState("idle"), 1800);
+  }
+
+  const copyLabel =
+    copyState === "copied"
+      ? text.copiedId
+      : copyState === "failed"
+        ? text.copyIdFailed
+        : text.copyId;
+
+  return (
+    <span className={styles.technicalId}>
+      <span className={styles.jobId} title={safeValue} aria-label={safeValue}>
+        {formatShortId(safeValue)}
+      </span>
+      <button
+        type="button"
+        className={styles.copyIdButton}
+        onClick={() => void copyFullId()}
+        aria-label={`${copyLabel}: ${safeValue}`}
+        title={copyLabel}
+      >
+        {copyState === "copied" ? "✓" : "⧉"}
+      </button>
+    </span>
+  );
+}
+
 export function GenerationRow({
   item,
   locale,
@@ -193,8 +246,6 @@ export function GenerationRow({
   const modelText = formatSafeText(item.model, "");
   const templateTitle = formatSafeText(item.templateTitle);
   const generationIdText = formatShortId(item.generationId);
-  const userIdText = formatShortId(item.userId);
-  const templateIdText = formatShortId(item.templateId);
   const detailsPanelId = `generation-details-${item.generationId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
   const toggleDetailsLabel = `${isExpanded ? text.hideDetails : text.showDetails}: ${generationIdText}`;
   const grantCleanLabel = `${text.grantClean}: ${generationIdText}`;
@@ -257,11 +308,9 @@ export function GenerationRow({
 
   return (
     <>
-      <tr>
-        <td className={adminTableStyles.mono}>
-          <span className={styles.jobId} title={generationIdText} aria-label={generationIdText}>
-            {generationIdText}
-          </span>
+      <tr className={styles.generationRow}>
+        <td className={adminTableStyles.mono} data-label={text.job}>
+          <TechnicalId value={item.generationId} text={text} />
           <div>
             <button
               type="button"
@@ -330,16 +379,15 @@ export function GenerationRow({
             ) : null}
           </div>
         </td>
-        <td className={adminTableStyles.mono}>
-          <span className={styles.jobId} title={userIdText} aria-label={userIdText}>
-            {userIdText}
-          </span>
+        <td className={adminTableStyles.mono} data-label={text.user}>
+          <TechnicalId value={item.userId} text={text} />
         </td>
-        <td>
+        <td data-label={text.template}>
           <span className={styles.templateTitle}>
             <strong>{templateTitle}</strong>
             <span>
-              {formatTemplateType(item.templateType, text)} / {templateIdText}
+              {formatTemplateType(item.templateType, text)} /{" "}
+              <TechnicalId value={item.templateId} text={text} />
             </span>
             <span className={styles.lineage}>{lineageText}</span>
             {lineageMetadataText ? (
@@ -347,24 +395,30 @@ export function GenerationRow({
             ) : null}
           </span>
         </td>
-        <td className={styles.statusCell}>
+        <td className={styles.statusCell} data-label={text.status}>
           <AdminStatusBadge color={getStatusTone(item.status)}>
             {formatStatus(item.status, text)}
           </AdminStatusBadge>
         </td>
-        <td>
+        <td data-label={text.provider}>
           {providerText !== "-" ? <AdminBadge tone="info">{providerText}</AdminBadge> : "-"}
           {modelText ? <div className={adminTableStyles.mono}>{modelText}</div> : null}
         </td>
-        <td className={adminTableStyles.numeric}>{item.tokenCost}</td>
-        <td className={adminTableStyles.numeric}>{item.attemptCount}</td>
-        <td className={adminTableStyles.numeric}>{formatMoney(item.providerCostUsd, locale)}</td>
-        <td>
+        <td className={adminTableStyles.numeric} data-label={text.cost}>
+          {item.tokenCost}
+        </td>
+        <td className={adminTableStyles.numeric} data-label={text.attempts}>
+          {item.attemptCount}
+        </td>
+        <td className={adminTableStyles.numeric} data-label={text.usdLabel}>
+          {formatMoney(item.providerCostUsd, locale)}
+        </td>
+        <td data-label={text.failure}>
           <span className={styles.failure} aria-label={failureText} title={failureText}>
             {failureDisplayText}
           </span>
         </td>
-        <td>
+        <td data-label={text.watermark}>
           <span className={styles.watermarkMeta}>
             <strong>{watermarkState}</strong>
             {watermarkMethod ? (
@@ -397,11 +451,13 @@ export function GenerationRow({
             ) : null}
           </span>
         </td>
-        <td>{formatDateTime(item.createdAtUtc, locale)}</td>
-        <td>{item.completedAtUtc ? formatDateTime(item.completedAtUtc, locale) : "-"}</td>
+        <td data-label={text.created}>{formatDateTime(item.createdAtUtc, locale)}</td>
+        <td data-label={text.completedAt}>
+          {item.completedAtUtc ? formatDateTime(item.completedAtUtc, locale) : "-"}
+        </td>
       </tr>
       {isExpanded ? (
-        <tr>
+        <tr className={styles.detailsRow}>
           <td colSpan={12} className={styles.detailsCell}>
             <div className={styles.detailsPanel} id={detailsPanelId}>
               {detailLoading ? <p role="status">{text.loadingTitle}</p> : null}

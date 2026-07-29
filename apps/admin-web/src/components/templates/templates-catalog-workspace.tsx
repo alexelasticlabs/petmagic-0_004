@@ -11,7 +11,7 @@ import {
   TemplatesIcon,
   VideoIcon,
 } from "@/components/admin/admin-icons";
-import { AdminCard, AdminMetricStrip, AdminPageHero } from "@/components/admin/admin-primitives";
+import { AdminCard, AdminContextBar, AdminMetricStrip } from "@/components/admin/admin-primitives";
 import type { TemplatesCatalogViewText } from "@/components/templates/templates-catalog-view.content";
 import styles from "@/components/templates/templates-catalog.module.css";
 import type { AdminTemplateCatalogSummary, TemplateType } from "@/lib/api-client";
@@ -67,10 +67,8 @@ export function TemplatesCatalogWorkspaceHeader({
 
   return (
     <>
-      <AdminPageHero
+      <AdminContextBar
         className={styles.catalogHero}
-        title={copy.title}
-        description={copy.description}
         actions={
           <div className={styles.catalogActions}>
             {canManageTemplates ? (

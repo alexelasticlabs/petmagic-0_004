@@ -31,6 +31,7 @@ await withE2eBuildIsolation(
       PLAYWRIGHT_EXTERNAL_SERVER: "1",
       NEXT_PUBLIC_API_BASE_URL: "https://api.petmagic.test",
       NEXT_PUBLIC_E2E_DISABLE_SUPPORT_REALTIME: "1",
+      NEXT_PUBLIC_E2E_DISABLE_ADMIN_NOTIFICATIONS_REALTIME: "1",
       ADMIN_MEDIA_ORIGINS: "https://cdn.petgpt.app",
     };
 

@@ -16,6 +16,7 @@ export default function RootNotFoundPage() {
   return (
     <AdminPage>
       <AdminPageHero
+        showTitle
         eyebrow="404"
         title={text.notFoundTitle}
         description={text.notFoundDescription}

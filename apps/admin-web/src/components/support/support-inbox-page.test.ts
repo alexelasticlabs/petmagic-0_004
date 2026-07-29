@@ -31,11 +31,11 @@ describe("support inbox page", () => {
     expect(source).toContain("{text.adminRetryAction}");
     expect(source).toContain("useQuery<AdminSupportInboxPage>");
     expect(source).toContain("sortSupportQueueItems(inboxQuery.data?.items ?? [])");
-    expect(source).toContain("const sortedConversationIdSignature = sortedConversations");
-    expect(source).toContain(".map((conversation) => conversation.conversationId)");
+    expect(source).toContain("const sortedConversationIds = useMemo(");
     expect(source).toContain(
-      'sortedConversationIdSignature.split("|").includes(selectedConversationId)'
+      "new Set(sortedConversations.map((conversation) => conversation.conversationId))"
     );
+    expect(source).toContain("sortedConversationIds.has(selectedConversationId)");
     expect(source).toContain("let isActive = true;");
     expect(source).toContain("queueMicrotask(() => {");
     expect(source).toContain("if (isActive) {\n        setSelectedConversationId(null);");

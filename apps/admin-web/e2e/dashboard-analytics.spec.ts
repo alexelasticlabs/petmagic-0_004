@@ -269,7 +269,12 @@ test("dashboard switches commerce ranges and stays within the mobile viewport", 
   await page.locator("#login-password").fill("production-ready-password");
   await page.locator('form button[type="submit"]').click();
   await expect(page).toHaveURL(/\/en\/dashboard$/);
-  await expect(page.getByRole("heading", { name: "Admin Overview", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("banner").getByRole("heading", { name: "Dashboard", exact: true })
+  ).toBeVisible();
+  await expect(
+    page.locator("#admin-main").getByRole("heading", { name: "Admin Overview", exact: true })
+  ).toHaveCount(0);
 
   const attentionRegion = page.getByRole("region", { name: "Needs attention", exact: true });
   await expect(attentionRegion).toBeVisible();
@@ -357,6 +362,10 @@ test("dashboard switches commerce ranges and stays within the mobile viewport", 
       }))
     )
     .toEqual({ clientWidth: 390, scrollWidth: 390 });
+
+  await expect(page.getByRole("list", { name: "Recent orders", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "#ORDER1", exact: true }).last()).toBeVisible();
+  await expect(page.locator("table").filter({ hasText: "#ORDER1" })).toBeHidden();
 
   await page.screenshot({ path: testInfo.outputPath("dashboard-mobile-viewport.png") });
 

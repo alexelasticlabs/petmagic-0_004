@@ -2,59 +2,6 @@
   gap: clamp(0.85rem, 0.72rem + 0.25vw, 1rem);
 }
 
-.intro {
-  min-width: 0;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: clamp(0.85rem, 0.74rem + 0.28vw, 1rem);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius);
-  background: var(--surface-1);
-  box-shadow: var(--shadow-card);
-}
-
-.introCopy {
-  min-width: 0;
-  display: grid;
-  gap: 0.28rem;
-}
-
-.eyebrow {
-  margin: 0;
-  color: var(--accent);
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  line-height: 1.2;
-  text-transform: uppercase;
-}
-
-.description {
-  max-width: 76ch;
-  margin: 0;
-  color: var(--text-soft);
-  font-size: 0.82rem;
-  line-height: 1.5;
-}
-
-.introActions {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.65rem;
-}
-
-.updated {
-  max-width: 15rem;
-  color: var(--text-muted);
-  font-size: 0.72rem;
-  line-height: 1.35;
-  text-align: right;
-}
-
 .metricsGrid {
   min-width: 0;
   display: grid;
@@ -811,22 +758,6 @@
 }
 
 @media (max-width: 720px) {
-  .intro {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .introActions {
-    align-items: stretch;
-    justify-content: flex-start;
-    flex-direction: column-reverse;
-  }
-
-  .updated {
-    max-width: none;
-    text-align: left;
-  }
-
   .metricsGrid {
     grid-template-columns: 1fr;
   }
@@ -866,7 +797,6 @@
 }
 
 @media (max-width: 420px) {
-  .intro,
   .panel,
   .metricCard {
     padding: 0.75rem;

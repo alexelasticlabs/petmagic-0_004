@@ -558,238 +558,240 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
 
   return (
     <>
-      <AdminCard
-        title={text.title}
-        description={text.description}
-        action={
-          <div className={styles.actions}>
-            <button
-              className={styles.button}
-              type="button"
-              disabled={refreshMutation.isPending}
-              onClick={() => refreshMutation.mutate()}
-            >
-              {refreshMutation.isPending ? text.refreshingProvider : text.refreshProvider}
-            </button>
-            <button
-              className={styles.primaryButton}
-              type="button"
-              disabled={snapshotTooOld}
-              onClick={openEditor}
-            >
-              {text.editPolicy}
-            </button>
-          </div>
-        }
-      >
-        <div className={styles.statusRow}>
-          <AdminBadge tone={control.admissionEnabled ? "success" : "danger"}>
-            {control.admissionEnabled ? text.admissionOn : text.admissionOff}
-          </AdminBadge>
-          <AdminBadge tone={balanceTone(control.balance.state)}>
-            {text.balanceStateLabels[control.balance.state]}
-          </AdminBadge>
-          <span>
-            {text.policyRevision}: {control.revision}
-          </span>
-          <span>
-            {text.confirmedAt}: {formatOptionalDate(control.confirmedAtUtc, locale)}
-          </span>
-        </div>
-
-        <div className={styles.metricGrid}>
-          <AdminKpiCard
-            label={text.effectiveCapacity}
-            value={String(control.effectiveGlobalLimit)}
-            hint={`${text.providerLimit}: ${control.confirmedFalConcurrencyLimit} · reserve ${control.reservedHeadroom}`}
-            tone={control.admissionEnabled ? "primary" : "danger"}
-          />
-          <AdminKpiCard
-            label={text.balance}
-            value={formatUsd(control.balance.currentBalanceUsd, locale)}
-            hint={`${text.checkedAt}: ${formatOptionalDate(control.balance.checkedAtUtc, locale)}`}
-            tone={balanceTone(control.balance.state)}
-          />
-          <AdminKpiCard
-            label={text.inFlight}
-            value={`${control.lanes.inFlightTotal} / ${control.effectiveGlobalLimit}`}
-            hint={`${usagePercent}% · ${text.borrowedSlots}: ${control.lanes.borrowedSlotsInUse}`}
-            tone={usagePercent >= 90 ? "warning" : "info"}
-          />
-          <AdminKpiCard
-            label={text.queued}
-            value={String(control.queue.totalDepth)}
-            hint={`${text.imageQueue}: ${control.queue.imageDepth} · ${text.videoQueue}: ${control.queue.videoDepth}`}
-            tone={control.queue.totalDepth > 0 ? "magenta" : "success"}
-          />
-        </div>
-
-        <div className={styles.progressHeader}>
-          <span>{text.capacityUsage}</span>
-          <strong>{usagePercent}%</strong>
-        </div>
-        <div
-          className={styles.progressTrack}
-          role="progressbar"
-          aria-label={text.capacityUsage}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={usagePercent}
-        >
-          <span style={{ width: `${usagePercent}%` }} />
-        </div>
-
-        {capacityQuery.isRefetchError || snapshotTooOld ? (
-          <AdminStateCard
-            title={snapshotTooOld ? text.snapshotTooOldTitle : text.snapshotRefreshFailedTitle}
-            description={
-              snapshotTooOld
-                ? text.snapshotTooOldDescription
-                : getAdminErrorMessage(capacityQuery.error, text.snapshotRefreshFailedDescription)
-            }
-            tone="warning"
-            action={
+      <div data-admin-surface="generation-capacity">
+        <AdminCard
+          title={text.title}
+          description={text.description}
+          action={
+            <div className={styles.actions}>
               <button
                 className={styles.button}
                 type="button"
-                disabled={capacityQuery.isFetching}
-                onClick={() => void capacityQuery.refetch().catch(() => undefined)}
+                disabled={refreshMutation.isPending}
+                onClick={() => refreshMutation.mutate()}
               >
-                {text.retry}
+                {refreshMutation.isPending ? text.refreshingProvider : text.refreshProvider}
               </button>
-            }
-          />
-        ) : null}
-        {refreshError ? <AdminStateCard title={refreshError} tone="warning" /> : null}
-        {control.alerts.length > 0 ? (
-          <section className={styles.alerts} aria-label={text.alerts}>
-            {control.alerts.map((alert) => (
-              <AdminStateCard
-                key={buildGenerationCapacityAlertTransitionKey(alert)}
-                title={getGenerationCapacityAlertText(locale, alert).title}
-                description={getGenerationCapacityAlertText(locale, alert).message}
-                tone={alertTone(alert.severity)}
-              />
-            ))}
-          </section>
-        ) : null}
+              <button
+                className={styles.primaryButton}
+                type="button"
+                disabled={snapshotTooOld}
+                onClick={openEditor}
+              >
+                {text.editPolicy}
+              </button>
+            </div>
+          }
+        >
+          <div className={styles.statusRow}>
+            <AdminBadge tone={control.admissionEnabled ? "success" : "danger"}>
+              {control.admissionEnabled ? text.admissionOn : text.admissionOff}
+            </AdminBadge>
+            <AdminBadge tone={balanceTone(control.balance.state)}>
+              {text.balanceStateLabels[control.balance.state]}
+            </AdminBadge>
+            <span>
+              {text.policyRevision}: {control.revision}
+            </span>
+            <span>
+              {text.confirmedAt}: {formatOptionalDate(control.confirmedAtUtc, locale)}
+            </span>
+          </div>
 
-        <GenerationProviderRecoveryPanel
-          locale={locale}
-          enabled={control.lanes.submissionUnknownCount > 0}
-        />
+          <div className={styles.metricGrid}>
+            <AdminKpiCard
+              label={text.effectiveCapacity}
+              value={String(control.effectiveGlobalLimit)}
+              hint={`${text.providerLimit}: ${control.confirmedFalConcurrencyLimit} · reserve ${control.reservedHeadroom}`}
+              tone={control.admissionEnabled ? "primary" : "danger"}
+            />
+            <AdminKpiCard
+              label={text.balance}
+              value={formatUsd(control.balance.currentBalanceUsd, locale)}
+              hint={`${text.checkedAt}: ${formatOptionalDate(control.balance.checkedAtUtc, locale)}`}
+              tone={balanceTone(control.balance.state)}
+            />
+            <AdminKpiCard
+              label={text.inFlight}
+              value={`${control.lanes.inFlightTotal} / ${control.effectiveGlobalLimit}`}
+              hint={`${usagePercent}% · ${text.borrowedSlots}: ${control.lanes.borrowedSlotsInUse}`}
+              tone={usagePercent >= 90 ? "warning" : "info"}
+            />
+            <AdminKpiCard
+              label={text.queued}
+              value={String(control.queue.totalDepth)}
+              hint={`${text.imageQueue}: ${control.queue.imageDepth} · ${text.videoQueue}: ${control.queue.videoDepth}`}
+              tone={control.queue.totalDepth > 0 ? "magenta" : "success"}
+            />
+          </div>
 
-        <div className={styles.detailGrid}>
-          <details className={styles.details} open>
-            <summary>{text.profile}</summary>
-            <dl className={styles.definitionGrid}>
-              {profileRows(control.effectiveProfile, text).map(([label, value]) => (
-                <div key={label}>
-                  <dt>{label}</dt>
-                  <dd>{value}</dd>
-                </div>
+          <div className={styles.progressHeader}>
+            <span>{text.capacityUsage}</span>
+            <strong>{usagePercent}%</strong>
+          </div>
+          <div
+            className={styles.progressTrack}
+            role="progressbar"
+            aria-label={text.capacityUsage}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={usagePercent}
+          >
+            <span style={{ width: `${usagePercent}%` }} />
+          </div>
+
+          {capacityQuery.isRefetchError || snapshotTooOld ? (
+            <AdminStateCard
+              title={snapshotTooOld ? text.snapshotTooOldTitle : text.snapshotRefreshFailedTitle}
+              description={
+                snapshotTooOld
+                  ? text.snapshotTooOldDescription
+                  : getAdminErrorMessage(capacityQuery.error, text.snapshotRefreshFailedDescription)
+              }
+              tone="warning"
+              action={
+                <button
+                  className={styles.button}
+                  type="button"
+                  disabled={capacityQuery.isFetching}
+                  onClick={() => void capacityQuery.refetch().catch(() => undefined)}
+                >
+                  {text.retry}
+                </button>
+              }
+            />
+          ) : null}
+          {refreshError ? <AdminStateCard title={refreshError} tone="warning" /> : null}
+          {control.alerts.length > 0 ? (
+            <section className={styles.alerts} aria-label={text.alerts}>
+              {control.alerts.map((alert) => (
+                <AdminStateCard
+                  key={buildGenerationCapacityAlertTransitionKey(alert)}
+                  title={getGenerationCapacityAlertText(locale, alert).title}
+                  description={getGenerationCapacityAlertText(locale, alert).message}
+                  tone={alertTone(alert.severity)}
+                />
               ))}
-            </dl>
-          </details>
+            </section>
+          ) : null}
 
-          <details className={styles.details}>
-            <summary>{text.worker}</summary>
-            <dl className={styles.definitionGrid}>
-              <div>
-                <dt>{text.workerInstances}</dt>
-                <dd>{control.worker.instanceCount}</dd>
-              </div>
-              <div>
-                <dt>{text.workerRevision}</dt>
-                <dd>{control.worker.appliedPolicyRevision ?? "—"}</dd>
-              </div>
-              <div>
-                <dt>{text.schedulerMode}</dt>
-                <dd>
-                  {control.worker.schedulerV2Enabled === null
-                    ? text.balanceUnknown
-                    : control.worker.schedulerV2Enabled
-                      ? text.schedulerV2On
-                      : text.schedulerV2Off}
-                </dd>
-              </div>
-              <div>
-                <dt>{text.workerHeartbeat}</dt>
-                <dd>{formatOptionalDate(control.worker.heartbeatAtUtc, locale)}</dd>
-              </div>
-              <div>
-                <dt>{text.workerProgress}</dt>
-                <dd>{formatOptionalDate(control.worker.lastProgressAtUtc, locale)}</dd>
-              </div>
-              <div>
-                <dt>{text.imageInFlight}</dt>
-                <dd>{control.lanes.imageInFlight}</dd>
-              </div>
-              <div>
-                <dt>{text.videoInFlight}</dt>
-                <dd>{control.lanes.videoInFlight}</dd>
-              </div>
-              <div>
-                <dt>{text.preprocessingInFlight}</dt>
-                <dd>{control.lanes.videoPreprocessingInFlight}</dd>
-              </div>
-              <div>
-                <dt>{text.submissionUnknown}</dt>
-                <dd>{control.lanes.submissionUnknownCount}</dd>
-              </div>
-              <div>
-                <dt>{text.nativeSlots}</dt>
-                <dd>{control.lanes.nativeSlotsInUse}</dd>
-              </div>
-              <div>
-                <dt>{text.borrowedSlots}</dt>
-                <dd>{control.lanes.borrowedSlotsInUse}</dd>
-              </div>
-              <div>
-                <dt>{text.reservedSlots}</dt>
-                <dd>{control.lanes.reservedSlotsAvailable}</dd>
-              </div>
-              <div>
-                <dt>{text.dispatch}</dt>
-                <dd>{control.worker.dispatchConcurrency ?? text.balanceUnknown}</dd>
-              </div>
-              <div>
-                <dt>{text.reconciliation}</dt>
-                <dd>{control.worker.reconciliationConcurrency ?? text.balanceUnknown}</dd>
-              </div>
-              <div>
-                <dt>{text.mediaImport}</dt>
-                <dd>{control.worker.mediaImportConcurrency ?? text.balanceUnknown}</dd>
-              </div>
-              <div>
-                <dt>{text.maintenance}</dt>
-                <dd>{control.worker.maintenanceConcurrency ?? text.balanceUnknown}</dd>
-              </div>
-            </dl>
-          </details>
+          <GenerationProviderRecoveryPanel
+            locale={locale}
+            enabled={control.lanes.submissionUnknownCount > 0}
+          />
 
-          <details className={styles.details}>
-            <summary>{text.stages}</summary>
-            <p className={styles.emptyDetail}>
-              {control.queue.oldestQueuedAtUtc
-                ? `${text.oldestQueued}: ${formatOptionalDate(control.queue.oldestQueuedAtUtc, locale)}`
-                : text.noQueue}
-            </p>
-            {control.queue.stages.length > 0 ? (
+          <div className={styles.detailGrid}>
+            <details className={styles.details}>
+              <summary>{text.profile}</summary>
               <dl className={styles.definitionGrid}>
-                {control.queue.stages.map((stage) => (
-                  <div key={stage.stage}>
-                    <dt>{stage.stage}</dt>
-                    <dd>{stage.count}</dd>
+                {profileRows(control.effectiveProfile, text).map(([label, value]) => (
+                  <div key={label}>
+                    <dt>{label}</dt>
+                    <dd>{value}</dd>
                   </div>
                 ))}
               </dl>
-            ) : (
-              <p className={styles.emptyDetail}>{text.noStages}</p>
-            )}
-          </details>
-        </div>
-      </AdminCard>
+            </details>
+
+            <details className={styles.details}>
+              <summary>{text.worker}</summary>
+              <dl className={styles.definitionGrid}>
+                <div>
+                  <dt>{text.workerInstances}</dt>
+                  <dd>{control.worker.instanceCount}</dd>
+                </div>
+                <div>
+                  <dt>{text.workerRevision}</dt>
+                  <dd>{control.worker.appliedPolicyRevision ?? "—"}</dd>
+                </div>
+                <div>
+                  <dt>{text.schedulerMode}</dt>
+                  <dd>
+                    {control.worker.schedulerV2Enabled === null
+                      ? text.balanceUnknown
+                      : control.worker.schedulerV2Enabled
+                        ? text.schedulerV2On
+                        : text.schedulerV2Off}
+                  </dd>
+                </div>
+                <div>
+                  <dt>{text.workerHeartbeat}</dt>
+                  <dd>{formatOptionalDate(control.worker.heartbeatAtUtc, locale)}</dd>
+                </div>
+                <div>
+                  <dt>{text.workerProgress}</dt>
+                  <dd>{formatOptionalDate(control.worker.lastProgressAtUtc, locale)}</dd>
+                </div>
+                <div>
+                  <dt>{text.imageInFlight}</dt>
+                  <dd>{control.lanes.imageInFlight}</dd>
+                </div>
+                <div>
+                  <dt>{text.videoInFlight}</dt>
+                  <dd>{control.lanes.videoInFlight}</dd>
+                </div>
+                <div>
+                  <dt>{text.preprocessingInFlight}</dt>
+                  <dd>{control.lanes.videoPreprocessingInFlight}</dd>
+                </div>
+                <div>
+                  <dt>{text.submissionUnknown}</dt>
+                  <dd>{control.lanes.submissionUnknownCount}</dd>
+                </div>
+                <div>
+                  <dt>{text.nativeSlots}</dt>
+                  <dd>{control.lanes.nativeSlotsInUse}</dd>
+                </div>
+                <div>
+                  <dt>{text.borrowedSlots}</dt>
+                  <dd>{control.lanes.borrowedSlotsInUse}</dd>
+                </div>
+                <div>
+                  <dt>{text.reservedSlots}</dt>
+                  <dd>{control.lanes.reservedSlotsAvailable}</dd>
+                </div>
+                <div>
+                  <dt>{text.dispatch}</dt>
+                  <dd>{control.worker.dispatchConcurrency ?? text.balanceUnknown}</dd>
+                </div>
+                <div>
+                  <dt>{text.reconciliation}</dt>
+                  <dd>{control.worker.reconciliationConcurrency ?? text.balanceUnknown}</dd>
+                </div>
+                <div>
+                  <dt>{text.mediaImport}</dt>
+                  <dd>{control.worker.mediaImportConcurrency ?? text.balanceUnknown}</dd>
+                </div>
+                <div>
+                  <dt>{text.maintenance}</dt>
+                  <dd>{control.worker.maintenanceConcurrency ?? text.balanceUnknown}</dd>
+                </div>
+              </dl>
+            </details>
+
+            <details className={styles.details}>
+              <summary>{text.stages}</summary>
+              <p className={styles.emptyDetail}>
+                {control.queue.oldestQueuedAtUtc
+                  ? `${text.oldestQueued}: ${formatOptionalDate(control.queue.oldestQueuedAtUtc, locale)}`
+                  : text.noQueue}
+              </p>
+              {control.queue.stages.length > 0 ? (
+                <dl className={styles.definitionGrid}>
+                  {control.queue.stages.map((stage) => (
+                    <div key={stage.stage}>
+                      <dt>{stage.stage}</dt>
+                      <dd>{stage.count}</dd>
+                    </div>
+                  ))}
+                </dl>
+              ) : (
+                <p className={styles.emptyDetail}>{text.noStages}</p>
+              )}
+            </details>
+          </div>
+        </AdminCard>
+      </div>
 
       <ConfirmationDialog
         open={isEditorOpen && draft !== null}

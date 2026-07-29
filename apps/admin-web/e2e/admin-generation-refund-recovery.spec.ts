@@ -7,6 +7,72 @@ const userId = "33333333-3333-4333-8333-333333333333";
 const templateId = "44444444-4444-4444-8444-444444444444";
 const recoveryReason = "Verified provider recovery after exhausted automatic attempts.";
 
+const generationControlSnapshot = {
+  revision: 1,
+  admissionEnabled: true,
+  confirmedFalConcurrencyLimit: 6,
+  confirmedAtUtc: "2026-07-27T09:30:00Z",
+  reservedHeadroom: 1,
+  applicationHardCeiling: 5,
+  effectiveGlobalLimit: 4,
+  policy: {
+    globalMaxConcurrentGenerations: 4,
+    imageReservedConcurrentGenerations: 3,
+    imageProtectedConcurrentGenerations: 2,
+    imageMaxConcurrentGenerations: 3,
+    videoReservedConcurrentGenerations: 1,
+    videoMaxConcurrentGenerations: 2,
+    videoBorrowMaxConcurrentGenerations: 1,
+    videoPreprocessingMaxConcurrentGenerations: 1,
+  },
+  effectiveProfile: {
+    globalMaxConcurrentGenerations: 4,
+    imageReservedConcurrentGenerations: 3,
+    imageProtectedConcurrentGenerations: 2,
+    imageMaxConcurrentGenerations: 3,
+    videoReservedConcurrentGenerations: 1,
+    videoMaxConcurrentGenerations: 2,
+    videoBorrowMaxConcurrentGenerations: 1,
+    videoPreprocessingMaxConcurrentGenerations: 1,
+  },
+  balance: {
+    state: "fresh",
+    currentBalanceUsd: 25,
+    checkedAtUtc: "2026-07-27T09:30:00Z",
+    lastSuccessfulAtUtc: "2026-07-27T09:30:00Z",
+  },
+  queue: {
+    totalDepth: 0,
+    imageDepth: 0,
+    videoDepth: 0,
+    oldestQueuedAtUtc: null,
+    stages: [],
+  },
+  lanes: {
+    inFlightTotal: 0,
+    imageInFlight: 0,
+    videoInFlight: 0,
+    videoPreprocessingInFlight: 0,
+    nativeSlotsInUse: 0,
+    borrowedSlotsInUse: 0,
+    reservedSlotsAvailable: 1,
+    submissionUnknownCount: 0,
+  },
+  worker: {
+    instanceCount: 1,
+    heartbeatAtUtc: "2026-07-27T09:30:00Z",
+    lastProgressAtUtc: "2026-07-27T09:30:00Z",
+    appliedPolicyRevision: 1,
+    schedulerV2Enabled: true,
+    dispatchConcurrency: 4,
+    reconciliationConcurrency: 1,
+    mediaImportConcurrency: 1,
+    maintenanceConcurrency: 1,
+  },
+  alerts: [],
+  generatedAtUtc: "2026-07-27T09:30:00Z",
+};
+
 function createAdminSession() {
   return {
     accessToken: "refund-recovery-access-token",
@@ -198,6 +264,11 @@ async function installRefundRecoveryMocks(page: Page, failFirstRefundRequest: bo
       return;
     }
 
+    if (url.pathname === "/api/admin/templates/generation-control") {
+      await fulfillJson(route, generationControlSnapshot);
+      return;
+    }
+
     if (url.pathname === "/api/admin/templates/generations") {
       listRequests += 1;
       const requestedRefundState = url.searchParams.get("refundState");
@@ -353,6 +424,18 @@ test("exhausted refund recovery dialog stays within the 390px viewport", async (
   await page.goto("/en/generations?refundState=exhausted");
   const retryButton = page.getByRole("button", { name: /Retry refund:/ });
   await expect(retryButton).toBeVisible();
+  await expect(page.locator("h1")).toHaveCount(1);
+  await expect(page.getByRole("main").locator("h1")).toHaveCount(0);
+
+  const jobCell = page.locator('[data-label="Job"]');
+  await expect(jobCell).toBeVisible();
+  await expect(jobCell.getByRole("button", { name: /Copy full ID:/ })).toBeVisible();
+  const mobileQueueLayout = await jobCell.evaluate((cell) => ({
+    cellDisplay: getComputedStyle(cell).display,
+    rowDisplay: getComputedStyle(cell.parentElement as HTMLElement).display,
+  }));
+  expect(mobileQueueLayout.cellDisplay).toBe("grid");
+  expect(mobileQueueLayout.rowDisplay).toBe("grid");
   await retryButton.click();
 
   const dialog = page.getByRole("dialog", { name: "Retry the charge refund?", exact: true });
@@ -373,6 +456,19 @@ test("exhausted refund recovery dialog stays within the 390px viewport", async (
   await page.screenshot({
     path: testInfo.outputPath("generation-refund-recovery-mobile-390.png"),
     fullPage: false,
+  });
+
+  await page.keyboard.press("Escape");
+  await page.setViewportSize({ width: 320, height: 844 });
+  const narrowDimensions = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+  }));
+  expect(narrowDimensions.scrollWidth).toBeLessThanOrEqual(narrowDimensions.clientWidth);
+  await expect(jobCell).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("generation-priority-queue-mobile-320.png"),
+    fullPage: true,
   });
   expect(api.getRefundRequests()).toEqual([]);
   expect(runtimeErrors).toEqual([]);

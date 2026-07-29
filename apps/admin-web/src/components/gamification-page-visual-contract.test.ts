@@ -52,6 +52,15 @@ describe("gamification-page visual and safety contract", () => {
     expect(css).toContain("@media (max-width: 420px)");
   });
 
+  it("keeps route identity in the shared topbar and starts with operational context", () => {
+    const source = readFileSync(pagePath, "utf8");
+
+    expect(source).toContain("<AdminContextBar");
+    expect(source).not.toContain("gamification-workspace-title");
+    expect(source).not.toContain("<AdminPageHero");
+    expect(source).not.toContain("<h1");
+  });
+
   it("keeps partial data visible while each unfinished query renders its own loading state", () => {
     const source = readFileSync(pagePath, "utf8");
 

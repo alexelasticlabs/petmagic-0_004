@@ -563,8 +563,8 @@ describe("api-client.economy query normalization", () => {
     expect(controllerSource).toContain(
       'const revenueCurrencyCode = economyDashboardMetricsQuery.data?.currencyCode ?? "USD";'
     );
-    expect(pageSource).toContain(
-      "formatCurrency(metrics.grossRevenue, locale, metrics.revenueCurrencyCode)"
+    expect(pageSource).toMatch(
+      /formatCurrency\(\s*metrics\.grossRevenue,\s*locale,\s*metrics\.revenueCurrencyCode\s*\)/
     );
     expect(controllerSource).not.toContain(
       "purchaseItems.reduce((sum, item) => sum + item.priceAmount, 0)"

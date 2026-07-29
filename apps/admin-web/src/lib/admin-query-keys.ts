@@ -5,6 +5,8 @@ export const adminQueryKeys = {
     ["admin", "dashboard", locale, commercePeriodDays] as const,
   systemStatus: ["admin", "system", "status"] as const,
   operationsStatus: ["admin", "system", "operations"] as const,
+  notificationsRoot: ["admin", "notifications"] as const,
+  notifications: (query: unknown) => ["admin", "notifications", query] as const,
   auditEvents: (query: unknown) => ["admin", "audit", "events", query] as const,
   auditEvent: (id: string) => ["admin", "audit", "events", id] as const,
   usersRoot: ["admin", "users"] as const,

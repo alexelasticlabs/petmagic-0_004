@@ -314,8 +314,8 @@ export function PromoCodesListCard({
         />
       ) : (
         <>
-          <div className={adminTableStyles.tableWrap}>
-            <table className={adminTableStyles.table}>
+          <div className={`${adminTableStyles.tableWrap} ${styles.promoTableWrap}`}>
+            <table className={`${adminTableStyles.table} ${styles.promoTable}`}>
               <thead>
                 <tr>
                   <th>{text.promoCodesCodeLabel}</th>
@@ -366,7 +366,7 @@ export function PromoCodesListCard({
                       aria-selected={isSelected}
                       data-status={status}
                     >
-                      <td>
+                      <td data-label={text.promoCodesCodeLabel}>
                         <div className={styles.codeCell}>
                           <strong className={styles.codeValue}>{codeValue}</strong>
                           <span className={styles.codeMeta}>
@@ -381,7 +381,7 @@ export function PromoCodesListCard({
                           </span>
                         </div>
                       </td>
-                      <td>
+                      <td data-label={text.promoCodesRewardLabel}>
                         <div className={styles.rewardCell}>
                           <AdminStatusBadge color={rewardKindColors[code.rewardKind]}>
                             {formatRewardValue(code.rewardValue, code.rewardKind, text)}
@@ -391,7 +391,7 @@ export function PromoCodesListCard({
                           </span>
                         </div>
                       </td>
-                      <td>
+                      <td data-label={text.promoCodesUsageLabel}>
                         <div className={styles.usageCell}>
                           <div className={styles.usageTopRow}>
                             <strong>
@@ -407,24 +407,26 @@ export function PromoCodesListCard({
                           </div>
                         </div>
                       </td>
-                      <td>
+                      <td data-label={text.promoCodesPerUserLimitLabel}>
                         <span className={styles.inlineNumeric}>
                           {formatNumber(code.maxRedemptionsPerUser, locale)}
                         </span>
                       </td>
-                      <td className={styles.windowCell}>{formatWindow(code, locale, text)}</td>
-                      <td>
+                      <td className={styles.windowCell} data-label={text.promoCodesWindowLabel}>
+                        {formatWindow(code, locale, text)}
+                      </td>
+                      <td data-label={text.statusLabel}>
                         <AdminStatusBadge color={statusView.color}>
                           {statusView.label}
                         </AdminStatusBadge>
                       </td>
-                      <td>
+                      <td data-label={text.createdAtLabel}>
                         <div className={styles.createdCell}>
                           <strong>{formatDateTime(code.createdAtUtc, locale)}</strong>
                           <span>{formatPromoDisplayText(code.createdBy, 80)}</span>
                         </div>
                       </td>
-                      <td>
+                      <td data-label={text.actionsLabel}>
                         <div
                           className={styles.actionsMenu}
                           data-promo-actions-root

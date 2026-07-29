@@ -24,9 +24,10 @@ import {
 import {
   AdminBadge,
   AdminCard,
+  AdminContextBar,
+  AdminDataSurface,
   AdminPage,
   AdminPageGrid,
-  AdminPageHero,
   AdminStatCard,
   AdminSectionHeader,
   AdminStateCard,
@@ -211,11 +212,6 @@ export function DashboardView({ locale }: DashboardViewProps) {
   if (!viewModel) {
     return (
       <AdminPage className={styles.dashboard}>
-        <AdminPageHero
-          eyebrow={copy.hero.eyebrow}
-          title={copy.hero.title}
-          description={copy.hero.description}
-        />
         <AdminStateCard
           title={
             dashboardQuery.isError
@@ -246,10 +242,7 @@ export function DashboardView({ locale }: DashboardViewProps) {
 
   return (
     <AdminPage className={styles.dashboard}>
-      <AdminPageHero
-        eyebrow={viewModel.hero.eyebrow}
-        title={viewModel.hero.title}
-        description={viewModel.hero.description}
+      <AdminContextBar
         actions={
           <Button
             variant="secondary"
@@ -538,7 +531,7 @@ export function DashboardView({ locale }: DashboardViewProps) {
           )}
         </AdminCard>
 
-        <AdminCard
+        <AdminDataSurface
           title={
             <span className={styles.cardTitleWithIcon}>
               <TableIcon className={styles.cardTitleIcon} />
@@ -570,40 +563,79 @@ export function DashboardView({ locale }: DashboardViewProps) {
               }
             />
           ) : viewModel.orders.length > 0 ? (
-            <div className={adminTableStyles.tableWrap}>
-              <table className={adminTableStyles.table}>
-                <thead>
-                  <tr>
-                    <th>{viewModel.ordersSection.headers.order}</th>
-                    <th>{viewModel.ordersSection.headers.user}</th>
-                    <th>{viewModel.ordersSection.headers.amount}</th>
-                    <th>{viewModel.ordersSection.headers.status}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {viewModel.orders.map((order) => (
-                    <tr key={order.id}>
-                      <td className={adminTableStyles.mono}>
-                        <Link href={order.orderHref} className={styles.entityLink}>
+            <>
+              <div className={styles.ordersDesktopTable}>
+                <div className={adminTableStyles.tableWrap}>
+                  <table className={adminTableStyles.table}>
+                    <thead>
+                      <tr>
+                        <th>{viewModel.ordersSection.headers.order}</th>
+                        <th>{viewModel.ordersSection.headers.user}</th>
+                        <th>{viewModel.ordersSection.headers.amount}</th>
+                        <th>{viewModel.ordersSection.headers.status}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {viewModel.orders.map((order) => (
+                        <tr key={order.id}>
+                          <td className={adminTableStyles.mono}>
+                            <Link href={order.orderHref} className={styles.entityLink}>
+                              {order.id}
+                            </Link>
+                          </td>
+                          <td>
+                            <Link href={order.userHref} className={styles.entityLink}>
+                              {order.user}
+                            </Link>
+                          </td>
+                          <td className={adminTableStyles.numeric}>{order.amount}</td>
+                          <td>
+                            <AdminStatusBadge
+                              color={DASHBOARD_ORDER_STATUS_COLORS[order.statusType]}
+                            >
+                              {order.status}
+                            </AdminStatusBadge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <ul className={styles.ordersMobileList} aria-label={viewModel.ordersSection.title}>
+                {viewModel.orders.map((order) => (
+                  <li key={order.id}>
+                    <article className={styles.orderMobileCard}>
+                      <div className={styles.orderMobileHeader}>
+                        <Link
+                          href={order.orderHref}
+                          className={`${styles.entityLink} ${adminTableStyles.mono}`}
+                        >
                           {order.id}
                         </Link>
-                      </td>
-                      <td>
-                        <Link href={order.userHref} className={styles.entityLink}>
-                          {order.user}
-                        </Link>
-                      </td>
-                      <td className={adminTableStyles.numeric}>{order.amount}</td>
-                      <td>
                         <AdminStatusBadge color={DASHBOARD_ORDER_STATUS_COLORS[order.statusType]}>
                           {order.status}
                         </AdminStatusBadge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </div>
+                      <dl className={styles.orderMobileFacts}>
+                        <div>
+                          <dt>{viewModel.ordersSection.headers.user}</dt>
+                          <dd>
+                            <Link href={order.userHref} className={styles.entityLink}>
+                              {order.user}
+                            </Link>
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>{viewModel.ordersSection.headers.amount}</dt>
+                          <dd>{order.amount}</dd>
+                        </div>
+                      </dl>
+                    </article>
+                  </li>
+                ))}
+              </ul>
+            </>
           ) : (
             <DashboardSectionNotice
               tone="info"
@@ -611,7 +643,7 @@ export function DashboardView({ locale }: DashboardViewProps) {
               description={copy.states.noPaymentsDescription}
             />
           )}
-        </AdminCard>
+        </AdminDataSurface>
       </div>
 
       <div className={styles.contentGrid}>

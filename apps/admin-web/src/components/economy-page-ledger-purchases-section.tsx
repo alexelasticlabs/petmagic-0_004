@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import {
-  AdminCard,
+  AdminDataSurface,
   AdminFilterBar,
   AdminStateCard,
   AdminStatusBadge,
@@ -113,7 +113,7 @@ export function EconomyPageLedgerPurchasesSection({
 
   return (
     <div className={styles.overviewDataGrid}>
-      <AdminCard
+      <AdminDataSurface
         title={text.recentActivityTitle}
         description={text.recentActivityDescription}
         className={styles.overviewDataCard}
@@ -254,9 +254,9 @@ export function EconomyPageLedgerPurchasesSection({
             )}
           </TableOrEmpty>
         )}
-      </AdminCard>
+      </AdminDataSurface>
 
-      <AdminCard
+      <AdminDataSurface
         title={text.recentPurchasesTitle}
         description={text.recentPurchasesDescription}
         className={styles.overviewDataCard}
@@ -326,8 +326,13 @@ export function EconomyPageLedgerPurchasesSection({
           <TableOrEmpty hasItems={purchaseItems.length > 0} emptyTitle={text.noPurchases}>
             {showPurchaseDetails ? (
               <div id="economy-purchase-details">
-                <div className={adminTableStyles.tableWrap} aria-busy={purchasesIsFetching}>
-                  <table className={`${adminTableStyles.table} ${styles.wideTable}`}>
+                <div
+                  className={`${adminTableStyles.tableWrap} ${styles.entityTableWrap}`}
+                  aria-busy={purchasesIsFetching}
+                >
+                  <table
+                    className={`${adminTableStyles.table} ${styles.wideTable} ${styles.entityTable}`}
+                  >
                     <thead>
                       <tr>
                         <th scope="col">{text.timeColumn}</th>
@@ -350,12 +355,16 @@ export function EconomyPageLedgerPurchasesSection({
 
                         return (
                           <tr key={item.orderId}>
-                            <td>
+                            <td data-label={text.timeColumn}>
                               {formatDateTime(item.confirmedAtUtc ?? item.createdAtUtc, locale)}
                             </td>
-                            <td className={adminTableStyles.mono}>{shortGuid(item.userId)}</td>
-                            <td>{safeText(item.productType ?? "TokenPack")}</td>
-                            <td>
+                            <td className={adminTableStyles.mono} data-label={text.userColumn}>
+                              {shortGuid(item.userId)}
+                            </td>
+                            <td data-label={text.productTypeColumn}>
+                              {safeText(item.productType ?? "TokenPack")}
+                            </td>
+                            <td data-label={text.packColumn}>
                               <div className={styles.packMeta}>
                                 <strong>{safeText(item.packDisplayName)}</strong>
                                 <span>
@@ -363,20 +372,24 @@ export function EconomyPageLedgerPurchasesSection({
                                 </span>
                               </div>
                             </td>
-                            <td>{humanizeProvider(item.paymentProvider, locale)}</td>
-                            <td>{formatCurrency(item.priceAmount, locale, item.currencyCode)}</td>
-                            <td>
+                            <td data-label={text.providerColumn}>
+                              {humanizeProvider(item.paymentProvider, locale)}
+                            </td>
+                            <td data-label={text.amountColumn}>
+                              {formatCurrency(item.priceAmount, locale, item.currencyCode)}
+                            </td>
+                            <td data-label={text.statusColumn}>
                               <AdminStatusBadge color={statusColor(item.status)}>
                                 {humanizeStatus(item.status, locale)}
                               </AdminStatusBadge>
                             </td>
-                            <td>
+                            <td data-label={text.refundStatusColumn}>
                               {safeText(
                                 item.refundStatus ??
                                   (item.status === "refunded" ? "refunded" : "none")
                               )}
                             </td>
-                            <td>
+                            <td data-label={text.actionsColumn}>
                               <div className={styles.tableActions}>
                                 <Button
                                   type="button"
@@ -483,7 +496,7 @@ export function EconomyPageLedgerPurchasesSection({
             )}
           </TableOrEmpty>
         )}
-      </AdminCard>
+      </AdminDataSurface>
     </div>
   );
 }

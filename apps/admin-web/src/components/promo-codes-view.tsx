@@ -863,8 +863,6 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
         locale={locale}
         metrics={metrics}
         promoText={promoText}
-        title={text.navPromoCodes}
-        subtitle={text.promoCodesHeroDescription}
         tokenUnit={tokenUnit}
         metricsError={promoMetricsQuery.isError ? promoMetricsQuery.error : null}
         canManagePromoCodes={canManagePromoCodes}

@@ -14,6 +14,7 @@ type AdminPageMetaCopy = {
   support: { title: string; description: string };
   moderation: { title: string; description: string };
   audit: { title: string; description: string };
+  notifications: { title: string; description: string };
   imageTemplates: { title: string; description: string };
   videoTemplates: { title: string; description: string };
   templateCategories: { title: string; description: string };
@@ -77,6 +78,11 @@ const adminPageMetaCopy: Record<Locale, AdminPageMetaCopy> = {
       title: "Журнал действий",
       description:
         "История административных действий с фильтрами по исполнителю, типу события и объекту.",
+    },
+    notifications: {
+      title: "Уведомления",
+      description:
+        "Операционные события, требующие чтения, архивации или командного подтверждения.",
     },
     imageTemplates: {
       title: "Шаблоны изображений",
@@ -159,6 +165,10 @@ const adminPageMetaCopy: Record<Locale, AdminPageMetaCopy> = {
     audit: {
       title: "Audit trail",
       description: "Administrative action history with actor, event type, and target filters.",
+    },
+    notifications: {
+      title: "Notifications",
+      description: "Operational events that require review, archive, or team acknowledgement.",
     },
     imageTemplates: {
       title: "Image templates",

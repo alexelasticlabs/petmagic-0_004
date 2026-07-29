@@ -22,6 +22,7 @@ describe("admin-rbac", () => {
     "/generations",
     "/image-templates",
     "/moderation",
+    "/notifications",
     "/promo-codes",
     "/roles",
     "/support",
@@ -77,6 +78,7 @@ describe("admin-rbac", () => {
     expect(canAccessAdminPath(["Moderator"], "/generations")).toBe(false);
     expect(canAccessAdminPath(["Moderator"], "/roles")).toBe(false);
     expect(canAccessAdminPath(["Moderator"], "/audit")).toBe(false);
+    expect(canAccessAdminPath(["Moderator"], "/notifications")).toBe(true);
   });
 
   it("denies protected admin routes when roles are absent or non-admin", () => {

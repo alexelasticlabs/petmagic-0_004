@@ -8,4 +8,5 @@ export * from "./api-client.types.templates";
 export * from "./api-client.types.gamification";
 export * from "./api-client.types.audit";
 export * from "./api-client.types.system-status";
+export * from "./api-client.types.notifications";
 export * from "./api-client.types.template-category-diagnostics";

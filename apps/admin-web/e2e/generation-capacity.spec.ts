@@ -2,6 +2,10 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 
 const apiOrigin = "https://api.petmagic.test";
 
+function getCapacitySurface(page: Page) {
+  return page.locator('[data-admin-surface="generation-capacity"]');
+}
+
 function createSession() {
   return {
     accessToken: "capacity-admin-token",
@@ -437,7 +441,9 @@ test("generation capacity previews and saves a scale-up with optimistic concurre
   await expect(
     page.getByRole("heading", { name: "Capacity and fal.ai", exact: true })
   ).toBeVisible();
-  await expect(page.getByText("fal.ai balance is low", { exact: true })).toBeVisible();
+  await expect(
+    getCapacitySurface(page).getByText("fal.ai balance is low", { exact: true })
+  ).toBeVisible();
   await page.getByRole("button", { name: "Configure", exact: true }).click();
 
   const dialog = page.getByRole("dialog", { name: "Configure generation capacity", exact: true });
@@ -606,9 +612,10 @@ test("does not report a failed provider refresh as successful", async ({ page })
   await page.getByRole("button", { name: "Refresh balance", exact: true }).click();
 
   await expect(
-    page.getByText("fal.ai did not confirm the refresh; the last safe snapshot is still shown.", {
-      exact: true,
-    })
+    getCapacitySurface(page).getByText(
+      "fal.ai did not confirm the refresh; the last safe snapshot is still shown.",
+      { exact: true }
+    )
   ).toBeVisible();
   await expect(page.getByText("$8.25", { exact: true })).toBeVisible();
 });
@@ -675,7 +682,7 @@ test("resuming admission also requires explicit acknowledgement", async ({ page 
   expect(api.getPolicyRequests()[0]?.body.admissionEnabled).toBe(true);
 });
 
-test("localizes known capacity alerts and does not duplicate their transition after reload", async ({
+test("localizes known capacity alerts without persisting them in the server inbox cache", async ({
   page,
 }) => {
   await installMocks(page);
@@ -683,26 +690,16 @@ test("localizes known capacity alerts and does not duplicate their transition af
   await loginAsAdmin(page, "ru");
   await page.goto("/ru/generations");
 
-  await expect(page.getByText("Низкий баланс fal.ai", { exact: true })).toBeVisible();
-  await expect(page.getByText("fal.ai balance is low", { exact: true })).toHaveCount(0);
+  await expect(
+    getCapacitySurface(page).getByText("Низкий баланс fal.ai", { exact: true })
+  ).toBeVisible();
+  await expect(
+    getCapacitySurface(page).getByText("fal.ai balance is low", { exact: true })
+  ).toHaveCount(0);
 
   const userId = createSession().user.userId;
   const transitionStorageKey = `petmagic.admin.generation-capacity-alert-transitions.v1:${encodeURIComponent(userId)}`;
   const notificationStorageKey = `petmagic.admin.notifications.v2:${encodeURIComponent(userId)}`;
-  const countLocalizedNotifications = () =>
-    page.evaluate(
-      ({ storageKey, title }) => {
-        const rawValue = window.localStorage.getItem(storageKey);
-        if (!rawValue) return 0;
-        const value = JSON.parse(rawValue) as Array<{ title?: string }>;
-        return value.filter((notification) => notification.title === title).length;
-      },
-      {
-        storageKey: notificationStorageKey,
-        title: "Низкий баланс fal.ai",
-      }
-    );
-
   await expect
     .poll(() =>
       page.evaluate(
@@ -715,11 +712,17 @@ test("localizes known capacity alerts and does not duplicate their transition af
       )
     )
     .toBe(true);
-  await expect.poll(countLocalizedNotifications).toBe(1);
+  await expect
+    .poll(() => page.evaluate((key) => window.localStorage.getItem(key), notificationStorageKey))
+    .toBeNull();
 
   await page.reload();
-  await expect(page.getByText("Низкий баланс fal.ai", { exact: true })).toBeVisible();
-  await expect.poll(countLocalizedNotifications).toBe(1);
+  await expect(
+    getCapacitySurface(page).getByText("Низкий баланс fal.ai", { exact: true })
+  ).toBeVisible();
+  await expect
+    .poll(() => page.evaluate((key) => window.localStorage.getItem(key), notificationStorageKey))
+    .toBeNull();
 });
 
 test("surfaces ambiguous provider submissions as occupied capacity requiring reconciliation", async ({
@@ -745,7 +748,9 @@ test("surfaces ambiguous provider submissions as occupied capacity requiring rec
   await page.goto("/en/generations");
 
   await expect(
-    page.getByText("fal.ai submissions require reconciliation", { exact: true })
+    getCapacitySurface(page).getByText("fal.ai submissions require reconciliation", {
+      exact: true,
+    })
   ).toBeVisible();
   await page.getByText("Worker and lanes", { exact: true }).click();
   const unknownRow = page.getByText("Provider submits to reconcile", { exact: true }).locator("..");
@@ -976,13 +981,13 @@ test("requires explicit acknowledgement before confirming that fal.ai did not ac
     evidenceReference: "support:case_456",
     providerRequestId: null,
   });
-  await expect
-    .poll(async () =>
-      (await readPersistedNotificationMessages(page)).includes(
-        "Provider request absence was confirmed; cancellation and refund recovery were scheduled."
-      )
+  await expect(
+    page.getByText(
+      "Provider request absence was confirmed; cancellation and refund recovery were scheduled.",
+      { exact: true }
     )
-    .toBe(true);
+  ).toBeVisible();
+  expect(await readPersistedNotificationMessages(page)).toEqual([]);
 });
 
 test("does not claim that a refund was scheduled when backend reports no refund work", async ({
@@ -1017,16 +1022,13 @@ test("does not claim that a refund was scheduled when backend reports no refund 
     .check();
   await dialog.getByRole("button", { name: "Apply decision" }).click();
 
-  await expect
-    .poll(async () =>
-      (await readPersistedNotificationMessages(page)).includes(
-        "Provider request absence was confirmed; the generation was cancelled and no new refund was required."
-      )
+  await expect(
+    page.getByText(
+      "Provider request absence was confirmed; the generation was cancelled and no new refund was required.",
+      { exact: true }
     )
-    .toBe(true);
-  expect(await readPersistedNotificationMessages(page)).not.toContain(
-    "Provider request absence was confirmed; cancellation and refund recovery were scheduled."
-  );
+  ).toBeVisible();
+  expect(await readPersistedNotificationMessages(page)).toEqual([]);
 });
 
 test("shows unknown worker runtime instead of claiming compatibility mode before heartbeat", async ({
@@ -1063,7 +1065,7 @@ test("shows unknown worker runtime instead of claiming compatibility mode before
   await page.goto("/en/generations");
 
   await expect(
-    page.getByText("Generation worker heartbeat is missing", { exact: true })
+    getCapacitySurface(page).getByText("Generation worker heartbeat is missing", { exact: true })
   ).toBeVisible();
   await page.getByText("Worker and lanes", { exact: true }).click();
   await expect(page.getByText("Compatibility loop", { exact: true })).toHaveCount(0);

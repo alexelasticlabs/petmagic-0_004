@@ -81,8 +81,6 @@ type PromoCodesViewChromeProps = {
   locale: Locale;
   metrics: PromoCodesMetrics;
   promoText: PromoCodesViewText;
-  title: string;
-  subtitle: string;
   tokenUnit: string;
   metricsError: unknown;
   canManagePromoCodes: boolean;
@@ -98,8 +96,6 @@ export function PromoCodesViewChrome({
   locale,
   metrics,
   promoText,
-  title,
-  subtitle,
   tokenUnit,
   metricsError,
   canManagePromoCodes,
@@ -123,11 +119,6 @@ export function PromoCodesViewChrome({
           {feedback.message}
         </div>
       ) : null}
-
-      <header className={styles.pageHeader}>
-        <h1 className={styles.pageTitle}>{title}</h1>
-        <p className={styles.pageSubtitle}>{subtitle}</p>
-      </header>
 
       {metricsError ? (
         <AdminStateCard

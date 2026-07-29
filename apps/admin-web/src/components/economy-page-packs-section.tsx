@@ -132,8 +132,10 @@ export function EconomyPagePacksSection({
         />
 
         <TableOrEmpty hasItems={visiblePacks.length > 0} emptyTitle={text.noPacks}>
-          <div className={adminTableStyles.tableWrap}>
-            <table className={`${adminTableStyles.table} ${styles.wideTable}`}>
+          <div className={`${adminTableStyles.tableWrap} ${styles.entityTableWrap}`}>
+            <table
+              className={`${adminTableStyles.table} ${styles.wideTable} ${styles.entityTable}`}
+            >
               <thead>
                 <tr>
                   <th>{text.packColumn}</th>
@@ -159,7 +161,7 @@ export function EconomyPagePacksSection({
 
                   return (
                     <tr key={pack.packId}>
-                      <td>
+                      <td data-label={text.packColumn}>
                         <div className={styles.packMeta}>
                           <strong>{safeText(pack.code.toUpperCase(), 32)}</strong>
                           <span>{safeText(pack.currencyCode.toUpperCase(), 12)}</span>
@@ -195,7 +197,7 @@ export function EconomyPagePacksSection({
                           </span>
                         )}
                       </td>
-                      <td>
+                      <td data-label={text.priceColumn}>
                         {isPackEditorOpen ? (
                           <label className={styles.field}>
                             <span>{text.priceColumn}</span>
@@ -219,7 +221,7 @@ export function EconomyPagePacksSection({
                           </span>
                         )}
                       </td>
-                      <td>
+                      <td data-label={text.grantedColumn}>
                         {isPackEditorOpen ? (
                           <label className={styles.field}>
                             <span>{text.grantedColumn}</span>
@@ -242,7 +244,7 @@ export function EconomyPagePacksSection({
                           </span>
                         )}
                       </td>
-                      <td>
+                      <td data-label={text.bonusColumn}>
                         {isPackEditorOpen ? (
                           <label className={styles.field}>
                             <span>{text.bonusColumn}</span>
@@ -263,7 +265,7 @@ export function EconomyPagePacksSection({
                           <span className={styles.mutedText}>{safeText(draft.bonusSpark, 32)}</span>
                         )}
                       </td>
-                      <td>
+                      <td data-label={text.sortColumn}>
                         {isPackEditorOpen ? (
                           <label className={styles.field}>
                             <span>{text.sortColumn}</span>
@@ -284,7 +286,7 @@ export function EconomyPagePacksSection({
                           <span className={styles.mutedText}>{safeText(draft.sortOrder, 32)}</span>
                         )}
                       </td>
-                      <td>
+                      <td data-label={text.activeColumn}>
                         {isPackEditorOpen ? (
                           <label className={styles.checkboxField}>
                             <input
@@ -305,7 +307,7 @@ export function EconomyPagePacksSection({
                           </span>
                         )}
                       </td>
-                      <td>
+                      <td data-label={text.actionsColumn}>
                         <div className={styles.tableActions}>
                           {isPackEditorOpen ? (
                             <>

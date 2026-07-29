@@ -41,6 +41,9 @@ export type GenerationsPageText = {
   tableTitle: string;
   showDetails: string;
   hideDetails: string;
+  copyId: string;
+  copiedId: string;
+  copyIdFailed: string;
   before: string;
   after: string;
   compareReady: string;
@@ -180,6 +183,9 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
     tableTitle: "История генераций",
     showDetails: "Показать",
     hideDetails: "Скрыть",
+    copyId: "Копировать полный ID",
+    copiedId: "ID скопирован",
+    copyIdFailed: "Не удалось скопировать ID",
     before: "До",
     after: "После",
     compareReady: "Доступно",
@@ -365,6 +371,9 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
     tableTitle: "Generation history",
     showDetails: "Show",
     hideDetails: "Hide",
+    copyId: "Copy full ID",
+    copiedId: "ID copied",
+    copyIdFailed: "Failed to copy ID",
     before: "Before",
     after: "After",
     compareReady: "Available",

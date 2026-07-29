@@ -15,7 +15,8 @@ describe("user detail workspace UX", () => {
 
     expect(source).toContain("className={styles.profileMasthead}");
     expect(source).toContain("className={styles.profilePrimary}");
-    expect(source).toContain('<h1 id="user-profile-title">{safeUserName}</h1>');
+    expect(source).toContain('<h2 id="user-profile-title">{safeUserName}</h2>');
+    expect(source).not.toContain("<h1");
     expect(source).toContain("{maskEmail(user.email)}");
     expect(source).not.toContain("AdminPageHero");
     expect(source).not.toContain("styles.profileCard");

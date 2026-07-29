@@ -1,7 +1,7 @@
 import { type ReactNode } from "react";
 
 import {
-  AdminCard,
+  AdminDataSurface,
   AdminFilterBar,
   AdminStateCard,
   AdminStatusBadge,
@@ -104,7 +104,7 @@ export function EconomyPageSubscriptionsSection({
 }: EconomyPageSubscriptionsSectionProps) {
   return (
     <>
-      <AdminCard title={text.subscriptionsTitle} description={text.subscriptionsDescription}>
+      <AdminDataSurface title={text.subscriptionsTitle} description={text.subscriptionsDescription}>
         <AdminFilterBar className={styles.tableFilterBar}>
           <EconomySelectField
             label={text.providerColumn}
@@ -137,63 +137,126 @@ export function EconomyPageSubscriptionsSection({
           </label>
         </AdminFilterBar>
         <TableOrEmpty hasItems={subscriptionItems.length > 0} emptyTitle={text.noSubscriptions}>
-          <div className={adminTableStyles.tableWrap} aria-busy={subscriptionsIsFetching}>
-            <table className={`${adminTableStyles.table} ${styles.wideTable}`}>
-              <thead>
-                <tr>
-                  <th>{text.userColumn}</th>
-                  <th>{text.planColumn}</th>
-                  <th>{text.providerColumn}</th>
-                  <th>{text.statusColumn}</th>
-                  <th>{text.renewalColumn}</th>
-                  <th>{text.actionsColumn}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {subscriptionItems.map((item) => (
-                  <tr key={item.subscriptionId}>
-                    <td className={adminTableStyles.mono}>{shortGuid(item.userId)}</td>
-                    <td>
-                      <div className={styles.packMeta}>
-                        <strong>{safeText(item.planName || item.planId)}</strong>
-                        <span>{`${item.monthlyTokensGranted}/${item.monthlyTokenLimit} ${text.tokensShort}`}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <div className={styles.packMeta}>
-                        <strong>{humanizeProvider(item.provider, locale)}</strong>
-                        <span>{`${safeText(item.purchaseChannel, 48)} • ${safeText(item.region, 32)}`}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <div className={styles.statusStack}>
-                        <AdminStatusBadge color={statusColor(item.status)}>
-                          {humanizeStatus(item.status, locale)}
-                        </AdminStatusBadge>
-                        {item.cancelAtPeriodEnd ? (
-                          <AdminStatusBadge color="var(--warning)">
-                            {text.cancelAtPeriodEndLabel}
-                          </AdminStatusBadge>
-                        ) : null}
-                      </div>
-                    </td>
-                    <td>{formatDateTime(item.currentPeriodEndUtc ?? item.updatedAtUtc, locale)}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className={styles.dangerButton}
-                        disabled={cancelSubscriptionPending || !canCancelSubscription(item)}
-                        aria-label={`${text.cancelSubscriptionAction}: ${shortGuid(item.subscriptionId)}`}
-                        onClick={() => onCancelSubscription(item)}
-                      >
-                        {text.cancelSubscriptionAction}
-                      </button>
-                    </td>
+          <div className={styles.economyDesktopTable}>
+            <div className={adminTableStyles.tableWrap} aria-busy={subscriptionsIsFetching}>
+              <table className={`${adminTableStyles.table} ${styles.wideTable}`}>
+                <thead>
+                  <tr>
+                    <th>{text.userColumn}</th>
+                    <th>{text.planColumn}</th>
+                    <th>{text.providerColumn}</th>
+                    <th>{text.statusColumn}</th>
+                    <th>{text.renewalColumn}</th>
+                    <th>{text.actionsColumn}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {subscriptionItems.map((item) => (
+                    <tr key={item.subscriptionId}>
+                      <td className={adminTableStyles.mono}>{shortGuid(item.userId)}</td>
+                      <td>
+                        <div className={styles.packMeta}>
+                          <strong>{safeText(item.planName || item.planId)}</strong>
+                          <span>{`${item.monthlyTokensGranted}/${item.monthlyTokenLimit} ${text.tokensShort}`}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div className={styles.packMeta}>
+                          <strong>{humanizeProvider(item.provider, locale)}</strong>
+                          <span>{`${safeText(item.purchaseChannel, 48)} • ${safeText(item.region, 32)}`}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div className={styles.statusStack}>
+                          <AdminStatusBadge color={statusColor(item.status)}>
+                            {humanizeStatus(item.status, locale)}
+                          </AdminStatusBadge>
+                          {item.cancelAtPeriodEnd ? (
+                            <AdminStatusBadge color="var(--warning)">
+                              {text.cancelAtPeriodEndLabel}
+                            </AdminStatusBadge>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td>
+                        {formatDateTime(item.currentPeriodEndUtc ?? item.updatedAtUtc, locale)}
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className={styles.dangerButton}
+                          disabled={cancelSubscriptionPending || !canCancelSubscription(item)}
+                          aria-label={`${text.cancelSubscriptionAction}: ${shortGuid(item.subscriptionId)}`}
+                          onClick={() => onCancelSubscription(item)}
+                        >
+                          {text.cancelSubscriptionAction}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
+          <ul
+            className={styles.economyMobileList}
+            aria-label={text.subscriptionsTitle}
+            aria-busy={subscriptionsIsFetching}
+          >
+            {subscriptionItems.map((item) => (
+              <li key={item.subscriptionId}>
+                <article className={styles.economyMobileCard}>
+                  <div className={styles.economyMobileCardHeader}>
+                    <div className={styles.economyMobileIdentity}>
+                      <strong>{safeText(item.planName || item.planId)}</strong>
+                      <span className={adminTableStyles.mono}>{shortGuid(item.userId)}</span>
+                    </div>
+                    <div className={styles.economyMobileBadges}>
+                      <AdminStatusBadge color={statusColor(item.status)}>
+                        {humanizeStatus(item.status, locale)}
+                      </AdminStatusBadge>
+                      {item.cancelAtPeriodEnd ? (
+                        <AdminStatusBadge color="var(--warning)">
+                          {text.cancelAtPeriodEndLabel}
+                        </AdminStatusBadge>
+                      ) : null}
+                    </div>
+                  </div>
+                  <dl className={styles.economyMobileFacts}>
+                    <div>
+                      <dt>{text.providerColumn}</dt>
+                      <dd>{humanizeProvider(item.provider, locale)}</dd>
+                    </div>
+                    <div>
+                      <dt>{text.renewalColumn}</dt>
+                      <dd>
+                        {formatDateTime(item.currentPeriodEndUtc ?? item.updatedAtUtc, locale)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>{text.tokensColumn}</dt>
+                      <dd>{`${item.monthlyTokensGranted}/${item.monthlyTokenLimit} ${text.tokensShort}`}</dd>
+                    </div>
+                    <div>
+                      <dt>{text.platformColumn}</dt>
+                      <dd>{`${safeText(item.purchaseChannel, 48)} • ${safeText(item.region, 32)}`}</dd>
+                    </div>
+                  </dl>
+                  <div className={styles.economyMobileActions}>
+                    <button
+                      type="button"
+                      className={styles.dangerButton}
+                      disabled={cancelSubscriptionPending || !canCancelSubscription(item)}
+                      aria-label={`${text.cancelSubscriptionAction}: ${shortGuid(item.subscriptionId)}`}
+                      onClick={() => onCancelSubscription(item)}
+                    >
+                      {text.cancelSubscriptionAction}
+                    </button>
+                  </div>
+                </article>
+              </li>
+            ))}
+          </ul>
           <div className={styles.pager}>
             <button
               type="button"
@@ -215,9 +278,9 @@ export function EconomyPageSubscriptionsSection({
             </button>
           </div>
         </TableOrEmpty>
-      </AdminCard>
+      </AdminDataSurface>
 
-      <AdminCard
+      <AdminDataSurface
         title={text.subscriptionEventsTitle}
         description={text.subscriptionEventsDescription}
       >
@@ -246,45 +309,88 @@ export function EconomyPageSubscriptionsSection({
             hasItems={subscriptionEvents.length > 0}
             emptyTitle={text.noSubscriptionEvents}
           >
-            <div className={adminTableStyles.tableWrap} aria-busy={subscriptionEventsIsFetching}>
-              <table className={`${adminTableStyles.table} ${styles.wideTable}`}>
-                <thead>
-                  <tr>
-                    <th>{text.timeColumn}</th>
-                    <th>{text.providerColumn}</th>
-                    <th>{text.eventTypeColumn}</th>
-                    <th>{text.statusColumn}</th>
-                    <th>{text.processedColumn}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {subscriptionEvents.map((item) => (
-                    <tr key={item.eventId}>
-                      <td>{formatDateTime(item.createdAtUtc, locale)}</td>
-                      <td>{humanizeProvider(item.provider, locale)}</td>
-                      <td>
-                        <div className={styles.packMeta}>
-                          <strong>{safeText(item.eventType, 80)}</strong>
-                          <span>
-                            {formatExternalEventId(item.externalEventId, text.noDescription)}
-                          </span>
-                        </div>
-                      </td>
-                      <td>
-                        <AdminStatusBadge color={statusColor(item.status)}>
-                          {humanizeStatus(item.status, locale)}
-                        </AdminStatusBadge>
-                      </td>
-                      <td>
-                        {item.processedAtUtc
-                          ? formatDateTime(item.processedAtUtc, locale)
-                          : text.notProcessedLabel}
-                      </td>
+            <div className={styles.economyDesktopTable}>
+              <div className={adminTableStyles.tableWrap} aria-busy={subscriptionEventsIsFetching}>
+                <table className={`${adminTableStyles.table} ${styles.wideTable}`}>
+                  <thead>
+                    <tr>
+                      <th>{text.timeColumn}</th>
+                      <th>{text.providerColumn}</th>
+                      <th>{text.eventTypeColumn}</th>
+                      <th>{text.statusColumn}</th>
+                      <th>{text.processedColumn}</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {subscriptionEvents.map((item) => (
+                      <tr key={item.eventId}>
+                        <td>{formatDateTime(item.createdAtUtc, locale)}</td>
+                        <td>{humanizeProvider(item.provider, locale)}</td>
+                        <td>
+                          <div className={styles.packMeta}>
+                            <strong>{safeText(item.eventType, 80)}</strong>
+                            <span>
+                              {formatExternalEventId(item.externalEventId, text.noDescription)}
+                            </span>
+                          </div>
+                        </td>
+                        <td>
+                          <AdminStatusBadge color={statusColor(item.status)}>
+                            {humanizeStatus(item.status, locale)}
+                          </AdminStatusBadge>
+                        </td>
+                        <td>
+                          {item.processedAtUtc
+                            ? formatDateTime(item.processedAtUtc, locale)
+                            : text.notProcessedLabel}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
+            <ul
+              className={styles.economyMobileList}
+              aria-label={text.subscriptionEventsTitle}
+              aria-busy={subscriptionEventsIsFetching}
+            >
+              {subscriptionEvents.map((item) => (
+                <li key={item.eventId}>
+                  <article className={styles.economyMobileCard}>
+                    <div className={styles.economyMobileCardHeader}>
+                      <div className={styles.economyMobileIdentity}>
+                        <strong>{safeText(item.eventType, 80)}</strong>
+                        <span>
+                          {formatExternalEventId(item.externalEventId, text.noDescription)}
+                        </span>
+                      </div>
+                      <AdminStatusBadge color={statusColor(item.status)}>
+                        {humanizeStatus(item.status, locale)}
+                      </AdminStatusBadge>
+                    </div>
+                    <dl className={styles.economyMobileFacts}>
+                      <div>
+                        <dt>{text.providerColumn}</dt>
+                        <dd>{humanizeProvider(item.provider, locale)}</dd>
+                      </div>
+                      <div>
+                        <dt>{text.timeColumn}</dt>
+                        <dd>{formatDateTime(item.createdAtUtc, locale)}</dd>
+                      </div>
+                      <div>
+                        <dt>{text.processedColumn}</dt>
+                        <dd>
+                          {item.processedAtUtc
+                            ? formatDateTime(item.processedAtUtc, locale)
+                            : text.notProcessedLabel}
+                        </dd>
+                      </div>
+                    </dl>
+                  </article>
+                </li>
+              ))}
+            </ul>
             <div className={styles.pager}>
               <button
                 type="button"
@@ -307,7 +413,7 @@ export function EconomyPageSubscriptionsSection({
             </div>
           </TableOrEmpty>
         )}
-      </AdminCard>
+      </AdminDataSurface>
     </>
   );
 }

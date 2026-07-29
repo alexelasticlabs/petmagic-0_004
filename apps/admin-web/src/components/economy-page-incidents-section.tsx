@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 
 import {
-  AdminCard,
+  AdminDataSurface,
   AdminFilterBar,
   AdminStateCard,
   AdminStatusBadge,
@@ -101,7 +101,7 @@ export function EconomyPageIncidentsSection({
 
   return (
     <>
-      <AdminCard title={text.incidentsTitle} description={text.incidentsDescription}>
+      <AdminDataSurface title={text.incidentsTitle} description={text.incidentsDescription}>
         <AdminFilterBar className={styles.tableFilterBar}>
           <EconomySelectField
             label={text.incidentStatusFilterLabel}
@@ -147,100 +147,152 @@ export function EconomyPageIncidentsSection({
           <AdminStateCard tone="info" title={text.noIncidents} />
         ) : (
           <>
-            <div className={adminTableStyles.tableWrap} aria-busy={incidentsIsFetching}>
-              <table className={`${adminTableStyles.table} ${styles.wideTable}`}>
-                <thead>
-                  <tr>
-                    <th scope="col">{text.timeColumn}</th>
-                    <th scope="col">{text.incidentColumn}</th>
-                    <th scope="col">{text.categoryColumn}</th>
-                    <th scope="col">{text.severityColumn}</th>
-                    <th scope="col">{text.providerColumn}</th>
-                    <th scope="col">{text.userColumn}</th>
-                    <th scope="col">{text.retryColumn}</th>
-                    <th scope="col">{text.statusColumn}</th>
-                    <th scope="col">{text.actionsColumn}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {incidentItems.map((item) => (
-                    <tr key={item.incidentId}>
-                      <td>{formatDateTime(item.lastDetectedAtUtc, locale)}</td>
-                      <td>
-                        <div className={styles.packMeta}>
-                          <strong>{safeText(item.type, 80)}</strong>
-                          <span>{safeText(item.summary, 180)}</span>
-                          {item.lastError ? <span>{safeText(item.lastError, 96)}</span> : null}
-                        </div>
-                      </td>
-                      <td>{safeText(item.category, 64)}</td>
-                      <td>
+            <div className={styles.economyDesktopTable}>
+              <div className={adminTableStyles.tableWrap} aria-busy={incidentsIsFetching}>
+                <table className={`${adminTableStyles.table} ${styles.wideTable}`}>
+                  <thead>
+                    <tr>
+                      <th scope="col">{text.timeColumn}</th>
+                      <th scope="col">{text.incidentColumn}</th>
+                      <th scope="col">{text.categoryColumn}</th>
+                      <th scope="col">{text.severityColumn}</th>
+                      <th scope="col">{text.providerColumn}</th>
+                      <th scope="col">{text.userColumn}</th>
+                      <th scope="col">{text.retryColumn}</th>
+                      <th scope="col">{text.statusColumn}</th>
+                      <th scope="col">{text.actionsColumn}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {incidentItems.map((item) => (
+                      <tr key={item.incidentId}>
+                        <td>{formatDateTime(item.lastDetectedAtUtc, locale)}</td>
+                        <td>
+                          <div className={styles.packMeta}>
+                            <strong>{safeText(item.type, 80)}</strong>
+                            <span>{safeText(item.summary, 180)}</span>
+                          </div>
+                        </td>
+                        <td>{safeText(item.category, 64)}</td>
+                        <td>
+                          <AdminStatusBadge color={severityColor(item.severity)}>
+                            {safeText(item.severity, 32)}
+                          </AdminStatusBadge>
+                        </td>
+                        <td>{safeText(item.provider ?? "-")}</td>
+                        <td className={adminTableStyles.mono}>
+                          {item.userId ? shortGuid(item.userId) : "-"}
+                        </td>
+                        <td>
+                          <div className={styles.packMeta}>
+                            <strong>{String(item.retryCount)}</strong>
+                            <span>
+                              {item.nextRetryAtUtc
+                                ? formatDateTime(item.nextRetryAtUtc, locale)
+                                : "-"}
+                            </span>
+                          </div>
+                        </td>
+                        <td>
+                          <AdminStatusBadge color={statusColor(item.status)}>
+                            {humanizeStatus(item.status, locale)}
+                          </AdminStatusBadge>
+                        </td>
+                        <td>
+                          <IncidentRowActions
+                            item={item}
+                            locale={locale}
+                            text={text}
+                            actionPending={actionPending}
+                            selectedIncidentId={selectedIncidentId}
+                            selectedIncidentError={selectedIncidentError}
+                            onResolve={() => setIncidentPendingResolve(item)}
+                            onRetrySelectedIncident={onRetrySelectedIncident}
+                            onSelectIncident={() => onSelectIncident(item)}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <ul
+              className={styles.economyMobileList}
+              aria-label={text.incidentsTitle}
+              aria-busy={incidentsIsFetching}
+            >
+              {incidentItems.map((item) => (
+                <li key={item.incidentId}>
+                  <article
+                    className={styles.economyMobileCard}
+                    data-severity={item.severity.toLowerCase()}
+                  >
+                    <div className={styles.economyMobileCardHeader}>
+                      <div className={styles.economyMobileIdentity}>
+                        <strong>{safeText(item.type, 80)}</strong>
+                        <span>{safeText(item.summary, 180)}</span>
+                      </div>
+                      <div className={styles.economyMobileBadges}>
                         <AdminStatusBadge color={severityColor(item.severity)}>
                           {safeText(item.severity, 32)}
                         </AdminStatusBadge>
-                      </td>
-                      <td>{safeText(item.provider ?? "-")}</td>
-                      <td className={adminTableStyles.mono}>
-                        {item.userId ? shortGuid(item.userId) : "-"}
-                      </td>
-                      <td>
-                        <div className={styles.packMeta}>
-                          <strong>{String(item.retryCount)}</strong>
-                          <span>
-                            {item.nextRetryAtUtc
-                              ? formatDateTime(item.nextRetryAtUtc, locale)
-                              : "-"}
-                          </span>
-                        </div>
-                      </td>
-                      <td>
                         <AdminStatusBadge color={statusColor(item.status)}>
                           {humanizeStatus(item.status, locale)}
                         </AdminStatusBadge>
-                      </td>
-                      <td>
-                        {item.status.toLowerCase() === "open" ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="secondary"
-                            disabled={actionPending}
-                            aria-label={`${text.resolveIncidentAction}: ${safeText(item.type, 80)}`}
-                            onClick={() => setIncidentPendingResolve(item)}
-                          >
-                            {text.resolveIncidentAction}
-                          </Button>
-                        ) : (
-                          <span className={styles.mutedText}>
-                            {humanizeStatus(item.status, locale)}
-                          </span>
-                        )}
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          disabled={
-                            actionPending ||
-                            (selectedIncidentId === item.incidentId && !selectedIncidentError)
-                          }
-                          aria-label={`${text.viewIncidentAction}: ${safeText(item.type, 80)}`}
-                          onClick={() => {
-                            if (selectedIncidentId === item.incidentId && selectedIncidentError) {
-                              onRetrySelectedIncident();
-                              return;
-                            }
-
-                            onSelectIncident(item);
-                          }}
-                        >
-                          {text.viewIncidentAction}
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </div>
+                    </div>
+                    <dl className={styles.economyMobileFacts}>
+                      <div>
+                        <dt>{text.categoryColumn}</dt>
+                        <dd>{safeText(item.category, 64)}</dd>
+                      </div>
+                      <div>
+                        <dt>{text.providerColumn}</dt>
+                        <dd>{safeText(item.provider ?? "-")}</dd>
+                      </div>
+                      <div>
+                        <dt>{text.userColumn}</dt>
+                        <dd className={adminTableStyles.mono}>
+                          {item.userId ? shortGuid(item.userId) : "-"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>{text.retryColumn}</dt>
+                        <dd>
+                          {item.nextRetryAtUtc
+                            ? `${item.retryCount} · ${formatDateTime(item.nextRetryAtUtc, locale)}`
+                            : String(item.retryCount)}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>{text.timeColumn}</dt>
+                        <dd>{formatDateTime(item.lastDetectedAtUtc, locale)}</dd>
+                      </div>
+                    </dl>
+                    {item.lastError ? (
+                      <details className={styles.economyMobileDiagnostic}>
+                        <summary>{text.incidentDiagnosticLabel}</summary>
+                        <span>{safeText(item.lastError, 96)}</span>
+                      </details>
+                    ) : null}
+                    <div className={styles.economyMobileActions}>
+                      <IncidentRowActions
+                        item={item}
+                        locale={locale}
+                        text={text}
+                        actionPending={actionPending}
+                        selectedIncidentId={selectedIncidentId}
+                        selectedIncidentError={selectedIncidentError}
+                        onResolve={() => setIncidentPendingResolve(item)}
+                        onRetrySelectedIncident={onRetrySelectedIncident}
+                        onSelectIncident={() => onSelectIncident(item)}
+                      />
+                    </div>
+                  </article>
+                </li>
+              ))}
+            </ul>
             <div className={styles.sectionStack}>
               {!selectedIncidentId ? (
                 <AdminStateCard tone="info" title={text.incidentNoDetail} />
@@ -307,7 +359,7 @@ export function EconomyPageIncidentsSection({
             </div>
           </>
         )}
-      </AdminCard>
+      </AdminDataSurface>
       <ConfirmationDialog
         open={incidentPendingResolve !== null}
         title={text.resolveIncidentConfirmTitle}
@@ -336,6 +388,68 @@ export function EconomyPageIncidentsSection({
           });
         }}
       />
+    </>
+  );
+}
+
+type IncidentRowActionsProps = {
+  item: AdminEconomyIncident;
+  locale: Locale;
+  text: EconomyPageText;
+  actionPending: boolean;
+  selectedIncidentId: string | null;
+  selectedIncidentError: string | null;
+  onResolve: () => void;
+  onRetrySelectedIncident: () => void;
+  onSelectIncident: () => void;
+};
+
+function IncidentRowActions({
+  item,
+  locale,
+  text,
+  actionPending,
+  selectedIncidentId,
+  selectedIncidentError,
+  onResolve,
+  onRetrySelectedIncident,
+  onSelectIncident,
+}: IncidentRowActionsProps) {
+  return (
+    <>
+      {item.status.toLowerCase() === "open" ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={actionPending}
+          aria-label={`${text.resolveIncidentAction}: ${safeText(item.type, 80)}`}
+          onClick={onResolve}
+        >
+          {text.resolveIncidentAction}
+        </Button>
+      ) : (
+        <span className={styles.mutedText}>{humanizeStatus(item.status, locale)}</span>
+      )}
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        disabled={
+          actionPending || (selectedIncidentId === item.incidentId && !selectedIncidentError)
+        }
+        aria-label={`${text.viewIncidentAction}: ${safeText(item.type, 80)}`}
+        onClick={() => {
+          if (selectedIncidentId === item.incidentId && selectedIncidentError) {
+            onRetrySelectedIncident();
+            return;
+          }
+
+          onSelectIncident();
+        }}
+      >
+        {text.viewIncidentAction}
+      </Button>
     </>
   );
 }

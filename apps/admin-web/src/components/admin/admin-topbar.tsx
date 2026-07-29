@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type RefObject } from "react";
+import { createPortal } from "react-dom";
 
 import {
   getAdminChromeCopy,
@@ -69,8 +70,15 @@ export function AdminTopbar({
 }: AdminTopbarProps) {
   const copy = useMemo(() => getAdminChromeCopy(locale), [locale]);
   const pathname = usePathname();
-  const { clearRead, items, markAllAsRead, markAsRead, markCategoryAsRead, unreadCount } =
-    useAdminNotifications();
+  const {
+    clearRead,
+    criticalUnacknowledgedCount,
+    items,
+    markAllAsRead,
+    markAsRead,
+    markCategoryAsRead,
+    unreadCount,
+  } = useAdminNotifications();
   const [notificationPanelPathname, setNotificationPanelPathname] = useState<string | null>(null);
   const [notificationFilter, setNotificationFilter] = useState<NotificationFilter>("all");
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
@@ -88,9 +96,13 @@ export function AdminTopbar({
     (item) => item.category === "support" && !item.read
   ).length;
   const unreadNonSupportNotificationCount = unreadCount - unreadSupportNotificationCount;
+  const unreadCriticalCount = items.filter(
+    (item) => item.priority === "critical" && !item.read
+  ).length;
   const totalAttentionCount =
     unreadNonSupportNotificationCount +
-    Math.max(unreadSupportNotificationCount, supportUnreadCount);
+    Math.max(unreadSupportNotificationCount, supportUnreadCount) +
+    Math.max(0, criticalUnacknowledgedCount - unreadCriticalCount);
   const filterOptions = useMemo(
     () => [
       { value: "all" as const, label: copy.topbar.filterLabels.all },
@@ -182,18 +194,37 @@ export function AdminTopbar({
     }
 
     function handlePointerDown(event: MouseEvent) {
+      if (!(event.target instanceof Node)) return;
       if (
-        notificationRootRef.current &&
-        event.target instanceof Node &&
-        !notificationRootRef.current.contains(event.target)
-      ) {
-        closeNotificationPanel();
-      }
+        notificationRootRef.current?.contains(event.target) ||
+        notificationPanelRef.current?.contains(event.target)
+      )
+        return;
+      closeNotificationPanel();
     }
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         closeNotificationPanel({ restoreFocus: true });
+        return;
+      }
+
+      if (event.key === "Tab" && notificationPanelRef.current) {
+        const focusable = Array.from(
+          notificationPanelRef.current.querySelectorAll<HTMLElement>(
+            'a[href], button:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])'
+          )
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
       }
     }
 
@@ -290,248 +321,267 @@ export function AdminTopbar({
             ) : null}
           </button>
 
-          {isNotificationsOpen ? (
-            <div
-              id={notificationPanelId}
-              ref={notificationPanelRef}
-              className={styles.notificationPanel}
-              role="dialog"
-              aria-labelledby={notificationPanelTitleId}
-              tabIndex={-1}
-            >
-              <div className={styles.notificationPanelHeader}>
-                <div className={styles.notificationPanelCopy}>
-                  <span className={styles.notificationEyebrow}>{copy.topbar.centerEyebrow}</span>
-                  <strong id={notificationPanelTitleId} className={styles.notificationTitle}>
-                    {copy.topbar.centerTitle}
-                  </strong>
-                  <p className={styles.notificationSummary}>
-                    {copy.topbar.summary(unreadCount, supportUnreadCount)}
-                  </p>
-                </div>
-                <div className={styles.notificationHeaderActions}>
-                  <button
-                    type="button"
-                    className={styles.notificationTextButton}
-                    onClick={markAllAsRead}
-                    disabled={unreadCount === 0}
-                  >
-                    {copy.topbar.markAllRead}
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.notificationTextButton}
-                    onClick={clearRead}
-                    disabled={items.every((item) => !item.read)}
-                  >
-                    {copy.topbar.clearRead}
-                  </button>
-                </div>
-              </div>
-
-              <div
-                className={styles.notificationFilters}
-                role="toolbar"
-                aria-label={notificationFiltersLabel}
-              >
-                {filterOptions.map((filterOption) => (
-                  <button
-                    key={filterOption.value}
-                    type="button"
-                    className={`${styles.notificationFilterChip} ${notificationFilter === filterOption.value ? styles.notificationFilterChipActive : ""}`}
-                    aria-pressed={notificationFilter === filterOption.value}
-                    onClick={() => setNotificationFilter(filterOption.value)}
-                  >
-                    {filterOption.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className={styles.notificationList}>
-                {shouldShowSupportSummary ? (
-                  <Link
-                    href={`/${locale}/support`}
-                    className={`${styles.notificationCard} ${styles.notificationCardUnread} ${styles.notificationCardPinned}`}
-                    onClick={() => closeNotificationPanel()}
-                  >
-                    <div className={styles.notificationCardMeta}>
-                      <div className={styles.notificationCardMetaLead}>
-                        <span className={styles.notificationPinnedMark}>
-                          {copy.topbar.critical}
-                        </span>
-                        <span
-                          className={`${styles.notificationCategoryPill} ${styles.notificationCategorySupport}`}
-                        >
-                          {copy.topbar.categoryLabels.support}
-                        </span>
-                      </div>
-                      <span className={styles.notificationTime}>{copy.topbar.needsAttention}</span>
+          {isNotificationsOpen && typeof document !== "undefined"
+            ? createPortal(
+                <div
+                  id={notificationPanelId}
+                  ref={notificationPanelRef}
+                  className={styles.notificationPanel}
+                  role="dialog"
+                  aria-labelledby={notificationPanelTitleId}
+                  tabIndex={-1}
+                >
+                  <div className={styles.notificationPanelHeader}>
+                    <div className={styles.notificationPanelCopy}>
+                      <span className={styles.notificationEyebrow}>
+                        {copy.topbar.centerEyebrow}
+                      </span>
+                      <strong id={notificationPanelTitleId} className={styles.notificationTitle}>
+                        {copy.topbar.centerTitle}
+                      </strong>
+                      <p className={styles.notificationSummary}>
+                        {copy.topbar.summary(unreadCount, supportUnreadCount)}
+                      </p>
                     </div>
-                    <strong className={styles.notificationCardTitle}>
-                      {copy.topbar.supportSummaryTitle(supportUnreadCount)}
-                    </strong>
-                    <p className={styles.notificationCardMessage}>
-                      {copy.topbar.supportSummaryMessage}
-                    </p>
-                  </Link>
-                ) : null}
-
-                {pinnedNotifications.length > 0 ? (
-                  <section className={styles.notificationGroupSection}>
-                    <div className={styles.notificationGroupHeader}>
-                      <span className={styles.notificationGroupTitle}>{copy.topbar.critical}</span>
+                    <div className={styles.notificationHeaderActions}>
+                      <button
+                        type="button"
+                        className={styles.notificationTextButton}
+                        onClick={() => closeNotificationPanel({ restoreFocus: true })}
+                      >
+                        {locale === "ru" ? "Закрыть" : "Close"}
+                      </button>
+                      <Link
+                        href={`/${locale}/notifications`}
+                        className={styles.notificationTextButton}
+                      >
+                        {locale === "ru" ? "Вся история" : "Full history"}
+                      </Link>
+                      <button
+                        type="button"
+                        className={styles.notificationTextButton}
+                        onClick={markAllAsRead}
+                        disabled={unreadCount === 0}
+                      >
+                        {copy.topbar.markAllRead}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.notificationTextButton}
+                        onClick={clearRead}
+                        disabled={items.every((item) => !item.read)}
+                      >
+                        {copy.topbar.clearRead}
+                      </button>
                     </div>
-                    <div className={styles.notificationGroupItems}>
-                      {pinnedNotifications.map((item) => {
-                        const safeNotificationTitle = sanitizeAdminNotificationText(
-                          item.title,
-                          NOTIFICATION_RENDER_TITLE_MAX_LENGTH
-                        );
-                        const safeNotificationMessage = sanitizeAdminNotificationText(
-                          item.message,
-                          NOTIFICATION_RENDER_MESSAGE_MAX_LENGTH
-                        );
-                        const content = (
-                          <>
-                            <div className={styles.notificationCardMeta}>
-                              <div className={styles.notificationCardMetaLead}>
-                                <span className={styles.notificationPinnedMark}>
-                                  {copy.topbar.pinned}
-                                </span>
-                                <span
-                                  className={`${styles.notificationCategoryPill} ${item.category === "support" ? styles.notificationCategorySupport : item.category === "users" ? styles.notificationCategoryUsers : item.category === "templates" ? styles.notificationCategoryTemplates : item.category === "economy" ? styles.notificationCategoryEconomy : item.category === "promo" ? styles.notificationCategoryPromo : styles.notificationCategorySystem}`}
-                                >
-                                  {getNotificationCategoryLabel(
-                                    item.category,
-                                    copy.topbar.categoryLabels
-                                  )}
-                                </span>
-                              </div>
-                              <span className={styles.notificationTime}>
-                                {formatRelativeNotificationTime(item.createdAt, locale)}
-                              </span>
-                            </div>
-                            <strong className={styles.notificationCardTitle}>
-                              {safeNotificationTitle}
-                            </strong>
-                            <p className={styles.notificationCardMessage}>
-                              {safeNotificationMessage}
-                            </p>
-                          </>
-                        );
-
-                        if (item.href) {
-                          return (
-                            <Link
-                              key={item.id}
-                              href={item.href}
-                              className={`${styles.notificationCard} ${styles.notificationCardPinned} ${!item.read ? styles.notificationCardUnread : ""}`}
-                              onClick={() => {
-                                markAsRead(item.id);
-                                closeNotificationPanel();
-                              }}
-                            >
-                              {content}
-                            </Link>
-                          );
-                        }
-
-                        return (
-                          <button
-                            key={item.id}
-                            type="button"
-                            className={`${styles.notificationCard} ${styles.notificationCardButton} ${styles.notificationCardPinned} ${!item.read ? styles.notificationCardUnread : ""}`}
-                            onClick={() => markAsRead(item.id)}
-                          >
-                            {content}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </section>
-                ) : null}
-
-                {groupedNotifications.map((group) => (
-                  <section key={group.key} className={styles.notificationGroupSection}>
-                    <div className={styles.notificationGroupHeader}>
-                      <span className={styles.notificationGroupTitle}>{group.label}</span>
-                    </div>
-                    <div className={styles.notificationGroupItems}>
-                      {group.items.map((item) => {
-                        const safeNotificationTitle = sanitizeAdminNotificationText(
-                          item.title,
-                          NOTIFICATION_RENDER_TITLE_MAX_LENGTH
-                        );
-                        const safeNotificationMessage = sanitizeAdminNotificationText(
-                          item.message,
-                          NOTIFICATION_RENDER_MESSAGE_MAX_LENGTH
-                        );
-                        const content = (
-                          <>
-                            <div className={styles.notificationCardMeta}>
-                              <span
-                                className={`${styles.notificationCategoryPill} ${item.category === "support" ? styles.notificationCategorySupport : item.category === "users" ? styles.notificationCategoryUsers : item.category === "templates" ? styles.notificationCategoryTemplates : item.category === "economy" ? styles.notificationCategoryEconomy : item.category === "promo" ? styles.notificationCategoryPromo : styles.notificationCategorySystem}`}
-                              >
-                                {getNotificationCategoryLabel(
-                                  item.category,
-                                  copy.topbar.categoryLabels
-                                )}
-                              </span>
-                              <span className={styles.notificationTime}>
-                                {formatRelativeNotificationTime(item.createdAt, locale)}
-                              </span>
-                            </div>
-                            <strong className={styles.notificationCardTitle}>
-                              {safeNotificationTitle}
-                            </strong>
-                            <p className={styles.notificationCardMessage}>
-                              {safeNotificationMessage}
-                            </p>
-                          </>
-                        );
-
-                        if (item.href) {
-                          return (
-                            <Link
-                              key={item.id}
-                              href={item.href}
-                              className={`${styles.notificationCard} ${!item.read ? styles.notificationCardUnread : ""}`}
-                              onClick={() => {
-                                markAsRead(item.id);
-                                closeNotificationPanel();
-                              }}
-                            >
-                              {content}
-                            </Link>
-                          );
-                        }
-
-                        return (
-                          <button
-                            key={item.id}
-                            type="button"
-                            className={`${styles.notificationCard} ${styles.notificationCardButton} ${!item.read ? styles.notificationCardUnread : ""}`}
-                            onClick={() => markAsRead(item.id)}
-                          >
-                            {content}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </section>
-                ))}
-
-                {!shouldShowSupportSummary &&
-                pinnedNotifications.length === 0 &&
-                groupedNotifications.length === 0 ? (
-                  <div className={styles.notificationEmptyState}>
-                    <strong>{copy.topbar.emptyTitle}</strong>
-                    <p>{copy.topbar.emptyMessage}</p>
                   </div>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
+
+                  <div
+                    className={styles.notificationFilters}
+                    role="toolbar"
+                    aria-label={notificationFiltersLabel}
+                  >
+                    {filterOptions.map((filterOption) => (
+                      <button
+                        key={filterOption.value}
+                        type="button"
+                        className={`${styles.notificationFilterChip} ${notificationFilter === filterOption.value ? styles.notificationFilterChipActive : ""}`}
+                        aria-pressed={notificationFilter === filterOption.value}
+                        onClick={() => setNotificationFilter(filterOption.value)}
+                      >
+                        {filterOption.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className={styles.notificationList}>
+                    {shouldShowSupportSummary ? (
+                      <Link
+                        href={`/${locale}/support`}
+                        className={`${styles.notificationCard} ${styles.notificationCardUnread} ${styles.notificationCardPinned}`}
+                      >
+                        <div className={styles.notificationCardMeta}>
+                          <div className={styles.notificationCardMetaLead}>
+                            <span className={styles.notificationPinnedMark}>
+                              {copy.topbar.critical}
+                            </span>
+                            <span
+                              className={`${styles.notificationCategoryPill} ${styles.notificationCategorySupport}`}
+                            >
+                              {copy.topbar.categoryLabels.support}
+                            </span>
+                          </div>
+                          <span className={styles.notificationTime}>
+                            {copy.topbar.needsAttention}
+                          </span>
+                        </div>
+                        <strong className={styles.notificationCardTitle}>
+                          {copy.topbar.supportSummaryTitle(supportUnreadCount)}
+                        </strong>
+                        <p className={styles.notificationCardMessage}>
+                          {copy.topbar.supportSummaryMessage}
+                        </p>
+                      </Link>
+                    ) : null}
+
+                    {pinnedNotifications.length > 0 ? (
+                      <section className={styles.notificationGroupSection}>
+                        <div className={styles.notificationGroupHeader}>
+                          <span className={styles.notificationGroupTitle}>
+                            {copy.topbar.critical}
+                          </span>
+                        </div>
+                        <div className={styles.notificationGroupItems}>
+                          {pinnedNotifications.map((item) => {
+                            const safeNotificationTitle = sanitizeAdminNotificationText(
+                              item.title,
+                              NOTIFICATION_RENDER_TITLE_MAX_LENGTH
+                            );
+                            const safeNotificationMessage = sanitizeAdminNotificationText(
+                              item.message,
+                              NOTIFICATION_RENDER_MESSAGE_MAX_LENGTH
+                            );
+                            const content = (
+                              <>
+                                <div className={styles.notificationCardMeta}>
+                                  <div className={styles.notificationCardMetaLead}>
+                                    <span className={styles.notificationPinnedMark}>
+                                      {copy.topbar.pinned}
+                                    </span>
+                                    <span
+                                      className={`${styles.notificationCategoryPill} ${item.category === "support" ? styles.notificationCategorySupport : item.category === "users" ? styles.notificationCategoryUsers : item.category === "templates" ? styles.notificationCategoryTemplates : item.category === "economy" ? styles.notificationCategoryEconomy : item.category === "promo" ? styles.notificationCategoryPromo : styles.notificationCategorySystem}`}
+                                    >
+                                      {getNotificationCategoryLabel(
+                                        item.category,
+                                        copy.topbar.categoryLabels
+                                      )}
+                                    </span>
+                                  </div>
+                                  <span className={styles.notificationTime}>
+                                    {formatRelativeNotificationTime(item.createdAt, locale)}
+                                  </span>
+                                </div>
+                                <strong className={styles.notificationCardTitle}>
+                                  {safeNotificationTitle}
+                                </strong>
+                                <p className={styles.notificationCardMessage}>
+                                  {safeNotificationMessage}
+                                </p>
+                              </>
+                            );
+
+                            if (item.href) {
+                              return (
+                                <Link
+                                  key={item.id}
+                                  href={item.href}
+                                  className={`${styles.notificationCard} ${styles.notificationCardPinned} ${!item.read ? styles.notificationCardUnread : ""}`}
+                                  onClick={() => {
+                                    markAsRead(item.id);
+                                  }}
+                                >
+                                  {content}
+                                </Link>
+                              );
+                            }
+
+                            return (
+                              <button
+                                key={item.id}
+                                type="button"
+                                className={`${styles.notificationCard} ${styles.notificationCardButton} ${styles.notificationCardPinned} ${!item.read ? styles.notificationCardUnread : ""}`}
+                                onClick={() => markAsRead(item.id)}
+                              >
+                                {content}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </section>
+                    ) : null}
+
+                    {groupedNotifications.map((group) => (
+                      <section key={group.key} className={styles.notificationGroupSection}>
+                        <div className={styles.notificationGroupHeader}>
+                          <span className={styles.notificationGroupTitle}>{group.label}</span>
+                        </div>
+                        <div className={styles.notificationGroupItems}>
+                          {group.items.map((item) => {
+                            const safeNotificationTitle = sanitizeAdminNotificationText(
+                              item.title,
+                              NOTIFICATION_RENDER_TITLE_MAX_LENGTH
+                            );
+                            const safeNotificationMessage = sanitizeAdminNotificationText(
+                              item.message,
+                              NOTIFICATION_RENDER_MESSAGE_MAX_LENGTH
+                            );
+                            const content = (
+                              <>
+                                <div className={styles.notificationCardMeta}>
+                                  <span
+                                    className={`${styles.notificationCategoryPill} ${item.category === "support" ? styles.notificationCategorySupport : item.category === "users" ? styles.notificationCategoryUsers : item.category === "templates" ? styles.notificationCategoryTemplates : item.category === "economy" ? styles.notificationCategoryEconomy : item.category === "promo" ? styles.notificationCategoryPromo : styles.notificationCategorySystem}`}
+                                  >
+                                    {getNotificationCategoryLabel(
+                                      item.category,
+                                      copy.topbar.categoryLabels
+                                    )}
+                                  </span>
+                                  <span className={styles.notificationTime}>
+                                    {formatRelativeNotificationTime(item.createdAt, locale)}
+                                  </span>
+                                </div>
+                                <strong className={styles.notificationCardTitle}>
+                                  {safeNotificationTitle}
+                                </strong>
+                                <p className={styles.notificationCardMessage}>
+                                  {safeNotificationMessage}
+                                </p>
+                              </>
+                            );
+
+                            if (item.href) {
+                              return (
+                                <Link
+                                  key={item.id}
+                                  href={item.href}
+                                  className={`${styles.notificationCard} ${!item.read ? styles.notificationCardUnread : ""}`}
+                                  onClick={() => {
+                                    markAsRead(item.id);
+                                  }}
+                                >
+                                  {content}
+                                </Link>
+                              );
+                            }
+
+                            return (
+                              <button
+                                key={item.id}
+                                type="button"
+                                className={`${styles.notificationCard} ${styles.notificationCardButton} ${!item.read ? styles.notificationCardUnread : ""}`}
+                                onClick={() => markAsRead(item.id)}
+                              >
+                                {content}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </section>
+                    ))}
+
+                    {!shouldShowSupportSummary &&
+                    pinnedNotifications.length === 0 &&
+                    groupedNotifications.length === 0 ? (
+                      <div className={styles.notificationEmptyState}>
+                        <strong>{copy.topbar.emptyTitle}</strong>
+                        <p>{copy.topbar.emptyMessage}</p>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>,
+                document.body
+              )
+            : null}
         </div>
 
         <button

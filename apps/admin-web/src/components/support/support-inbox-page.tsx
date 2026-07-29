@@ -80,16 +80,17 @@ export function SupportInboxPage({ locale }: SupportInboxPageProps) {
     () => sortSupportQueueItems(inboxQuery.data?.items ?? []),
     [inboxQuery.data]
   );
-  const sortedConversationIdSignature = sortedConversations
-    .map((conversation) => conversation.conversationId)
-    .join("|");
+  const sortedConversationIds = useMemo(
+    () => new Set(sortedConversations.map((conversation) => conversation.conversationId)),
+    [sortedConversations]
+  );
 
   useEffect(() => {
     let isActive = true;
     if (
       !selectedConversationId ||
       inboxQuery.isFetching ||
-      sortedConversationIdSignature.split("|").includes(selectedConversationId)
+      sortedConversationIds.has(selectedConversationId)
     ) {
       return;
     }
@@ -103,7 +104,7 @@ export function SupportInboxPage({ locale }: SupportInboxPageProps) {
     return () => {
       isActive = false;
     };
-  }, [inboxQuery.isFetching, selectedConversationId, sortedConversationIdSignature]);
+  }, [inboxQuery.isFetching, selectedConversationId, sortedConversationIds]);
 
   const activeConversationId = useMemo(() => {
     if (sortedConversations.length === 0) {

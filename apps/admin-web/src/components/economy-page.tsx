@@ -5,7 +5,13 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 
 import { useSyncFeedbackToAdminNotifications } from "@/components/admin/admin-notifications";
-import { AdminPage, AdminStateCard } from "@/components/admin/admin-primitives";
+import {
+  AdminMetricStrip,
+  AdminPage,
+  AdminSectionHeader,
+  AdminStateCard,
+  AdminSummaryChips,
+} from "@/components/admin/admin-primitives";
 import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
 import { useAdminUrlStateSyncGuard } from "@/components/admin/use-admin-url-state-sync-guard";
 import { EconomyPageConfirmationDialogs } from "@/components/economy-page-confirmation-dialogs";
@@ -110,6 +116,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
   const [workspace, setWorkspace] = useState<EconomyWorkspace>(() =>
     readEconomyWorkspace(searchParams.get("workspace"))
   );
+  const workspaceNavRef = useRef<HTMLDivElement | null>(null);
   const workspaceTabRefs = useRef<Partial<Record<EconomyWorkspace, HTMLButtonElement | null>>>({});
   const workspacePanelRef = useRef<HTMLDivElement | null>(null);
   const shouldFocusWorkspacePanel = useRef(false);
@@ -357,6 +364,35 @@ export function EconomyPage({ locale }: EconomyPageProps) {
     workspacePanelRef.current?.focus();
   }, [workspace]);
 
+  useEffect(() => {
+    let frameId = 0;
+    const keepActiveWorkspaceVisible = () => {
+      cancelAnimationFrame(frameId);
+      frameId = requestAnimationFrame(() => {
+        const navigation = workspaceNavRef.current;
+        const activeTab = workspaceTabRefs.current[workspace];
+        if (!navigation || !activeTab) {
+          return;
+        }
+
+        navigation.scrollTo({
+          left: Math.max(
+            0,
+            activeTab.offsetLeft - (navigation.clientWidth - activeTab.offsetWidth) / 2
+          ),
+          behavior: "auto",
+        });
+      });
+    };
+
+    keepActiveWorkspaceVisible();
+    window.addEventListener("resize", keepActiveWorkspaceVisible);
+    return () => {
+      window.removeEventListener("resize", keepActiveWorkspaceVisible);
+      cancelAnimationFrame(frameId);
+    };
+  }, [workspace]);
+
   function selectWorkspace(nextWorkspace: EconomyWorkspace, focusWorkspacePanel = false) {
     if (nextWorkspace === workspace) {
       if (focusWorkspacePanel) {
@@ -471,62 +507,53 @@ export function EconomyPage({ locale }: EconomyPageProps) {
       return (
         <>
           <section className={styles.workspaceSection} aria-labelledby="economy-overview-title">
-            <div className={styles.workspaceSectionIntro}>
-              <h2 id="economy-overview-title">{text.overviewTitle}</h2>
-            </div>
-            <div className={styles.overviewSummary}>
-              <div className={styles.overviewSummaryPrimary}>
-                <span>{text.revenueLabel}</span>
-                <strong>
-                  {formatCurrency(metrics.grossRevenue, locale, metrics.revenueCurrencyCode)}
-                </strong>
-                <small>
-                  {formatWeekDelta(metrics.grossRevenue, metrics.revenuePreviousWeek, text)}
-                </small>
-              </div>
-              <dl className={styles.overviewMetricList}>
-                <div>
-                  <dt>{text.successfulPaymentsLabel}</dt>
-                  <dd>{metrics.successfulPaymentsThisWeek}</dd>
-                  <span>
-                    {formatOptionalWeekDelta(
-                      metrics.successfulPaymentsThisWeek,
-                      metrics.successfulPaymentsPreviousWeek,
-                      text
-                    )}
-                  </span>
-                </div>
-                <div>
-                  <dt>{text.failedPaymentsLabel}</dt>
-                  <dd>{metrics.failedPaymentsThisWeek}</dd>
-                  <span>
-                    {formatOptionalWeekDelta(
-                      metrics.failedPaymentsThisWeek,
-                      metrics.failedPaymentsPreviousWeek,
-                      text
-                    )}
-                  </span>
-                </div>
-                <div>
-                  <dt>{text.purchasesThisWeekLabel}</dt>
-                  <dd>{metrics.purchasesThisWeek}</dd>
-                  <span>
-                    {formatOptionalWeekDelta(
-                      metrics.purchasesThisWeek,
-                      metrics.purchasesPreviousWeek,
-                      text
-                    )}
-                  </span>
-                </div>
-                <div>
-                  <dt>{text.activeSubscriptionsLabel}</dt>
-                  <dd>{premiumMetrics.activeSubscriptions}</dd>
-                  <span>
-                    {text.renewalStopsLabel}: {premiumMetrics.renewalStops}
-                  </span>
-                </div>
-              </dl>
-            </div>
+            <AdminSectionHeader title={text.overviewTitle} titleId="economy-overview-title" />
+            <AdminMetricStrip
+              items={[
+                {
+                  label: text.revenueLabel,
+                  value: formatCurrency(metrics.grossRevenue, locale, metrics.revenueCurrencyCode),
+                  hint: formatWeekDelta(metrics.grossRevenue, metrics.revenuePreviousWeek, text),
+                  tone: "primary",
+                },
+                {
+                  label: text.successfulPaymentsLabel,
+                  value: metrics.successfulPaymentsThisWeek,
+                  hint: formatOptionalWeekDelta(
+                    metrics.successfulPaymentsThisWeek,
+                    metrics.successfulPaymentsPreviousWeek,
+                    text
+                  ),
+                  tone: "success",
+                },
+                {
+                  label: text.failedPaymentsLabel,
+                  value: metrics.failedPaymentsThisWeek,
+                  hint: formatOptionalWeekDelta(
+                    metrics.failedPaymentsThisWeek,
+                    metrics.failedPaymentsPreviousWeek,
+                    text
+                  ),
+                  tone: metrics.failedPaymentsThisWeek > 0 ? "danger" : "neutral",
+                },
+                {
+                  label: text.activeSubscriptionsLabel,
+                  value: premiumMetrics.activeSubscriptions,
+                  hint: `${text.renewalStopsLabel}: ${premiumMetrics.renewalStops}`,
+                  tone: "info",
+                },
+              ]}
+            />
+            <AdminSummaryChips
+              items={[
+                `${text.purchasesThisWeekLabel}: ${metrics.purchasesThisWeek}`,
+                formatOptionalWeekDelta(
+                  metrics.purchasesThisWeek,
+                  metrics.purchasesPreviousWeek,
+                  text
+                ),
+              ]}
+            />
           </section>
 
           <EconomyPageOverviewActions
@@ -736,6 +763,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
         data-has-action={workspace !== "overview" || undefined}
       >
         <div
+          ref={workspaceNavRef}
           className={styles.workspaceNav}
           role="tablist"
           aria-label={text.workspaceNavigationLabel}

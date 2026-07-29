@@ -9,9 +9,9 @@ import { ClockIcon } from "@/components/admin/admin-icons";
 import {
   AdminBadge,
   AdminCard,
+  AdminContextBar,
   AdminMetricStrip,
   AdminPage,
-  AdminPageHero,
   AdminStateCard,
 } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
@@ -581,9 +581,7 @@ export function AuditEventsPage({ locale }: AuditEventsPageProps) {
 
   return (
     <AdminPage className={styles.page}>
-      <AdminPageHero
-        title={text.title}
-        description={text.description}
+      <AdminContextBar
         badge={<AdminBadge tone="success">{text.accessBadge}</AdminBadge>}
         actions={
           <Button

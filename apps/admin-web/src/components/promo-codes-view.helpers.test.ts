@@ -753,6 +753,16 @@ describe("promo code sensitive display", () => {
     expect(stylesSource).toContain("@media (max-width: 860px)");
     expect(stylesSource).toContain(".statusTabs {\n    width: 100%;\n    flex-wrap: nowrap;");
     expect(stylesSource).toContain(".paginationActions {\n    justify-content: flex-start;");
+    expect(listSource).toContain(
+      "className={`${adminTableStyles.tableWrap} ${styles.promoTableWrap}`}"
+    );
+    expect(listSource).toContain("className={`${adminTableStyles.table} ${styles.promoTable}`}");
+    expect(listSource).toContain("data-label={text.promoCodesCodeLabel}");
+    expect(listSource).toContain("data-label={text.actionsLabel}");
+    expect(stylesSource).toContain("@media (max-width: 640px)");
+    expect(stylesSource).toContain(".promoTableWrap {\n    overflow: visible;");
+    expect(stylesSource).toContain(".promoTable tr {\n    min-width: 0;\n    display: grid;");
+    expect(stylesSource).toContain(".promoTable td::before {\n    content: attr(data-label);");
     const editorDrawerBlock = stylesSource.match(/\.editorDrawer \{[\s\S]*?\n\}/)?.[0] ?? "";
     expect(editorDrawerBlock).toContain("height: min(100%, calc(100dvh - 1.8rem));");
     expect(editorDrawerBlock).toContain("border-radius: var(--radius);");

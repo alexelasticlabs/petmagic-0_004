@@ -35,6 +35,7 @@ import {
   restoreSession,
   useAuthSession,
 } from "@/lib/api-client";
+import { clientLogger } from "@/lib/client-logger";
 import { type Locale, getDictionary } from "@/lib/i18n";
 import { maskEmail, sanitizeSensitiveText } from "@/lib/sensitive-display";
 import { useSupportRealtime } from "@/lib/support-realtime";
@@ -54,6 +55,29 @@ type AdminShellProps = { locale: Locale; children: ReactNode };
 
 const ADMIN_SIDEBAR_FOCUSABLE_SELECTOR =
   'a[href], button:not(:disabled), [tabindex]:not([tabindex="-1"])';
+const ADMIN_SIDEBAR_STORAGE_KEY = "petmagic.admin.sidebar.v1";
+const ADMIN_SIDEBAR_CHANGE_EVENT = "petmagic:admin-sidebar-change";
+
+function subscribeToAdminSidebarState(onChange: () => void) {
+  window.addEventListener("storage", onChange);
+  window.addEventListener(ADMIN_SIDEBAR_CHANGE_EVENT, onChange);
+  return () => {
+    window.removeEventListener("storage", onChange);
+    window.removeEventListener(ADMIN_SIDEBAR_CHANGE_EVENT, onChange);
+  };
+}
+
+function getAdminSidebarState() {
+  try {
+    return window.localStorage.getItem(ADMIN_SIDEBAR_STORAGE_KEY) === "collapsed";
+  } catch {
+    return false;
+  }
+}
+
+function getServerAdminSidebarState() {
+  return false;
+}
 
 function AdminAccessGate({ locale }: { locale: Locale }) {
   const copy = getAdminChromeCopy(locale);
@@ -138,6 +162,11 @@ export function AdminShell({ locale, children }: AdminShellProps) {
 
   /* Admin panel state */
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const sidebarCollapsed = useSyncExternalStore(
+    subscribeToAdminSidebarState,
+    getAdminSidebarState,
+    getServerAdminSidebarState
+  );
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isSidebarDrawerMode, setIsSidebarDrawerMode] = useState(false);
@@ -166,6 +195,19 @@ export function AdminShell({ locale, children }: AdminShellProps) {
   }, []);
 
   function handleSidebarToggle() {
+    if (!isSidebarDrawerMode) {
+      const next = !sidebarCollapsed;
+      try {
+        window.localStorage.setItem(ADMIN_SIDEBAR_STORAGE_KEY, next ? "collapsed" : "expanded");
+        window.dispatchEvent(new Event(ADMIN_SIDEBAR_CHANGE_EVENT));
+      } catch (error) {
+        clientLogger.warn("admin.sidebar_state_write_failed", {
+          errorName: error instanceof Error ? error.name : "UnknownError",
+        });
+      }
+      return;
+    }
+
     if (sidebarOpen) {
       closeSidebar(true);
       return;
@@ -440,7 +482,7 @@ export function AdminShell({ locale, children }: AdminShellProps) {
   const enPath = buildLocaleSwitchPath("en", pathname, currentSearch);
 
   return (
-    <div className={styles.layout}>
+    <div className={`${styles.layout}${sidebarCollapsed ? ` ${styles.layoutCollapsed}` : ""}`}>
       <a
         className={styles.skipLink}
         href="#admin-main"
@@ -459,6 +501,7 @@ export function AdminShell({ locale, children }: AdminShellProps) {
         currentPath={currentPath}
         isOpen={sidebarOpen}
         isDrawerMode={isSidebarDrawerMode}
+        isCollapsed={!isSidebarDrawerMode && sidebarCollapsed}
         sidebarRef={sidebarRef}
         onClose={() => closeSidebar(true)}
         onNavigate={() => closeSidebar(true)}
@@ -486,7 +529,7 @@ export function AdminShell({ locale, children }: AdminShellProps) {
           roles={sessionRoles}
           ruPath={ruPath}
           enPath={enPath}
-          sidebarOpen={sidebarOpen}
+          sidebarOpen={isSidebarDrawerMode ? sidebarOpen : !sidebarCollapsed}
           sidebarTriggerRef={sidebarTriggerRef}
           onToggleSidebar={handleSidebarToggle}
           onToggleTheme={handleToggleTheme}

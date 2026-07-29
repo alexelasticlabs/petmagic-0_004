@@ -3,8 +3,8 @@
 import { RefreshIcon } from "@/components/admin/admin-icons";
 import {
   AdminBadge,
+  AdminContextBar,
   AdminPage,
-  AdminPageHero,
   AdminStateCard,
 } from "@/components/admin/admin-primitives";
 import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
@@ -86,10 +86,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
 
   return (
     <AdminPage className={styles.page}>
-      <AdminPageHero
-        eyebrow={text.eyebrow}
-        title={text.title}
-        description={text.description}
+      <AdminContextBar
         badge={<AdminBadge tone="info">{text.heroBadge}</AdminBadge>}
         actions={
           <Button

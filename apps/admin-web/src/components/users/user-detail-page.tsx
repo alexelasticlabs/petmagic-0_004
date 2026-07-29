@@ -312,7 +312,6 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
           {workspaceText.backToUsers}
         </Link>
         <section className={styles.compactState} aria-busy="true">
-          <h1>{workspaceText.profileTitle}</h1>
           <AdminStateCard tone="info" title={text.loading} />
         </section>
       </AdminPage>
@@ -326,7 +325,6 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
           {workspaceText.backToUsers}
         </Link>
         <section className={styles.compactState}>
-          <h1>{workspaceText.profileTitle}</h1>
           <AdminStateCard
             tone="danger"
             title={text.userAnalyticsLoadError}
@@ -376,7 +374,7 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
           />
           <div className={styles.profileCopy}>
             <div className={styles.profileIdentity}>
-              <h1 id="user-profile-title">{safeUserName}</h1>
+              <h2 id="user-profile-title">{safeUserName}</h2>
               <p>{maskEmail(user.email)}</p>
             </div>
             <div className={styles.profileBadges}>

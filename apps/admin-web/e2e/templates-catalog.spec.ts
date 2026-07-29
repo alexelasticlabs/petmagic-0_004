@@ -670,8 +670,11 @@ test("unified templates catalog supports publishing filters and responsive cards
   const main = page.locator("#admin-main");
   await expect(page).toHaveURL(/\/ru\/templates$/);
   await expect(
-    main.getByRole("heading", { name: "Управление шаблонами", exact: true })
+    page.getByRole("banner").getByRole("heading", { name: "Шаблоны", exact: true })
   ).toBeVisible();
+  await expect(
+    main.getByRole("heading", { name: "Управление шаблонами", exact: true })
+  ).toHaveCount(0);
   await expect(main.getByRole("link", { name: "Все", exact: true })).toHaveAttribute(
     "aria-current",
     "page"

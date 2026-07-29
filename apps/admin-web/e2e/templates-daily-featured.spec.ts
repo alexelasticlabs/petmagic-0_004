@@ -373,7 +373,7 @@ test("daily featured supports settings, manual schedule, auto-pick, edit and del
 
   await page.goto("/en/templates/daily-featured");
   await expect(
-    page.getByRole("main").getByRole("heading", { name: "Daily Featured", exact: true })
+    page.getByRole("banner").getByRole("heading", { name: "Daily Featured", exact: true })
   ).toBeVisible();
   const scheduleTable = page.getByRole("table");
   await expect(scheduleTable).toHaveCount(1);
@@ -503,7 +503,7 @@ test("daily featured supports settings, manual schedule, auto-pick, edit and del
   await page.waitForTimeout(260);
   await page.evaluate(() => window.scrollTo(0, 0));
   await expect(
-    page.getByRole("main").getByRole("heading", { name: "Daily Featured", exact: true })
+    page.getByRole("banner").getByRole("heading", { name: "Daily Featured", exact: true })
   ).toBeVisible();
   const mobileDimensions = await page.evaluate(() => {
     const form = document.querySelector<HTMLFormElement>("form[aria-busy]");

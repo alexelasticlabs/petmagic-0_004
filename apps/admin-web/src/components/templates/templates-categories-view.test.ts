@@ -176,9 +176,10 @@ describe("template categories view actions", () => {
     expect(source).toContain("getActionErrorMessage(actionError, categoryText.archiveError)");
     expect(source).toContain("message: categoryText.deleteSuccess");
     expect(source).toContain("getActionErrorMessage(actionError, categoryText.deleteError)");
-    expect(source).toContain("eyebrow={categoryText.heroEyebrow}");
-    expect(source).toContain("title={categoryText.heroTitle}");
-    expect(source).toContain("description={categoryText.heroDescription}");
+    expect(source).toContain("<AdminContextBar");
+    expect(source).not.toContain("<AdminPageHero");
+    expect(source).not.toContain("categoryText.heroTitle");
+    expect(source).not.toContain("categoryText.heroDescription");
     expect(source).toContain(
       "badge={canManageCategories ? categoryText.crudEnabled : categoryText.readOnly}"
     );

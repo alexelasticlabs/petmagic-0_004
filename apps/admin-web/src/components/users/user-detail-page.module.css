@@ -60,14 +60,9 @@
   gap: 0.74rem;
 }
 
-.compactState h1,
-.profileIdentity h1 {
+.profileIdentity h2 {
   margin: 0;
   color: var(--text-strong);
-}
-
-.compactState h1 {
-  font-size: 1.18rem;
 }
 
 .tabPanel {
@@ -162,7 +157,7 @@
   gap: 0.16rem;
 }
 
-.profileIdentity h1 {
+.profileIdentity h2 {
   overflow-wrap: anywhere;
   font-size: clamp(1.42rem, 2vw, 1.85rem);
   line-height: 1.08;

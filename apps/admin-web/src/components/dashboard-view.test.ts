@@ -423,6 +423,21 @@ describe("dashboard production data handling", () => {
     expect(stylesSource).toContain(".cardActionLink {\n    text-align: left;");
   });
 
+  it("uses semantic payment cards instead of horizontal order tables on phones", () => {
+    const source = readDashboardViewLibrarySource();
+    const stylesSource = readFileSync(dashboardStylesPath, "utf8");
+
+    expect(source).toContain("<AdminDataSurface");
+    expect(source).toContain("className={styles.ordersDesktopTable}");
+    expect(source).toContain("className={styles.ordersMobileList}");
+    expect(source).toContain("className={styles.orderMobileCard}");
+    expect(source).toContain("aria-label={viewModel.ordersSection.title}");
+    expect(stylesSource).toContain(".ordersMobileList {\n  display: none;");
+    expect(stylesSource).toContain(
+      ".ordersDesktopTable {\n    display: none;\n  }\n\n  .ordersMobileList {\n    display: grid;"
+    );
+  });
+
   it("sanitizes dashboard user, support, and identifier labels before rendering", () => {
     const source = readDashboardViewLibrarySource();
     const contentSource = readFileSync(dashboardContentPath, "utf8");

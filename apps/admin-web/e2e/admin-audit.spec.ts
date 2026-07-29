@@ -210,7 +210,7 @@ test("Admin investigates audit events with server filters and safe detail contex
   await page.goto("/en/audit");
   await expect(page).toHaveURL(/\/en\/audit$/);
   await expect(
-    page.getByRole("main").getByRole("heading", { name: "Audit trail", exact: true })
+    page.getByRole("banner").getByRole("heading", { name: "Audit trail", exact: true })
   ).toBeVisible();
   const timeline = page.locator('section[aria-labelledby="audit-timeline-title"]');
   await expect(timeline.getByText("User access blocked", { exact: true })).toBeVisible();

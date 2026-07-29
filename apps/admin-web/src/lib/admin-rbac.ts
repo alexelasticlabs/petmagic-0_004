@@ -110,6 +110,10 @@ export function canAccessAdminPath(
     return canAccessAdminSection(roles, "audit");
   }
 
+  if (matchesAdminPath(currentPath, "/notifications")) {
+    return hasAdminPanelAccess(roles);
+  }
+
   if (matchesAdminPath(currentPath, "/templates/categories")) {
     return canAccessAdminSection(roles, "template-categories");
   }

@@ -111,18 +111,14 @@ describe("admin route fallbacks", () => {
     expect(fallbackContentSource).toContain('signInActionLabel: "К входу"');
     expect(fallbackContentSource).toContain('retryActionLabel: "Retry"');
 
-    expect(errorSource).toContain(
-      'import { getAdminPageMetaCopy } from "@/lib/admin-navigation.content";'
-    );
-    expect(errorSource).toContain("const pageMeta = getAdminPageMetaCopy(locale);");
-    expect(errorSource).toContain("title={pageMeta.workspace.title}");
+    expect(errorSource).toContain("title={text.adminErrorTitle}");
+    expect(errorSource).not.toContain("getAdminPageMetaCopy");
+    expect(errorSource).not.toContain("<AdminPageHero");
     expect(errorSource).not.toContain('title="PetMagic Admin"');
     expect(loadingSource).toContain("description={text.adminLoadingDescription}");
-    expect(loadingSource).toContain(
-      'import { getAdminPageMetaCopy } from "@/lib/admin-navigation.content";'
-    );
-    expect(loadingSource).toContain("const pageMeta = getAdminPageMetaCopy(locale);");
-    expect(loadingSource).toContain("title={pageMeta.workspace.title}");
+    expect(loadingSource).toContain("title={text.loading}");
+    expect(loadingSource).not.toContain("getAdminPageMetaCopy");
+    expect(loadingSource).not.toContain("<AdminPageHero");
     expect(loadingSource).toContain('<AdminPage aria-busy="true" aria-live="polite">');
     expect(loadingSource).not.toContain("description={text.navDashboard}");
     expect(loadingSource).not.toContain('title="PetMagic Admin"');

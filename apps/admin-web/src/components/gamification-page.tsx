@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 
 import { AdminEntityLink } from "@/components/admin/admin-entity-link";
-import { AdminPage, AdminStateCard } from "@/components/admin/admin-primitives";
+import { AdminContextBar, AdminPage, AdminStateCard } from "@/components/admin/admin-primitives";
 import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
 import { getGamificationText } from "@/components/gamification-page.content";
 import {
@@ -332,18 +332,10 @@ export function GamificationPage({ locale }: GamificationPageProps) {
 
   return (
     <AdminPage className={styles.page}>
-      <section className={styles.intro} aria-labelledby="gamification-workspace-title">
-        <div className={styles.introCopy}>
-          <p className={styles.eyebrow}>{text.workspaceEyebrow}</p>
-          <h2 id="gamification-workspace-title" className={styles.panelTitle}>
-            {text.workspaceTitle}
-          </h2>
-          <p className={styles.description}>{text.description}</p>
-        </div>
-        <div className={styles.introActions}>
-          <span className={styles.updated}>
-            {text.lastUpdatedLabel}: {formatDateTime(metrics?.generatedAtUtc, locale)}
-          </span>
+      <AdminContextBar
+        label={text.workspaceEyebrow}
+        metaItems={[`${text.lastUpdatedLabel}: ${formatDateTime(metrics?.generatedAtUtc, locale)}`]}
+        actions={
           <Button
             type="button"
             variant="secondary"
@@ -352,8 +344,8 @@ export function GamificationPage({ locale }: GamificationPageProps) {
           >
             {isBaseFetching ? text.refreshingAction : text.refreshAction}
           </Button>
-        </div>
-      </section>
+        }
+      />
 
       {feedback ? <AdminStateCard tone={feedback.tone} title={feedback.message} /> : null}
       {hasPartialError ? (

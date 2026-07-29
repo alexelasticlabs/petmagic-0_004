@@ -1,6 +1,72 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 const apiOrigin = "https://api.petmagic.test";
+
+const generationControlSnapshot = {
+  revision: 1,
+  admissionEnabled: true,
+  confirmedFalConcurrencyLimit: 6,
+  confirmedAtUtc: "2026-07-27T09:30:00Z",
+  reservedHeadroom: 1,
+  applicationHardCeiling: 5,
+  effectiveGlobalLimit: 4,
+  policy: {
+    globalMaxConcurrentGenerations: 4,
+    imageReservedConcurrentGenerations: 3,
+    imageProtectedConcurrentGenerations: 2,
+    imageMaxConcurrentGenerations: 3,
+    videoReservedConcurrentGenerations: 1,
+    videoMaxConcurrentGenerations: 2,
+    videoBorrowMaxConcurrentGenerations: 1,
+    videoPreprocessingMaxConcurrentGenerations: 1,
+  },
+  effectiveProfile: {
+    globalMaxConcurrentGenerations: 4,
+    imageReservedConcurrentGenerations: 3,
+    imageProtectedConcurrentGenerations: 2,
+    imageMaxConcurrentGenerations: 3,
+    videoReservedConcurrentGenerations: 1,
+    videoMaxConcurrentGenerations: 2,
+    videoBorrowMaxConcurrentGenerations: 1,
+    videoPreprocessingMaxConcurrentGenerations: 1,
+  },
+  balance: {
+    state: "fresh",
+    currentBalanceUsd: 25,
+    checkedAtUtc: "2026-07-27T09:30:00Z",
+    lastSuccessfulAtUtc: "2026-07-27T09:30:00Z",
+  },
+  queue: {
+    totalDepth: 0,
+    imageDepth: 0,
+    videoDepth: 0,
+    oldestQueuedAtUtc: null,
+    stages: [],
+  },
+  lanes: {
+    inFlightTotal: 0,
+    imageInFlight: 0,
+    videoInFlight: 0,
+    videoPreprocessingInFlight: 0,
+    nativeSlotsInUse: 0,
+    borrowedSlotsInUse: 0,
+    reservedSlotsAvailable: 1,
+    submissionUnknownCount: 0,
+  },
+  worker: {
+    instanceCount: 1,
+    heartbeatAtUtc: "2026-07-27T09:30:00Z",
+    lastProgressAtUtc: "2026-07-27T09:30:00Z",
+    appliedPolicyRevision: 1,
+    schedulerV2Enabled: true,
+    dispatchConcurrency: 4,
+    reconciliationConcurrency: 1,
+    mediaImportConcurrency: 1,
+    maintenanceConcurrency: 1,
+  },
+  alerts: [],
+  generatedAtUtc: "2026-07-27T09:30:00Z",
+};
 const adminUserId = "11111111-1111-1111-1111-111111111111";
 const moderatorUserId = "22222222-2222-2222-2222-222222222222";
 const conversationId = "33333333-3333-3333-3333-333333333333";
@@ -1080,6 +1146,8 @@ test("running generation cancellation becomes pending and polls", async ({ page 
         { generationId, status: "CancellationRequested", canCancel: false },
         202
       );
+    } else if (url.pathname === "/api/admin/templates/generation-control") {
+      await fulfillJson(route, generationControlSnapshot);
     } else if (url.pathname === "/api/admin/templates/generations/metrics") {
       await fulfillJson(route, {
         totalJobs: 1,
@@ -1117,7 +1185,9 @@ test("running generation cancellation becomes pending and polls", async ({ page 
   await page.goto("/en/generations");
   await page.getByRole("button", { name: /Cancel:/ }).click();
   await page.getByRole("button", { name: "Cancel generation", exact: true }).click();
-  await expect(page.getByText("Cancelling", { exact: true }).first()).toBeVisible();
+  await expect(
+    page.locator('[data-label="Status"]').getByText("Cancelling", { exact: true })
+  ).toBeVisible();
   await expect.poll(() => listRequests).toBeGreaterThan(1);
 });
 
@@ -1162,6 +1232,8 @@ test("legacy Gamification delivery requires an audited decision before replay", 
         replayQueued: true,
         resolvedAtUtc: "2026-07-10T00:00:00Z",
       });
+    } else if (url.pathname === "/api/admin/templates/generation-control") {
+      await fulfillJson(route, generationControlSnapshot);
     } else if (url.pathname === "/api/admin/templates/generations/metrics") {
       await fulfillJson(route, {
         totalJobs: 1,
@@ -1466,7 +1538,8 @@ test("Gamification workspace is responsive and keeps streak reset audited", asyn
   await expect(page.locator('a[href="/en/gamification"]')).toBeVisible();
 
   const workspaceAccessibilityTree = await page.getByRole("main").ariaSnapshot();
-  expect(workspaceAccessibilityTree).toContain('heading "Gamification"');
+  expect(workspaceAccessibilityTree).not.toContain('heading "Gamification"');
+  expect(workspaceAccessibilityTree).toContain('text: "Engagement Last updated:');
   expect(workspaceAccessibilityTree).toContain('heading "Current challenges"');
   expect(workspaceAccessibilityTree).toContain('searchbox "User search"');
 

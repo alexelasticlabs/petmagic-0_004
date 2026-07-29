@@ -281,7 +281,7 @@ test("admin operates template analytics hub filters, pagination, links and expor
 
   await expect(page).toHaveURL(/\/ru\/templates\/analytics$/);
   await expect(
-    page.locator("#admin-main").getByRole("heading", { name: "Аналитика шаблонов", exact: true })
+    page.getByRole("banner").getByRole("heading", { name: "Аналитика шаблонов", exact: true })
   ).toBeVisible();
   await expect(page.getByRole("img", { name: "Динамика по времени", exact: true })).toBeVisible();
   await expect(page.locator("nextjs-portal")).toHaveCount(0);

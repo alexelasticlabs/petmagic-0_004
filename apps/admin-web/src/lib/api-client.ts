@@ -10,4 +10,5 @@ export * from "./api-client.feedback";
 export * from "./api-client.gamification";
 export * from "./api-client.audit";
 export * from "./api-client.system-status";
+export * from "./api-client.notifications";
 export * from "./api-client.template-category-diagnostics";

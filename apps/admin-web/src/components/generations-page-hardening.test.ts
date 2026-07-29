@@ -40,7 +40,10 @@ describe("generations page hardening", () => {
     expect(source).toContain('const modelText = formatSafeText(item.model, "")');
     expect(source).toContain("const templateTitle = formatSafeText(item.templateTitle)");
     expect(source).toContain("const generationIdText = formatShortId(item.generationId)");
-    expect(source).toContain("const userIdText = formatShortId(item.userId)");
+    expect(source).toContain("const safeValue = sanitizeSensitiveText(value, 160)");
+    expect(source).toContain("<TechnicalId value={item.generationId} text={text} />");
+    expect(source).toContain("<TechnicalId value={item.userId} text={text} />");
+    expect(source).toContain("<TechnicalId value={item.templateId} text={text} />");
     expect(source).not.toContain("{item.provider}</AdminBadge>");
     expect(source).not.toContain("{item.model}</div>");
     expect(source).not.toContain("{item.failureCode}");
@@ -208,6 +211,28 @@ describe("generations page hardening", () => {
     expect(stylesSource).toContain(".pagerButton {\n    width: auto;");
   });
 
+  it("uses a priority-card queue layout instead of horizontal scrolling on mobile", () => {
+    const source = readGenerationsPageLibrarySource();
+    const contentSource = readFileSync(generationsContentPath, "utf8");
+    const stylesSource = readFileSync(generationsStylesPath, "utf8");
+
+    expect(source).toContain(
+      "className={`${adminTableStyles.tableWrap} ${styles.generationTableWrap}`}"
+    );
+    expect(source).toContain("className={`${adminTableStyles.table} ${styles.generationTable}`}");
+    expect(source).toContain("className={styles.generationRow}");
+    expect(source).toContain("data-label={text.job}");
+    expect(source).toContain("data-label={text.status}");
+    expect(source).toContain("data-label={text.failure}");
+    expect(contentSource).toContain('copyId: "Копировать полный ID"');
+    expect(contentSource).toContain('copyId: "Copy full ID"');
+    expect(stylesSource).toContain(".generationTableWrap {\n    overflow: visible;");
+    expect(stylesSource).toContain(".generationRow > td::before");
+    expect(stylesSource).toContain("content: attr(data-label);");
+    expect(stylesSource).toContain(".generationRow > td:nth-child(6)");
+    expect(stylesSource).toContain(".detailsRow > td");
+  });
+
   it("sources status KPI cards from backend aggregate metrics", () => {
     const source = readGenerationsPageLibrarySource();
 
@@ -221,7 +246,11 @@ describe("generations page hardening", () => {
     expect(source).toContain("generationMetrics?.cancelledJobs");
     expect(source).toContain("generationMetrics?.pendingRefunds");
     expect(source).toContain("generationMetrics?.exhaustedRefunds");
-    expect(source).toContain("hint={text.allJobsScope}");
+    expect(source).toContain("<AdminMetricStrip");
+    expect(source).toContain("<AdminSummaryChips");
+    expect(source).toContain("<AdminFilterToolbar");
+    expect(source).toContain("<AdminDataSurface");
+    expect(source).not.toContain("<AdminKpiCard");
     expect(source).toContain('aria-busy={generationsQuery.isFetching ? "true" : undefined}');
     expect(source).not.toContain('currentPageScope: isRu ? "Текущая страница" : "Current page"');
     expect(source).not.toContain("items.filter((item) => item.status");

@@ -16,6 +16,13 @@ type AdminCardProps = {
   className?: string;
 };
 
+type AdminFilterToolbarProps = Omit<AdminCardProps, "padding"> & {
+  activeFilters?: ReactNode;
+  advancedFilters?: ReactNode;
+};
+
+type AdminDataSurfaceProps = AdminCardProps;
+
 type AdminStatCardProps = {
   label: string;
   value: string;
@@ -41,6 +48,15 @@ type AdminPageHeroProps = {
   actions?: ReactNode;
   metaItems?: readonly ReactNode[];
   className?: string;
+  showTitle?: boolean;
+};
+
+type AdminContextBarProps = {
+  label?: ReactNode;
+  badge?: ReactNode;
+  actions?: ReactNode;
+  metaItems?: readonly ReactNode[];
+  className?: string;
 };
 
 type AdminSummaryChipsProps = {
@@ -51,6 +67,7 @@ type AdminSummaryChipsProps = {
 type AdminSectionHeaderProps = {
   eyebrow?: string;
   title: ReactNode;
+  titleId?: string;
   description?: ReactNode;
   aside?: ReactNode;
   className?: string;
@@ -59,6 +76,8 @@ type AdminSectionHeaderProps = {
 type AdminMetricStripItem = {
   label: ReactNode;
   value: ReactNode;
+  hint?: ReactNode;
+  tone?: AdminTone;
 };
 
 type AdminMetricStripProps = {
@@ -314,6 +333,30 @@ export function AdminCard({
   );
 }
 
+export function AdminFilterToolbar({
+  activeFilters,
+  advancedFilters,
+  children,
+  className,
+  ...cardProps
+}: AdminFilterToolbarProps) {
+  return (
+    <AdminCard
+      {...cardProps}
+      padding="md"
+      className={joinClassNames(styles.filterToolbar, className)}
+    >
+      <div className={styles.filterToolbarControls}>{children}</div>
+      {activeFilters ? <div className={styles.filterToolbarActive}>{activeFilters}</div> : null}
+      {advancedFilters}
+    </AdminCard>
+  );
+}
+
+export function AdminDataSurface({ className, ...cardProps }: AdminDataSurfaceProps) {
+  return <AdminCard {...cardProps} className={joinClassNames(styles.dataSurface, className)} />;
+}
+
 export function AdminStatCard({
   label,
   value,
@@ -385,7 +428,20 @@ export function AdminPageHero({
   actions,
   metaItems = [],
   className,
+  showTitle = false,
 }: AdminPageHeroProps) {
+  if (!showTitle) {
+    return (
+      <AdminContextBar
+        label={eyebrow}
+        badge={badge}
+        actions={actions}
+        metaItems={metaItems}
+        className={className}
+      />
+    );
+  }
+
   const hasAside = badge || actions;
 
   return (
@@ -408,9 +464,35 @@ export function AdminPageHero({
   );
 }
 
+export function AdminContextBar({
+  label,
+  badge,
+  actions,
+  metaItems = [],
+  className,
+}: AdminContextBarProps) {
+  if (!label && !badge && !actions && metaItems.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className={joinClassNames(styles.contextBar, className)}>
+      <div className={styles.contextBarLead}>
+        {label ? <span className={styles.contextBarLabel}>{label}</span> : null}
+        <AdminSummaryChips items={metaItems} />
+      </div>
+      <div className={styles.contextBarActions}>
+        {badge ? <span className={styles.pageBadge}>{badge}</span> : null}
+        {actions}
+      </div>
+    </section>
+  );
+}
+
 export function AdminSectionHeader({
   eyebrow,
   title,
+  titleId,
   description,
   aside,
   className,
@@ -419,7 +501,9 @@ export function AdminSectionHeader({
     <div className={joinClassNames(styles.sectionHeader, className)}>
       <div className={styles.sectionHeaderCopy}>
         {eyebrow ? <p className={styles.sectionEyebrow}>{eyebrow}</p> : null}
-        <h2 className={styles.sectionHeading}>{title}</h2>
+        <h2 id={titleId} className={styles.sectionHeading}>
+          {title}
+        </h2>
         {description ? <p className={styles.sectionText}>{description}</p> : null}
       </div>
       {aside ? <div className={styles.sectionHeaderAside}>{aside}</div> : null}
@@ -437,9 +521,14 @@ export function AdminMetricStrip({ items, className }: AdminMetricStripProps) {
   return (
     <div className={joinClassNames(styles.metricStrip, className)}>
       {visibleItems.map((item, index) => (
-        <div key={index} className={styles.metricChip}>
+        <div
+          key={index}
+          className={styles.metricChip}
+          data-tone={item.tone && item.tone !== "neutral" ? item.tone : undefined}
+        >
           <span className={styles.metricChipLabel}>{item.label}</span>
           <strong className={styles.metricChipValue}>{item.value}</strong>
+          {item.hint ? <span className={styles.metricChipHint}>{item.hint}</span> : null}
         </div>
       ))}
     </div>

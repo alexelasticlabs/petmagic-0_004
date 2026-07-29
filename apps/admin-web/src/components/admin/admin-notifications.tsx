@@ -1,19 +1,27 @@
 "use client";
 
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { usePathname } from "next/navigation";
 import {
   createContext,
   useCallback,
   useContext,
   useEffect,
-  useLayoutEffect,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
 } from "react";
 
-import { isActionableAdminNotification } from "@/lib/admin-notification-policy";
-import { useAuthSession } from "@/lib/api-client.core";
+import { useAdminNotificationsRealtime } from "@/lib/admin-notifications-realtime";
+import { adminQueryKeys } from "@/lib/admin-query-keys";
+import {
+  archiveAdminNotification,
+  fetchAdminNotifications,
+  markAdminNotificationRead,
+  markAllAdminNotificationsRead,
+  useAuthSession,
+  type AdminNotificationEvent,
+} from "@/lib/api-client";
 import { clientLogger } from "@/lib/client-logger";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
@@ -33,6 +41,8 @@ export type AdminNotificationItem = {
   source: string;
   createdAt: string;
   read: boolean;
+  archived: boolean;
+  event?: AdminNotificationEvent;
 };
 
 type AddAdminNotificationInput = {
@@ -49,36 +59,26 @@ type AddAdminNotificationInput = {
 type AdminNotificationsContextValue = {
   items: AdminNotificationItem[];
   unreadCount: number;
+  criticalUnacknowledgedCount: number;
+  asOfUtc?: string;
+  isLoading: boolean;
   addNotification: (input: AddAdminNotificationInput) => void;
   markAsRead: (notificationId: string) => void;
   markCategoryAsRead: (category: AdminNotificationCategory) => void;
   markAllAsRead: () => void;
   clearRead: () => void;
   removeNotification: (notificationId: string) => void;
+  refresh: () => void;
 };
 
-type AdminNotificationState = {
-  storageKey: string | null;
-  items: AdminNotificationItem[];
-};
-
-type ToastLike = {
-  type: "success" | "error";
-  message: string;
-};
-
+type ToastLike = { type: "success" | "error"; message: string };
 type SyncToastOptions = {
   category: AdminNotificationCategory;
   source: string;
   title: string | ((toast: ToastLike) => string);
   href?: string;
 };
-
-type FeedbackLike = {
-  tone: "success" | "danger" | "info";
-  message: string;
-};
-
+type FeedbackLike = { tone: "success" | "danger" | "info"; message: string };
 type SyncFeedbackOptions = {
   category: AdminNotificationCategory;
   source: string;
@@ -86,27 +86,10 @@ type SyncFeedbackOptions = {
   href?: string;
 };
 
-const MAX_ADMIN_NOTIFICATIONS = 24;
-const DEDUPE_WINDOW_MS = 4000;
 const ADMIN_NOTIFICATIONS_STORAGE_KEY_PREFIX = "petmagic.admin.notifications.v2";
 const LEGACY_ADMIN_NOTIFICATIONS_STORAGE_KEY = "petmagic.admin.notifications.v1";
-const MAX_PERSISTED_AGE_MS = 7 * 24 * 60 * 60 * 1000;
-const MAX_NOTIFICATION_TITLE_LENGTH = 120;
-const MAX_NOTIFICATION_MESSAGE_LENGTH = 280;
-const MAX_NOTIFICATION_SOURCE_LENGTH = 120;
-const MAX_NOTIFICATION_HREF_LENGTH = 240;
 const MAX_NOTIFICATION_DEDUPE_KEY_LENGTH = 360;
-
-const notificationCategories = new Set<AdminNotificationCategory>([
-  "support",
-  "users",
-  "templates",
-  "economy",
-  "promo",
-  "system",
-]);
-const notificationTones = new Set<AdminNotificationTone>(["info", "success", "warning", "error"]);
-const notificationPriorities = new Set<AdminNotificationPriority>(["normal", "critical"]);
+const AdminNotificationsContext = createContext<AdminNotificationsContextValue | null>(null);
 let adminNotificationIdSequence = 0;
 
 export function getAdminNotificationStorageKey(userId: string | null | undefined): string | null {
@@ -118,69 +101,14 @@ export function getAdminNotificationStorageKey(userId: string | null | undefined
 
 export function createAdminNotificationId(now: number = Date.now()): string {
   const crypto = globalThis.crypto;
-  if (typeof crypto?.randomUUID === "function") {
-    return `${now}-${crypto.randomUUID()}`;
-  }
-
+  if (typeof crypto?.randomUUID === "function") return `${now}-${crypto.randomUUID()}`;
   if (typeof crypto?.getRandomValues === "function") {
     const bytes = new Uint8Array(8);
     crypto.getRandomValues(bytes);
-    const randomHex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
-    return `${now}-${randomHex}`;
+    return `${now}-${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
   }
-
   adminNotificationIdSequence = (adminNotificationIdSequence + 1) % Number.MAX_SAFE_INTEGER;
   return `${now}-${adminNotificationIdSequence.toString(36)}`;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function getAdminNotificationStorageErrorDetails(error: unknown): {
-  errorName: string;
-  errorDigest?: string;
-} {
-  return {
-    errorName: error instanceof Error ? error.name : "UnknownError",
-    errorDigest:
-      error && typeof error === "object" && "digest" in error
-        ? sanitizeSensitiveText(String((error as { digest?: unknown }).digest ?? ""), 80)
-        : undefined,
-  };
-}
-
-function removeStoredAdminNotifications(
-  storageKey: string | null,
-  storageFailureEvent: string
-): void {
-  if (typeof window === "undefined" || !storageKey) {
-    return;
-  }
-
-  try {
-    window.localStorage.removeItem(storageKey);
-  } catch (error) {
-    clientLogger.warn(storageFailureEvent, getAdminNotificationStorageErrorDetails(error));
-  }
-}
-
-function sanitizeNotificationHref(href: unknown): string | undefined {
-  if (typeof href !== "string") {
-    return undefined;
-  }
-
-  const trimmed = href.trim();
-  if (!trimmed || !trimmed.startsWith("/") || trimmed.startsWith("//")) {
-    return undefined;
-  }
-
-  const sanitizedPath = trimmed.split(/[?#]/, 1)[0];
-  if (!sanitizedPath || sanitizedPath.length > MAX_NOTIFICATION_HREF_LENGTH) {
-    return undefined;
-  }
-
-  return sanitizedPath;
 }
 
 export function sanitizeAdminNotificationText(value: string, maxLength: number): string {
@@ -193,7 +121,7 @@ export function sanitizeAdminNotificationDedupeKey(value: string): string {
 
 export function sanitizeAdminNotificationSource(value: string): string {
   const trimmed = value.trim();
-  return trimmed ? sanitizeAdminNotificationText(trimmed, MAX_NOTIFICATION_SOURCE_LENGTH) : "";
+  return trimmed ? sanitizeAdminNotificationText(trimmed, 120) : "";
 }
 
 export function buildAdminNotificationDedupeKey(
@@ -205,325 +133,213 @@ export function buildAdminNotificationDedupeKey(
   return sanitizeAdminNotificationDedupeKey(
     [
       sanitizeAdminNotificationSource(source),
-      sanitizeAdminNotificationText(type, MAX_NOTIFICATION_TITLE_LENGTH),
-      sanitizeAdminNotificationText(message, MAX_NOTIFICATION_MESSAGE_LENGTH),
+      sanitizeAdminNotificationText(type, 120),
+      sanitizeAdminNotificationText(message, 280),
       sanitizeNotificationHref(href) ?? "",
     ].join(":")
   );
 }
 
-function toHydratedNotificationItem(rawValue: unknown, now: number): AdminNotificationItem | null {
-  if (!isRecord(rawValue)) {
-    return null;
-  }
-
-  const id = typeof rawValue.id === "string" ? rawValue.id : "";
-  const title =
-    typeof rawValue.title === "string"
-      ? sanitizeAdminNotificationText(rawValue.title, MAX_NOTIFICATION_TITLE_LENGTH)
-      : "";
-  const message =
-    typeof rawValue.message === "string"
-      ? sanitizeAdminNotificationText(rawValue.message, MAX_NOTIFICATION_MESSAGE_LENGTH)
-      : "";
-  const source =
-    typeof rawValue.source === "string" ? sanitizeAdminNotificationSource(rawValue.source) : "";
-  const createdAt = typeof rawValue.createdAt === "string" ? rawValue.createdAt : "";
-  const read = typeof rawValue.read === "boolean" ? rawValue.read : false;
-  const category = rawValue.category;
-  const tone = rawValue.tone;
-  const priority = rawValue.priority;
-
-  if (!id || !title || !message || !source || !createdAt) {
-    return null;
-  }
-
-  if (!notificationCategories.has(category as AdminNotificationCategory)) {
-    return null;
-  }
-
-  const createdAtTs = new Date(createdAt).getTime();
-  if (!Number.isFinite(createdAtTs) || now - createdAtTs > MAX_PERSISTED_AGE_MS) {
-    return null;
-  }
-
-  const resolvedTone: AdminNotificationTone = notificationTones.has(tone as AdminNotificationTone)
-    ? (tone as AdminNotificationTone)
-    : "info";
-  const resolvedPriority: AdminNotificationPriority = notificationPriorities.has(
-    priority as AdminNotificationPriority
-  )
-    ? (priority as AdminNotificationPriority)
-    : resolvedTone === "error" || resolvedTone === "warning"
-      ? "critical"
-      : "normal";
-
-  return {
-    id,
-    title,
-    message,
-    source,
-    createdAt,
-    read,
-    category: category as AdminNotificationCategory,
-    tone: resolvedTone,
-    priority: resolvedPriority,
-    href: sanitizeNotificationHref(rawValue.href),
-  };
-}
-
-function readInitialAdminNotifications(storageKey: string | null): AdminNotificationItem[] {
-  if (typeof window === "undefined" || !storageKey) {
-    return [];
-  }
-
-  try {
-    const raw = window.localStorage.getItem(storageKey);
-    if (!raw) {
-      return [];
-    }
-
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) {
-      removeStoredAdminNotifications(
-        storageKey,
-        "admin.notifications_invalid_storage_cleanup_failed"
-      );
-      return [];
-    }
-
-    const now = Date.now();
-    const hydrated = parsed
-      .map((item) => toHydratedNotificationItem(item, now))
-      .filter((item): item is AdminNotificationItem => item !== null)
-      .filter((item) =>
-        isActionableAdminNotification({
-          source: item.source,
-          tone: item.tone,
-        })
-      )
-      .slice(0, MAX_ADMIN_NOTIFICATIONS);
-
-    if (hydrated.length === 0) {
-      removeStoredAdminNotifications(
-        storageKey,
-        "admin.notifications_empty_hydration_cleanup_failed"
-      );
-    }
-
-    return hydrated;
-  } catch (error) {
-    clientLogger.warn(
-      "admin.notifications_hydrate_failed",
-      getAdminNotificationStorageErrorDetails(error)
-    );
-    removeStoredAdminNotifications(storageKey, "admin.notifications_hydrate_cleanup_failed");
-    return [];
+export function localizeAdminNotification(
+  event: AdminNotificationEvent,
+  locale: "ru" | "en"
+): Pick<AdminNotificationItem, "title" | "message" | "category" | "tone"> {
+  const payload = event.payload;
+  const id = (key: string) => compactId(payload[key]);
+  switch (event.type) {
+    case "support.message.received":
+      return {
+        title: locale === "ru" ? "Новое сообщение в поддержке" : "New support message",
+        message:
+          locale === "ru"
+            ? `Диалог ${id("conversationId")} ждёт ответа оператора.`
+            : `Conversation ${id("conversationId")} is waiting for an operator response.`,
+        category: "support",
+        tone: "info",
+      };
+    case "generation.failed":
+      return {
+        title: locale === "ru" ? "Генерация завершилась ошибкой" : "Generation failed",
+        message:
+          locale === "ru"
+            ? `Задание ${id("generationId")} требует проверки. Код: ${safePayloadText(payload.failureCode)}.`
+            : `Job ${id("generationId")} needs review. Code: ${safePayloadText(payload.failureCode)}.`,
+        category: "templates",
+        tone: "warning",
+      };
+    case "generation.refund_exhausted":
+      return {
+        title: locale === "ru" ? "Возврат списания не выполнен" : "Charge refund exhausted",
+        message:
+          locale === "ru"
+            ? `Автоматические попытки для ${id("generationId")} исчерпаны. Нужна ручная проверка.`
+            : `Automatic attempts for ${id("generationId")} are exhausted. Manual review is required.`,
+        category: "economy",
+        tone: "error",
+      };
+    case "economy.incident.detected":
+      return {
+        title: locale === "ru" ? "Обнаружен финансовый инцидент" : "Economy incident detected",
+        message:
+          locale === "ru"
+            ? `Инцидент ${id("incidentId")} требует сверки и решения.`
+            : `Incident ${id("incidentId")} requires reconciliation and resolution.`,
+        category: "economy",
+        tone: event.priority === "critical" ? "error" : "warning",
+      };
+    case "capacity.provider_alert":
+      return {
+        title: locale === "ru" ? "Ограничение провайдера" : "Provider capacity alert",
+        message:
+          locale === "ru"
+            ? "Проверьте доступную ёмкость и очередь генераций."
+            : "Review provider capacity and the generation queue.",
+        category: "templates",
+        tone: event.priority === "critical" ? "error" : "warning",
+      };
+    default:
+      return {
+        title: locale === "ru" ? "Требуется внимание оператора" : "Operator attention required",
+        message:
+          locale === "ru"
+            ? "Откройте связанный раздел и проверьте актуальное состояние."
+            : "Open the related workspace and review the current state.",
+        category: mapCategory(event.category),
+        tone:
+          event.priority === "critical"
+            ? "error"
+            : event.priority === "warning"
+              ? "warning"
+              : "info",
+      };
   }
 }
-
-const AdminNotificationsContext = createContext<AdminNotificationsContextValue | null>(null);
 
 export function AdminNotificationsProvider({ children }: { children: ReactNode }) {
   const session = useAuthSession();
-  const storageKey = getAdminNotificationStorageKey(session?.user.userId);
-  const [notificationState, setNotificationState] = useState<AdminNotificationState>(() => ({
-    storageKey,
-    items: readInitialAdminNotifications(storageKey),
-  }));
-  const items = notificationState.items;
-  const dedupeMapRef = useRef<Map<string, number>>(new Map());
-  const previousStorageKeyRef = useRef<string | null | undefined>(undefined);
-  const legacyStorageCleanupRef = useRef(false);
-
-  useLayoutEffect(() => {
-    if (!legacyStorageCleanupRef.current) {
-      legacyStorageCleanupRef.current = true;
-      removeStoredAdminNotifications(
-        LEGACY_ADMIN_NOTIFICATIONS_STORAGE_KEY,
-        "admin.notifications_legacy_storage_cleanup_failed"
-      );
-    }
-
-    if (previousStorageKeyRef.current === storageKey) {
-      return;
-    }
-
-    previousStorageKeyRef.current = storageKey;
-    dedupeMapRef.current.clear();
-    setNotificationState({
-      storageKey,
-      items: storageKey ? readInitialAdminNotifications(storageKey) : [],
-    });
-  }, [storageKey]);
+  const pathname = usePathname();
+  const locale: "ru" | "en" = pathname.startsWith("/ru") ? "ru" : "en";
+  const queryClient = useQueryClient();
+  const [transientFeedback, setTransientFeedback] = useState<AddAdminNotificationInput | null>(
+    null
+  );
+  const queryKey = adminQueryKeys.notifications({ state: "active", take: 24 });
+  const query = useQuery({
+    queryKey,
+    queryFn: ({ signal }) => fetchAdminNotifications({ state: "active", take: 24 }, signal),
+    enabled: Boolean(session?.user.userId),
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+    staleTime: 5_000,
+  });
 
   useEffect(() => {
-    if (
-      typeof window === "undefined" ||
-      !storageKey ||
-      notificationState.storageKey !== storageKey
-    ) {
-      return;
-    }
-
-    if (items.length === 0) {
-      removeStoredAdminNotifications(
-        storageKey,
-        "admin.notifications_empty_persist_cleanup_failed"
-      );
-      return;
-    }
-
+    if (!query.data || typeof window === "undefined") return;
     try {
-      window.localStorage.setItem(storageKey, JSON.stringify(items));
+      window.localStorage.removeItem(LEGACY_ADMIN_NOTIFICATIONS_STORAGE_KEY);
+      const userStorageKey = getAdminNotificationStorageKey(session?.user.userId);
+      if (userStorageKey) window.localStorage.removeItem(userStorageKey);
     } catch (error) {
-      clientLogger.warn(
-        "admin.notifications_persist_failed",
-        getAdminNotificationStorageErrorDetails(error)
-      );
-    }
-  }, [items, notificationState.storageKey, storageKey]);
-
-  const addNotification = useCallback((input: AddAdminNotificationInput) => {
-    const tone = input.tone ?? "info";
-    const safeHref = sanitizeNotificationHref(input.href);
-    const sanitizedSource = sanitizeAdminNotificationSource(input.source);
-    if (
-      !isActionableAdminNotification({
-        source: sanitizedSource,
-        tone,
-      })
-    ) {
-      return;
-    }
-
-    const now = Date.now();
-    const sanitizedTitle = sanitizeAdminNotificationText(
-      input.title,
-      MAX_NOTIFICATION_TITLE_LENGTH
-    );
-    const sanitizedMessage = sanitizeAdminNotificationText(
-      input.message,
-      MAX_NOTIFICATION_MESSAGE_LENGTH
-    );
-    const sanitizedInputDedupeKey = input.dedupeKey?.trim()
-      ? sanitizeAdminNotificationDedupeKey(input.dedupeKey)
-      : undefined;
-    const dedupeKey =
-      sanitizedInputDedupeKey ??
-      [sanitizedSource, input.category, tone, sanitizedTitle, sanitizedMessage, safeHref]
-        .filter(Boolean)
-        .join("::");
-    const previousTimestamp = dedupeMapRef.current.get(dedupeKey);
-
-    if (previousTimestamp && now - previousTimestamp < DEDUPE_WINDOW_MS) {
-      return;
-    }
-
-    dedupeMapRef.current.set(dedupeKey, now);
-
-    const notification: AdminNotificationItem = {
-      id: createAdminNotificationId(now),
-      title: sanitizedTitle,
-      message: sanitizedMessage,
-      category: input.category,
-      tone,
-      priority: input.priority ?? (tone === "error" || tone === "warning" ? "critical" : "normal"),
-      href: safeHref,
-      source: sanitizedSource,
-      createdAt: new Date(now).toISOString(),
-      read: false,
-    };
-
-    setNotificationState((current) => ({
-      ...current,
-      items: [notification, ...current.items].slice(0, MAX_ADMIN_NOTIFICATIONS),
-    }));
-  }, []);
-
-  const markAsRead = useCallback((notificationId: string) => {
-    setNotificationState((current) => {
-      let didChange = false;
-      const next = current.items.map((item) => {
-        if (item.id !== notificationId || item.read) {
-          return item;
-        }
-
-        didChange = true;
-        return { ...item, read: true };
+      clientLogger.warn("admin.notifications_legacy_cleanup_failed", {
+        errorName: error instanceof Error ? error.name : "UnknownError",
       });
+    }
+  }, [query.data, session?.user.userId]);
 
-      return didChange ? { ...current, items: next } : current;
-    });
-  }, []);
+  const invalidate = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: adminQueryKeys.notificationsRoot });
+  }, [queryClient]);
+  useAdminNotificationsRealtime(session?.accessToken, invalidate);
+  const items = useMemo(
+    () =>
+      (query.data?.items ?? []).map((event): AdminNotificationItem => ({
+        id: event.notificationId,
+        ...localizeAdminNotification(event, locale),
+        priority: event.priority === "critical" ? "critical" : "normal",
+        href: localizeHref(event.href, locale),
+        source: event.source,
+        createdAt: event.createdAtUtc,
+        read: Boolean(event.readAtUtc),
+        archived: Boolean(event.archivedAtUtc),
+        event,
+      })),
+    [locale, query.data?.items]
+  );
 
-  const markCategoryAsRead = useCallback((category: AdminNotificationCategory) => {
-    setNotificationState((current) => {
-      let didChange = false;
-      const next = current.items.map((item) => {
-        if (item.category !== category || item.read) {
-          return item;
-        }
-
-        didChange = true;
-        return { ...item, read: true };
-      });
-
-      return didChange ? { ...current, items: next } : current;
-    });
-  }, []);
-
+  const markAsRead = useCallback(
+    (notificationId: string) => {
+      void markAdminNotificationRead(notificationId).then(invalidate).catch(logMutationFailure);
+    },
+    [invalidate]
+  );
   const markAllAsRead = useCallback(() => {
-    setNotificationState((current) => {
-      let didChange = false;
-      const next = current.items.map((item) => {
-        if (item.read) {
-          return item;
-        }
-
-        didChange = true;
-        return { ...item, read: true };
-      });
-
-      return didChange ? { ...current, items: next } : current;
-    });
-  }, []);
-
+    const cutoffUtc = query.data?.asOfUtc ?? new Date().toISOString();
+    void markAllAdminNotificationsRead(cutoffUtc).then(invalidate).catch(logMutationFailure);
+  }, [invalidate, query.data?.asOfUtc]);
+  const removeNotification = useCallback(
+    (notificationId: string) => {
+      void archiveAdminNotification(notificationId).then(invalidate).catch(logMutationFailure);
+    },
+    [invalidate]
+  );
+  const markCategoryAsRead = useCallback(
+    (category: AdminNotificationCategory) => {
+      void Promise.all(
+        items
+          .filter((item) => item.category === category && !item.read)
+          .map((item) => markAdminNotificationRead(item.id))
+      )
+        .then(invalidate)
+        .catch(logMutationFailure);
+    },
+    [invalidate, items]
+  );
   const clearRead = useCallback(() => {
-    setNotificationState((current) => {
-      if (current.items.every((item) => !item.read)) {
-        return current;
-      }
-
-      return { ...current, items: current.items.filter((item) => !item.read) };
+    void Promise.all(
+      items.filter((item) => item.read).map((item) => archiveAdminNotification(item.id))
+    )
+      .then(invalidate)
+      .catch(logMutationFailure);
+  }, [invalidate, items]);
+  const addNotification = useCallback((input: AddAdminNotificationInput) => {
+    setTransientFeedback({
+      ...input,
+      title: sanitizeAdminNotificationText(input.title, 96),
+      message: sanitizeAdminNotificationText(input.message, 280),
     });
   }, []);
 
-  const removeNotification = useCallback((notificationId: string) => {
-    setNotificationState((current) => ({
-      ...current,
-      items: current.items.filter((item) => item.id !== notificationId),
-    }));
-  }, []);
+  useEffect(() => {
+    if (!transientFeedback) return;
+    const timer = window.setTimeout(() => setTransientFeedback(null), 3_200);
+    return () => window.clearTimeout(timer);
+  }, [transientFeedback]);
 
   const value = useMemo<AdminNotificationsContextValue>(
     () => ({
       items,
-      unreadCount: items.reduce((count, item) => count + (item.read ? 0 : 1), 0),
+      unreadCount: query.data?.unreadCount ?? 0,
+      criticalUnacknowledgedCount: query.data?.criticalUnacknowledgedCount ?? 0,
+      asOfUtc: query.data?.asOfUtc,
+      isLoading: query.isLoading,
       addNotification,
       markAsRead,
       markCategoryAsRead,
       markAllAsRead,
       clearRead,
       removeNotification,
+      refresh: invalidate,
     }),
     [
       addNotification,
       clearRead,
+      invalidate,
       items,
       markAllAsRead,
       markAsRead,
       markCategoryAsRead,
+      query.data,
+      query.isLoading,
       removeNotification,
     ]
   );
@@ -531,63 +347,86 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
   return (
     <AdminNotificationsContext.Provider value={value}>
       {children}
+      {transientFeedback ? (
+        <div
+          className={`ui-toast ui-toast--${transientFeedback.tone === "error" ? "error" : "success"}`}
+          role={transientFeedback.tone === "error" ? "alert" : "status"}
+          aria-live={transientFeedback.tone === "error" ? "assertive" : "polite"}
+        >
+          <strong>{transientFeedback.title}</strong>
+          <div>{transientFeedback.message}</div>
+        </div>
+      ) : null}
     </AdminNotificationsContext.Provider>
   );
 }
 
 export function useAdminNotifications() {
   const context = useContext(AdminNotificationsContext);
-  if (!context) {
+  if (!context)
     throw new Error("useAdminNotifications must be used within AdminNotificationsProvider");
-  }
-
   return context;
 }
 
 export function useSyncToastToAdminNotifications(
-  toast: ToastLike | null,
-  { category, source, title, href }: SyncToastOptions
+  _toast: ToastLike | null,
+  _options: SyncToastOptions
 ) {
-  const { addNotification } = useAdminNotifications();
-
-  useEffect(() => {
-    if (!toast) {
-      return;
-    }
-
-    addNotification({
-      title: typeof title === "function" ? title(toast) : title,
-      message: toast.message,
-      category,
-      source,
-      tone: toast.type === "success" ? "success" : "error",
-      priority: toast.type === "error" ? "critical" : "normal",
-      href,
-      dedupeKey: buildAdminNotificationDedupeKey(source, toast.type, toast.message, href),
-    });
-  }, [addNotification, category, href, source, title, toast]);
+  void _toast;
+  void _options;
+  // Deliberately empty: action results are already rendered as transient toasts.
 }
 
 export function useSyncFeedbackToAdminNotifications(
-  feedback: FeedbackLike | null,
-  { category, source, title, href }: SyncFeedbackOptions
+  _feedback: FeedbackLike | null,
+  _options: SyncFeedbackOptions
 ) {
-  const { addNotification } = useAdminNotifications();
+  void _feedback;
+  void _options;
+  // Deliberately empty: persistent inbox events originate from trusted server transitions.
+}
 
-  useEffect(() => {
-    if (!feedback) {
-      return;
-    }
+function sanitizeNotificationHref(href: unknown): string | undefined {
+  if (typeof href !== "string") return undefined;
+  const trimmed = href.trim();
+  if (!trimmed.startsWith("/") || trimmed.startsWith("//") || trimmed.includes("\\"))
+    return undefined;
+  return trimmed.length <= 512 ? trimmed : undefined;
+}
 
-    addNotification({
-      title: typeof title === "function" ? title(feedback) : title,
-      message: feedback.message,
-      category,
-      source,
-      tone: feedback.tone === "success" ? "success" : feedback.tone === "danger" ? "error" : "info",
-      priority: feedback.tone === "danger" ? "critical" : "normal",
-      href,
-      dedupeKey: buildAdminNotificationDedupeKey(source, feedback.tone, feedback.message, href),
-    });
-  }, [addNotification, category, feedback, href, source, title]);
+function localizeHref(href: string | null | undefined, locale: "ru" | "en") {
+  const safeHref = sanitizeNotificationHref(href);
+  if (!safeHref) return undefined;
+  if (/^\/(ru|en)(?:\/|$)/.test(safeHref)) return safeHref;
+  return `/${locale}${safeHref}`;
+}
+
+function safePayloadText(value: unknown) {
+  return typeof value === "string" ? sanitizeAdminNotificationText(value, 80) : "—";
+}
+
+function compactId(value: unknown) {
+  const raw = typeof value === "string" ? value.trim() : "";
+  const safe = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(raw) ? raw : safePayloadText(value);
+  const prefixLength = /^\d{6}/.test(safe) ? 4 : 8;
+  return safe.length > 12 ? `${safe.slice(0, prefixLength)}…${safe.slice(-4)}` : safe;
+}
+
+function mapCategory(category: string): AdminNotificationCategory {
+  if (category === "support") return "support";
+  if (category === "economy") return "economy";
+  if (
+    category === "content" ||
+    category === "generation" ||
+    category === "capacity" ||
+    category === "moderation"
+  )
+    return "templates";
+  return "system";
+}
+
+function logMutationFailure(error: unknown) {
+  clientLogger.warn("admin.notifications_mutation_failed", {
+    errorName: error instanceof Error ? error.name : "UnknownError",
+  });
 }

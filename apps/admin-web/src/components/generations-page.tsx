@@ -6,11 +6,11 @@ import { useEffect, useMemo, useState } from "react";
 
 import { CaretDownIcon } from "@/components/admin/admin-icons";
 import {
-  AdminBadge,
-  AdminCard,
-  AdminKpiCard,
-  AdminPageHero,
+  AdminDataSurface,
+  AdminFilterToolbar,
+  AdminMetricStrip,
   AdminStateCard,
+  AdminSummaryChips,
   adminTableStyles,
 } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
@@ -558,12 +558,6 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
   if (!canViewGenerations) {
     return (
       <section className={styles.page} data-admin-route="generations">
-        <AdminPageHero
-          eyebrow={text.eyebrow}
-          title={text.title}
-          description={text.description}
-          badge={<AdminBadge tone="danger">{text.adminOnly}</AdminBadge>}
-        />
         <AdminStateCard tone="info" title={text.loadingTitle} />
       </section>
     );
@@ -572,70 +566,25 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
   return (
     <>
       <section className={styles.page} data-admin-route="generations">
-        <AdminPageHero
-          eyebrow={text.eyebrow}
-          title={text.title}
-          description={text.description}
-          badge={<AdminBadge tone="danger">{text.adminOnly}</AdminBadge>}
-        />
-
         <GenerationCapacityPanel locale={locale} enabled={canViewGenerations} />
 
-        <div className={styles.kpiGrid}>
-          <AdminKpiCard
-            label={text.total}
-            value={formatMetricCount(generationMetrics?.totalJobs)}
-            tone="primary"
-          />
-          <AdminKpiCard
-            label={text.pending}
-            value={formatMetricCount(generationMetrics?.pendingJobs)}
-            hint={text.allJobsScope}
-            tone="warning"
-          />
-          <AdminKpiCard
-            label={text.running}
-            value={formatMetricCount(generationMetrics?.runningJobs)}
-            hint={text.allJobsScope}
-            tone="info"
-          />
-          <AdminKpiCard
-            label={text.failed}
-            value={formatMetricCount(generationMetrics?.failedJobs)}
-            hint={text.allJobsScope}
-            tone="danger"
-          />
-          <AdminKpiCard
-            label={text.retrying}
-            value={formatMetricCount(generationMetrics?.retryingJobs)}
-            hint={text.allJobsScope}
-            tone="warning"
-          />
-          <AdminKpiCard
-            label={text.cancelled}
-            value={formatMetricCount(generationMetrics?.cancelledJobs)}
-            hint={text.allJobsScope}
-            tone="neutral"
-          />
-          <AdminKpiCard
-            label={text.cancelling}
-            value={formatMetricCount(generationMetrics?.cancellingJobs)}
-            hint={text.allJobsScope}
-            tone="warning"
-          />
-          <AdminKpiCard
-            label={text.pendingRefunds}
-            value={formatMetricCount(generationMetrics?.pendingRefunds)}
-            hint={text.allJobsScope}
-            tone="warning"
-          />
-          <AdminKpiCard
-            label={text.exhaustedRefunds}
-            value={formatMetricCount(generationMetrics?.exhaustedRefunds)}
-            hint={text.allJobsScope}
-            tone="danger"
-          />
-        </div>
+        <AdminMetricStrip
+          items={[
+            { label: text.total, value: formatMetricCount(generationMetrics?.totalJobs) },
+            { label: text.pending, value: formatMetricCount(generationMetrics?.pendingJobs) },
+            { label: text.running, value: formatMetricCount(generationMetrics?.runningJobs) },
+            { label: text.failed, value: formatMetricCount(generationMetrics?.failedJobs) },
+          ]}
+        />
+        <AdminSummaryChips
+          items={[
+            `${text.retrying}: ${formatMetricCount(generationMetrics?.retryingJobs)}`,
+            `${text.cancelled}: ${formatMetricCount(generationMetrics?.cancelledJobs)}`,
+            `${text.cancelling}: ${formatMetricCount(generationMetrics?.cancellingJobs)}`,
+            `${text.pendingRefunds}: ${formatMetricCount(generationMetrics?.pendingRefunds)}`,
+            `${text.exhaustedRefunds}: ${formatMetricCount(generationMetrics?.exhaustedRefunds)}`,
+          ]}
+        />
 
         {generationMetricsQuery.isError ? (
           <AdminStateCard
@@ -659,7 +608,7 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
           />
         ) : null}
 
-        <AdminCard title={text.filtersTitle} description={text.filtersDescription}>
+        <AdminFilterToolbar title={text.filtersTitle} description={text.filtersDescription}>
           <div className={styles.filters}>
             <label className={styles.field}>
               <span className={styles.label}>{text.searchLabel}</span>
@@ -740,7 +689,7 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
               />
             </label>
           </div>
-        </AdminCard>
+        </AdminFilterToolbar>
 
         {generationsQuery.isLoading || isGenerationsRefreshing ? (
           <AdminStateCard title={text.loadingTitle} />
@@ -763,7 +712,7 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
         ) : visibleItems.length === 0 ? (
           <AdminStateCard title={text.emptyTitle} description={text.emptyDescription} />
         ) : (
-          <AdminCard
+          <AdminDataSurface
             title={
               <span className={styles.tableHeader}>
                 <span className={styles.tableTitle}>{text.tableTitle}</span>
@@ -788,10 +737,10 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
               <AdminStateCard tone="warning" title={legacyGamificationError} />
             ) : null}
             <div
-              className={adminTableStyles.tableWrap}
+              className={`${adminTableStyles.tableWrap} ${styles.generationTableWrap}`}
               aria-busy={generationsQuery.isFetching ? "true" : undefined}
             >
-              <table className={adminTableStyles.table}>
+              <table className={`${adminTableStyles.table} ${styles.generationTable}`}>
                 <thead>
                   <tr>
                     <th>{text.job}</th>
@@ -884,7 +833,7 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
                 <CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconNext}`} />
               </button>
             </div>
-          </AdminCard>
+          </AdminDataSurface>
         )}
       </section>
       <ConfirmationDialog

@@ -310,7 +310,7 @@ test("Admin reviews a moderation item with summary, keyboard focus and an audite
   await page.goto("/en/moderation");
   await expect(page).toHaveURL(/\/en\/moderation$/);
   await expect(
-    page.getByRole("main").getByRole("heading", { name: "Moderation", exact: true })
+    page.getByRole("banner").getByRole("heading", { name: "Moderation", exact: true })
   ).toBeVisible();
   await expect.poll(api.getPageQueueReadCount).toBeGreaterThanOrEqual(1);
 
@@ -459,7 +459,7 @@ test("409 moderation conflict shows a localized toast and refetches the queue", 
 
   await page.goto("/ru/moderation");
   await expect(
-    page.getByRole("main").getByRole("heading", { name: "Модерация", exact: true })
+    page.getByRole("banner").getByRole("heading", { name: "Модерация", exact: true })
   ).toBeVisible();
   await expect.poll(api.getPageQueueReadCount).toBeGreaterThanOrEqual(1);
   const readsBeforeConflict = api.getPageQueueReadCount();

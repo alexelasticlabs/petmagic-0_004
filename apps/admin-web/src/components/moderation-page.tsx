@@ -11,7 +11,6 @@ import {
   AdminBadge,
   AdminCard,
   AdminKpiCard,
-  AdminPageHero,
   AdminStateCard,
   AdminStatusBadge,
   adminTableStyles,
@@ -485,13 +484,6 @@ export function ModerationPage({ locale }: ModerationPageProps) {
 
   return (
     <section className={styles.page}>
-      <AdminPageHero
-        eyebrow={text.eyebrow}
-        title={text.title}
-        description={text.description}
-        badge={<AdminBadge tone="info">{text.workspaceBadge}</AdminBadge>}
-      />
-
       {!canModerate ? <AdminStateCard title={text.loading} /> : null}
 
       {canModerate && summary ? (

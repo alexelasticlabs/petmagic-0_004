@@ -1,5 +1,15 @@
 # PetMagic Admin Style Guide
 
+## Compact Operations contract
+
+- Базовый ритм строится на 4px/8px: `--space-1` = 4px, `--space-2` = 8px; более крупные интервалы составляются из этого шага.
+- Интерактивные controls имеют высоту 36px (`--control-height-sm`) или 40px (`--control-height-md`). Исключения допускаются только для multiline inputs и touch-oriented sheets.
+- Route title и description принадлежат только `AdminTopbar`. Feature content начинается с `AdminContextBar`, `AdminMetricStrip`, actions либо основной рабочей поверхности и не повторяет page identity.
+- Desktop sidebar имеет ширину 240px и сворачивается в rail 72px. Versioned состояние хранится под ключом `petmagic.admin.sidebar.v1`; mobile всегда использует modal drawer с focus trap.
+- Motion использует только `--motion-fast` (120ms), `--motion-standard` (160ms) и `--motion-emphasis` (220ms). При `prefers-reduced-motion: reduce` декоративное движение отключается.
+- Tables, queue lists и inspectors должны помещать операторский смысл первым. Technical IDs сокращаются визуально и получают copy action; payload/error diagnostics раскрываются по запросу.
+- Light/dark themes используют одинаковую semantic иерархию surfaces, borders, focus, success, warning и danger; локальные hex/rgba в authenticated CSS Modules запрещены.
+
 Этот файл фиксирует текущий стиль админ-панели и порядок добавления новых разделов. Цель - сохранять единый операционный интерфейс в dark/light themes без возврата к старым глобальным стилям.
 
 ## Visual Language
@@ -29,6 +39,10 @@
 - `AdminTopbar` - title, description, global command search, notifications, theme, locale switch, user badge.
 - `AdminCommandPalette` - RBAC-aware быстрый переход по доступным разделам через `Ctrl/Cmd+K`.
 - `AdminCard` - базовая панель с title/description/action.
+- `AdminContextBar` - статус, updated time и page actions без повторения route title.
+- `AdminMetricStrip` и `AdminSummaryChips` - 3–4 приоритетных KPI и компактные вторичные показатели.
+- `AdminFilterToolbar` - primary filters, active-filter chips и slot для advanced filters.
+- `AdminDataSurface` - основная table/list workspace без дополнительного page identity.
 - `AdminStatCard` - метрика с accent color and icon.
 - `AdminStatusBadge` - status pill через CSS custom property `--status-color`.
 - `AdminQueueLayout` - flat queue/workspace/inspector composition без nested cards.
@@ -107,7 +121,9 @@ export default async function FeaturePage({ params }: Props) {
 
 ## Adding A Card, Table Or Form
 
-- Начинайте с `AdminCard`; action кладите в `action`, а не в произвольный header.
+- Самостоятельную вспомогательную панель начинайте с `AdminCard`; action кладите в `action`, а не в произвольный header.
+- Route-фильтры собирайте через `AdminFilterToolbar`, а основной queue/table/list — через `AdminDataSurface`.
+- На route оставляйте не более четырех первичных KPI в `AdminMetricStrip`; вторичные счетчики переносите в `AdminSummaryChips`.
 - Для таблиц используйте `adminTableStyles.tableWrap` и `adminTableStyles.table`.
 - Status values показывайте через `AdminStatusBadge`, не через plain text.
 - Для repeated metrics используйте `AdminStatCard`.

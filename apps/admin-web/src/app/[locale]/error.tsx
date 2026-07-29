@@ -4,9 +4,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect } from "react";
 
-import { AdminPage, AdminPageHero, AdminStateCard } from "@/components/admin/admin-primitives";
+import { AdminPage, AdminStateCard } from "@/components/admin/admin-primitives";
 import { Button } from "@/components/ui/button";
-import { getAdminPageMetaCopy } from "@/lib/admin-navigation.content";
 import { getDefaultAdminPath } from "@/lib/admin-rbac";
 import { useAuthSession } from "@/lib/api-client";
 import { clientLogger } from "@/lib/client-logger";
@@ -25,7 +24,6 @@ export default function Error({ error, reset }: ErrorPageProps) {
   const localeParam = Array.isArray(params.locale) ? params.locale[0] : params.locale;
   const locale = typeof localeParam === "string" && isLocale(localeParam) ? localeParam : "en";
   const text = getDictionary(locale);
-  const pageMeta = getAdminPageMetaCopy(locale);
   const session = useAuthSession();
   const fallbackHref = getDefaultAdminPath(locale, session?.user.roles);
   const fallbackLabel = fallbackHref.endsWith("/support")
@@ -44,7 +42,6 @@ export default function Error({ error, reset }: ErrorPageProps) {
 
   return (
     <AdminPage>
-      <AdminPageHero title={pageMeta.workspace.title} description={text.adminErrorDescription} />
       <AdminStateCard
         tone="danger"
         title={text.adminErrorTitle}
