@@ -18,7 +18,9 @@ internal sealed record TemplateGenerationProviderAttemptReservation(
     string SubmissionTokenHash,
     DateTime SubmissionDeadlineAtUtc,
     DateTime ProcessingDeadlineAtUtc,
-    DateTime ReconciliationDeadlineAtUtc);
+    DateTime ReconciliationDeadlineAtUtc,
+    string? ExpectedJobLockOwner = null,
+    TemplateGenerationStatus? ExpectedJobStatus = null);
 
 internal sealed record TemplateGenerationProviderAttemptClaim(
     Guid AttemptId,
@@ -86,6 +88,11 @@ internal interface ITemplateGenerationProviderAttemptStore
     Task<TemplateGenerationProviderAttemptClaim?> ClaimDueAsync(
         string workerId,
         TimeSpan lockTimeout,
+        CancellationToken cancellationToken);
+
+    Task ReleaseClaimAsync(
+        Guid attemptId,
+        string claimToken,
         CancellationToken cancellationToken);
 
     Task UpdateClaimedStateAsync(
@@ -210,6 +217,16 @@ internal sealed class TemplateGenerationProviderAttemptStore(
 
                 return null;
             }
+        }
+
+        if (!await IsExpectedJobClaimCurrentAsync(reservation, transaction, cancellationToken))
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+
+            return null;
         }
 
         var existing = await dbContext.TemplateGenerationProviderAttempts
@@ -376,8 +393,58 @@ internal sealed class TemplateGenerationProviderAttemptStore(
                 && (job.Status == TemplateGenerationStatus.Queued
                     || job.Status == TemplateGenerationStatus.Retrying
                     || (job.Status == TemplateGenerationStatus.Processing
-                        && !job.ProviderAttempts.Any(attempt => ActiveStates.Contains(attempt.State)))),
+                        && !job.ProviderAttempts.Any(attempt => ActiveStates.Contains(attempt.State)))
+                    || (mediaType == TemplateGenerationQueue.MediaTypeVideo
+                        && job.Status == TemplateGenerationStatus.ProviderQueued
+                        && job.CurrentProviderStage == "video_preprocessing"
+                        && job.ProviderCompletedAtUtc != null
+                        && job.NormalizedImageUrl != null
+                        && job.MotionProviderRequestId == null)),
             cancellationToken);
+    }
+
+    private async Task<bool> IsExpectedJobClaimCurrentAsync(
+        TemplateGenerationProviderAttemptReservation reservation,
+        IDbContextTransaction? transaction,
+        CancellationToken cancellationToken)
+    {
+        if (reservation.ExpectedJobStatus is null
+            && string.IsNullOrWhiteSpace(reservation.ExpectedJobLockOwner))
+        {
+            return true;
+        }
+
+        if (reservation.ExpectedJobStatus is null
+            || string.IsNullOrWhiteSpace(reservation.ExpectedJobLockOwner))
+        {
+            return false;
+        }
+
+        if (transaction is not null)
+        {
+            var matchingIds = await dbContext.Database.SqlQueryRaw<Guid>(
+                """
+                SELECT "Id" AS "Value"
+                FROM templates_generation_jobs
+                WHERE "Id" = {0}
+                  AND "Status" = {1}
+                  AND "LockedBy" = {2}
+                FOR UPDATE
+                """,
+                reservation.GenerationJobId,
+                (int)reservation.ExpectedJobStatus.Value,
+                reservation.ExpectedJobLockOwner)
+                .ToListAsync(cancellationToken);
+            return matchingIds.Count == 1;
+        }
+
+        return await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .AnyAsync(
+                job => job.Id == reservation.GenerationJobId
+                    && job.Status == reservation.ExpectedJobStatus.Value
+                    && job.LockedBy == reservation.ExpectedJobLockOwner,
+                cancellationToken);
     }
 
     public async Task MarkSubmissionAcceptedAsync(
@@ -570,6 +637,43 @@ internal sealed class TemplateGenerationProviderAttemptStore(
         }
 
         return MapClaim(attempt, claimToken);
+    }
+
+    public async Task ReleaseClaimAsync(
+        Guid attemptId,
+        string claimToken,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(claimToken);
+        var now = DateTime.UtcNow;
+        if (string.Equals(dbContext.Database.ProviderName, NpgsqlProviderName, StringComparison.Ordinal))
+        {
+            await dbContext.TemplateGenerationProviderAttempts
+                .Where(attempt => attempt.Id == attemptId && attempt.LockedBy == claimToken)
+                .ExecuteUpdateAsync(
+                    setters => setters
+                        .SetProperty(attempt => attempt.LockedBy, (string?)null)
+                        .SetProperty(attempt => attempt.LockedAtUtc, (DateTime?)null)
+                        .SetProperty(attempt => attempt.UpdatedAtUtc, now)
+                        .SetProperty(attempt => attempt.Version, attempt => attempt.Version + 1),
+                    cancellationToken);
+            return;
+        }
+
+        var claimedAttempt = await dbContext.TemplateGenerationProviderAttempts
+            .SingleOrDefaultAsync(
+                attempt => attempt.Id == attemptId && attempt.LockedBy == claimToken,
+                cancellationToken);
+        if (claimedAttempt is null)
+        {
+            return;
+        }
+
+        claimedAttempt.LockedBy = null;
+        claimedAttempt.LockedAtUtc = null;
+        claimedAttempt.UpdatedAtUtc = now;
+        claimedAttempt.Version++;
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task UpdateClaimedStateAsync(

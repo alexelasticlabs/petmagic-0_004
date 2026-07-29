@@ -15,7 +15,12 @@ internal sealed class EconomyTemplateGenerationBilling(IEconomyService economySe
         }
 
         var result = await economyService.SpendAsync(
-            new SpendBalanceCommand(userId, tokenCost, CreateReason(generationId)),
+            new SpendBalanceCommand(
+                userId,
+                tokenCost,
+                CreateReason(generationId),
+                WalletLedgerSource.GenerationSpend,
+                CreateChargeIdempotencyKey(generationId)),
             cancellationToken);
 
         return result.IsSuccess ? Result.Success() : Result.Failure(result.Error);
@@ -64,6 +69,11 @@ internal sealed class EconomyTemplateGenerationBilling(IEconomyService economySe
     }
 
     private static string CreateReason(Guid generationId)
+    {
+        return $"template_generation:{generationId:N}";
+    }
+
+    private static string CreateChargeIdempotencyKey(Guid generationId)
     {
         return $"template_generation:{generationId:N}";
     }

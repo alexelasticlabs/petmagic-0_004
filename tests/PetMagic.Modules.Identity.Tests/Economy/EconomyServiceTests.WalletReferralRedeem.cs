@@ -399,6 +399,46 @@ public sealed partial class EconomyServiceTests
     }
 
     [Fact]
+    public async Task GenerationCharge_ShouldNoOp_WhenRetriedAfterJobStatusSaveFailure()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var generationId = Guid.NewGuid();
+        dbContext.Wallets.Add(new Wallet
+        {
+            UserId = userId,
+            Balance = 100,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        await dbContext.SaveChangesAsync();
+        var service = CreateService(dbContext);
+        var billing = new EconomyTemplateGenerationBilling(service);
+
+        var first = await billing.ChargeAsync(userId, generationId, 60, CancellationToken.None);
+        var retryAfterJobSaveFailure = await billing.ChargeAsync(
+            userId,
+            generationId,
+            60,
+            CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(retryAfterJobSaveFailure.IsSuccess);
+
+        var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
+        var ledgerEntries = await dbContext.WalletLedgerEntries
+            .Where(x => x.UserId == userId && x.Source == WalletLedgerSource.GenerationSpend)
+            .ToArrayAsync();
+
+        Assert.Equal(40, wallet.Balance);
+        var ledgerEntry = Assert.Single(ledgerEntries);
+        Assert.Equal(-60, ledgerEntry.Delta);
+        Assert.Equal($"template_generation:{generationId:N}", ledgerEntry.Reason);
+        Assert.Equal("internal", ledgerEntry.SourceProvider);
+        Assert.NotNull(ledgerEntry.SourceTransactionId);
+    }
+
+    [Fact]
     public async Task SpendAsync_ShouldBeIdempotentForWatermarkUnlockReason()
     {
         await using var dbContext = CreateDbContext();

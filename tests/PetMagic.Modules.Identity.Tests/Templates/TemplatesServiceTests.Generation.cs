@@ -97,7 +97,8 @@ public sealed partial class TemplatesServiceTests
     {
         await using var dbContext = CreateDbContext();
         var service = CreateService(dbContext);
-        var generationService = CreateGenerationService(dbContext);
+        var billing = new RecordingGenerationBilling();
+        var generationService = CreateGenerationService(dbContext, billing: billing);
         var templateId = await CreateActiveImageTemplateAsync(service, "Billing Command Portrait", "Portrait", ["billing"]);
         var userId = Guid.NewGuid();
 
@@ -123,6 +124,7 @@ public sealed partial class TemplatesServiceTests
         Assert.Equal(persisted.ChargedAtUtc, command.CompletedAtUtc);
         Assert.Equal(userId, command.UserId);
         Assert.Equal(persisted.TokenCost, command.TokenCost);
+        Assert.Equal(new[] { persisted.Id }, billing.ChargedGenerationIds);
     }
 
     [Fact]

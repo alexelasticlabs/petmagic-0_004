@@ -402,7 +402,9 @@ internal sealed partial class TemplateGenerationJobProcessor
                 submissionTokenHash,
                 submissionDeadline,
                 processingDeadline,
-                processingDeadline.AddMinutes(10)),
+                processingDeadline.AddMinutes(10),
+                job.LockedBy,
+                job.Status),
             cancellationToken);
         if (attempt is null)
         {
@@ -1476,6 +1478,21 @@ internal sealed partial class TemplateGenerationJobProcessor
                 TemplateLogSanitizer.SafeId(job.Id),
                 TemplateLogSanitizer.SafeId(claim.AttemptId));
             dbContext.ChangeTracker.Clear();
+            try
+            {
+                await providerAttemptStore.ReleaseClaimAsync(
+                    claim.AttemptId,
+                    claim.ClaimToken,
+                    CancellationToken.None);
+            }
+            catch (Exception releaseException)
+            {
+                logger.LogWarning(
+                    "Failed to release a yielded provider attempt claim. AttemptIdHash={AttemptIdHash} ExceptionType={ExceptionType}",
+                    TemplateLogSanitizer.SafeId(claim.AttemptId),
+                    SafeLogValues.ExceptionType(releaseException));
+            }
+
             return true;
         }
         catch (Exception exception)
@@ -1838,6 +1855,99 @@ internal sealed partial class TemplateGenerationJobProcessor
     }
 
     private async Task<TemplateGenerationJob?> ClaimNextProviderJobAsync(
+        bool includePollingJobs,
+        bool includeReconciliationJobs,
+        bool includeImportJobs,
+        CancellationToken cancellationToken)
+    {
+        return string.Equals(dbContext.Database.ProviderName, NpgsqlProviderName, StringComparison.Ordinal)
+            ? await ClaimNextProviderJobPostgresAsync(
+                includePollingJobs,
+                includeReconciliationJobs,
+                includeImportJobs,
+                cancellationToken)
+            : await ClaimNextProviderJobTrackedAsync(
+                includePollingJobs,
+                includeReconciliationJobs,
+                includeImportJobs,
+                cancellationToken);
+    }
+
+    private async Task<TemplateGenerationJob?> ClaimNextProviderJobPostgresAsync(
+        bool includePollingJobs,
+        bool includeReconciliationJobs,
+        bool includeImportJobs,
+        CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        var staleThreshold = now.AddMilliseconds(-options.JobLockTimeoutMilliseconds);
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var claimedIds = await dbContext.Database.SqlQueryRaw<Guid>(
+            """
+            UPDATE templates_generation_jobs AS claimed
+            SET "LockedAtUtc" = {0},
+                "LockedBy" = {1}
+            WHERE claimed."Id" = (
+                SELECT candidate."Id"
+                FROM templates_generation_jobs AS candidate
+                WHERE (({2} AND candidate."Status" = {3})
+                        OR ({4}
+                            AND (({5}
+                                    AND candidate."Status" IN ({6}, {7})
+                                    AND ({8}
+                                        OR NOT EXISTS (
+                                            SELECT 1
+                                            FROM templates_generation_provider_attempts AS attempt
+                                            WHERE attempt."GenerationJobId" = candidate."Id")))
+                                OR (candidate."Status" = {6}
+                                    AND candidate."CurrentProviderStage" = 'video_preprocessing'
+                                    AND candidate."ProviderCompletedAtUtc" IS NOT NULL
+                                    AND candidate."NormalizedImageUrl" IS NOT NULL
+                                    AND candidate."MotionProviderRequestId" IS NULL))))
+                    AND candidate."InputSourceType" <> 'qa_fixture'
+                    AND ((candidate."Status" = {3}
+                            AND (candidate."MediaImportNextAttemptAtUtc" IS NULL
+                                OR candidate."MediaImportNextAttemptAtUtc" <= {0}))
+                        OR (candidate."Status" <> {3}
+                            AND (candidate."NextAttemptEarliestAtUtc" IS NULL
+                                OR candidate."NextAttemptEarliestAtUtc" <= {0})))
+                    AND (candidate."LockedAtUtc" IS NULL OR candidate."LockedAtUtc" <= {9})
+                ORDER BY COALESCE(candidate."ProviderStatusCheckedAtUtc", candidate."UpdatedAtUtc"),
+                    candidate."QueuedAtUtc"
+                FOR UPDATE OF candidate SKIP LOCKED
+                LIMIT 1
+            )
+            RETURNING claimed."Id" AS "Value"
+            """,
+            now,
+            WorkerInstanceId,
+            includeImportJobs,
+            (int)TemplateGenerationStatus.ImportingMedia,
+            includeReconciliationJobs,
+            includePollingJobs,
+            (int)TemplateGenerationStatus.ProviderQueued,
+            (int)TemplateGenerationStatus.ProviderProcessing,
+            providerAttemptStore is null,
+            staleThreshold)
+            .ToListAsync(cancellationToken);
+        var claimedId = claimedIds.FirstOrDefault();
+        if (claimedId == Guid.Empty)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return null;
+        }
+
+        dbContext.ChangeTracker.Clear();
+        var claimedJob = await dbContext.TemplateGenerationJobs
+            .Include(job => job.Template)
+            .ThenInclude(template => template.Assets)
+            .SingleAsync(job => job.Id == claimedId, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        dbContext.Entry(claimedJob).Property(job => job.LockedBy).OriginalValue = claimedJob.LockedBy;
+        return claimedJob;
+    }
+
+    private async Task<TemplateGenerationJob?> ClaimNextProviderJobTrackedAsync(
         bool includePollingJobs,
         bool includeReconciliationJobs,
         bool includeImportJobs,

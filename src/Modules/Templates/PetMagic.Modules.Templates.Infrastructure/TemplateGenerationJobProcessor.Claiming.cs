@@ -878,9 +878,14 @@ internal sealed partial class TemplateGenerationJobProcessor
 
         var queuedVideo = await dbContext.TemplateGenerationJobs
             .AsNoTracking()
-            .LongCountAsync(x => x.Status == TemplateGenerationStatus.Queued
+            .LongCountAsync(x => x.QueueMediaType == TemplateGenerationQueue.MediaTypeVideo
                 && (x.ChargedAtUtc != null || x.UserId == TemplateGenerationService.AdminTestUserId)
-                && x.QueueMediaType == TemplateGenerationQueue.MediaTypeVideo,
+                && (x.Status == TemplateGenerationStatus.Queued
+                    || (x.Status == TemplateGenerationStatus.ProviderQueued
+                        && x.CurrentProviderStage == ProviderStageVideoPreprocessing
+                        && x.ProviderCompletedAtUtc != null
+                        && x.NormalizedImageUrl != null
+                        && x.MotionProviderRequestId == null)),
                 cancellationToken);
 
         return new SchedulerCapacitySnapshot(

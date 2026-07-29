@@ -34,6 +34,49 @@ namespace PetMagic.Modules.Identity.Tests.Templates;
 public sealed class TemplateGenerationJobProcessorTests
 {
     [Fact]
+    public async Task BillingRecovery_ShouldReplayGenerationScopedChargeWithoutApplyingItTwiceAfterCrashGap()
+    {
+        await using var dbContext = CreateDbContext();
+        var now = DateTime.UtcNow;
+        var template = CreateReadyImageTemplate();
+        var job = CreateGenerationJob(template, TemplateGenerationStatus.Queued, now);
+        job.ChargedAtUtc = null;
+        job.CompletedAtUtc = null;
+        var billingCommand = new TemplateGenerationBillingCommand
+        {
+            Id = Guid.NewGuid(),
+            GenerationId = job.Id,
+            UserId = job.UserId,
+            TokenCost = job.TokenCost,
+            Status = TemplateGenerationBillingCommandStatuses.Processing,
+            AttemptCount = 1,
+            LastAttemptedAtUtc = now.AddMinutes(-3),
+            CreatedAtUtc = now.AddMinutes(-4),
+            UpdatedAtUtc = now.AddMinutes(-3)
+        };
+        var billing = new TestTemplateGenerationBilling();
+        billing.SeedAppliedCharge(job.Id);
+
+        dbContext.TemplateItems.Add(template);
+        dbContext.TemplateGenerationJobs.Add(job);
+        dbContext.TemplateGenerationBillingCommands.Add(billingCommand);
+        await dbContext.SaveChangesAsync();
+
+        var processed = await CreateProcessor(dbContext, billing: billing)
+            .ProcessNextAsync(CancellationToken.None);
+
+        var persistedJob = await dbContext.TemplateGenerationJobs.SingleAsync(candidate => candidate.Id == job.Id);
+        var persistedCommand = await dbContext.TemplateGenerationBillingCommands
+            .SingleAsync(command => command.Id == billingCommand.Id);
+        Assert.True(processed);
+        Assert.NotNull(persistedJob.ChargedAtUtc);
+        Assert.Equal(TemplateGenerationBillingCommandStatuses.Succeeded, persistedCommand.Status);
+        Assert.Equal(2, persistedCommand.AttemptCount);
+        Assert.Equal(new[] { job.Id }, billing.ChargedGenerationIds);
+        Assert.Equal(1, billing.AppliedChargeCount);
+    }
+
+    [Fact]
     public async Task ProcessNextAsync_ShouldSanitizeDurableBillingFailureDiagnostics()
     {
         await using var dbContext = CreateDbContext();
@@ -741,6 +784,244 @@ public sealed class TemplateGenerationJobProcessorTests
             await cleanupContext.TemplateItems
                 .Where(item => item.Id == template.Id)
                 .ExecuteDeleteAsync();
+        }
+    }
+
+    [Fact]
+    public async Task ProviderReconciliationConcurrencyYield_ShouldReleaseAttemptLeaseImmediatelyOnPostgres()
+    {
+        var baseConnectionString = Environment.GetEnvironmentVariable(
+            "PETMAGIC_POSTGRES_INTEGRATION_CONNECTION_STRING");
+        if (string.IsNullOrWhiteSpace(baseConnectionString))
+        {
+            return;
+        }
+
+        var schema = $"provider_attempt_yield_{Guid.NewGuid():N}";
+        await CreateIsolatedPostgresSchemaAsync(baseConnectionString, schema);
+        var connectionString = new NpgsqlConnectionStringBuilder(baseConnectionString)
+        {
+            SearchPath = schema
+        }.ConnectionString;
+        var postgresOptions = new DbContextOptionsBuilder<TemplatesDbContext>()
+            .UseNpgsql(connectionString)
+            .Options;
+        var now = DateTime.UtcNow;
+        var template = CreateReadyImageTemplate();
+        var requestId = $"provider-yield-{Guid.NewGuid():N}";
+        var requestBaseUrl = $"https://queue.fal.test/{template.ImageModel}/requests/{requestId}";
+        var job = CreateGenerationJob(template, TemplateGenerationStatus.ProviderQueued, now);
+        job.CompletedAtUtc = null;
+        job.PreprocessingProviderRequestId = requestId;
+        job.PreprocessingProviderStatusUrl = $"{requestBaseUrl}/status";
+        job.PreprocessingProviderResponseUrl = $"{requestBaseUrl}/response";
+        job.PreprocessingProviderCancelUrl = $"{requestBaseUrl}/cancel";
+        job.CurrentProviderStage = "image_generation";
+        job.ProviderStatus = "IN_QUEUE";
+        job.ProviderStatusCheckedAtUtc = now.AddMinutes(-1);
+        job.ProviderSubmittedAtUtc = now.AddMinutes(-2);
+        job.UsedPreprocessingModel = template.ImageModel;
+        var attempt = new TemplateGenerationProviderAttempt
+        {
+            Id = Guid.NewGuid(),
+            GenerationJobId = job.Id,
+            Stage = TemplateGenerationProviderAttemptStage.ImageGeneration,
+            Ordinal = 1,
+            State = TemplateGenerationProviderAttemptState.ProviderQueued,
+            Provider = "fal",
+            SubmissionTokenHash = new string('C', 64),
+            ProviderRequestId = requestId,
+            ProviderStatusUrl = job.PreprocessingProviderStatusUrl,
+            ProviderResponseUrl = job.PreprocessingProviderResponseUrl,
+            ProviderCancelUrl = job.PreprocessingProviderCancelUrl,
+            NextPollAtUtc = now.AddSeconds(-1),
+            SubmissionDeadlineAtUtc = now.AddMinutes(5),
+            ProcessingDeadlineAtUtc = now.AddHours(1),
+            ReconciliationDeadlineAtUtc = now.AddHours(2),
+            SubmitAttemptCount = 1,
+            CreatedAtUtc = now.AddMinutes(-2),
+            UpdatedAtUtc = now.AddMinutes(-2),
+            SubmittedAtUtc = now.AddMinutes(-2)
+        };
+        var pollingHandler = new BlockingCompletedFalQueueHandler(requestId);
+
+        try
+        {
+            await using (var migrationContext = new TemplatesDbContext(postgresOptions))
+            {
+                await migrationContext.Database.MigrateAsync();
+            }
+
+            await using (var seedContext = new TemplatesDbContext(postgresOptions))
+            {
+                seedContext.TemplateItems.Add(template);
+                seedContext.TemplateGenerationJobs.Add(job);
+                seedContext.TemplateGenerationProviderAttempts.Add(attempt);
+                await seedContext.SaveChangesAsync();
+            }
+
+            await using var processorContext = new TemplatesDbContext(postgresOptions);
+            var attemptStore = CreateProviderAttemptStore(processorContext);
+            var processor = CreateProcessor(
+                processorContext,
+                imageGenerator: new AsyncSubmittingImageGenerator(),
+                falQueueClient: CreateFalQueueClient(processorContext, pollingHandler),
+                options: CreateOptions(generationSchedulerV2Enabled: true),
+                providerAttemptStore: attemptStore);
+            var processingTask = processor.ProcessNextProviderReconciliationAsync(CancellationToken.None);
+            var firstSignal = await Task.WhenAny(
+                    pollingHandler.StatusRequested.Task,
+                    processingTask)
+                .WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.Same(pollingHandler.StatusRequested.Task, firstSignal);
+
+            await using (var competingContext = new TemplatesDbContext(postgresOptions))
+            {
+                Assert.Equal(1, await competingContext.TemplateGenerationProviderAttempts
+                    .Where(candidate => candidate.Id == attempt.Id)
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(candidate => candidate.Version, candidate => candidate.Version + 1)));
+            }
+
+            pollingHandler.Release.TrySetResult();
+            Assert.True(await processingTask.WaitAsync(TimeSpan.FromSeconds(10)));
+
+            await using var verificationContext = new TemplatesDbContext(postgresOptions);
+            var yieldedAttempt = await verificationContext.TemplateGenerationProviderAttempts
+                .AsNoTracking()
+                .SingleAsync(candidate => candidate.Id == attempt.Id);
+            Assert.Null(yieldedAttempt.LockedBy);
+            Assert.Null(yieldedAttempt.LockedAtUtc);
+
+            var nextStore = CreateProviderAttemptStore(verificationContext);
+            var nextClaim = await nextStore.ClaimDueAsync(
+                "next-reconciliation-worker",
+                TimeSpan.FromMinutes(1),
+                CancellationToken.None);
+            Assert.NotNull(nextClaim);
+            Assert.Equal(attempt.Id, nextClaim!.AttemptId);
+        }
+        finally
+        {
+            pollingHandler.Release.TrySetResult();
+            await DropIsolatedPostgresSchemaAsync(baseConnectionString, schema);
+        }
+    }
+
+    [Fact]
+    public async Task VideoInterstageCancellationRacingClaim_ShouldNeverSubmitMotionOnPostgres()
+    {
+        var baseConnectionString = Environment.GetEnvironmentVariable(
+            "PETMAGIC_POSTGRES_INTEGRATION_CONNECTION_STRING");
+        if (string.IsNullOrWhiteSpace(baseConnectionString))
+        {
+            return;
+        }
+
+        var schema = $"video_interstage_cancel_race_{Guid.NewGuid():N}";
+        await CreateIsolatedPostgresSchemaAsync(baseConnectionString, schema);
+        var connectionString = new NpgsqlConnectionStringBuilder(baseConnectionString)
+        {
+            SearchPath = schema
+        }.ConnectionString;
+        var postgresOptions = new DbContextOptionsBuilder<TemplatesDbContext>()
+            .UseNpgsql(connectionString)
+            .Options;
+        var now = DateTime.UtcNow;
+        var template = CreateReadyTemplate();
+        var job = CreateGenerationJob(template, TemplateGenerationStatus.ProviderQueued, now);
+        job.CompletedAtUtc = null;
+        job.CurrentProviderStage = "video_preprocessing";
+        job.ProviderStatus = "COMPLETED";
+        job.ProviderCompletedAtUtc = now.AddSeconds(-2);
+        job.PreprocessingCompletedAtUtc = now.AddSeconds(-2);
+        job.NormalizedImageUrl = "https://cdn.example.test/normalized-motion-ready.jpg";
+        job.MotionProviderRequestId = null;
+        var policy = CreateRuntimePolicySnapshot(now);
+        var blockingPolicyProvider = new BlockingGenerationRuntimePolicyProvider(policy);
+        var options = CreateOptions(
+            aiProvider: TemplateAiProviders.Fal,
+            generationSchedulerV2Enabled: true);
+        var runtimeSnapshot = CreateProviderRuntimeSnapshot(
+            TemplateProviderBalanceState.Fresh,
+            20m,
+            now);
+        var billing = new TestTemplateGenerationBilling();
+        var motionGenerator = new AsyncSubmittingVideoMotionGenerator();
+
+        try
+        {
+            await using (var migrationContext = new TemplatesDbContext(postgresOptions))
+            {
+                await migrationContext.Database.MigrateAsync();
+            }
+
+            await using (var seedContext = new TemplatesDbContext(postgresOptions))
+            {
+                seedContext.TemplateItems.Add(template);
+                seedContext.TemplateGenerationJobs.Add(job);
+                await seedContext.SaveChangesAsync();
+            }
+
+            await using var processorContext = new TemplatesDbContext(postgresOptions);
+            var snapshotService = new FixedFalRuntimeSnapshotService(runtimeSnapshot);
+            var attemptStore = new TemplateGenerationProviderAttemptStore(
+                processorContext,
+                blockingPolicyProvider,
+                snapshotService,
+                options);
+            var processor = CreateProcessor(
+                processorContext,
+                billing: billing,
+                videoMotionGenerator: motionGenerator,
+                options: options,
+                providerAttemptStore: attemptStore,
+                runtimePolicyProvider: blockingPolicyProvider,
+                providerRuntimeSnapshotService: snapshotService);
+
+            var processingTask = processor.ProcessNextProviderReconciliationAsync(CancellationToken.None);
+            var firstSignal = await Task.WhenAny(
+                    blockingPolicyProvider.Requested.Task,
+                    processingTask)
+                .WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.Same(blockingPolicyProvider.Requested.Task, firstSignal);
+
+            await using var cancellationContext = new TemplatesDbContext(postgresOptions);
+            var cancellationService = new TemplateGenerationService(
+                cancellationContext,
+                billing,
+                new TrackingMediaStorage(),
+                options,
+                realtimeService: new RecordingTemplateFeedRealtimeService());
+            var cancellation = await cancellationService.CancelAdminAsync(
+                Guid.NewGuid(),
+                job.Id,
+                CancellationToken.None);
+
+            Assert.True(cancellation.IsSuccess);
+            Assert.False(cancellation.Value.IsPending);
+            blockingPolicyProvider.Release.TrySetResult();
+            Assert.True(await processingTask.WaitAsync(TimeSpan.FromSeconds(10)));
+
+            await using var verificationContext = new TemplatesDbContext(postgresOptions);
+            var persisted = await verificationContext.TemplateGenerationJobs
+                .AsNoTracking()
+                .SingleAsync(candidate => candidate.Id == job.Id);
+            Assert.Equal(TemplateGenerationStatus.Cancelled, persisted.Status);
+            Assert.Equal("CANCELLED_BETWEEN_STAGES", persisted.ProviderStatus);
+            Assert.Null(persisted.MotionProviderRequestId);
+            Assert.Null(persisted.LockedBy);
+            Assert.NotNull(persisted.RefundedAtUtc);
+            Assert.Equal(0, motionGenerator.SubmitCount);
+            Assert.Equal(new[] { job.Id }, billing.RefundedGenerationIds);
+            Assert.Empty(await verificationContext.TemplateGenerationProviderAttempts
+                .Where(attempt => attempt.GenerationJobId == job.Id)
+                .ToArrayAsync());
+        }
+        finally
+        {
+            blockingPolicyProvider.Release.TrySetResult();
+            await DropIsolatedPostgresSchemaAsync(baseConnectionString, schema);
         }
     }
 
@@ -3833,6 +4114,8 @@ public sealed class TemplateGenerationJobProcessorTests
 
     private sealed class AsyncSubmittingVideoMotionGenerator : IVideoMotionGenerator, IAsyncVideoMotionGenerationQueue
     {
+        public int SubmitCount { get; private set; }
+
         public Task<Result<VideoMotionGenerationResult>> CreateAsync(
             string normalizedImageUrl,
             string referenceVideoUrl,
@@ -3859,6 +4142,7 @@ public sealed class TemplateGenerationJobProcessorTests
             int? seed,
             CancellationToken cancellationToken)
         {
+            SubmitCount++;
             return Task.FromResult(Result.Success(new ProviderQueueSubmission(
                 "video-provider-request-1",
                 "https://queue.fal.run/fal-ai/test/status/video-provider-request-1",
@@ -4208,7 +4492,13 @@ public sealed class TemplateGenerationJobProcessorTests
 
     private sealed class TestTemplateGenerationBilling : ITemplateGenerationBilling
     {
+        private readonly ConcurrentDictionary<Guid, byte> appliedCharges = new();
+
+        public ConcurrentBag<Guid> ChargedGenerationIds { get; } = [];
+
         public ConcurrentBag<Guid> RefundedGenerationIds { get; } = [];
+
+        public int AppliedChargeCount => appliedCharges.Count;
 
         public Error? ChargeError { get; init; }
 
@@ -4216,7 +4506,18 @@ public sealed class TemplateGenerationJobProcessorTests
 
         public Task<Result> ChargeAsync(Guid userId, Guid generationId, int tokenCost, CancellationToken cancellationToken)
         {
+            ChargedGenerationIds.Add(generationId);
+            if (ChargeError is null)
+            {
+                appliedCharges.TryAdd(generationId, 0);
+            }
+
             return Task.FromResult(ChargeError is null ? Result.Success() : Result.Failure(ChargeError));
+        }
+
+        public void SeedAppliedCharge(Guid generationId)
+        {
+            appliedCharges.TryAdd(generationId, 0);
         }
 
         public Task<Result> RefundAsync(Guid userId, Guid generationId, int tokenCost, CancellationToken cancellationToken)
@@ -4241,6 +4542,22 @@ public sealed class TemplateGenerationJobProcessorTests
     {
         public Task<TemplateGenerationRuntimePolicySnapshot> GetRuntimePolicyAsync(
             CancellationToken cancellationToken) => Task.FromResult(policy);
+    }
+
+    private sealed class BlockingGenerationRuntimePolicyProvider(
+        TemplateGenerationRuntimePolicySnapshot policy) : ITemplateGenerationRuntimePolicyProvider
+    {
+        public TaskCompletionSource Requested { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async Task<TemplateGenerationRuntimePolicySnapshot> GetRuntimePolicyAsync(
+            CancellationToken cancellationToken)
+        {
+            Requested.TrySetResult();
+            await Release.Task.WaitAsync(cancellationToken);
+            return policy;
+        }
     }
 
     private sealed class FixedFalRuntimeSnapshotService(
